@@ -65,26 +65,26 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 
 	// 获取真实客户端IP
 	clientIP := m.getClientIP(r)
-	
+
 	// 透明代理 - 正确设置所有必要的头部
 	scheme := "https"
 	if r.TLS == nil {
 		scheme = "http"
 	}
-	
+
 	// 设置标准的代理头部
 	r.Header.Set("X-Forwarded-Proto", scheme)
 	r.Header.Set("X-Forwarded-Host", r.Host)
 	r.Header.Set("X-Forwarded-Port", m.getPort(r))
 	r.Header.Set("X-Real-IP", clientIP)
-	
+
 	// 正确处理 X-Forwarded-For 链
 	if existing := r.Header.Get("X-Forwarded-For"); existing != "" {
 		r.Header.Set("X-Forwarded-For", existing+", "+clientIP)
 	} else {
 		r.Header.Set("X-Forwarded-For", clientIP)
 	}
-	
+
 	// 设置原始请求信息
 	r.Header.Set("X-Forwarded-Server", "withssl")
 	r.Header.Set("X-Original-URI", r.RequestURI)
@@ -114,25 +114,25 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
-	
+
 	// 自定义 Director 函数以实现真正的透明代理
 	originalDirector := proxy.Director
 	proxy.Director = func(req *http.Request) {
 		// 调用原始 Director
 		originalDirector(req)
-		
+
 		// 保持原始的 Host 头，实现透明代理
 		req.Header.Set("Host", req.Host)
-		
+
 		// 移除 Hop-by-hop 头部
 		hopHeaders := []string{
 			"Connection",
-			"Proxy-Connection", 
+			"Proxy-Connection",
 			"Keep-Alive",
 			"Proxy-Authenticate",
 			"Proxy-Authorization",
 			"Te",
-			"Trailers", 
+			"Trailers",
 			"Transfer-Encoding",
 			"Upgrade",
 		}
@@ -203,12 +203,12 @@ func (m *Manager) getClientIP(r *http.Request) string {
 	if cfIP := r.Header.Get("CF-Connecting-IP"); cfIP != "" && m.isValidIP(cfIP) {
 		return cfIP
 	}
-	
+
 	// 2. 检查 X-Real-IP
 	if xri := r.Header.Get("X-Real-IP"); xri != "" && m.isValidIP(xri) {
 		return xri
 	}
-	
+
 	// 3. 检查 X-Forwarded-For (取第一个非内网IP)
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		ips := strings.Split(xff, ",")
@@ -226,16 +226,16 @@ func (m *Manager) getClientIP(r *http.Request) string {
 			}
 		}
 	}
-	
+
 	// 4. 检查其他常见头部
 	headers := []string{
 		"X-Client-IP",
 		"X-Forwarded",
 		"X-Cluster-Client-IP",
-		"Forwarded-For", 
+		"Forwarded-For",
 		"Forwarded",
 	}
-	
+
 	for _, header := range headers {
 		if ip := r.Header.Get(header); ip != "" && m.isValidIP(ip) {
 			return ip
@@ -262,7 +262,7 @@ func (m *Manager) isPrivateIP(ip string) bool {
 	if parsedIP == nil {
 		return false
 	}
-	
+
 	// 检查IPv4内网地址
 	if parsedIP.To4() != nil {
 		// 10.0.0.0/8
@@ -282,12 +282,12 @@ func (m *Manager) isPrivateIP(ip string) bool {
 			return true
 		}
 	}
-	
+
 	// 检查IPv6内网地址
 	if parsedIP.IsLoopback() || parsedIP.IsLinkLocalUnicast() || parsedIP.IsLinkLocalMulticast() {
 		return true
 	}
-	
+
 	return false
 }
 
