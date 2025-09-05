@@ -1053,13 +1053,19 @@ func (s *Server) formatDuration(d time.Duration) string {
 // HTML生成函数
 
 func (s *Server) generateProxyManagementHTML(data map[string]interface{}) string {
+	title := s.translator.T("proxy.title")
+	addRule := s.translator.T("proxy.add_rule")
+	thDomain := s.translator.T("proxy.domain")
+	thTarget := s.translator.T("proxy.target")
+	thStatus := s.translator.T("proxy.status")
+	thActions := s.translator.T("proxy.actions")
 	return fmt.Sprintf(`
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>代理配置 - SSLcat</title>
+    <title>%s - SSLcat</title>
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
 </head>
@@ -1069,9 +1075,9 @@ func (s *Server) generateProxyManagementHTML(data map[string]interface{}) string
             <div class="col-md-2">%s</div>
             <main class="col-md-10">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">代理配置</h1>
+                    <h1 class="h2">%s</h1>
                     <a href="%s/proxy/add" class="btn btn-primary">
-                        <i class="bi bi-plus-circle"></i> 添加代理规则
+                        <i class="bi bi-plus-circle"></i> %s
                     </a>
                 </div>
                 
@@ -1081,10 +1087,10 @@ func (s *Server) generateProxyManagementHTML(data map[string]interface{}) string
                             <table class="table table-striped">
                                 <thead>
                                     <tr>
-                                        <th>域名</th>
-                                        <th>目标地址</th>
-                                        <th>状态</th>
-                                        <th>操作</th>
+                                        <th>%s</th>
+                                        <th>%s</th>
+                                        <th>%s</th>
+                                        <th>%s</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1100,15 +1106,22 @@ func (s *Server) generateProxyManagementHTML(data map[string]interface{}) string
     <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>`,
+		title,
 		s.generateSidebar(data["AdminPrefix"].(string), "proxy"),
+		title,
 		data["AdminPrefix"].(string),
+		addRule,
+		thDomain,
+		thTarget,
+		thStatus,
+		thActions,
 		s.generateProxyRulesTable(data))
 }
 
 func (s *Server) generateProxyRulesTable(data map[string]interface{}) string {
 	rules, ok := data["Rules"].([]config.ProxyRule)
 	if !ok || len(rules) == 0 {
-		return `<tr><td colspan="4" class="text-center">暂无代理规则</td></tr>`
+		return `<tr><td colspan="4" class="text-center">` + s.translator.T("proxy.no_rules") + `</td></tr>`
 	}
 
 	var rows strings.Builder
@@ -1117,10 +1130,10 @@ func (s *Server) generateProxyRulesTable(data map[string]interface{}) string {
                     <tr>
                         <td>%s</td>
                         <td>%s</td>
-                        <td><span class="badge bg-success">活跃</span></td>
+                        <td><span class="badge bg-success">` + s.translator.T("proxy.active") + `</span></td>
                         <td>
-                            <a href="%s/proxy/edit?index=%d" class="btn btn-sm btn-outline-primary">编辑</a>
-                            <a href="%s/proxy/delete?index=%d" class="btn btn-sm btn-outline-danger" onclick="return confirm('确定删除此规则吗？')">删除</a>
+                            <a href="%s/proxy/edit?index=%d" class="btn btn-sm btn-outline-primary">` + s.translator.T("proxy.edit") + `</a>
+                            <a href="%s/proxy/delete?index=%d" class="btn btn-sm btn-outline-danger" onclick="return confirm('` + s.translator.T("proxy.delete_confirm") + `')">` + s.translator.T("proxy.delete") + `</a>
                         </td>
                     </tr>`,
 			rule.Domain, rule.Target, data["AdminPrefix"].(string), i, data["AdminPrefix"].(string), i))
