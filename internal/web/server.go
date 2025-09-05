@@ -18,6 +18,7 @@ import (
 	"github.com/xurenlu/sslcat/internal/ssl"
 
 	"github.com/sirupsen/logrus"
+	"github.com/xurenlu/sslcat/internal/assets"
 )
 
 // Server Web服务器
@@ -40,8 +41,23 @@ type Server struct {
 
 // NewServer 创建Web服务器
 func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Manager, sslMgr *ssl.Manager) *Server {
-	// 初始化翻译器
-	translator := i18n.NewTranslator(i18n.LangZhCN, "internal/assets/i18n")
+	// 初始化翻译器（从嵌入读取）
+	translator := i18n.NewTranslator(i18n.LangZhCN, "")
+	// 通过嵌入 i18n 文件加载翻译
+	if files, err := assets.ListI18nFiles(); err == nil {
+		for _, f := range files {
+			if b, err := assets.ReadI18nFile(f); err == nil {
+				code := i18n.SupportedLanguage(strings.TrimSuffix(f, ".json"))
+				_ = translator.SaveTranslations(code, func() map[string]string {
+					m := make(map[string]string)
+					_ = json.Unmarshal(b, &m)
+					return m
+				}())
+			}
+		}
+	} else {
+		logrus.Warnf("读取嵌入的 i18n 文件失败: %v", err)
+	}
 
 	// 初始化模板渲染器
 	templateRenderer := NewTemplateRenderer(translator)

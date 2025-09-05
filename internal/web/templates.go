@@ -60,8 +60,7 @@ func (tr *TemplateRenderer) loadTemplates() error {
 		"supportedLangs": func() map[i18n.SupportedLanguage]*i18n.LanguageInfo {
 			return tr.translator.GetSupportedLanguages()
 		},
-		
-		
+
 		// 通用工具函数
 		"formatNumber": func(n interface{}) string {
 			switch v := n.(type) {
@@ -102,7 +101,7 @@ func (tr *TemplateRenderer) loadTemplates() error {
 			default:
 				return fmt.Sprintf("%v", bytes)
 			}
-			
+
 			const unit = 1024
 			if b < unit {
 				return fmt.Sprintf("%d B", b)
@@ -126,7 +125,7 @@ func (tr *TemplateRenderer) loadTemplates() error {
 			default:
 				return fmt.Sprintf("%v", seconds)
 			}
-			
+
 			if s < 60 {
 				return fmt.Sprintf("%ds", s)
 			} else if s < 3600 {
@@ -193,8 +192,10 @@ func (tr *TemplateRenderer) Render(w http.ResponseWriter, templateName string, d
 func (tr *TemplateRenderer) RenderWithLang(w http.ResponseWriter, templateName string, lang i18n.SupportedLanguage, data interface{}) error {
 	// 临时切换语言
 	originalLang := tr.translator.GetCurrentLanguage()
-	if err := tr.translator.SetLanguage(lang); err != nil {
-		tr.log.Warnf("切换语言失败 %s: %v", lang, err)
+	if lang != originalLang {
+		if err := tr.translator.SetLanguage(lang); err != nil {
+			tr.log.Warnf("切换语言失败 %s: %v", lang, err)
+		}
 	}
 
 	// 渲染模板
@@ -210,22 +211,35 @@ func (tr *TemplateRenderer) RenderWithLang(w http.ResponseWriter, templateName s
 
 // DetectLanguageAndRender 检测语言并渲染模板
 func (tr *TemplateRenderer) DetectLanguageAndRender(w http.ResponseWriter, r *http.Request, templateName string, data interface{}) error {
-	// 从请求中检测语言
-	acceptLanguage := r.Header.Get("Accept-Language")
-	detectedLang := tr.translator.DetectLanguageFromRequest(acceptLanguage)
+	var detectedLang i18n.SupportedLanguage
 
-	// 检查是否有语言参数
+	// 1) URL 参数优先
 	if langParam := r.URL.Query().Get("lang"); langParam != "" {
 		if supportedLang := i18n.SupportedLanguage(langParam); tr.isSupportedLanguage(supportedLang) {
 			detectedLang = supportedLang
+			// 设置持久 Cookie
+			http.SetCookie(w, &http.Cookie{
+				Name:   "language",
+				Value:  string(supportedLang),
+				Path:   "/",
+				MaxAge: 365 * 24 * 3600,
+			})
 		}
 	}
 
-	// 检查Cookie中的语言设置
-	if cookie, err := r.Cookie("language"); err == nil {
-		if supportedLang := i18n.SupportedLanguage(cookie.Value); tr.isSupportedLanguage(supportedLang) {
-			detectedLang = supportedLang
+	// 2) Cookie 其次（若 URL 未指定）
+	if detectedLang == "" {
+		if cookie, err := r.Cookie("language"); err == nil {
+			if supportedLang := i18n.SupportedLanguage(cookie.Value); tr.isSupportedLanguage(supportedLang) {
+				detectedLang = supportedLang
+			}
 		}
+	}
+
+	// 3) Accept-Language 最后
+	if detectedLang == "" {
+		acceptLanguage := r.Header.Get("Accept-Language")
+		detectedLang = tr.translator.DetectLanguageFromRequest(acceptLanguage)
 	}
 
 	return tr.RenderWithLang(w, templateName, detectedLang, data)

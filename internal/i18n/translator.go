@@ -297,10 +297,14 @@ func (t *Translator) SetLanguage(lang SupportedLanguage) error {
 	}
 
 	t.mutex.Lock()
+	changed := t.currentLang != lang
 	t.currentLang = lang
 	t.mutex.Unlock()
 
-	t.log.Infof("语言已切换到: %s", lang)
+	if changed {
+		// 降低日志噪音
+		t.log.Debugf("语言切换为: %s", lang)
+	}
 	return nil
 }
 
