@@ -160,12 +160,12 @@ func main() {
 		}
 	}()
 
-	// 如果是443端口，同时启动80端口的HTTP重定向服务器
+	// 如果是443端口，同时启动80端口的HTTP重定向服务器，并处理 ACME HTTP-01 挑战
 	if cfg.Server.Port == 443 {
 		go func() {
 			redirectServer := &http.Server{
 				Addr: fmt.Sprintf("%s:80", cfg.Server.Host),
-				Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				Handler: sslManager.HTTPChallengeHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					// 检查是否是管理面板路径或API路径
 					if strings.HasPrefix(r.URL.Path, cfg.AdminPrefix) {
 						// 管理面板路径重定向到HTTPS
@@ -183,7 +183,7 @@ func main() {
 					// 没有配置的域名重定向到HTTPS
 					httpsURL := fmt.Sprintf("https://%s%s", r.Host, r.RequestURI)
 					http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
-				}),
+				})),
 				ReadTimeout:  10 * time.Second,
 				WriteTimeout: 10 * time.Second,
 			}

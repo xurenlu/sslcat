@@ -1,6 +1,7 @@
 package ssl
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -9,6 +10,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,6 +21,8 @@ import (
 	"github.com/xurenlu/sslcat/internal/notify"
 
 	"github.com/sirupsen/logrus"
+	"golang.org/x/crypto/acme"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 // Manager SSL证书管理器
@@ -30,6 +34,8 @@ type Manager struct {
 	log        *logrus.Entry
 	notifier   *notify.Notifier
 	lastNotify map[string]string
+	acmeMgr    *autocert.Manager
+	defaultCert *tls.Certificate
 }
 
 // NewManager 创建SSL管理器
@@ -45,6 +51,44 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 		log:        log,
 		notifier:   notify.NewFromEnv(),
 		lastNotify: make(map[string]string),
+	}
+
+	// 初始化一个默认自签证书（用于未允许域名回退，避免写盘）
+	if cert, err := manager.generateSelfSignedCert("localhost"); err == nil {
+		manager.defaultCert = cert
+	}
+
+	// 初始化 ACME/Let's Encrypt（当配置了 Email 且仅允许配置域名时启用）
+	if strings.TrimSpace(cfg.SSL.Email) != "" {
+		acmeCacheDir := filepath.Join(filepath.Dir(cfg.SSL.CertDir), "acme-cache")
+		if err := os.MkdirAll(acmeCacheDir, 0755); err != nil {
+			log.Warnf("创建 ACME 缓存目录失败: %v", err)
+		}
+
+		m := &autocert.Manager{
+			Prompt: autocert.AcceptTOS,
+			Cache:  autocert.DirCache(acmeCacheDir),
+			Email:  cfg.SSL.Email,
+			HostPolicy: func(ctx context.Context, host string) error {
+				host = strings.ToLower(host)
+				if manager.isAllowedDomain(host) {
+					return nil
+				}
+				return fmt.Errorf("acme: host not allowed: %s", host)
+			},
+		}
+
+		client := &acme.Client{}
+		if cfg.SSL.Staging {
+			client.DirectoryURL = acme.LetsEncryptStagingURL
+		} else {
+			client.DirectoryURL = acme.LetsEncryptURL
+		}
+		m.Client = client
+		manager.acmeMgr = m
+		log.Infof("ACME 已启用（邮箱: %s, staging=%v）", cfg.SSL.Email, cfg.SSL.Staging)
+	} else {
+		log.Infof("ACME 未启用（未配置 ssl.email）")
 	}
 
 	return manager, nil
@@ -427,25 +471,107 @@ func matchDomain(domain, pattern string) bool {
 
 // GetTLSConfig 获取用于HTTPS服务器的TLS配置
 func (m *Manager) GetTLSConfig() *tls.Config {
+	// 若启用 ACME，优先使用 ACME 的证书获取逻辑（仅允许域名）
+	if m.acmeMgr != nil {
+		return &tls.Config{
+			GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+				host := hello.ServerName
+				if host == "" {
+					host = "localhost"
+				}
+				if m.isAllowedDomain(host) {
+					if cert, err := m.acmeMgr.GetCertificate(hello); err == nil {
+						return cert, nil
+					}
+				}
+				// 回退到本地（文件/缓存）或默认自签
+				if cert, err := m.GetCertificate(host); err == nil {
+					return cert, nil
+				}
+				if m.defaultCert != nil {
+					return m.defaultCert, nil
+				}
+				return nil, fmt.Errorf("no certificate available for %s", host)
+			},
+			NextProtos: []string{"h2", "http/1.1", "acme-tls/1"},
+			MinVersion: tls.VersionTLS12,
+		}
+	}
+
+	// 默认：使用本地缓存/磁盘并在缺失时自签
 	return &tls.Config{
 		GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-			domain := hello.ServerName
-			if domain == "" {
-				domain = "localhost"
+			host := hello.ServerName
+			if host == "" {
+				host = "localhost"
 			}
-
-			m.log.Debugf("请求域名: %s 的SSL证书", domain)
-			cert, err := m.GetCertificate(domain)
-			if err != nil {
-				m.log.Errorf("获取证书失败 %s: %v", domain, err)
-				return nil, err
+			if cert, err := m.GetCertificate(host); err == nil {
+				return cert, nil
 			}
-
-			return cert, nil
+			if m.defaultCert != nil {
+				return m.defaultCert, nil
+			}
+			return nil, fmt.Errorf("no certificate available for %s", host)
 		},
-		NextProtos: []string{"h2", "http/1.1"}, // 支持 HTTP/2
-		MinVersion: tls.VersionTLS12,           // 最低 TLS 1.2
+		NextProtos: []string{"h2", "http/1.1"},
+		MinVersion: tls.VersionTLS12,
 	}
+}
+
+// HTTPChallengeHandler 包裹 HTTP 服务器以处理 ACME HTTP-01 挑战
+func (m *Manager) HTTPChallengeHandler(h http.Handler) http.Handler {
+	if m.acmeMgr != nil {
+		return m.acmeMgr.HTTPHandler(h)
+	}
+	return h
+}
+
+// EnsureDomainCert 主动为指定域名申请（或加载）证书（当启用 ACME 时）
+func (m *Manager) EnsureDomainCert(domain string) error {
+	if m.acmeMgr == nil {
+		return nil
+	}
+	domain = strings.ToLower(strings.TrimSpace(domain))
+	if domain == "" {
+		return fmt.Errorf("empty domain")
+	}
+	if !m.isAllowedDomain(domain) {
+		return fmt.Errorf("domain not allowed by policy: %s", domain)
+	}
+	_, err := m.acmeMgr.GetCertificate(&tls.ClientHelloInfo{ServerName: domain})
+	if err != nil {
+		m.log.Warnf("ACME 申请证书失败 %s: %v", domain, err)
+	}
+	return err
+}
+
+// isAllowedDomain 仅允许配置中的域名（代理规则或 ssl.domains）
+func (m *Manager) isAllowedDomain(host string) bool {
+	host = strings.ToLower(host)
+	// 显式配置的 ssl.domains
+	for _, d := range m.config.SSL.Domains {
+		d = strings.ToLower(strings.TrimSpace(d))
+		if d == "" {
+			continue
+		}
+		if host == d || matchDomain(host, d) {
+			return true
+		}
+	}
+	// 代理规则中启用的域名
+	for _, r := range m.config.Proxy.Rules {
+		if !r.Enabled {
+			continue
+		}
+		d := strings.ToLower(strings.TrimSpace(r.Domain))
+		if d == "" {
+			continue
+		}
+		if host == d || matchDomain(host, d) {
+			return true
+		}
+	}
+	return false
 }
 
 // GenerateMultiDomainCert 生成多域名自签名证书

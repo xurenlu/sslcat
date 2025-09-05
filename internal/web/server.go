@@ -506,6 +506,13 @@ func (s *Server) handleProxyAdd(w http.ResponseWriter, r *http.Request) {
 			// 保存配置
 			s.config.Save(s.config.ConfigFile)
 
+			// 尝试为该域名预取/申请证书（若启用 ACME）
+			if s.sslManager != nil {
+				if err := s.sslManager.EnsureDomainCert(domain); err != nil {
+					s.log.Warnf("预取证书失败 %s: %v", domain, err)
+				}
+			}
+
 			// 重定向回代理管理页面
 			http.Redirect(w, r, s.config.AdminPrefix+"/proxy", http.StatusFound)
 			return
@@ -545,6 +552,13 @@ func (s *Server) handleProxyEdit(w http.ResponseWriter, r *http.Request) {
 
 			// 保存配置
 			s.config.Save(s.config.ConfigFile)
+
+			// 尝试为该域名预取/申请证书（若启用 ACME）
+			if s.sslManager != nil {
+				if err := s.sslManager.EnsureDomainCert(domain); err != nil {
+					s.log.Warnf("预取证书失败 %s: %v", domain, err)
+				}
+			}
 
 			// 重定向回代理管理页面
 			http.Redirect(w, r, s.config.AdminPrefix+"/proxy", http.StatusFound)
