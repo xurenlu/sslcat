@@ -1409,13 +1409,32 @@ func (s *Server) generateSSLGenerateHTML(data map[string]interface{}) string {
 }
 
 func (s *Server) generateSecurityManagementHTML(data map[string]interface{}) string {
+	title := s.translator.T("security.title")
+	blockedIPs := s.translator.T("security.blocked_ips")
+	thIP := s.translator.T("security.ip")
+	thBlockTime := s.translator.T("security.block_time")
+	thActions := s.translator.T("security.actions")
+	securityConfig := s.translator.T("security.config")
+	maxAttempts := s.translator.T("security.max_attempts")
+	maxAttempts5 := s.translator.T("security.max_attempts_5min")
+	blockDuration := s.translator.T("security.block_duration")
+	uaCheck := s.translator.T("security.ua_check")
+	auditLog := s.translator.T("security.audit_log")
+	exportJSON := s.translator.T("security.export_json")
+	auditTime := s.translator.T("audit.time")
+	auditUser := s.translator.T("audit.user_ip")
+	auditAction := s.translator.T("audit.action")
+	auditDetail := s.translator.T("audit.detail")
+	loading := s.translator.T("security.loading")
+	noRecords := s.translator.T("security.no_records")
+	loadFailed := s.translator.T("security.load_failed")
 	return fmt.Sprintf(`
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>安全设置 - SSLcat</title>
+    <title>%s - SSLcat</title>
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
 </head>
@@ -1425,23 +1444,23 @@ func (s *Server) generateSecurityManagementHTML(data map[string]interface{}) str
             <div class="col-md-2">%s</div>
             <main class="col-md-10">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">安全设置</h1>
+                    <h1 class="h2">%s</h1>
                 </div>
                 
                 <div class="row">
                     <div class="col-md-6">
                         <div class="card">
                             <div class="card-header">
-                                <h5 class="mb-0">被封禁的IP地址</h5>
+                                <h5 class="mb-0">%s</h5>
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">
                                     <table class="table table-sm">
                                         <thead>
                                             <tr>
-                                                <th>IP地址</th>
-                                                <th>封禁时间</th>
-                                                <th>操作</th>
+                                                <th>%s</th>
+                                                <th>%s</th>
+                                                <th>%s</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -1455,38 +1474,38 @@ func (s *Server) generateSecurityManagementHTML(data map[string]interface{}) str
                     <div class="col-md-6">
                         <div class="card">
                             <div class="card-header">
-                                <h5 class="mb-0">安全配置</h5>
+                                <h5 class="mb-0">%s</h5>
                             </div>
                             <div class="card-body">
-                                <p><strong>最大失败次数:</strong> 3次/分钟</p>
-                                <p><strong>扩展失败次数:</strong> 10次/5分钟</p>
-                                <p><strong>封禁时长:</strong> 1小时</p>
-                                <p><strong>User-Agent检查:</strong> 启用</p>
+                                <p><strong>%s:</strong> 3/1min</p>
+                                <p><strong>%s:</strong> 10/5min</p>
+                                <p><strong>%s:</strong> 1h</p>
+                                <p><strong>%s:</strong> ON</p>
                             </div>
                         </div>
                     </div>
                 </div>
-
+ 
                 <div class="row mt-3">
                     <div class="col-12">
                         <div class="card">
                             <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0">审计日志</h5>
-                                <a class="btn btn-sm btn-outline-secondary" href="%s/api/audit?download=1">导出JSON</a>
+                                <h5 class="mb-0">%s</h5>
+                                <a class="btn btn-sm btn-outline-secondary" href="%s/api/audit?download=1">%s</a>
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">
                                     <table class="table table-sm table-striped">
                                         <thead>
                                             <tr>
-                                                <th style="width: 22%%">时间</th>
-                                                <th style="width: 18%%">用户/IP</th>
-                                                <th style="width: 20%%">操作</th>
-                                                <th>详情</th>
+                                                <th style="width: 22%">%s</th>
+                                                <th style="width: 18%">%s</th>
+                                                <th style="width: 20%">%s</th>
+                                                <th>%s</th>
                                             </tr>
                                         </thead>
                                         <tbody id="audit-body">
-                                            <tr><td colspan="4" class="text-center text-muted">加载中...</td></tr>
+                                            <tr><td colspan="4" class="text-center text-muted">%s</td></tr>
                                         </tbody>
                                     </table>
                                 </div>
@@ -1505,7 +1524,7 @@ func (s *Server) generateSecurityManagementHTML(data map[string]interface{}) str
         body.innerHTML = '';
         const logs = (data && data.logs) || [];
         if (logs.length === 0) {
-          body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">暂无记录</td></tr>';
+          body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">%s</td></tr>';
           return;
         }
         logs.slice(-100).forEach(it=>{
@@ -1518,31 +1537,46 @@ func (s *Server) generateSecurityManagementHTML(data map[string]interface{}) str
         });
       }).catch(()=>{
         const body = document.getElementById('audit-body');
-        body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">加载失败</td></tr>';
+        body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">%s</td></tr>';
       });
     })();
     </script>
 </body>
 </html>`,
+		title,
 		s.generateSidebar(data["AdminPrefix"].(string), "security"),
+		title,
+		blockedIPs,
+		thIP, thBlockTime, thActions,
 		s.generateBlockedIPsTable(data),
-		data["AdminPrefix"].(string),
-		data["AdminPrefix"].(string))
+		securityConfig,
+		maxAttempts, maxAttempts5, blockDuration, uaCheck,
+		auditLog, data["AdminPrefix"].(string), exportJSON,
+		auditTime, auditUser, auditAction, auditDetail, loading,
+		data["AdminPrefix"].(string), noRecords, loadFailed)
 }
 
 func (s *Server) generateBlockedIPsTable(data map[string]interface{}) string {
 	// 暂时返回示例，实际应该从SecurityManager获取
-	return `<tr><td colspan="3" class="text-center">暂无被封禁的IP</td></tr>`
+	return `<tr><td colspan="3" class="text-center">` + s.translator.T("security.no_blocked") + `</td></tr>`
 }
 
 func (s *Server) generateSettingsHTML(data map[string]interface{}) string {
+	title := s.translator.T("settings.title")
+	adminPrefixLabel := s.translator.T("settings.admin_prefix")
+	adminUserLabel := s.translator.T("settings.admin_username")
+	adminPassLabel := s.translator.T("settings.admin_password")
+	saveBtn := s.translator.T("settings.save")
+	exportBtn := s.translator.T("settings.export")
+	importPreview := s.translator.T("settings.import_preview")
+	viewLastDiff := s.translator.T("settings.view_last_diff")
 	return fmt.Sprintf(`
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>系统设置 - SSLcat</title>
+    <title>%s - SSLcat</title>
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
@@ -1551,31 +1585,31 @@ func (s *Server) generateSettingsHTML(data map[string]interface{}) string {
             <div class="col-md-2">%s</div>
             <main class="col-md-10">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">系统设置</h1>
+                    <h1 class="h2">%s</h1>
                 </div>
                 
                 <div class="card">
                     <div class="card-body">
                         <form method="POST" action="%s/settings/save">
                             <div class="mb-3">
-                                <label for="admin_prefix" class="form-label">管理面板路径</label>
+                                <label for="admin_prefix" class="form-label">%s</label>
                                 <input type="text" class="form-control" id="admin_prefix" name="admin_prefix" 
                                        value="%s">
                             </div>
                             <div class="mb-3">
-                                <label for="admin_username" class="form-label">管理员用户名</label>
+                                <label for="admin_username" class="form-label">%s</label>
                                 <input type="text" class="form-control" id="admin_username" name="admin_username" 
                                        value="%s">
                             </div>
                             <div class="mb-3">
-                                <label for="admin_password" class="form-label">管理员密码</label>
+                                <label for="admin_password" class="form-label">%s</label>
                                 <input type="password" class="form-control" id="admin_password" name="admin_password" 
                                        placeholder="留空表示不修改">
                             </div>
-                            <button type="submit" class="btn btn-primary">保存设置</button>
-                            <a href="%s/config/export" class="btn btn-outline-secondary ms-2">导出配置</a>
-                            <a href="%s/config/import" class="btn btn-outline-primary ms-2">导入配置(预览diff)</a>
-                            <a href="%s/config/preview" class="btn btn-warning ms-2">查看上次导入的diff</a>
+                            <button type="submit" class="btn btn-primary">%s</button>
+                            <a href="%s/config/export" class="btn btn-outline-secondary ms-2">%s</a>
+                            <a href="%s/config/import" class="btn btn-outline-primary ms-2">%s</a>
+                            <a href="%s/config/preview" class="btn btn-warning ms-2">%s</a>
                         </form>
                     </div>
                 </div>
@@ -1584,13 +1618,19 @@ func (s *Server) generateSettingsHTML(data map[string]interface{}) string {
     </div>
 </body>
 </html>`,
+		title,
 		s.generateSidebar(data["AdminPrefix"].(string), "settings"),
+		title,
 		data["AdminPrefix"].(string),
+		adminPrefixLabel,
 		data["AdminPrefix"].(string),
+		adminUserLabel,
 		s.config.Admin.Username,
-		data["AdminPrefix"].(string),
-		data["AdminPrefix"].(string),
-		data["AdminPrefix"].(string))
+		adminPassLabel,
+		saveBtn,
+		data["AdminPrefix"].(string), exportBtn,
+		data["AdminPrefix"].(string), importPreview,
+		data["AdminPrefix"].(string), viewLastDiff)
 }
 
 func (s *Server) generateSidebar(adminPrefix, activePage string) string {
