@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# WithSSL 服务配置修复脚本
+# SSLcat 服务配置修复脚本
 # 修复systemd服务文件中的路径问题
 
 set -e
@@ -29,7 +29,7 @@ log_error() {
 }
 
 echo "=========================================="
-echo "WithSSL 服务配置修复脚本"
+echo "SSLcat 服务配置修复脚本"
 echo "=========================================="
 
 # 检查是否为root用户
@@ -41,14 +41,14 @@ fi
 
 # 检查服务是否存在
 if ! systemctl list-unit-files | grep -q "withssl.service"; then
-    log_error "WithSSL服务未安装，请先运行 install.sh"
+    log_error "SSLcat服务未安装，请先运行 install.sh"
     exit 1
 fi
 
-log_info "检测到WithSSL服务，开始修复..."
+log_info "检测到SSLcat服务，开始修复..."
 
 # 停止服务
-log_info "停止WithSSL服务..."
+log_info "停止SSLcat服务..."
 systemctl stop withssl || true
 
 # 备份原始服务文件
@@ -59,7 +59,7 @@ cp /etc/systemd/system/withssl.service /etc/systemd/system/withssl.service.backu
 log_info "创建修复后的服务文件..."
 cat > /etc/systemd/system/withssl.service << 'EOF'
 [Unit]
-Description=WithSSL SSL Proxy Server
+Description=SSLcat SSL Proxy Server
 After=network.target
 
 [Service]
@@ -133,7 +133,7 @@ chmod 755 /etc/withssl
 chmod 755 /var/lib/withssl
 
 # 启动服务
-log_info "启动WithSSL服务..."
+log_info "启动SSLcat服务..."
 systemctl enable withssl
 systemctl start withssl
 
@@ -142,7 +142,7 @@ sleep 3
 
 # 检查服务状态
 if systemctl is-active --quiet withssl; then
-    log_success "WithSSL服务启动成功！"
+    log_success "SSLcat服务启动成功！"
     
     echo ""
     echo "=========================================="

@@ -1,5 +1,5 @@
 {
-  "app.title": "WithSSL - SSL Прокси Сервер",
+  "app.title": "SSLcat - SSL Прокси Сервер",
   "app.description": "Мощный SSL прокси-сервер с автоматическим управлением сертификатами, перенаправлением доменов, защитой безопасности и веб-панелью управления",
   
   "nav.dashboard": "Панель Управления",
@@ -18,7 +18,7 @@
   "login.submit": "Войти",
   "login.forgot_password": "Забыли пароль?",
   
-  "dashboard.welcome": "Добро пожаловать в WithSSL",
+  "dashboard.welcome": "Добро пожаловать в SSLcat",
   "dashboard.total_requests": "Всего Запросов",
   "dashboard.requests_per_sec": "Запросов в Секунду",
   "dashboard.error_rate": "Частота Ошибок",

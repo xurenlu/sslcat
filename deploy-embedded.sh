@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# WithSSL 嵌入式部署脚本
+# SSLcat 嵌入式部署脚本
 # 使用 Go embed 将所有资源嵌入到二进制文件中，无需手工复制文件
 
 set -e
 
 echo "=========================================="
-echo "WithSSL 嵌入式部署脚本"
+echo "SSLcat 嵌入式部署脚本"
 echo "=========================================="
 
 # 检查Go版本
@@ -80,9 +80,9 @@ cp start.sh "$DEPLOY_DIR/" 2>/dev/null || true
 
 # 创建部署说明
 cat > "$DEPLOY_DIR/README.md" << 'EOF'
-# WithSSL 部署包
+# SSLcat 部署包
 
-此部署包包含了使用 Go embed 特性的 WithSSL 二进制文件，所有 HTML 模板和翻译文件都已嵌入到二进制文件中。
+此部署包包含了使用 Go embed 特性的 SSLcat 二进制文件，所有 HTML 模板和翻译文件都已嵌入到二进制文件中。
 
 ## 部署优势
 

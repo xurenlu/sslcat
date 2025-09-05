@@ -3,7 +3,7 @@ set -euo pipefail
 
 # withssl 中国区一键安装脚本（通过 sslcat.com 代理加速）
 # 用法：
-#   curl -fsSL https://sslcat.com/xurenlu/withssl/main/scripts/install-from-release-zh.sh | sudo bash -s -- -v 1.0.2
+#   curl -fsSL https://sslcat.com/xurenlu/sslcat/main/scripts/install-from-release-zh.sh | sudo bash -s -- -v 1.0.2
 
 VER=""
 DEST_LINUX="/opt/withssl"
@@ -37,7 +37,7 @@ EXT=.tar.gz
 [[ "$OS" == "windows" ]] && EXT=.zip
 
 # 使用 sslcat.com 代理加速 GitHub Releases
-URL="https://sslcat.com/xurenlu/withssl/releases/download/v${VER}/${ASSET}${EXT}"
+URL="https://sslcat.com/xurenlu/sslcat/releases/download/v${VER}/${ASSET}${EXT}"
 echo "[withssl] 下载: $URL"
 
 TMP=$(mktemp -d)
@@ -72,7 +72,7 @@ fi
 SERVICE=/etc/systemd/system/withssl.service
 sudo bash -c "cat > $SERVICE" <<'UNIT'
 [Unit]
-Description=WithSSL Service
+Description=SSLcat Service
 After=network.target
 
 [Service]

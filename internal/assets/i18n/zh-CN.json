@@ -1,5 +1,5 @@
 {
-  "app.title": "WithSSL - SSL代理服务器",
+  "app.title": "SSLcat - SSL代理服务器",
   "app.description": "功能强大的SSL代理服务器，支持自动证书管理、域名转发、安全防护和Web管理面板",
   
   "nav.dashboard": "仪表板",
@@ -18,7 +18,7 @@
   "login.submit": "登录",
   "login.forgot_password": "忘记密码？",
   
-  "dashboard.welcome": "欢迎使用 WithSSL",
+  "dashboard.welcome": "欢迎使用 SSLcat",
   "dashboard.total_requests": "总请求数",
   "dashboard.requests_per_sec": "每秒请求数",
   "dashboard.error_rate": "错误率",

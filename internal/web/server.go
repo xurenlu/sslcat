@@ -1059,7 +1059,7 @@ func (s *Server) generateProxyManagementHTML(data map[string]interface{}) string
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>代理配置 - WithSSL</title>
+    <title>代理配置 - SSLcat</title>
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
 </head>
@@ -1135,7 +1135,7 @@ func (s *Server) generateProxyAddHTML(data map[string]interface{}) string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>添加代理规则 - WithSSL</title>
+    <title>添加代理规则 - SSLcat</title>
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
@@ -1188,7 +1188,7 @@ func (s *Server) generateProxyEditHTML(data map[string]interface{}) string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>编辑代理规则 - WithSSL</title>
+    <title>编辑代理规则 - SSLcat</title>
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
@@ -1238,7 +1238,7 @@ func (s *Server) generateSSLManagementHTML(data map[string]interface{}) string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SSL证书管理 - WithSSL</title>
+    <title>SSL证书管理 - SSLcat</title>
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
 </head>
@@ -1332,7 +1332,7 @@ func (s *Server) generateSSLGenerateHTML(data map[string]interface{}) string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>生成SSL证书 - WithSSL</title>
+    <title>生成SSL证书 - SSLcat</title>
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
@@ -1376,7 +1376,7 @@ func (s *Server) generateSecurityManagementHTML(data map[string]interface{}) str
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>安全设置 - WithSSL</title>
+    <title>安全设置 - SSLcat</title>
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
 </head>
@@ -1503,7 +1503,7 @@ func (s *Server) generateSettingsHTML(data map[string]interface{}) string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>系统设置 - WithSSL</title>
+    <title>系统设置 - SSLcat</title>
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
@@ -1559,7 +1559,7 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
                 <nav class="d-md-block sidebar collapse">
                     <div class="position-sticky pt-3">
                         <div class="text-center mb-4">
-                            <h4 class="navbar-brand text-primary">WithSSL</h4>
+                            <h4 class="navbar-brand text-primary">SSLcat</h4>
                             <small class="text-muted">SSL 代理服务器</small>
                         </div>
                         

@@ -18,12 +18,12 @@ Section: net
 Priority: optional
 Architecture: amd64
 Maintainer: withssl
-Description: WithSSL reverse proxy with auto TLS and web panel
+Description: SSLcat reverse proxy with auto TLS and web panel
 EOF
 
 cat > "$PKGDIR/lib/systemd/system/withssl.service" <<'EOF'
 [Unit]
-Description=WithSSL Service
+Description=SSLcat Service
 After=network.target
 
 [Service]

@@ -1,5 +1,5 @@
 {
-  "comment": "WithSSL 高级配置示例 - 展示未来功能规划",
+  "comment": "SSLcat 高级配置示例 - 展示未来功能规划",
   
   "server": {
     "host": "0.0.0.0",

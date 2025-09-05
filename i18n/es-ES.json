@@ -1,5 +1,5 @@
 {
-  "app.title": "WithSSL - Servidor Proxy SSL",
+  "app.title": "SSLcat - Servidor Proxy SSL",
   "app.description": "Potente servidor proxy SSL con gestión automática de certificados, reenvío de dominios, protección de seguridad y panel de gestión web",
   
   "nav.dashboard": "Panel de Control",
@@ -18,7 +18,7 @@
   "login.submit": "Iniciar Sesión",
   "login.forgot_password": "¿Olvidaste tu contraseña?",
   
-  "dashboard.welcome": "Bienvenido a WithSSL",
+  "dashboard.welcome": "Bienvenido a SSLcat",
   "dashboard.total_requests": "Total de Solicitudes",
   "dashboard.requests_per_sec": "Solicitudes por Segundo",
   "dashboard.error_rate": "Tasa de Error",

@@ -6,7 +6,7 @@ set -euo pipefail
 VER=${VER:-1.0.1}
 SHA256=${SHA256:-}
 TAP_DIR=${TAP_DIR:-build/homebrew-tap}
-REPO=${REPO:-xurenlu/withssl}
+REPO=${REPO:-xurenlu/sslcat}
 
 mkdir -p "$TAP_DIR/Formula"
 
@@ -17,7 +17,7 @@ fi
 
 cat > "$TAP_DIR/Formula/withssl.rb" <<EOF
 class Withssl < Formula
-  desc "WithSSL reverse proxy with auto TLS and web panel"
+  desc "SSLcat reverse proxy with auto TLS and web panel"
   homepage "https://github.com/${REPO}"
   version "${VER}"
   url "https://github.com/${REPO}/releases/download/v#{version}/withssl_#{version}_darwin_arm64.tar.gz"

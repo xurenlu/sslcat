@@ -29,7 +29,7 @@ func NewFromEnv() *Notifier {
 	if h, _ := os.Hostname(); h != "" {
 		n.hostname = h
 	} else {
-		n.hostname = "withssl"
+		n.hostname = "sslcat"
 	}
 	return n
 }
@@ -52,7 +52,7 @@ func (n *Notifier) SendJSON(v map[string]any) {
 	// syslog (UDP 简化)
 	if n.syslogAddr != "" {
 		line, _ := json.Marshal(v)
-		msg := fmt.Sprintf("<14>%s withssl: %s", time.Now().Format(time.RFC3339), string(line))
+		msg := fmt.Sprintf("<14>%s sslcat: %s", time.Now().Format(time.RFC3339), string(line))
 		_ = sendUDP(n.syslogAddr, []byte(msg))
 	}
 	// loki
@@ -80,7 +80,7 @@ func (n *Notifier) sendLoki(v map[string]any) {
 	ts := fmt.Sprintf("%d", time.Now().UnixNano())
 	payload := map[string]any{
 		"streams": []any{map[string]any{
-			"stream": map[string]string{"job": "withssl", "host": n.hostname},
+			"stream": map[string]string{"job": "sslcat", "host": n.hostname},
 			"values": [][]string{{ts, string(b)}},
 		}},
 	}

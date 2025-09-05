@@ -1,5 +1,5 @@
 {
-  "app.title": "WithSSL - SSL Proxy Server",
+  "app.title": "SSLcat - SSL Proxy Server",
   "app.description": "Powerful SSL proxy server with automatic certificate management, domain forwarding, security protection and web management panel",
   
   "nav.dashboard": "Dashboard",
@@ -18,7 +18,7 @@
   "login.submit": "Login",
   "login.forgot_password": "Forgot password?",
   
-  "dashboard.welcome": "Welcome to WithSSL",
+  "dashboard.welcome": "Welcome to SSLcat",
   "dashboard.total_requests": "Total Requests",
   "dashboard.requests_per_sec": "Requests Per Second",
   "dashboard.error_rate": "Error Rate",

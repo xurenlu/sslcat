@@ -1,5 +1,5 @@
 {
-  "app.title": "WithSSL - SSL プロキシサーバー",
+  "app.title": "SSLcat - SSL プロキシサーバー",
   "app.description": "自動証明書管理、ドメイン転送、セキュリティ保護、Web管理パネルを備えた強力なSSLプロキシサーバー",
   
   "nav.dashboard": "ダッシュボード",
@@ -18,7 +18,7 @@
   "login.submit": "ログイン",
   "login.forgot_password": "パスワードを忘れましたか？",
   
-  "dashboard.welcome": "WithSSLへようこそ",
+  "dashboard.welcome": "SSLcatへようこそ",
   "dashboard.total_requests": "総リクエスト数",
   "dashboard.requests_per_sec": "秒間リクエスト数",
   "dashboard.error_rate": "エラー率",

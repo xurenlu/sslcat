@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# WithSSL 快速启动脚本
+# SSLcat 快速启动脚本
 
 # 创建必要的目录
 mkdir -p data/certs data/keys data/logs
@@ -12,7 +12,7 @@ if [ ! -f "withssl.conf" ]; then
 fi
 
 # 启动程序
-echo "启动 WithSSL 服务器..."
+echo "启动 SSLcat 服务器..."
 echo "管理面板: http://localhost:8080/withssl-panel"
 echo "默认用户名: admin"
 echo "默认密码: admin*9527"

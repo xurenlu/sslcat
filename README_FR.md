@@ -1,6 +1,6 @@
-# WithSSL - Serveur Proxy SSL
+# SSLcat - Serveur Proxy SSL
 
-WithSSL est un serveur proxy SSL puissant qui prend en charge la gestion automatique des certificats, le transfert de domaines, la protection de sécurité et le panneau d'administration web.
+SSLcat est un serveur proxy SSL puissant qui prend en charge la gestion automatique des certificats, le transfert de domaines, la protection de sécurité et le panneau d'administration web.
 
 ## 📚 Documentation
 
@@ -61,7 +61,7 @@ WithSSL est un serveur proxy SSL puissant qui prend en charge la gestion automat
 
 ```bash
 # Télécharger le script d'installation
-curl -fsSL https://raw.githubusercontent.com/xurenlu/withssl/main/install.sh -o install.sh
+curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/install.sh -o install.sh
 
 # Exécuter le script d'installation
 sudo bash install.sh
@@ -89,9 +89,9 @@ echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-3. **Compiler WithSSL**
+3. **Compiler SSLcat**
 ```bash
-git clone https://github.com/xurenlu/withssl.git
+git clone https://github.com/xurenlu/sslcat.git
 cd withssl
 go mod download
 go build -o withssl main.go
@@ -163,6 +163,6 @@ Ce projet utilise la licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus d
 ## Support
 
 Si vous rencontrez des problèmes ou avez des suggestions:
-1. Rechercher dans [Issues](https://github.com/xurenlu/withssl/issues)
+1. Rechercher dans [Issues](https://github.com/xurenlu/sslcat/issues)
 2. Créer un nouveau Issue
 3. Contacter les mainteneurs

@@ -86,7 +86,7 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 	}
 
 	// 设置原始请求信息
-	r.Header.Set("X-Forwarded-Server", "withssl")
+	r.Header.Set("X-Forwarded-Server", "sslcat")
 	r.Header.Set("X-Original-URI", r.RequestURI)
 	r.Header.Set("X-Original-Method", r.Method)
 
@@ -184,7 +184,7 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 		resp.Header.Del("X-Content-Type-Options")
 
 		// 添加代理标识
-		resp.Header.Set("X-Proxy-By", "WithSSL")
+		resp.Header.Set("X-Proxy-By", "SSLcat")
 
 		return nil
 	}

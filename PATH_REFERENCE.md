@@ -1,8 +1,8 @@
-# WithSSL 路径配置参考
+# SSLcat 路径配置参考
 
 ## 📁 标准路径配置
 
-WithSSL 项目所有安装脚本和部署工具现在使用统一的路径配置：
+SSLcat 项目所有安装脚本和部署工具现在使用统一的路径配置：
 
 | 文件类型 | 路径 | 权限 | 所有者 |
 |---------|------|------|--------|
@@ -53,7 +53,7 @@ WithSSL 项目所有安装脚本和部署工具现在使用统一的路径配置
 
 ```ini
 [Unit]
-Description=WithSSL SSL Proxy Server
+Description=SSLcat SSL Proxy Server
 After=network.target
 
 [Service]

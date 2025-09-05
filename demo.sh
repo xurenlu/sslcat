@@ -1,15 +1,15 @@
 #!/bin/bash
 
-# WithSSL 演示脚本
+# SSLcat 演示脚本
 
 echo "==============================================="
-echo "WithSSL SSL 代理服务器 - 演示脚本"
+echo "SSLcat SSL 代理服务器 - 演示脚本"
 echo "==============================================="
 echo ""
 
 # 检查是否存在二进制文件
 if [ ! -f "withssl" ]; then
-    echo "🔨 构建 WithSSL..."
+    echo "🔨 构建 SSLcat..."
     go build -o withssl main.go
     if [ $? -ne 0 ]; then
         echo "❌ 构建失败，请检查 Go 环境"
@@ -29,7 +29,7 @@ if [ ! -f "withssl.conf" ]; then
 fi
 
 echo ""
-echo "🚀 启动 WithSSL 服务器..."
+echo "🚀 启动 SSLcat 服务器..."
 echo ""
 echo "📋 服务信息："
 echo "   • 监听端口：8080"

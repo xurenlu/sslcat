@@ -83,7 +83,7 @@ node_modules/
 .env.test.local
 .env.production.local
 
-# WithSSL specific files
+# SSLcat specific files
 config/withssl.conf
 data/
 certs/

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# WithSSL 安装脚本
+# SSLcat 安装脚本
 # 支持 Ubuntu/Debian 和 CentOS/RHEL 系统
 
 set -e
@@ -154,9 +154,9 @@ create_user_and_dirs() {
     log_success "目录创建完成"
 }
 
-# 编译WithSSL
+# 编译SSLcat
 build_withssl() {
-    log_info "编译WithSSL..."
+    log_info "编译SSLcat..."
     
     # 设置Go环境变量
     export PATH=$PATH:/usr/local/go/bin
@@ -178,7 +178,7 @@ build_withssl() {
     chmod +x withssl
     chown withssl:withssl withssl
     
-    log_success "WithSSL编译完成"
+    log_success "SSLcat编译完成"
 }
 
 # 创建systemd服务
@@ -187,7 +187,7 @@ create_systemd_service() {
     
     cat > /etc/systemd/system/withssl.service << EOF
 [Unit]
-Description=WithSSL SSL Proxy Server
+Description=SSLcat SSL Proxy Server
 After=network.target
 
 [Service]
@@ -300,7 +300,7 @@ configure_firewall() {
 
 # 启动服务
 start_service() {
-    log_info "启动WithSSL服务..."
+    log_info "启动SSLcat服务..."
     
     systemctl enable withssl
     systemctl start withssl
@@ -309,9 +309,9 @@ start_service() {
     sleep 3
     
     if systemctl is-active --quiet withssl; then
-        log_success "WithSSL服务启动成功"
+        log_success "SSLcat服务启动成功"
     else
-        log_error "WithSSL服务启动失败"
+        log_error "SSLcat服务启动失败"
         systemctl status withssl
         exit 1
     fi
@@ -319,7 +319,7 @@ start_service() {
 
 # 显示安装信息
 show_install_info() {
-    log_success "WithSSL安装完成！"
+    log_success "SSLcat安装完成！"
     echo
     echo "=========================================="
     echo "安装信息:"
@@ -344,7 +344,7 @@ show_install_info() {
 # 主函数
 main() {
     echo "=========================================="
-    echo "WithSSL SSL代理服务器安装脚本"
+    echo "SSLcat SSL代理服务器安装脚本"
     echo "=========================================="
     echo
     

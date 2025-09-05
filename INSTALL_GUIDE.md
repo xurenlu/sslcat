@@ -1,6 +1,6 @@
-# WithSSL 安装指南
+# SSLcat 安装指南
 
-WithSSL 提供多种安装方式，满足不同用户的需求。
+SSLcat 提供多种安装方式，满足不同用户的需求。
 
 ## 🚀 快速安装（推荐）
 
@@ -8,7 +8,7 @@ WithSSL 提供多种安装方式，满足不同用户的需求。
 
 ```bash
 # 从GitHub下载并运行安装脚本
-curl -fsSL https://raw.githubusercontent.com/xurenlu/withssl/main/install.sh -o install.sh
+curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/install.sh -o install.sh
 sudo bash install.sh
 ```
 
@@ -24,7 +24,7 @@ sudo bash install.sh
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/xurenlu/withssl.git
+git clone https://github.com/xurenlu/sslcat.git
 cd withssl
 
 # 2. 生成部署包
@@ -49,7 +49,7 @@ ssh user@server "cd /tmp/withssl-deploy && sudo bash deploy-commands.sh"
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/xurenlu/withssl.git
+git clone https://github.com/xurenlu/sslcat.git
 cd withssl
 
 # 2. 直接部署到远程服务器
@@ -88,7 +88,7 @@ docker-compose up -d
 
 ```bash
 # 1. 克隆源码
-git clone https://github.com/xurenlu/withssl.git
+git clone https://github.com/xurenlu/sslcat.git
 cd withssl
 
 # 2. 编译
@@ -221,7 +221,7 @@ sudo firewall-cmd --reload
 ### 3. 定期更新
 ```bash
 # 使用自动更新脚本
-curl -fsSL https://raw.githubusercontent.com/xurenlu/withssl/main/update.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/update.sh | sudo bash
 ```
 
 ---
@@ -231,7 +231,7 @@ curl -fsSL https://raw.githubusercontent.com/xurenlu/withssl/main/update.sh | su
 如果遇到安装问题：
 
 1. 📖 查看 [故障排除文档](DEPLOYMENT.md#故障排除)
-2. 🔍 搜索 [GitHub Issues](https://github.com/xurenlu/withssl/issues)
+2. 🔍 搜索 [GitHub Issues](https://github.com/xurenlu/sslcat/issues)
 3. 🆕 创建新的 Issue
 4. 💬 加入社区讨论
 

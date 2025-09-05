@@ -1,4 +1,4 @@
-# WithSSL Makefile
+# SSLcat Makefile
 
 # 变量定义
 BINARY_NAME=withssl
@@ -180,7 +180,7 @@ ci: clean deps check build test
 # 显示帮助信息
 .PHONY: help
 help:
-	@echo "WithSSL Makefile 帮助"
+	@echo "SSLcat Makefile 帮助"
 	@echo ""
 	@echo "可用目标:"
 	@echo "  all          - 清理并构建项目"

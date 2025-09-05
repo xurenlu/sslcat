@@ -1,16 +1,16 @@
-# WithSSL - SSL 代理服务器
+# SSLcat - SSL 代理服务器
 
-## ⏱️ 一分钟快速上手 WithSSL
+## ⏱️ 一分钟快速上手 SSLcat
 
 ```bash
 # 1) 一键安装（Linux）
 # 面向中国大陆用户（通过 sslcat.com 加速）
-curl -fsSL https://sslcat.com/xurenlu/withssl/main/scripts/install-from-release-zh.sh | sudo bash -s -- -v 1.0.2
+curl -fsSL https://sslcat.com/xurenlu/sslcat/main/scripts/install-from-release-zh.sh | sudo bash -s -- -v 1.0.2
 # 非大陆用户可直接使用 GitHubusercontent：
-# curl -fsSL https://raw.githubusercontent.com/xurenlu/withssl/main/scripts/install-from-release.sh | sudo bash -s -- -v 1.0.2
+# curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/scripts/install-from-release.sh | sudo bash -s -- -v 1.0.2
 
 # 2) macOS 本地快速试用（或自行下载 darwin 包）
-curl -fsSL https://sslcat.com/xurenlu/withssl/releases/download/v1.0.2/withssl_1.0.2_darwin_arm64.tar.gz -o withssl.tgz
+curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.0.2/withssl_1.0.2_darwin_arm64.tar.gz -o withssl.tgz
 tar -xzf withssl.tgz && sudo install -m 0755 withssl /usr/local/bin/withssl
 withssl --config withssl.conf --port 8080
 # 浏览器访问: http://localhost:8080/withssl-panel/
@@ -21,7 +21,7 @@ docker compose up -d
 ```
 
 
-WithSSL 是一个功能强大的 SSL 代理服务器，支持自动证书管理、域名转发、安全防护和 Web 管理面板。
+SSLcat 是一个功能强大的 SSL 代理服务器，支持自动证书管理、域名转发、安全防护和 Web 管理面板。
 
 ## 📚 文档导航
 
@@ -85,17 +85,17 @@ WithSSL 是一个功能强大的 SSL 代理服务器，支持自动证书管理�
 
 ### GitHub 仓库
 
-项目托管在GitHub上：**[https://github.com/xurenlu/withssl](https://github.com/xurenlu/withssl)**
+项目托管在GitHub上：**[https://github.com/xurenlu/sslcat](https://github.com/xurenlu/sslcat)**
 
 ### 最新版本下载
 
 ```bash
 # 克隆最新源码
-git clone https://github.com/xurenlu/withssl.git
+git clone https://github.com/xurenlu/sslcat.git
 cd withssl
 
 # 或者下载指定版本（推荐）
-wget https://github.com/xurenlu/withssl/archive/refs/heads/main.zip
+wget https://github.com/xurenlu/sslcat/archive/refs/heads/main.zip
 unzip main.zip
 cd withssl-main
 ```
@@ -106,7 +106,7 @@ cd withssl-main
 
 ```bash
 # 从GitHub下载安装脚本
-curl -fsSL https://raw.githubusercontent.com/xurenlu/withssl/main/install.sh -o install.sh
+curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/install.sh -o install.sh
 
 # 运行安装脚本
 sudo bash install.sh
@@ -146,9 +146,9 @@ echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-3. **编译 WithSSL**
+3. **编译 SSLcat**
 ```bash
-git clone https://github.com/xurenlu/withssl.git
+git clone https://github.com/xurenlu/sslcat.git
 cd withssl
 go mod download
 go build -o withssl main.go
@@ -315,7 +315,7 @@ proxy:
 ## SSL 证书管理
 
 ### 自动获取证书
-WithSSL 会自动为配置的域名获取 SSL 证书，无需手动操作。
+SSLcat 会自动为配置的域名获取 SSL 证书，无需手动操作。
 
 ### 证书续期
 证书会在到期前30天自动续期，也可以手动触发续期。
@@ -435,7 +435,7 @@ security:
 
 ### 中国大陆用户优化
 
-WithSSL 项目已针对中国大陆网络环境进行了优化，使用了 [CDNProxy](https://cdnproxy.some.im/docs) 代理服务来解决访问 jsdelivr CDN 的网络问题。
+SSLcat 项目已针对中国大陆网络环境进行了优化，使用了 [CDNProxy](https://cdnproxy.some.im/docs) 代理服务来解决访问 jsdelivr CDN 的网络问题。
 
 #### 使用的 CDN 代理
 - **原始地址**: `https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css`
@@ -475,7 +475,7 @@ withssl/
 ### 开发环境搭建
 ```bash
 # 克隆项目
-git clone https://github.com/xurenlu/withssl.git
+git clone https://github.com/xurenlu/sslcat.git
 cd withssl
 
 # 安装依赖
@@ -500,7 +500,7 @@ go run main.go --config withssl.conf --log-level debug
 
 如果您遇到问题或有建议，请：
 1. 查看 [故障排除](#故障排除) 部分
-2. 搜索 [Issues](https://github.com/xurenlu/withssl/issues)
+2. 搜索 [Issues](https://github.com/xurenlu/sslcat/issues)
 3. 创建新的 Issue
 4. 联系维护者
 

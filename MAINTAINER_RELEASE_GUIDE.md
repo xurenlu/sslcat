@@ -1,4 +1,4 @@
-# WithSSL 维护者发布指南
+# SSLcat 维护者发布指南
 
 本指南面向项目维护者，涵盖版本发布、产物构建与打包（GitHub Releases、DEB/RPM/Homebrew、Docker Compose）、以及升级流程。
 
@@ -60,7 +60,7 @@ docker compose up -d
 ## 4) 升级助手（服务器端）
 ```
 # 将 REPO 与 VER 指定到你的仓库与目标版本
-env VER=1.0.2 REPO=xurenlu/withssl \
+env VER=1.0.2 REPO=xurenlu/sslcat \
 scripts/release/upgrade-helper.sh
 ```
 - 步骤：下载 → 备份当前 `/opt/withssl/withssl` → 替换 → 重启 systemd 服务

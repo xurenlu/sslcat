@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# WithSSL 部署脚本
+# SSLcat 部署脚本
 
 set -e
 
@@ -9,14 +9,14 @@ TARGET_USER=${2:-"root"}
 TARGET_DIR="/opt/withssl"
 
 echo "==============================================="
-echo "WithSSL 部署脚本"
+echo "SSLcat 部署脚本"
 echo "==============================================="
 echo "目标服务器: $TARGET_USER@$TARGET_HOST"
 echo "部署目录: $TARGET_DIR"
 echo ""
 
 # 1. 构建 Linux 64位二进制文件
-echo "🔨 构建 WithSSL Linux 64位二进制文件..."
+echo "🔨 构建 SSLcat Linux 64位二进制文件..."
 echo "   平台: linux/amd64"
 GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o withssl main.go
 
@@ -39,7 +39,7 @@ cp README.md deploy/
 echo "⚙️  创建 systemd 服务文件..."
 cat > deploy/withssl.service << EOF
 [Unit]
-Description=WithSSL SSL Proxy Server
+Description=SSLcat SSL Proxy Server
 After=network.target
 
 [Service]
@@ -112,7 +112,7 @@ systemctl start withssl
 systemctl status withssl
 
 echo ""
-echo "✅ WithSSL 部署完成！"
+echo "✅ SSLcat 部署完成！"
 echo "管理面板: https://your-domain/withssl-panel/"
 echo "默认用户名: admin"
 echo "默认密码: admin*9527"
@@ -136,4 +136,4 @@ echo "📋 或使用 SCP 自动部署："
 echo "  scp -r deploy/ $TARGET_USER@$TARGET_HOST:/tmp/"
 echo "  ssh $TARGET_USER@$TARGET_HOST 'cd /tmp/deploy && bash deploy-commands.sh'"
 echo ""
-echo "注意: WithSSL 使用 CDN 资源，无需部署静态文件！"
+echo "注意: SSLcat 使用 CDN 资源，无需部署静态文件！"

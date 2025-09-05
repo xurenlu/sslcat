@@ -1,6 +1,6 @@
-# WithSSL 部署指南
+# SSLcat 部署指南
 
-本文档详细说明如何在不同环境中部署 WithSSL。
+本文档详细说明如何在不同环境中部署 SSLcat。
 
 ## 📚 相关文档
 
@@ -40,7 +40,7 @@ scp withssl.conf.example root@your-server.com:/etc/withssl/withssl.conf
 
 ### 支持的平台
 
-WithSSL 支持以下平台的交叉编译：
+SSLcat 支持以下平台的交叉编译：
 
 | 平台 | 架构 | 命令 | 用途 |
 |------|------|------|------|
@@ -126,7 +126,7 @@ ssh root@server 'chown withssl:withssl /etc/withssl/withssl.conf'
 # 创建 systemd 服务文件
 cat > /etc/systemd/system/withssl.service << 'EOF'
 [Unit]
-Description=WithSSL SSL Proxy Server
+Description=SSLcat SSL Proxy Server
 After=network.target
 
 [Service]

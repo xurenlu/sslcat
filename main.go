@@ -40,7 +40,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("WithSSL v%s (build: %s)\n", version, build)
+		fmt.Printf("SSLcat v%s (build: %s)\n", version, build)
 		return
 	}
 
@@ -50,7 +50,7 @@ func main() {
 		"component": "main",
 	})
 
-	log.Infof("启动 WithSSL v%s (build: %s)", version, build)
+	log.Infof("启动 SSLcat v%s (build: %s)", version, build)
 
 	// 加载配置
 	cfg, err := config.Load(*configFile)
@@ -202,5 +202,5 @@ func main() {
 		log.Errorf("服务器关闭失败: %v", err)
 	}
 
-	log.Info("WithSSL 服务器已关闭")
+	log.Info("SSLcat 服务器已关闭")
 }

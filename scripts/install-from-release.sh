@@ -3,7 +3,7 @@ set -euo pipefail
 
 # withssl 一键安装脚本（Linux/macOS）
 # 用法（推荐传版本）：
-#   curl -fsSL https://raw.githubusercontent.com/xurenlu/withssl/main/scripts/install-from-release.sh | sudo bash -s -- -v 1.0.2
+#   curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/scripts/install-from-release.sh | sudo bash -s -- -v 1.0.2
 
 VER=""
 DEST_LINUX="/opt/withssl"
@@ -38,7 +38,7 @@ esac
 ASSET="withssl_${VER}_${OS}_${ARCH}"
 EXT=".tar.gz"
 if [[ "$OS" == "windows" ]]; then EXT=".zip"; fi
-URL="https://github.com/xurenlu/withssl/releases/download/v${VER}/${ASSET}${EXT}"
+URL="https://github.com/xurenlu/sslcat/releases/download/v${VER}/${ASSET}${EXT}"
 
 echo "[withssl] 下载: $URL"
 TMP="$(mktemp -d)"
@@ -73,7 +73,7 @@ fi
 SERVICE=/etc/systemd/system/withssl.service
 sudo bash -c "cat > $SERVICE" <<'UNIT'
 [Unit]
-Description=WithSSL Service
+Description=SSLcat Service
 After=network.target
 
 [Service]

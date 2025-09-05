@@ -17,7 +17,7 @@ echo "==> Preparing sources"
 cp -f withssl.conf "$TOP/SOURCES/withssl.conf" 2>/dev/null || true
 cat > "$TOP/SOURCES/withssl.service" <<'EOF'
 [Unit]
-Description=WithSSL Service
+Description=SSLcat Service
 After=network.target
 
 [Service]
@@ -36,15 +36,15 @@ cat > "$TOP/SPECS/withssl.spec" <<EOF
 Name:           withssl
 Version:        ${VER}
 Release:        1%{?dist}
-Summary:        WithSSL reverse proxy with auto TLS and web panel
+Summary:        SSLcat reverse proxy with auto TLS and web panel
 License:        MIT
-URL:            https://github.com/xurenlu/withssl
+URL:            https://github.com/xurenlu/sslcat
 BuildArch:      x86_64
 
 %define _unitdir /usr/lib/systemd/system
 
 %description
-WithSSL reverse proxy with auto TLS and web panel.
+SSLcat reverse proxy with auto TLS and web panel.
 
 %prep
 %build

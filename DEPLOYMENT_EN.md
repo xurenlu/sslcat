@@ -1,6 +1,6 @@
-# WithSSL Deployment Guide
+# SSLcat Deployment Guide
 
-This document provides detailed instructions for deploying WithSSL in different environments.
+This document provides detailed instructions for deploying SSLcat in different environments.
 
 ## 📚 Related Documentation
 
@@ -40,7 +40,7 @@ scp withssl.conf.example root@your-server.com:/etc/withssl/withssl.conf
 
 ### Supported Platforms
 
-WithSSL supports cross-compilation for the following platforms:
+SSLcat supports cross-compilation for the following platforms:
 
 | Platform | Architecture | Command | Purpose |
 |----------|--------------|---------|---------|
@@ -126,7 +126,7 @@ ssh root@server 'chown withssl:withssl /etc/withssl/withssl.conf'
 # Create systemd service file
 cat > /etc/systemd/system/withssl.service << 'EOF'
 [Unit]
-Description=WithSSL SSL Proxy Server
+Description=SSLcat SSL Proxy Server
 After=network.target
 
 [Service]

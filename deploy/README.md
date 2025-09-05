@@ -1,6 +1,6 @@
-# WithSSL 部署包
+# SSLcat 部署包
 
-此部署包包含了使用 Go embed 特性的 WithSSL 二进制文件，所有 HTML 模板和翻译文件都已嵌入到二进制文件中。
+此部署包包含了使用 Go embed 特性的 SSLcat 二进制文件，所有 HTML 模板和翻译文件都已嵌入到二进制文件中。
 
 ## 部署优势
 

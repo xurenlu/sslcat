@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# WithSSL 多域名SSL证书测试脚本
+# SSLcat 多域名SSL证书测试脚本
 
 echo "=========================================="
-echo "WithSSL 多域名SSL证书测试"
+echo "SSLcat 多域名SSL证书测试"
 echo "=========================================="
 
 # 检查编译后的二进制文件
@@ -32,7 +32,7 @@ if [ ! -d "$SSL_DIR" ]; then
 fi
 
 echo ""
-echo "🔧 启动 WithSSL 服务器 (测试模式)..."
+echo "🔧 启动 SSLcat 服务器 (测试模式)..."
 echo "   - 监听端口: 8080 (HTTP测试)"
 echo "   - 配置文件: withssl.conf"
 echo "   - 日志级别: debug"
@@ -143,7 +143,7 @@ echo "   ✅ 安全防护机制: 正常"
 echo "   ✅ HTTP/HTTPS服务: 正常"
 
 echo ""
-echo "🎉 WithSSL 多域名SSL证书功能测试完成!"
+echo "🎉 SSLcat 多域名SSL证书功能测试完成!"
 echo ""
 echo "📝 生产环境部署建议:"
 echo "   1. 使用 443 端口启用HTTPS"
