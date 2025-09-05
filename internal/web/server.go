@@ -1245,13 +1245,23 @@ func (s *Server) generateProxyEditHTML(data map[string]interface{}) string {
 }
 
 func (s *Server) generateSSLManagementHTML(data map[string]interface{}) string {
+	title := s.translator.T("ssl.title")
+	genBtn := s.translator.T("ssl.generate")
+	thDomain := s.translator.T("ssl.columns.domain")
+	thIssued := s.translator.T("ssl.columns.issued")
+	thExpires := s.translator.T("ssl.columns.expires")
+	thStatus := s.translator.T("ssl.columns.status")
+	thActions := s.translator.T("ssl.columns.actions")
+	uploadTitle := s.translator.T("ssl.upload_title")
+	uploadNote := s.translator.T("ssl.upload_note")
+	uploadBtn := s.translator.T("ssl.upload_button")
 	return fmt.Sprintf(`
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SSL证书管理 - SSLcat</title>
+    <title>%s - SSLcat</title>
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
 </head>
@@ -1261,9 +1271,9 @@ func (s *Server) generateSSLManagementHTML(data map[string]interface{}) string {
             <div class="col-md-2">%s</div>
             <main class="col-md-10">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">SSL证书管理</h1>
+                    <h1 class="h2">%s</h1>
                     <a href="%s/ssl/generate" class="btn btn-primary">
-                        <i class="bi bi-plus-circle"></i> 生成证书
+                        <i class="bi bi-plus-circle"></i> %s
                     </a>
                 </div>
                 
@@ -1273,11 +1283,11 @@ func (s *Server) generateSSLManagementHTML(data map[string]interface{}) string {
                             <table class="table table-striped">
                                 <thead>
                                     <tr>
-                                        <th>域名</th>
-                                        <th>颁发日期</th>
-                                        <th>过期日期</th>
-                                        <th>状态</th>
-                                        <th>操作</th>
+                                        <th>%s</th>
+                                        <th>%s</th>
+                                        <th>%s</th>
+                                        <th>%s</th>
+                                        <th>%s</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1290,9 +1300,9 @@ func (s *Server) generateSSLManagementHTML(data map[string]interface{}) string {
 
                 <div class="card">
                     <div class="card-body">
-                        <h5 class="card-title">上传现有证书</h5>
-                        <p class="text-muted">支持 .crt/.pem 证书与 .key 私钥文件。</p>
-                        <a class="btn btn-outline-primary" href="%s/ssl/upload">上传证书</a>
+                        <h5 class="card-title">%s</h5>
+                        <p class="text-muted">%s</p>
+                        <a class="btn btn-outline-primary" href="%s/ssl/upload">%s</a>
                     </div>
                 </div>
             </main>
@@ -1301,16 +1311,21 @@ func (s *Server) generateSSLManagementHTML(data map[string]interface{}) string {
     <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>`,
+		title,
 		s.generateSidebar(data["AdminPrefix"].(string), "ssl"),
+		title,
 		data["AdminPrefix"].(string),
+		genBtn,
+		thDomain, thIssued, thExpires, thStatus, thActions,
 		s.generateSSLCertsTable(data),
-		data["AdminPrefix"].(string))
+		uploadTitle, uploadNote,
+		data["AdminPrefix"].(string), uploadBtn)
 }
 
 func (s *Server) generateSSLCertsTable(data map[string]interface{}) string {
 	certs, _ := data["Certificates"].([]ssl.CertificateInfo)
 	if len(certs) == 0 {
-		return `<tr><td colspan="5" class="text-center">暂无SSL证书</td></tr>`
+		return `<tr><td colspan="5" class="text-center">` + s.translator.T("ssl.none") + `</td></tr>`
 	}
 	var b strings.Builder
 	for _, c := range certs {
@@ -1321,9 +1336,9 @@ func (s *Server) generateSSLCertsTable(data map[string]interface{}) string {
 				<td>%s</td>
 				<td>%s</td>
 				<td>
-					<a class="btn btn-sm btn-outline-primary" href="%s/ssl/download?domain=%s&type=cert">下载证书</a>
-					<a class="btn btn-sm btn-outline-secondary" href="%s/ssl/download?domain=%s&type=key">下载私钥</a>
-					<a class="btn btn-sm btn-outline-danger" href="%s/ssl/delete?domain=%s" onclick="return confirm('确定删除该证书?')">删除</a>
+					<a class="btn btn-sm btn-outline-primary" href="%s/ssl/download?domain=%s&type=cert">` + s.translator.T("ssl.download_cert") + `</a>
+					<a class="btn btn-sm btn-outline-secondary" href="%s/ssl/download?domain=%s&type=key">` + s.translator.T("ssl.download_key") + `</a>
+					<a class="btn btn-sm btn-outline-danger" href="%s/ssl/delete?domain=%s" onclick="return confirm('` + s.translator.T("ssl.delete_confirm") + `')">` + s.translator.T("proxy.delete") + `</a>
 				</td>
 			</tr>`,
 			c.Domain,
@@ -1339,13 +1354,19 @@ func (s *Server) generateSSLCertsTable(data map[string]interface{}) string {
 }
 
 func (s *Server) generateSSLGenerateHTML(data map[string]interface{}) string {
+	pageTitle := s.translator.T("ssl.generate")
+	back := s.translator.T("common.back")
+	labelDomains := s.translator.T("ssl.domain")
+	help := s.translator.T("ssl.generate_help")
+	btnGenerate := s.translator.T("ssl.generate")
+	btnCancel := s.translator.T("proxy.cancel")
 	return fmt.Sprintf(`
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>生成SSL证书 - SSLcat</title>
+    <title>%s - SSLcat</title>
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
@@ -1354,21 +1375,21 @@ func (s *Server) generateSSLGenerateHTML(data map[string]interface{}) string {
             <div class="col-md-2">%s</div>
             <main class="col-md-10">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">生成SSL证书</h1>
-                    <a href="%s/ssl" class="btn btn-secondary">返回</a>
+                    <h1 class="h2">%s</h1>
+                    <a href="%s/ssl" class="btn btn-secondary">%s</a>
                 </div>
                 
                 <div class="card">
                     <div class="card-body">
                         <form method="POST">
                             <div class="mb-3">
-                                <label for="domains" class="form-label">域名列表</label>
+                                <label for="domains" class="form-label">%s</label>
                                 <textarea class="form-control" id="domains" name="domains" rows="4" required 
                                          placeholder="example.com, www.example.com, *.example.com"></textarea>
-                                <div class="form-text">输入要生成证书的域名，多个域名用逗号分隔</div>
+                                <div class="form-text">%s</div>
                             </div>
-                            <button type="submit" class="btn btn-primary">生成证书</button>
-                            <a href="%s/ssl" class="btn btn-secondary">取消</a>
+                            <button type="submit" class="btn btn-primary">%s</button>
+                            <a href="%s/ssl" class="btn btn-secondary">%s</a>
                         </form>
                     </div>
                 </div>
@@ -1377,9 +1398,14 @@ func (s *Server) generateSSLGenerateHTML(data map[string]interface{}) string {
     </div>
 </body>
 </html>`,
+		pageTitle,
 		s.generateSidebar(data["AdminPrefix"].(string), "ssl"),
-		data["AdminPrefix"].(string),
-		data["AdminPrefix"].(string))
+		pageTitle,
+		data["AdminPrefix"].(string), back,
+		labelDomains,
+		help,
+		btnGenerate,
+		data["AdminPrefix"].(string), btnCancel)
 }
 
 func (s *Server) generateSecurityManagementHTML(data map[string]interface{}) string {

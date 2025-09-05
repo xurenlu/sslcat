@@ -40,6 +40,7 @@
   "ssl.renew": "续期",
   "ssl.view": "查看",
   "ssl.delete": "删除",
+  "ssl.generate_help": "输入要生成证书的域名，多个域名用逗号分隔",
   
   "proxy.title": "代理配置",
   "proxy.add_rule": "添加代理规则",

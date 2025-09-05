@@ -53,6 +53,7 @@
   "ssl.download_cert": "Download Cert",
   "ssl.download_key": "Download Key",
   "ssl.delete_confirm": "Delete this certificate?",
+  "ssl.generate_help": "Enter domains to generate certificates, separate by comma",
   
   "proxy.title": "Proxy Configuration",
   "proxy.add_rule": "Add Rule",
