@@ -1,34 +1,34 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VER=${VER:-1.0.1}
+VER=${VER:-1.0.4}
 PKGDIR=build/deb
-DEST=dist/withssl_${VER}_linux_amd64.deb
-BIN=withssl
+DEST=dist/sslcat_${VER}_linux_amd64.deb
+BIN=sslcat
 
 rm -rf "$PKGDIR" && mkdir -p "$PKGDIR/DEBIAN" "$PKGDIR/opt/sslcat" "$PKGDIR/etc/sslcat" "$PKGDIR/lib/systemd/system"
 
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.version=${VER}" -o "$PKGDIR/opt/sslcat/$BIN" main.go
-cp withssl.conf "$PKGDIR/etc/sslcat/withssl.conf" || true
+cp sslcat.conf "$PKGDIR/etc/sslcat/sslcat.conf" 2>/dev/null || true
 
 cat > "$PKGDIR/DEBIAN/control" <<EOF
-Package: withssl
+Package: sslcat
 Version: ${VER}
 Section: net
 Priority: optional
 Architecture: amd64
-Maintainer: withssl
+Maintainer: sslcat
 Description: SSLcat reverse proxy with auto TLS and web panel
 EOF
 
-cat > "$PKGDIR/lib/systemd/system/withssl.service" <<'EOF'
+cat > "$PKGDIR/lib/systemd/system/sslcat.service" <<'EOF'
 [Unit]
 Description=SSLcat Service
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/opt/sslcat/withssl --config /etc/sslcat/withssl.conf
+ExecStart=/opt/sslcat/sslcat --config /etc/sslcat/sslcat.conf
 Restart=always
 RestartSec=3
 User=root

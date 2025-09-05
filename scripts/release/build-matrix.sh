@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# withssl: 多架构批量构建脚本
+# sslcat: 多架构批量构建脚本
 # 使用：VER=1.0.0 scripts/release/build-matrix.sh
 
 VER=${VER:-1.0.0}
@@ -21,7 +21,8 @@ mkdir -p dist
 
 for T in "${MATRIX[@]}"; do
   IFS=/ read -r GOOS GOARCH GOARMV <<<"$T"
-  EXT=""; GOARM=""; BIN="withssl_${VER}_${GOOS}_${GOARCH}"
+  EXT=""; GOARM=""; BIN="sslcat"
+  ARCHIVE="sslcat_${VER}_${GOOS}_${GOARCH}"
   [[ "$GOOS" == windows ]] && EXT=.exe
   [[ "$GOARMV" == v7 ]] && GOARM=7
 
@@ -32,9 +33,9 @@ for T in "${MATRIX[@]}"; do
       -o "dist/${BIN}${EXT}" main.go
 
   if [[ "$GOOS" == windows ]]; then
-    ( cd dist && zip -q "${BIN}.zip" "${BIN}${EXT}" && rm -f "${BIN}${EXT}" )
+    ( cd dist && zip -q "${ARCHIVE}.zip" "${BIN}${EXT}" && rm -f "${BIN}${EXT}" )
   else
-    ( cd dist && tar -czf "${BIN}.tar.gz" "${BIN}${EXT}" && rm -f "${BIN}${EXT}" )
+    ( cd dist && tar -czf "${ARCHIVE}.tar.gz" "${BIN}${EXT}" && rm -f "${BIN}${EXT}" )
   fi
 done
 
