@@ -16,13 +16,13 @@ import (
 type ChartType string
 
 const (
-	ChartTypeLine      ChartType = "line"
-	ChartTypeBar       ChartType = "bar"
-	ChartTypePie       ChartType = "pie"
-	ChartTypeDoughnut  ChartType = "doughnut"
-	ChartTypeArea      ChartType = "area"
-	ChartTypeScatter   ChartType = "scatter"
-	ChartTypeHeatmap   ChartType = "heatmap"
+	ChartTypeLine     ChartType = "line"
+	ChartTypeBar      ChartType = "bar"
+	ChartTypePie      ChartType = "pie"
+	ChartTypeDoughnut ChartType = "doughnut"
+	ChartTypeArea     ChartType = "area"
+	ChartTypeScatter  ChartType = "scatter"
+	ChartTypeHeatmap  ChartType = "heatmap"
 )
 
 // ChartData 图表数据
@@ -59,9 +59,9 @@ type TimeSeriesPoint struct {
 
 // ChartGenerator 图表生成器
 type ChartGenerator struct {
-	monitor     *monitor.Monitor
+	monitor      *monitor.Monitor
 	colorPalette []string
-	log         *logrus.Entry
+	log          *logrus.Entry
 }
 
 // NewChartGenerator 创建图表生成器
@@ -82,7 +82,7 @@ func NewChartGenerator(monitor *monitor.Monitor) *ChartGenerator {
 // GenerateTrafficChart 生成流量图表
 func (g *ChartGenerator) GenerateTrafficChart(period string, interval string) (*ChartData, error) {
 	data := g.monitor.GetTimeSeriesData(g.parsePeriod(period))
-	
+
 	chart := &ChartData{
 		Type:        ChartTypeLine,
 		Title:       "流量监控",
@@ -91,7 +91,7 @@ func (g *ChartGenerator) GenerateTrafficChart(period string, interval string) (*
 		Period:      period,
 		Description: fmt.Sprintf("过去%s的流量统计", period),
 		Options: map[string]interface{}{
-			"responsive": true,
+			"responsive":          true,
 			"maintainAspectRatio": false,
 			"scales": map[string]interface{}{
 				"y": map[string]interface{}{
@@ -110,17 +110,17 @@ func (g *ChartGenerator) GenerateTrafficChart(period string, interval string) (*
 			},
 			"plugins": map[string]interface{}{
 				"legend": map[string]interface{}{
-					"display": true,
+					"display":  true,
 					"position": "top",
 				},
 				"tooltip": map[string]interface{}{
-					"mode": "index",
+					"mode":      "index",
 					"intersect": false,
 				},
 			},
 			"interaction": map[string]interface{}{
-				"mode": "nearest",
-				"axis": "x",
+				"mode":      "nearest",
+				"axis":      "x",
 				"intersect": false,
 			},
 		},
@@ -132,16 +132,16 @@ func (g *ChartGenerator) GenerateTrafficChart(period string, interval string) (*
 		for i, v := range requests {
 			requestData[i] = float64(v)
 		}
-		
+
 		chart.Datasets = append(chart.Datasets, Dataset{
-			Label:       "请求数",
-			Data:        requestData,
-			BorderColor: g.colorPalette[0],
+			Label:           "请求数",
+			Data:            requestData,
+			BorderColor:     g.colorPalette[0],
 			BackgroundColor: g.addAlpha(g.colorPalette[0], 0.1),
-			BorderWidth: 2,
-			Fill:        true,
-			Tension:     0.4,
-			PointRadius: 3,
+			BorderWidth:     2,
+			Fill:            true,
+			Tension:         0.4,
+			PointRadius:     3,
 		})
 	}
 
@@ -151,16 +151,16 @@ func (g *ChartGenerator) GenerateTrafficChart(period string, interval string) (*
 		for i, v := range errors {
 			errorData[i] = float64(v)
 		}
-		
+
 		chart.Datasets = append(chart.Datasets, Dataset{
-			Label:       "错误数",
-			Data:        errorData,
-			BorderColor: g.colorPalette[3],
+			Label:           "错误数",
+			Data:            errorData,
+			BorderColor:     g.colorPalette[3],
 			BackgroundColor: g.addAlpha(g.colorPalette[3], 0.1),
-			BorderWidth: 2,
-			Fill:        false,
-			Tension:     0.4,
-			PointRadius: 3,
+			BorderWidth:     2,
+			Fill:            false,
+			Tension:         0.4,
+			PointRadius:     3,
 		})
 	}
 
@@ -171,7 +171,7 @@ func (g *ChartGenerator) GenerateTrafficChart(period string, interval string) (*
 func (g *ChartGenerator) GenerateStatusCodeChart() (*ChartData, error) {
 	globalStats := g.monitor.GetGlobalStats()
 	domainStats := g.monitor.GetAllDomainStats()
-	
+
 	// 收集所有状态码统计
 	statusCodes := make(map[int]int64)
 	for _, domain := range domainStats {
@@ -179,25 +179,25 @@ func (g *ChartGenerator) GenerateStatusCodeChart() (*ChartData, error) {
 			statusCodes[code] += count
 		}
 	}
-	
+
 	// 转换为图表数据
 	var labels []string
 	var data []float64
 	var colors []string
-	
+
 	// 按状态码排序
 	var codes []int
 	for code := range statusCodes {
 		codes = append(codes, code)
 	}
 	sort.Ints(codes)
-	
+
 	for i, code := range codes {
 		labels = append(labels, fmt.Sprintf("%d", code))
 		data = append(data, float64(statusCodes[code]))
 		colors = append(colors, g.getStatusCodeColor(code, i))
 	}
-	
+
 	chart := &ChartData{
 		Type:        ChartTypeDoughnut,
 		Title:       "状态码分布",
@@ -214,7 +214,7 @@ func (g *ChartGenerator) GenerateStatusCodeChart() (*ChartData, error) {
 			},
 		},
 		Options: map[string]interface{}{
-			"responsive": true,
+			"responsive":          true,
 			"maintainAspectRatio": false,
 			"plugins": map[string]interface{}{
 				"legend": map[string]interface{}{
@@ -229,7 +229,7 @@ func (g *ChartGenerator) GenerateStatusCodeChart() (*ChartData, error) {
 			},
 		},
 	}
-	
+
 	return chart, nil
 }
 
@@ -237,10 +237,10 @@ func (g *ChartGenerator) GenerateStatusCodeChart() (*ChartData, error) {
 func (g *ChartGenerator) GenerateResponseTimeChart(period string) (*ChartData, error) {
 	// 这里应该从监控系统获取响应时间历史数据
 	// 现在使用模拟数据
-	
+
 	labels := g.generateTimeLabels(period, "1h")
 	responseTimeData := g.generateResponseTimeData(len(labels))
-	
+
 	chart := &ChartData{
 		Type:        ChartTypeArea,
 		Title:       "响应时间趋势",
@@ -261,7 +261,7 @@ func (g *ChartGenerator) GenerateResponseTimeChart(period string) (*ChartData, e
 			},
 		},
 		Options: map[string]interface{}{
-			"responsive": true,
+			"responsive":          true,
 			"maintainAspectRatio": false,
 			"scales": map[string]interface{}{
 				"y": map[string]interface{}{
@@ -279,24 +279,24 @@ func (g *ChartGenerator) GenerateResponseTimeChart(period string) (*ChartData, e
 			},
 		},
 	}
-	
+
 	return chart, nil
 }
 
 // GenerateTopDomainsChart 生成热门域名图表
 func (g *ChartGenerator) GenerateTopDomainsChart(limit int) (*ChartData, error) {
 	topDomains := g.monitor.GetTopDomains(limit)
-	
+
 	var labels []string
 	var data []float64
 	var colors []string
-	
+
 	for i, domain := range topDomains {
 		labels = append(labels, domain.Domain)
 		data = append(data, float64(domain.RequestStats.TotalRequests))
 		colors = append(colors, g.colorPalette[i%len(g.colorPalette)])
 	}
-	
+
 	chart := &ChartData{
 		Type:        ChartTypeBar,
 		Title:       fmt.Sprintf("Top %d 域名", limit),
@@ -313,7 +313,7 @@ func (g *ChartGenerator) GenerateTopDomainsChart(limit int) (*ChartData, error) 
 			},
 		},
 		Options: map[string]interface{}{
-			"responsive": true,
+			"responsive":          true,
 			"maintainAspectRatio": false,
 			"scales": map[string]interface{}{
 				"y": map[string]interface{}{
@@ -331,7 +331,7 @@ func (g *ChartGenerator) GenerateTopDomainsChart(limit int) (*ChartData, error) 
 			},
 		},
 	}
-	
+
 	return chart, nil
 }
 
@@ -339,7 +339,7 @@ func (g *ChartGenerator) GenerateTopDomainsChart(limit int) (*ChartData, error) 
 func (g *ChartGenerator) GenerateErrorRateChart(period string) (*ChartData, error) {
 	labels := g.generateTimeLabels(period, "1h")
 	errorRateData := g.generateErrorRateData(len(labels))
-	
+
 	chart := &ChartData{
 		Type:        ChartTypeLine,
 		Title:       "错误率趋势",
@@ -349,18 +349,18 @@ func (g *ChartGenerator) GenerateErrorRateChart(period string) (*ChartData, erro
 		Description: fmt.Sprintf("过去%s的错误率趋势", period),
 		Datasets: []Dataset{
 			{
-				Label:       "错误率 (%)",
-				Data:        errorRateData,
-				BorderColor: g.colorPalette[3],
+				Label:           "错误率 (%)",
+				Data:            errorRateData,
+				BorderColor:     g.colorPalette[3],
 				BackgroundColor: g.addAlpha(g.colorPalette[3], 0.1),
-				BorderWidth: 2,
-				Fill:        true,
-				Tension:     0.4,
-				PointRadius: 3,
+				BorderWidth:     2,
+				Fill:            true,
+				Tension:         0.4,
+				PointRadius:     3,
 			},
 		},
 		Options: map[string]interface{}{
-			"responsive": true,
+			"responsive":          true,
 			"maintainAspectRatio": false,
 			"scales": map[string]interface{}{
 				"y": map[string]interface{}{
@@ -379,7 +379,7 @@ func (g *ChartGenerator) GenerateErrorRateChart(period string) (*ChartData, erro
 			},
 		},
 	}
-	
+
 	return chart, nil
 }
 
@@ -387,7 +387,7 @@ func (g *ChartGenerator) GenerateErrorRateChart(period string) (*ChartData, erro
 func (g *ChartGenerator) GenerateHeatmapChart(period string) (*ChartData, error) {
 	// 生成24小时x7天的热力图数据
 	data := g.generateHeatmapData()
-	
+
 	chart := &ChartData{
 		Type:        ChartTypeHeatmap,
 		Title:       "访问热力图",
@@ -401,7 +401,7 @@ func (g *ChartGenerator) GenerateHeatmapChart(period string) (*ChartData, error)
 			},
 		},
 		Options: map[string]interface{}{
-			"responsive": true,
+			"responsive":          true,
 			"maintainAspectRatio": false,
 			"plugins": map[string]interface{}{
 				"legend": map[string]interface{}{
@@ -410,7 +410,7 @@ func (g *ChartGenerator) GenerateHeatmapChart(period string) (*ChartData, error)
 			},
 		},
 	}
-	
+
 	return chart, nil
 }
 
@@ -438,7 +438,7 @@ func (g *ChartGenerator) parsePeriod(period string) int {
 func (g *ChartGenerator) generateTimeLabels(period string, interval string) []string {
 	var labels []string
 	now := time.Now()
-	
+
 	switch period {
 	case "1h":
 		for i := 60; i >= 0; i -= 5 {
@@ -456,7 +456,7 @@ func (g *ChartGenerator) generateTimeLabels(period string, interval string) []st
 			labels = append(labels, t.Format("01-02"))
 		}
 	}
-	
+
 	return labels
 }
 
@@ -464,32 +464,32 @@ func (g *ChartGenerator) generateTimeLabels(period string, interval string) []st
 func (g *ChartGenerator) generateResponseTimeData(count int) []float64 {
 	data := make([]float64, count)
 	base := 150.0
-	
+
 	for i := 0; i < count; i++ {
 		// 模拟波动的响应时间数据
 		variation := math.Sin(float64(i)*0.1) * 50
 		data[i] = base + variation + float64(i%10)*5
 	}
-	
+
 	return data
 }
 
 // generateErrorRateData 生成错误率数据
 func (g *ChartGenerator) generateErrorRateData(count int) []float64 {
 	data := make([]float64, count)
-	
+
 	for i := 0; i < count; i++ {
 		// 模拟错误率数据
 		data[i] = math.Max(0, 2+math.Sin(float64(i)*0.05)*1.5)
 	}
-	
+
 	return data
 }
 
 // generateHeatmapData 生成热力图数据
 func (g *ChartGenerator) generateHeatmapData() []float64 {
 	data := make([]float64, 24*7) // 24小时 x 7天
-	
+
 	for day := 0; day < 7; day++ {
 		for hour := 0; hour < 24; hour++ {
 			index := day*24 + hour
@@ -503,7 +503,7 @@ func (g *ChartGenerator) generateHeatmapData() []float64 {
 			}
 		}
 	}
-	
+
 	return data
 }
 
@@ -596,7 +596,7 @@ func (g *ChartGenerator) GetAvailableCharts() map[string]interface{} {
 func (g *ChartGenerator) ExportChartData(chartType string, format string) ([]byte, error) {
 	var chart *ChartData
 	var err error
-	
+
 	switch chartType {
 	case "traffic":
 		chart, err = g.GenerateTrafficChart("24h", "1h")
@@ -613,11 +613,11 @@ func (g *ChartGenerator) ExportChartData(chartType string, format string) ([]byt
 	default:
 		return nil, fmt.Errorf("不支持的图表类型: %s", chartType)
 	}
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	switch format {
 	case "json":
 		return json.MarshalIndent(chart, "", "  ")

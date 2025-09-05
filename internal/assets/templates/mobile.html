@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>WithSSL 移动端管理</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #6c757d;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+            --info-color: #17a2b8;
+            --dark-color: #343a40;
+            --light-color: #f8f9fa;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--light-color);
+            padding-bottom: 80px; /* 为底部导航留空间 */
+        }
+
+        /* 移动端优化 */
+        .mobile-header {
+            background: linear-gradient(135deg, var(--primary-color), #0056b3);
+            color: white;
+            padding: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .mobile-header h1 {
+            font-size: 1.5rem;
+            margin: 0;
+            display: flex;
+            align-items: center;
+        }
+
+        .mobile-header .status-badge {
+            margin-left: auto;
+            font-size: 0.8rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.2);
+        }
+
+        /* 仪表板卡片 */
+        .dashboard-cards {
+            padding: 1rem;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .stat-card .icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+
+        .stat-card .value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-card .label {
+            font-size: 0.9rem;
+            color: var(--secondary-color);
+        }
+
+        /* 快速操作区 */
+        .quick-actions {
+            padding: 0 1rem 1rem;
+        }
+
+        .action-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .action-btn {
+            background: white;
+            border: none;
+            border-radius: 15px;
+            padding: 1rem;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+            text-decoration: none;
+            color: var(--dark-color);
+        }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+            color: var(--primary-color);
+        }
+
+        .action-btn i {
+            font-size: 1.5rem;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        /* 实时数据图表区域 */
+        .charts-section {
+            margin: 1rem;
+            background: white;
+            border-radius: 15px;
+            padding: 1rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .chart-container {
+            height: 200px;
+            margin: 1rem 0;
+        }
+
+        /* 底部导航 */
+        .mobile-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 1px solid #dee2e6;
+            padding: 0.5rem 0;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        .nav-items {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .nav-item {
+            text-align: center;
+            color: var(--secondary-color);
+            text-decoration: none;
+            padding: 0.5rem;
+            border-radius: 10px;
+            transition: all 0.2s ease;
+            flex: 1;
+        }
+
+        .nav-item.active {
+            color: var(--primary-color);
+            background: rgba(0,123,255,0.1);
+        }
+
+        .nav-item i {
+            font-size: 1.2rem;
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+
+        .nav-item span {
+            font-size: 0.7rem;
+        }
+
+        /* 弹出菜单 */
+        .action-sheet {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-radius: 20px 20px 0 0;
+            padding: 1rem;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+            z-index: 2000;
+            max-height: 50vh;
+            overflow-y: auto;
+        }
+
+        .action-sheet.show {
+            transform: translateY(0);
+        }
+
+        .action-sheet-header {
+            text-align: center;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .action-sheet-item {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            border-radius: 10px;
+            margin-bottom: 0.5rem;
+            transition: background 0.2s ease;
+        }
+
+        .action-sheet-item:hover {
+            background: var(--light-color);
+        }
+
+        .action-sheet-item i {
+            margin-right: 1rem;
+            font-size: 1.2rem;
+            width: 24px;
+        }
+
+        /* 响应式优化 */
+        @media (max-width: 576px) {
+            .dashboard-cards {
+                grid-template-columns: 1fr;
+            }
+            
+            .action-buttons {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* 暗色主题支持 */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #1a1a1a;
+                color: white;
+            }
+            
+            .stat-card, .action-btn, .charts-section, .mobile-nav {
+                background: #2d2d2d;
+                color: white;
+            }
+            
+            .action-sheet {
+                background: #2d2d2d;
+                color: white;
+            }
+        }
+
+        /* 加载动画 */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* 通知徽章 */
+        .notification-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: var(--danger-color);
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            font-size: 0.7rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-item {
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+    <!-- 移动端头部 -->
+    <div class="mobile-header">
+        <h1>
+            <i class="bi bi-shield-check me-2"></i>
+            WithSSL
+            <div class="status-badge">
+                <i class="bi bi-circle-fill text-success me-1"></i>
+                在线
+            </div>
+        </h1>
+    </div>
+
+    <!-- 仪表板卡片 -->
+    <div class="dashboard-cards">
+        <div class="stat-card">
+            <i class="bi bi-graph-up icon text-success"></i>
+            <div class="value" id="total-requests">-</div>
+            <div class="label">总请求数</div>
+        </div>
+        
+        <div class="stat-card">
+            <i class="bi bi-speedometer2 icon text-info"></i>
+            <div class="value" id="requests-per-sec">-</div>
+            <div class="label">当前QPS</div>
+        </div>
+        
+        <div class="stat-card">
+            <i class="bi bi-exclamation-triangle icon text-warning"></i>
+            <div class="value" id="error-rate">-</div>
+            <div class="label">错误率</div>
+        </div>
+        
+        <div class="stat-card">
+            <i class="bi bi-clock icon text-primary"></i>
+            <div class="value" id="avg-response-time">-</div>
+            <div class="label">平均响应时间</div>
+        </div>
+    </div>
+
+    <!-- 快速操作 -->
+    <div class="quick-actions">
+        <h5 class="mb-3">快速操作</h5>
+        <div class="action-buttons">
+            <button class="action-btn" onclick="showActionSheet('ssl')">
+                <i class="bi bi-shield-lock"></i>
+                SSL证书管理
+            </button>
+            
+            <button class="action-btn" onclick="showActionSheet('proxy')">
+                <i class="bi bi-arrow-left-right"></i>
+                代理配置
+            </button>
+            
+            <button class="action-btn" onclick="showActionSheet('security')">
+                <i class="bi bi-shield-exclamation"></i>
+                安全防护
+            </button>
+            
+            <button class="action-btn" onclick="showActionSheet('logs')">
+                <i class="bi bi-file-text"></i>
+                日志查看
+            </button>
+        </div>
+    </div>
+
+    <!-- 实时数据图表 -->
+    <div class="charts-section">
+        <h5 class="mb-3">实时流量监控</h5>
+        <div class="chart-container">
+            <canvas id="traffic-chart"></canvas>
+        </div>
+    </div>
+
+    <!-- 底部导航 -->
+    <div class="mobile-nav">
+        <div class="nav-items">
+            <a href="#dashboard" class="nav-item active">
+                <i class="bi bi-speedometer2"></i>
+                <span>仪表板</span>
+            </a>
+            
+            <a href="#domains" class="nav-item">
+                <i class="bi bi-globe"></i>
+                <span>域名</span>
+                <div class="notification-badge">3</div>
+            </a>
+            
+            <a href="#security" class="nav-item">
+                <i class="bi bi-shield-check"></i>
+                <span>安全</span>
+            </a>
+            
+            <a href="#alerts" class="nav-item">
+                <i class="bi bi-bell"></i>
+                <span>告警</span>
+                <div class="notification-badge">2</div>
+            </a>
+            
+            <a href="#settings" class="nav-item">
+                <i class="bi bi-gear"></i>
+                <span>设置</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- 操作面板 -->
+    <div class="action-sheet" id="action-sheet">
+        <div class="action-sheet-header">
+            <h6 id="action-sheet-title">操作菜单</h6>
+            <button class="btn-close" onclick="hideActionSheet()"></button>
+        </div>
+        <div id="action-sheet-content">
+            <!-- 动态内容 -->
+        </div>
+    </div>
+
+    <!-- 遮罩层 -->
+    <div class="modal-backdrop fade" id="backdrop" onclick="hideActionSheet()"></div>
+
+    <!-- Chart.js -->
+    <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Axios -->
+    <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+    <script>
+        // 实时数据更新
+        let chart;
+        let isLoading = false;
+
+        // 初始化图表
+        function initChart() {
+            const ctx = document.getElementById('traffic-chart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '请求数/分钟',
+                        data: [],
+                        borderColor: '#007bff',
+                        backgroundColor: 'rgba(0,123,255,0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0,0,0,0.1)'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgba(0,0,0,0.1)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        // 更新仪表板数据
+        async function updateDashboard() {
+            if (isLoading) return;
+            isLoading = true;
+
+            try {
+                const response = await axios.get('/withssl-panel/api/stats');
+                const data = response.data;
+
+                // 更新统计卡片
+                document.getElementById('total-requests').textContent = 
+                    formatNumber(data.total_requests || 0);
+                document.getElementById('requests-per-sec').textContent = 
+                    (data.requests_per_sec || 0).toFixed(1);
+                document.getElementById('error-rate').textContent = 
+                    (data.error_rate || 0).toFixed(1) + '%';
+                document.getElementById('avg-response-time').textContent = 
+                    (data.avg_response_time || 0).toFixed(0) + 'ms';
+
+                // 更新图表数据
+                if (data.time_series) {
+                    chart.data.labels = data.time_series.labels;
+                    chart.data.datasets[0].data = data.time_series.requests;
+                    chart.update('none');
+                }
+
+            } catch (error) {
+                console.error('获取数据失败:', error);
+            } finally {
+                isLoading = false;
+            }
+        }
+
+        // 格式化数字
+        function formatNumber(num) {
+            if (num >= 1000000) {
+                return (num / 1000000).toFixed(1) + 'M';
+            } else if (num >= 1000) {
+                return (num / 1000).toFixed(1) + 'K';
+            }
+            return num.toString();
+        }
+
+        // 显示操作面板
+        function showActionSheet(type) {
+            const sheet = document.getElementById('action-sheet');
+            const backdrop = document.getElementById('backdrop');
+            const title = document.getElementById('action-sheet-title');
+            const content = document.getElementById('action-sheet-content');
+
+            let titleText = '';
+            let contentHtml = '';
+
+            switch (type) {
+                case 'ssl':
+                    titleText = 'SSL证书管理';
+                    contentHtml = `
+                        <button class="action-sheet-item" onclick="manageSSL('view')">
+                            <i class="bi bi-eye text-info"></i>
+                            查看证书状态
+                        </button>
+                        <button class="action-sheet-item" onclick="manageSSL('renew')">
+                            <i class="bi bi-arrow-clockwise text-success"></i>
+                            手动续期证书
+                        </button>
+                        <button class="action-sheet-item" onclick="manageSSL('add')">
+                            <i class="bi bi-plus-circle text-primary"></i>
+                            添加新域名
+                        </button>
+                    `;
+                    break;
+                case 'proxy':
+                    titleText = '代理配置';
+                    contentHtml = `
+                        <button class="action-sheet-item" onclick="manageProxy('list')">
+                            <i class="bi bi-list text-info"></i>
+                            查看代理规则
+                        </button>
+                        <button class="action-sheet-item" onclick="manageProxy('add')">
+                            <i class="bi bi-plus-circle text-success"></i>
+                            添加代理规则
+                        </button>
+                        <button class="action-sheet-item" onclick="manageProxy('health')">
+                            <i class="bi bi-heart-pulse text-warning"></i>
+                            健康检测状态
+                        </button>
+                    `;
+                    break;
+                case 'security':
+                    titleText = '安全防护';
+                    contentHtml = `
+                        <button class="action-sheet-item" onclick="manageSecurity('waf')">
+                            <i class="bi bi-shield-check text-success"></i>
+                            WAF防护状态
+                        </button>
+                        <button class="action-sheet-item" onclick="manageSecurity('ddos')">
+                            <i class="bi bi-shield-exclamation text-warning"></i>
+                            DDoS防护设置
+                        </button>
+                        <button class="action-sheet-item" onclick="manageSecurity('blocked')">
+                            <i class="bi bi-x-circle text-danger"></i>
+                            被封禁IP列表
+                        </button>
+                    `;
+                    break;
+                case 'logs':
+                    titleText = '日志查看';
+                    contentHtml = `
+                        <button class="action-sheet-item" onclick="viewLogs('access')">
+                            <i class="bi bi-file-text text-info"></i>
+                            访问日志
+                        </button>
+                        <button class="action-sheet-item" onclick="viewLogs('error')">
+                            <i class="bi bi-exclamation-triangle text-warning"></i>
+                            错误日志
+                        </button>
+                        <button class="action-sheet-item" onclick="viewLogs('security')">
+                            <i class="bi bi-shield text-danger"></i>
+                            安全日志
+                        </button>
+                    `;
+                    break;
+            }
+
+            title.textContent = titleText;
+            content.innerHTML = contentHtml;
+            
+            backdrop.style.display = 'block';
+            setTimeout(() => {
+                backdrop.classList.add('show');
+                sheet.classList.add('show');
+            }, 10);
+        }
+
+        // 隐藏操作面板
+        function hideActionSheet() {
+            const sheet = document.getElementById('action-sheet');
+            const backdrop = document.getElementById('backdrop');
+            
+            sheet.classList.remove('show');
+            backdrop.classList.remove('show');
+            
+            setTimeout(() => {
+                backdrop.style.display = 'none';
+            }, 300);
+        }
+
+        // 导航切换
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // 移除所有活动状态
+                document.querySelectorAll('.nav-item').forEach(nav => {
+                    nav.classList.remove('active');
+                });
+                
+                // 添加当前活动状态
+                this.classList.add('active');
+                
+                // 这里可以添加页面切换逻辑
+                const target = this.getAttribute('href').substring(1);
+                console.log('切换到:', target);
+            });
+        });
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initChart();
+            updateDashboard();
+            
+            // 定期更新数据
+            setInterval(updateDashboard, 30000); // 30秒更新一次
+        });
+
+        // 触摸支持
+        let touchStartY = 0;
+        document.addEventListener('touchstart', function(e) {
+            touchStartY = e.touches[0].clientY;
+        });
+
+        document.addEventListener('touchmove', function(e) {
+            // 下拉刷新逻辑
+            if (window.scrollY === 0 && e.touches[0].clientY > touchStartY + 50) {
+                updateDashboard();
+            }
+        });
+    </script>
+</body>
+</html>

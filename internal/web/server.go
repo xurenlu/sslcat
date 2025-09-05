@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"withssl/internal/config"
+	"withssl/internal/i18n"
 	"withssl/internal/proxy"
 	"withssl/internal/security"
 
@@ -17,17 +18,27 @@ type Server struct {
 	config          *config.Config
 	proxyManager    *proxy.Manager
 	securityManager *security.Manager
+	templateRenderer *TemplateRenderer
+	translator      *i18n.Translator
 	mux             *http.ServeMux
 	log             *logrus.Entry
 }
 
 // NewServer 创建Web服务器
 func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Manager) *Server {
+	// 初始化翻译器
+	translator := i18n.NewTranslator(i18n.LangZhCN, "internal/assets/i18n")
+	
+	// 初始化模板渲染器
+	templateRenderer := NewTemplateRenderer(translator)
+	
 	server := &Server{
-		config:          cfg,
-		proxyManager:    proxyMgr,
-		securityManager: secMgr,
-		mux:             http.NewServeMux(),
+		config:           cfg,
+		proxyManager:     proxyMgr,
+		securityManager:  secMgr,
+		templateRenderer: templateRenderer,
+		translator:       translator,
+		mux:              http.NewServeMux(),
 		log: logrus.WithFields(logrus.Fields{
 			"component": "web_server",
 		}),
@@ -43,6 +54,8 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/", s.handleAdmin)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/login", s.handleLogin)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/dashboard", s.handleDashboard)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/mobile", s.handleMobile)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/charts", s.handleCharts)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/proxy", s.handleProxy)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/ssl", s.handleSSL)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/security", s.handleSecurity)
@@ -170,6 +183,22 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+}
+
+// handleMobile 处理移动端页面
+func (s *Server) handleMobile(w http.ResponseWriter, r *http.Request) {
+	data := map[string]interface{}{
+		"Title": "移动端管理 - WithSSL",
+	}
+	s.templateRenderer.DetectLanguageAndRender(w, r, "mobile.html", data)
+}
+
+// handleCharts 处理图表页面
+func (s *Server) handleCharts(w http.ResponseWriter, r *http.Request) {
+	data := map[string]interface{}{
+		"Title": "流量分析图表 - WithSSL",
+	}
+	s.templateRenderer.DetectLanguageAndRender(w, r, "charts.html", data)
 }
 
 func (s *Server) renderLoginPage(w http.ResponseWriter, r *http.Request, errorMsg string) {
