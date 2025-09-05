@@ -1,12 +1,10 @@
 package waf
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"regexp"
 	"strings"
 	"sync"
@@ -19,12 +17,12 @@ import (
 type RuleType string
 
 const (
-	RuleTypeSQLInjection RuleType = "sql_injection"
-	RuleTypeXSS          RuleType = "xss"
-	RuleTypePathTraversal RuleType = "path_traversal"
+	RuleTypeSQLInjection     RuleType = "sql_injection"
+	RuleTypeXSS              RuleType = "xss"
+	RuleTypePathTraversal    RuleType = "path_traversal"
 	RuleTypeCommandInjection RuleType = "command_injection"
-	RuleTypeFileUpload   RuleType = "file_upload"
-	RuleTypeCustom       RuleType = "custom"
+	RuleTypeFileUpload       RuleType = "file_upload"
+	RuleTypeCustom           RuleType = "custom"
 )
 
 // Action WAF动作
@@ -38,15 +36,15 @@ const (
 
 // Rule WAF规则
 type Rule struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Type        RuleType  `json:"type"`
-	Pattern     string    `json:"pattern"`
+	ID          string         `json:"id"`
+	Name        string         `json:"name"`
+	Type        RuleType       `json:"type"`
+	Pattern     string         `json:"pattern"`
 	Regex       *regexp.Regexp `json:"-"`
-	Action      Action    `json:"action"`
-	Enabled     bool      `json:"enabled"`
-	Description string    `json:"description"`
-	CreatedAt   time.Time `json:"created_at"`
+	Action      Action         `json:"action"`
+	Enabled     bool           `json:"enabled"`
+	Description string         `json:"description"`
+	CreatedAt   time.Time      `json:"created_at"`
 }
 
 // AttackEvent 攻击事件
@@ -91,10 +89,10 @@ func NewEngine() *Engine {
 			"component": "waf_engine",
 		}),
 	}
-	
+
 	// 初始化默认规则
 	engine.initDefaultRules()
-	
+
 	return engine
 }
 
@@ -113,7 +111,7 @@ func (e *Engine) initDefaultRules() {
 		{"SQL Time-based", `(?i)(sleep|benchmark|waitfor|delay)`},
 		{"SQL Error-based", `(?i)(extractvalue|updatexml|exp|floor|rand)`},
 	}
-	
+
 	for i, rule := range sqlRules {
 		e.AddRule(&Rule{
 			ID:          fmt.Sprintf("sql_%d", i+1),
@@ -126,7 +124,7 @@ func (e *Engine) initDefaultRules() {
 			CreatedAt:   time.Now(),
 		})
 	}
-	
+
 	// XSS规则
 	xssRules := []struct {
 		name    string
@@ -139,7 +137,7 @@ func (e *Engine) initDefaultRules() {
 		{"Data URI", `(?i)data:.*base64`},
 		{"Expression", `(?i)expression\s*\(`},
 	}
-	
+
 	for i, rule := range xssRules {
 		e.AddRule(&Rule{
 			ID:          fmt.Sprintf("xss_%d", i+1),
@@ -152,7 +150,7 @@ func (e *Engine) initDefaultRules() {
 			CreatedAt:   time.Now(),
 		})
 	}
-	
+
 	// 路径遍历规则
 	pathRules := []struct {
 		name    string
@@ -163,7 +161,7 @@ func (e *Engine) initDefaultRules() {
 		{"Null Byte", `%00`},
 		{"Encoded Traversal", `%2e%2e%2f|%2e%2e%5c`},
 	}
-	
+
 	for i, rule := range pathRules {
 		e.AddRule(&Rule{
 			ID:          fmt.Sprintf("path_%d", i+1),
@@ -176,7 +174,7 @@ func (e *Engine) initDefaultRules() {
 			CreatedAt:   time.Now(),
 		})
 	}
-	
+
 	// 命令注入规则
 	cmdRules := []struct {
 		name    string
@@ -187,7 +185,7 @@ func (e *Engine) initDefaultRules() {
 		{"File Operations", `(?i)(rm|del|copy|move|mkdir|rmdir)`},
 		{"Network Commands", `(?i)(ping|wget|curl|nc|netcat|telnet)`},
 	}
-	
+
 	for i, rule := range cmdRules {
 		e.AddRule(&Rule{
 			ID:          fmt.Sprintf("cmd_%d", i+1),
@@ -200,7 +198,7 @@ func (e *Engine) initDefaultRules() {
 			CreatedAt:   time.Now(),
 		})
 	}
-	
+
 	e.log.Infof("已初始化 %d 个默认WAF规则", len(e.rules))
 }
 
@@ -210,14 +208,14 @@ func (e *Engine) AddRule(rule *Rule) error {
 	if err != nil {
 		return fmt.Errorf("编译正则表达式失败: %w", err)
 	}
-	
+
 	rule.Regex = regex
-	
+
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
-	
+
 	e.rules[rule.ID] = rule
-	
+
 	// 按类型分类
 	switch rule.Type {
 	case RuleTypeSQLInjection:
@@ -231,7 +229,7 @@ func (e *Engine) AddRule(rule *Rule) error {
 	case RuleTypeCustom:
 		e.customRules = append(e.customRules, rule)
 	}
-	
+
 	return nil
 }
 
@@ -239,9 +237,9 @@ func (e *Engine) AddRule(rule *Rule) error {
 func (e *Engine) RemoveRule(ruleID string) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
-	
+
 	delete(e.rules, ruleID)
-	
+
 	// 从分类数组中删除
 	e.removeFromSlice(&e.sqlPatterns, ruleID)
 	e.removeFromSlice(&e.xssPatterns, ruleID)
@@ -265,38 +263,38 @@ func (e *Engine) CheckRequest(r *http.Request) (*AttackEvent, bool) {
 	if !e.enabled {
 		return nil, false
 	}
-	
+
 	e.mutex.RLock()
 	defer e.mutex.RUnlock()
-	
+
 	// 获取请求数据
 	url := r.URL.String()
 	method := r.Method
 	clientIP := e.getClientIP(r)
 	userAgent := r.Header.Get("User-Agent")
-	
+
 	// 检查URL参数
 	if event := e.checkURLParams(r, clientIP, userAgent, url, method); event != nil {
 		return event, event.Blocked
 	}
-	
+
 	// 检查请求头
 	if event := e.checkHeaders(r, clientIP, userAgent, url, method); event != nil {
 		return event, event.Blocked
 	}
-	
+
 	// 检查请求体
 	if event := e.checkBody(r, clientIP, userAgent, url, method); event != nil {
 		return event, event.Blocked
 	}
-	
+
 	return nil, false
 }
 
 // checkURLParams 检查URL参数
 func (e *Engine) checkURLParams(r *http.Request, clientIP, userAgent, url, method string) *AttackEvent {
 	params := r.URL.Query()
-	
+
 	for key, values := range params {
 		for _, value := range values {
 			payload := key + "=" + value
@@ -305,7 +303,7 @@ func (e *Engine) checkURLParams(r *http.Request, clientIP, userAgent, url, metho
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -319,7 +317,7 @@ func (e *Engine) checkHeaders(r *http.Request, clientIP, userAgent, url, method 
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -328,23 +326,23 @@ func (e *Engine) checkBody(r *http.Request, clientIP, userAgent, url, method str
 	if r.Body == nil {
 		return nil
 	}
-	
+
 	// 读取请求体
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		return nil
 	}
-	
+
 	// 恢复请求体
 	r.Body = io.NopCloser(bytes.NewBuffer(body))
-	
+
 	// 检查请求体内容
 	if len(body) > 0 {
 		payload := string(body)
 		if event := e.matchRules(payload, clientIP, userAgent, url, method); event != nil {
 			return event
 		}
-		
+
 		// 如果是表单数据，解析并检查
 		if strings.Contains(r.Header.Get("Content-Type"), "application/x-www-form-urlencoded") {
 			if values, err := url.ParseQuery(payload); err == nil {
@@ -359,7 +357,7 @@ func (e *Engine) checkBody(r *http.Request, clientIP, userAgent, url, method str
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -370,7 +368,7 @@ func (e *Engine) matchRules(payload, clientIP, userAgent, url, method string) *A
 		if !rule.Enabled {
 			continue
 		}
-		
+
 		if rule.Regex.MatchString(payload) {
 			event := &AttackEvent{
 				ID:        e.generateEventID(),
@@ -386,23 +384,23 @@ func (e *Engine) matchRules(payload, clientIP, userAgent, url, method string) *A
 				Timestamp: time.Now(),
 				Blocked:   rule.Action == ActionBlock,
 			}
-			
+
 			e.addEvent(event)
-			
-			e.log.Warnf("WAF检测到攻击: %s from %s, 规则: %s, 动作: %s", 
+
+			e.log.Warnf("WAF检测到攻击: %s from %s, 规则: %s, 动作: %s",
 				rule.Type, clientIP, rule.Name, rule.Action)
-			
+
 			return event
 		}
 	}
-	
+
 	return nil
 }
 
 // addEvent 添加事件
 func (e *Engine) addEvent(event *AttackEvent) {
 	e.events = append(e.events, *event)
-	
+
 	// 保持事件数量限制
 	if len(e.events) > e.maxEvents {
 		e.events = e.events[1:]
@@ -422,18 +420,18 @@ func (e *Engine) getClientIP(r *http.Request) string {
 			return strings.TrimSpace(ips[0])
 		}
 	}
-	
+
 	if xri := r.Header.Get("X-Real-IP"); xri != "" {
 		return strings.TrimSpace(xri)
 	}
-	
+
 	if ip := r.RemoteAddr; ip != "" {
 		if idx := strings.LastIndex(ip, ":"); idx != -1 {
 			return ip[:idx]
 		}
 		return ip
 	}
-	
+
 	return "unknown"
 }
 
@@ -441,7 +439,7 @@ func (e *Engine) getClientIP(r *http.Request) string {
 func (e *Engine) SetEnabled(enabled bool) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
-	
+
 	e.enabled = enabled
 	e.log.Infof("WAF引擎已%s", map[bool]string{true: "启用", false: "禁用"}[enabled])
 }
@@ -457,12 +455,12 @@ func (e *Engine) IsEnabled() bool {
 func (e *Engine) GetRules() map[string]*Rule {
 	e.mutex.RLock()
 	defer e.mutex.RUnlock()
-	
+
 	result := make(map[string]*Rule)
 	for id, rule := range e.rules {
 		result[id] = rule
 	}
-	
+
 	return result
 }
 
@@ -470,11 +468,11 @@ func (e *Engine) GetRules() map[string]*Rule {
 func (e *Engine) GetEvents(limit int) []AttackEvent {
 	e.mutex.RLock()
 	defer e.mutex.RUnlock()
-	
+
 	if limit <= 0 || limit > len(e.events) {
 		limit = len(e.events)
 	}
-	
+
 	// 返回最新的事件
 	start := len(e.events) - limit
 	return e.events[start:]
@@ -484,7 +482,7 @@ func (e *Engine) GetEvents(limit int) []AttackEvent {
 func (e *Engine) GetEventsByType(ruleType RuleType, limit int) []AttackEvent {
 	e.mutex.RLock()
 	defer e.mutex.RUnlock()
-	
+
 	var filtered []AttackEvent
 	for i := len(e.events) - 1; i >= 0; i-- {
 		if e.events[i].RuleType == ruleType {
@@ -494,7 +492,7 @@ func (e *Engine) GetEventsByType(ruleType RuleType, limit int) []AttackEvent {
 			}
 		}
 	}
-	
+
 	return filtered
 }
 
@@ -502,35 +500,35 @@ func (e *Engine) GetEventsByType(ruleType RuleType, limit int) []AttackEvent {
 func (e *Engine) GetStats() map[string]interface{} {
 	e.mutex.RLock()
 	defer e.mutex.RUnlock()
-	
+
 	stats := map[string]interface{}{
 		"enabled":      e.enabled,
 		"total_rules":  len(e.rules),
 		"total_events": len(e.events),
 	}
-	
+
 	// 按类型统计规则
 	rulesByType := make(map[RuleType]int)
 	for _, rule := range e.rules {
 		rulesByType[rule.Type]++
 	}
 	stats["rules_by_type"] = rulesByType
-	
+
 	// 按类型统计事件
 	eventsByType := make(map[RuleType]int)
 	blockedEvents := 0
-	
+
 	for _, event := range e.events {
 		eventsByType[event.RuleType]++
 		if event.Blocked {
 			blockedEvents++
 		}
 	}
-	
+
 	stats["events_by_type"] = eventsByType
 	stats["blocked_events"] = blockedEvents
 	stats["detection_rate"] = float64(len(e.events)) / float64(len(e.events)+1) * 100
-	
+
 	return stats
 }
 
@@ -538,7 +536,7 @@ func (e *Engine) GetStats() map[string]interface{} {
 func (e *Engine) ClearEvents() {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
-	
+
 	e.events = make([]AttackEvent, 0)
 	e.log.Info("WAF攻击事件已清空")
 }

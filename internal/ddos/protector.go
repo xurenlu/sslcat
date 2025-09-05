@@ -41,15 +41,15 @@ func (l ProtectionLevel) String() string {
 
 // ClientInfo 客户端信息
 type ClientInfo struct {
-	IP            string    `json:"ip"`
-	RequestCount  int       `json:"request_count"`
-	LastRequest   time.Time `json:"last_request"`
-	FirstRequest  time.Time `json:"first_request"`
-	BlockedUntil  time.Time `json:"blocked_until"`
-	UserAgent     string    `json:"user_agent"`
-	RequestRate   float64   `json:"request_rate"`
-	Suspicious    bool      `json:"suspicious"`
-	BlockCount    int       `json:"block_count"`
+	IP           string    `json:"ip"`
+	RequestCount int       `json:"request_count"`
+	LastRequest  time.Time `json:"last_request"`
+	FirstRequest time.Time `json:"first_request"`
+	BlockedUntil time.Time `json:"blocked_until"`
+	UserAgent    string    `json:"user_agent"`
+	RequestRate  float64   `json:"request_rate"`
+	Suspicious   bool      `json:"suspicious"`
+	BlockCount   int       `json:"block_count"`
 }
 
 // Attack 攻击信息
@@ -75,17 +75,17 @@ type Protector struct {
 	mutex           sync.RWMutex
 	cleanupInterval time.Duration
 	stopChan        chan struct{}
-	
+
 	// 配置参数
 	maxRequestsPerMinute int
 	maxRequestsPerHour   int
 	blockDuration        time.Duration
 	maxClients           int
 	maxAttacks           int
-	
+
 	// 防护阈值
 	thresholds map[ProtectionLevel]ThresholdConfig
-	
+
 	log *logrus.Entry
 }
 
@@ -115,13 +115,13 @@ func NewProtector() *Protector {
 			"component": "ddos_protector",
 		}),
 	}
-	
+
 	// 初始化阈值配置
 	p.initThresholds()
-	
+
 	// 启动清理协程
 	go p.cleanupRoutine()
-	
+
 	return p
 }
 
@@ -176,14 +176,14 @@ func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
 	if !p.enabled || p.level == LevelOff {
 		return false, ""
 	}
-	
+
 	clientIP := p.getClientIP(r)
 	userAgent := r.Header.Get("User-Agent")
 	now := time.Now()
-	
+
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
-	
+
 	// 获取或创建客户端信息
 	client, exists := p.clients[clientIP]
 	if !exists {
@@ -195,49 +195,49 @@ func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
 		}
 		p.clients[clientIP] = client
 	}
-	
+
 	// 检查是否已被封禁
 	if now.Before(client.BlockedUntil) {
-		p.recordAttack(clientIP, userAgent, r.URL.String(), r.Method, 
+		p.recordAttack(clientIP, userAgent, r.URL.String(), r.Method,
 			"rate_limit", "high", "IP仍在封禁期内", true)
 		return true, "IP已被封禁"
 	}
-	
+
 	// 更新客户端信息
 	client.RequestCount++
 	client.LastRequest = now
-	
+
 	// 计算请求速率
 	duration := now.Sub(client.FirstRequest)
 	if duration > 0 {
 		client.RequestRate = float64(client.RequestCount) / duration.Minutes()
 	}
-	
+
 	// 获取当前阈值配置
 	threshold := p.thresholds[p.level]
-	
+
 	// 检查请求频率
 	if blocked, reason := p.checkRateLimit(client, threshold, now); blocked {
 		p.blockClient(client, threshold.BlockDuration, now)
-		p.recordAttack(clientIP, userAgent, r.URL.String(), r.Method, 
+		p.recordAttack(clientIP, userAgent, r.URL.String(), r.Method,
 			"rate_limit", "high", reason, true)
 		return true, reason
 	}
-	
+
 	// 检查可疑User-Agent
 	if threshold.SuspiciousUA && p.isSuspiciousUserAgent(userAgent) {
-		p.recordAttack(clientIP, userAgent, r.URL.String(), r.Method, 
+		p.recordAttack(clientIP, userAgent, r.URL.String(), r.Method,
 			"suspicious_ua", "medium", "可疑的User-Agent", false)
 		client.Suspicious = true
 	}
-	
+
 	// 检查请求模式
 	if p.isSuspiciousPattern(r, client) {
-		p.recordAttack(clientIP, userAgent, r.URL.String(), r.Method, 
+		p.recordAttack(clientIP, userAgent, r.URL.String(), r.Method,
 			"suspicious_pattern", "medium", "可疑的请求模式", false)
 		client.Suspicious = true
 	}
-	
+
 	return false, ""
 }
 
@@ -250,7 +250,7 @@ func (p *Protector) checkRateLimit(client *ClientInfo, threshold ThresholdConfig
 			return true, "每分钟请求数超限"
 		}
 	}
-	
+
 	// 检查每小时请求数
 	if threshold.RequestsPerHour > 0 {
 		hourAgo := now.Add(-time.Hour)
@@ -258,7 +258,7 @@ func (p *Protector) checkRateLimit(client *ClientInfo, threshold ThresholdConfig
 			return true, "每小时请求数超限"
 		}
 	}
-	
+
 	return false, ""
 }
 
@@ -266,8 +266,8 @@ func (p *Protector) checkRateLimit(client *ClientInfo, threshold ThresholdConfig
 func (p *Protector) blockClient(client *ClientInfo, duration time.Duration, now time.Time) {
 	client.BlockedUntil = now.Add(duration)
 	client.BlockCount++
-	
-	p.log.Warnf("封禁客户端 %s，持续时间: %v，封禁次数: %d", 
+
+	p.log.Warnf("封禁客户端 %s，持续时间: %v，封禁次数: %d",
 		client.IP, duration, client.BlockCount)
 }
 
@@ -276,31 +276,31 @@ func (p *Protector) isSuspiciousUserAgent(userAgent string) bool {
 	if userAgent == "" {
 		return true
 	}
-	
+
 	// 检查常见的恶意User-Agent
 	suspicious := []string{
 		"bot", "crawler", "spider", "scraper", "scan", "hack", "attack",
 		"sql", "injection", "exploit", "payload", "shell",
 	}
-	
+
 	userAgentLower := strings.ToLower(userAgent)
 	for _, keyword := range suspicious {
 		if strings.Contains(userAgentLower, keyword) {
 			return true
 		}
 	}
-	
+
 	// 检查是否为正常浏览器User-Agent
 	browsers := []string{
 		"mozilla", "chrome", "safari", "firefox", "edge", "opera",
 	}
-	
+
 	for _, browser := range browsers {
 		if strings.Contains(userAgentLower, browser) {
 			return false
 		}
 	}
-	
+
 	// 如果不包含常见浏览器标识，可能是可疑的
 	return len(userAgent) < 20 || len(userAgent) > 500
 }
@@ -308,30 +308,30 @@ func (p *Protector) isSuspiciousUserAgent(userAgent string) bool {
 // isSuspiciousPattern 检查是否为可疑请求模式
 func (p *Protector) isSuspiciousPattern(r *http.Request, client *ClientInfo) bool {
 	url := r.URL.String()
-	
+
 	// 检查路径遍历攻击
 	if strings.Contains(url, "../") || strings.Contains(url, "..\\") {
 		return true
 	}
-	
+
 	// 检查SQL注入尝试
 	sqlKeywords := []string{
 		"union", "select", "insert", "delete", "drop", "update",
 		"or 1=1", "and 1=1", "' or '", "\" or \"",
 	}
-	
+
 	urlLower := strings.ToLower(url)
 	for _, keyword := range sqlKeywords {
 		if strings.Contains(urlLower, keyword) {
 			return true
 		}
 	}
-	
+
 	// 检查异常请求频率
 	if client.RequestRate > 10 { // 每分钟超过10个请求
 		return true
 	}
-	
+
 	return false
 }
 
@@ -349,14 +349,14 @@ func (p *Protector) recordAttack(clientIP, userAgent, url, method, attackType, s
 		Blocked:    blocked,
 		Reason:     reason,
 	}
-	
+
 	p.attacks = append(p.attacks, attack)
-	
+
 	// 保持攻击记录数量限制
 	if len(p.attacks) > p.maxAttacks {
 		p.attacks = p.attacks[1:]
 	}
-	
+
 	if blocked {
 		p.log.Warnf("DDoS攻击已阻止: %s from %s, 原因: %s", attackType, clientIP, reason)
 	} else {
@@ -378,17 +378,17 @@ func (p *Protector) getClientIP(r *http.Request) string {
 			return strings.TrimSpace(ips[0])
 		}
 	}
-	
+
 	// 检查X-Real-IP
 	if xri := r.Header.Get("X-Real-IP"); xri != "" {
 		return strings.TrimSpace(xri)
 	}
-	
+
 	// 使用RemoteAddr
 	if ip, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
 		return ip
 	}
-	
+
 	return r.RemoteAddr
 }
 
@@ -396,7 +396,7 @@ func (p *Protector) getClientIP(r *http.Request) string {
 func (p *Protector) cleanupRoutine() {
 	ticker := time.NewTicker(p.cleanupInterval)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ticker.C:
@@ -411,9 +411,9 @@ func (p *Protector) cleanupRoutine() {
 func (p *Protector) cleanup() {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
-	
+
 	now := time.Now()
-	
+
 	// 清理过期的客户端记录
 	for ip, client := range p.clients {
 		// 如果客户端1小时内没有请求，且没有被封禁，则删除记录
@@ -421,7 +421,7 @@ func (p *Protector) cleanup() {
 			delete(p.clients, ip)
 		}
 	}
-	
+
 	// 清理旧的攻击记录（保留24小时）
 	cutoff := now.Add(-24 * time.Hour)
 	newAttacks := make([]Attack, 0)
@@ -431,8 +431,8 @@ func (p *Protector) cleanup() {
 		}
 	}
 	p.attacks = newAttacks
-	
-	p.log.Debugf("清理完成，当前客户端数: %d，攻击记录数: %d", 
+
+	p.log.Debugf("清理完成，当前客户端数: %d，攻击记录数: %d",
 		len(p.clients), len(p.attacks))
 }
 
@@ -440,7 +440,7 @@ func (p *Protector) cleanup() {
 func (p *Protector) SetEnabled(enabled bool) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
-	
+
 	p.enabled = enabled
 	p.log.Infof("DDoS防护已%s", map[bool]string{true: "启用", false: "禁用"}[enabled])
 }
@@ -449,7 +449,7 @@ func (p *Protector) SetEnabled(enabled bool) {
 func (p *Protector) SetLevel(level ProtectionLevel) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
-	
+
 	p.level = level
 	p.log.Infof("DDoS防护级别已设置为: %s", level.String())
 }
@@ -458,11 +458,11 @@ func (p *Protector) SetLevel(level ProtectionLevel) {
 func (p *Protector) GetStats() map[string]interface{} {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
-	
+
 	blockedClients := 0
 	suspiciousClients := 0
 	now := time.Now()
-	
+
 	for _, client := range p.clients {
 		if now.Before(client.BlockedUntil) {
 			blockedClients++
@@ -471,17 +471,17 @@ func (p *Protector) GetStats() map[string]interface{} {
 			suspiciousClients++
 		}
 	}
-	
+
 	attacksByType := make(map[string]int)
 	blockedAttacks := 0
-	
+
 	for _, attack := range p.attacks {
 		attacksByType[attack.AttackType]++
 		if attack.Blocked {
 			blockedAttacks++
 		}
 	}
-	
+
 	return map[string]interface{}{
 		"enabled":            p.enabled,
 		"level":              p.level.String(),
@@ -499,15 +499,15 @@ func (p *Protector) GetStats() map[string]interface{} {
 func (p *Protector) GetClients(limit int) map[string]*ClientInfo {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
-	
+
 	result := make(map[string]*ClientInfo)
 	count := 0
-	
+
 	for ip, client := range p.clients {
 		if count >= limit {
 			break
 		}
-		
+
 		result[ip] = &ClientInfo{
 			IP:           client.IP,
 			RequestCount: client.RequestCount,
@@ -521,7 +521,7 @@ func (p *Protector) GetClients(limit int) map[string]*ClientInfo {
 		}
 		count++
 	}
-	
+
 	return result
 }
 
@@ -529,11 +529,11 @@ func (p *Protector) GetClients(limit int) map[string]*ClientInfo {
 func (p *Protector) GetAttacks(limit int) []Attack {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
-	
+
 	if limit <= 0 || limit > len(p.attacks) {
 		limit = len(p.attacks)
 	}
-	
+
 	// 返回最新的攻击记录
 	start := len(p.attacks) - limit
 	return p.attacks[start:]
@@ -543,13 +543,13 @@ func (p *Protector) GetAttacks(limit int) []Attack {
 func (p *Protector) UnblockIP(ip string) bool {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
-	
+
 	if client, exists := p.clients[ip]; exists {
 		client.BlockedUntil = time.Time{}
 		p.log.Infof("手动解除IP封禁: %s", ip)
 		return true
 	}
-	
+
 	return false
 }
 
@@ -557,7 +557,7 @@ func (p *Protector) UnblockIP(ip string) bool {
 func (p *Protector) BlockIP(ip string, duration time.Duration, reason string) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
-	
+
 	now := time.Now()
 	client, exists := p.clients[ip]
 	if !exists {
@@ -567,10 +567,10 @@ func (p *Protector) BlockIP(ip string, duration time.Duration, reason string) {
 		}
 		p.clients[ip] = client
 	}
-	
+
 	client.BlockedUntil = now.Add(duration)
 	client.BlockCount++
-	
+
 	p.recordAttack(ip, "", "", "", "manual", "high", reason, true)
 	p.log.Warnf("手动封禁IP: %s，持续时间: %v，原因: %s", ip, duration, reason)
 }

@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>流量分析图表 - WithSSL</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #6c757d;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+            --info-color: #17a2b8;
+        }
+
+        body {
+            background-color: #f8f9fa;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+            transition: box-shadow 0.15s ease-in-out;
+        }
+
+        .chart-container:hover {
+            box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .chart-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 0;
+            color: #495057;
+        }
+
+        .chart-subtitle {
+            font-size: 0.875rem;
+            color: #6c757d;
+            margin: 0;
+        }
+
+        .chart-controls {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .chart-canvas {
+            position: relative;
+            height: 400px;
+            width: 100%;
+        }
+
+        .chart-canvas.small {
+            height: 250px;
+        }
+
+        .chart-canvas.large {
+            height: 500px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            text-align: center;
+            box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+        }
+
+        .stat-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.875rem;
+        }
+
+        .stat-change {
+            font-size: 0.75rem;
+            margin-top: 0.25rem;
+        }
+
+        .stat-change.positive {
+            color: var(--success-color);
+        }
+
+        .stat-change.negative {
+            color: var(--danger-color);
+        }
+
+        .chart-toolbar {
+            background: white;
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+        }
+
+        .period-selector {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .period-btn {
+            padding: 0.375rem 0.75rem;
+            border: 1px solid #dee2e6;
+            background: white;
+            border-radius: 0.375rem;
+            color: #495057;
+            text-decoration: none;
+            transition: all 0.15s ease-in-out;
+        }
+
+        .period-btn:hover {
+            background: #e9ecef;
+            color: #495057;
+            text-decoration: none;
+        }
+
+        .period-btn.active {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            z-index: 10;
+        }
+
+        .loading-spinner {
+            width: 2rem;
+            height: 2rem;
+            border: 0.25em solid #dee2e6;
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .export-menu {
+            position: relative;
+            display: inline-block;
+        }
+
+        .export-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
+            min-width: 150px;
+            z-index: 1000;
+            display: none;
+        }
+
+        .export-dropdown.show {
+            display: block;
+        }
+
+        .export-item {
+            display: block;
+            padding: 0.5rem 1rem;
+            color: #495057;
+            text-decoration: none;
+            border-bottom: 1px solid #f8f9fa;
+        }
+
+        .export-item:hover {
+            background: #f8f9fa;
+            color: #495057;
+            text-decoration: none;
+        }
+
+        .export-item:last-child {
+            border-bottom: none;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .chart-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .chart-controls {
+                margin-top: 0.5rem;
+            }
+            
+            .period-selector {
+                justify-content: center;
+            }
+            
+            .chart-canvas {
+                height: 300px;
+            }
+        }
+
+        /* 图表主题 */
+        .chart-theme-dark {
+            background: #343a40;
+            color: white;
+        }
+
+        .chart-theme-dark .chart-title {
+            color: white;
+        }
+
+        .chart-theme-dark .chart-subtitle {
+            color: #adb5bd;
+        }
+
+        /* 数据表格 */
+        .data-table {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+        }
+
+        .data-table table {
+            margin: 0;
+        }
+
+        .data-table th {
+            background: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+            font-weight: 600;
+        }
+
+        .data-table td {
+            border-bottom: 1px solid #f8f9fa;
+        }
+
+        .data-table tr:last-child td {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid py-4">
+        <!-- 页面标题 -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="h3 mb-0">流量分析图表</h1>
+                <p class="text-muted mb-0">实时监控和数据分析</p>
+            </div>
+            <div>
+                <button class="btn btn-primary" onclick="refreshAllCharts()">
+                    <i class="bi bi-arrow-clockwise"></i> 刷新数据
+                </button>
+                <button class="btn btn-outline-secondary" onclick="toggleTheme()">
+                    <i class="bi bi-palette"></i> 切换主题
+                </button>
+            </div>
+        </div>
+
+        <!-- 统计卡片 -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <i class="bi bi-graph-up stat-icon text-success"></i>
+                <div class="stat-value" id="total-requests">-</div>
+                <div class="stat-label">总请求数</div>
+                <div class="stat-change positive" id="requests-change">+12.5%</div>
+            </div>
+            
+            <div class="stat-card">
+                <i class="bi bi-speedometer2 stat-icon text-info"></i>
+                <div class="stat-value" id="avg-response-time">-</div>
+                <div class="stat-label">平均响应时间</div>
+                <div class="stat-change negative" id="response-time-change">-5.2%</div>
+            </div>
+            
+            <div class="stat-card">
+                <i class="bi bi-exclamation-triangle stat-icon text-warning"></i>
+                <div class="stat-value" id="error-rate">-</div>
+                <div class="stat-label">错误率</div>
+                <div class="stat-change positive" id="error-rate-change">-2.1%</div>
+            </div>
+            
+            <div class="stat-card">
+                <i class="bi bi-people stat-icon text-primary"></i>
+                <div class="stat-value" id="active-connections">-</div>
+                <div class="stat-label">活跃连接</div>
+                <div class="stat-change positive" id="connections-change">+8.3%</div>
+            </div>
+        </div>
+
+        <!-- 工具栏 -->
+        <div class="chart-toolbar">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <label class="form-label mb-0 me-2">时间范围:</label>
+                    <div class="period-selector">
+                        <a href="#" class="period-btn active" data-period="1h">1小时</a>
+                        <a href="#" class="period-btn" data-period="6h">6小时</a>
+                        <a href="#" class="period-btn" data-period="24h">24小时</a>
+                        <a href="#" class="period-btn" data-period="7d">7天</a>
+                        <a href="#" class="period-btn" data-period="30d">30天</a>
+                    </div>
+                </div>
+                <div class="col-md-6 text-end">
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-outline-secondary" onclick="exportAllCharts()">
+                            <i class="bi bi-download"></i> 导出数据
+                        </button>
+                        <button class="btn btn-outline-secondary" onclick="fullScreenChart()">
+                            <i class="bi bi-fullscreen"></i> 全屏
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主要图表 -->
+        <div class="row">
+            <!-- 流量监控 -->
+            <div class="col-lg-8 mb-4">
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <div>
+                            <h5 class="chart-title">流量监控</h5>
+                            <p class="chart-subtitle">实时请求数和错误统计</p>
+                        </div>
+                        <div class="chart-controls">
+                            <div class="export-menu">
+                                <button class="btn btn-sm btn-outline-secondary" onclick="toggleExportMenu('traffic')">
+                                    <i class="bi bi-three-dots"></i>
+                                </button>
+                                <div class="export-dropdown" id="traffic-export">
+                                    <a href="#" class="export-item" onclick="exportChart('traffic', 'png')">
+                                        <i class="bi bi-image"></i> 导出PNG
+                                    </a>
+                                    <a href="#" class="export-item" onclick="exportChart('traffic', 'svg')">
+                                        <i class="bi bi-vector-pen"></i> 导出SVG
+                                    </a>
+                                    <a href="#" class="export-item" onclick="exportChart('traffic', 'json')">
+                                        <i class="bi bi-file-code"></i> 导出JSON
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-canvas">
+                        <canvas id="traffic-chart"></canvas>
+                        <div class="loading-overlay" id="traffic-loading">
+                            <div class="loading-spinner"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 状态码分布 -->
+            <div class="col-lg-4 mb-4">
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <div>
+                            <h5 class="chart-title">状态码分布</h5>
+                            <p class="chart-subtitle">HTTP响应状态统计</p>
+                        </div>
+                        <div class="chart-controls">
+                            <div class="export-menu">
+                                <button class="btn btn-sm btn-outline-secondary" onclick="toggleExportMenu('status')">
+                                    <i class="bi bi-three-dots"></i>
+                                </button>
+                                <div class="export-dropdown" id="status-export">
+                                    <a href="#" class="export-item" onclick="exportChart('status', 'png')">
+                                        <i class="bi bi-image"></i> 导出PNG
+                                    </a>
+                                    <a href="#" class="export-item" onclick="exportChart('status', 'json')">
+                                        <i class="bi bi-file-code"></i> 导出JSON
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-canvas small">
+                        <canvas id="status-chart"></canvas>
+                        <div class="loading-overlay" id="status-loading">
+                            <div class="loading-spinner"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 次要图表 -->
+        <div class="row">
+            <!-- 响应时间 -->
+            <div class="col-lg-6 mb-4">
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <div>
+                            <h5 class="chart-title">响应时间趋势</h5>
+                            <p class="chart-subtitle">平均响应时间变化</p>
+                        </div>
+                    </div>
+                    <div class="chart-canvas small">
+                        <canvas id="response-time-chart"></canvas>
+                        <div class="loading-overlay" id="response-time-loading">
+                            <div class="loading-spinner"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 错误率 -->
+            <div class="col-lg-6 mb-4">
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <div>
+                            <h5 class="chart-title">错误率趋势</h5>
+                            <p class="chart-subtitle">错误请求百分比</p>
+                        </div>
+                    </div>
+                    <div class="chart-canvas small">
+                        <canvas id="error-rate-chart"></canvas>
+                        <div class="loading-overlay" id="error-rate-loading">
+                            <div class="loading-spinner"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 热门域名 -->
+        <div class="row">
+            <div class="col-lg-8 mb-4">
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <div>
+                            <h5 class="chart-title">热门域名</h5>
+                            <p class="chart-subtitle">访问量最高的域名统计</p>
+                        </div>
+                    </div>
+                    <div class="chart-canvas small">
+                        <canvas id="top-domains-chart"></canvas>
+                        <div class="loading-overlay" id="top-domains-loading">
+                            <div class="loading-spinner"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 域名详细数据表格 -->
+            <div class="col-lg-4 mb-4">
+                <div class="data-table">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>域名</th>
+                                <th>请求数</th>
+                                <th>错误率</th>
+                            </tr>
+                        </thead>
+                        <tbody id="domains-table">
+                            <tr>
+                                <td colspan="3" class="text-center">加载中...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 访问热力图 -->
+        <div class="row">
+            <div class="col-12 mb-4">
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <div>
+                            <h5 class="chart-title">访问热力图</h5>
+                            <p class="chart-subtitle">一周内不同时间段的访问分布</p>
+                        </div>
+                    </div>
+                    <div class="chart-canvas">
+                        <div id="heatmap-chart"></div>
+                        <div class="loading-overlay" id="heatmap-loading">
+                            <div class="loading-spinner"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart.js -->
+    <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chart.js 插件 -->
+    <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <!-- Axios -->
+    <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+    <script>
+        // 全局变量
+        let charts = {};
+        let currentPeriod = '1h';
+        let isDarkTheme = false;
+        let updateInterval;
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeCharts();
+            initializePeriodSelector();
+            startAutoUpdate();
+        });
+
+        // 初始化图表
+        function initializeCharts() {
+            charts.traffic = createTrafficChart();
+            charts.status = createStatusChart();
+            charts.responseTime = createResponseTimeChart();
+            charts.errorRate = createErrorRateChart();
+            charts.topDomains = createTopDomainsChart();
+            
+            // 加载初始数据
+            refreshAllCharts();
+        }
+
+        // 创建流量图表
+        function createTrafficChart() {
+            const ctx = document.getElementById('traffic-chart').getContext('2d');
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: '请求数',
+                            data: [],
+                            borderColor: '#007bff',
+                            backgroundColor: 'rgba(0,123,255,0.1)',
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: '错误数',
+                            data: [],
+                            borderColor: '#dc3545',
+                            backgroundColor: 'rgba(220,53,69,0.1)',
+                            tension: 0.4,
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: '请求数'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
+                    }
+                }
+            });
+        }
+
+        // 创建状态码图表
+        function createStatusChart() {
+            const ctx = document.getElementById('status-chart').getContext('2d');
+            return new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: [
+                            '#28a745', '#ffc107', '#dc3545', '#17a2b8', '#6f42c1'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        // 创建响应时间图表
+        function createResponseTimeChart() {
+            const ctx = document.getElementById('response-time-chart').getContext('2d');
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '响应时间 (ms)',
+                        data: [],
+                        borderColor: '#28a745',
+                        backgroundColor: 'rgba(40,167,69,0.2)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: '响应时间 (ms)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        // 创建错误率图表
+        function createErrorRateChart() {
+            const ctx = document.getElementById('error-rate-chart').getContext('2d');
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '错误率 (%)',
+                        data: [],
+                        borderColor: '#dc3545',
+                        backgroundColor: 'rgba(220,53,69,0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 10,
+                            title: {
+                                display: true,
+                                text: '错误率 (%)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        // 创建热门域名图表
+        function createTopDomainsChart() {
+            const ctx = document.getElementById('top-domains-chart').getContext('2d');
+            return new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '请求数',
+                        data: [],
+                        backgroundColor: '#007bff',
+                        borderColor: '#0056b3',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: '请求数'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        // 时间周期选择器
+        function initializePeriodSelector() {
+            document.querySelectorAll('.period-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // 更新活动状态
+                    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // 更新当前周期并刷新数据
+                    currentPeriod = this.dataset.period;
+                    refreshAllCharts();
+                });
+            });
+        }
+
+        // 刷新所有图表
+        async function refreshAllCharts() {
+            showAllLoadings();
+            
+            try {
+                // 并行加载所有数据
+                const [
+                    trafficData,
+                    statusData,
+                    responseTimeData,
+                    errorRateData,
+                    topDomainsData,
+                    statsData
+                ] = await Promise.all([
+                    fetchChartData('traffic', currentPeriod),
+                    fetchChartData('status_codes'),
+                    fetchChartData('response_time', currentPeriod),
+                    fetchChartData('error_rate', currentPeriod),
+                    fetchChartData('top_domains'),
+                    fetchStatsData()
+                ]);
+
+                // 更新图表
+                updateChart(charts.traffic, trafficData);
+                updateChart(charts.status, statusData);
+                updateChart(charts.responseTime, responseTimeData);
+                updateChart(charts.errorRate, errorRateData);
+                updateChart(charts.topDomains, topDomainsData);
+                
+                // 更新统计数据
+                updateStats(statsData);
+                updateDomainsTable(topDomainsData);
+
+            } catch (error) {
+                console.error('加载图表数据失败:', error);
+            } finally {
+                hideAllLoadings();
+            }
+        }
+
+        // 获取图表数据
+        async function fetchChartData(type, period = null) {
+            const params = new URLSearchParams();
+            if (period) params.append('period', period);
+            
+            const response = await axios.get(`/withssl-panel/api/charts/${type}?${params}`);
+            return response.data;
+        }
+
+        // 获取统计数据
+        async function fetchStatsData() {
+            const response = await axios.get('/withssl-panel/api/stats');
+            return response.data;
+        }
+
+        // 更新图表
+        function updateChart(chart, data) {
+            chart.data.labels = data.labels || [];
+            
+            if (data.datasets) {
+                data.datasets.forEach((dataset, index) => {
+                    if (chart.data.datasets[index]) {
+                        chart.data.datasets[index].data = dataset.data;
+                    }
+                });
+            }
+            
+            chart.update('none');
+        }
+
+        // 更新统计数据
+        function updateStats(data) {
+            document.getElementById('total-requests').textContent = formatNumber(data.total_requests || 0);
+            document.getElementById('avg-response-time').textContent = (data.avg_response_time || 0).toFixed(0) + 'ms';
+            document.getElementById('error-rate').textContent = (data.error_rate || 0).toFixed(1) + '%';
+            document.getElementById('active-connections').textContent = formatNumber(data.active_connections || 0);
+        }
+
+        // 更新域名表格
+        function updateDomainsTable(data) {
+            const tbody = document.getElementById('domains-table');
+            tbody.innerHTML = '';
+            
+            if (data.domains && data.domains.length > 0) {
+                data.domains.slice(0, 10).forEach(domain => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${domain.name}</td>
+                        <td>${formatNumber(domain.requests)}</td>
+                        <td>${domain.error_rate.toFixed(1)}%</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center">暂无数据</td></tr>';
+            }
+        }
+
+        // 显示/隐藏加载状态
+        function showAllLoadings() {
+            document.querySelectorAll('.loading-overlay').forEach(el => {
+                el.style.display = 'flex';
+            });
+        }
+
+        function hideAllLoadings() {
+            document.querySelectorAll('.loading-overlay').forEach(el => {
+                el.style.display = 'none';
+            });
+        }
+
+        // 导出功能
+        function toggleExportMenu(chartId) {
+            const menu = document.getElementById(chartId + '-export');
+            menu.classList.toggle('show');
+        }
+
+        function exportChart(chartId, format) {
+            // 隐藏菜单
+            document.getElementById(chartId + '-export').classList.remove('show');
+            
+            if (format === 'png' || format === 'svg') {
+                const chart = charts[chartId === 'traffic' ? 'traffic' : chartId];
+                const url = chart.toBase64Image();
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${chartId}-chart.${format}`;
+                a.click();
+            } else if (format === 'json') {
+                // 导出JSON数据
+                fetchChartData(chartId).then(data => {
+                    const blob = new Blob([JSON.stringify(data, null, 2)], {
+                        type: 'application/json'
+                    });
+                    const url = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${chartId}-data.json`;
+                    a.click();
+                    
+                    URL.revokeObjectURL(url);
+                });
+            }
+        }
+
+        // 自动更新
+        function startAutoUpdate() {
+            updateInterval = setInterval(refreshAllCharts, 30000); // 30秒更新一次
+        }
+
+        function stopAutoUpdate() {
+            if (updateInterval) {
+                clearInterval(updateInterval);
+                updateInterval = null;
+            }
+        }
+
+        // 工具函数
+        function formatNumber(num) {
+            if (num >= 1000000) {
+                return (num / 1000000).toFixed(1) + 'M';
+            } else if (num >= 1000) {
+                return (num / 1000).toFixed(1) + 'K';
+            }
+            return num.toString();
+        }
+
+        // 主题切换
+        function toggleTheme() {
+            isDarkTheme = !isDarkTheme;
+            document.body.classList.toggle('chart-theme-dark', isDarkTheme);
+            
+            // 更新图表主题
+            Object.values(charts).forEach(chart => {
+                if (chart.options.plugins) {
+                    chart.options.plugins.legend = chart.options.plugins.legend || {};
+                    chart.options.plugins.legend.labels = chart.options.plugins.legend.labels || {};
+                    chart.options.plugins.legend.labels.color = isDarkTheme ? '#fff' : '#495057';
+                }
+                chart.update();
+            });
+        }
+
+        // 全屏模式
+        function fullScreenChart() {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else {
+                document.documentElement.requestFullscreen();
+            }
+        }
+
+        // 导出所有图表数据
+        function exportAllCharts() {
+            const data = {
+                timestamp: new Date().toISOString(),
+                period: currentPeriod,
+                charts: {}
+            };
+            
+            // 收集所有图表数据
+            Promise.all([
+                fetchChartData('traffic', currentPeriod),
+                fetchChartData('status_codes'),
+                fetchChartData('response_time', currentPeriod),
+                fetchChartData('error_rate', currentPeriod),
+                fetchChartData('top_domains')
+            ]).then(results => {
+                data.charts.traffic = results[0];
+                data.charts.status_codes = results[1];
+                data.charts.response_time = results[2];
+                data.charts.error_rate = results[3];
+                data.charts.top_domains = results[4];
+                
+                const blob = new Blob([JSON.stringify(data, null, 2)], {
+                    type: 'application/json'
+                });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `withssl-charts-${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                
+                URL.revokeObjectURL(url);
+            });
+        }
+
+        // 关闭下拉菜单
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.export-menu')) {
+                document.querySelectorAll('.export-dropdown').forEach(menu => {
+                    menu.classList.remove('show');
+                });
+            }
+        });
+    </script>
+</body>
+</html>
