@@ -99,7 +99,7 @@ func Load(configFile string) (*Config, error) {
 			MaxAttempts:      3,
 			BlockDurationStr: "1m",
 			MaxAttempts5Min:  10,
-			BlockFile:        "./data/withssl.block",
+			BlockFile:        "./data/sslcat.block",
 			AllowedUserAgents: []string{
 				"Mozilla/",
 				"Chrome/",
@@ -108,7 +108,7 @@ func Load(configFile string) (*Config, error) {
 				"Edge/",
 			},
 		},
-		AdminPrefix: "/withssl-panel",
+		AdminPrefix: "/sslcat-panel",
 	}
 
 	// 如果配置文件存在，则加载

@@ -55,7 +55,7 @@ echo ""
 echo "1️⃣ 测试管理面板访问..."
 RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
     -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" \
-    http://localhost:8080/withssl-panel/)
+    http://localhost:8080/sslcat-panel/)
 
 if [ "$RESPONSE" = "200" ]; then
     echo "   ✅ 管理面板可访问 (HTTP $RESPONSE)"
@@ -107,7 +107,7 @@ RESPONSE=$(curl -s \
     -H "X-Real-IP: 203.0.113.1" \
     -H "CF-Connecting-IP: 203.0.113.1" \
     -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" \
-    http://localhost:8080/withssl-panel/ 2>/dev/null)
+    http://localhost:8080/sslcat-panel/ 2>/dev/null)
 
 if [ $? -eq 0 ]; then
     echo "   ✅ IP传递机制正常工作"
@@ -122,7 +122,7 @@ echo "4️⃣ 测试安全防护..."
 # 测试可疑User-Agent
 RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
     -H "User-Agent: " \
-    http://localhost:8080/withssl-panel/)
+    http://localhost:8080/sslcat-panel/)
 
 if [ "$RESPONSE" = "403" ]; then
     echo "   ✅ 安全防护正常 (空User-Agent被阻止)"

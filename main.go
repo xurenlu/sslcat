@@ -28,8 +28,8 @@ var (
 
 func main() {
 	var (
-		configFile  = flag.String("config", "/etc/withssl/withssl.conf", "配置文件路径")
-		adminPrefix = flag.String("admin-prefix", "/withssl-panel", "管理面板路径前缀")
+		configFile  = flag.String("config", "/etc/sslcat/sslcat.conf", "配置文件路径")
+		adminPrefix = flag.String("admin-prefix", "/sslcat-panel", "管理面板路径前缀")
 		email       = flag.String("email", "", "SSL证书邮箱")
 		staging     = flag.Bool("staging", false, "使用Let's Encrypt测试环境")
 		port        = flag.Int("port", 443, "监听端口")
@@ -59,7 +59,7 @@ func main() {
 	}
 
 	// 设置命令行参数覆盖配置
-	if *adminPrefix != "/withssl-panel" {
+	if *adminPrefix != "/sslcat-panel" {
 		cfg.AdminPrefix = *adminPrefix
 	}
 	if *email != "" {
@@ -76,10 +76,10 @@ func main() {
 	}
 
 	// 创建必要的目录（如果没有权限则跳过）
-	if err := os.MkdirAll("/etc/withssl", 0755); err != nil {
+	if err := os.MkdirAll("/etc/sslcat", 0755); err != nil {
 		log.Warnf("无法创建系统配置目录，使用当前目录: %v", err)
 	}
-	if err := os.MkdirAll("/var/lib/withssl", 0755); err != nil {
+	if err := os.MkdirAll("/var/lib/sslcat", 0755); err != nil {
 		log.Warnf("无法创建系统数据目录，使用当前目录: %v", err)
 	}
 

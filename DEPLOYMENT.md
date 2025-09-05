@@ -168,10 +168,10 @@ sudo netstat -tlnp | grep :443
 
 ```bash
 # 测试管理面板
-curl -k https://your-domain/withssl-panel/login
+curl -k https://your-domain/sslcat-panel/login
 
 # 测试 API
-curl -k https://your-domain/withssl-panel/api/stats
+curl -k https://your-domain/sslcat-panel/api/stats
 ```
 
 ## 🛠️ 常见部署问题

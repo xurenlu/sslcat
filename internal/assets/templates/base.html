@@ -39,33 +39,33 @@
                 <div class="position-sticky pt-3">
                     <div class="text-center mb-4">
                         <h4 class="navbar-brand text-primary">SSLcat</h4>
-                        <small class="text-muted">SSL 代理服务器</small>
+                        <small class="text-muted">{{t "app.description"}}</small>
                     </div>
                     
                     <ul class="nav flex-column">
                         <li class="nav-item">
                             <a class="nav-link" href="{{.AdminPrefix}}/">
-                                <i class="bi bi-speedometer2"></i> 仪表板
+                                <i class="bi bi-speedometer2"></i> {{t "nav.dashboard"}}
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="{{.AdminPrefix}}/proxy">
-                                <i class="bi bi-arrow-left-right"></i> 代理配置
+                                <i class="bi bi-arrow-left-right"></i> {{t "nav.proxy"}}
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="{{.AdminPrefix}}/ssl">
-                                <i class="bi bi-shield-lock"></i> SSL证书
+                                <i class="bi bi-shield-lock"></i> {{t "nav.ssl"}}
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="{{.AdminPrefix}}/security">
-                                <i class="bi bi-shield-check"></i> 安全设置
+                                <i class="bi bi-shield-check"></i> {{t "nav.security"}}
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="{{.AdminPrefix}}/settings">
-                                <i class="bi bi-gear"></i> 系统设置
+                                <i class="bi bi-gear"></i> {{t "nav.settings"}}
                             </a>
                         </li>
                     </ul>
@@ -73,7 +73,7 @@
                     <hr>
                     <div class="dropdown">
                         <a href="{{.AdminPrefix}}/logout" class="btn btn-outline-danger btn-sm">
-                            <i class="bi bi-box-arrow-right"></i> 退出
+                            <i class="bi bi-box-arrow-right"></i> {{t "common.cancel"}}
                         </a>
                     </div>
                 </div>

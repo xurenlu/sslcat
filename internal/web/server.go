@@ -277,7 +277,7 @@ func (s *Server) isCommonBotUserAgent(ua string) bool {
 }
 
 func (s *Server) checkAuth(w http.ResponseWriter, r *http.Request) bool {
-	session, err := r.Cookie("withssl_session")
+	session, err := r.Cookie("sslcat_session")
 	if err != nil || session.Value != "authenticated" {
 		http.Redirect(w, r, s.config.AdminPrefix+"/login", http.StatusFound)
 		return false
@@ -296,7 +296,7 @@ func (s *Server) processLogin(w http.ResponseWriter, r *http.Request) {
 	if username == s.config.Admin.Username && password == effective {
 		// 设置session cookie
 		http.SetCookie(w, &http.Cookie{
-			Name:     "withssl_session",
+			Name:     "sslcat_session",
 			Value:    "authenticated",
 			Path:     "/",
 			MaxAge:   3600 * 8, // 8小时
@@ -400,7 +400,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	// 清除session cookie
 	http.SetCookie(w, &http.Cookie{
-		Name:     "withssl_session",
+		Name:     "sslcat_session",
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,

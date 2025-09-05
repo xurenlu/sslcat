@@ -192,7 +192,7 @@ sudo systemctl start withssl
     "block_duration": "1m",
     "max_attempts_5min": 10
   },
-  "admin_prefix": "/withssl-panel"
+  "admin_prefix": "/sslcat-panel"
 }
 ```
 
@@ -235,7 +235,7 @@ sudo journalctl -u withssl -p err
 ## Web Management Panel
 
 ### Access Management Panel
-1. Open browser and visit: `https://your-domain/withssl-panel`
+1. Open browser and visit: `https://your-domain/sslcat-panel`
 2. Login with default credentials:
    - Username: `admin`
    - Password: `admin*9527`
@@ -325,7 +325,7 @@ withssl --help
 
 Available options:
 - `--config`: Configuration file path (default: "/etc/withssl/withssl.conf")
-- `--admin-prefix`: Management panel path prefix (default: "/withssl-panel")
+- `--admin-prefix`: Management panel path prefix (default: "/sslcat-panel")
 - `--email`: SSL certificate email
 - `--staging`: Use Let's Encrypt staging environment
 - `--port`: Listen port (default: 443)

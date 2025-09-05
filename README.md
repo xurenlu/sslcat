@@ -13,7 +13,7 @@ curl -fsSL https://sslcat.com/xurenlu/sslcat/main/scripts/install-from-release-z
 curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.0.2/withssl_1.0.2_darwin_arm64.tar.gz -o withssl.tgz
 tar -xzf withssl.tgz && sudo install -m 0755 withssl /usr/local/bin/withssl
 withssl --config withssl.conf --port 8080
-# 浏览器访问: http://localhost:8080/withssl-panel/
+# 浏览器访问: http://localhost:8080/sslcat-panel/
 # 首次登录：admin / admin*9527（会强制要求修改密码并生成 admin.pass）
 
 # 3) 可选：Docker Compose 一键起
@@ -209,7 +209,7 @@ security:
   block_duration: "1m"             # 封禁时长
   max_attempts_5min: 10            # 5分钟内最大失败次数
 
-admin_prefix: "/withssl-panel"     # 管理面板路径前缀
+admin_prefix: "/sslcat-panel"     # 管理面板路径前缀
 ```
 
 ### 忘记密码（紧急恢复）
@@ -270,7 +270,7 @@ sudo journalctl -u withssl -p err
 ## Web 管理面板
 
 ### 访问管理面板
-1. 打开浏览器访问: `https://your-domain/withssl-panel`
+1. 打开浏览器访问: `https://your-domain/sslcat-panel`
 2. 使用默认用户名和密码登录:
    - 用户名: `admin`
    - 密码: `admin*9527`
@@ -351,7 +351,7 @@ withssl [选项]
 
 选项:
   --config string        配置文件路径 (默认: "/etc/withssl/withssl.conf")
-  --admin-prefix string  管理面板路径前缀 (默认: "/withssl-panel")
+  --admin-prefix string  管理面板路径前缀 (默认: "/sslcat-panel")
   --email string         SSL证书邮箱
   --staging             使用Let's Encrypt测试环境
   --port int            监听端口 (默认: 443)

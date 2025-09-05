@@ -118,7 +118,7 @@ go build -o withssl main.go
     "password": "admin*9527",
     "first_run": true
   },
-  "admin_prefix": "/withssl-panel"
+  "admin_prefix": "/sslcat-panel"
 }
 ```
 
@@ -136,7 +136,7 @@ sudo systemctl stop withssl
 
 ### Веб-Панель Управления
 
-1. Открыть браузер и посетить: `https://your-domain/withssl-panel`
+1. Открыть браузер и посетить: `https://your-domain/sslcat-panel`
 2. Войти с учетными данными по умолчанию:
    - Имя пользователя: `admin`
    - Пароль: `admin*9527`
@@ -150,7 +150,7 @@ withssl --help
 
 Доступные опции:
 - `--config`: Путь к файлу конфигурации (по умолчанию: "/etc/withssl/withssl.conf")
-- `--admin-prefix`: Префикс пути панели управления (по умолчанию: "/withssl-panel")
+- `--admin-prefix`: Префикс пути панели управления (по умолчанию: "/sslcat-panel")
 - `--email`: Email для SSL сертификата
 - `--port`: Порт прослушивания (по умолчанию: 443)
 - `--host`: Адрес прослушивания (по умолчанию: "0.0.0.0")

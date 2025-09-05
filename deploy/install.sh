@@ -262,7 +262,7 @@ security:
     - "Safari/"
     - "Edge/"
 
-admin_prefix: "/withssl-panel"
+admin_prefix: "/sslcat-panel"
 EOF
     
     chown withssl:withssl /etc/withssl/withssl.conf
@@ -329,7 +329,7 @@ show_install_info() {
     echo "重启服务: systemctl restart withssl"
     echo "停止服务: systemctl stop withssl"
     echo
-    echo "管理面板: https://your-domain/withssl-panel"
+    echo "管理面板: https://your-domain/sslcat-panel"
     echo "默认用户名: admin"
     echo "默认密码: admin*9527"
     echo

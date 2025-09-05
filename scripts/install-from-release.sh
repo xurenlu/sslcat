@@ -65,7 +65,7 @@ if [[ ! -f "$CONF_LINUX" ]]; then
   "admin": {"username": "admin", "first_run": true, "password_file": "/var/lib/withssl/admin.pass"},
   "proxy": {"rules": []},
   "security": {"max_attempts": 3, "block_duration": "1m", "max_attempts_5min": 10, "block_file": "/var/lib/withssl/withssl.block", "allowed_user_agents": ["Mozilla/","Chrome/","Firefox/","Safari/","Edge/"]},
-  "admin_prefix": "/withssl-panel"
+  "admin_prefix": "/sslcat-panel"
 }
 JSON
 fi
@@ -93,6 +93,6 @@ sudo systemctl restart withssl || sudo systemctl start withssl || true
 
 echo "[withssl] 安装完成: /opt/withssl/withssl"
 echo "[withssl] 配置: /etc/withssl/withssl.conf"
-echo "[withssl] 管理面板: https://<你的域名或IP>/withssl-panel/ (首次登录将强制改密)"
+echo "[withssl] 管理面板: https://<你的域名或IP>/sslcat-panel/ (首次登录将强制改密)"
 
 

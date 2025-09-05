@@ -113,7 +113,7 @@ systemctl status withssl
 
 echo ""
 echo "✅ SSLcat 部署完成！"
-echo "管理面板: https://your-domain/withssl-panel/"
+echo "管理面板: https://your-domain/sslcat-panel/"
 echo "默认用户名: admin"
 echo "默认密码: admin*9527"
 EOF

@@ -118,7 +118,7 @@ go build -o withssl main.go
     "password": "admin*9527",
     "first_run": true
   },
-  "admin_prefix": "/withssl-panel"
+  "admin_prefix": "/sslcat-panel"
 }
 ```
 
@@ -136,7 +136,7 @@ sudo systemctl stop withssl
 
 ### Web管理パネル
 
-1. ブラウザで `https://your-domain/withssl-panel` にアクセス
+1. ブラウザで `https://your-domain/sslcat-panel` にアクセス
 2. デフォルト認証情報でログイン:
    - ユーザー名: `admin`
    - パスワード: `admin*9527`
@@ -150,7 +150,7 @@ withssl --help
 
 利用可能なオプション:
 - `--config`: 設定ファイルパス (デフォルト: "/etc/withssl/withssl.conf")
-- `--admin-prefix`: 管理パネルパスプレフィックス (デフォルト: "/withssl-panel")
+- `--admin-prefix`: 管理パネルパスプレフィックス (デフォルト: "/sslcat-panel")
 - `--email`: SSL証明書メールアドレス
 - `--port`: リスンポート (デフォルト: 443)
 - `--host`: リスンアドレス (デフォルト: "0.0.0.0")

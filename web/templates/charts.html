@@ -827,13 +827,13 @@
             const params = new URLSearchParams();
             if (period) params.append('period', period);
             
-            const response = await axios.get(`/withssl-panel/api/charts/${type}?${params}`);
+            const response = await axios.get(`/sslcat-panel/api/charts/${type}?${params}`);
             return response.data;
         }
 
         // 获取统计数据
         async function fetchStatsData() {
-            const response = await axios.get('/withssl-panel/api/stats');
+            const response = await axios.get('/sslcat-panel/api/stats');
             return response.data;
         }
 

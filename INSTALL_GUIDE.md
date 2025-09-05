@@ -145,7 +145,7 @@ sudo journalctl -u withssl -f
 ### 4. 访问管理面板
 
 ```
-https://your-domain/withssl-panel/
+https://your-domain/sslcat-panel/
 用户名: admin
 密码: admin*9527 (首次登录后请修改)
 ```

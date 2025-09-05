@@ -207,7 +207,7 @@
     "api_keys": []
   },
   
-  "admin_prefix": "/withssl-panel",
+  "admin_prefix": "/sslcat-panel",
   
   "features": {
     "http2": true,

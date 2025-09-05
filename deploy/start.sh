@@ -13,7 +13,7 @@ fi
 
 # 启动程序
 echo "启动 SSLcat 服务器..."
-echo "管理面板: http://localhost:8080/withssl-panel"
+echo "管理面板: http://localhost:8080/sslcat-panel"
 echo "默认用户名: admin"
 echo "默认密码: admin*9527"
 echo ""

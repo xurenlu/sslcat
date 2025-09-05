@@ -118,7 +118,7 @@ go build -o withssl main.go
     "password": "admin*9527",
     "first_run": true
   },
-  "admin_prefix": "/withssl-panel"
+  "admin_prefix": "/sslcat-panel"
 }
 ```
 
@@ -136,7 +136,7 @@ sudo systemctl stop withssl
 
 ### Panel de Administración Web
 
-1. Abrir navegador y visitar: `https://your-domain/withssl-panel`
+1. Abrir navegador y visitar: `https://your-domain/sslcat-panel`
 2. Iniciar sesión con credenciales predeterminadas:
    - Usuario: `admin`
    - Contraseña: `admin*9527`
@@ -150,7 +150,7 @@ withssl --help
 
 Opciones disponibles:
 - `--config`: Ruta del archivo de configuración (predeterminado: "/etc/withssl/withssl.conf")
-- `--admin-prefix`: Prefijo de ruta del panel de administración (predeterminado: "/withssl-panel")
+- `--admin-prefix`: Prefijo de ruta del panel de administración (predeterminado: "/sslcat-panel")
 - `--email`: Email para certificado SSL
 - `--port`: Puerto de escucha (predeterminado: 443)
 - `--host`: Dirección de escucha (predeterminado: "0.0.0.0")

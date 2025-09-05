@@ -36,7 +36,7 @@
     "password": "admin*9527",
     "first_run": true
   },
-  "admin_prefix": "/withssl-panel",
+  "admin_prefix": "/sslcat-panel",
   
   "health_check": {
     "enabled": true,
