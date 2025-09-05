@@ -7,7 +7,7 @@ import (
 	"sort"
 	"time"
 
-	"withssl/internal/monitor"
+	"github.com/xurenlu/sslcat/internal/monitor"
 
 	"github.com/sirupsen/logrus"
 )
@@ -169,7 +169,7 @@ func (g *ChartGenerator) GenerateTrafficChart(period string, interval string) (*
 
 // GenerateStatusCodeChart 生成状态码分布图表
 func (g *ChartGenerator) GenerateStatusCodeChart() (*ChartData, error) {
-	globalStats := g.monitor.GetGlobalStats()
+	_ = g.monitor.GetGlobalStats()
 	domainStats := g.monitor.GetAllDomainStats()
 
 	// 收集所有状态码统计

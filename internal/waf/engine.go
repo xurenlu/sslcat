@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"regexp"
 	"strings"
 	"sync"
@@ -345,7 +346,7 @@ func (e *Engine) checkBody(r *http.Request, clientIP, userAgent, url, method str
 
 		// 如果是表单数据，解析并检查
 		if strings.Contains(r.Header.Get("Content-Type"), "application/x-www-form-urlencoded") {
-			if values, err := url.ParseQuery(payload); err == nil {
+			if values, err := neturl.ParseQuery(payload); err == nil {
 				for key, vals := range values {
 					for _, val := range vals {
 						formPayload := key + "=" + val

@@ -15,8 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"withssl/internal/config"
-	"withssl/internal/notify"
+	"github.com/xurenlu/sslcat/internal/config"
+	"github.com/xurenlu/sslcat/internal/notify"
 
 	"github.com/sirupsen/logrus"
 )

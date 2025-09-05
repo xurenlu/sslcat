@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"withssl/internal/config"
+	"github.com/xurenlu/sslcat/internal/config"
 
 	"github.com/sirupsen/logrus"
 )

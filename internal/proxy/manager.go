@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"withssl/internal/config"
-	"withssl/internal/security"
-	"withssl/internal/ssl"
+	"github.com/xurenlu/sslcat/internal/config"
+	"github.com/xurenlu/sslcat/internal/security"
+	"github.com/xurenlu/sslcat/internal/ssl"
 
 	"github.com/sirupsen/logrus"
 )

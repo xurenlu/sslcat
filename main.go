@@ -11,12 +11,12 @@ import (
 	"syscall"
 	"time"
 
-	"withssl/internal/config"
-	"withssl/internal/logger"
-	"withssl/internal/proxy"
-	"withssl/internal/security"
-	"withssl/internal/ssl"
-	"withssl/internal/web"
+	"github.com/xurenlu/sslcat/internal/config"
+	"github.com/xurenlu/sslcat/internal/logger"
+	"github.com/xurenlu/sslcat/internal/proxy"
+	"github.com/xurenlu/sslcat/internal/security"
+	"github.com/xurenlu/sslcat/internal/ssl"
+	"github.com/xurenlu/sslcat/internal/web"
 
 	"github.com/sirupsen/logrus"
 )

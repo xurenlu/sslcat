@@ -1,4 +1,4 @@
-module withssl
+module github.com/xurenlu/sslcat
 
 go 1.21
 

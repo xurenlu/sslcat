@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"withssl/internal/config"
-	"withssl/internal/i18n"
-	"withssl/internal/notify"
-	"withssl/internal/proxy"
-	"withssl/internal/security"
-	"withssl/internal/ssl"
+	"github.com/xurenlu/sslcat/internal/config"
+	"github.com/xurenlu/sslcat/internal/i18n"
+	"github.com/xurenlu/sslcat/internal/notify"
+	"github.com/xurenlu/sslcat/internal/proxy"
+	"github.com/xurenlu/sslcat/internal/security"
+	"github.com/xurenlu/sslcat/internal/ssl"
 
 	"github.com/sirupsen/logrus"
 )

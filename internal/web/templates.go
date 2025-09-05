@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"sync"
 
-	"withssl/internal/assets"
-	"withssl/internal/i18n"
+	"github.com/xurenlu/sslcat/internal/assets"
+	"github.com/xurenlu/sslcat/internal/i18n"
 
 	"github.com/sirupsen/logrus"
 )
