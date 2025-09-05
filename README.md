@@ -3,18 +3,17 @@
 ## ⏱️ 一分钟快速上手 WithSSL
 
 ```bash
-# 1) 获取二进制（或自行构建）
-git clone https://github.com/xurenlu/withssl.git && cd withssl
-go build -o withssl main.go
+# 1) 一键安装（Linux）推荐：从 GitHub Release 下载并安装
+curl -fsSL https://raw.githubusercontent.com/xurenlu/withssl/main/scripts/install-from-release.sh | sudo bash -s -- -v 1.0.2
 
-# 2) 启动（开发环境示例，使用本地 withssl.conf）
-./withssl --config withssl.conf --port 8080
+# 2) macOS 本地快速试用（或自行下载 darwin 包）
+curl -fsSL https://github.com/xurenlu/withssl/releases/download/v1.0.2/withssl_1.0.2_darwin_arm64.tar.gz -o withssl.tgz
+tar -xzf withssl.tgz && sudo install -m 0755 withssl /usr/local/bin/withssl
+withssl --config withssl.conf --port 8080
+# 浏览器访问: http://localhost:8080/withssl-panel/
+# 首次登录：admin / admin*9527（会强制要求修改密码并生成 admin.pass）
 
-# 3) 浏览器访问管理面板
-# http://localhost:8080/withssl-panel/
-# 首次登录：admin / admin*9527（会强制要求修改密码并生成 ./data/admin.pass）
-
-# 4) 可选：一键Docker Compose
+# 3) 可选：Docker Compose 一键起
 docker compose up -d
 ```
 
