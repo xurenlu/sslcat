@@ -1,0 +1,159 @@
+package main
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"withssl/internal/config"
+	"withssl/internal/logger"
+	"withssl/internal/proxy"
+	"withssl/internal/security"
+	"withssl/internal/ssl"
+	"withssl/internal/web"
+
+	"github.com/sirupsen/logrus"
+)
+
+var (
+	version = "1.0.0"
+	build   = "dev"
+)
+
+func main() {
+	var (
+		configFile  = flag.String("config", "/etc/withssl/withssl.conf", "配置文件路径")
+		adminPrefix = flag.String("admin-prefix", "/withssl-panel", "管理面板路径前缀")
+		email       = flag.String("email", "", "SSL证书邮箱")
+		staging     = flag.Bool("staging", false, "使用Let's Encrypt测试环境")
+		port        = flag.Int("port", 443, "监听端口")
+		host        = flag.String("host", "0.0.0.0", "监听地址")
+		logLevel    = flag.String("log-level", "info", "日志级别")
+		showVersion = flag.Bool("version", false, "显示版本信息")
+	)
+	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("WithSSL v%s (build: %s)\n", version, build)
+		return
+	}
+
+	// 初始化日志
+	logger.Init(*logLevel)
+	log := logrus.WithFields(logrus.Fields{
+		"component": "main",
+	})
+
+	log.Infof("启动 WithSSL v%s (build: %s)", version, build)
+
+	// 加载配置
+	cfg, err := config.Load(*configFile)
+	if err != nil {
+		log.Fatalf("加载配置失败: %v", err)
+	}
+
+	// 设置命令行参数覆盖配置
+	if *adminPrefix != "/withssl-panel" {
+		cfg.AdminPrefix = *adminPrefix
+	}
+	if *email != "" {
+		cfg.SSL.Email = *email
+	}
+	if *staging {
+		cfg.SSL.Staging = true
+	}
+	if *port != 443 {
+		cfg.Server.Port = *port
+	}
+	if *host != "0.0.0.0" {
+		cfg.Server.Host = *host
+	}
+
+	// 创建必要的目录（如果没有权限则跳过）
+	if err := os.MkdirAll("/etc/withssl", 0755); err != nil {
+		log.Warnf("无法创建系统配置目录，使用当前目录: %v", err)
+	}
+	if err := os.MkdirAll("/var/lib/withssl", 0755); err != nil {
+		log.Warnf("无法创建系统数据目录，使用当前目录: %v", err)
+	}
+
+	// 初始化SSL管理器
+	sslManager, err := ssl.NewManager(cfg)
+	if err != nil {
+		log.Fatalf("初始化SSL管理器失败: %v", err)
+	}
+
+	// 初始化安全管理器
+	securityManager := security.NewManager(cfg)
+
+	// 初始化代理管理器
+	proxyManager := proxy.NewManager(cfg, sslManager, securityManager)
+
+	// 初始化Web服务器
+	webServer := web.NewServer(cfg, proxyManager, securityManager)
+
+	// 设置日志级别
+	if cfg.Server.Debug {
+		logrus.SetLevel(logrus.DebugLevel)
+	} else {
+		logrus.SetLevel(logrus.InfoLevel)
+	}
+
+	// 创建HTTP服务器
+	server := &http.Server{
+		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
+		Handler:      webServer,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+
+	// 启动SSL管理器
+	if err := sslManager.Start(); err != nil {
+		log.Fatalf("启动SSL管理器失败: %v", err)
+	}
+
+	// 启动代理管理器
+	if err := proxyManager.Start(); err != nil {
+		log.Fatalf("启动代理管理器失败: %v", err)
+	}
+
+	// 启动安全管理器
+	securityManager.Start()
+
+	// 启动Web服务器
+	go func() {
+		log.Infof("Web服务器启动在 %s", server.Addr)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Web服务器启动失败: %v", err)
+		}
+	}()
+
+	// 等待中断信号
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+
+	sig := <-quit
+	log.Infof("收到信号 %v，开始优雅关闭...", sig)
+
+	// 优雅关闭
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// 停止各个服务
+	securityManager.Stop()
+	proxyManager.Stop()
+	sslManager.Stop()
+
+	// 关闭HTTP服务器
+	if err := server.Shutdown(ctx); err != nil {
+		log.Errorf("服务器关闭失败: %v", err)
+	}
+
+	log.Info("WithSSL 服务器已关闭")
+}

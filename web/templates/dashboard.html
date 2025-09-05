@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}仪表板 - WithSSL{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">仪表板</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="refreshStats()">
+                <i class="bi bi-arrow-clockwise"></i> 刷新
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- 统计卡片 -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            活跃代理规则
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="active-rules">
+                            {{ stats.active_rules or 0 }}
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-arrow-left-right fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                            缓存的代理
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="cached-proxies">
+                            {{ stats.cached_proxies or 0 }}
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-lightning-charge fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                            SSL证书
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="ssl-certs">
+                            -
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-shield-lock fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                            被封禁IP
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="blocked-ips">
+                            -
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-shield-exclamation fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 快速操作 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-lightning"></i> 快速操作
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ admin_prefix }}/proxy/new" class="btn btn-primary w-100">
+                            <i class="bi bi-plus-circle"></i> 新建代理规则
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ admin_prefix }}/ssl" class="btn btn-success w-100">
+                            <i class="bi bi-shield-lock"></i> 管理SSL证书
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ admin_prefix }}/security" class="btn btn-warning w-100">
+                            <i class="bi bi-shield-exclamation"></i> 安全设置
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ admin_prefix }}/settings" class="btn btn-info w-100">
+                            <i class="bi bi-gear"></i> 系统设置
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 最近活动 -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-clock-history"></i> 最近活动
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>时间</th>
+                                <th>IP地址</th>
+                                <th>域名</th>
+                                <th>状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-activities">
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">
+                                    <i class="bi bi-hourglass-split"></i> 暂无活动记录
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function refreshStats() {
+    axios.get('{{ admin_prefix }}/api/stats')
+        .then(function (response) {
+            const stats = response.data;
+            document.getElementById('active-rules').textContent = stats.active_rules || 0;
+            document.getElementById('cached-proxies').textContent = stats.cached_proxies || 0;
+        })
+        .catch(function (error) {
+            console.error('获取统计信息失败:', error);
+        });
+}
+
+// 页面加载时刷新统计信息
+document.addEventListener('DOMContentLoaded', function() {
+    refreshStats();
+    
+    // 每30秒自动刷新一次
+    setInterval(refreshStats, 30000);
+});
+</script>
+{% endblock %}

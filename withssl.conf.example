@@ -1,0 +1,45 @@
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 443,
+    "debug": false
+  },
+  "ssl": {
+    "email": "your-email@example.com",
+    "staging": false,
+    "domains": [],
+    "cert_dir": "/var/lib/withssl/certs",
+    "key_dir": "/var/lib/withssl/keys",
+    "auto_renew": true
+  },
+  "admin": {
+    "username": "admin",
+    "password": "admin*9527",
+    "first_run": true
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "127.0.0.1",
+        "port": 8080,
+        "enabled": true,
+        "ssl_only": true
+      }
+    ]
+  },
+  "security": {
+    "max_attempts": 3,
+    "block_duration": "1m",
+    "max_attempts_5min": 10,
+    "block_file": "/var/lib/withssl/withssl.block",
+    "allowed_user_agents": [
+      "Mozilla/",
+      "Chrome/",
+      "Firefox/",
+      "Safari/",
+      "Edge/"
+    ]
+  },
+  "admin_prefix": "/withssl-panel"
+}
