@@ -61,7 +61,7 @@ WithSSL es un potente servidor proxy SSL que soporta gestión automática de cer
 
 ```bash
 # Descargar script de instalación
-curl -fsSL https://raw.githubusercontent.com/your-repo/withssl/main/install.sh -o install.sh
+curl -fsSL https://raw.githubusercontent.com/xurenlu/withssl/main/install.sh -o install.sh
 
 # Ejecutar script de instalación
 sudo bash install.sh
@@ -91,7 +91,7 @@ source ~/.bashrc
 
 3. **Compilar WithSSL**
 ```bash
-git clone https://github.com/your-repo/withssl.git
+git clone https://github.com/xurenlu/withssl.git
 cd withssl
 go mod download
 go build -o withssl main.go
@@ -163,6 +163,6 @@ Este proyecto utiliza la licencia MIT. Consulte el archivo [LICENSE](LICENSE) pa
 ## Soporte
 
 Si encuentra problemas o tiene sugerencias:
-1. Buscar en [Issues](https://github.com/your-repo/withssl/issues)
+1. Buscar en [Issues](https://github.com/xurenlu/withssl/issues)
 2. Crear un nuevo Issue
 3. Contactar a los mantenedores

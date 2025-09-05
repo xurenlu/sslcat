@@ -61,7 +61,7 @@ WithSSL — это мощный SSL прокси-сервер, который п
 
 ```bash
 # Скачать скрипт установки
-curl -fsSL https://raw.githubusercontent.com/your-repo/withssl/main/install.sh -o install.sh
+curl -fsSL https://raw.githubusercontent.com/xurenlu/withssl/main/install.sh -o install.sh
 
 # Запустить скрипт установки
 sudo bash install.sh
@@ -91,7 +91,7 @@ source ~/.bashrc
 
 3. **Скомпилировать WithSSL**
 ```bash
-git clone https://github.com/your-repo/withssl.git
+git clone https://github.com/xurenlu/withssl.git
 cd withssl
 go mod download
 go build -o withssl main.go
@@ -163,6 +163,6 @@ withssl --help
 ## Поддержка
 
 Если у вас возникли проблемы или есть предложения:
-1. Поискать в [Issues](https://github.com/your-repo/withssl/issues)
+1. Поискать в [Issues](https://github.com/xurenlu/withssl/issues)
 2. Создать новый Issue
 3. Связаться с разработчиками

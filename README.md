@@ -60,16 +60,47 @@ WithSSL 是一个功能强大的 SSL 代理服务器，支持自动证书管理�
 - Root 权限
 - 80 和 443 端口可用
 
-## 快速安装
+## 📥 获取源码
 
-### 自动安装
+### GitHub 仓库
+
+项目托管在GitHub上：**[https://github.com/xurenlu/withssl](https://github.com/xurenlu/withssl)**
+
+### 最新版本下载
 
 ```bash
-# 下载安装脚本
-curl -fsSL https://raw.githubusercontent.com/your-repo/withssl/main/install.sh -o install.sh
+# 克隆最新源码
+git clone https://github.com/xurenlu/withssl.git
+cd withssl
+
+# 或者下载指定版本（推荐）
+wget https://github.com/xurenlu/withssl/archive/refs/heads/main.zip
+unzip main.zip
+cd withssl-main
+```
+
+## 🚀 快速安装
+
+### 自动安装（推荐）
+
+```bash
+# 从GitHub下载安装脚本
+curl -fsSL https://raw.githubusercontent.com/xurenlu/withssl/main/install.sh -o install.sh
 
 # 运行安装脚本
 sudo bash install.sh
+```
+
+### 嵌入式部署（单文件）
+
+```bash
+# 生成嵌入式部署包
+./deploy-embedded.sh
+
+# 或生成Linux版本
+./deploy-embedded.sh linux
+
+# 然后上传deploy/目录到服务器即可
 ```
 
 ### 手动安装
@@ -96,7 +127,7 @@ source ~/.bashrc
 
 3. **编译 WithSSL**
 ```bash
-git clone https://github.com/your-repo/withssl.git
+git clone https://github.com/xurenlu/withssl.git
 cd withssl
 go mod download
 go build -o withssl main.go
@@ -404,7 +435,7 @@ withssl/
 ### 开发环境搭建
 ```bash
 # 克隆项目
-git clone https://github.com/your-repo/withssl.git
+git clone https://github.com/xurenlu/withssl.git
 cd withssl
 
 # 安装依赖
@@ -429,7 +460,7 @@ go run main.go --config withssl.conf --log-level debug
 
 如果您遇到问题或有建议，请：
 1. 查看 [故障排除](#故障排除) 部分
-2. 搜索 [Issues](https://github.com/your-repo/withssl/issues)
+2. 搜索 [Issues](https://github.com/xurenlu/withssl/issues)
 3. 创建新的 Issue
 4. 联系维护者
 

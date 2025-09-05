@@ -60,16 +60,47 @@ WithSSL is a powerful SSL proxy server that supports automatic certificate manag
 - Root privileges
 - Ports 80 and 443 available
 
-## Quick Installation
+## 📥 Get Source Code
 
-### Automatic Installation
+### GitHub Repository
+
+Project hosted on GitHub: **[https://github.com/xurenlu/withssl](https://github.com/xurenlu/withssl)**
+
+### Latest Version Download
 
 ```bash
-# Download installation script
-curl -fsSL https://raw.githubusercontent.com/your-repo/withssl/main/install.sh -o install.sh
+# Clone latest source code
+git clone https://github.com/xurenlu/withssl.git
+cd withssl
+
+# Or download specific version (recommended)
+wget https://github.com/xurenlu/withssl/archive/refs/heads/main.zip
+unzip main.zip
+cd withssl-main
+```
+
+## 🚀 Quick Installation
+
+### Automatic Installation (Recommended)
+
+```bash
+# Download installation script from GitHub
+curl -fsSL https://raw.githubusercontent.com/xurenlu/withssl/main/install.sh -o install.sh
 
 # Run installation script
 sudo bash install.sh
+```
+
+### Embedded Deployment (Single File)
+
+```bash
+# Generate embedded deployment package
+./deploy-embedded.sh
+
+# Or generate Linux version
+./deploy-embedded.sh linux
+
+# Then upload deploy/ directory to server
 ```
 
 ### Manual Installation
@@ -96,7 +127,7 @@ source ~/.bashrc
 
 3. **Compile WithSSL**
 ```bash
-git clone https://github.com/your-repo/withssl.git
+git clone https://github.com/xurenlu/withssl.git
 cd withssl
 go mod download
 go build -o withssl main.go
@@ -364,7 +395,7 @@ withssl/
 ### Development Environment Setup
 ```bash
 # Clone project
-git clone https://github.com/your-repo/withssl.git
+git clone https://github.com/xurenlu/withssl.git
 cd withssl
 
 # Install dependencies
@@ -465,7 +496,7 @@ This project uses the MIT license. See [LICENSE](LICENSE) file for details.
 
 If you encounter issues or have suggestions:
 1. Check the [Troubleshooting](#troubleshooting) section
-2. Search [Issues](https://github.com/your-repo/withssl/issues)
+2. Search [Issues](https://github.com/xurenlu/withssl/issues)
 3. Create a new Issue
 4. Contact maintainers
 

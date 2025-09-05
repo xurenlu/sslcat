@@ -61,7 +61,7 @@ WithSSL は、自動証明書管理、ドメイン転送、セキュリティ保
 
 ```bash
 # インストールスクリプトをダウンロード
-curl -fsSL https://raw.githubusercontent.com/your-repo/withssl/main/install.sh -o install.sh
+curl -fsSL https://raw.githubusercontent.com/xurenlu/withssl/main/install.sh -o install.sh
 
 # インストールスクリプトを実行
 sudo bash install.sh
@@ -91,7 +91,7 @@ source ~/.bashrc
 
 3. **WithSSL のコンパイル**
 ```bash
-git clone https://github.com/your-repo/withssl.git
+git clone https://github.com/xurenlu/withssl.git
 cd withssl
 go mod download
 go build -o withssl main.go
@@ -163,6 +163,6 @@ withssl --help
 ## サポート
 
 問題が発生した場合や提案がある場合:
-1. [Issues](https://github.com/your-repo/withssl/issues) を検索
+1. [Issues](https://github.com/xurenlu/withssl/issues) を検索
 2. 新しい Issue を作成
 3. メンテナーに連絡
