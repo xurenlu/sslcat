@@ -1555,12 +1555,19 @@ func (s *Server) generateSettingsHTML(data map[string]interface{}) string {
 }
 
 func (s *Server) generateSidebar(adminPrefix, activePage string) string {
+	title := s.translator.T("app.description")
+	navDashboard := s.translator.T("nav.dashboard")
+	navProxy := s.translator.T("nav.proxy")
+	navSSL := s.translator.T("nav.ssl")
+	navSecurity := s.translator.T("nav.security")
+	navSettings := s.translator.T("nav.settings")
+	logout := s.translator.T("menu.logout")
 	return fmt.Sprintf(`
                 <nav class="d-md-block sidebar collapse">
                     <div class="position-sticky pt-3">
                         <div class="text-center mb-4">
                             <h4 class="navbar-brand text-primary">SSLcat</h4>
-                            <small class="text-muted">SSL 代理服务器</small>
+                            <small class="text-muted">%s</small>
                         </div>
                         
                         <div class="dropdown mb-3 px-3">
@@ -1580,27 +1587,27 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
                         <ul class="nav flex-column">
                             <li class="nav-item">
                                 <a class="nav-link %s" href="%s/">
-                                    <i class="bi bi-speedometer2"></i> 仪表板
+                                    <i class="bi bi-speedometer2"></i> %s
                                 </a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link %s" href="%s/proxy">
-                                    <i class="bi bi-arrow-left-right"></i> 代理配置
+                                    <i class="bi bi-arrow-left-right"></i> %s
                                 </a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link %s" href="%s/ssl">
-                                    <i class="bi bi-shield-lock"></i> SSL证书
+                                    <i class="bi bi-shield-lock"></i> %s
                                 </a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link %s" href="%s/security">
-                                    <i class="bi bi-shield-check"></i> 安全设置
+                                    <i class="bi bi-shield-check"></i> %s
                                 </a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link %s" href="%s/settings">
-                                    <i class="bi bi-gear"></i> 系统设置
+                                    <i class="bi bi-gear"></i> %s
                                 </a>
                             </li>
                         </ul>
@@ -1608,11 +1615,12 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
                         <hr>
                         <div class="dropdown">
                             <a href="%s/logout" class="btn btn-outline-danger btn-sm">
-                                <i class="bi bi-box-arrow-right"></i> 退出
+                                <i class="bi bi-box-arrow-right"></i> %s
                             </a>
                         </div>
                     </div>
                 </nav>`,
+		title,
 		func() string {
 			if activePage == "dashboard" {
 				return "active"
@@ -1620,6 +1628,7 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 			return ""
 		}(),
 		adminPrefix,
+		navDashboard,
 		func() string {
 			if activePage == "proxy" {
 				return "active"
@@ -1627,6 +1636,7 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 			return ""
 		}(),
 		adminPrefix,
+		navProxy,
 		func() string {
 			if activePage == "ssl" {
 				return "active"
@@ -1634,6 +1644,7 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 			return ""
 		}(),
 		adminPrefix,
+		navSSL,
 		func() string {
 			if activePage == "security" {
 				return "active"
@@ -1641,6 +1652,7 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 			return ""
 		}(),
 		adminPrefix,
+		navSecurity,
 		func() string {
 			if activePage == "settings" {
 				return "active"
@@ -1648,7 +1660,9 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 			return ""
 		}(),
 		adminPrefix,
-		adminPrefix)
+		navSettings,
+		adminPrefix,
+		logout)
 }
 
 func (s *Server) handleConfigExport(w http.ResponseWriter, r *http.Request) {
@@ -1660,7 +1674,7 @@ func (s *Server) handleConfigExport(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "导出配置失败: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	filename := "withssl-" + time.Now().Format("20060102-150405") + ".json"
+	filename := "sslcat-" + time.Now().Format("20060102-150405") + ".json"
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Disposition", "attachment; filename="+filename)
 	w.Write(data)

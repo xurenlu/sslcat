@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>移动端管理 - SSLcat</title>
+    <title>{{t "mobile.title"}} - SSLcat</title>
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
     <style>
@@ -64,57 +64,57 @@
     <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-value" id="active-rules">{{if .Stats}}{{.Stats.ActiveRules}}{{else}}0{{end}}</div>
-            <div class="stat-label">活跃规则</div>
+            <div class="stat-label">{{t "mobile.active_rules"}}</div>
         </div>
         <div class="stat-card">
             <div class="stat-value" id="cached-proxies">{{if .Stats}}{{.Stats.CachedProxies}}{{else}}0{{end}}</div>
-            <div class="stat-label">缓存代理</div>
+            <div class="stat-label">{{t "mobile.cached_proxies"}}</div>
         </div>
         <div class="stat-card">
             <div class="stat-value" id="total-requests">{{if .Stats}}{{.Stats.TotalRequests}}{{else}}0{{end}}</div>
-            <div class="stat-label">总请求</div>
+            <div class="stat-label">{{t "dashboard.total_requests"}}</div>
         </div>
         <div class="stat-card">
             <div class="stat-value" id="error-rate">{{if .Stats}}{{printf "%.1f%%" .Stats.ErrorRate}}{{else}}0.0%{{end}}</div>
-            <div class="stat-label">错误率</div>
+            <div class="stat-label">{{t "dashboard.error_rate"}}</div>
         </div>
     </div>
 
     <!-- 快捷操作 -->
     <div class="action-section">
-        <h6>快捷操作</h6>
+        <h6>{{t "mobile.quick_actions"}}</h6>
         <a href="{{.AdminPrefix}}/proxy/new" class="btn btn-primary action-btn">
-            <i class="bi bi-plus-circle"></i> 新增代理规则
+            <i class="bi bi-plus-circle"></i> {{t "proxy.add_rule"}}
         </a>
         <a href="{{.AdminPrefix}}/ssl" class="btn btn-success action-btn">
-            <i class="bi bi-shield-lock"></i> 管理SSL证书
+            <i class="bi bi-shield-lock"></i> {{t "mobile.ssl_management"}}
         </a>
         <a href="{{.AdminPrefix}}/security" class="btn btn-warning action-btn">
-            <i class="bi bi-shield-check"></i> 安全设置
+            <i class="bi bi-shield-check"></i> {{t "nav.security"}}
         </a>
         <a href="{{.AdminPrefix}}/settings" class="btn btn-info action-btn">
-            <i class="bi bi-gear"></i> 系统设置
+            <i class="bi bi-gear"></i> {{t "nav.settings"}}
         </a>
         <a href="{{.AdminPrefix}}/charts" class="btn btn-secondary action-btn">
-            <i class="bi bi-bar-chart"></i> 统计图表
+            <i class="bi bi-bar-chart"></i> {{t "monitoring.title"}}
         </a>
     </div>
 
     <!-- 系统状态 -->
     <div class="action-section">
-        <h6>系统状态</h6>
+        <h6>{{t "dashboard.system_status"}}</h6>
         <div class="card">
             <div class="card-body">
                 <div class="d-flex justify-content-between">
-                    <span>服务状态</span>
-                    <span class="text-success"><i class="bi bi-check-circle"></i> 正常</span>
+                    <span>{{t "dashboard.service_status"}}</span>
+                    <span class="text-success"><i class="bi bi-check-circle"></i> {{t "common.enabled"}}</span>
                 </div>
                 <div class="d-flex justify-content-between">
-                    <span>SSL状态</span>
-                    <span class="text-success"><i class="bi bi-shield-lock"></i> 正常</span>
+                    <span>SSL</span>
+                    <span class="text-success"><i class="bi bi-shield-lock"></i> {{t "common.enabled"}}</span>
                 </div>
                 <div class="d-flex justify-content-between">
-                    <span>版本</span>
+                    <span>{{t "dashboard.version"}}</span>
                     <span>v1.0.0</span>
                 </div>
             </div>
