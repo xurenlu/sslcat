@@ -80,9 +80,9 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 
 		client := &acme.Client{}
 		if cfg.SSL.Staging {
-			client.DirectoryURL = acme.LetsEncryptStagingURL
+			client.DirectoryURL = "https://acme-staging-v02.api.letsencrypt.org/directory"
 		} else {
-			client.DirectoryURL = acme.LetsEncryptURL
+			client.DirectoryURL = "https://acme-v02.api.letsencrypt.org/directory"
 		}
 		m.Client = client
 		manager.acmeMgr = m
