@@ -3,11 +3,14 @@
 ## ⏱️ 一分钟快速上手 WithSSL
 
 ```bash
-# 1) 一键安装（Linux）推荐：从 GitHub Release 下载并安装
-curl -fsSL https://raw.githubusercontent.com/xurenlu/withssl/main/scripts/install-from-release.sh | sudo bash -s -- -v 1.0.2
+# 1) 一键安装（Linux）
+# 面向中国大陆用户（通过 sslcat.com 加速）
+curl -fsSL https://sslcat.com/xurenlu/withssl/main/scripts/install-from-release-zh.sh | sudo bash -s -- -v 1.0.2
+# 非大陆用户可直接使用 GitHubusercontent：
+# curl -fsSL https://raw.githubusercontent.com/xurenlu/withssl/main/scripts/install-from-release.sh | sudo bash -s -- -v 1.0.2
 
 # 2) macOS 本地快速试用（或自行下载 darwin 包）
-curl -fsSL https://github.com/xurenlu/withssl/releases/download/v1.0.2/withssl_1.0.2_darwin_arm64.tar.gz -o withssl.tgz
+curl -fsSL https://sslcat.com/xurenlu/withssl/releases/download/v1.0.2/withssl_1.0.2_darwin_arm64.tar.gz -o withssl.tgz
 tar -xzf withssl.tgz && sudo install -m 0755 withssl /usr/local/bin/withssl
 withssl --config withssl.conf --port 8080
 # 浏览器访问: http://localhost:8080/withssl-panel/
