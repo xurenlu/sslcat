@@ -9,7 +9,13 @@ All notable changes to this project will be documented in this file.
 - 系统设置页入口：新增“导出配置 / 导入配置(预览diff) / 查看上次导入的diff”按钮
 - 发布脚本与文档：scripts/release/* 与 RELEASE.md，支持多架构构建与发布
 
-## [1.0.2] - 2025-09-05
+## [1.0.3] - 2025-09-05
+### Added
+- HTTP/3 (QUIC) support alongside HTTPS (ALPN h3, fallback to h2/h1)
+- Sidebar link to official site (sslcat.com)
+- Docs and paths unified to sslcat branding
+
+## [1.0.3] - 2025-09-05
 ### Added
 - 维护者发布指南 `MAINTAINER_RELEASE_GUIDE.md`
 - 安装包脚本：DEB（package-deb.sh）、RPM（package-rpm.sh）、Homebrew（package-brew.sh）

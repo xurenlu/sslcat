@@ -1,6 +1,6 @@
 # SSLcat - SSL Proxy Server
 
-SSLcat is a powerful SSL proxy server that supports automatic certificate management, domain forwarding, security protection, and web management panel.
+SSLcat is a powerful SSL proxy server that supports automatic certificate management, domain forwarding, security protection, and web management panel. It now provides HTTP/3 (QUIC) and HTTP/2 support via ALPN with graceful fallback.
 
 ## 📚 Documentation
 

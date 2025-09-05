@@ -3,7 +3,7 @@ set -euo pipefail
 
 # withssl 一键安装脚本（Linux/macOS）
 # 用法（推荐传版本）：
-#   curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/scripts/install-from-release.sh | sudo bash -s -- -v 1.0.2
+#   curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/scripts/install-from-release.sh | sudo bash -s -- -v 1.0.3
 
 VER=""
 DEST_LINUX="/opt/sslcat"
@@ -22,8 +22,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$VER" ]]; then
-  echo "[withssl] 你未指定版本，默认安装 v1.0.2"
-  VER="1.0.2"
+  echo "[withssl] 你未指定版本，默认安装 v1.0.3"
+  VER="1.0.3"
 fi
 
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')

@@ -5,12 +5,12 @@
 ```bash
 # 1) 一键安装（Linux）
 # 面向中国大陆用户（通过 sslcat.com 加速）
-curl -fsSL https://sslcat.com/xurenlu/sslcat/main/scripts/install-from-release-zh.sh | sudo bash -s -- -v 1.0.2
+curl -fsSL https://sslcat.com/xurenlu/sslcat/main/scripts/install-from-release-zh.sh | sudo bash -s -- -v 1.0.3
 # 非大陆用户可直接使用 GitHubusercontent：
-# curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/scripts/install-from-release.sh | sudo bash -s -- -v 1.0.2
+# curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/scripts/install-from-release.sh | sudo bash -s -- -v 1.0.3
 
 # 2) macOS 本地快速试用（或自行下载 darwin 包）
-curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.0.2/withssl_1.0.2_darwin_arm64.tar.gz -o withssl.tgz
+curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.0.3/withssl_1.0.3_darwin_arm64.tar.gz -o withssl.tgz
 tar -xzf withssl.tgz && sudo install -m 0755 withssl /usr/local/bin/withssl
 withssl --config withssl.conf --port 8080
 # 浏览器访问: http://localhost:8080/sslcat-panel/
@@ -21,7 +21,7 @@ docker compose up -d
 ```
 
 
-SSLcat 是一个功能强大的 SSL 代理服务器，支持自动证书管理、域名转发、安全防护和 Web 管理面板。
+SSLcat 是一个功能强大的 SSL 代理服务器，支持自动证书管理、域名转发、安全防护和 Web 管理面板，并提供 HTTP/3 (QUIC) 与 HTTP/2 的协议支持（自动协商，向下兼容）。
 
 ## 📚 文档导航
 
