@@ -66,7 +66,7 @@
                             <i class="bi bi-exclamation-triangle feature-icon"></i>
                             <h3>域名未配置</h3>
                             <p class="text-muted">
-                                域名 <strong>{{ domain }}</strong> 尚未配置代理转发规则
+                                域名 <strong>{{.Domain}}</strong> 尚未配置代理转发规则
                             </p>
                         </div>
                         
@@ -97,7 +97,7 @@
                         </div>
                         
                         <div class="d-grid gap-2">
-                            <a href="{{ admin_prefix }}" class="btn-admin">
+                            <a href="{{.AdminPrefix}}" class="btn-admin">
                                 <i class="bi bi-gear"></i> 进入管理面板
                             </a>
                         </div>

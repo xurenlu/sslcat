@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}WithSSL{% endblock %}</title>
+    <title>{{if .Title}}{{.Title}}{{else}}WithSSL{{end}}</title>
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
     <style>
@@ -30,7 +30,6 @@
             font-size: 0.875rem;
         }
     </style>
-    {% block extra_css %}{% endblock %}
 </head>
 <body>
     <div class="container-fluid">
@@ -45,51 +44,49 @@
                     
                     <ul class="nav flex-column">
                         <li class="nav-item">
-                            <a class="nav-link {% if request.url_path == admin_prefix + '/' %}active{% endif %}" href="{{ admin_prefix }}/">
+                            <a class="nav-link" href="{{.AdminPrefix}}/">
                                 <i class="bi bi-speedometer2"></i> 仪表板
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link {% if 'proxy' in request.url_path %}active{% endif %}" href="{{ admin_prefix }}/proxy">
+                            <a class="nav-link" href="{{.AdminPrefix}}/proxy">
                                 <i class="bi bi-arrow-left-right"></i> 代理配置
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link {% if 'ssl' in request.url_path %}active{% endif %}" href="{{ admin_prefix }}/ssl">
+                            <a class="nav-link" href="{{.AdminPrefix}}/ssl">
                                 <i class="bi bi-shield-lock"></i> SSL证书
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link {% if 'security' in request.url_path %}active{% endif %}" href="{{ admin_prefix }}/security">
-                                <i class="bi bi-shield-exclamation"></i> 安全设置
+                            <a class="nav-link" href="{{.AdminPrefix}}/security">
+                                <i class="bi bi-shield-check"></i> 安全设置
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link {% if 'settings' in request.url_path %}active{% endif %}" href="{{ admin_prefix }}/settings">
+                            <a class="nav-link" href="{{.AdminPrefix}}/settings">
                                 <i class="bi bi-gear"></i> 系统设置
                             </a>
                         </li>
                     </ul>
                     
                     <hr>
-                    
-                    <div class="text-center">
-                        <a href="{{ admin_prefix }}/logout" class="btn btn-outline-danger btn-sm">
-                            <i class="bi bi-box-arrow-right"></i> 退出登录
+                    <div class="dropdown">
+                        <a href="{{.AdminPrefix}}/logout" class="btn btn-outline-danger btn-sm">
+                            <i class="bi bi-box-arrow-right"></i> 退出
                         </a>
                     </div>
                 </div>
             </nav>
-            
-            <!-- 主内容区 -->
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
-                {% block content %}{% endblock %}
+
+            <!-- 主内容 -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                {{.Content}}
             </main>
         </div>
     </div>
-    
+
     <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    {% block extra_js %}{% endblock %}
+    {{.ExtraJS}}
 </body>
 </html>

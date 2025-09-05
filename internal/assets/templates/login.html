@@ -62,13 +62,13 @@
                         <p class="mb-0">SSL 代理服务器管理面板</p>
                     </div>
                     <div class="login-body">
-                        {% if error %}
+                        {{if .Error}}
                         <div class="alert alert-danger" role="alert">
-                            <i class="bi bi-exclamation-triangle"></i> {{ error }}
+                            <i class="bi bi-exclamation-triangle"></i> {{.Error}}
                         </div>
-                        {% endif %}
+                        {{end}}
                         
-                        <form method="POST" action="{{ admin_prefix }}/login">
+                        <form method="POST" action="{{.AdminPrefix}}/login">
                             <div class="mb-3">
                                 <label for="username" class="form-label">
                                     <i class="bi bi-person"></i> 用户名

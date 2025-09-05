@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	"html/template"
 	"net/http"
 	"sync"
@@ -46,6 +47,7 @@ func (tr *TemplateRenderer) loadTemplates() error {
 
 	// 创建模板函数
 	funcMap := template.FuncMap{
+		// 国际化函数
 		"t": func(key string, args ...interface{}) string {
 			return tr.translator.T(key, args...)
 		},
@@ -57,6 +59,81 @@ func (tr *TemplateRenderer) loadTemplates() error {
 		},
 		"supportedLangs": func() map[i18n.SupportedLanguage]*i18n.LanguageInfo {
 			return tr.translator.GetSupportedLanguages()
+		},
+		
+		
+		// 通用工具函数
+		"formatNumber": func(n interface{}) string {
+			switch v := n.(type) {
+			case int:
+				if v >= 1000000 {
+					return fmt.Sprintf("%.1fM", float64(v)/1000000)
+				} else if v >= 1000 {
+					return fmt.Sprintf("%.1fK", float64(v)/1000)
+				}
+				return fmt.Sprintf("%d", v)
+			case int64:
+				if v >= 1000000 {
+					return fmt.Sprintf("%.1fM", float64(v)/1000000)
+				} else if v >= 1000 {
+					return fmt.Sprintf("%.1fK", float64(v)/1000)
+				}
+				return fmt.Sprintf("%d", v)
+			case float64:
+				if v >= 1000000 {
+					return fmt.Sprintf("%.1fM", v/1000000)
+				} else if v >= 1000 {
+					return fmt.Sprintf("%.1fK", v/1000)
+				}
+				return fmt.Sprintf("%.0f", v)
+			default:
+				return fmt.Sprintf("%v", v)
+			}
+		},
+		"formatBytes": func(bytes interface{}) string {
+			var b int64
+			switch v := bytes.(type) {
+			case int:
+				b = int64(v)
+			case int64:
+				b = v
+			case float64:
+				b = int64(v)
+			default:
+				return fmt.Sprintf("%v", bytes)
+			}
+			
+			const unit = 1024
+			if b < unit {
+				return fmt.Sprintf("%d B", b)
+			}
+			div, exp := int64(unit), 0
+			for n := b / unit; n >= unit; n /= unit {
+				div *= unit
+				exp++
+			}
+			return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
+		},
+		"formatDuration": func(seconds interface{}) string {
+			var s int64
+			switch v := seconds.(type) {
+			case int:
+				s = int64(v)
+			case int64:
+				s = v
+			case float64:
+				s = int64(v)
+			default:
+				return fmt.Sprintf("%v", seconds)
+			}
+			
+			if s < 60 {
+				return fmt.Sprintf("%ds", s)
+			} else if s < 3600 {
+				return fmt.Sprintf("%dm%ds", s/60, s%60)
+			} else {
+				return fmt.Sprintf("%dh%dm", s/3600, (s%3600)/60)
+			}
 		},
 	}
 
