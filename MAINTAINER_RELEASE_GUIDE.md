@@ -63,8 +63,8 @@ docker compose up -d
 env VER=1.0.2 REPO=xurenlu/sslcat \
 scripts/release/upgrade-helper.sh
 ```
-- 步骤：下载 → 备份当前 `/opt/withssl/withssl` → 替换 → 重启 systemd 服务
-- 回滚：从 `/opt/withssl-backups/<timestamp>/withssl` 拷回覆盖后重启
+- 步骤：下载 → 备份当前 `/opt/sslcat/withssl` → 替换 → 重启 systemd 服务
+- 回滚：从 `/opt/sslcat-backups/<timestamp>/withssl` 拷回覆盖后重启
 
 ## 5) 环境变量（可选）
 - Webhook：`WITHSSL_WEBHOOK_URL` → 发送审计/到期等事件

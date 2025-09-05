@@ -142,14 +142,14 @@ create_user_and_dirs() {
     fi
     
     # 创建目录
-    mkdir -p /etc/withssl
-    mkdir -p /var/lib/withssl/{certs,keys,logs}
-    mkdir -p /opt/withssl
+    mkdir -p /etc/sslcat
+    mkdir -p /var/lib/sslcat/{certs,keys,logs}
+    mkdir -p /opt/sslcat
     
     # 设置权限
-    chown -R withssl:withssl /var/lib/withssl
-    chmod 755 /etc/withssl
-    chmod 700 /var/lib/withssl
+    chown -R withssl:withssl /var/lib/sslcat
+    chmod 755 /etc/sslcat
+    chmod 700 /var/lib/sslcat
     
     log_success "目录创建完成"
 }
@@ -164,7 +164,7 @@ build_withssl() {
     export GOBIN=$GOPATH/bin
     
     # 进入项目目录
-    cd /opt/withssl
+    cd /opt/sslcat
     
     # 下载依赖
     log_info "下载Go依赖..."
@@ -194,8 +194,8 @@ After=network.target
 Type=simple
 User=withssl
 Group=withssl
-WorkingDirectory=/opt/withssl
-ExecStart=/opt/withssl/withssl --config /etc/withssl/withssl.conf
+WorkingDirectory=/opt/sslcat
+ExecStart=/opt/sslcat/withssl --config /etc/sslcat/withssl.conf
 ExecReload=/bin/kill -HUP \$MAINPID
 Restart=always
 RestartSec=5
@@ -208,7 +208,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/withssl /etc/withssl /opt/withssl
+ReadWritePaths=/var/lib/sslcat /etc/sslcat /opt/sslcat
 
 # 环境变量
 Environment=GOPATH=/opt/go
@@ -228,7 +228,7 @@ EOF
 create_config() {
     log_info "创建默认配置文件..."
     
-    cat > /etc/withssl/withssl.conf << EOF
+    cat > /etc/sslcat/withssl.conf << EOF
 server:
   host: "0.0.0.0"
   port: 443
@@ -238,8 +238,8 @@ ssl:
   email: ""
   staging: false
   domains: []
-  cert_dir: "/var/lib/withssl/certs"
-  key_dir: "/var/lib/withssl/keys"
+  cert_dir: "/var/lib/sslcat/certs"
+  key_dir: "/var/lib/sslcat/keys"
   auto_renew: true
 
 admin:
@@ -254,7 +254,7 @@ security:
   max_attempts: 3
   block_duration: "1m"
   max_attempts_5min: 10
-  block_file: "/var/lib/withssl/withssl.block"
+  block_file: "/var/lib/sslcat/withssl.block"
   allowed_user_agents:
     - "Mozilla/"
     - "Chrome/"
@@ -265,8 +265,8 @@ security:
 admin_prefix: "/sslcat-panel"
 EOF
     
-    chown withssl:withssl /etc/withssl/withssl.conf
-    chmod 600 /etc/withssl/withssl.conf
+    chown withssl:withssl /etc/sslcat/withssl.conf
+    chmod 600 /etc/sslcat/withssl.conf
     
     log_success "配置文件创建完成"
 }
@@ -333,9 +333,9 @@ show_install_info() {
     echo "默认用户名: admin"
     echo "默认密码: admin*9527"
     echo
-    echo "配置文件: /etc/withssl/withssl.conf"
-    echo "证书目录: /var/lib/withssl/certs"
-    echo "密钥目录: /var/lib/withssl/keys"
+    echo "配置文件: /etc/sslcat/withssl.conf"
+    echo "证书目录: /var/lib/sslcat/certs"
+    echo "密钥目录: /var/lib/sslcat/keys"
     echo
     echo "首次登录后请立即修改默认密码！"
     echo "=========================================="

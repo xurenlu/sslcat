@@ -149,7 +149,7 @@ withssl --help
 ```
 
 利用可能なオプション:
-- `--config`: 設定ファイルパス (デフォルト: "/etc/withssl/withssl.conf")
+- `--config`: 設定ファイルパス (デフォルト: "/etc/sslcat/withssl.conf")
 - `--admin-prefix`: 管理パネルパスプレフィックス (デフォルト: "/sslcat-panel")
 - `--email`: SSL証明書メールアドレス
 - `--port`: リスンポート (デフォルト: 443)

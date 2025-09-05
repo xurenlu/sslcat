@@ -66,8 +66,8 @@ After=network.target
 Type=simple
 User=withssl
 Group=withssl
-WorkingDirectory=/opt/withssl
-ExecStart=/opt/withssl/withssl --config /etc/withssl/withssl.conf
+WorkingDirectory=/opt/sslcat
+ExecStart=/opt/sslcat/withssl --config /etc/sslcat/withssl.conf
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=5
@@ -80,7 +80,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/withssl /etc/withssl /opt/withssl
+ReadWritePaths=/var/lib/sslcat /etc/sslcat /opt/sslcat
 
 # 环境变量
 Environment=GOPATH=/opt/go
@@ -98,19 +98,19 @@ systemctl daemon-reload
 log_info "检查文件和权限..."
 
 # 检查二进制文件
-if [[ ! -f /opt/withssl/withssl ]]; then
-    log_error "二进制文件 /opt/withssl/withssl 不存在"
+if [[ ! -f /opt/sslcat/withssl ]]; then
+    log_error "二进制文件 /opt/sslcat/withssl 不存在"
     exit 1
 fi
 
-if [[ ! -x /opt/withssl/withssl ]]; then
+if [[ ! -x /opt/sslcat/withssl ]]; then
     log_warning "二进制文件没有执行权限，正在修复..."
-    chmod +x /opt/withssl/withssl
+    chmod +x /opt/sslcat/withssl
 fi
 
 # 检查配置文件
-if [[ ! -f /etc/withssl/withssl.conf ]]; then
-    log_error "配置文件 /etc/withssl/withssl.conf 不存在"
+if [[ ! -f /etc/sslcat/withssl.conf ]]; then
+    log_error "配置文件 /etc/sslcat/withssl.conf 不存在"
     log_info "请检查配置文件路径或重新运行安装脚本"
     exit 1
 fi
@@ -124,13 +124,13 @@ fi
 
 # 检查目录权限
 log_info "检查和修复目录权限..."
-mkdir -p /var/lib/withssl
-chown -R withssl:withssl /var/lib/withssl
-chown -R withssl:withssl /etc/withssl
-chown -R withssl:withssl /opt/withssl
-chmod 755 /opt/withssl
-chmod 755 /etc/withssl
-chmod 755 /var/lib/withssl
+mkdir -p /var/lib/sslcat
+chown -R withssl:withssl /var/lib/sslcat
+chown -R withssl:withssl /etc/sslcat
+chown -R withssl:withssl /opt/sslcat
+chmod 755 /opt/sslcat
+chmod 755 /etc/sslcat
+chmod 755 /var/lib/sslcat
 
 # 启动服务
 log_info "启动SSLcat服务..."
@@ -151,9 +151,9 @@ if systemctl is-active --quiet withssl; then
     echo ""
     echo "📋 修复内容："
     echo "✅ 修复了systemd服务文件路径问题"
-    echo "✅ 配置文件路径: /etc/withssl/withssl.conf"
-    echo "✅ 二进制文件路径: /opt/withssl/withssl"
-    echo "✅ 数据目录: /var/lib/withssl"
+    echo "✅ 配置文件路径: /etc/sslcat/withssl.conf"
+    echo "✅ 二进制文件路径: /opt/sslcat/withssl"
+    echo "✅ 数据目录: /var/lib/sslcat"
     echo "✅ 修复了文件权限"
     echo ""
     echo "🔍 服务状态："
@@ -173,7 +173,7 @@ else
     echo ""
     echo "常见问题："
     echo "1. 检查端口是否被占用: netstat -tlnp | grep ':443'"
-    echo "2. 检查配置文件语法: /opt/withssl/withssl --config /etc/withssl/withssl.conf --check"
+    echo "2. 检查配置文件语法: /opt/sslcat/withssl --config /etc/sslcat/withssl.conf --check"
     echo "3. 检查防火墙设置"
     exit 1
 fi

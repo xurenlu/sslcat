@@ -136,13 +136,13 @@ go build -o withssl main.go
 4. **Create User and Directories**
 ```bash
 sudo useradd -r -s /bin/false withssl
-sudo mkdir -p /etc/withssl /var/lib/withssl/{certs,keys,logs}
-sudo chown -R withssl:withssl /var/lib/withssl
+sudo mkdir -p /etc/sslcat /var/lib/sslcat/{certs,keys,logs}
+sudo chown -R withssl:withssl /var/lib/sslcat
 ```
 
 5. **Configure and Start**
 ```bash
-sudo cp withssl /opt/withssl/
+sudo cp withssl /opt/sslcat/
 sudo cp withssl.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable withssl
@@ -152,10 +152,10 @@ sudo systemctl start withssl
 ## Configuration
 
 ### Configuration File Location
-- Main config file: `/etc/withssl/withssl.conf`
-- Certificate directory: `/var/lib/withssl/certs`
-- Key directory: `/var/lib/withssl/keys`
-- Log directory: `/var/lib/withssl/logs`
+- Main config file: `/etc/sslcat/withssl.conf`
+- Certificate directory: `/var/lib/sslcat/certs`
+- Key directory: `/var/lib/sslcat/keys`
+- Log directory: `/var/lib/sslcat/logs`
 
 ### Basic Configuration
 
@@ -294,8 +294,8 @@ SSLcat automatically obtains SSL certificates for configured domains without man
 Certificates are automatically renewed 30 days before expiration, or can be manually triggered.
 
 ### Certificate Storage
-- Certificate file: `/var/lib/withssl/certs/domain.crt`
-- Private key file: `/var/lib/withssl/keys/domain.key`
+- Certificate file: `/var/lib/sslcat/certs/domain.crt`
+- Private key file: `/var/lib/sslcat/keys/domain.key`
 
 ## Security Features
 
@@ -313,7 +313,7 @@ Certificates are automatically renewed 30 days before expiration, or can be manu
 ### Unblock IPs
 ```bash
 # Delete blocking file and restart service
-sudo rm /var/lib/withssl/withssl.block
+sudo rm /var/lib/sslcat/withssl.block
 sudo systemctl restart withssl
 ```
 
@@ -324,7 +324,7 @@ withssl --help
 ```
 
 Available options:
-- `--config`: Configuration file path (default: "/etc/withssl/withssl.conf")
+- `--config`: Configuration file path (default: "/etc/sslcat/withssl.conf")
 - `--admin-prefix`: Management panel path prefix (default: "/sslcat-panel")
 - `--email`: SSL certificate email
 - `--staging`: Use Let's Encrypt staging environment
@@ -360,7 +360,7 @@ Use the provided `install.sh` script to automatically install as a system servic
 ### 2. Docker Deployment
 ```bash
 docker build -t withssl .
-docker run -d -p 80:80 -p 443:443 -v $(pwd)/config:/etc/withssl withssl
+docker run -d -p 80:80 -p 443:443 -v $(pwd)/config:/etc/sslcat withssl
 ```
 
 ### 3. Docker Compose Deployment
@@ -454,7 +454,7 @@ sysctl -p
 1. **Service startup failure**
    ```bash
    # Check configuration file syntax
-   sudo withssl --config /etc/withssl/withssl.conf --log-level debug
+   sudo withssl --config /etc/sslcat/withssl.conf --log-level debug
    
    # Check port usage
    sudo netstat -tlnp | grep :443

@@ -1641,12 +1641,16 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 	navSecurity := s.translator.T("nav.security")
 	navSettings := s.translator.T("nav.settings")
 	logout := s.translator.T("menu.logout")
+	official := s.translator.T("menu.official_site")
 	return fmt.Sprintf(`
                 <nav class="d-md-block sidebar collapse">
                     <div class="position-sticky pt-3">
                         <div class="text-center mb-4">
                             <h4 class="navbar-brand text-primary">SSLcat</h4>
                             <small class="text-muted">%s</small>
+                            <div class="mt-2">
+                                <a class="btn btn-sm btn-outline-primary" href="https://sslcat.com" target="_blank" rel="noopener">%s</a>
+                            </div>
                         </div>
                         
                         <div class="dropdown mb-3 px-3">
@@ -1700,6 +1704,7 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
                     </div>
                 </nav>`,
 		title,
+		official,
 		func() string {
 			if activePage == "dashboard" {
 				return "active"

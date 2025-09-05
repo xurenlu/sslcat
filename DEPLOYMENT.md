@@ -32,8 +32,8 @@ ssh root@your-server.com 'cd /tmp/deploy && bash deploy-commands.sh'
 make build-linux
 
 # 手动上传
-scp build/withssl-linux-amd64 root@your-server.com:/opt/withssl/withssl
-scp withssl.conf.example root@your-server.com:/etc/withssl/withssl.conf
+scp build/withssl-linux-amd64 root@your-server.com:/opt/sslcat/withssl
+scp withssl.conf.example root@your-server.com:/etc/sslcat/withssl.conf
 ```
 
 ## 🔧 交叉编译说明
@@ -104,20 +104,20 @@ GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o withssl main.go
 ```bash
 # 创建用户和目录
 sudo useradd -r -s /bin/false withssl
-sudo mkdir -p /etc/withssl /var/lib/withssl/{certs,keys,logs}
-sudo chown -R withssl:withssl /var/lib/withssl
+sudo mkdir -p /etc/sslcat /var/lib/sslcat/{certs,keys,logs}
+sudo chown -R withssl:withssl /var/lib/sslcat
 ```
 
 ### 步骤 3: 上传文件
 
 ```bash
 # 上传二进制文件
-scp withssl root@server:/opt/withssl/
-ssh root@server 'chmod +x /opt/withssl/withssl'
+scp withssl root@server:/opt/sslcat/
+ssh root@server 'chmod +x /opt/sslcat/withssl'
 
 # 上传配置文件
-scp withssl.conf root@server:/etc/withssl/
-ssh root@server 'chown withssl:withssl /etc/withssl/withssl.conf'
+scp withssl.conf root@server:/etc/sslcat/
+ssh root@server 'chown withssl:withssl /etc/sslcat/withssl.conf'
 ```
 
 ### 步骤 4: 安装系统服务
@@ -133,8 +133,8 @@ After=network.target
 Type=simple
 User=withssl
 Group=withssl
-WorkingDirectory=/opt/withssl
-ExecStart=/opt/withssl/withssl --config /etc/withssl/withssl.conf
+WorkingDirectory=/opt/sslcat
+ExecStart=/opt/sslcat/withssl --config /etc/sslcat/withssl.conf
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=5
@@ -180,25 +180,25 @@ curl -k https://your-domain/sslcat-panel/api/stats
 
 ```bash
 # 检查文件权限
-ls -la /opt/withssl/withssl
+ls -la /opt/sslcat/withssl
 
 # 设置执行权限
-sudo chmod +x /opt/withssl/withssl
+sudo chmod +x /opt/sslcat/withssl
 
 # 检查文件类型
-file /opt/withssl/withssl
+file /opt/sslcat/withssl
 ```
 
 ### 问题 2: 权限问题
 
 ```bash
 # 检查目录权限
-ls -la /var/lib/withssl
-ls -la /etc/withssl
+ls -la /var/lib/sslcat
+ls -la /etc/sslcat
 
 # 修复权限
-sudo chown -R withssl:withssl /var/lib/withssl
-sudo chown withssl:withssl /etc/withssl/withssl.conf
+sudo chown -R withssl:withssl /var/lib/sslcat
+sudo chown withssl:withssl /etc/sslcat/withssl.conf
 ```
 
 ### 问题 3: 端口被占用
@@ -208,7 +208,7 @@ sudo chown withssl:withssl /etc/withssl/withssl.conf
 sudo netstat -tlnp | grep :443
 
 # 修改配置文件端口
-sudo nano /etc/withssl/withssl.conf
+sudo nano /etc/sslcat/withssl.conf
 ```
 
 ### 问题 4: 防火墙问题
@@ -233,13 +233,13 @@ sudo firewall-cmd --reload
 GOOS=linux GOARCH=amd64 go build -o withssl main.go
 
 # 2. 上传新版本
-scp withssl root@server:/opt/withssl/withssl-new
+scp withssl root@server:/opt/sslcat/withssl-new
 
 # 3. 平滑重启
 ssh root@server '
   sudo systemctl stop withssl
-  sudo mv /opt/withssl/withssl-new /opt/withssl/withssl
-  sudo chmod +x /opt/withssl/withssl
+  sudo mv /opt/sslcat/withssl-new /opt/sslcat/withssl
+  sudo chmod +x /opt/sslcat/withssl
   sudo systemctl start withssl
 '
 ```
@@ -271,7 +271,7 @@ sysctl -p
 ```bash
 # 设置日志轮转
 cat > /etc/logrotate.d/withssl << 'EOF'
-/var/lib/withssl/logs/*.log {
+/var/lib/sslcat/logs/*.log {
     daily
     rotate 30
     compress
@@ -288,9 +288,9 @@ EOF
 ```bash
 # 备份配置和证书
 tar -czf withssl-backup-$(date +%Y%m%d).tar.gz \
-    /etc/withssl/ \
-    /var/lib/withssl/certs/ \
-    /var/lib/withssl/keys/
+    /etc/sslcat/ \
+    /var/lib/sslcat/certs/ \
+    /var/lib/sslcat/keys/
 ```
 
 ## 🎯 总结

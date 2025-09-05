@@ -32,8 +32,8 @@ ssh root@your-server.com 'cd /tmp/deploy && bash deploy-commands.sh'
 make build-linux
 
 # Manual upload
-scp build/withssl-linux-amd64 root@your-server.com:/opt/withssl/withssl
-scp withssl.conf.example root@your-server.com:/etc/withssl/withssl.conf
+scp build/withssl-linux-amd64 root@your-server.com:/opt/sslcat/withssl
+scp withssl.conf.example root@your-server.com:/etc/sslcat/withssl.conf
 ```
 
 ## 🔧 Cross-Compilation Guide
@@ -104,20 +104,20 @@ On target server:
 ```bash
 # Create user and directories
 sudo useradd -r -s /bin/false withssl
-sudo mkdir -p /etc/withssl /var/lib/withssl/{certs,keys,logs}
-sudo chown -R withssl:withssl /var/lib/withssl
+sudo mkdir -p /etc/sslcat /var/lib/sslcat/{certs,keys,logs}
+sudo chown -R withssl:withssl /var/lib/sslcat
 ```
 
 ### Step 3: Upload Files
 
 ```bash
 # Upload binary
-scp withssl root@server:/opt/withssl/
-ssh root@server 'chmod +x /opt/withssl/withssl'
+scp withssl root@server:/opt/sslcat/
+ssh root@server 'chmod +x /opt/sslcat/withssl'
 
 # Upload configuration
-scp withssl.conf root@server:/etc/withssl/
-ssh root@server 'chown withssl:withssl /etc/withssl/withssl.conf'
+scp withssl.conf root@server:/etc/sslcat/
+ssh root@server 'chown withssl:withssl /etc/sslcat/withssl.conf'
 ```
 
 ### Step 4: Install System Service
@@ -133,8 +133,8 @@ After=network.target
 Type=simple
 User=withssl
 Group=withssl
-WorkingDirectory=/opt/withssl
-ExecStart=/opt/withssl/withssl --config /etc/withssl/withssl.conf
+WorkingDirectory=/opt/sslcat
+ExecStart=/opt/sslcat/withssl --config /etc/sslcat/withssl.conf
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=5
@@ -180,25 +180,25 @@ curl -k https://your-domain/sslcat-panel/api/stats
 
 ```bash
 # Check file permissions
-ls -la /opt/withssl/withssl
+ls -la /opt/sslcat/withssl
 
 # Set execute permissions
-sudo chmod +x /opt/withssl/withssl
+sudo chmod +x /opt/sslcat/withssl
 
 # Check file type
-file /opt/withssl/withssl
+file /opt/sslcat/withssl
 ```
 
 ### Issue 2: Permission Issues
 
 ```bash
 # Check directory permissions
-ls -la /var/lib/withssl
-ls -la /etc/withssl
+ls -la /var/lib/sslcat
+ls -la /etc/sslcat
 
 # Fix permissions
-sudo chown -R withssl:withssl /var/lib/withssl
-sudo chown withssl:withssl /etc/withssl/withssl.conf
+sudo chown -R withssl:withssl /var/lib/sslcat
+sudo chown withssl:withssl /etc/sslcat/withssl.conf
 ```
 
 ### Issue 3: Port in Use
@@ -208,7 +208,7 @@ sudo chown withssl:withssl /etc/withssl/withssl.conf
 sudo netstat -tlnp | grep :443
 
 # Modify configuration file port
-sudo nano /etc/withssl/withssl.conf
+sudo nano /etc/sslcat/withssl.conf
 ```
 
 ### Issue 4: Firewall Issues
@@ -233,13 +233,13 @@ sudo firewall-cmd --reload
 GOOS=linux GOARCH=amd64 go build -o withssl main.go
 
 # 2. Upload new version
-scp withssl root@server:/opt/withssl/withssl-new
+scp withssl root@server:/opt/sslcat/withssl-new
 
 # 3. Graceful restart
 ssh root@server '
   sudo systemctl stop withssl
-  sudo mv /opt/withssl/withssl-new /opt/withssl/withssl
-  sudo chmod +x /opt/withssl/withssl
+  sudo mv /opt/sslcat/withssl-new /opt/sslcat/withssl
+  sudo chmod +x /opt/sslcat/withssl
   sudo systemctl start withssl
 '
 ```
@@ -271,7 +271,7 @@ sysctl -p
 ```bash
 # Setup log rotation
 cat > /etc/logrotate.d/withssl << 'EOF'
-/var/lib/withssl/logs/*.log {
+/var/lib/sslcat/logs/*.log {
     daily
     rotate 30
     compress
@@ -288,9 +288,9 @@ EOF
 ```bash
 # Backup configuration and certificates
 tar -czf withssl-backup-$(date +%Y%m%d).tar.gz \
-    /etc/withssl/ \
-    /var/lib/withssl/certs/ \
-    /var/lib/withssl/keys/
+    /etc/sslcat/ \
+    /var/lib/sslcat/certs/ \
+    /var/lib/sslcat/keys/
 ```
 
 ## 🎯 Summary

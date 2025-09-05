@@ -22,7 +22,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/opt/withssl/withssl --config /etc/withssl/withssl.conf
+ExecStart=/opt/sslcat/withssl --config /etc/sslcat/withssl.conf
 Restart=always
 RestartSec=3
 User=root
@@ -49,10 +49,10 @@ SSLcat reverse proxy with auto TLS and web panel.
 %prep
 %build
 %install
-mkdir -p %{buildroot}/opt/withssl
-install -m 0755 %{_sourcedir}/withssl %{buildroot}/opt/withssl/withssl
-mkdir -p %{buildroot}/etc/withssl
-if [ -f %{_sourcedir}/withssl.conf ]; then install -m 0644 %{_sourcedir}/withssl.conf %{buildroot}/etc/withssl/withssl.conf; fi
+mkdir -p %{buildroot}/opt/sslcat
+install -m 0755 %{_sourcedir}/withssl %{buildroot}/opt/sslcat/withssl
+mkdir -p %{buildroot}/etc/sslcat
+if [ -f %{_sourcedir}/withssl.conf ]; then install -m 0644 %{_sourcedir}/withssl.conf %{buildroot}/etc/sslcat/withssl.conf; fi
 mkdir -p %{buildroot}%{_unitdir}
 install -m 0644 %{_sourcedir}/withssl.service %{buildroot}%{_unitdir}/withssl.service
 
@@ -66,8 +66,8 @@ if [ $1 -eq 0 ]; then /bin/systemctl stop withssl >/dev/null 2>&1 || true; fi
 /bin/systemctl daemon-reload >/dev/null 2>&1 || true
 
 %files
-/opt/withssl/withssl
-/etc/withssl/withssl.conf
+/opt/sslcat/withssl
+/etc/sslcat/withssl.conf
 %{_unitdir}/withssl.service
 
 %changelog

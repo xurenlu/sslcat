@@ -6,8 +6,8 @@ set -euo pipefail
 #   curl -fsSL https://sslcat.com/xurenlu/sslcat/main/scripts/install-from-release-zh.sh | sudo bash -s -- -v 1.0.2
 
 VER=""
-DEST_LINUX="/opt/withssl"
-CONF_LINUX="/etc/withssl/withssl.conf"
+DEST_LINUX="/opt/sslcat"
+CONF_LINUX="/etc/sslcat/withssl.conf"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -51,8 +51,8 @@ if [[ "$OS" == "darwin" ]]; then
   exit 0
 fi
 
-# Linux: 安装到 /opt/withssl 并写入 systemd 与默认配置
-sudo mkdir -p "$DEST_LINUX" /var/lib/withssl/{certs,keys,logs} /etc/withssl
+# Linux: 安装到 /opt/sslcat 并写入 systemd 与默认配置
+sudo mkdir -p "$DEST_LINUX" /var/lib/sslcat/{certs,keys,logs} /etc/sslcat
 tar -xzf "$TMP/pkg${EXT}" -C "$TMP"
 sudo install -m 0755 "$TMP/withssl" "$DEST_LINUX/withssl"
 
@@ -60,10 +60,10 @@ if [[ ! -f "$CONF_LINUX" ]]; then
   sudo bash -c "cat > $CONF_LINUX" <<'JSON'
 {
   "server": {"host": "0.0.0.0", "port": 443, "debug": false},
-  "ssl": {"staging": false, "cert_dir": "/var/lib/withssl/certs", "key_dir": "/var/lib/withssl/keys", "auto_renew": true},
-  "admin": {"username": "admin", "first_run": true, "password_file": "/var/lib/withssl/admin.pass"},
+  "ssl": {"staging": false, "cert_dir": "/var/lib/sslcat/certs", "key_dir": "/var/lib/sslcat/keys", "auto_renew": true},
+  "admin": {"username": "admin", "first_run": true, "password_file": "/var/lib/sslcat/admin.pass"},
   "proxy": {"rules": []},
-  "security": {"max_attempts": 3, "block_duration": "1m", "max_attempts_5min": 10, "block_file": "/var/lib/withssl/withssl.block", "allowed_user_agents": ["Mozilla/","Chrome/","Firefox/","Safari/","Edge/"]},
+  "security": {"max_attempts": 3, "block_duration": "1m", "max_attempts_5min": 10, "block_file": "/var/lib/sslcat/withssl.block", "allowed_user_agents": ["Mozilla/","Chrome/","Firefox/","Safari/","Edge/"]},
   "admin_prefix": "/sslcat-panel"
 }
 JSON
@@ -77,7 +77,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/opt/withssl/withssl --config /etc/withssl/withssl.conf
+ExecStart=/opt/sslcat/withssl --config /etc/sslcat/withssl.conf
 Restart=always
 RestartSec=3
 User=root
@@ -90,8 +90,8 @@ sudo systemctl daemon-reload
 sudo systemctl enable withssl || true
 sudo systemctl restart withssl || sudo systemctl start withssl || true
 
-echo "[withssl] 安装完成: /opt/withssl/withssl"
-echo "[withssl] 配置: /etc/withssl/withssl.conf"
+echo "[withssl] 安装完成: /opt/sslcat/withssl"
+echo "[withssl] 配置: /etc/sslcat/withssl.conf"
 echo "[withssl] 管理面板: https://<你的域名或IP>/sslcat-panel/ (首次登录将强制改密)"
 
 

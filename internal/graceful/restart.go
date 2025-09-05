@@ -163,7 +163,7 @@ func (rm *RestartManager) ListenTCP(network, address string) (net.Listener, erro
 // SaveState 保存状态信息
 func (rm *RestartManager) SaveState() error {
 	// 这里可以保存当前状态到文件，供新进程恢复使用
-	stateFile := "/var/lib/withssl/restart_state.json"
+	stateFile := "/var/lib/sslcat/restart_state.json"
 
 	// 创建状态数据
 	state := map[string]interface{}{
@@ -186,7 +186,7 @@ func (rm *RestartManager) SaveState() error {
 // LoadState 加载状态信息
 func (rm *RestartManager) LoadState() error {
 	// 这里可以从文件加载状态信息
-	stateFile := "/var/lib/withssl/restart_state.json"
+	stateFile := "/var/lib/sslcat/restart_state.json"
 
 	if _, err := os.Stat(stateFile); os.IsNotExist(err) {
 		rm.log.Info("没有找到重启状态文件，跳过状态恢复")

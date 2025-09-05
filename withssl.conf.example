@@ -8,8 +8,8 @@
     "email": "your-email@example.com",
     "staging": false,
     "domains": [],
-    "cert_dir": "/var/lib/withssl/certs",
-    "key_dir": "/var/lib/withssl/keys",
+    "cert_dir": "/var/lib/sslcat/certs",
+    "key_dir": "/var/lib/sslcat/keys",
     "auto_renew": true
   },
   "admin": {
@@ -32,7 +32,7 @@
     "max_attempts": 3,
     "block_duration": "1m",
     "max_attempts_5min": 10,
-    "block_file": "/var/lib/withssl/withssl.block",
+    "block_file": "/var/lib/sslcat/withssl.block",
     "allowed_user_agents": [
       "Mozilla/",
       "Chrome/",

@@ -103,9 +103,9 @@ dev:
 .PHONY: install
 install: build
 	@echo "安装到系统..."
-	@sudo mkdir -p /opt/withssl
-	@sudo cp $(BUILD_DIR)/$(BINARY_NAME) /opt/withssl/
-	@sudo chmod +x /opt/withssl/$(BINARY_NAME)
+	@sudo mkdir -p /opt/sslcat
+	@sudo cp $(BUILD_DIR)/$(BINARY_NAME) /opt/sslcat/
+	@sudo chmod +x /opt/sslcat/$(BINARY_NAME)
 	@echo "安装完成"
 
 # 创建发布包
@@ -156,8 +156,8 @@ docker-run:
 		--name withssl \
 		-p 80:80 \
 		-p 443:443 \
-		-v /etc/withssl:/etc/withssl \
-		-v /var/lib/withssl:/var/lib/withssl \
+		-v /etc/sslcat:/etc/sslcat \
+		-v /var/lib/sslcat:/var/lib/sslcat \
 		withssl:latest
 
 # 停止Docker容器

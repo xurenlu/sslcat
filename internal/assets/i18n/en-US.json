@@ -219,6 +219,7 @@
   "mobile.real_time_monitor": "Real-time Traffic Monitoring",
   "menu.logout": "Logout",
   "menu.language": "Language",
+  "menu.official_site": "Official Site",
   "mobile.title": "Mobile Admin",
   "mobile.active_rules": "Active Rules",
   "mobile.cached_proxies": "Cached Proxies",

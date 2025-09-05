@@ -6,9 +6,9 @@ set -euo pipefail
 REPO=${REPO:-xurenlu/sslcat}
 VER=${VER:-1.0.1}
 BIN_URL=${BIN_URL:-"https://github.com/${REPO}/releases/download/v${VER}/withssl_${VER}_linux_amd64.tar.gz"}
-DEST=/opt/withssl
-CONF=/etc/withssl/withssl.conf
-BACKUP_DIR=${BACKUP_DIR:-/opt/withssl-backups}
+DEST=/opt/sslcat
+CONF=/etc/sslcat/withssl.conf
+BACKUP_DIR=${BACKUP_DIR:-/opt/sslcat-backups}
 
 echo "==> Downloading ${BIN_URL}"
 mkdir -p "$BACKUP_DIR" "$DEST"

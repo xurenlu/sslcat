@@ -95,9 +95,9 @@ cd withssl
 go build -o withssl main.go
 
 # 3. 手动配置
-sudo mkdir -p /opt/withssl /etc/withssl /var/lib/withssl
-sudo cp withssl /opt/withssl/
-sudo cp withssl.conf.example /etc/withssl/withssl.conf
+sudo mkdir -p /opt/sslcat /etc/sslcat /var/lib/sslcat
+sudo cp withssl /opt/sslcat/
+sudo cp withssl.conf.example /etc/sslcat/withssl.conf
 # ... 更多手动步骤
 ```
 
@@ -125,7 +125,7 @@ sudo cp withssl.conf.example /etc/withssl/withssl.conf
 ### 1. 编辑配置文件
 
 ```bash
-sudo nano /etc/withssl/withssl.conf
+sudo nano /etc/sslcat/withssl.conf
 ```
 
 ### 2. 启动服务
@@ -179,10 +179,10 @@ sudo systemctl status withssl
 sudo journalctl -u withssl -n 50
 
 # 检查配置
-sudo /opt/withssl/withssl --config /etc/withssl/withssl.conf --check
+sudo /opt/sslcat/withssl --config /etc/sslcat/withssl.conf --check
 
 # 修复权限
-sudo chown -R withssl:withssl /opt/withssl /etc/withssl /var/lib/withssl
+sudo chown -R withssl:withssl /opt/sslcat /etc/sslcat /var/lib/sslcat
 ```
 
 ### 端口被占用
@@ -250,10 +250,10 @@ sudo systemctl restart withssl
 sudo journalctl -u withssl -f
 
 # 编辑配置
-sudo nano /etc/withssl/withssl.conf
+sudo nano /etc/sslcat/withssl.conf
 
 # 测试配置
-sudo /opt/withssl/withssl --config /etc/withssl/withssl.conf --check
+sudo /opt/sslcat/withssl --config /etc/sslcat/withssl.conf --check
 
 # 修复服务（如遇路径问题）
 sudo bash fix-service.sh

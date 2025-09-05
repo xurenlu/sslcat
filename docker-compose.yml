@@ -12,8 +12,8 @@ services:
       # - WITHSSL_SYSLOG_ADDR=
       # - WITHSSL_LOKI_URL=
     volumes:
-      - ./withssl.conf:/etc/withssl/withssl.conf:ro
-      - ./data:/var/lib/withssl
+      - ./withssl.conf:/etc/sslcat/withssl.conf:ro
+      - ./data:/var/lib/sslcat
     restart: unless-stopped
 version: '3.8'
 
@@ -26,8 +26,8 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./config:/etc/withssl
-      - ./data:/var/lib/withssl
+      - ./config:/etc/sslcat
+      - ./data:/var/lib/sslcat
       - /etc/localtime:/etc/localtime:ro
     environment:
       - TZ=Asia/Shanghai

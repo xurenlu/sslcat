@@ -157,13 +157,13 @@ go build -o withssl main.go
 4. **创建用户和目录**
 ```bash
 sudo useradd -r -s /bin/false withssl
-sudo mkdir -p /etc/withssl /var/lib/withssl/{certs,keys,logs}
-sudo chown -R withssl:withssl /var/lib/withssl
+sudo mkdir -p /etc/sslcat /var/lib/sslcat/{certs,keys,logs}
+sudo chown -R withssl:withssl /var/lib/sslcat
 ```
 
 5. **配置和启动**
 ```bash
-sudo cp withssl /opt/withssl/
+sudo cp withssl /opt/sslcat/
 sudo cp withssl.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable withssl
@@ -173,10 +173,10 @@ sudo systemctl start withssl
 ## 配置说明
 
 ### 配置文件位置
-- 主配置文件: `/etc/withssl/withssl.conf`
-- 证书目录: `/var/lib/withssl/certs`
-- 密钥目录: `/var/lib/withssl/keys`
-- 日志目录: `/var/lib/withssl/logs`
+- 主配置文件: `/etc/sslcat/withssl.conf`
+- 证书目录: `/var/lib/sslcat/certs`
+- 密钥目录: `/var/lib/sslcat/keys`
+- 日志目录: `/var/lib/sslcat/logs`
 
 ### 基本配置
 
@@ -321,8 +321,8 @@ SSLcat 会自动为配置的域名获取 SSL 证书，无需手动操作。
 证书会在到期前30天自动续期，也可以手动触发续期。
 
 ### 证书存储
-- 证书文件: `/var/lib/withssl/certs/domain.crt`
-- 私钥文件: `/var/lib/withssl/keys/domain.key`
+- 证书文件: `/var/lib/sslcat/certs/domain.crt`
+- 私钥文件: `/var/lib/sslcat/keys/domain.key`
 
 ## 安全功能
 
@@ -340,7 +340,7 @@ SSLcat 会自动为配置的域名获取 SSL 证书，无需手动操作。
 ### 解除封禁
 ```bash
 # 删除封禁文件重启服务
-sudo rm /var/lib/withssl/withssl.block
+sudo rm /var/lib/sslcat/withssl.block
 sudo systemctl restart withssl
 ```
 
@@ -350,7 +350,7 @@ sudo systemctl restart withssl
 withssl [选项]
 
 选项:
-  --config string        配置文件路径 (默认: "/etc/withssl/withssl.conf")
+  --config string        配置文件路径 (默认: "/etc/sslcat/withssl.conf")
   --admin-prefix string  管理面板路径前缀 (默认: "/sslcat-panel")
   --email string         SSL证书邮箱
   --staging             使用Let's Encrypt测试环境
@@ -367,7 +367,7 @@ withssl [选项]
 1. **服务启动失败**
    ```bash
    # 检查配置文件语法
-   sudo withssl --config /etc/withssl/withssl.conf --log-level debug
+   sudo withssl --config /etc/sslcat/withssl.conf --log-level debug
    
    # 检查端口占用
    sudo netstat -tlnp | grep :443

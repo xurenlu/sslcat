@@ -18,6 +18,7 @@ import (
 	"github.com/xurenlu/sslcat/internal/ssl"
 	"github.com/xurenlu/sslcat/internal/web"
 
+	http3 "github.com/quic-go/http3"
 	"github.com/sirupsen/logrus"
 )
 
@@ -134,6 +135,19 @@ func main() {
 		
 		// 如果是443端口，启动HTTPS服务器
 		if cfg.Server.Port == 443 || cfg.Server.Port == 8443 {
+			// 启动 HTTP/3 (QUIC)
+			h3s := &http3.Server{
+				Addr:      server.Addr,
+				Handler:   webServer,
+				TLSConfig: sslManager.GetTLSConfig(),
+			}
+			go func() {
+				log.Infof("HTTP/3(QUIC)服务器启动在 %s/udp", server.Addr)
+				if err := h3s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+					log.Errorf("HTTP/3 启动失败: %v", err)
+				}
+			}()
+
 			if err := server.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
 				log.Fatalf("HTTPS服务器启动失败: %v", err)
 			}

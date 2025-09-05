@@ -6,10 +6,10 @@ PKGDIR=build/deb
 DEST=dist/withssl_${VER}_linux_amd64.deb
 BIN=withssl
 
-rm -rf "$PKGDIR" && mkdir -p "$PKGDIR/DEBIAN" "$PKGDIR/opt/withssl" "$PKGDIR/etc/withssl" "$PKGDIR/lib/systemd/system"
+rm -rf "$PKGDIR" && mkdir -p "$PKGDIR/DEBIAN" "$PKGDIR/opt/sslcat" "$PKGDIR/etc/sslcat" "$PKGDIR/lib/systemd/system"
 
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.version=${VER}" -o "$PKGDIR/opt/withssl/$BIN" main.go
-cp withssl.conf "$PKGDIR/etc/withssl/withssl.conf" || true
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.version=${VER}" -o "$PKGDIR/opt/sslcat/$BIN" main.go
+cp withssl.conf "$PKGDIR/etc/sslcat/withssl.conf" || true
 
 cat > "$PKGDIR/DEBIAN/control" <<EOF
 Package: withssl
@@ -28,7 +28,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/opt/withssl/withssl --config /etc/withssl/withssl.conf
+ExecStart=/opt/sslcat/withssl --config /etc/sslcat/withssl.conf
 Restart=always
 RestartSec=3
 User=root

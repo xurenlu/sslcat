@@ -149,7 +149,7 @@ withssl --help
 ```
 
 Opciones disponibles:
-- `--config`: Ruta del archivo de configuración (predeterminado: "/etc/withssl/withssl.conf")
+- `--config`: Ruta del archivo de configuración (predeterminado: "/etc/sslcat/withssl.conf")
 - `--admin-prefix`: Prefijo de ruta del panel de administración (predeterminado: "/sslcat-panel")
 - `--email`: Email para certificado SSL
 - `--port`: Puerto de escucha (predeterminado: 443)

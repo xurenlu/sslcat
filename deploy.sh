@@ -6,7 +6,7 @@ set -e
 
 TARGET_HOST=${1:-"your-server.com"}
 TARGET_USER=${2:-"root"}
-TARGET_DIR="/opt/withssl"
+TARGET_DIR="/opt/sslcat"
 
 echo "==============================================="
 echo "SSLcat 部署脚本"
@@ -47,7 +47,7 @@ Type=simple
 User=withssl
 Group=withssl
 WorkingDirectory=$TARGET_DIR
-ExecStart=$TARGET_DIR/withssl --config /etc/withssl/withssl.conf
+ExecStart=$TARGET_DIR/withssl --config /etc/sslcat/withssl.conf
 ExecReload=/bin/kill -HUP \$MAINPID
 Restart=always
 RestartSec=5
@@ -60,7 +60,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/withssl /etc/withssl $TARGET_DIR
+ReadWritePaths=/var/lib/sslcat /etc/sslcat $TARGET_DIR
 
 [Install]
 WantedBy=multi-user.target
@@ -76,14 +76,14 @@ set -e
 
 echo "📁 创建目录和用户..."
 useradd -r -s /bin/false withssl || true
-mkdir -p /etc/withssl /var/lib/withssl/{certs,keys,logs}
-chown -R withssl:withssl /var/lib/withssl
+mkdir -p /etc/sslcat /var/lib/sslcat/{certs,keys,logs}
+chown -R withssl:withssl /var/lib/sslcat
 
 echo "📋 复制文件..."
-mkdir -p /opt/withssl
-cp withssl /opt/withssl/
-chmod +x /opt/withssl/withssl
-chown -R withssl:withssl /opt/withssl
+mkdir -p /opt/sslcat
+cp withssl /opt/sslcat/
+chmod +x /opt/sslcat/withssl
+chown -R withssl:withssl /opt/sslcat
 
 echo "⚙️  安装服务..."
 cp withssl.service /etc/systemd/system/
@@ -91,10 +91,10 @@ systemctl daemon-reload
 systemctl enable withssl
 
 echo "📝 配置文件..."
-if [ ! -f /etc/withssl/withssl.conf ]; then
-    cp withssl.conf /etc/withssl/
-    chown withssl:withssl /etc/withssl/withssl.conf
-    chmod 600 /etc/withssl/withssl.conf
+if [ ! -f /etc/sslcat/withssl.conf ]; then
+    cp withssl.conf /etc/sslcat/
+    chown withssl:withssl /etc/sslcat/withssl.conf
+    chmod 600 /etc/sslcat/withssl.conf
 fi
 
 echo "🔧 配置防火墙..."

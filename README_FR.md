@@ -149,7 +149,7 @@ withssl --help
 ```
 
 Options disponibles:
-- `--config`: Chemin du fichier de configuration (par défaut: "/etc/withssl/withssl.conf")
+- `--config`: Chemin du fichier de configuration (par défaut: "/etc/sslcat/withssl.conf")
 - `--admin-prefix`: Préfixe du chemin du panneau d'administration (par défaut: "/sslcat-panel")
 - `--email`: Email pour certificat SSL
 - `--port`: Port d'écoute (par défaut: 443)
