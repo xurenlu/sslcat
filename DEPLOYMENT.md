@@ -32,7 +32,7 @@ ssh root@your-server.com 'cd /tmp/deploy && bash deploy-commands.sh'
 make build-linux
 
 # 手动上传
-scp build/withssl-linux-amd64 root@your-server.com:/usr/local/bin/withssl
+scp build/withssl-linux-amd64 root@your-server.com:/opt/withssl/withssl
 scp withssl.conf.example root@your-server.com:/etc/withssl/withssl.conf
 ```
 
@@ -112,8 +112,8 @@ sudo chown -R withssl:withssl /var/lib/withssl
 
 ```bash
 # 上传二进制文件
-scp withssl root@server:/usr/local/bin/
-ssh root@server 'chmod +x /usr/local/bin/withssl'
+scp withssl root@server:/opt/withssl/
+ssh root@server 'chmod +x /opt/withssl/withssl'
 
 # 上传配置文件
 scp withssl.conf root@server:/etc/withssl/
@@ -134,7 +134,7 @@ Type=simple
 User=withssl
 Group=withssl
 WorkingDirectory=/opt/withssl
-ExecStart=/usr/local/bin/withssl --config /etc/withssl/withssl.conf
+ExecStart=/opt/withssl/withssl --config /etc/withssl/withssl.conf
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=5
@@ -180,13 +180,13 @@ curl -k https://your-domain/withssl-panel/api/stats
 
 ```bash
 # 检查文件权限
-ls -la /usr/local/bin/withssl
+ls -la /opt/withssl/withssl
 
 # 设置执行权限
-sudo chmod +x /usr/local/bin/withssl
+sudo chmod +x /opt/withssl/withssl
 
 # 检查文件类型
-file /usr/local/bin/withssl
+file /opt/withssl/withssl
 ```
 
 ### 问题 2: 权限问题
@@ -233,13 +233,13 @@ sudo firewall-cmd --reload
 GOOS=linux GOARCH=amd64 go build -o withssl main.go
 
 # 2. 上传新版本
-scp withssl root@server:/usr/local/bin/withssl-new
+scp withssl root@server:/opt/withssl/withssl-new
 
 # 3. 平滑重启
 ssh root@server '
   sudo systemctl stop withssl
-  sudo mv /usr/local/bin/withssl-new /usr/local/bin/withssl
-  sudo chmod +x /usr/local/bin/withssl
+  sudo mv /opt/withssl/withssl-new /opt/withssl/withssl
+  sudo chmod +x /opt/withssl/withssl
   sudo systemctl start withssl
 '
 ```

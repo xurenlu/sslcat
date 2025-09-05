@@ -37,13 +37,14 @@ RUN addgroup -g 1000 withssl && \
 ENV TZ=Asia/Shanghai
 
 # 从构建阶段复制二进制文件
-COPY --from=builder /app/withssl /usr/local/bin/withssl
+COPY --from=builder /app/withssl /opt/withssl/withssl
 
 # 复制配置文件模板
 COPY --from=builder /app/withssl.conf.example /etc/withssl/withssl.conf
 
 # 设置权限
-RUN chmod +x /usr/local/bin/withssl && \
+RUN mkdir -p /opt/withssl && \
+    chmod +x /opt/withssl/withssl && \
     chown withssl:withssl /etc/withssl/withssl.conf && \
     chmod 600 /etc/withssl/withssl.conf
 
@@ -58,4 +59,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:80/health || exit 1
 
 # 启动命令
-CMD ["withssl", "--config", "/etc/withssl/withssl.conf"]
+CMD ["/opt/withssl/withssl", "--config", "/etc/withssl/withssl.conf"]

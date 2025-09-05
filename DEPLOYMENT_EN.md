@@ -32,7 +32,7 @@ ssh root@your-server.com 'cd /tmp/deploy && bash deploy-commands.sh'
 make build-linux
 
 # Manual upload
-scp build/withssl-linux-amd64 root@your-server.com:/usr/local/bin/withssl
+scp build/withssl-linux-amd64 root@your-server.com:/opt/withssl/withssl
 scp withssl.conf.example root@your-server.com:/etc/withssl/withssl.conf
 ```
 
@@ -112,8 +112,8 @@ sudo chown -R withssl:withssl /var/lib/withssl
 
 ```bash
 # Upload binary
-scp withssl root@server:/usr/local/bin/
-ssh root@server 'chmod +x /usr/local/bin/withssl'
+scp withssl root@server:/opt/withssl/
+ssh root@server 'chmod +x /opt/withssl/withssl'
 
 # Upload configuration
 scp withssl.conf root@server:/etc/withssl/
@@ -134,7 +134,7 @@ Type=simple
 User=withssl
 Group=withssl
 WorkingDirectory=/opt/withssl
-ExecStart=/usr/local/bin/withssl --config /etc/withssl/withssl.conf
+ExecStart=/opt/withssl/withssl --config /etc/withssl/withssl.conf
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=5
@@ -180,13 +180,13 @@ curl -k https://your-domain/withssl-panel/api/stats
 
 ```bash
 # Check file permissions
-ls -la /usr/local/bin/withssl
+ls -la /opt/withssl/withssl
 
 # Set execute permissions
-sudo chmod +x /usr/local/bin/withssl
+sudo chmod +x /opt/withssl/withssl
 
 # Check file type
-file /usr/local/bin/withssl
+file /opt/withssl/withssl
 ```
 
 ### Issue 2: Permission Issues
@@ -233,13 +233,13 @@ sudo firewall-cmd --reload
 GOOS=linux GOARCH=amd64 go build -o withssl main.go
 
 # 2. Upload new version
-scp withssl root@server:/usr/local/bin/withssl-new
+scp withssl root@server:/opt/withssl/withssl-new
 
 # 3. Graceful restart
 ssh root@server '
   sudo systemctl stop withssl
-  sudo mv /usr/local/bin/withssl-new /usr/local/bin/withssl
-  sudo chmod +x /usr/local/bin/withssl
+  sudo mv /opt/withssl/withssl-new /opt/withssl/withssl
+  sudo chmod +x /opt/withssl/withssl
   sudo systemctl start withssl
 '
 ```

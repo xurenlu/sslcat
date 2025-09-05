@@ -103,8 +103,9 @@ dev:
 .PHONY: install
 install: build
 	@echo "安装到系统..."
-	@sudo cp $(BUILD_DIR)/$(BINARY_NAME) /usr/local/bin/
-	@sudo chmod +x /usr/local/bin/$(BINARY_NAME)
+	@sudo mkdir -p /opt/withssl
+	@sudo cp $(BUILD_DIR)/$(BINARY_NAME) /opt/withssl/
+	@sudo chmod +x /opt/withssl/$(BINARY_NAME)
 	@echo "安装完成"
 
 # 创建发布包
