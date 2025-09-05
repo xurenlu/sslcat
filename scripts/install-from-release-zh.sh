@@ -3,7 +3,7 @@ set -euo pipefail
 
 # withssl 中国区一键安装脚本（通过 sslcat.com 代理加速）
 # 用法：
-#   curl -fsSL https://sslcat.com/xurenlu/sslcat/main/scripts/install-from-release-zh.sh | sudo bash -s -- -v 1.0.3
+#   curl -fsSL https://sslcat.com/xurenlu/sslcat/main/scripts/install-from-release-zh.sh | sudo bash -s -- -v 1.0.4
 
 VER=""
 DEST_LINUX="/opt/sslcat"
@@ -19,8 +19,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$VER" ]]; then
-  echo "[withssl] 你未指定版本，默认安装 v1.0.3"
-  VER="1.0.3"
+  echo "[withssl] 你未指定版本，默认安装 v1.0.4"
+  VER="1.0.4"
 fi
 
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')

@@ -18,12 +18,12 @@ import (
 	"github.com/xurenlu/sslcat/internal/ssl"
 	"github.com/xurenlu/sslcat/internal/web"
 
-	http3 "github.com/quic-go/http3"
+	http3 "github.com/quic-go/quic-go/http3"
 	"github.com/sirupsen/logrus"
 )
 
 var (
-	version = "1.0.3"
+	version = "1.0.4"
 	build   = "dev"
 )
 
@@ -132,7 +132,7 @@ func main() {
 	// 启动Web服务器
 	go func() {
 		log.Infof("HTTPS服务器启动在 %s (支持多域名SSL证书)", server.Addr)
-		
+
 		// 如果是443端口，启动HTTPS服务器
 		if cfg.Server.Port == 443 || cfg.Server.Port == 8443 {
 			// 启动 HTTP/3 (QUIC)
@@ -159,7 +159,7 @@ func main() {
 			}
 		}
 	}()
-	
+
 	// 如果是443端口，同时启动80端口的HTTP重定向服务器
 	if cfg.Server.Port == 443 {
 		go func() {
@@ -173,13 +173,13 @@ func main() {
 						http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
 						return
 					}
-					
+
 					// 其他路径通过代理处理（如果有配置）
 					if rule := proxyManager.GetProxyConfig(r.Host); rule != nil {
 						proxyManager.ProxyRequest(w, r, rule)
 						return
 					}
-					
+
 					// 没有配置的域名重定向到HTTPS
 					httpsURL := fmt.Sprintf("https://%s%s", r.Host, r.RequestURI)
 					http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
@@ -187,7 +187,7 @@ func main() {
 				ReadTimeout:  10 * time.Second,
 				WriteTimeout: 10 * time.Second,
 			}
-			
+
 			log.Infof("HTTP重定向服务器启动在 %s:80", cfg.Server.Host)
 			if err := redirectServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				log.Errorf("HTTP重定向服务器失败: %v", err)

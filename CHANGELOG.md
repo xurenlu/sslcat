@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.4] - 2025-09-05
+### Changed
+- Upgrade QUIC dependency to quic-go and stabilize build
+- Update install snippets to v1.0.4
+
 ## [1.0.1] - 2025-09-05
 ### Added
 - 配置导出/导入流程：支持上传或粘贴 JSON，预览差异（分区表格与规则变更），确认后应用并持久化到配置文件
@@ -15,7 +20,7 @@ All notable changes to this project will be documented in this file.
 - Sidebar link to official site (sslcat.com)
 - Docs and paths unified to sslcat branding
 
-## [1.0.3] - 2025-09-05
+## [1.0.2] - 2025-09-05
 ### Added
 - 维护者发布指南 `MAINTAINER_RELEASE_GUIDE.md`
 - 安装包脚本：DEB（package-deb.sh）、RPM（package-rpm.sh）、Homebrew（package-brew.sh）

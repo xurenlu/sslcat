@@ -9,8 +9,8 @@
 
 ## 1) 构建多架构产物并发布到 GitHub Releases
 ```
-# 1. 设置版本号（例如 v1.0.3）
-VER=1.0.3
+# 1. 设置版本号（例如 v1.0.4）
+VER=1.0.4
 
 # 2. 构建多架构二进制（产物在 dist/）
 VER=$VER scripts/release/build-matrix.sh
@@ -32,21 +32,21 @@ VER=$VER scripts/release/upload-github-release.sh
 ## 2) 生成系统安装包
 ### 2.1 DEB（x86_64）
 ```
-VER=1.0.3 scripts/release/package-deb.sh
-# 输出: dist/withssl_1.0.3_linux_amd64.deb
+VER=1.0.4 scripts/release/package-deb.sh
+# 输出: dist/withssl_1.0.4_linux_amd64.deb
 ```
 
 ### 2.2 RPM（x86_64）
 ```
-VER=1.0.3 scripts/release/package-rpm.sh
+VER=1.0.4 scripts/release/package-rpm.sh
 # 依赖: rpmbuild
-# 输出: dist/withssl_1.0.3_x86_64.rpm
+# 输出: dist/withssl_1.0.4_x86_64.rpm
 ```
 
 ### 2.3 Homebrew 公式
 ```
 # 先在 GitHub Releases 上传 darwin_arm64 包并获得 tarball 的 sha256
-VER=1.0.3 SHA256=<tarball_sha256> scripts/release/package-brew.sh
+VER=1.0.4 SHA256=<tarball_sha256> scripts/release/package-brew.sh
 # 输出: build/homebrew-tap/Formula/withssl.rb
 # 将 withssl.rb 推送到你的 tap 仓库（如 github.com/<you>/homebrew-tap）
 ```
@@ -60,7 +60,7 @@ docker compose up -d
 ## 4) 升级助手（服务器端）
 ```
 # 将 REPO 与 VER 指定到你的仓库与目标版本
-env VER=1.0.3 REPO=xurenlu/sslcat \
+env VER=1.0.4 REPO=xurenlu/sslcat \
 scripts/release/upgrade-helper.sh
 ```
 - 步骤：下载 → 备份当前 `/opt/sslcat/withssl` → 替换 → 重启 systemd 服务
