@@ -1,0 +1,219 @@
+{
+  "comment": "WithSSL 高级配置示例 - 展示未来功能规划",
+  
+  "server": {
+    "host": "0.0.0.0",
+    "port": 443,
+    "debug": false,
+    "cluster_mode": false,
+    "node_id": "node-1"
+  },
+  
+  "ssl": {
+    "email": "admin@example.com",
+    "staging": false,
+    "auto_renew": true,
+    "cert_dir": "./data/ssl/certs",
+    "key_dir": "./data/ssl/keys",
+    "providers": {
+      "letsencrypt": {
+        "enabled": true,
+        "server": "https://acme-v02.api.letsencrypt.org/directory",
+        "staging_server": "https://acme-staging-v02.api.letsencrypt.org/directory"
+      },
+      "zerossl": {
+        "enabled": false,
+        "api_key": ""
+      },
+      "aliyun": {
+        "enabled": false,
+        "access_key": "",
+        "secret_key": ""
+      }
+    },
+    "challenge_methods": ["http-01", "dns-01"],
+    "wildcard_support": true
+  },
+  
+  "dns": {
+    "upstream_servers": [
+      "223.5.5.5:53",
+      "119.29.29.29:53", 
+      "1.1.1.1:53",
+      "8.8.8.8:53"
+    ],
+    "doh_servers": [
+      "https://dns.alidns.com/dns-query",
+      "https://doh.pub/dns-query",
+      "https://cloudflare-dns.com/dns-query"
+    ],
+    "china_list": "./data/china-domains.txt",
+    "cache_size": 10000,
+    "cache_ttl": 300
+  },
+  
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "127.0.0.1",
+        "port": 3000,
+        "protocol": "http",
+        "load_balance": {
+          "enabled": true,
+          "method": "round_robin",
+          "health_check": {
+            "enabled": true,
+            "interval": 30,
+            "timeout": 5,
+            "path": "/health"
+          },
+          "targets": [
+            {"host": "127.0.0.1", "port": 3000, "weight": 1},
+            {"host": "127.0.0.1", "port": 3001, "weight": 1}
+          ]
+        }
+      }
+    ]
+  },
+  
+  "security": {
+    "ip_whitelist": [],
+    "ip_blacklist": [],
+    "geo_blocking": {
+      "enabled": false,
+      "allowed_countries": ["CN", "US", "HK"],
+      "blocked_countries": []
+    },
+    "rate_limiting": {
+      "enabled": true,
+      "requests_per_minute": 60,
+      "requests_per_hour": 3600,
+      "burst": 10
+    },
+    "ddos_protection": {
+      "enabled": true,
+      "threshold": 1000,
+      "ban_duration": 3600,
+      "challenge_mode": "captcha"
+    },
+    "waf": {
+      "enabled": true,
+      "sql_injection": true,
+      "xss_protection": true,
+      "file_upload_check": true,
+      "custom_rules": []
+    },
+    "user_agent": {
+      "block_empty": true,
+      "block_suspicious": true,
+      "whitelist": [
+        "Mozilla/5.0*",
+        "Chrome/*",
+        "Safari/*"
+      ]
+    }
+  },
+  
+  "cache": {
+    "enabled": true,
+    "storage": "memory",
+    "max_size": "1GB",
+    "ttl": 3600,
+    "static_files": {
+      "enabled": true,
+      "extensions": [".js", ".css", ".png", ".jpg", ".ico", ".woff2"],
+      "ttl": 86400
+    },
+    "compression": {
+      "enabled": true,
+      "algorithms": ["brotli", "gzip"],
+      "level": 6,
+      "min_size": 1024
+    }
+  },
+  
+  "cdn": {
+    "providers": [
+      {
+        "name": "cdnproxy",
+        "enabled": true,
+        "base_url": "https://cdnproxy.some.im",
+        "priority": 1
+      },
+      {
+        "name": "jsdelivr",
+        "enabled": true, 
+        "base_url": "https://cdn.jsdelivr.net",
+        "priority": 2
+      },
+      {
+        "name": "unpkg",
+        "enabled": false,
+        "base_url": "https://unpkg.com",
+        "priority": 3
+      }
+    ],
+    "fallback_enabled": true,
+    "health_check": true
+  },
+  
+  "monitoring": {
+    "metrics": {
+      "enabled": true,
+      "endpoint": "/metrics",
+      "prometheus": true
+    },
+    "logging": {
+      "level": "info",
+      "format": "json",
+      "output": "file",
+      "rotation": {
+        "max_size": "100MB",
+        "max_files": 10,
+        "max_age": 30
+      }
+    },
+    "alerts": {
+      "enabled": true,
+      "webhook_url": "",
+      "email": {
+        "smtp_server": "",
+        "username": "",
+        "password": "",
+        "recipients": []
+      },
+      "rules": [
+        {
+          "name": "high_error_rate",
+          "condition": "error_rate > 5%",
+          "duration": "5m"
+        },
+        {
+          "name": "certificate_expiry",
+          "condition": "cert_expiry < 7d",
+          "duration": "1h"
+        }
+      ]
+    }
+  },
+  
+  "admin": {
+    "username": "admin",
+    "password": "admin*9527",
+    "first_run": true,
+    "session_timeout": 3600,
+    "mfa_enabled": false,
+    "api_keys": []
+  },
+  
+  "admin_prefix": "/withssl-panel",
+  
+  "features": {
+    "http2": true,
+    "websocket": true,
+    "grpc": false,
+    "auto_optimization": true,
+    "ai_security": false
+  }
+}

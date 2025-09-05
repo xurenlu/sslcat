@@ -1,0 +1,93 @@
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 443,
+    "debug": false
+  },
+  "ssl": {
+    "email": "admin@example.com",
+    "staging": false,
+    "auto_renew": true,
+    "cert_dir": "./data/ssl/certs",
+    "key_dir": "./data/ssl/keys"
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "127.0.0.1",
+        "port": 3000
+      },
+      {
+        "domain": "api.example.com", 
+        "target": "127.0.0.1",
+        "port": 8080
+      }
+    ]
+  },
+  "security": {
+    "block_file": "./data/withssl.block",
+    "failed_attempts_limit": 3,
+    "failed_attempts_window": "1m",
+    "block_duration": "1h"
+  },
+  "admin": {
+    "username": "admin",
+    "password": "admin*9527",
+    "first_run": true
+  },
+  "admin_prefix": "/withssl-panel",
+  
+  "health_check": {
+    "enabled": true,
+    "interval": "30s",
+    "timeout": "5s"
+  },
+  
+  "access_log": {
+    "enabled": true,
+    "format": "nginx",
+    "path": "./logs/access.log",
+    "max_size": "100MB",
+    "max_files": 10
+  },
+  
+  "monitoring": {
+    "enabled": true,
+    "stats_enabled": true,
+    "error_threshold": 50.0,
+    "response_time_threshold": 10000
+  },
+  
+  "waf": {
+    "enabled": true,
+    "sql_injection": true,
+    "xss_protection": true,
+    "path_traversal": true,
+    "command_injection": true,
+    "custom_rules": []
+  },
+  
+  "ddos_protection": {
+    "enabled": true,
+    "level": "medium",
+    "requests_per_minute": 60,
+    "requests_per_hour": 3600,
+    "block_duration": "30m",
+    "cleanup_interval": "5m"
+  },
+  
+  "webp_conversion": {
+    "enabled": true,
+    "quality": 80,
+    "cache_size": 100,
+    "max_image_size": "10MB"
+  },
+  
+  "features": {
+    "mobile_ui": true,
+    "multilingual": true,
+    "real_time_stats": true,
+    "traffic_charts": true
+  }
+}
