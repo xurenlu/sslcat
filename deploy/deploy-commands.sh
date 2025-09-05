@@ -10,8 +10,10 @@ mkdir -p /etc/withssl /var/lib/withssl/{certs,keys,logs}
 chown -R withssl:withssl /var/lib/withssl
 
 echo "📋 复制文件..."
-cp withssl /usr/local/bin/
-chmod +x /usr/local/bin/withssl
+mkdir -p /opt/withssl
+cp withssl /opt/withssl/
+chmod +x /opt/withssl/withssl
+chown -R withssl:withssl /opt/withssl
 
 echo "⚙️  安装服务..."
 cp withssl.service /etc/systemd/system/

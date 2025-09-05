@@ -47,7 +47,7 @@ Type=simple
 User=withssl
 Group=withssl
 WorkingDirectory=$TARGET_DIR
-ExecStart=$TARGET_DIR/withssl --config $TARGET_DIR/withssl.conf
+ExecStart=$TARGET_DIR/withssl --config /etc/withssl/withssl.conf
 ExecReload=/bin/kill -HUP \$MAINPID
 Restart=always
 RestartSec=5
@@ -80,8 +80,10 @@ mkdir -p /etc/withssl /var/lib/withssl/{certs,keys,logs}
 chown -R withssl:withssl /var/lib/withssl
 
 echo "📋 复制文件..."
-cp withssl /usr/local/bin/
-chmod +x /usr/local/bin/withssl
+mkdir -p /opt/withssl
+cp withssl /opt/withssl/
+chmod +x /opt/withssl/withssl
+chown -R withssl:withssl /opt/withssl
 
 echo "⚙️  安装服务..."
 cp withssl.service /etc/systemd/system/
