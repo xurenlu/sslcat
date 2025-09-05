@@ -10,9 +10,9 @@ curl -fsSL https://sslcat.com/xurenlu/sslcat/main/scripts/install-from-release-z
 # curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/scripts/install-from-release.sh | sudo bash -s -- -v 1.0.4
 
 # 2) macOS 本地快速试用（或自行下载 darwin 包）
-curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.0.4/withssl_1.0.4_darwin_arm64.tar.gz -o withssl.tgz
-tar -xzf withssl.tgz && sudo install -m 0755 withssl /usr/local/bin/withssl
-withssl --config withssl.conf --port 8080
+curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.0.4/sslcat_1.0.4_darwin_arm64.tar.gz -o sslcat.tgz
+tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
+sslcat --config sslcat.conf --port 8080
 # 浏览器访问: http://localhost:8080/sslcat-panel/
 # 首次登录：admin / admin*9527（会强制要求修改密码并生成 admin.pass）
 
@@ -92,12 +92,12 @@ SSLcat 是一个功能强大的 SSL 代理服务器，支持自动证书管理�
 ```bash
 # 克隆最新源码
 git clone https://github.com/xurenlu/sslcat.git
-cd withssl
+cd sslcat
 
 # 或者下载指定版本（推荐）
 wget https://github.com/xurenlu/sslcat/archive/refs/heads/main.zip
 unzip main.zip
-cd withssl-main
+cd sslcat-main
 ```
 
 ## 🚀 快速安装
@@ -149,31 +149,31 @@ source ~/.bashrc
 3. **编译 SSLcat**
 ```bash
 git clone https://github.com/xurenlu/sslcat.git
-cd withssl
+cd sslcat
 go mod download
-go build -o withssl main.go
+go build -o sslcat main.go
 ```
 
 4. **创建用户和目录**
 ```bash
-sudo useradd -r -s /bin/false withssl
+sudo useradd -r -s /bin/false sslcat
 sudo mkdir -p /etc/sslcat /var/lib/sslcat/{certs,keys,logs}
-sudo chown -R withssl:withssl /var/lib/sslcat
+sudo chown -R sslcat:sslcat /var/lib/sslcat
 ```
 
 5. **配置和启动**
 ```bash
-sudo cp withssl /opt/sslcat/
-sudo cp withssl.service /etc/systemd/system/
+sudo cp sslcat /opt/sslcat/
+sudo cp sslcat.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable withssl
-sudo systemctl start withssl
+sudo systemctl enable sslcat
+sudo systemctl start sslcat
 ```
 
 ## 配置说明
 
 ### 配置文件位置
-- 主配置文件: `/etc/sslcat/withssl.conf`
+- 主配置文件: `/etc/sslcat/sslcat.conf`
 - 证书目录: `/var/lib/sslcat/certs`
 - 密钥目录: `/var/lib/sslcat/keys`
 - 日志目录: `/var/lib/sslcat/logs`
@@ -193,7 +193,7 @@ ssl:
 
 admin:
   username: "admin"
-  password_file: "./data/admin.pass"     # 密码保存在此文件，withssl.conf不持久化password
+  password_file: "/var/lib/sslcat/admin.pass"     # 密码保存在此文件，sslcat.conf不持久化password
   first_run: true
 
 proxy:
@@ -214,7 +214,7 @@ admin_prefix: "/sslcat-panel"     # 管理面板路径前缀
 
 ### 忘记密码（紧急恢复）
 
-withssl 采用“标记文件 + 首次强制改密”的安全策略：
+sslcat 采用“标记文件 + 首次强制改密”的安全策略：
 
 - 标记文件：`admin.password_file`（默认 `./data/admin.pass`）。文件以 0600 权限保存当前管理员密码。
 - 首次登录：若标记文件不存在，或文件内容仍为默认密码 `admin*9527`，管理员登录成功后会被强制跳转到“修改密码”页设置新密码，并写入标记文件。
@@ -229,42 +229,42 @@ withssl 采用“标记文件 + 首次强制改密”的安全策略：
 3. 重新启动服务，使用默认账户登录（admin / admin*9527）。
 4. 系统将强制进入“修改密码”页，设置新密码后恢复正常。
 
-说明：出于安全考虑，`withssl.conf` 在保存时不再持久化 `admin.password` 明文；运行时真实密码以 `admin.password_file` 为准。
+说明：出于安全考虑，`sslcat.conf` 在保存时不再持久化 `admin.password` 明文；运行时真实密码以 `admin.password_file` 为准。
 
 ## 使用方法
 
 ### 启动服务
 ```bash
-sudo systemctl start withssl
+sudo systemctl start sslcat
 ```
 
 ### 停止服务
 ```bash
-sudo systemctl stop withssl
+sudo systemctl stop sslcat
 ```
 
 ### 重启服务
 ```bash
-sudo systemctl restart withssl
+sudo systemctl restart sslcat
 ```
 
 ### 平滑重启
 ```bash
-sudo systemctl reload withssl
+sudo systemctl reload sslcat
 # 或者发送 SIGHUP 信号
-sudo kill -HUP $(pgrep withssl)
+sudo kill -HUP $(pgrep sslcat)
 ```
 
 ### 查看日志
 ```bash
 # 查看服务状态
-sudo systemctl status withssl
+sudo systemctl status sslcat
 
 # 查看实时日志
-sudo journalctl -u withssl -f
+sudo journalctl -u sslcat -f
 
 # 查看错误日志
-sudo journalctl -u withssl -p err
+sudo journalctl -u sslcat -p err
 ```
 
 ## Web 管理面板
@@ -340,17 +340,17 @@ SSLcat 会自动为配置的域名获取 SSL 证书，无需手动操作。
 ### 解除封禁
 ```bash
 # 删除封禁文件重启服务
-sudo rm /var/lib/sslcat/withssl.block
-sudo systemctl restart withssl
+sudo rm /var/lib/sslcat/sslcat.block
+sudo systemctl restart sslcat
 ```
 
 ## 命令行参数
 
 ```bash
-withssl [选项]
+sslcat [选项]
 
 选项:
-  --config string        配置文件路径 (默认: "/etc/sslcat/withssl.conf")
+  --config string        配置文件路径 (默认: "/etc/sslcat/sslcat.conf")
   --admin-prefix string  管理面板路径前缀 (默认: "/sslcat-panel")
   --email string         SSL证书邮箱
   --staging             使用Let's Encrypt测试环境
@@ -392,13 +392,13 @@ withssl [选项]
 ### 日志分析
 ```bash
 # 查看详细日志
-sudo journalctl -u withssl -f --no-pager
+sudo journalctl -u sslcat -f --no-pager
 
 # 过滤错误日志
-sudo journalctl -u withssl -p err --since "1 hour ago"
+sudo journalctl -u sslcat -p err --since "1 hour ago"
 
 # 查看特定时间段的日志
-sudo journalctl -u withssl --since "2024-01-01 00:00:00" --until "2024-01-01 23:59:59"
+sudo journalctl -u sslcat --since "2024-01-01 00:00:00" --until "2024-01-01 23:59:59"
 ```
 
 ## 性能优化
@@ -454,7 +454,7 @@ SSLcat 项目已针对中国大陆网络环境进行了优化，使用了 [CDNPr
 
 ### 项目结构
 ```
-withssl/
+sslcat/
 ├── main.go                 # 主程序入口
 ├── go.mod                  # Go模块文件
 ├── internal/               # 内部包
@@ -476,13 +476,13 @@ withssl/
 ```bash
 # 克隆项目
 git clone https://github.com/xurenlu/sslcat.git
-cd withssl
+cd sslcat
 
 # 安装依赖
 go mod download
 
 # 运行开发服务器
-go run main.go --config withssl.conf --log-level debug
+go run main.go --config sslcat.conf --log-level debug
 ```
 
 ### 贡献指南

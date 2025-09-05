@@ -71,7 +71,7 @@ Project hosted on GitHub: **[https://github.com/xurenlu/sslcat](https://github.c
 ```bash
 # Clone latest source code
 git clone https://github.com/xurenlu/sslcat.git
-cd withssl
+cd sslcat
 
 # Or download specific version (recommended)
 wget https://github.com/xurenlu/sslcat/archive/refs/heads/main.zip
@@ -128,31 +128,31 @@ source ~/.bashrc
 3. **Compile SSLcat**
 ```bash
 git clone https://github.com/xurenlu/sslcat.git
-cd withssl
+cd sslcat
 go mod download
-go build -o withssl main.go
+go build -o sslcat main.go
 ```
 
 4. **Create User and Directories**
 ```bash
-sudo useradd -r -s /bin/false withssl
+sudo useradd -r -s /bin/false sslcat
 sudo mkdir -p /etc/sslcat /var/lib/sslcat/{certs,keys,logs}
-sudo chown -R withssl:withssl /var/lib/sslcat
+sudo chown -R sslcat:sslcat /var/lib/sslcat
 ```
 
 5. **Configure and Start**
 ```bash
-sudo cp withssl /opt/sslcat/
-sudo cp withssl.service /etc/systemd/system/
+sudo cp sslcat /opt/sslcat/
+sudo cp sslcat.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable withssl
-sudo systemctl start withssl
+sudo systemctl enable sslcat
+sudo systemctl start sslcat
 ```
 
 ## Configuration
 
 ### Configuration File Location
-- Main config file: `/etc/sslcat/withssl.conf`
+- Main config file: `/etc/sslcat/sslcat.conf`
 - Certificate directory: `/var/lib/sslcat/certs`
 - Key directory: `/var/lib/sslcat/keys`
 - Log directory: `/var/lib/sslcat/logs`
@@ -200,36 +200,36 @@ sudo systemctl start withssl
 
 ### Start Service
 ```bash
-sudo systemctl start withssl
+sudo systemctl start sslcat
 ```
 
 ### Stop Service
 ```bash
-sudo systemctl stop withssl
+sudo systemctl stop sslcat
 ```
 
 ### Restart Service
 ```bash
-sudo systemctl restart withssl
+sudo systemctl restart sslcat
 ```
 
 ### Graceful Restart
 ```bash
-sudo systemctl reload withssl
+sudo systemctl reload sslcat
 # or send SIGHUP signal
-sudo kill -HUP $(pgrep withssl)
+sudo kill -HUP $(pgrep sslcat)
 ```
 
 ### View Logs
 ```bash
 # View service status
-sudo systemctl status withssl
+sudo systemctl status sslcat
 
 # View real-time logs
-sudo journalctl -u withssl -f
+sudo journalctl -u sslcat -f
 
 # View error logs
-sudo journalctl -u withssl -p err
+sudo journalctl -u sslcat -p err
 ```
 
 ## Web Management Panel
@@ -313,8 +313,8 @@ Certificates are automatically renewed 30 days before expiration, or can be manu
 ### Unblock IPs
 ```bash
 # Delete blocking file and restart service
-sudo rm /var/lib/sslcat/withssl.block
-sudo systemctl restart withssl
+sudo rm /var/lib/sslcat/sslcat.block
+sudo systemctl restart sslcat
 ```
 
 ## Command Line Arguments
@@ -359,8 +359,8 @@ Use the provided `install.sh` script to automatically install as a system servic
 
 ### 2. Docker Deployment
 ```bash
-docker build -t withssl .
-docker run -d -p 80:80 -p 443:443 -v $(pwd)/config:/etc/sslcat withssl
+docker build -t sslcat .
+docker run -d -p 80:80 -p 443:443 -v $(pwd)/config:/etc/sslcat sslcat
 ```
 
 ### 3. Docker Compose Deployment
@@ -372,7 +372,7 @@ docker-compose up -d
 
 ### Project Structure
 ```
-withssl/
+sslcat/
 ├── main.go                 # Main program entry
 ├── go.mod                  # Go module file
 ├── internal/               # Internal packages
@@ -396,13 +396,13 @@ withssl/
 ```bash
 # Clone project
 git clone https://github.com/xurenlu/sslcat.git
-cd withssl
+cd sslcat
 
 # Install dependencies
 go mod download
 
 # Run development server
-go run main.go --config withssl.conf --log-level debug
+go run main.go --config sslcat.conf --log-level debug
 ```
 
 ### Cross-Platform Compilation

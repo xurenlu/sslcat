@@ -1,4 +1,4 @@
-# withssl 发布指引
+# sslcat 发布指引
 
 本项目提供脚本一键构建多架构产物并上传到 GitHub Release。
 
@@ -18,7 +18,7 @@ VER=1.0.0 scripts/release/build-linux-amd64.sh
 VER=1.0.0 scripts/release/build-darwin-arm64.sh
 ```
 脚本会自动：
-- 将二进制命名为 withssl_${VER}_${GOOS}_${GOARCH}
+- 将二进制命名为 sslcat_${VER}_${GOOS}_${GOARCH}
 - 非 Windows 打包为 .tar.gz，Windows 打包为 .zip
 - 写入 dist/sha256sum.txt 校验文件
 

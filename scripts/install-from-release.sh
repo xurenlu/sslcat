@@ -36,23 +36,16 @@ case "$ARCH_RAW" in
 esac
 
 PREFERRED="sslcat_${VER}_${OS}_${ARCH}"
-FALLBACK="withssl_${VER}_${OS}_${ARCH}"
 EXT=".tar.gz"
 if [[ "$OS" == "windows" ]]; then EXT=".zip"; fi
 TMP="$(mktemp -d)"
 URL_PREF="https://github.com/xurenlu/sslcat/releases/download/v${VER}/${PREFERRED}${EXT}"
 echo "[sslcat] 下载: $URL_PREF"
-if ! curl -fsSL "$URL_PREF" -o "$TMP/pkg${EXT}"; then
-  URL_FB="https://github.com/xurenlu/sslcat/releases/download/v${VER}/${FALLBACK}${EXT}"
-  echo "[sslcat] 兼容旧包名，改为: $URL_FB"
-  curl -fsSL "$URL_FB" -o "$TMP/pkg${EXT}"
-fi
+curl -fsSL "$URL_PREF" -o "$TMP/pkg${EXT}"
 
 if [[ "$OS" == "darwin" ]]; then
   tar -xzf "$TMP/pkg${EXT}" -C "$TMP"
-  BIN="$TMP/sslcat"
-  if [[ ! -f "$BIN" && -f "$TMP/withssl" ]]; then BIN="$TMP/withssl"; fi
-  sudo install -m 0755 "$BIN" /usr/local/bin/sslcat
+  sudo install -m 0755 "$TMP/sslcat" /usr/local/bin/sslcat
   echo "[sslcat] 安装完成: /usr/local/bin/sslcat"
   echo "[sslcat] 运行: sslcat --config sslcat.conf --port 8080"
   exit 0
@@ -61,9 +54,7 @@ fi
 # Linux: 安装到 /opt/sslcat 并写入 systemd 与默认配置
 sudo mkdir -p "$DEST_LINUX" /var/lib/sslcat/{certs,keys,logs} /etc/sslcat
 tar -xzf "$TMP/pkg${EXT}" -C "$TMP"
-BIN="$TMP/sslcat"
-if [[ ! -f "$BIN" && -f "$TMP/withssl" ]]; then BIN="$TMP/withssl"; fi
-sudo install -m 0755 "$BIN" "$DEST_LINUX/sslcat"
+sudo install -m 0755 "$TMP/sslcat" "$DEST_LINUX/sslcat"
 
 if [[ ! -f "$CONF_LINUX" ]]; then
   sudo bash -c "cat > $CONF_LINUX" <<'JSON'

@@ -33,22 +33,22 @@ VER=$VER scripts/release/upload-github-release.sh
 ### 2.1 DEB（x86_64）
 ```
 VER=1.0.4 scripts/release/package-deb.sh
-# 输出: dist/withssl_1.0.4_linux_amd64.deb
+# 输出: dist/sslcat_1.0.4_linux_amd64.deb
 ```
 
 ### 2.2 RPM（x86_64）
 ```
 VER=1.0.4 scripts/release/package-rpm.sh
 # 依赖: rpmbuild
-# 输出: dist/withssl_1.0.4_x86_64.rpm
+# 输出: dist/sslcat_1.0.4_x86_64.rpm
 ```
 
 ### 2.3 Homebrew 公式
 ```
 # 先在 GitHub Releases 上传 darwin_arm64 包并获得 tarball 的 sha256
 VER=1.0.4 SHA256=<tarball_sha256> scripts/release/package-brew.sh
-# 输出: build/homebrew-tap/Formula/withssl.rb
-# 将 withssl.rb 推送到你的 tap 仓库（如 github.com/<you>/homebrew-tap）
+# 输出: build/homebrew-tap/Formula/sslcat.rb
+# 将 sslcat.rb 推送到你的 tap 仓库（如 github.com/<you>/homebrew-tap）
 ```
 
 ## 3) Docker Compose 一键启动
@@ -63,8 +63,8 @@ docker compose up -d
 env VER=1.0.4 REPO=xurenlu/sslcat \
 scripts/release/upgrade-helper.sh
 ```
-- 步骤：下载 → 备份当前 `/opt/sslcat/withssl` → 替换 → 重启 systemd 服务
-- 回滚：从 `/opt/sslcat-backups/<timestamp>/withssl` 拷回覆盖后重启
+- 步骤：下载 → 备份当前 `/opt/sslcat/sslcat` → 替换 → 重启 systemd 服务
+- 回滚：从 `/opt/sslcat-backups/<timestamp>/sslcat` 拷回覆盖后重启
 
 ## 5) 环境变量（可选）
 - Webhook：`WITHSSL_WEBHOOK_URL` → 发送审计/到期等事件
