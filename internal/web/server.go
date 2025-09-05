@@ -1282,6 +1282,7 @@ func (s *Server) generateSSLManagementHTML(data map[string]interface{}) string {
 	thExpires := s.translator.T("ssl.columns.expires")
 	thStatus := s.translator.T("ssl.columns.status")
 	thActions := s.translator.T("ssl.columns.actions")
+	thType := s.translator.T("ssl.columns.type")
 	uploadTitle := s.translator.T("ssl.upload_title")
 	uploadNote := s.translator.T("ssl.upload_note")
 	uploadBtn := s.translator.T("ssl.upload_button")
@@ -1318,6 +1319,7 @@ func (s *Server) generateSSLManagementHTML(data map[string]interface{}) string {
                                         <th>%s</th>
                                         <th>%s</th>
                                         <th>%s</th>
+                                        <th>%s</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1346,7 +1348,7 @@ func (s *Server) generateSSLManagementHTML(data map[string]interface{}) string {
 		title,
 		data["AdminPrefix"].(string),
 		genBtn,
-		thDomain, thIssued, thExpires, thStatus, thActions,
+		thDomain, thIssued, thExpires, thStatus, thActions, thType,
 		s.generateSSLCertsTable(data),
 		uploadTitle, uploadNote,
 		data["AdminPrefix"].(string), uploadBtn)
@@ -1359,8 +1361,13 @@ func (s *Server) generateSSLCertsTable(data map[string]interface{}) string {
 	}
 	var b strings.Builder
 	for _, c := range certs {
+		ctype := s.translator.T("ssl.type.ca")
+		if c.SelfSigned {
+			ctype = s.translator.T("ssl.type.self_signed")
+		}
 		b.WriteString(fmt.Sprintf(`
 			<tr>
+				<td>%s</td>
 				<td>%s</td>
 				<td>%s</td>
 				<td>%s</td>
@@ -1375,6 +1382,7 @@ func (s *Server) generateSSLCertsTable(data map[string]interface{}) string {
 			c.IssuedAt.Format("2006-01-02"),
 			c.ExpiresAt.Format("2006-01-02"),
 			c.Status,
+			ctype,
 			data["AdminPrefix"].(string), c.Domain,
 			data["AdminPrefix"].(string), c.Domain,
 			data["AdminPrefix"].(string), c.Domain,

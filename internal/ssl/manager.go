@@ -101,6 +101,7 @@ type CertificateInfo struct {
 	ExpiresAt  time.Time `json:"expires_at"`
 	Status     string    `json:"status"`
 	IsWildcard bool      `json:"is_wildcard"`
+	SelfSigned bool      `json:"self_signed"`
 }
 
 // GetCertificateList 获取证书列表
@@ -124,12 +125,15 @@ func (m *Manager) GetCertificateList() []CertificateInfo {
 				status = "即将过期"
 			}
 
+			selfSigned := x509Cert.Issuer.String() == x509Cert.Subject.String()
+
 			certs = append(certs, CertificateInfo{
 				Domain:     domain,
 				IssuedAt:   x509Cert.NotBefore,
 				ExpiresAt:  x509Cert.NotAfter,
 				Status:     status,
 				IsWildcard: strings.HasPrefix(domain, "*."),
+				SelfSigned: selfSigned,
 			})
 		}
 	}
@@ -712,12 +716,15 @@ func (m *Manager) ListCertificatesFromDisk() []CertificateInfo {
 			status = "即将过期"
 		}
 
+		selfSigned := x509Cert.Issuer.String() == x509Cert.Subject.String()
+
 		certs = append(certs, CertificateInfo{
 			Domain:     domain,
 			IssuedAt:   x509Cert.NotBefore,
 			ExpiresAt:  x509Cert.NotAfter,
 			Status:     status,
 			IsWildcard: strings.HasPrefix(domain, "*."),
+			SelfSigned: selfSigned,
 		})
 	}
 	return certs

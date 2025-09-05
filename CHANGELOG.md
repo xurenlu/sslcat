@@ -1,3 +1,8 @@
+## [1.0.8] - 2025-09-05
+- 证书管理新增“类型”列，显示自签/CA签发
+- ACME 严格化：仅对已配置域名申请，保存规则时预取证书
+- i18n 修复：URL>Cookie>Accept-Language；加载嵌入翻译；降噪日志
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
