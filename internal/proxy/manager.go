@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
@@ -62,10 +63,32 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 	// 获取或创建反向代理
 	proxy := m.getOrCreateProxy(rule)
 
-	// 修改请求头
-	r.Header.Set("X-Forwarded-Proto", "https")
-	r.Header.Set("X-Forwarded-For", m.getClientIP(r))
-	r.Header.Set("X-Real-IP", m.getClientIP(r))
+	// 获取真实客户端IP
+	clientIP := m.getClientIP(r)
+	
+	// 透明代理 - 正确设置所有必要的头部
+	scheme := "https"
+	if r.TLS == nil {
+		scheme = "http"
+	}
+	
+	// 设置标准的代理头部
+	r.Header.Set("X-Forwarded-Proto", scheme)
+	r.Header.Set("X-Forwarded-Host", r.Host)
+	r.Header.Set("X-Forwarded-Port", m.getPort(r))
+	r.Header.Set("X-Real-IP", clientIP)
+	
+	// 正确处理 X-Forwarded-For 链
+	if existing := r.Header.Get("X-Forwarded-For"); existing != "" {
+		r.Header.Set("X-Forwarded-For", existing+", "+clientIP)
+	} else {
+		r.Header.Set("X-Forwarded-For", clientIP)
+	}
+	
+	// 设置原始请求信息
+	r.Header.Set("X-Forwarded-Server", "withssl")
+	r.Header.Set("X-Original-URI", r.RequestURI)
+	r.Header.Set("X-Original-Method", r.Method)
 
 	// 执行代理
 	proxy.ServeHTTP(w, r)
@@ -91,6 +114,32 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
+	
+	// 自定义 Director 函数以实现真正的透明代理
+	originalDirector := proxy.Director
+	proxy.Director = func(req *http.Request) {
+		// 调用原始 Director
+		originalDirector(req)
+		
+		// 保持原始的 Host 头，实现透明代理
+		req.Header.Set("Host", req.Host)
+		
+		// 移除 Hop-by-hop 头部
+		hopHeaders := []string{
+			"Connection",
+			"Proxy-Connection", 
+			"Keep-Alive",
+			"Proxy-Authenticate",
+			"Proxy-Authorization",
+			"Te",
+			"Trailers", 
+			"Transfer-Encoding",
+			"Upgrade",
+		}
+		for _, header := range hopHeaders {
+			req.Header.Del(header)
+		}
+	}
 
 	// 自定义传输配置
 	proxy.Transport = &http.Transport{
@@ -104,6 +153,8 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
+		// 不验证后端证书，允许自签名证书
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 
 	// 自定义错误处理
@@ -146,28 +197,106 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 	return proxy
 }
 
-// getClientIP 获取客户端IP
+// getClientIP 获取客户端真实IP
 func (m *Manager) getClientIP(r *http.Request) string {
-	// 优先使用X-Forwarded-For
+	// 1. 首先检查 CF-Connecting-IP (Cloudflare)
+	if cfIP := r.Header.Get("CF-Connecting-IP"); cfIP != "" && m.isValidIP(cfIP) {
+		return cfIP
+	}
+	
+	// 2. 检查 X-Real-IP
+	if xri := r.Header.Get("X-Real-IP"); xri != "" && m.isValidIP(xri) {
+		return xri
+	}
+	
+	// 3. 检查 X-Forwarded-For (取第一个非内网IP)
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		ips := strings.Split(xff, ",")
-		if len(ips) > 0 {
-			return strings.TrimSpace(ips[0])
+		for _, ip := range ips {
+			ip = strings.TrimSpace(ip)
+			if m.isValidIP(ip) && !m.isPrivateIP(ip) {
+				return ip
+			}
+		}
+		// 如果没有公网IP，返回第一个有效IP
+		for _, ip := range ips {
+			ip = strings.TrimSpace(ip)
+			if m.isValidIP(ip) {
+				return ip
+			}
+		}
+	}
+	
+	// 4. 检查其他常见头部
+	headers := []string{
+		"X-Client-IP",
+		"X-Forwarded",
+		"X-Cluster-Client-IP",
+		"Forwarded-For", 
+		"Forwarded",
+	}
+	
+	for _, header := range headers {
+		if ip := r.Header.Get(header); ip != "" && m.isValidIP(ip) {
+			return ip
 		}
 	}
 
-	// 使用X-Real-IP
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return strings.TrimSpace(xri)
-	}
-
-	// 使用RemoteAddr
+	// 5. 最后使用RemoteAddr
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return r.RemoteAddr
 	}
 
 	return host
+}
+
+// isValidIP 检查是否为有效IP地址
+func (m *Manager) isValidIP(ip string) bool {
+	return net.ParseIP(ip) != nil
+}
+
+// isPrivateIP 检查是否为内网IP
+func (m *Manager) isPrivateIP(ip string) bool {
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil {
+		return false
+	}
+	
+	// 检查IPv4内网地址
+	if parsedIP.To4() != nil {
+		// 10.0.0.0/8
+		if parsedIP[0] == 10 {
+			return true
+		}
+		// 172.16.0.0/12
+		if parsedIP[0] == 172 && parsedIP[1] >= 16 && parsedIP[1] <= 31 {
+			return true
+		}
+		// 192.168.0.0/16
+		if parsedIP[0] == 192 && parsedIP[1] == 168 {
+			return true
+		}
+		// 127.0.0.0/8 (localhost)
+		if parsedIP[0] == 127 {
+			return true
+		}
+	}
+	
+	// 检查IPv6内网地址
+	if parsedIP.IsLoopback() || parsedIP.IsLinkLocalUnicast() || parsedIP.IsLinkLocalMulticast() {
+		return true
+	}
+	
+	return false
+}
+
+// getPort 获取请求端口
+func (m *Manager) getPort(r *http.Request) string {
+	if r.TLS != nil {
+		return "443"
+	}
+	return "80"
 }
 
 // HandleWebSocket 处理WebSocket代理

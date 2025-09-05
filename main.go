@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -104,15 +105,6 @@ func main() {
 		logrus.SetLevel(logrus.InfoLevel)
 	}
 
-	// 创建HTTP服务器
-	server := &http.Server{
-		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
-		Handler:      webServer,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  120 * time.Second,
-	}
-
 	// 启动SSL管理器
 	if err := sslManager.Start(); err != nil {
 		log.Fatalf("启动SSL管理器失败: %v", err)
@@ -126,13 +118,68 @@ func main() {
 	// 启动安全管理器
 	securityManager.Start()
 
+	// 创建HTTP服务器
+	server := &http.Server{
+		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
+		Handler:      webServer,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  120 * time.Second,
+		TLSConfig:    sslManager.GetTLSConfig(), // 使用SSL管理器的TLS配置
+	}
+
 	// 启动Web服务器
 	go func() {
-		log.Infof("Web服务器启动在 %s", server.Addr)
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Web服务器启动失败: %v", err)
+		log.Infof("HTTPS服务器启动在 %s (支持多域名SSL证书)", server.Addr)
+		
+		// 如果是443端口，启动HTTPS服务器
+		if cfg.Server.Port == 443 || cfg.Server.Port == 8443 {
+			if err := server.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("HTTPS服务器启动失败: %v", err)
+			}
+		} else {
+			// 其他端口启动HTTP服务器
+			log.Warnf("在非标准端口 %d 启动HTTP服务器", cfg.Server.Port)
+			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("HTTP服务器启动失败: %v", err)
+			}
 		}
 	}()
+	
+	// 如果是443端口，同时启动80端口的HTTP重定向服务器
+	if cfg.Server.Port == 443 {
+		go func() {
+			redirectServer := &http.Server{
+				Addr: fmt.Sprintf("%s:80", cfg.Server.Host),
+				Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					// 检查是否是管理面板路径或API路径
+					if strings.HasPrefix(r.URL.Path, cfg.AdminPrefix) {
+						// 管理面板路径重定向到HTTPS
+						httpsURL := fmt.Sprintf("https://%s%s", r.Host, r.RequestURI)
+						http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
+						return
+					}
+					
+					// 其他路径通过代理处理（如果有配置）
+					if rule := proxyManager.GetProxyConfig(r.Host); rule != nil {
+						proxyManager.ProxyRequest(w, r, rule)
+						return
+					}
+					
+					// 没有配置的域名重定向到HTTPS
+					httpsURL := fmt.Sprintf("https://%s%s", r.Host, r.RequestURI)
+					http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
+				}),
+				ReadTimeout:  10 * time.Second,
+				WriteTimeout: 10 * time.Second,
+			}
+			
+			log.Infof("HTTP重定向服务器启动在 %s:80", cfg.Server.Host)
+			if err := redirectServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Errorf("HTTP重定向服务器失败: %v", err)
+			}
+		}()
+	}
 
 	// 等待中断信号
 	quit := make(chan os.Signal, 1)
