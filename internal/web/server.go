@@ -331,7 +331,7 @@ func (s *Server) processLogin(w http.ResponseWriter, r *http.Request) {
 	// 显示错误页面
 	data := map[string]interface{}{
 		"AdminPrefix": s.config.AdminPrefix,
-		"Error":       "用户名或密码错误",
+		"Error":       s.translator.T("login.invalid"),
 	}
 	s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
 }
