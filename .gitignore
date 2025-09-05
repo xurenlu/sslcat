@@ -6,6 +6,9 @@
 *.dylib
 withssl
 withssl.exe
+sslcat
+sslcat.exe
+main
 
 # Test binary, built with `go test -c`
 *.test

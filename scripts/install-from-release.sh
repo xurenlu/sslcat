@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# withssl 一键安装脚本（Linux/macOS）
+# sslcat 一键安装脚本（Linux/macOS）
 # 用法（推荐传版本）：
 #   curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/scripts/install-from-release.sh | sudo bash -s -- -v 1.0.4
 
 VER=""
 DEST_LINUX="/opt/sslcat"
-CONF_LINUX="/etc/sslcat/withssl.conf"
+CONF_LINUX="/etc/sslcat/sslcat.conf"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -22,7 +22,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$VER" ]]; then
-  echo "[withssl] 你未指定版本，默认安装 v1.0.4"
+  echo "[sslcat] 你未指定版本，默认安装 v1.0.4"
   VER="1.0.4"
 fi
 
@@ -32,30 +32,38 @@ case "$ARCH_RAW" in
   x86_64|amd64) ARCH=amd64 ;;
   aarch64|arm64) ARCH=arm64 ;;
   armv7l|armv7|armhf) ARCH=arm ;;
-  *) echo "[withssl] 不支持的架构: $ARCH_RAW" >&2; exit 1 ;;
+  *) echo "[sslcat] 不支持的架构: $ARCH_RAW" >&2; exit 1 ;;
 esac
 
-ASSET="withssl_${VER}_${OS}_${ARCH}"
+PREFERRED="sslcat_${VER}_${OS}_${ARCH}"
+FALLBACK="withssl_${VER}_${OS}_${ARCH}"
 EXT=".tar.gz"
 if [[ "$OS" == "windows" ]]; then EXT=".zip"; fi
-URL="https://github.com/xurenlu/sslcat/releases/download/v${VER}/${ASSET}${EXT}"
-
-echo "[withssl] 下载: $URL"
 TMP="$(mktemp -d)"
-curl -fsSL "$URL" -o "$TMP/pkg${EXT}"
+URL_PREF="https://github.com/xurenlu/sslcat/releases/download/v${VER}/${PREFERRED}${EXT}"
+echo "[sslcat] 下载: $URL_PREF"
+if ! curl -fsSL "$URL_PREF" -o "$TMP/pkg${EXT}"; then
+  URL_FB="https://github.com/xurenlu/sslcat/releases/download/v${VER}/${FALLBACK}${EXT}"
+  echo "[sslcat] 兼容旧包名，改为: $URL_FB"
+  curl -fsSL "$URL_FB" -o "$TMP/pkg${EXT}"
+fi
 
 if [[ "$OS" == "darwin" ]]; then
   tar -xzf "$TMP/pkg${EXT}" -C "$TMP"
-  sudo install -m 0755 "$TMP/withssl" /usr/local/bin/withssl
-  echo "[withssl] 安装完成: /usr/local/bin/withssl"
-  echo "[withssl] 运行: withssl --config withssl.conf --port 8080"
+  BIN="$TMP/sslcat"
+  if [[ ! -f "$BIN" && -f "$TMP/withssl" ]]; then BIN="$TMP/withssl"; fi
+  sudo install -m 0755 "$BIN" /usr/local/bin/sslcat
+  echo "[sslcat] 安装完成: /usr/local/bin/sslcat"
+  echo "[sslcat] 运行: sslcat --config sslcat.conf --port 8080"
   exit 0
 fi
 
 # Linux: 安装到 /opt/sslcat 并写入 systemd 与默认配置
 sudo mkdir -p "$DEST_LINUX" /var/lib/sslcat/{certs,keys,logs} /etc/sslcat
 tar -xzf "$TMP/pkg${EXT}" -C "$TMP"
-sudo install -m 0755 "$TMP/withssl" "$DEST_LINUX/withssl"
+BIN="$TMP/sslcat"
+if [[ ! -f "$BIN" && -f "$TMP/withssl" ]]; then BIN="$TMP/withssl"; fi
+sudo install -m 0755 "$BIN" "$DEST_LINUX/sslcat"
 
 if [[ ! -f "$CONF_LINUX" ]]; then
   sudo bash -c "cat > $CONF_LINUX" <<'JSON'
@@ -64,13 +72,13 @@ if [[ ! -f "$CONF_LINUX" ]]; then
   "ssl": {"staging": false, "cert_dir": "/var/lib/sslcat/certs", "key_dir": "/var/lib/sslcat/keys", "auto_renew": true},
   "admin": {"username": "admin", "first_run": true, "password_file": "/var/lib/sslcat/admin.pass"},
   "proxy": {"rules": []},
-  "security": {"max_attempts": 3, "block_duration": "1m", "max_attempts_5min": 10, "block_file": "/var/lib/sslcat/withssl.block", "allowed_user_agents": ["Mozilla/","Chrome/","Firefox/","Safari/","Edge/"]},
+  "security": {"max_attempts": 3, "block_duration": "1m", "max_attempts_5min": 10, "block_file": "/var/lib/sslcat/sslcat.block", "allowed_user_agents": ["Mozilla/","Chrome/","Firefox/","Safari/","Edge/"]},
   "admin_prefix": "/sslcat-panel"
 }
 JSON
 fi
 
-SERVICE=/etc/systemd/system/withssl.service
+SERVICE=/etc/systemd/system/sslcat.service
 sudo bash -c "cat > $SERVICE" <<'UNIT'
 [Unit]
 Description=SSLcat Service
@@ -78,7 +86,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/opt/sslcat/withssl --config /etc/sslcat/withssl.conf
+ExecStart=/opt/sslcat/sslcat --config /etc/sslcat/sslcat.conf
 Restart=always
 RestartSec=3
 User=root
@@ -88,11 +96,12 @@ WantedBy=multi-user.target
 UNIT
 
 sudo systemctl daemon-reload
-sudo systemctl enable withssl || true
-sudo systemctl restart withssl || sudo systemctl start withssl || true
+sudo systemctl disable withssl --now >/dev/null 2>&1 || true
+sudo systemctl enable sslcat || true
+sudo systemctl restart sslcat || sudo systemctl start sslcat || true
 
-echo "[withssl] 安装完成: /opt/sslcat/withssl"
-echo "[withssl] 配置: /etc/sslcat/withssl.conf"
-echo "[withssl] 管理面板: https://<你的域名或IP>/sslcat-panel/ (首次登录将强制改密)"
+echo "[sslcat] 安装完成: /opt/sslcat/sslcat"
+echo "[sslcat] 配置: /etc/sslcat/sslcat.conf"
+echo "[sslcat] 管理面板: https://<你的域名或IP>/sslcat-panel/ (首次登录将强制改密)"
 
 
