@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -16,6 +17,7 @@ type Config struct {
 	Proxy       ProxyConfig    `json:"proxy"`
 	Security    SecurityConfig `json:"security"`
 	AdminPrefix string         `json:"admin_prefix"`
+	ConfigFile  string         `json:"-"` // 配置文件路径，不序列化
 }
 
 // ServerConfig 服务器配置
@@ -37,9 +39,10 @@ type SSLConfig struct {
 
 // AdminConfig 管理面板配置
 type AdminConfig struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	FirstRun bool   `json:"first_run"`
+	Username     string `json:"username"`
+	Password     string `json:"password,omitempty"`
+	FirstRun     bool   `json:"first_run"`
+	PasswordFile string `json:"password_file"`
 }
 
 // ProxyConfig 代理配置
@@ -84,9 +87,10 @@ func Load(configFile string) (*Config, error) {
 			AutoRenew: true,
 		},
 		Admin: AdminConfig{
-			Username: "admin",
-			Password: "admin*9527",
-			FirstRun: true,
+			Username:     "admin",
+			Password:     "admin*9527",
+			FirstRun:     true,
+			PasswordFile: "./data/admin.pass",
 		},
 		Proxy: ProxyConfig{
 			Rules: []ProxyRule{},
@@ -137,6 +141,18 @@ func Load(configFile string) (*Config, error) {
 	if err := os.MkdirAll(config.SSL.KeyDir, 0755); err != nil {
 		return nil, fmt.Errorf("创建密钥目录失败: %w", err)
 	}
+	// 确保密码文件目录存在，并且如存在则覆盖内存密码
+	if config.Admin.PasswordFile != "" {
+		if err := os.MkdirAll(filepath.Dir(config.Admin.PasswordFile), 0755); err != nil {
+			return nil, fmt.Errorf("创建密码文件目录失败: %w", err)
+		}
+		if b, err := os.ReadFile(config.Admin.PasswordFile); err == nil {
+			config.Admin.Password = strings.TrimSpace(string(b))
+		}
+	}
+
+	// 保存配置文件路径
+	config.ConfigFile = configFile
 
 	return config, nil
 }
@@ -146,22 +162,22 @@ func (c *Config) Save(configFile string) error {
 	// 确保配置目录存在
 	configDir := filepath.Dir(configFile)
 	if err := os.MkdirAll(configDir, 0755); err != nil {
-		return fmt.Errorf("创建配置目录失败: %w", err)
+		return fmt.Errorf("创建配置目录失败 (%s): %w", configDir, err)
 	}
 
-	// 更新时间字符串
-	c.Security.BlockDurationStr = c.Security.BlockDuration.String()
+	// 序列化时避免写入明文密码
+	shadow := *c
+	shadow.Security.BlockDurationStr = c.Security.BlockDuration.String()
+	shadow.Admin.Password = ""
 
-	// 保存配置
-	data, err := json.MarshalIndent(c, "", "  ")
+	data, err := json.MarshalIndent(&shadow, "", "  ")
 	if err != nil {
 		return fmt.Errorf("序列化配置失败: %w", err)
 	}
 
 	if err := os.WriteFile(configFile, data, 0644); err != nil {
-		return fmt.Errorf("写入配置文件失败: %w", err)
+		return fmt.Errorf("写入配置文件失败 (%s): %w", configFile, err)
 	}
-
 	return nil
 }
 

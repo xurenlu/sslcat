@@ -16,17 +16,20 @@ import (
 	"time"
 
 	"withssl/internal/config"
+	"withssl/internal/notify"
 
 	"github.com/sirupsen/logrus"
 )
 
 // Manager SSL证书管理器
 type Manager struct {
-	config    *config.Config
-	certCache map[string]*tls.Certificate
-	certMutex sync.RWMutex
-	stopChan  chan struct{}
-	log       *logrus.Entry
+	config     *config.Config
+	certCache  map[string]*tls.Certificate
+	certMutex  sync.RWMutex
+	stopChan   chan struct{}
+	log        *logrus.Entry
+	notifier   *notify.Notifier
+	lastNotify map[string]string
 }
 
 // NewManager 创建SSL管理器
@@ -36,13 +39,82 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 	})
 
 	manager := &Manager{
-		config:    cfg,
-		certCache: make(map[string]*tls.Certificate),
-		stopChan:  make(chan struct{}),
-		log:       log,
+		config:     cfg,
+		certCache:  make(map[string]*tls.Certificate),
+		stopChan:   make(chan struct{}),
+		log:        log,
+		notifier:   notify.NewFromEnv(),
+		lastNotify: make(map[string]string),
 	}
 
 	return manager, nil
+}
+
+// CertificateInfo 证书信息
+type CertificateInfo struct {
+	Domain     string    `json:"domain"`
+	IssuedAt   time.Time `json:"issued_at"`
+	ExpiresAt  time.Time `json:"expires_at"`
+	Status     string    `json:"status"`
+	IsWildcard bool      `json:"is_wildcard"`
+}
+
+// GetCertificateList 获取证书列表
+func (m *Manager) GetCertificateList() []CertificateInfo {
+	m.certMutex.RLock()
+	defer m.certMutex.RUnlock()
+
+	var certs []CertificateInfo
+	for domain, cert := range m.certCache {
+		if cert != nil && len(cert.Certificate) > 0 {
+			// 解析证书信息
+			x509Cert, err := x509.ParseCertificate(cert.Certificate[0])
+			if err != nil {
+				continue
+			}
+
+			status := "有效"
+			if time.Now().After(x509Cert.NotAfter) {
+				status = "过期"
+			} else if time.Now().Add(30 * 24 * time.Hour).After(x509Cert.NotAfter) {
+				status = "即将过期"
+			}
+
+			certs = append(certs, CertificateInfo{
+				Domain:     domain,
+				IssuedAt:   x509Cert.NotBefore,
+				ExpiresAt:  x509Cert.NotAfter,
+				Status:     status,
+				IsWildcard: strings.HasPrefix(domain, "*."),
+			})
+		}
+	}
+
+	return certs
+}
+
+// DeleteCertificate 删除证书
+func (m *Manager) DeleteCertificate(domain string) error {
+	m.certMutex.Lock()
+	defer m.certMutex.Unlock()
+
+	// 从缓存中删除
+	delete(m.certCache, domain)
+
+	// 删除文件
+	certFile := filepath.Join(m.config.SSL.CertDir, domain+".crt")
+	keyFile := filepath.Join(m.config.SSL.KeyDir, domain+".key")
+
+	if err := os.Remove(certFile); err != nil && !os.IsNotExist(err) {
+		m.log.Warnf("删除证书文件失败 %s: %v", certFile, err)
+	}
+
+	if err := os.Remove(keyFile); err != nil && !os.IsNotExist(err) {
+		m.log.Warnf("删除密钥文件失败 %s: %v", keyFile, err)
+	}
+
+	m.log.Infof("已删除域名 %s 的证书", domain)
+	return nil
 }
 
 // Start 启动SSL管理器
@@ -53,6 +125,8 @@ func (m *Manager) Start() error {
 	if m.config.SSL.AutoRenew {
 		go m.autoRenewCerts()
 	}
+	// 周期性证书到期提醒
+	go m.expiryNotifier()
 
 	return nil
 }
@@ -61,6 +135,45 @@ func (m *Manager) Start() error {
 func (m *Manager) Stop() {
 	m.log.Info("停止SSL管理器")
 	close(m.stopChan)
+}
+
+// expiryNotifier 定期检查证书到期，分别在15/7/3天提醒一次
+func (m *Manager) expiryNotifier() {
+	ticker := time.NewTicker(12 * time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			m.notifyExpiringCerts()
+		case <-m.stopChan:
+			return
+		}
+	}
+}
+
+func (m *Manager) notifyExpiringCerts() {
+	certs := m.ListCertificatesFromDisk()
+	for _, ci := range certs {
+		days := int(time.Until(ci.ExpiresAt).Hours() / 24)
+		if days == 15 || days == 7 || days == 3 {
+			key := ci.Domain
+			stamp := fmt.Sprintf("%d", days)
+			if m.lastNotify[key] == stamp {
+				continue
+			}
+			m.lastNotify[key] = stamp
+			m.log.Warnf("证书即将到期: %s, %d 天后过期", ci.Domain, days)
+			if m.notifier != nil && m.notifier.Enabled() {
+				m.notifier.SendJSON(map[string]any{
+					"ts":        time.Now().Format(time.RFC3339),
+					"level":     "warn",
+					"event":     "cert_expiring",
+					"domain":    ci.Domain,
+					"days_left": days,
+				})
+			}
+		}
+	}
 }
 
 // GetCertificate 获取指定域名的证书
@@ -243,24 +356,24 @@ func (m *Manager) domainMatchesCert(domain string, cert *tls.Certificate) bool {
 	if len(cert.Certificate) == 0 {
 		return false
 	}
-	
+
 	x509Cert, err := x509.ParseCertificate(cert.Certificate[0])
 	if err != nil {
 		return false
 	}
-	
+
 	// 检查 CN
 	if x509Cert.Subject.CommonName == domain {
 		return true
 	}
-	
+
 	// 检查 SAN (Subject Alternative Names)
 	for _, dnsName := range x509Cert.DNSNames {
 		if matchDomain(domain, dnsName) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -270,13 +383,13 @@ func (m *Manager) findWildcardCert(domain string) *tls.Certificate {
 	if len(parts) < 2 {
 		return nil
 	}
-	
+
 	// 尝试匹配 *.domain.com 格式的通配符证书
 	wildcardDomain := "*." + strings.Join(parts[1:], ".")
-	
+
 	m.certMutex.RLock()
 	defer m.certMutex.RUnlock()
-	
+
 	for cachedDomain, cert := range m.certCache {
 		if cachedDomain == wildcardDomain || strings.Contains(cachedDomain, "*") {
 			if m.domainMatchesCert(domain, cert) {
@@ -285,7 +398,7 @@ func (m *Manager) findWildcardCert(domain string) *tls.Certificate {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -294,7 +407,7 @@ func matchDomain(domain, pattern string) bool {
 	if pattern == domain {
 		return true
 	}
-	
+
 	// 支持通配符匹配
 	if strings.HasPrefix(pattern, "*.") {
 		// 移除 "*." 前缀
@@ -308,7 +421,7 @@ func matchDomain(domain, pattern string) bool {
 		// 直接匹配根域名
 		return domain == suffix
 	}
-	
+
 	return false
 }
 
@@ -320,14 +433,14 @@ func (m *Manager) GetTLSConfig() *tls.Config {
 			if domain == "" {
 				domain = "localhost"
 			}
-			
+
 			m.log.Debugf("请求域名: %s 的SSL证书", domain)
 			cert, err := m.GetCertificate(domain)
 			if err != nil {
 				m.log.Errorf("获取证书失败 %s: %v", domain, err)
 				return nil, err
 			}
-			
+
 			return cert, nil
 		},
 		NextProtos: []string{"h2", "http/1.1"}, // 支持 HTTP/2
@@ -340,10 +453,10 @@ func (m *Manager) GenerateMultiDomainCert(domains []string) (*tls.Certificate, e
 	if len(domains) == 0 {
 		return nil, fmt.Errorf("域名列表不能为空")
 	}
-	
+
 	primaryDomain := domains[0]
 	m.log.Infof("为域名组 %v 生成多域名自签名证书", domains)
-	
+
 	// 生成私钥
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -407,4 +520,79 @@ func (m *Manager) GenerateMultiDomainCert(domains []string) (*tls.Certificate, e
 
 	m.log.Infof("成功生成并缓存多域名证书: %v", domains)
 	return &cert, nil
+}
+
+// LoadCertificateFromDisk 从磁盘加载指定域名证书到缓存
+func (m *Manager) LoadCertificateFromDisk(domain string) error {
+	certPath := filepath.Join(m.config.SSL.CertDir, domain+".crt")
+	keyPath := filepath.Join(m.config.SSL.KeyDir, domain+".key")
+
+	if _, err := os.Stat(certPath); err != nil {
+		return fmt.Errorf("证书文件不存在: %s", certPath)
+	}
+	if _, err := os.Stat(keyPath); err != nil {
+		return fmt.Errorf("私钥文件不存在: %s", keyPath)
+	}
+
+	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+	if err != nil {
+		return fmt.Errorf("加载证书失败: %w", err)
+	}
+
+	m.certMutex.Lock()
+	m.certCache[domain] = &cert
+	m.certMutex.Unlock()
+	m.log.Infof("已从磁盘加载证书到缓存: %s", domain)
+	return nil
+}
+
+// ListCertificatesFromDisk 扫描证书目录获取证书信息
+func (m *Manager) ListCertificatesFromDisk() []CertificateInfo {
+	certDir := m.config.SSL.CertDir
+	entries, err := os.ReadDir(certDir)
+	if err != nil {
+		m.log.Warnf("读取证书目录失败 %s: %v", certDir, err)
+		return nil
+	}
+
+	var certs []CertificateInfo
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if !strings.HasSuffix(strings.ToLower(name), ".crt") {
+			continue
+		}
+		domain := strings.TrimSuffix(name, ".crt")
+		certPath := filepath.Join(certDir, name)
+		pemBytes, err := os.ReadFile(certPath)
+		if err != nil {
+			continue
+		}
+		block, _ := pem.Decode(pemBytes)
+		if block == nil || block.Type != "CERTIFICATE" {
+			continue
+		}
+		x509Cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			continue
+		}
+
+		status := "有效"
+		if time.Now().After(x509Cert.NotAfter) {
+			status = "过期"
+		} else if time.Now().Add(30 * 24 * time.Hour).After(x509Cert.NotAfter) {
+			status = "即将过期"
+		}
+
+		certs = append(certs, CertificateInfo{
+			Domain:     domain,
+			IssuedAt:   x509Cert.NotBefore,
+			ExpiresAt:  x509Cert.NotAfter,
+			Status:     status,
+			IsWildcard: strings.HasPrefix(domain, "*."),
+		})
+	}
+	return certs
 }

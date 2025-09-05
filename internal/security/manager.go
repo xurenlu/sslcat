@@ -77,6 +77,19 @@ func (m *Manager) Stop() {
 	close(m.stopChan)
 }
 
+// AccessLogsSnapshot 返回当前访问日志的只读快照（深拷贝切片，避免并发问题）
+func (m *Manager) AccessLogsSnapshot() map[string][]AccessLog {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	out := make(map[string][]AccessLog, len(m.accessLogs))
+	for ip, logs := range m.accessLogs {
+		cp := make([]AccessLog, len(logs))
+		copy(cp, logs)
+		out[ip] = cp
+	}
+	return out
+}
+
 // IsBlocked 检查IP是否被封禁
 func (m *Manager) IsBlocked(ip string) bool {
 	m.mutex.RLock()
@@ -347,4 +360,84 @@ func GetClientIP(remoteAddr string, headers map[string]string) string {
 	}
 
 	return host
+}
+
+// GetBlockedIPs 获取被封禁的IP列表
+func (m *Manager) GetBlockedIPs() []BlockedIP {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	var blockedList []BlockedIP
+	for _, blocked := range m.blockedIPs {
+		// 只返回未过期的IP
+		if time.Now().Before(blocked.ExpireTime) {
+			blockedList = append(blockedList, blocked)
+		}
+	}
+
+	return blockedList
+}
+
+// UnblockIP 解除IP封禁
+func (m *Manager) UnblockIP(ip string) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	if _, exists := m.blockedIPs[ip]; exists {
+		delete(m.blockedIPs, ip)
+		delete(m.attemptCounts, ip)
+		delete(m.lastAttempts, ip)
+		m.log.Infof("手动解除IP封禁: %s", ip)
+	}
+}
+
+// GetAccessLogs 获取访问日志
+func (m *Manager) GetAccessLogs(ip string, limit int) []AccessLog {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	logs, exists := m.accessLogs[ip]
+	if !exists {
+		return nil
+	}
+
+	// 返回最新的日志
+	if limit > 0 && len(logs) > limit {
+		return logs[len(logs)-limit:]
+	}
+
+	return logs
+}
+
+// GetSecurityStats 获取安全统计信息
+func (m *Manager) GetSecurityStats() map[string]interface{} {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	totalBlocked := 0
+	recentAttempts := 0
+	now := time.Now()
+	oneHourAgo := now.Add(-time.Hour)
+
+	// 统计被封禁的IP数量
+	for _, blocked := range m.blockedIPs {
+		if now.Before(blocked.ExpireTime) {
+			totalBlocked++
+		}
+	}
+
+	// 统计最近一小时的失败尝试次数
+	for _, logs := range m.accessLogs {
+		for _, log := range logs {
+			if !log.Success && log.Timestamp.After(oneHourAgo) {
+				recentAttempts++
+			}
+		}
+	}
+
+	return map[string]interface{}{
+		"blocked_ips":      totalBlocked,
+		"recent_attempts":  recentAttempts,
+		"total_access_ips": len(m.accessLogs),
+	}
 }

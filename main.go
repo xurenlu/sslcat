@@ -96,7 +96,7 @@ func main() {
 	proxyManager := proxy.NewManager(cfg, sslManager, securityManager)
 
 	// 初始化Web服务器
-	webServer := web.NewServer(cfg, proxyManager, securityManager)
+	webServer := web.NewServer(cfg, proxyManager, securityManager, sslManager)
 
 	// 设置日志级别
 	if cfg.Server.Debug {
