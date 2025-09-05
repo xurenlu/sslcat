@@ -123,6 +123,29 @@ func (s *Server) setupRoutes() {
 
 // ServeHTTP 实现http.Handler接口
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// 语言切换：如果存在 ?lang= 参数，则设置 cookie 并重定向到去掉 lang 的同一路径
+	if langParam := r.URL.Query().Get("lang"); langParam != "" {
+		if s.isSupportedLanguage(langParam) {
+			// 设置语言 cookie（180 天）
+			http.SetCookie(w, &http.Cookie{
+				Name:     "language",
+				Value:    langParam,
+				Path:     "/",
+				MaxAge:   180 * 24 * 3600,
+				HttpOnly: false,
+				Secure:   r.TLS != nil,
+			})
+			// 立即切换当前会话语言
+			s.translator.SetLanguage(i18n.SupportedLanguage(langParam))
+			// 构造重定向URL（去掉 lang 参数）
+			q := r.URL.Query()
+			q.Del("lang")
+			r.URL.RawQuery = q.Encode()
+			http.Redirect(w, r, r.URL.String(), http.StatusFound)
+			return
+		}
+	}
+
 	// 安全中间件
 	if !s.securityMiddleware(w, r) {
 		return
@@ -135,6 +158,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// 处理请求
 	s.mux.ServeHTTP(w, r)
+}
+
+func (s *Server) isSupportedLanguage(lang string) bool {
+	langs := s.translator.GetSupportedLanguages()
+	if _, ok := langs[i18n.SupportedLanguage(lang)]; ok {
+		return true
+	}
+	return false
 }
 
 // securityMiddleware 安全中间件
@@ -1530,6 +1561,20 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
                         <div class="text-center mb-4">
                             <h4 class="navbar-brand text-primary">WithSSL</h4>
                             <small class="text-muted">SSL 代理服务器</small>
+                        </div>
+                        
+                        <div class="dropdown mb-3 px-3">
+                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                语言 Language
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="?lang=zh-CN">简体中文</a></li>
+                                <li><a class="dropdown-item" href="?lang=en-US">English</a></li>
+                                <li><a class="dropdown-item" href="?lang=ja-JP">日本語</a></li>
+                                <li><a class="dropdown-item" href="?lang=es-ES">Español</a></li>
+                                <li><a class="dropdown-item" href="?lang=fr-FR">Français</a></li>
+                                <li><a class="dropdown-item" href="?lang=ru-RU">Русский</a></li>
+                            </ul>
                         </div>
                         
                         <ul class="nav flex-column">
