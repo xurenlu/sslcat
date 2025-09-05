@@ -195,7 +195,7 @@ Type=simple
 User=withssl
 Group=withssl
 WorkingDirectory=/opt/withssl
-ExecStart=/opt/withssl/withssl --config /etc/withssl/withssl.conf
+ExecStart=/opt/withssl/withssl
 ExecReload=/bin/kill -HUP \$MAINPID
 Restart=always
 RestartSec=5
@@ -208,7 +208,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/withssl /etc/withssl /opt/withssl
+ReadWritePaths=/var/lib/withssl /etc/withssl
 
 # 环境变量
 Environment=GOPATH=/opt/go
