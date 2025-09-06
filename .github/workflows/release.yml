@@ -1,0 +1,102 @@
+name: Release Builds
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - '1.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  BIN_NAME: sslcat
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            arch_tag: linux-amd64
+            archive: tar.gz
+            ext: ""
+          - goos: linux
+            goarch: arm64
+            arch_tag: linux-arm64
+            archive: tar.gz
+            ext: ""
+          - goos: darwin
+            goarch: amd64
+            arch_tag: darwin-amd64
+            archive: tar.gz
+            ext: ""
+          - goos: darwin
+            goarch: arm64
+            arch_tag: darwin-arm64
+            archive: tar.gz
+            ext: ""
+          - goos: windows
+            goarch: amd64
+            arch_tag: windows-amd64
+            archive: zip
+            ext: .exe
+          - goos: windows
+            goarch: arm64
+            arch_tag: windows-arm64
+            archive: zip
+            ext: .exe
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Print Go version
+        run: go version
+
+      - name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          mkdir -p build artifacts
+          VERSION="${GITHUB_REF_NAME}"
+          if [ -z "$VERSION" ]; then VERSION="dev"; fi
+          echo "Building $BIN_NAME for $GOOS/$GOARCH (version=$VERSION)"
+          go build -trimpath -ldflags "-s -w -X main.version=$VERSION -X main.build=$GITHUB_RUN_ID" -o build/${BIN_NAME}${{ matrix.ext }} .
+
+      - name: Package
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          if [ -z "$VERSION" ]; then VERSION="dev"; fi
+          NAME="${BIN_NAME}_${VERSION}_${{ matrix.arch_tag }}"
+          if [ "${{ matrix.archive }}" = "zip" ]; then
+            (cd build && zip -9 ../artifacts/${NAME}.zip ${BIN_NAME}${{ matrix.ext }})
+          else
+            tar -C build -czf artifacts/${NAME}.tar.gz ${BIN_NAME}${{ matrix.ext }}
+          fi
+          ls -lh artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          files: artifacts/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
