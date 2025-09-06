@@ -114,6 +114,9 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/settings/save", s.handleSettingsSave)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/settings/change-password", s.handleChangePassword)
 
+	// 紧急修复（忘记密码）
+	s.mux.HandleFunc(s.config.AdminPrefix+"/help/recover", s.handleRecoverHelp)
+
 	// 首启向导
 	s.mux.HandleFunc(s.config.AdminPrefix+"/wizard", s.handleWizard)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/wizard/step2", s.handleWizardStep2)
@@ -344,7 +347,7 @@ func (s *Server) processLogin(w http.ResponseWriter, r *http.Request) {
 	s.securityManager.LogAccess(clientIP, r.Header.Get("User-Agent"), r.URL.Path, false)
 	s.audit("login_failed", clientIP)
 
-	// 显示错误页面
+	// 显示错误页面（带紧急修复链接，模板内根据 Error 判断显示链接）
 	data := map[string]interface{}{
 		"AdminPrefix": s.config.AdminPrefix,
 		"Error":       s.translator.T("login.invalid"),
@@ -856,6 +859,36 @@ func (s *Server) handleUnblock(w http.ResponseWriter, r *http.Request) {
 
 	// 重定向回安全设置页面
 	http.Redirect(w, r, s.config.AdminPrefix+"/security", http.StatusFound)
+}
+
+// 忘记密码紧急修复页面
+func (s *Server) handleRecoverHelp(w http.ResponseWriter, r *http.Request) {
+	// 无需登录，允许直接访问
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	// 多语言内容使用 translator
+	title := s.translator.T("recover.title")
+	intro := s.translator.T("recover.intro")
+	s1 := s.translator.T("recover.step1")
+	s2 := s.translator.T("recover.step2")
+	s3 := s.translator.T("recover.step3")
+	s4 := s.translator.T("recover.step4")
+	paths := s.translator.T("recover.paths")
+	cmds := s.translator.T("recover.commands")
+	back := s.translator.T("recover.back_to_login")
+	fmt.Fprintf(w, `<!DOCTYPE html><html><head><meta charset="utf-8"><title>%s</title>
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"></head><body>
+    <div class="container mt-4">
+      <h3>%s</h3>
+      <p class="text-muted">%s</p>
+      <ol>
+        <li>%s</li>
+        <li>%s</li>
+        <li>%s</li>
+        <li>%s</li>
+      </ol>
+      <div class="alert alert-secondary"><strong>Info</strong><br>%s<br>%s</div>
+      <a class="btn btn-primary" href="%s/login">%s</a>
+    </div></body></html>`, title, title, intro, s1, s2, s3, s4, paths, cmds, s.config.AdminPrefix, back)
 }
 
 // 系统设置
