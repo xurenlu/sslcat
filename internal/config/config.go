@@ -73,6 +73,9 @@ type SecurityConfig struct {
 	MaxAttempts5Min   int      `json:"max_attempts_5min"`
 	BlockFile         string   `json:"block_file"`
 	AllowedUserAgents []string `json:"allowed_user_agents"`
+	// 可疑 UA 计数阈值（达到后封禁）
+	UAInvalidMax1Min int `json:"ua_invalid_max_1min"`
+	UAInvalidMax5Min int `json:"ua_invalid_max_5min"`
 	// TLS 指纹统计配置
 	TLSFingerprintWindowSec int `json:"tls_fp_window_sec"`
 	TLSFingerprintMaxPerMin int `json:"tls_fp_max_per_min"`
@@ -168,9 +171,9 @@ func Load(configFile string) (*Config, error) {
 			Rules: []ProxyRule{},
 		},
 		Security: SecurityConfig{
-			MaxAttempts:      90,
+			MaxAttempts:      900,
 			BlockDurationStr: "5s",
-			MaxAttempts5Min:  300,
+			MaxAttempts5Min:  3000,
 			BlockFile:        "./data/sslcat.block",
 			AllowedUserAgents: []string{
 				"Mozilla/",
@@ -179,8 +182,10 @@ func Load(configFile string) (*Config, error) {
 				"Safari/",
 				"Edge/",
 			},
+			UAInvalidMax1Min: 30,
+			UAInvalidMax5Min: 100,
 			TLSFingerprintWindowSec: 60,
-			TLSFingerprintMaxPerMin: 6000,
+			TLSFingerprintMaxPerMin: 60000,
 			TLSFingerprintTopN:      20,
 		},
 		AdminPrefix: "/sslcat-panel",

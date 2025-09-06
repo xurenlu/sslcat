@@ -48,6 +48,9 @@ type Manager struct {
 	blockedIPs    map[string]BlockedIP
 	attemptCounts map[string]int
 	lastAttempts  map[string][]time.Time
+	// UA 违规计数：按IP维度记录
+	uaInvalid1Min map[string][]time.Time
+	uaInvalid5Min map[string][]time.Time
 	// TLS 指纹计数
 	tlsFPCounts map[string][]time.Time
 	mutex       sync.RWMutex
@@ -63,6 +66,8 @@ func NewManager(cfg *config.Config) *Manager {
 		blockedIPs:    make(map[string]BlockedIP),
 		attemptCounts: make(map[string]int),
 		lastAttempts:  make(map[string][]time.Time),
+		uaInvalid1Min: make(map[string][]time.Time),
+		uaInvalid5Min: make(map[string][]time.Time),
 		tlsFPCounts:   make(map[string][]time.Time),
 		stopChan:      make(chan struct{}),
 		log: logrus.WithFields(logrus.Fields{
@@ -128,7 +133,42 @@ func (m *Manager) LogAccess(ip, userAgent, path string, success bool) {
 	// 检查User-Agent是否合法
 	if !m.isValidUserAgent(userAgent) {
 		m.log.Warnf("Suspicious User-Agent: %s from %s", userAgent, ip)
-		m.blockIP(ip, "Invalid User-Agent")
+		now := time.Now()
+		// 记录1分钟/5分钟窗口内的无效UA
+		m.uaInvalid1Min[ip] = append(m.uaInvalid1Min[ip], now)
+		m.uaInvalid5Min[ip] = append(m.uaInvalid5Min[ip], now)
+		// 清理窗口外
+		cut1 := now.Add(-1 * time.Minute)
+		cut5 := now.Add(-5 * time.Minute)
+		pruned1 := m.uaInvalid1Min[ip][:0]
+		for _, t := range m.uaInvalid1Min[ip] {
+			if t.After(cut1) {
+				pruned1 = append(pruned1, t)
+			}
+		}
+		m.uaInvalid1Min[ip] = pruned1
+		pruned5 := m.uaInvalid5Min[ip][:0]
+		for _, t := range m.uaInvalid5Min[ip] {
+			if t.After(cut5) {
+				pruned5 = append(pruned5, t)
+			}
+		}
+		m.uaInvalid5Min[ip] = pruned5
+
+		// 阈值（配置可调，未配置则使用默认）
+		max1 := m.config.Security.UAInvalidMax1Min
+		if max1 <= 0 {
+			max1 = 30
+		}
+		max5 := m.config.Security.UAInvalidMax5Min
+		if max5 <= 0 {
+			max5 = 100
+		}
+		if len(m.uaInvalid1Min[ip]) >= max1 || len(m.uaInvalid5Min[ip]) >= max5 {
+			m.blockIP(ip, fmt.Sprintf("Too many invalid UA: %d in 1min, %d in 5min", len(m.uaInvalid1Min[ip]), len(m.uaInvalid5Min[ip])))
+			delete(m.uaInvalid1Min, ip)
+			delete(m.uaInvalid5Min, ip)
+		}
 		return
 	}
 
