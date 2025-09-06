@@ -289,13 +289,20 @@ func (s *Server) proxyMiddleware(w http.ResponseWriter, r *http.Request) bool {
 
 	// 查找代理配置
 	rule := s.proxyManager.GetProxyConfig(host)
-	if rule != nil {
+	if rule != nil && rule.Enabled {
+		// 若仅允许HTTPS且当前为HTTP，则跳转到HTTPS
+		if rule.SSLOnly && r.TLS == nil {
+			target := "https://" + host + r.URL.RequestURI()
+			s.log.Warnf("SSL-only rule, redirecting http->https for host=%s", host)
+			http.Redirect(w, r, target, http.StatusMovedPermanently)
+			return true
+		}
 		// 执行代理
 		s.proxyManager.ProxyRequest(w, r, rule)
 		return true
 	}
 
-	// 没有找到代理配置，依据配置项处理
+	// 没有找到（或规则未启用）代理配置，依据配置项处理
 	switch s.config.Proxy.UnmatchedBehavior {
 	case "302":
 		target := s.config.Proxy.UnmatchedRedirectURL

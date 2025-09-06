@@ -40,9 +40,13 @@ func (s *Server) handleProxyAdd(w http.ResponseWriter, r *http.Request) {
 
 		if domain != "" && target != "" {
 			// 添加新规则到配置
+			enabled := r.FormValue("enabled") == "on"
+			sslOnly := r.FormValue("ssl_only") == "on"
 			newRule := config.ProxyRule{
-				Domain: domain,
-				Target: target,
+				Domain:  domain,
+				Target:  target,
+				Enabled: enabled,
+				SSLOnly: sslOnly,
 			}
 			s.config.Proxy.Rules = append(s.config.Proxy.Rules, newRule)
 
@@ -88,10 +92,14 @@ func (s *Server) handleProxyEdit(w http.ResponseWriter, r *http.Request) {
 		// 处理编辑代理规则
 		domain := r.FormValue("domain")
 		target := r.FormValue("target")
+		enabled := r.FormValue("enabled") == "on"
+		sslOnly := r.FormValue("ssl_only") == "on"
 
 		if domain != "" && target != "" {
 			s.config.Proxy.Rules[index].Domain = domain
 			s.config.Proxy.Rules[index].Target = target
+			s.config.Proxy.Rules[index].Enabled = enabled
+			s.config.Proxy.Rules[index].SSLOnly = sslOnly
 
 			// 保存配置
 			s.config.Save(s.config.ConfigFile)

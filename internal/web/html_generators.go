@@ -218,17 +218,21 @@ func (s *Server) generateProxyRulesTable(data map[string]interface{}) string {
 
 	var rows strings.Builder
 	for i, rule := range rules {
+		statusBadge := `<span class="badge bg-secondary">` + s.translator.T("common.disabled") + `</span>`
+		if rule.Enabled {
+			statusBadge = `<span class="badge bg-success">` + s.translator.T("common.enabled") + `</span>`
+		}
 		rows.WriteString(fmt.Sprintf(`
                     <tr>
                         <td>%s</td>
                         <td>%s</td>
-                        <td><span class="badge bg-success">`+s.translator.T("proxy.active")+`</span></td>
+                        <td>%s</td>
                         <td>
                             <a href="%s/proxy/edit?index=%d" class="btn btn-sm btn-outline-primary">`+s.translator.T("proxy.edit")+`</a>
                             <a href="%s/proxy/delete?index=%d" class="btn btn-sm btn-outline-danger" onclick="return confirm('`+s.translator.T("proxy.delete_confirm")+`')">`+s.translator.T("proxy.delete")+`</a>
                         </td>
                     </tr>`,
-			rule.Domain, rule.Target, data["AdminPrefix"].(string), i, data["AdminPrefix"].(string), i))
+			rule.Domain, rule.Target, statusBadge, data["AdminPrefix"].(string), i, data["AdminPrefix"].(string), i))
 	}
 	return rows.String()
 }
@@ -336,6 +340,14 @@ func (s *Server) generateProxyAddHTML(data map[string]interface{}) string {
                                        placeholder="http://192.168.1.100:8080">
                                 <div class="form-text">输入后端服务地址，包括协议和端口</div>
                             </div>
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="enabled" name="enabled">
+                                <label class="form-check-label" for="enabled">启用该规则</label>
+                            </div>
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="ssl_only" name="ssl_only">
+                                <label class="form-check-label" for="ssl_only">仅限HTTPS（HTTP访问将自动301到HTTPS）</label>
+                            </div>
                             <button type="submit" class="btn btn-primary">添加规则</button>
                             <a href="%s/proxy" class="btn btn-secondary">取消</a>
                         </form>
@@ -385,6 +397,14 @@ func (s *Server) generateProxyEditHTML(data map[string]interface{}) string {
                                 <input type="text" class="form-control" id="target" name="target" required 
                                        value="%s">
                             </div>
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="enabled" name="enabled" %s>
+                                <label class="form-check-label" for="enabled">启用该规则</label>
+                            </div>
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="ssl_only" name="ssl_only" %s>
+                                <label class="form-check-label" for="ssl_only">仅限HTTPS（HTTP访问将自动301到HTTPS）</label>
+                            </div>
                             <button type="submit" class="btn btn-primary">保存更改</button>
                             <a href="%s/proxy" class="btn btn-secondary">取消</a>
                         </form>
@@ -399,6 +419,8 @@ func (s *Server) generateProxyEditHTML(data map[string]interface{}) string {
 		data["AdminPrefix"].(string),
 		rule.Domain,
 		rule.Target,
+		map[bool]string{true:"checked"}[rule.Enabled],
+		map[bool]string{true:"checked"}[rule.SSLOnly],
 		data["AdminPrefix"].(string))
 }
 
