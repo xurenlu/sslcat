@@ -2,11 +2,14 @@ package security
 
 import (
 	"bufio"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -15,6 +18,11 @@ import (
 
 	"github.com/sirupsen/logrus"
 )
+
+type TLSFPStat struct {
+	FP    string `json:"fp"`
+	Count int    `json:"count"`
+}
 
 // AccessLog 访问日志记录
 type AccessLog struct {
@@ -40,9 +48,11 @@ type Manager struct {
 	blockedIPs    map[string]BlockedIP
 	attemptCounts map[string]int
 	lastAttempts  map[string][]time.Time
-	mutex         sync.RWMutex
-	log           *logrus.Entry
-	stopChan      chan struct{}
+	// TLS 指纹计数
+	tlsFPCounts map[string][]time.Time
+	mutex       sync.RWMutex
+	log         *logrus.Entry
+	stopChan    chan struct{}
 }
 
 // NewManager 创建安全管理器
@@ -53,6 +63,7 @@ func NewManager(cfg *config.Config) *Manager {
 		blockedIPs:    make(map[string]BlockedIP),
 		attemptCounts: make(map[string]int),
 		lastAttempts:  make(map[string][]time.Time),
+		tlsFPCounts:   make(map[string][]time.Time),
 		stopChan:      make(chan struct{}),
 		log: logrus.WithFields(logrus.Fields{
 			"component": "security_manager",
@@ -132,9 +143,9 @@ func (m *Manager) LogAccess(ip, userAgent, path string, success bool) {
 
 	m.accessLogs[ip] = append(m.accessLogs[ip], accessLog)
 
-	// 限制日志数量，只保留最近100条
-	if len(m.accessLogs[ip]) > 100 {
-		m.accessLogs[ip] = m.accessLogs[ip][len(m.accessLogs[ip])-100:]
+	// 限制日志数量（放宽）：只保留最近3000条
+	if len(m.accessLogs[ip]) > 3000 {
+		m.accessLogs[ip] = m.accessLogs[ip][len(m.accessLogs[ip])-3000:]
 	}
 
 	// 如果不是成功访问，检查是否需要封禁
@@ -143,16 +154,84 @@ func (m *Manager) LogAccess(ip, userAgent, path string, success bool) {
 	}
 }
 
+// LogTLSFingerprint 记录 TLS 指纹（单位时间窗口）
+func (m *Manager) LogTLSFingerprint(fingerprint, ip string) {
+	if fingerprint == "" {
+		return
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	now := time.Now()
+	arr := append(m.tlsFPCounts[fingerprint], now)
+	// 清理窗口外
+	window := time.Duration(m.config.Security.TLSFingerprintWindowSec) * time.Second
+	if window <= 0 {
+		window = time.Minute
+	}
+	cut := now.Add(-window)
+	pruned := arr[:0]
+	for _, t := range arr {
+		if t.After(cut) {
+			pruned = append(pruned, t)
+		}
+	}
+	m.tlsFPCounts[fingerprint] = pruned
+	// 阈值告警
+	maxPerMin := m.config.Security.TLSFingerprintMaxPerMin
+	if maxPerMin <= 0 {
+		maxPerMin = 6000
+	}
+	if len(pruned) > maxPerMin {
+		m.log.Warnf("TLS 指纹过于活跃 fp=%s count=%d ip=%s", fingerprint, len(pruned), ip)
+	}
+}
+
+// GetTLSFingerprintStats 返回最近窗口内的指纹计数（按降序）
+func (m *Manager) GetTLSFingerprintStats() []TLSFPStat {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	now := time.Now()
+	window := time.Duration(m.config.Security.TLSFingerprintWindowSec) * time.Second
+	if window <= 0 {
+		window = time.Minute
+	}
+	cut := now.Add(-window)
+	tmp := make([]TLSFPStat, 0, len(m.tlsFPCounts))
+	for fp, times := range m.tlsFPCounts {
+		cnt := 0
+		for _, t := range times {
+			if t.After(cut) {
+				cnt++
+			}
+		}
+		if cnt > 0 {
+			tmp = append(tmp, TLSFPStat{FP: fp, Count: cnt})
+		}
+	}
+	sort.Slice(tmp, func(i, j int) bool { return tmp[i].Count > tmp[j].Count })
+	topN := m.config.Security.TLSFingerprintTopN
+	if topN <= 0 {
+		topN = 20
+	}
+	if len(tmp) > topN {
+		tmp = tmp[:topN]
+	}
+	return tmp
+}
+
+// HashTLSRaw 计算原始字符串的 SHA256 指纹
+func HashTLSRaw(raw string) string {
+	sum := sha256.Sum256([]byte(raw))
+	return hex.EncodeToString(sum[:])
+}
+
 // checkAndBlock 检查并封禁IP
 func (m *Manager) checkAndBlock(ip string) {
 	now := time.Now()
-
 	// 更新失败次数
 	m.attemptCounts[ip]++
-
 	// 记录失败时间
 	m.lastAttempts[ip] = append(m.lastAttempts[ip], now)
-
 	// 清理过期的失败记录（5分钟前）
 	var validAttempts []time.Time
 	for _, attempt := range m.lastAttempts[ip] {
@@ -161,7 +240,6 @@ func (m *Manager) checkAndBlock(ip string) {
 		}
 	}
 	m.lastAttempts[ip] = validAttempts
-
 	// 检查1分钟内失败次数
 	recentAttempts := 0
 	for _, attempt := range m.lastAttempts[ip] {
@@ -169,10 +247,8 @@ func (m *Manager) checkAndBlock(ip string) {
 			recentAttempts++
 		}
 	}
-
 	// 检查5分钟内失败次数
 	fiveMinAttempts := len(m.lastAttempts[ip])
-
 	// 封禁条件
 	if recentAttempts >= m.config.Security.MaxAttempts ||
 		fiveMinAttempts >= m.config.Security.MaxAttempts5Min {
@@ -189,29 +265,21 @@ func (m *Manager) blockIP(ip, reason string) {
 		BlockTime:  time.Now(),
 		ExpireTime: time.Now().Add(m.config.Security.BlockDuration),
 	}
-
 	m.blockedIPs[ip] = blocked
-
-	// 保存到文件
 	m.saveBlockedIPs()
-
 	m.log.Warnf("封禁IP %s: %s", ip, reason)
 }
 
 // isValidUserAgent 检查User-Agent是否合法
 func (m *Manager) isValidUserAgent(userAgent string) bool {
-	// 空User-Agent不合法
 	if userAgent == "" {
 		return false
 	}
-
-	// 检查是否包含允许的User-Agent前缀
 	for _, allowed := range m.config.Security.AllowedUserAgents {
 		if strings.Contains(userAgent, allowed) {
 			return true
 		}
 	}
-
 	return false
 }
 
@@ -334,6 +402,21 @@ func (m *Manager) cleanup() {
 			delete(m.attemptCounts, ip)
 		} else {
 			m.lastAttempts[ip] = validAttempts
+		}
+	}
+
+	// 清理过期的 TLS 指纹计数
+	for fp, times := range m.tlsFPCounts {
+		var validTimes []time.Time
+		for _, t := range times {
+			if now.Sub(t) <= time.Duration(m.config.Security.TLSFingerprintWindowSec)*time.Second {
+				validTimes = append(validTimes, t)
+			}
+		}
+		if len(validTimes) == 0 {
+			delete(m.tlsFPCounts, fp)
+		} else {
+			m.tlsFPCounts[fp] = validTimes
 		}
 	}
 }

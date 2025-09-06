@@ -67,6 +67,10 @@ type SecurityConfig struct {
 	MaxAttempts5Min   int      `json:"max_attempts_5min"`
 	BlockFile         string   `json:"block_file"`
 	AllowedUserAgents []string `json:"allowed_user_agents"`
+	// TLS 指纹统计配置
+	TLSFingerprintWindowSec int `json:"tls_fp_window_sec"`
+	TLSFingerprintMaxPerMin int `json:"tls_fp_max_per_min"`
+	TLSFingerprintTopN      int `json:"tls_fp_top_n"`
 
 	// 解析后的时间字段
 	BlockDuration time.Duration `json:"-"`
@@ -109,6 +113,9 @@ func Load(configFile string) (*Config, error) {
 				"Safari/",
 				"Edge/",
 			},
+			TLSFingerprintWindowSec: 60,
+			TLSFingerprintMaxPerMin: 6000,
+			TLSFingerprintTopN:      20,
 		},
 		AdminPrefix: "/sslcat-panel",
 	}
