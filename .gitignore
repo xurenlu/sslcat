@@ -120,3 +120,8 @@ docker-data/
 local.conf
 dev.conf
 test.conf
+
+# Ignore build outputs
+sslcat
+/build/
+/dist/
