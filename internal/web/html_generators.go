@@ -419,8 +419,8 @@ func (s *Server) generateProxyEditHTML(data map[string]interface{}) string {
 		data["AdminPrefix"].(string),
 		rule.Domain,
 		rule.Target,
-		map[bool]string{true:"checked"}[rule.Enabled],
-		map[bool]string{true:"checked"}[rule.SSLOnly],
+		map[bool]string{true: "checked"}[rule.Enabled],
+		map[bool]string{true: "checked"}[rule.SSLOnly],
 		data["AdminPrefix"].(string))
 }
 
@@ -830,6 +830,22 @@ func (s *Server) generateSettingsHTML(data map[string]interface{}) string {
                                 <input class="form-check-input" type="checkbox" id="ssl_disable_self_signed" name="ssl_disable_self_signed" %s>
                                 <label class="form-check-label" for="ssl_disable_self_signed">禁用自签名证书回退</label>
                             </div>
+                            <hr>
+                            <h5 class="mb-3">代理设置</h5>
+                            <div class="mb-3">
+                                <label for="proxy_unmatched_behavior" class="form-label">未命中代理时的行为</label>
+                                <select class="form-select" id="proxy_unmatched_behavior" name="proxy_unmatched_behavior">
+                                    <option value="502" %s>502 Bad Gateway</option>
+                                    <option value="404" %s>404 Not Found</option>
+                                    <option value="302" %s>302 Redirect</option>
+                                    <option value="blank" %s>空白响应</option>
+                                </select>
+                                <div class="form-text">当选择 302 时，必须填写下方重定向URL</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="proxy_unmatched_redirect_url" class="form-label">未命中时重定向URL</label>
+                                <input type="text" class="form-control" id="proxy_unmatched_redirect_url" name="proxy_unmatched_redirect_url" value="%s" placeholder="https://example.com/"> 
+                            </div>
                             <button type="submit" class="btn btn-primary">%s</button>
                             <a href="%s/config/export" class="btn btn-outline-secondary ms-2">%s</a>
                             <a href="%s/config/import" class="btn btn-outline-primary ms-2">%s</a>
@@ -853,6 +869,11 @@ func (s *Server) generateSettingsHTML(data map[string]interface{}) string {
 		adminPassLabel,
 		s.getConfigSSLEmail(data),
 		s.getConfigSSLDisableSelfSigned(data),
+		map[bool]string{true:"selected"}[s.config.Proxy.UnmatchedBehavior=="502"],
+		map[bool]string{true:"selected"}[s.config.Proxy.UnmatchedBehavior=="404"],
+		map[bool]string{true:"selected"}[s.config.Proxy.UnmatchedBehavior=="302"],
+		map[bool]string{true:"selected"}[s.config.Proxy.UnmatchedBehavior=="blank"],
+		s.config.Proxy.UnmatchedRedirectURL,
 		saveBtn,
 		data["AdminPrefix"].(string), exportBtn,
 		data["AdminPrefix"].(string), importPreview,

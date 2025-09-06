@@ -307,6 +307,21 @@ func (s *Server) handleSettingsSave(w http.ResponseWriter, r *http.Request) {
 			s.config.SSL.DisableSelfSigned = (v == "on" || v == "true" || v == "1")
 		}
 
+		// 代理未命中行为与重定向URL
+		if b := r.FormValue("proxy_unmatched_behavior"); b != "" {
+			s.config.Proxy.UnmatchedBehavior = b
+		}
+		if u := strings.TrimSpace(r.FormValue("proxy_unmatched_redirect_url")); u != "" {
+			s.config.Proxy.UnmatchedRedirectURL = u
+		}
+		// 如果选择302但未提供URL，返回错误
+		if s.config.Proxy.UnmatchedBehavior == "302" && strings.TrimSpace(s.config.Proxy.UnmatchedRedirectURL) == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			w.Write([]byte("proxy_unmatched_redirect_url is required when behavior is 302"))
+			return
+		}
+
 		// 保存配置
 		s.config.Save(s.config.ConfigFile)
 
