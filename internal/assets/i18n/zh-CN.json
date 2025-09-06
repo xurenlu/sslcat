@@ -245,5 +245,11 @@
   "ssl.none": "暂无SSL证书",
   "ssl.download_cert": "下载证书",
   "ssl.download_key": "下载私钥",
-  "ssl.delete_confirm": "确定删除该证书?"
+  "ssl.delete_confirm": "确定删除该证书?",
+  "ssl.columns.type": "类型",
+  "ssl.type.ca": "CA",
+  "security.export_json": "导出JSON",
+  "audit.time": "时间",
+  "audit.detail": "详情",
+  "security.no_blocked": "暂无封禁IP"
 }

@@ -168,5 +168,11 @@
   "mobile.security_protection": "Protección de Seguridad",
   "mobile.view_logs": "Ver Logs",
   "mobile.real_time_monitor": "Monitoreo de Tráfico en Tiempo Real",
-  "security.tls_fp_stats": "Estadísticas de Huellas TLS del Cliente"
+  "security.tls_fp_stats": "Estadísticas de Huellas TLS del Cliente",
+  "ssl.columns.type": "Tipo",
+  "ssl.type.ca": "CA",
+  "security.export_json": "Exportar JSON",
+  "audit.time": "Hora",
+  "audit.detail": "Detalle",
+  "security.no_blocked": "Sin IPs bloqueadas"
 }

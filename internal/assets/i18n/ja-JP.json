@@ -168,5 +168,11 @@
   "mobile.security_protection": "セキュリティ保護",
   "mobile.view_logs": "ログ表示",
   "mobile.real_time_monitor": "リアルタイム トラフィック監視",
-  "security.tls_fp_stats": "TLS クライアント指紋 統計"
+  "security.tls_fp_stats": "TLS クライアント指紋 統計",
+  "ssl.columns.type": "タイプ",
+  "ssl.type.ca": "CA",
+  "security.export_json": "JSON をエクスポート",
+  "audit.time": "時刻",
+  "audit.detail": "詳細",
+  "security.no_blocked": "ブロックされたIPはありません"
 }

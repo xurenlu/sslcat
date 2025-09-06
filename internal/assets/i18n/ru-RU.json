@@ -168,5 +168,11 @@
   "mobile.security_protection": "Защита Безопасности",
   "mobile.view_logs": "Просмотр Логов",
   "mobile.real_time_monitor": "Мониторинг Трафика в Реальном Времени",
-  "security.tls_fp_stats": "Статистика TLS-Отпечатков Клиентов"
+  "security.tls_fp_stats": "Статистика TLS-Отпечатков Клиентов",
+  "ssl.columns.type": "Тип",
+  "ssl.type.ca": "ЦС",
+  "security.export_json": "Экспорт JSON",
+  "audit.time": "Время",
+  "audit.detail": "Подробности",
+  "security.no_blocked": "Нет заблокированных IP"
 }

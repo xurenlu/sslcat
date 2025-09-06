@@ -256,5 +256,11 @@
   "common.generate": "Generate",
   "common.return": "Back",
   "common.delete_confirm": "Delete this certificate?",
-  "common.delete_rule_confirm": "Delete this rule?"
+  "common.delete_rule_confirm": "Delete this rule?",
+  "ssl.columns.type": "Type",
+  "ssl.type.ca": "CA",
+  "security.export_json": "Export JSON",
+  "audit.time": "Time",
+  "audit.detail": "Detail",
+  "security.no_blocked": "No blocked IPs"
 }
