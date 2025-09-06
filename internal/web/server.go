@@ -18,8 +18,9 @@ import (
 	"github.com/xurenlu/sslcat/internal/security"
 	"github.com/xurenlu/sslcat/internal/ssl"
 
-	"github.com/sirupsen/logrus"
 	"io"
+
+	"github.com/sirupsen/logrus"
 )
 
 // ClusterManager 集群管理器接口
@@ -207,8 +208,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		hostOnly = host[:idx]
 	}
 	if net.ParseIP(hostOnly) != nil {
-		// 允许通过 IP 访问的条件：没有可用域名，或无法获取公网IP
-		if s.leRedirectHost != "" && s.isPathAdminOrRoot(r.URL.Path) {
+		// 仅当访问管理面板路径时才重定向
+		if s.leRedirectHost != "" && strings.HasPrefix(r.URL.Path, s.config.AdminPrefix) {
 			target := "https://" + s.leRedirectHost + s.config.AdminPrefix
 			http.Redirect(w, r, target, http.StatusMovedPermanently)
 			return
@@ -463,12 +464,7 @@ func (s *Server) audit(action, detail string) {
 	}
 }
 
-func (s *Server) isPathAdminOrRoot(p string) bool {
-	if p == "/" || strings.HasPrefix(p, s.config.AdminPrefix) {
-		return true
-	}
-	return false
-}
+// 保留扩展点：若未来需要根路径也跳转，可在此扩展
 
 // 每30秒刷新一次首选LE域名（证书有效且解析到本机公网IP）
 func (s *Server) refreshLEPreferredHostLoop() {

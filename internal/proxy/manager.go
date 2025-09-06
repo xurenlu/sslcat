@@ -107,7 +107,15 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 	m.cacheMutex.RUnlock()
 
 	// 创建新的反向代理
-	targetURL := "http://" + net.JoinHostPort(rule.Target, strconv.Itoa(rule.Port))
+	// 允许在配置中直接写入完整URL（包含协议与端口）或仅写主机名/IP
+	targetURL := rule.Target
+	if !strings.HasPrefix(strings.ToLower(targetURL), "http://") && !strings.HasPrefix(strings.ToLower(targetURL), "https://") {
+		if rule.Port > 0 {
+			targetURL = "http://" + net.JoinHostPort(rule.Target, strconv.Itoa(rule.Port))
+		} else {
+			targetURL = "http://" + rule.Target
+		}
+	}
 	target, err := url.Parse(targetURL)
 	if err != nil {
 		m.log.Errorf("Failed to parse target URL: %v", err)
