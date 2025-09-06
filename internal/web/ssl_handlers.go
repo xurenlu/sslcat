@@ -7,14 +7,14 @@ import (
 	"strings"
 )
 
-// SSL管理
+// SSL management
 
 func (s *Server) handleSSL(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
 		return
 	}
 
-	// 获取SSL证书信息（扫描磁盘）
+	// 获取SSL证书信息（内存缓存+磁盘聚合）
 	certs := s.sslManager.GetCertificateList()
 
 	data := map[string]interface{}{
@@ -54,7 +54,7 @@ func (s *Server) handleSSLGenerate(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			if firstErr != nil {
-				s.log.Warnf("申请证书(ACME)出现问题: %v", firstErr)
+				s.log.Warnf("ACME certificate request issue: %v", firstErr)
 			}
 
 			// 重定向回SSL管理页面
@@ -103,19 +103,19 @@ func (s *Server) handleSSLUpload(w http.ResponseWriter, r *http.Request) {
 	case "POST":
 		domain := strings.TrimSpace(r.FormValue("domain"))
 		if domain == "" {
-			http.Error(w, "缺少domain", http.StatusBadRequest)
+			http.Error(w, "missing domain", http.StatusBadRequest)
 			return
 		}
 
 		certFile, _, err := r.FormFile("cert")
 		if err != nil {
-			http.Error(w, "读取证书失败", http.StatusBadRequest)
+			http.Error(w, "failed to read certificate", http.StatusBadRequest)
 			return
 		}
 		defer certFile.Close()
 		keyFile, _, err := r.FormFile("key")
 		if err != nil {
-			http.Error(w, "读取私钥失败", http.StatusBadRequest)
+			http.Error(w, "failed to read private key", http.StatusBadRequest)
 			return
 		}
 		defer keyFile.Close()
@@ -124,16 +124,16 @@ func (s *Server) handleSSLUpload(w http.ResponseWriter, r *http.Request) {
 		keyPath := s.config.SSL.KeyDir + "/" + domain + ".key"
 
 		if err := writeAllFromReader(certFile, certPath, 0644); err != nil {
-			http.Error(w, "保存证书失败", http.StatusInternalServerError)
+			http.Error(w, "failed to save certificate", http.StatusInternalServerError)
 			return
 		}
 		if err := writeAllFromReader(keyFile, keyPath, 0600); err != nil {
-			http.Error(w, "保存私钥失败", http.StatusInternalServerError)
+			http.Error(w, "failed to save private key", http.StatusInternalServerError)
 			return
 		}
 
 		if err := s.sslManager.LoadCertificateFromDisk(domain); err != nil {
-			s.log.Warnf("上传后加载证书失败: %v", err)
+			s.log.Warnf("Failed to load certificate after upload: %v", err)
 		}
 		http.Redirect(w, r, s.config.AdminPrefix+"/ssl", http.StatusFound)
 		return
@@ -150,7 +150,7 @@ func (s *Server) handleSSLDownload(w http.ResponseWriter, r *http.Request) {
 	domain := strings.TrimSpace(r.URL.Query().Get("domain"))
 	typ := strings.TrimSpace(r.URL.Query().Get("type"))
 	if domain == "" {
-		http.Error(w, "缺少domain", http.StatusBadRequest)
+		http.Error(w, "missing domain", http.StatusBadRequest)
 		return
 	}
 	if typ == "" {
@@ -166,7 +166,7 @@ func (s *Server) handleSSLDownload(w http.ResponseWriter, r *http.Request) {
 	case "bundle":
 		path, filename = s.config.SSL.CertDir+"/"+domain+".crt", domain+"-bundle.pem"
 	default:
-		http.Error(w, "type无效", http.StatusBadRequest)
+		http.Error(w, "invalid type", http.StatusBadRequest)
 		return
 	}
 	w.Header().Set("Content-Disposition", "attachment; filename="+filename)
@@ -200,12 +200,33 @@ func (s *Server) handleSSLDelete(w http.ResponseWriter, r *http.Request) {
 	if domain != "" {
 		err := s.sslManager.DeleteCertificate(domain)
 		if err != nil {
-			s.log.Errorf("删除证书失败: %v", err)
-			http.Error(w, "删除证书失败: "+err.Error(), http.StatusInternalServerError)
+			s.log.Errorf("Failed to delete certificate: %v", err)
+			http.Error(w, "failed to delete certificate: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}
 
 	// 重定向回SSL管理页面
+	http.Redirect(w, r, s.config.AdminPrefix+"/ssl", http.StatusFound)
+}
+
+// handleSSLSyncACME 触发从 acme-cache 同步有效证书到 certs/keys
+func (s *Server) handleSSLSyncACME(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.sslManager == nil {
+		http.Error(w, "SSL manager not ready", http.StatusServiceUnavailable)
+		return
+	}
+	if n, err := s.sslManager.SyncACMECertsToDisk(); err != nil {
+		s.log.Warnf("Failed to sync ACME certificates: %v", err)
+	} else {
+		s.log.Infof("Synced %d certificates from acme-cache", n)
+	}
 	http.Redirect(w, r, s.config.AdminPrefix+"/ssl", http.StatusFound)
 }

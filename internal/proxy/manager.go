@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -44,13 +45,13 @@ func NewManager(cfg *config.Config, sslMgr *ssl.Manager, secMgr *security.Manage
 
 // Start 启动代理管理器
 func (m *Manager) Start() error {
-	m.log.Info("启动代理管理器")
+	m.log.Info("Starting proxy manager")
 	return nil
 }
 
 // Stop 停止代理管理器
 func (m *Manager) Stop() {
-	m.log.Info("停止代理管理器")
+	m.log.Info("Stopping proxy manager")
 }
 
 // GetProxyConfig 获取指定域名的代理配置
@@ -106,10 +107,10 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 	m.cacheMutex.RUnlock()
 
 	// 创建新的反向代理
-	targetURL := fmt.Sprintf("http://%s:%d", rule.Target, rule.Port)
+	targetURL := "http://" + net.JoinHostPort(rule.Target, strconv.Itoa(rule.Port))
 	target, err := url.Parse(targetURL)
 	if err != nil {
-		m.log.Errorf("解析目标URL失败: %v", err)
+		m.log.Errorf("Failed to parse target URL: %v", err)
 		return nil
 	}
 
@@ -159,18 +160,18 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 
 	// 自定义错误处理
 	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-		m.log.Errorf("代理错误 %s -> %s: %v", r.Host, targetURL, err)
+		m.log.Errorf("Proxy error %s -> %s: %v", r.Host, targetURL, err)
 
 		// 返回错误页面
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusBadGateway)
 		fmt.Fprintf(w, `
 		<html>
-		<head><title>代理错误</title></head>
+		<head><title>Proxy Error</title></head>
 		<body>
 			<h1>502 Bad Gateway</h1>
-			<p>无法连接到目标服务器: %s</p>
-			<p>错误: %v</p>
+			<p>Unable to connect to upstream: %s</p>
+			<p>Error: %v</p>
 		</body>
 		</html>
 		`, targetURL, err)
@@ -302,7 +303,7 @@ func (m *Manager) getPort(r *http.Request) string {
 // HandleWebSocket 处理WebSocket代理
 func (m *Manager) HandleWebSocket(w http.ResponseWriter, r *http.Request, rule *config.ProxyRule) {
 	// 建立WebSocket连接
-	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", rule.Target, rule.Port))
+	conn, err := net.Dial("tcp", net.JoinHostPort(rule.Target, strconv.Itoa(rule.Port)))
 	if err != nil {
 		http.Error(w, "无法连接到目标服务器", http.StatusBadGateway)
 		return
@@ -344,7 +345,7 @@ func (m *Manager) copyData(dst, src net.Conn) {
 		n, err := src.Read(buffer)
 		if err != nil {
 			if err != io.EOF {
-				m.log.Debugf("读取数据错误: %v", err)
+				m.log.Debugf("Error reading data: %v", err)
 			}
 			break
 		}
@@ -352,7 +353,7 @@ func (m *Manager) copyData(dst, src net.Conn) {
 		if n > 0 {
 			_, err := dst.Write(buffer[:n])
 			if err != nil {
-				m.log.Debugf("写入数据错误: %v", err)
+				m.log.Debugf("Error writing data: %v", err)
 				break
 			}
 		}
@@ -361,9 +362,9 @@ func (m *Manager) copyData(dst, src net.Conn) {
 
 // TestConnection 测试到目标服务器的连接
 func (m *Manager) TestConnection(rule *config.ProxyRule) error {
-	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", rule.Target, rule.Port), 5*time.Second)
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort(rule.Target, strconv.Itoa(rule.Port)), 5*time.Second)
 	if err != nil {
-		return fmt.Errorf("无法连接到 %s:%d: %w", rule.Target, rule.Port, err)
+		return fmt.Errorf("failed to connect to %s:%d: %w", rule.Target, rule.Port, err)
 	}
 	defer conn.Close()
 

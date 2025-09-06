@@ -505,7 +505,7 @@ Si vous rencontrez des problèmes ou avez des suggestions :
 
 Pour l'historique complet des mises à jour de version, veuillez consulter : **[CHANGELOG.md](CHANGELOG.md)**
 
-### Dernière Version v1.0.13 (2025-01-03)
+### Dernière Version v1.0.15 (2025-01-03)
 - 🌐 Architecture de cluster Master-Slave : Support de déploiement multi-nœuds pour haute disponibilité
 - 🔄 Synchronisation automatique de configuration : Poussée en temps réel du Master vers tous les nœuds Slave
 - 🔒 Contrôle de séparation des permissions : Restrictions fonctionnelles strictes en mode Slave

@@ -37,6 +37,8 @@ type Manager struct {
 	acmeMgr       *autocert.Manager
 	defaultCert   *tls.Certificate
 	onClientHello func(*tls.ClientHelloInfo)
+	// 运行时临时允许 ACME 的域名（例如来自面板的手动申请），带过期时间
+	tempAllowedDomains map[string]time.Time
 }
 
 // NewManager 创建SSL管理器
@@ -46,12 +48,13 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 	})
 
 	manager := &Manager{
-		config:     cfg,
-		certCache:  make(map[string]*tls.Certificate),
-		stopChan:   make(chan struct{}),
-		log:        log,
-		notifier:   notify.NewFromEnv(),
-		lastNotify: make(map[string]string),
+		config:             cfg,
+		certCache:          make(map[string]*tls.Certificate),
+		stopChan:           make(chan struct{}),
+		log:                log,
+		notifier:           notify.NewFromEnv(),
+		lastNotify:         make(map[string]string),
+		tempAllowedDomains: make(map[string]time.Time),
 	}
 
 	// 初始化一个默认自签证书（用于未允许域名回退，避免写盘）
@@ -66,7 +69,7 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 	if strings.TrimSpace(cfg.SSL.Email) != "" {
 		acmeCacheDir := filepath.Join(filepath.Dir(cfg.SSL.CertDir), "acme-cache")
 		if err := os.MkdirAll(acmeCacheDir, 0755); err != nil {
-			log.Warnf("创建 ACME 缓存目录失败: %v", err)
+			log.Warnf("Failed to create ACME cache directory: %v", err)
 		}
 
 		m := &autocert.Manager{
@@ -90,9 +93,9 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 		}
 		m.Client = client
 		manager.acmeMgr = m
-		log.Infof("ACME 已启用（邮箱: %s, staging=%v）", cfg.SSL.Email, cfg.SSL.Staging)
+		log.Infof("ACME enabled (email: %s, staging=%v)", cfg.SSL.Email, cfg.SSL.Staging)
 	} else {
-		log.Infof("ACME 未启用（未配置 ssl.email）")
+		log.Infof("ACME disabled (ssl.email not configured)")
 	}
 
 	return manager, nil
@@ -158,20 +161,20 @@ func (m *Manager) DeleteCertificate(domain string) error {
 	keyFile := filepath.Join(m.config.SSL.KeyDir, domain+".key")
 
 	if err := os.Remove(certFile); err != nil && !os.IsNotExist(err) {
-		m.log.Warnf("删除证书文件失败 %s: %v", certFile, err)
+		m.log.Warnf("Failed to remove certificate file %s: %v", certFile, err)
 	}
 
 	if err := os.Remove(keyFile); err != nil && !os.IsNotExist(err) {
-		m.log.Warnf("删除密钥文件失败 %s: %v", keyFile, err)
+		m.log.Warnf("Failed to remove private key file %s: %v", keyFile, err)
 	}
 
-	m.log.Infof("已删除域名 %s 的证书", domain)
+	m.log.Infof("Deleted certificate for domain %s", domain)
 	return nil
 }
 
 // Start 启动SSL管理器
 func (m *Manager) Start() error {
-	m.log.Info("启动SSL管理器")
+	m.log.Info("Starting SSL manager")
 
 	// 启动证书自动续期
 	if m.config.SSL.AutoRenew {
@@ -185,7 +188,7 @@ func (m *Manager) Start() error {
 
 // Stop 停止SSL管理器
 func (m *Manager) Stop() {
-	m.log.Info("停止SSL管理器")
+	m.log.Info("Stopping SSL manager")
 	close(m.stopChan)
 }
 
@@ -214,7 +217,7 @@ func (m *Manager) notifyExpiringCerts() {
 				continue
 			}
 			m.lastNotify[key] = stamp
-			m.log.Warnf("证书即将到期: %s, %d 天后过期", ci.Domain, days)
+			m.log.Warnf("Certificate expiring soon: %s, expires in %d days", ci.Domain, days)
 			if m.notifier != nil && m.notifier.Enabled() {
 				m.notifier.SendJSON(map[string]any{
 					"ts":        time.Now().Format(time.RFC3339),
@@ -235,7 +238,7 @@ func (m *Manager) GetCertificate(domain string) (*tls.Certificate, error) {
 	for cachedDomain, cert := range m.certCache {
 		if m.domainMatchesCert(domain, cert) {
 			m.certMutex.RUnlock()
-			m.log.Debugf("域名 %s 匹配已缓存的证书 %s", domain, cachedDomain)
+			m.log.Debugf("Domain %s matches cached certificate %s", domain, cachedDomain)
 			return cert, nil
 		}
 	}
@@ -257,7 +260,7 @@ func (m *Manager) GetCertificate(domain string) (*tls.Certificate, error) {
 		if _, err := os.Stat(keyPath); err == nil {
 			cert, err := tls.LoadX509KeyPair(certPath, keyPath)
 			if err != nil {
-				m.log.Errorf("加载证书失败 %s: %v", domain, err)
+				m.log.Errorf("Failed to load certificate %s: %v", domain, err)
 			} else {
 				m.certMutex.Lock()
 				m.certCache[domain] = &cert
@@ -274,11 +277,11 @@ func (m *Manager) GetCertificate(domain string) (*tls.Certificate, error) {
 
 	// 如果没有证书
 	if m.config.SSL.DisableSelfSigned {
-		m.log.Warnf("域名 %s 无可用证书，且已禁用自签名回退", domain)
+		m.log.Warnf("No certificate available for %s and self-signed fallback is disabled", domain)
 		return nil, fmt.Errorf("no certificate for %s and self-signed disabled", domain)
 	}
 	// 生成自签名证书作为临时方案
-	m.log.Infof("为域名 %s 生成自签名证书", domain)
+	m.log.Infof("Generating self-signed certificate for domain %s", domain)
 	return m.generateSelfSignedCert(domain)
 }
 
@@ -287,7 +290,7 @@ func (m *Manager) generateSelfSignedCert(domain string) (*tls.Certificate, error
 	// 生成私钥
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		return nil, fmt.Errorf("生成私钥失败: %w", err)
+		return nil, fmt.Errorf("failed to generate private key: %w", err)
 	}
 
 	// 创建证书模板
@@ -305,7 +308,7 @@ func (m *Manager) generateSelfSignedCert(domain string) (*tls.Certificate, error
 	// 生成证书
 	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
 	if err != nil {
-		return nil, fmt.Errorf("生成证书失败: %w", err)
+		return nil, fmt.Errorf("failed to generate certificate: %w", err)
 	}
 
 	// 编码私钥
@@ -325,17 +328,17 @@ func (m *Manager) generateSelfSignedCert(domain string) (*tls.Certificate, error
 	keyPath := filepath.Join(m.config.SSL.KeyDir, domain+".key")
 
 	if err := os.WriteFile(certPath, certPEM, 0644); err != nil {
-		m.log.Errorf("保存证书失败: %v", err)
+		m.log.Errorf("Failed to save certificate: %v", err)
 	}
 
 	if err := os.WriteFile(keyPath, keyPEM, 0600); err != nil {
-		m.log.Errorf("保存私钥失败: %v", err)
+		m.log.Errorf("Failed to save private key: %v", err)
 	}
 
 	// 加载证书到内存
 	cert, err := tls.X509KeyPair(certPEM, keyPEM)
 	if err != nil {
-		return nil, fmt.Errorf("解析证书失败: %w", err)
+		return nil, fmt.Errorf("failed to parse certificate: %w", err)
 	}
 
 	// 缓存证书
@@ -343,7 +346,7 @@ func (m *Manager) generateSelfSignedCert(domain string) (*tls.Certificate, error
 	m.certCache[domain] = &cert
 	m.certMutex.Unlock()
 
-	m.log.Infof("成功生成并缓存域名 %s 的自签名证书", domain)
+	m.log.Infof("Successfully generated and cached self-signed certificate for %s", domain)
 	return &cert, nil
 }
 
@@ -379,21 +382,21 @@ func (m *Manager) renewExpiringCerts() {
 
 		// 检查证书是否即将过期（30天内）
 		if m.isCertExpiringSoon(certPath) {
-			m.log.Infof("证书即将过期，开始续期: %s", domain)
+			m.log.Infof("Certificate expiring soon, starting renewal: %s", domain)
 			if m.config.SSL.DisableSelfSigned {
 				if m.acmeMgr != nil && m.isAllowedDomain(domain) {
 					if _, err := m.acmeMgr.GetCertificate(&tls.ClientHelloInfo{ServerName: domain}); err != nil {
-						m.log.Errorf("ACME 续期证书失败 %s: %v", domain, err)
+						m.log.Errorf("ACME renewal failed %s: %v", domain, err)
 					} else {
-						m.log.Infof("ACME 已触发续期流程: %s", domain)
+						m.log.Infof("ACME renewal triggered: %s", domain)
 					}
 				} else {
-					m.log.Warnf("已禁用自签续期，且 ACME 不可用或域名未允许: %s", domain)
+					m.log.Warnf("Self-signed renewal disabled; ACME unavailable or domain not allowed: %s", domain)
 				}
 				continue
 			}
 			if _, err := m.generateSelfSignedCert(domain); err != nil {
-				m.log.Errorf("续期证书失败 %s: %v", domain, err)
+				m.log.Errorf("Failed to renew certificate %s: %v", domain, err)
 			}
 		}
 	}
@@ -462,7 +465,7 @@ func (m *Manager) findWildcardCert(domain string) *tls.Certificate {
 	for cachedDomain, cert := range m.certCache {
 		if cachedDomain == wildcardDomain || strings.Contains(cachedDomain, "*") {
 			if m.domainMatchesCert(domain, cert) {
-				m.log.Debugf("域名 %s 匹配通配符证书 %s", domain, cachedDomain)
+				m.log.Debugf("Domain %s matches wildcard certificate %s", domain, cachedDomain)
 				return cert
 			}
 		}
@@ -570,7 +573,7 @@ func (m *Manager) EnableACME() error {
 	}
 	acmeCacheDir := filepath.Join(filepath.Dir(m.config.SSL.CertDir), "acme-cache")
 	if err := os.MkdirAll(acmeCacheDir, 0755); err != nil {
-		m.log.Warnf("创建 ACME 缓存目录失败: %v", err)
+		m.log.Warnf("Failed to create ACME cache directory: %v", err)
 	}
 	mgr := &autocert.Manager{
 		Prompt: autocert.AcceptTOS,
@@ -592,7 +595,7 @@ func (m *Manager) EnableACME() error {
 	}
 	mgr.Client = client
 	m.acmeMgr = mgr
-	m.log.Infof("ACME 已启用（邮箱: %s, staging=%v）", email, m.config.SSL.Staging)
+	m.log.Infof("ACME enabled (email: %s, staging=%v)", email, m.config.SSL.Staging)
 	return nil
 }
 
@@ -605,12 +608,11 @@ func (m *Manager) EnsureDomainCert(domain string) error {
 	if domain == "" {
 		return fmt.Errorf("empty domain")
 	}
-	if !m.isAllowedDomain(domain) {
-		return fmt.Errorf("domain not allowed by policy: %s", domain)
-	}
+	// 临时放行该域名以触发申请（避免必须写入配置）
+	m.AllowDomainTemporary(domain, 24*time.Hour)
 	_, err := m.acmeMgr.GetCertificate(&tls.ClientHelloInfo{ServerName: domain})
 	if err != nil {
-		m.log.Warnf("ACME 申请证书失败 %s: %v", domain, err)
+		m.log.Warnf("ACME certificate request failed %s: %v", domain, err)
 	}
 	return err
 }
@@ -618,6 +620,19 @@ func (m *Manager) EnsureDomainCert(domain string) error {
 // isAllowedDomain 仅允许配置中的域名（代理规则或 ssl.domains）
 func (m *Manager) isAllowedDomain(host string) bool {
 	host = strings.ToLower(host)
+	// 临时允许域名（例如来自面板的手动申请），未过期则放行
+	if m.tempAllowedDomains != nil {
+		now := time.Now()
+		if exp, ok := m.tempAllowedDomains[host]; ok && now.Before(exp) {
+			return true
+		}
+		// 清理过期条目
+		for d, e := range m.tempAllowedDomains {
+			if now.After(e) {
+				delete(m.tempAllowedDomains, d)
+			}
+		}
+	}
 	// 显式配置的 ssl.domains
 	for _, d := range m.config.SSL.Domains {
 		d = strings.ToLower(strings.TrimSpace(d))
@@ -647,16 +662,16 @@ func (m *Manager) isAllowedDomain(host string) bool {
 // GenerateMultiDomainCert 生成多域名自签名证书
 func (m *Manager) GenerateMultiDomainCert(domains []string) (*tls.Certificate, error) {
 	if len(domains) == 0 {
-		return nil, fmt.Errorf("域名列表不能为空")
+		return nil, fmt.Errorf("domain list cannot be empty")
 	}
 
 	primaryDomain := domains[0]
-	m.log.Infof("为域名组 %v 生成多域名自签名证书", domains)
+	m.log.Infof("Generating multi-domain self-signed certificate for %v", domains)
 
 	// 生成私钥
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		return nil, fmt.Errorf("生成私钥失败: %w", err)
+		return nil, fmt.Errorf("failed to generate private key: %w", err)
 	}
 
 	// 创建证书模板，支持多域名
@@ -674,7 +689,7 @@ func (m *Manager) GenerateMultiDomainCert(domains []string) (*tls.Certificate, e
 	// 生成证书
 	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
 	if err != nil {
-		return nil, fmt.Errorf("生成证书失败: %w", err)
+		return nil, fmt.Errorf("failed to generate certificate: %w", err)
 	}
 
 	// 编码私钥
@@ -694,17 +709,17 @@ func (m *Manager) GenerateMultiDomainCert(domains []string) (*tls.Certificate, e
 	keyPath := filepath.Join(m.config.SSL.KeyDir, primaryDomain+".key")
 
 	if err := os.WriteFile(certPath, certPEM, 0644); err != nil {
-		m.log.Errorf("保存证书失败: %v", err)
+		m.log.Errorf("Failed to save certificate: %v", err)
 	}
 
 	if err := os.WriteFile(keyPath, keyPEM, 0600); err != nil {
-		m.log.Errorf("保存私钥失败: %v", err)
+		m.log.Errorf("Failed to save private key: %v", err)
 	}
 
 	// 加载证书到内存
 	cert, err := tls.X509KeyPair(certPEM, keyPEM)
 	if err != nil {
-		return nil, fmt.Errorf("解析证书失败: %w", err)
+		return nil, fmt.Errorf("failed to parse certificate: %w", err)
 	}
 
 	// 为所有域名缓存同一个证书
@@ -714,7 +729,7 @@ func (m *Manager) GenerateMultiDomainCert(domains []string) (*tls.Certificate, e
 	}
 	m.certMutex.Unlock()
 
-	m.log.Infof("成功生成并缓存多域名证书: %v", domains)
+	m.log.Infof("Successfully generated and cached multi-domain certificate: %v", domains)
 	return &cert, nil
 }
 
@@ -724,22 +739,37 @@ func (m *Manager) LoadCertificateFromDisk(domain string) error {
 	keyPath := filepath.Join(m.config.SSL.KeyDir, domain+".key")
 
 	if _, err := os.Stat(certPath); err != nil {
-		return fmt.Errorf("证书文件不存在: %s", certPath)
+		return fmt.Errorf("certificate file not found: %s", certPath)
 	}
 	if _, err := os.Stat(keyPath); err != nil {
-		return fmt.Errorf("私钥文件不存在: %s", keyPath)
+		return fmt.Errorf("private key file not found: %s", keyPath)
 	}
 
 	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
 	if err != nil {
-		return fmt.Errorf("加载证书失败: %w", err)
+		return fmt.Errorf("failed to load certificate: %w", err)
 	}
 
 	m.certMutex.Lock()
 	m.certCache[domain] = &cert
 	m.certMutex.Unlock()
-	m.log.Infof("已从磁盘加载证书到缓存: %s", domain)
+	m.log.Infof("Loaded certificate from disk into cache: %s", domain)
 	return nil
+}
+
+// AllowDomainTemporary 将域名加入临时允许列表，用于绕过策略发起 ACME 申请
+func (m *Manager) AllowDomainTemporary(domain string, ttl time.Duration) {
+	domain = strings.ToLower(strings.TrimSpace(domain))
+	if domain == "" {
+		return
+	}
+	if ttl <= 0 {
+		ttl = 24 * time.Hour
+	}
+	if m.tempAllowedDomains == nil {
+		m.tempAllowedDomains = make(map[string]time.Time)
+	}
+	m.tempAllowedDomains[domain] = time.Now().Add(ttl)
 }
 
 // ListCertificatesFromDisk 扫描证书目录获取证书信息
@@ -747,7 +777,7 @@ func (m *Manager) ListCertificatesFromDisk() []CertificateInfo {
 	certDir := m.config.SSL.CertDir
 	entries, err := os.ReadDir(certDir)
 	if err != nil {
-		m.log.Warnf("读取证书目录失败 %s: %v", certDir, err)
+		m.log.Warnf("Failed to read certificate directory %s: %v", certDir, err)
 		return nil
 	}
 
@@ -832,6 +862,92 @@ func (m *Manager) ListCertificatesFromDisk() []CertificateInfo {
 	}
 	m.certMutex.RUnlock()
 	return certs
+}
+
+// SyncACMECertsToDisk 扫描 acme-cache，将有效证书与私钥写入 certs/keys 目录
+func (m *Manager) SyncACMECertsToDisk() (int, error) {
+	acmeCacheDir := filepath.Join(filepath.Dir(m.config.SSL.CertDir), "acme-cache")
+	entries, err := os.ReadDir(acmeCacheDir)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read ACME cache directory: %w", err)
+	}
+	if err := os.MkdirAll(m.config.SSL.CertDir, 0755); err != nil {
+		return 0, fmt.Errorf("failed to create certificate directory: %w", err)
+	}
+	if err := os.MkdirAll(m.config.SSL.KeyDir, 0755); err != nil {
+		return 0, fmt.Errorf("failed to create key directory: %w", err)
+	}
+
+	var synced int
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		path := filepath.Join(acmeCacheDir, e.Name())
+		data, err := os.ReadFile(path)
+		if err != nil || len(data) == 0 {
+			continue
+		}
+		var certBlocks [][]byte
+		var keyBlock []byte
+		rest := data
+		for {
+			var blk *pem.Block
+			blk, rest = pem.Decode(rest)
+			if blk == nil {
+				break
+			}
+			t := strings.ToUpper(strings.TrimSpace(blk.Type))
+			if t == "CERTIFICATE" {
+				certBlocks = append(certBlocks, blk.Bytes)
+			} else if strings.Contains(t, "PRIVATE KEY") {
+				keyBlock = blk.Bytes
+			}
+		}
+		if len(certBlocks) == 0 || len(keyBlock) == 0 {
+			continue
+		}
+		x509Cert, err := x509.ParseCertificate(certBlocks[0])
+		if err != nil {
+			continue
+		}
+		if time.Now().After(x509Cert.NotAfter) {
+			continue
+		}
+		domain := ""
+		if len(x509Cert.DNSNames) > 0 {
+			domain = x509Cert.DNSNames[0]
+		}
+		if domain == "" {
+			domain = x509Cert.Subject.CommonName
+		}
+		domain = strings.ToLower(strings.TrimSpace(domain))
+		if domain == "" {
+			continue
+		}
+
+		var certPEM []byte
+		for _, der := range certBlocks {
+			certPEM = append(certPEM, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})...)
+		}
+		keyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyBlock})
+
+		certPath := filepath.Join(m.config.SSL.CertDir, domain+".crt")
+		keyPath := filepath.Join(m.config.SSL.KeyDir, domain+".key")
+		if err := os.WriteFile(certPath, certPEM, 0644); err != nil {
+			m.log.Warnf("Failed to write certificate %s: %v", certPath, err)
+			continue
+		}
+		if err := os.WriteFile(keyPath, keyPEM, 0600); err != nil {
+			m.log.Warnf("Failed to write private key %s: %v", keyPath, err)
+			continue
+		}
+		if err := m.LoadCertificateFromDisk(domain); err != nil {
+			m.log.Warnf("Failed to load certificate after sync %s: %v", domain, err)
+		}
+		synced++
+	}
+	return synced, nil
 }
 
 // HasValidSSLCertificates 检查是否有有效的非自签名证书

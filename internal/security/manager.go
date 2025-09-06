@@ -73,7 +73,7 @@ func NewManager(cfg *config.Config) *Manager {
 
 // Start 启动安全管理器
 func (m *Manager) Start() {
-	m.log.Info("启动安全管理器")
+	m.log.Info("Starting security manager")
 
 	// 加载被封禁的IP列表
 	m.loadBlockedIPs()
@@ -84,7 +84,7 @@ func (m *Manager) Start() {
 
 // Stop 停止安全管理器
 func (m *Manager) Stop() {
-	m.log.Info("停止安全管理器")
+	m.log.Info("Stopping security manager")
 	close(m.stopChan)
 }
 
@@ -127,7 +127,7 @@ func (m *Manager) LogAccess(ip, userAgent, path string, success bool) {
 
 	// 检查User-Agent是否合法
 	if !m.isValidUserAgent(userAgent) {
-		m.log.Warnf("可疑的User-Agent: %s from %s", userAgent, ip)
+		m.log.Warnf("Suspicious User-Agent: %s from %s", userAgent, ip)
 		m.blockIP(ip, "Invalid User-Agent")
 		return
 	}
@@ -182,7 +182,7 @@ func (m *Manager) LogTLSFingerprint(fingerprint, ip string) {
 		maxPerMin = 6000
 	}
 	if len(pruned) > maxPerMin {
-		m.log.Warnf("TLS 指纹过于活跃 fp=%s count=%d ip=%s", fingerprint, len(pruned), ip)
+		m.log.Warnf("TLS fingerprint too active fp=%s count=%d ip=%s", fingerprint, len(pruned), ip)
 	}
 }
 
@@ -267,7 +267,7 @@ func (m *Manager) blockIP(ip, reason string) {
 	}
 	m.blockedIPs[ip] = blocked
 	m.saveBlockedIPs()
-	m.log.Warnf("封禁IP %s: %s", ip, reason)
+	m.log.Warnf("Blocked IP %s: %s", ip, reason)
 }
 
 // isValidUserAgent 检查User-Agent是否合法
@@ -292,7 +292,7 @@ func (m *Manager) loadBlockedIPs() {
 
 	file, err := os.Open(blockFile)
 	if err != nil {
-		m.log.Errorf("打开封禁文件失败: %v", err)
+		m.log.Errorf("Failed to open block file: %v", err)
 		return
 	}
 	defer file.Close()
@@ -301,7 +301,7 @@ func (m *Manager) loadBlockedIPs() {
 	for scanner.Scan() {
 		var blocked BlockedIP
 		if err := json.Unmarshal(scanner.Bytes(), &blocked); err != nil {
-			m.log.Errorf("解析封禁记录失败: %v", err)
+			m.log.Errorf("Failed to parse blocked record: %v", err)
 			continue
 		}
 
@@ -311,7 +311,7 @@ func (m *Manager) loadBlockedIPs() {
 		}
 	}
 
-	m.log.Infof("加载了 %d 个封禁IP记录", len(m.blockedIPs))
+	m.log.Infof("Loaded %d blocked IP records", len(m.blockedIPs))
 }
 
 // saveBlockedIPs 保存被封禁的IP列表
@@ -321,13 +321,13 @@ func (m *Manager) saveBlockedIPs() {
 	// 确保目录存在
 	dir := filepath.Dir(blockFile)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		m.log.Errorf("创建封禁文件目录失败: %v", err)
+		m.log.Errorf("Failed to create block file directory: %v", err)
 		return
 	}
 
 	file, err := os.Create(blockFile)
 	if err != nil {
-		m.log.Errorf("创建封禁文件失败: %v", err)
+		m.log.Errorf("Failed to create block file: %v", err)
 		return
 	}
 	defer file.Close()
@@ -335,12 +335,12 @@ func (m *Manager) saveBlockedIPs() {
 	for _, blocked := range m.blockedIPs {
 		data, err := json.Marshal(blocked)
 		if err != nil {
-			m.log.Errorf("序列化封禁记录失败: %v", err)
+			m.log.Errorf("Failed to serialize blocked record: %v", err)
 			continue
 		}
 
 		if _, err := file.Write(append(data, '\n')); err != nil {
-			m.log.Errorf("写入封禁记录失败: %v", err)
+			m.log.Errorf("Failed to write blocked record: %v", err)
 		}
 	}
 }
@@ -470,7 +470,7 @@ func (m *Manager) UnblockIP(ip string) {
 		delete(m.blockedIPs, ip)
 		delete(m.attemptCounts, ip)
 		delete(m.lastAttempts, ip)
-		m.log.Infof("手动解除IP封禁: %s", ip)
+		m.log.Infof("Manually unblocked IP: %s", ip)
 	}
 }
 

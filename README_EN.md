@@ -505,7 +505,7 @@ If you encounter issues or have suggestions:
 
 For complete version update history, please refer to: **[CHANGELOG.md](CHANGELOG.md)**
 
-### Latest Version v1.0.13 (2025-01-03)
+### Latest Version v1.0.15 (2025-01-03)
 - 🌐 Master-Slave cluster architecture: Multi-node deployment support for high availability
 - 🔄 Automatic configuration synchronization: Real-time config push from Master to all Slave nodes
 - 🔒 Permission separation control: Strict functional restrictions in Slave mode

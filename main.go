@@ -62,12 +62,12 @@ func main() {
 		"component": "main",
 	})
 
-	log.Infof("启动 SSLcat v%s (build: %s)", version, build)
+	log.Infof("Starting SSLcat v%s (build: %s)", version, build)
 
 	// 加载配置
 	cfg, err := config.Load(*configFile)
 	if err != nil {
-		log.Fatalf("加载配置失败: %v", err)
+		log.Fatalf("failed to load config: %v", err)
 	}
 
 	// 覆盖配置
@@ -89,16 +89,16 @@ func main() {
 
 	// 创建必要目录
 	if err := os.MkdirAll("/etc/sslcat", 0755); err != nil {
-		log.Warnf("无法创建系统配置目录，使用当前目录: %v", err)
+		log.Warnf("failed to create system config dir, falling back to CWD: %v", err)
 	}
 	if err := os.MkdirAll("/var/lib/sslcat", 0755); err != nil {
-		log.Warnf("无法创建系统数据目录，使用当前目录: %v", err)
+		log.Warnf("failed to create system data dir, falling back to CWD: %v", err)
 	}
 
 	// 初始化模块
 	sslManager, err := ssl.NewManager(cfg)
 	if err != nil {
-		log.Fatalf("初始化SSL管理器失败: %v", err)
+		log.Fatalf("failed to init SSL manager: %v", err)
 	}
 	securityManager := security.NewManager(cfg)
 	proxyManager := proxy.NewManager(cfg, sslManager, securityManager)
@@ -141,14 +141,14 @@ func main() {
 		TLSConfig:    sslManager.GetTLSConfig(),
 	}
 	go func() {
-		log.Infof("HTTPS服务器启动在 %s (支持多域名SSL证书)", server.Addr)
+		log.Infof("HTTPS server listening on %s (multi-domain SSL supported)", server.Addr)
 		if cfg.Server.Port == 443 || cfg.Server.Port == 8443 {
 			if err := server.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
-				log.Fatalf("HTTPS服务器启动失败: %v", err)
+				log.Fatalf("failed to start HTTPS server: %v", err)
 			}
 		} else {
 			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Fatalf("HTTP服务器启动失败: %v", err)
+				log.Fatalf("failed to start HTTP server: %v", err)
 			}
 		}
 	}()
@@ -194,9 +194,9 @@ func main() {
 				WriteTimeout: 10 * time.Second,
 			}
 
-			log.Infof("HTTP重定向服务器启动在 %s:80", cfg.Server.Host)
+			log.Infof("HTTP redirect server listening on %s:80", cfg.Server.Host)
 			if err := redirectServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Errorf("HTTP重定向服务器失败: %v", err)
+				log.Errorf("HTTP redirect server error: %v", err)
 			}
 		}()
 	}
@@ -205,12 +205,12 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	sig := <-quit
-	log.Infof("收到信号 %v，开始优雅关闭...", sig)
+	log.Infof("Received signal %v, starting graceful shutdown...", sig)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	securityManager.Stop()
 	proxyManager.Stop()
 	sslManager.Stop()
 	_ = server.Shutdown(ctx)
-	log.Info("SSLcat 服务器已关闭")
+	log.Info("SSLcat server stopped")
 }

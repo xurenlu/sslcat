@@ -509,7 +509,7 @@ go run main.go --config sslcat.conf --log-level debug
 
 完全なバージョン更新履歴はこちらを参照してください：**[CHANGELOG.md](CHANGELOG.md)**
 
-### 最新バージョン v1.0.13 (2025-01-03)
+### 最新バージョン v1.0.15 (2025-01-03)
 - 🌐 Master-Slaveクラスターアーキテクチャ：高可用性のためのマルチノードデプロイメントサポート
 - 🔄 自動設定同期：MasterからすべてのSlaveノードへのリアルタイム設定プッシュ
 - 🔒 権限分離制御：Slaveモードでの厳格な機能制限

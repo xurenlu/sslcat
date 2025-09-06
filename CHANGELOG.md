@@ -1,3 +1,10 @@
+## [1.0.15] - 2025-01-03
+- Switch all logs to English across core modules
+- Add runtime ACME temporary allowlist for panel-initiated requests
+- Add ACME cache sync to certs/keys with admin UI button
+- Fix i18n translator mkdir on empty dir and embedded loading
+- Use net.JoinHostPort for IPv6-safe dialing/URLs
+
 ## [1.0.13] - 2025-01-03
 
 ### 🌐 集群架构重大升级

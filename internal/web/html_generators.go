@@ -441,6 +441,11 @@ func (s *Server) generateSSLManagementHTML(data map[string]interface{}) string {
                         <a href="%s/ssl/upload-all" class="btn btn-outline-secondary">
                             <i class="bi bi-upload"></i> 导入全部
                         </a>
+                        <form method="POST" action="%s/ssl/sync-acme" class="d-inline ms-2">
+                            <button type="submit" class="btn btn-outline-success">
+                                <i class="bi bi-arrow-repeat"></i> 同步ACME证书到本地
+                            </button>
+                        </form>
                     </div>
                 </div>
                 

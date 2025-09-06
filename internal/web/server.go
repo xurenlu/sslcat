@@ -73,7 +73,7 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 			}
 		}
 	} else {
-		logrus.Warnf("读取嵌入的 i18n 文件失败: %v", err)
+		logrus.Warnf("Failed to read embedded i18n files: %v", err)
 	}
 
 	// 初始化模板渲染器
@@ -143,6 +143,8 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/ssl/upload", s.handleSSLUpload)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/ssl/download", s.handleSSLDownload)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/ssl/delete", s.handleSSLDelete)
+	// 从 acme-cache 同步证书到 certs/keys
+	s.mux.HandleFunc(s.config.AdminPrefix+"/ssl/sync-acme", s.handleSSLSyncACME)
 
 	// 安全设置路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/security", s.handleSecurity)
@@ -245,16 +247,16 @@ func (s *Server) securityMiddleware(w http.ResponseWriter, r *http.Request) bool
 
 	// 检查是否被封禁
 	if s.securityManager.IsBlocked(clientIP) {
-		s.log.Warnf("封禁的IP尝试访问: %s", clientIP)
-		http.Error(w, "IP地址已被封禁", http.StatusForbidden)
+		s.log.Warnf("Blocked IP attempted to access: %s", clientIP)
+		http.Error(w, "IP address blocked", http.StatusForbidden)
 		return false
 	}
 
 	// 检查User-Agent
 	if strings.HasPrefix(path, s.config.AdminPrefix) && (userAgent == "" || s.isCommonBotUserAgent(userAgent)) {
-		s.log.Warnf("可疑User-Agent访问管理面板: %s from %s", userAgent, clientIP)
+		s.log.Warnf("Suspicious User-Agent attempted to access admin panel: %s from %s", userAgent, clientIP)
 		s.securityManager.LogAccess(clientIP, userAgent, path, false)
-		http.Error(w, "访问被拒绝", http.StatusForbidden)
+		http.Error(w, "Access denied", http.StatusForbidden)
 		return false
 	}
 

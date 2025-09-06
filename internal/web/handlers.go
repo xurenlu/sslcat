@@ -29,18 +29,18 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		// 检查是否需要验证码（有真实SSL证书时启用）
 		requireCaptcha := s.sslManager.HasValidSSLCertificates()
-		
+
 		data := map[string]interface{}{
-			"AdminPrefix":     s.config.AdminPrefix,
-			"Error":           "",
-			"RequireCaptcha":  requireCaptcha,
+			"AdminPrefix":    s.config.AdminPrefix,
+			"Error":          "",
+			"RequireCaptcha": requireCaptcha,
 		}
-		
+
 		// 如果需要验证码，添加JS解码函数
 		if requireCaptcha {
 			data["JSDecodeFunction"] = s.captchaManager.GetJSDecodeFunction()
 		}
-		
+
 		s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
 		return
 	}
@@ -128,12 +128,12 @@ func (s *Server) processLogin(w http.ResponseWriter, r *http.Request) {
 	if s.sslManager.HasValidSSLCertificates() {
 		captchaAnswer := r.FormValue("captcha")
 		sessionID := r.FormValue("captcha_session_id")
-		
+
 		if captchaAnswer == "" || sessionID == "" {
 			s.renderLoginError(w, r, s.translator.T("captcha.required"))
 			return
 		}
-		
+
 		// 验证验证码答案
 		if answer, err := strconv.Atoi(captchaAnswer); err != nil || !s.captchaManager.VerifyCaptcha(sessionID, answer) {
 			s.renderLoginError(w, r, s.translator.T("captcha.invalid"))
@@ -300,7 +300,7 @@ func (s *Server) handleSettingsSave(w http.ResponseWriter, r *http.Request) {
 			s.config.SSL.Email = v
 			// 尝试启用 ACME
 			if err := s.sslManager.EnableACME(); err != nil {
-				s.log.Warnf("启用 ACME 失败: %v", err)
+				s.log.Warnf("Failed to enable ACME: %v", err)
 			}
 		}
 		if v := r.FormValue("ssl_disable_self_signed"); v != "" {
@@ -383,26 +383,26 @@ func (s *Server) handleFirstTimeSetup(w http.ResponseWriter, r *http.Request) {
 
 		// 验证密码
 		if newPassword == "" || newPassword != confirmPassword {
-			http.Error(w, "密码不一致或为空", http.StatusBadRequest)
+			http.Error(w, "passwords do not match or empty", http.StatusBadRequest)
 			return
 		}
 
 		// 验证邮箱
 		if adminEmail == "" {
-			http.Error(w, "管理员邮箱不能为空", http.StatusBadRequest)
+			http.Error(w, "admin email is required", http.StatusBadRequest)
 			return
 		}
 
 		// 简单的邮箱格式验证
 		if !strings.Contains(adminEmail, "@") || !strings.Contains(adminEmail, ".") {
-			http.Error(w, "请输入有效的邮箱地址", http.StatusBadRequest)
+			http.Error(w, "invalid email address", http.StatusBadRequest)
 			return
 		}
 
 		// 更新内存与持久化密码文件
 		s.config.Admin.Password = "" // 避免将明文写入 withssl.conf
 		if err := os.WriteFile(s.config.Admin.PasswordFile, []byte(newPassword+"\n"), 0600); err != nil {
-			http.Error(w, "写入密码文件失败: "+err.Error(), http.StatusInternalServerError)
+			http.Error(w, "failed to write password file: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
@@ -411,13 +411,13 @@ func (s *Server) handleFirstTimeSetup(w http.ResponseWriter, r *http.Request) {
 
 		// 保存配置（不包含密码）
 		if err := s.config.Save(s.config.ConfigFile); err != nil {
-			http.Error(w, "保存配置失败: "+err.Error(), http.StatusInternalServerError)
+			http.Error(w, "failed to save config: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		// 尝试启用 ACME（现在有邮箱了）
 		if err := s.sslManager.EnableACME(); err != nil {
-			s.log.Warnf("启用 ACME 失败: %v", err)
+			s.log.Warnf("Failed to enable ACME: %v", err)
 		}
 
 		// 审计日志
@@ -450,18 +450,18 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		newp := r.FormValue("new")
 		conf := r.FormValue("confirm")
 		if newp == "" || newp != conf {
-			http.Error(w, "密码不一致或为空", http.StatusBadRequest)
+			http.Error(w, "passwords do not match or empty", http.StatusBadRequest)
 			return
 		}
 		// 更新内存与持久化密码文件
 		s.config.Admin.Password = "" // 避免将明文写入 withssl.conf
 		if err := os.WriteFile(s.config.Admin.PasswordFile, []byte(newp+"\n"), 0600); err != nil {
-			http.Error(w, "写入密码文件失败: "+err.Error(), http.StatusInternalServerError)
+			http.Error(w, "failed to write password file: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		// 保存配置（不包含密码）
 		if err := s.config.Save(s.config.ConfigFile); err != nil {
-			http.Error(w, "保存配置失败: "+err.Error(), http.StatusInternalServerError)
+			http.Error(w, "failed to save config: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		http.Redirect(w, r, s.config.AdminPrefix+"/dashboard", http.StatusFound)
@@ -474,17 +474,17 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 func (s *Server) renderLoginError(w http.ResponseWriter, r *http.Request, errorMsg string) {
 	// 检查是否需要验证码
 	requireCaptcha := s.sslManager.HasValidSSLCertificates()
-	
+
 	data := map[string]interface{}{
 		"AdminPrefix":    s.config.AdminPrefix,
 		"Error":          errorMsg,
 		"RequireCaptcha": requireCaptcha,
 	}
-	
+
 	// 如果需要验证码，添加JS解码函数
 	if requireCaptcha {
 		data["JSDecodeFunction"] = s.captchaManager.GetJSDecodeFunction()
 	}
-	
+
 	s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
 }

@@ -506,7 +506,7 @@ go run main.go --config sslcat.conf --log-level debug
 
 查看完整的版本更新历史，请参阅：**[CHANGELOG.md](CHANGELOG.md)**
 
-### 最新版本 v1.0.13 (2025-01-03)
+### 最新版本 v1.0.15 (2025-01-03)
 - 🌐 Master-Slave集群架构：支持多节点部署，实现高可用性
 - 🔄 自动配置同步：Master配置变更实时推送到所有Slave节点
 - 🔒 权限分离控制：Slave模式下严格限制可修改功能

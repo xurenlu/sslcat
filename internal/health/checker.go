@@ -3,6 +3,7 @@ package health
 import (
 	"fmt"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 
@@ -45,13 +46,13 @@ type TargetHealth struct {
 
 // Checker 健康检测器
 type Checker struct {
-	config      *config.Config
-	targets     map[string]*TargetHealth
-	mutex       sync.RWMutex
-	stopChan    chan struct{}
-	interval    time.Duration
-	timeout     time.Duration
-	log         *logrus.Entry
+	config   *config.Config
+	targets  map[string]*TargetHealth
+	mutex    sync.RWMutex
+	stopChan chan struct{}
+	interval time.Duration
+	timeout  time.Duration
+	log      *logrus.Entry
 }
 
 // NewChecker 创建健康检测器
@@ -70,20 +71,20 @@ func NewChecker(cfg *config.Config) *Checker {
 
 // Start 启动健康检测
 func (c *Checker) Start() error {
-	c.log.Info("启动健康检测服务")
-	
+	c.log.Info("Starting health check service")
+
 	// 初始化所有代理目标的健康状态
 	c.initTargets()
-	
+
 	// 启动定期检测
 	go c.periodicCheck()
-	
+
 	return nil
 }
 
 // Stop 停止健康检测
 func (c *Checker) Stop() {
-	c.log.Info("停止健康检测服务")
+	c.log.Info("Stopping health check service")
 	close(c.stopChan)
 }
 
@@ -91,7 +92,7 @@ func (c *Checker) Stop() {
 func (c *Checker) initTargets() {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	
+
 	for _, rule := range c.config.Proxy.Rules {
 		key := fmt.Sprintf("%s:%d", rule.Target, rule.Port)
 		c.targets[key] = &TargetHealth{
@@ -103,18 +104,18 @@ func (c *Checker) initTargets() {
 			TotalChecks: 0,
 		}
 	}
-	
-	c.log.Infof("初始化 %d 个健康检测目标", len(c.targets))
+
+	c.log.Infof("Initialized %d health check targets", len(c.targets))
 }
 
 // periodicCheck 定期检测
 func (c *Checker) periodicCheck() {
 	ticker := time.NewTicker(c.interval)
 	defer ticker.Stop()
-	
+
 	// 立即执行一次检测
 	c.checkAllTargets()
-	
+
 	for {
 		select {
 		case <-ticker.C:
@@ -133,7 +134,7 @@ func (c *Checker) checkAllTargets() {
 		targets = append(targets, target)
 	}
 	c.mutex.RUnlock()
-	
+
 	// 并发检测所有目标
 	var wg sync.WaitGroup
 	for _, target := range targets {
@@ -143,37 +144,37 @@ func (c *Checker) checkAllTargets() {
 			c.checkTarget(t)
 		}(target)
 	}
-	
+
 	wg.Wait()
-	c.log.Debugf("完成一轮健康检测，共检测 %d 个目标", len(targets))
+	c.log.Debugf("Completed a health check round, targets: %d", len(targets))
 }
 
 // checkTarget 检测单个目标
 func (c *Checker) checkTarget(target *TargetHealth) {
 	start := time.Now()
-	address := fmt.Sprintf("%s:%d", target.Target, target.Port)
-	
+	address := net.JoinHostPort(target.Target, strconv.Itoa(target.Port))
+
 	// 尝试TCP连接
 	conn, err := net.DialTimeout("tcp", address, c.timeout)
 	responseTime := time.Since(start).Milliseconds()
-	
+
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	
+
 	target.LastCheck = time.Now()
 	target.ResponseTime = responseTime
 	target.TotalChecks++
-	
+
 	if err != nil {
 		target.ErrorCount++
 		target.Status = StatusUnhealthy
-		c.log.Warnf("健康检测失败 %s: %v (响应时间: %dms)", address, err, responseTime)
+		c.log.Warnf("Health check failed %s: %v (latency: %dms)", address, err, responseTime)
 	} else {
 		conn.Close()
 		target.Status = StatusHealthy
-		c.log.Debugf("健康检测成功 %s (响应时间: %dms)", address, responseTime)
+		c.log.Debugf("Health check OK %s (latency: %dms)", address, responseTime)
 	}
-	
+
 	// 计算可用率
 	if target.TotalChecks > 0 {
 		target.Uptime = float64(target.TotalChecks-target.ErrorCount) / float64(target.TotalChecks) * 100
@@ -183,10 +184,10 @@ func (c *Checker) checkTarget(target *TargetHealth) {
 // GetTargetHealth 获取指定目标的健康状态
 func (c *Checker) GetTargetHealth(target string, port int) *TargetHealth {
 	key := fmt.Sprintf("%s:%d", target, port)
-	
+
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-	
+
 	if health, exists := c.targets[key]; exists {
 		// 返回副本以避免并发问题
 		return &TargetHealth{
@@ -200,7 +201,7 @@ func (c *Checker) GetTargetHealth(target string, port int) *TargetHealth {
 			Uptime:       health.Uptime,
 		}
 	}
-	
+
 	return nil
 }
 
@@ -208,7 +209,7 @@ func (c *Checker) GetTargetHealth(target string, port int) *TargetHealth {
 func (c *Checker) GetAllTargetsHealth() map[string]*TargetHealth {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-	
+
 	result := make(map[string]*TargetHealth)
 	for key, health := range c.targets {
 		result[key] = &TargetHealth{
@@ -222,7 +223,7 @@ func (c *Checker) GetAllTargetsHealth() map[string]*TargetHealth {
 			Uptime:       health.Uptime,
 		}
 	}
-	
+
 	return result
 }
 
@@ -236,7 +237,7 @@ func (c *Checker) IsTargetHealthy(target string, port int) bool {
 func (c *Checker) GetHealthyTargets() []*TargetHealth {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-	
+
 	var healthy []*TargetHealth
 	for _, health := range c.targets {
 		if health.Status == StatusHealthy {
@@ -252,7 +253,7 @@ func (c *Checker) GetHealthyTargets() []*TargetHealth {
 			})
 		}
 	}
-	
+
 	return healthy
 }
 
@@ -260,15 +261,15 @@ func (c *Checker) GetHealthyTargets() []*TargetHealth {
 func (c *Checker) GetStats() map[string]interface{} {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-	
+
 	total := len(c.targets)
 	healthy := 0
 	unhealthy := 0
 	unknown := 0
-	
+
 	var totalResponseTime int64
 	var totalUptime float64
-	
+
 	for _, health := range c.targets {
 		switch health.Status {
 		case StatusHealthy:
@@ -278,39 +279,39 @@ func (c *Checker) GetStats() map[string]interface{} {
 		case StatusUnknown:
 			unknown++
 		}
-		
+
 		totalResponseTime += health.ResponseTime
 		totalUptime += health.Uptime
 	}
-	
+
 	var avgResponseTime int64
 	var avgUptime float64
-	
+
 	if total > 0 {
 		avgResponseTime = totalResponseTime / int64(total)
 		avgUptime = totalUptime / float64(total)
 	}
-	
+
 	return map[string]interface{}{
-		"total_targets":         total,
-		"healthy_targets":       healthy,
-		"unhealthy_targets":     unhealthy,
-		"unknown_targets":       unknown,
-		"health_rate":           float64(healthy) / float64(total) * 100,
-		"avg_response_time_ms":  avgResponseTime,
-		"avg_uptime_percent":    avgUptime,
-		"last_check":            time.Now(),
+		"total_targets":        total,
+		"healthy_targets":      healthy,
+		"unhealthy_targets":    unhealthy,
+		"unknown_targets":      unknown,
+		"health_rate":          float64(healthy) / float64(total) * 100,
+		"avg_response_time_ms": avgResponseTime,
+		"avg_uptime_percent":   avgUptime,
+		"last_check":           time.Now(),
 	}
 }
 
 // SetCheckInterval 设置检测间隔
 func (c *Checker) SetCheckInterval(interval time.Duration) {
 	c.interval = interval
-	c.log.Infof("健康检测间隔已设置为: %v", interval)
+	c.log.Infof("Health check interval set to: %v", interval)
 }
 
 // SetTimeout 设置检测超时时间
 func (c *Checker) SetTimeout(timeout time.Duration) {
 	c.timeout = timeout
-	c.log.Infof("健康检测超时时间已设置为: %v", timeout)
+	c.log.Infof("Health check timeout set to: %v", timeout)
 }

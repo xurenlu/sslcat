@@ -29,26 +29,26 @@ const (
 
 // LanguageInfo 语言信息
 type LanguageInfo struct {
-	Code         SupportedLanguage `json:"code"`
-	Name         string            `json:"name"`
-	NativeName   string            `json:"native_name"`
-	Flag         string            `json:"flag"`
-	RTL          bool              `json:"rtl"`          // 是否从右到左
-	Enabled      bool              `json:"enabled"`      // 是否启用
-	Progress     float64           `json:"progress"`     // 翻译完成度
-	LastUpdated  string            `json:"last_updated"` // 最后更新时间
+	Code        SupportedLanguage `json:"code"`
+	Name        string            `json:"name"`
+	NativeName  string            `json:"native_name"`
+	Flag        string            `json:"flag"`
+	RTL         bool              `json:"rtl"`          // 是否从右到左
+	Enabled     bool              `json:"enabled"`      // 是否启用
+	Progress    float64           `json:"progress"`     // 翻译完成度
+	LastUpdated string            `json:"last_updated"` // 最后更新时间
 }
 
 // Translator 翻译器
 type Translator struct {
-	defaultLang   SupportedLanguage
-	currentLang   SupportedLanguage
-	translations  map[SupportedLanguage]map[string]string
-	languages     map[SupportedLanguage]*LanguageInfo
-	fallbacks     map[SupportedLanguage]SupportedLanguage
+	defaultLang     SupportedLanguage
+	currentLang     SupportedLanguage
+	translations    map[SupportedLanguage]map[string]string
+	languages       map[SupportedLanguage]*LanguageInfo
+	fallbacks       map[SupportedLanguage]SupportedLanguage
 	translationsDir string
-	mutex         sync.RWMutex
-	log           *logrus.Entry
+	mutex           sync.RWMutex
+	log             *logrus.Entry
 }
 
 // NewTranslator 创建翻译器
@@ -66,13 +66,13 @@ func NewTranslator(defaultLang SupportedLanguage, translationsDir string) *Trans
 
 	// 初始化支持的语言
 	t.initLanguages()
-	
+
 	// 设置回退语言
 	t.initFallbacks()
-	
+
 	// 加载翻译文件
 	if err := t.loadTranslations(); err != nil {
-		t.log.Errorf("加载翻译文件失败: %v", err)
+		t.log.Errorf("Failed to load translations: %v", err)
 	}
 
 	return t
@@ -180,9 +180,13 @@ func (t *Translator) initFallbacks() {
 
 // loadTranslations 加载翻译文件
 func (t *Translator) loadTranslations() error {
+	// 当未提供本地翻译目录时，跳过磁盘加载（仅使用嵌入/内存）
+	if strings.TrimSpace(t.translationsDir) == "" {
+		return nil
+	}
 	// 创建翻译目录（如果不存在）
 	if err := os.MkdirAll(t.translationsDir, 0755); err != nil {
-		return fmt.Errorf("创建翻译目录失败: %w", err)
+		return fmt.Errorf("failed to create translations directory: %w", err)
 	}
 
 	// 遍历翻译目录
@@ -201,17 +205,17 @@ func (t *Translator) loadTranslations() error {
 
 		// 检查是否为支持的语言
 		if _, exists := t.languages[lang]; !exists {
-			t.log.Warnf("不支持的语言文件: %s", path)
+			t.log.Warnf("Unsupported language file: %s", path)
 			return nil
 		}
 
 		// 加载翻译数据
 		if err := t.loadLanguageFile(lang, path); err != nil {
-			t.log.Errorf("加载语言文件失败 %s: %v", path, err)
-			return nil // 继续加载其他文件
+			t.log.Errorf("Failed to load language file %s: %v", path, err)
+			return nil // continue loading others
 		}
 
-		t.log.Infof("成功加载语言文件: %s", path)
+		t.log.Infof("Loaded language file: %s", path)
 		return nil
 	})
 }
@@ -220,12 +224,12 @@ func (t *Translator) loadTranslations() error {
 func (t *Translator) loadLanguageFile(lang SupportedLanguage, path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("读取文件失败: %w", err)
+		return fmt.Errorf("failed to read file: %w", err)
 	}
 
 	var translations map[string]string
 	if err := json.Unmarshal(data, &translations); err != nil {
-		return fmt.Errorf("解析JSON失败: %w", err)
+		return fmt.Errorf("failed to parse JSON: %w", err)
 	}
 
 	t.mutex.Lock()
@@ -433,7 +437,7 @@ func (t *Translator) GetMissingTranslations(lang SupportedLanguage) []string {
 	defer t.mutex.RUnlock()
 
 	var missing []string
-	
+
 	// 以默认语言为基准
 	defaultTranslations, exists := t.translations[t.defaultLang]
 	if !exists {
@@ -441,7 +445,7 @@ func (t *Translator) GetMissingTranslations(lang SupportedLanguage) []string {
 	}
 
 	langTranslations := t.translations[lang]
-	
+
 	for key := range defaultTranslations {
 		if _, found := langTranslations[key]; !found {
 			missing = append(missing, key)
@@ -485,7 +489,7 @@ func (t *Translator) GetStats() map[string]interface{} {
 	for lang, translations := range t.translations {
 		langStats[string(lang)] = map[string]interface{}{
 			"translation_count": len(translations),
-			"progress":         t.languages[lang].Progress,
+			"progress":          t.languages[lang].Progress,
 		}
 	}
 	stats["language_stats"] = langStats
@@ -507,6 +511,11 @@ func (t *Translator) SaveTranslations(lang SupportedLanguage, translations map[s
 	t.mutex.Lock()
 	t.translations[lang] = translations
 	t.mutex.Unlock()
+
+	// 未配置目录时，只保存到内存（用于嵌入资源加载场景）
+	if strings.TrimSpace(t.translationsDir) == "" {
+		return nil
+	}
 
 	// 保存到文件
 	filePath := filepath.Join(t.translationsDir, string(lang)+".json")

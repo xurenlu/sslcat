@@ -124,8 +124,8 @@ func (tr *TemplateRenderer) Render(w http.ResponseWriter, templateName string, d
 	if !exists {
 		// 尝试从嵌入资源加载模板
 		if err := tr.loadTemplate(templateName); err != nil {
-			tr.log.Errorf("加载模板失败 %s: %v", templateName, err)
-			http.Error(w, "模板加载失败", http.StatusInternalServerError)
+			tr.log.Errorf("Failed to load template %s: %v", templateName, err)
+			http.Error(w, "template load failed", http.StatusInternalServerError)
 			return
 		}
 
@@ -135,8 +135,8 @@ func (tr *TemplateRenderer) Render(w http.ResponseWriter, templateName string, d
 	}
 
 	if tmpl == nil {
-		tr.log.Errorf("模板不存在: %s", templateName)
-		http.Error(w, "模板不存在", http.StatusNotFound)
+		tr.log.Errorf("Template not found: %s", templateName)
+		http.Error(w, "template not found", http.StatusNotFound)
 		return
 	}
 
@@ -149,8 +149,8 @@ func (tr *TemplateRenderer) Render(w http.ResponseWriter, templateName string, d
 	// 渲染模板
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := tmpl.Execute(w, data); err != nil {
-		tr.log.Errorf("渲染模板失败 %s: %v", templateName, err)
-		http.Error(w, "模板渲染失败", http.StatusInternalServerError)
+		tr.log.Errorf("Failed to render template %s: %v", templateName, err)
+		http.Error(w, "template render failed", http.StatusInternalServerError)
 		return
 	}
 }
@@ -163,7 +163,7 @@ func (tr *TemplateRenderer) loadTemplate(templateName string) error {
 	// 从嵌入资源读取模板内容
 	templateContent, err := assets.ReadTemplate(templateName)
 	if err != nil {
-		return fmt.Errorf("读取模板文件失败: %w", err)
+		return fmt.Errorf("failed to read template file: %w", err)
 	}
 
 	// 创建带翻译函数的模板
@@ -175,11 +175,11 @@ func (tr *TemplateRenderer) loadTemplate(templateName string) error {
 	// 解析模板
 	tmpl, err := template.New(templateName).Funcs(funcMap).Parse(string(templateContent))
 	if err != nil {
-		return fmt.Errorf("解析模板失败: %w", err)
+		return fmt.Errorf("failed to parse template: %w", err)
 	}
 
 	tr.templates[templateName] = tmpl
-	tr.log.Infof("成功加载模板: %s", templateName)
+	tr.log.Infof("Loaded template: %s", templateName)
 	return nil
 }
 
@@ -187,12 +187,12 @@ func (tr *TemplateRenderer) loadTemplate(templateName string) error {
 func (tr *TemplateRenderer) PreloadTemplates() error {
 	templateNames, err := assets.ListTemplates()
 	if err != nil {
-		return fmt.Errorf("获取模板列表失败: %w", err)
+		return fmt.Errorf("failed to list templates: %w", err)
 	}
 
 	for _, name := range templateNames {
 		if err := tr.loadTemplate(name); err != nil {
-			tr.log.Warnf("预加载模板失败 %s: %v", name, err)
+			tr.log.Warnf("Failed to preload template %s: %v", name, err)
 		}
 	}
 

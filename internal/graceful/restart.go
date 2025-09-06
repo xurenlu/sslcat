@@ -48,10 +48,10 @@ func (rm *RestartManager) StartGracefulRestart() {
 	go func() {
 		for {
 			sig := <-sigChan
-			rm.log.Infof("收到信号 %v，开始平滑重启", sig)
+			rm.log.Infof("Received signal %v, starting graceful restart", sig)
 
 			if err := rm.performGracefulRestart(); err != nil {
-				rm.log.Errorf("平滑重启失败: %v", err)
+				rm.log.Errorf("Graceful restart failed: %v", err)
 			}
 		}
 	}()
@@ -62,7 +62,7 @@ func (rm *RestartManager) performGracefulRestart() error {
 	// 1. 启动新的进程
 	newProcess, err := rm.startNewProcess()
 	if err != nil {
-		return fmt.Errorf("启动新进程失败: %w", err)
+		return fmt.Errorf("failed to start new process: %w", err)
 	}
 
 	// 2. 等待新进程启动
@@ -70,7 +70,7 @@ func (rm *RestartManager) performGracefulRestart() error {
 
 	// 3. 检查新进程是否正常运行
 	if !rm.isProcessRunning(newProcess.Process.Pid) {
-		return fmt.Errorf("新进程启动失败")
+		return fmt.Errorf("new process failed to start")
 	}
 
 	// 4. 关闭当前进程的监听器
@@ -80,7 +80,7 @@ func (rm *RestartManager) performGracefulRestart() error {
 	time.Sleep(5 * time.Second)
 
 	// 6. 退出当前进程
-	rm.log.Info("平滑重启完成，退出当前进程")
+	rm.log.Info("Graceful restart complete, exiting current process")
 	os.Exit(0)
 
 	return nil
@@ -91,7 +91,7 @@ func (rm *RestartManager) startNewProcess() (*exec.Cmd, error) {
 	// 获取当前可执行文件路径
 	execPath, err := os.Executable()
 	if err != nil {
-		return nil, fmt.Errorf("获取可执行文件路径失败: %w", err)
+		return nil, fmt.Errorf("failed to get executable path: %w", err)
 	}
 
 	// 获取当前进程的命令行参数
@@ -108,10 +108,10 @@ func (rm *RestartManager) startNewProcess() (*exec.Cmd, error) {
 
 	// 启动新进程
 	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("启动新进程失败: %w", err)
+		return nil, fmt.Errorf("failed to start new process: %w", err)
 	}
 
-	rm.log.Infof("新进程已启动，PID: %d", cmd.Process.Pid)
+	rm.log.Infof("New process started, PID: %d", cmd.Process.Pid)
 	return cmd, nil
 }
 
@@ -130,9 +130,9 @@ func (rm *RestartManager) isProcessRunning(pid int) bool {
 // closeListeners 关闭所有监听器
 func (rm *RestartManager) closeListeners() {
 	for name, listener := range rm.listeners {
-		rm.log.Infof("关闭监听器: %s", name)
+		rm.log.Infof("Closing listener: %s", name)
 		if err := listener.Close(); err != nil {
-			rm.log.Errorf("关闭监听器失败 %s: %v", name, err)
+			rm.log.Errorf("Failed to close listener %s: %v", name, err)
 		}
 	}
 }
@@ -144,7 +144,7 @@ func (rm *RestartManager) ListenTCP(network, address string) (net.Listener, erro
 		// 尝试从环境变量获取文件描述符
 		if fd := os.Getenv("WITHSSL_LISTENER_FD"); fd != "" {
 			// 这里可以实现从文件描述符恢复监听器的逻辑
-			rm.log.Info("从文件描述符恢复监听器")
+			rm.log.Info("Restored listener from file descriptor")
 		}
 	}
 
@@ -178,7 +178,7 @@ func (rm *RestartManager) SaveState() error {
 
 	// 保存到文件
 	// 这里简化处理，实际应该使用JSON序列化
-	rm.log.Infof("保存重启状态到: %s", stateFile)
+	rm.log.Infof("Saved restart state to: %s", stateFile)
 
 	return nil
 }
@@ -189,11 +189,11 @@ func (rm *RestartManager) LoadState() error {
 	stateFile := "/var/lib/sslcat/restart_state.json"
 
 	if _, err := os.Stat(stateFile); os.IsNotExist(err) {
-		rm.log.Info("没有找到重启状态文件，跳过状态恢复")
+		rm.log.Info("Restart state file not found, skipping recovery")
 		return nil
 	}
 
-	rm.log.Infof("从文件加载重启状态: %s", stateFile)
+	rm.log.Infof("Loaded restart state from: %s", stateFile)
 
 	// 这里简化处理，实际应该使用JSON反序列化
 
@@ -206,7 +206,7 @@ func (rm *RestartManager) WaitForShutdown() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	sig := <-sigChan
-	rm.log.Infof("收到关闭信号 %v", sig)
+	rm.log.Infof("Received shutdown signal %v", sig)
 
 	// 执行优雅关闭
 	rm.gracefulShutdown()
@@ -214,7 +214,7 @@ func (rm *RestartManager) WaitForShutdown() {
 
 // gracefulShutdown 优雅关闭
 func (rm *RestartManager) gracefulShutdown() {
-	rm.log.Info("开始优雅关闭...")
+	rm.log.Info("Starting graceful shutdown...")
 
 	// 1. 停止接受新连接
 	rm.closeListeners()
@@ -223,7 +223,7 @@ func (rm *RestartManager) gracefulShutdown() {
 	time.Sleep(5 * time.Second)
 
 	// 3. 强制退出
-	rm.log.Info("优雅关闭完成")
+	rm.log.Info("Graceful shutdown complete")
 	os.Exit(0)
 }
 

@@ -16,7 +16,7 @@ func (s *Server) handleConfigExport(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := json.MarshalIndent(s.config, "", "  ")
 	if err != nil {
-		http.Error(w, "导出配置失败: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "failed to export config: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	filename := "sslcat-" + time.Now().Format("20060102-150405") + ".json"
@@ -72,12 +72,12 @@ func (s *Server) handleConfigImport(w http.ResponseWriter, r *http.Request) {
 		payload = []byte(r.FormValue("json"))
 	}
 	if len(payload) == 0 {
-		http.Error(w, "未提供配置", http.StatusBadRequest)
+		http.Error(w, "no configuration provided", http.StatusBadRequest)
 		return
 	}
 	var proposed config.Config
 	if err := json.Unmarshal(payload, &proposed); err != nil {
-		http.Error(w, "JSON解析失败: "+err.Error(), http.StatusBadRequest)
+		http.Error(w, "failed to parse JSON: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	// 保存到pending
@@ -87,7 +87,7 @@ func (s *Server) handleConfigImport(w http.ResponseWriter, r *http.Request) {
 	s.pendingDiff = &d
 
 	// 调试：记录差异信息
-	s.log.Infof("配置导入差异统计: Server=%d, SSL=%d, Admin=%d, Security=%d, ProxyAdded=%d, ProxyRemoved=%d, ProxyModified=%d",
+	s.log.Infof("Config import diff: Server=%d, SSL=%d, Admin=%d, Security=%d, ProxyAdded=%d, ProxyRemoved=%d, ProxyModified=%d",
 		len(d.ServerChanges), len(d.SSLChanges), len(d.AdminChanges), len(d.SecurityChanges),
 		len(d.ProxyAdded), len(d.ProxyRemoved), len(d.ProxyModified))
 
@@ -99,7 +99,7 @@ func (s *Server) handleConfigPreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.pendingImport == nil || s.pendingDiff == nil {
-		http.Error(w, "没有待预览的配置", http.StatusBadRequest)
+		http.Error(w, "no configuration to preview", http.StatusBadRequest)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -115,7 +115,7 @@ func (s *Server) handleConfigApply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.pendingImport == nil {
-		http.Error(w, "没有待应用的配置", http.StatusBadRequest)
+		http.Error(w, "no configuration to apply", http.StatusBadRequest)
 		return
 	}
 	// 写回文件：保留原路径，避免被导入配置覆盖
@@ -124,7 +124,7 @@ func (s *Server) handleConfigApply(w http.ResponseWriter, r *http.Request) {
 	// 恢复原有配置文件路径
 	s.config.ConfigFile = oldPath
 	if err := s.config.Save(oldPath); err != nil {
-		http.Error(w, "保存配置失败: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "failed to save config: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	// 清理pending

@@ -52,7 +52,7 @@ func (s *Server) handleProxyAdd(w http.ResponseWriter, r *http.Request) {
 			// 尝试为该域名预取/申请证书（若启用 ACME）
 			if s.sslManager != nil {
 				if err := s.sslManager.EnsureDomainCert(domain); err != nil {
-					s.log.Warnf("预取证书失败 %s: %v", domain, err)
+					s.log.Warnf("Failed to prefetch certificate %s: %v", domain, err)
 				}
 			}
 
@@ -80,7 +80,7 @@ func (s *Server) handleProxyEdit(w http.ResponseWriter, r *http.Request) {
 	indexStr := r.URL.Query().Get("index")
 	index, err := strconv.Atoi(indexStr)
 	if err != nil || index < 0 || index >= len(s.config.Proxy.Rules) {
-		http.Error(w, "无效的规则索引", http.StatusBadRequest)
+		http.Error(w, "invalid rule index", http.StatusBadRequest)
 		return
 	}
 
@@ -99,7 +99,7 @@ func (s *Server) handleProxyEdit(w http.ResponseWriter, r *http.Request) {
 			// 尝试为该域名预取/申请证书（若启用 ACME）
 			if s.sslManager != nil {
 				if err := s.sslManager.EnsureDomainCert(domain); err != nil {
-					s.log.Warnf("预取证书失败 %s: %v", domain, err)
+					s.log.Warnf("Failed to prefetch certificate %s: %v", domain, err)
 				}
 			}
 
@@ -130,7 +130,7 @@ func (s *Server) handleProxyDelete(w http.ResponseWriter, r *http.Request) {
 	indexStr := r.URL.Query().Get("index")
 	index, err := strconv.Atoi(indexStr)
 	if err != nil || index < 0 || index >= len(s.config.Proxy.Rules) {
-		http.Error(w, "无效的规则索引", http.StatusBadRequest)
+		http.Error(w, "invalid rule index", http.StatusBadRequest)
 		return
 	}
 
