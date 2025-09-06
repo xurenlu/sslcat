@@ -430,6 +430,7 @@ func (s *Server) getSystemStats() map[string]interface{} {
 		"UptimeString":    s.formatDuration(uptime),
 		"SSLCertificates": len(s.sslManager.GetCertificateList()),
 		"BlockedIPs":      len(s.securityManager.GetBlockedIPs()),
+		"PublicIP":        s.fetchPublicIPv4(),
 	}
 }
 

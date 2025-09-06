@@ -39,9 +39,13 @@ PREFERRED="sslcat_${VER}_${OS}_${ARCH}"
 EXT=".tar.gz"
 if [[ "$OS" == "windows" ]]; then EXT=".zip"; fi
 TMP="$(mktemp -d)"
-URL_PREF="https://github.com/xurenlu/sslcat/releases/download/v${VER}/${PREFERRED}${EXT}"
-echo "[sslcat] 下载: $URL_PREF"
-curl -fsSL "$URL_PREF" -o "$TMP/pkg${EXT}"
+URL_GH="https://github.com/xurenlu/sslcat/releases/download/v${VER}/sslcat_v${VER}_${OS}-${ARCH}${EXT}"
+URL_CN="https://sslcat.com/xurenlu/sslcat/releases/download/v${VER}/sslcat_v${VER}_${OS}-${ARCH}${EXT}"
+echo "[sslcat] 优先下载: $URL_GH"
+if ! curl -fsSL "$URL_GH" -o "$TMP/pkg${EXT}"; then
+  echo "[sslcat] GitHub下载失败，尝试中国大陆镜像: $URL_CN"
+  curl -fsSL "$URL_CN" -o "$TMP/pkg${EXT}"
+fi
 
 if [[ "$OS" == "darwin" ]]; then
   tar -xzf "$TMP/pkg${EXT}" -C "$TMP"

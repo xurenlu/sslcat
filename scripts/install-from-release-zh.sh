@@ -38,9 +38,13 @@ EXT=.tar.gz
 
 # 使用 sslcat.com 代理加速 GitHub Releases（仅新命名）
 TMP=$(mktemp -d)
-URL_PREF="https://sslcat.com/xurenlu/sslcat/releases/download/v${VER}/${PREFERRED}${EXT}"
-echo "[sslcat] 下载: $URL_PREF"
-curl -fsSL "$URL_PREF" -o "$TMP/pkg${EXT}"
+URL_CN="https://sslcat.com/xurenlu/sslcat/releases/download/v${VER}/sslcat_v${VER}_${OS}-${ARCH}${EXT}"
+URL_GH="https://github.com/xurenlu/sslcat/releases/download/v${VER}/sslcat_v${VER}_${OS}-${ARCH}${EXT}"
+echo "[sslcat] 优先使用中国大陆镜像: $URL_CN"
+if ! curl -fsSL "$URL_CN" -o "$TMP/pkg${EXT}"; then
+  echo "[sslcat] 镜像下载失败，改用 GitHub 原地址: $URL_GH"
+  curl -fsSL "$URL_GH" -o "$TMP/pkg${EXT}"
+fi
 
 if [[ "$OS" == "darwin" ]]; then
   tar -xzf "$TMP/pkg${EXT}" -C "$TMP"
