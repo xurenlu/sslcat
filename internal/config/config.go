@@ -56,7 +56,7 @@ type AdminConfig struct {
 type ProxyConfig struct {
 	Rules []ProxyRule `json:"rules"`
 	// 未命中代理规则时的行为: "404" | "302" | "blank" | "502"
-	UnmatchedBehavior   string `json:"unmatched_behavior"`
+	UnmatchedBehavior string `json:"unmatched_behavior"`
 	// 当 UnmatchedBehavior=="302" 时的跳转URL
 	UnmatchedRedirectURL string `json:"unmatched_redirect_url"`
 }
@@ -172,8 +172,8 @@ func Load(configFile string) (*Config, error) {
 			PasswordFile: "./data/admin.pass",
 		},
 		Proxy: ProxyConfig{
-			Rules:               []ProxyRule{},
-			UnmatchedBehavior:   "502",
+			Rules:                []ProxyRule{},
+			UnmatchedBehavior:    "502",
 			UnmatchedRedirectURL: "",
 		},
 		Security: SecurityConfig{
