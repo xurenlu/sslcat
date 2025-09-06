@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 )
 
 // KeyChange 描述一个字段的变更
@@ -63,7 +64,16 @@ func CompareConfigs(cur, prop *Config) ConfigDiff {
 	diff := ConfigDiff{}
 
 	diff.ServerChanges = compareStruct(&cur.Server, &prop.Server, []string{"Host", "Port", "Debug"}, "server.")
-	diff.SSLChanges = compareStruct(&cur.SSL, &prop.SSL, []string{"Email", "Staging", "CertDir", "KeyDir", "AutoRenew"}, "ssl.")
+	diff.SSLChanges = compareStruct(&cur.SSL, &prop.SSL, []string{"Email", "Staging", "CertDir", "KeyDir", "AutoRenew", "DisableSelfSigned"}, "ssl.")
+
+	// SSL Domains 需要特殊处理
+	if !reflect.DeepEqual(cur.SSL.Domains, prop.SSL.Domains) {
+		diff.SSLChanges = append(diff.SSLChanges, KeyChange{
+			Key: "ssl.domains",
+			Old: fmt.Sprintf("[%s]", strings.Join(cur.SSL.Domains, ", ")),
+			New: fmt.Sprintf("[%s]", strings.Join(prop.SSL.Domains, ", ")),
+		})
+	}
 
 	// Admin: 不直接展示密码明文
 	if cur.Admin.Username != prop.Admin.Username {
@@ -74,6 +84,9 @@ func CompareConfigs(cur, prop *Config) ConfigDiff {
 	}
 	if cur.Admin.FirstRun != prop.Admin.FirstRun {
 		diff.AdminChanges = append(diff.AdminChanges, KeyChange{Key: "admin.first_run", Old: stringOf(cur.Admin.FirstRun), New: stringOf(prop.Admin.FirstRun)})
+	}
+	if cur.Admin.PasswordFile != prop.Admin.PasswordFile {
+		diff.AdminChanges = append(diff.AdminChanges, KeyChange{Key: "admin.password_file", Old: cur.Admin.PasswordFile, New: prop.Admin.PasswordFile})
 	}
 
 	// Security
@@ -90,6 +103,10 @@ func CompareConfigs(cur, prop *Config) ConfigDiff {
 	if cur.Security.BlockFile != prop.Security.BlockFile {
 		diff.SecurityChanges = append(diff.SecurityChanges, KeyChange{Key: "security.block_file", Old: cur.Security.BlockFile, New: prop.Security.BlockFile})
 	}
+	// TLS 指纹相关配置
+	diff.SecurityChanges = append(diff.SecurityChanges, simpleDiff("security.tls_fp_window_sec", cur.Security.TLSFingerprintWindowSec, prop.Security.TLSFingerprintWindowSec)...)
+	diff.SecurityChanges = append(diff.SecurityChanges, simpleDiff("security.tls_fp_max_per_min", cur.Security.TLSFingerprintMaxPerMin, prop.Security.TLSFingerprintMaxPerMin)...)
+	diff.SecurityChanges = append(diff.SecurityChanges, simpleDiff("security.tls_fp_top_n", cur.Security.TLSFingerprintTopN, prop.Security.TLSFingerprintTopN)...)
 
 	if cur.AdminPrefix != prop.AdminPrefix {
 		kc := KeyChange{Key: "admin_prefix", Old: cur.AdminPrefix, New: prop.AdminPrefix}

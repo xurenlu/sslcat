@@ -1,13 +1,33 @@
 # SSLcat - SSL Proxy Server
 
-SSLcat is a powerful SSL proxy server that supports automatic certificate management, domain forwarding, security protection, and web management panel. It now provides HTTP/3 (QUIC) and HTTP/2 support via ALPN with graceful fallback.
+## ⏱️ Quick Start with SSLcat in 1 Minute
 
-## 📚 Documentation
+```bash
+# 1) One-click installation (Linux)
+# For users in mainland China (accelerated via sslcat.com)
+curl -fsSL https://sslcat.com/xurenlu/sslcat/main/scripts/install-from-release-zh.sh | sudo bash -s -- -v 1.0.11
+# Non-mainland users can directly use GitHub raw content:
+# curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/scripts/install-from-release.sh | sudo bash -s -- -v 1.0.11
+
+# 2) macOS local quick test (or download darwin package manually)
+curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.0.11/sslcat_1.0.11_darwin_arm64.tar.gz -o sslcat.tgz
+tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
+sslcat --config sslcat.conf --port 8080
+# Browser access: http://localhost:8080/sslcat-panel/
+# First login: admin / admin*9527 (will force password change and generate admin.pass)
+
+# 3) Optional: Docker Compose one-click start
+docker compose up -d
+```
+
+SSLcat is a powerful SSL proxy server that supports automatic certificate management, domain forwarding, security protection, and web management panel, with HTTP/3 (QUIC) and HTTP/2 protocol support (automatic negotiation, backward compatible).
+
+## 📚 Documentation Navigation
 
 - 📑 [Complete Documentation Index](DOCS.md) - Index and navigation for all documents
-- 📖 [Project Summary (Chinese)](项目总结.md) - Detailed feature introduction and technical documentation
-- 🚀 [Deployment Guide (English)](DEPLOYMENT_EN.md) - Complete deployment and operations documentation
-- 🚀 [部署指南 (中文)](DEPLOYMENT.md) - Chinese deployment guide
+- 📖 [Project Summary](项目总结.md) - Detailed feature introduction and technical documentation
+- 🚀 [Deployment Guide (Chinese)](DEPLOYMENT.md) - Complete deployment and operations documentation
+- 🚀 [Deployment Guide (English)](DEPLOYMENT_EN.md) - English deployment guide
 
 ### 🌍 Multilingual Versions
 - 🇨🇳 [中文 README](README.md) - Chinese version
@@ -19,7 +39,7 @@ SSLcat is a powerful SSL proxy server that supports automatic certificate manage
 ## Features
 
 ### 🌏 Network Optimization for China
-- **CDN Proxy Optimization**: Uses [CDNProxy](https://cdnproxy.some.im/docs) service
+- **CDN Proxy Optimization**: Uses [CDNProxy](https://cdnproxy.some.im/docs) proxy service
 - **Access Acceleration**: Solves jsdelivr CDN access issues in mainland China
 - **Stability**: Ensures stable resource loading through proxy service
 
@@ -28,6 +48,7 @@ SSLcat is a powerful SSL proxy server that supports automatic certificate manage
 - Support for automatic certificate renewal
 - Support for staging and production environments
 - Certificate caching and performance optimization
+- **Bulk Certificate Operations**: One-click download/import of all certificates (ZIP format)
 
 ### 🔄 Smart Domain Forwarding
 - Intelligent proxy forwarding based on domain names
@@ -35,11 +56,13 @@ SSLcat is a powerful SSL proxy server that supports automatic certificate manage
 - WebSocket proxy support
 - Connection pooling and load balancing
 
-### 🛡️ Security Protection
+### 🛡️ Security Protection Mechanisms
 - IP blocking and access control
 - Anti-brute force protection
 - User-Agent validation
 - Access logging
+- **TLS Client Fingerprinting**: Client identification based on ClientHello characteristics
+- **Production Environment Optimization**: More lenient security thresholds for high-traffic scenarios
 
 ### 🎛️ Web Management Panel
 - Intuitive web interface
@@ -47,6 +70,8 @@ SSLcat is a powerful SSL proxy server that supports automatic certificate manage
 - Proxy rule management
 - SSL certificate management
 - Security configuration
+- **API Token Management**: Read-only/read-write API access control
+- **TLS Fingerprint Statistics**: Real-time client fingerprint analysis data
 
 ### 🔄 Graceful Restart
 - Zero-downtime restart
@@ -76,7 +101,7 @@ cd sslcat
 # Or download specific version (recommended)
 wget https://github.com/xurenlu/sslcat/archive/refs/heads/main.zip
 unzip main.zip
-cd withssl-main
+cd sslcat-main
 ```
 
 ## 🚀 Quick Installation
@@ -159,42 +184,56 @@ sudo systemctl start sslcat
 
 ### Basic Configuration
 
-```json
-{
-  "server": {
-    "host": "0.0.0.0",
-    "port": 443,
-    "debug": false
-  },
-  "ssl": {
-    "email": "your-email@example.com",
-    "staging": false,
-    "auto_renew": true
-  },
-  "admin": {
-    "username": "admin",
-    "password": "admin*9527",
-    "first_run": true
-  },
-  "proxy": {
-    "rules": [
-      {
-        "domain": "example.com",
-        "target": "127.0.0.1",
-        "port": 8080,
-        "enabled": true,
-        "ssl_only": true
-      }
-    ]
-  },
-  "security": {
-    "max_attempts": 3,
-    "block_duration": "1m",
-    "max_attempts_5min": 10
-  },
-  "admin_prefix": "/sslcat-panel"
-}
+```yaml
+server:
+  host: "0.0.0.0"
+  port: 443
+  debug: false
+
+ssl:
+  email: "your-email@example.com"  # SSL certificate email
+  staging: false                   # Whether to use staging environment
+  auto_renew: true                 # Auto renewal
+
+admin:
+  username: "admin"
+  password_file: "/var/lib/sslcat/admin.pass"     # Password saved in this file, sslcat.conf doesn't persist password
+  first_run: true
+
+proxy:
+  rules:
+    - domain: "example.com"
+      target: "127.0.0.1"
+      port: 8080
+      enabled: true
+      ssl_only: true
+
+security:
+  max_attempts: 3                  # Max failed attempts in 1 minute
+  block_duration: "1m"             # Block duration
+  max_attempts_5min: 10            # Max failed attempts in 5 minutes
+
+admin_prefix: "/sslcat-panel"     # Management panel path prefix
 ```
+
+### Password Recovery (Emergency Recovery)
+
+SSLcat uses "marker file + first-time forced password change" security strategy:
+
+- Marker file: `admin.password_file` (default `./data/admin.pass`). File saves current admin password with 0600 permissions.
+- First login: If marker file doesn't exist, or file content is still default password `admin*9527`, admin will be forced to "change password" page after successful login to set new password and write to marker file.
+
+Password recovery steps:
+
+1. Stop service (or keep running, recommend stopping).
+2. Delete marker file (if path changed, delete according to actual config path):
+   ```bash
+   rm -f ./data/admin.pass
+   ```
+3. Restart service, login with default account (admin / admin*9527).
+4. System will force enter "change password" page, set new password to restore normal operation.
+
+Note: For security reasons, `sslcat.conf` no longer persists `admin.password` plaintext when saving; runtime actual password uses `admin.password_file` as standard.
 
 ## Usage
 
@@ -262,27 +301,19 @@ sudo journalctl -u sslcat -p err
    - SSL Only: Whether to allow HTTPS access only
 
 ### Proxy Rule Example
-```json
-{
-  "proxy": {
-    "rules": [
-      {
-        "domain": "api.example.com",
-        "target": "127.0.0.1",
-        "port": 3000,
-        "enabled": true,
-        "ssl_only": true
-      },
-      {
-        "domain": "app.example.com",
-        "target": "192.168.1.100",
-        "port": 8080,
-        "enabled": true,
-        "ssl_only": false
-      }
-    ]
-  }
-}
+```yaml
+proxy:
+  rules:
+    - domain: "api.example.com"
+      target: "127.0.0.1"
+      port: 3000
+      enabled: true
+      ssl_only: true
+    - domain: "app.example.com"
+      target: "192.168.1.100"
+      port: 8080
+      enabled: true
+      ssl_only: false
 ```
 
 ## SSL Certificate Management
@@ -320,131 +351,17 @@ sudo systemctl restart sslcat
 ## Command Line Arguments
 
 ```bash
-withssl --help
-```
+sslcat [options]
 
-Available options:
-- `--config`: Configuration file path (default: "/etc/sslcat/withssl.conf")
-- `--admin-prefix`: Management panel path prefix (default: "/sslcat-panel")
-- `--email`: SSL certificate email
-- `--staging`: Use Let's Encrypt staging environment
-- `--port`: Listen port (default: 443)
-- `--host`: Listen address (default: "0.0.0.0")
-- `--log-level`: Log level (default: "info")
-- `--version`: Show version information
-
-## Network Optimization
-
-### China Mainland User Optimization
-
-SSLcat has been optimized for China mainland network environment, using [CDNProxy](https://cdnproxy.some.im/docs) service to solve jsdelivr CDN access issues.
-
-#### CDN Proxy Usage
-- **Original address**: `https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css`
-- **Proxy address**: `https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css`
-
-#### Resource Files Involved
-- Bootstrap 5.1.3 CSS
-- Bootstrap Icons 1.7.2
-- Bootstrap 5.1.3 JavaScript
-- Axios JavaScript library
-
-#### Access Control
-According to CDNProxy documentation, the service implements access control policies. If access is blocked, it's usually because the request's Referer domain is not in the whitelist. Contact the service administrator to add your domain to the whitelist if needed.
-
-## Deployment Options
-
-### 1. System Service Deployment
-Use the provided `install.sh` script to automatically install as a system service.
-
-### 2. Docker Deployment
-```bash
-docker build -t sslcat .
-docker run -d -p 80:80 -p 443:443 -v $(pwd)/config:/etc/sslcat sslcat
-```
-
-### 3. Docker Compose Deployment
-```bash
-docker-compose up -d
-```
-
-## Development Guide
-
-### Project Structure
-```
-sslcat/
-├── main.go                 # Main program entry
-├── go.mod                  # Go module file
-├── internal/               # Internal packages
-│   ├── config/            # Configuration management
-│   ├── logger/            # Log management
-│   ├── ssl/               # SSL certificate management
-│   ├── proxy/             # Proxy management
-│   ├── security/          # Security management
-│   ├── web/               # Web server
-│   └── graceful/          # Graceful restart
-├── web/                   # Web resources
-│   ├── templates/         # HTML templates
-│   └── static/            # Static resources
-├── install.sh             # Installation script
-├── deploy.sh              # Deployment script
-├── DEPLOYMENT.md          # Deployment guide
-└── README.md              # Documentation
-```
-
-### Development Environment Setup
-```bash
-# Clone project
-git clone https://github.com/xurenlu/sslcat.git
-cd sslcat
-
-# Install dependencies
-go mod download
-
-# Run development server
-go run main.go --config sslcat.conf --log-level debug
-```
-
-### Cross-Platform Compilation
-
-SSLcat supports cross-compilation for multiple platforms:
-
-```bash
-# Linux 64-bit (recommended for servers)
-make build-linux
-
-# All platforms
-make build-all
-
-# Manual compilation
-GOOS=linux GOARCH=amd64 go build -o withssl-linux main.go
-```
-
-## Performance Optimization
-
-### System Optimization
-```bash
-# Increase file descriptor limit
-echo "* soft nofile 65536" >> /etc/security/limits.conf
-echo "* hard nofile 65536" >> /etc/security/limits.conf
-
-# Optimize network parameters
-echo "net.core.somaxconn = 65536" >> /etc/sysctl.conf
-echo "net.ipv4.tcp_max_syn_backlog = 65536" >> /etc/sysctl.conf
-sysctl -p
-```
-
-### Configuration Optimization
-```json
-{
-  "server": {
-    "debug": false
-  },
-  "security": {
-    "max_attempts": 5,
-    "block_duration": "5m"
-  }
-}
+Options:
+  --config string        Configuration file path (default: "/etc/sslcat/sslcat.conf")
+  --admin-prefix string  Management panel path prefix (default: "/sslcat-panel")
+  --email string         SSL certificate email
+  --staging             Use Let's Encrypt staging environment
+  --port int            Listen port (default: 443)
+  --host string         Listen address (default: "0.0.0.0")
+  --log-level string    Log level (default: "info")
+  --version             Show version information
 ```
 
 ## Troubleshooting
@@ -479,14 +396,105 @@ sysctl -p
 ### Log Analysis
 ```bash
 # View detailed logs
-sudo journalctl -u withssl -f --no-pager
+sudo journalctl -u sslcat -f --no-pager
 
 # Filter error logs
-sudo journalctl -u withssl -p err --since "1 hour ago"
+sudo journalctl -u sslcat -p err --since "1 hour ago"
 
 # View logs for specific time period
-sudo journalctl -u withssl --since "2024-01-01 00:00:00" --until "2024-01-01 23:59:59"
+sudo journalctl -u sslcat --since "2024-01-01 00:00:00" --until "2024-01-01 23:59:59"
 ```
+
+## Performance Optimization
+
+### System Optimization
+```bash
+# Increase file descriptor limit
+echo "* soft nofile 65536" >> /etc/security/limits.conf
+echo "* hard nofile 65536" >> /etc/security/limits.conf
+
+# Optimize network parameters
+echo "net.core.somaxconn = 65536" >> /etc/sysctl.conf
+echo "net.ipv4.tcp_max_syn_backlog = 65536" >> /etc/sysctl.conf
+sysctl -p
+```
+
+### Configuration Optimization
+```yaml
+server:
+  # Enable debug mode for performance analysis
+  debug: false
+  
+proxy:
+  # Configure reasonable number of proxy rules
+  rules: []
+  
+security:
+  # Adjust security parameters
+  max_attempts: 5
+  block_duration: "5m"
+```
+
+## Network Optimization
+
+### China Mainland User Optimization
+
+SSLcat has been optimized for China mainland network environment, using [CDNProxy](https://cdnproxy.some.im/docs) proxy service to solve jsdelivr CDN access issues.
+
+#### CDN Proxy Usage
+- **Original address**: `https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css`
+- **Proxy address**: `https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css`
+
+#### Resource Files Involved
+- Bootstrap 5.1.3 CSS
+- Bootstrap Icons 1.7.2
+- Bootstrap 5.1.3 JavaScript
+- Axios JavaScript library
+
+#### Access Control
+According to CDNProxy documentation, the service implements access control policies. If access is blocked, it's usually because the request's Referer domain is not in the whitelist. Contact the service administrator to add your domain to the whitelist if needed.
+
+## Development Guide
+
+### Project Structure
+```
+sslcat/
+├── main.go                 # Main program entry
+├── go.mod                  # Go module file
+├── internal/               # Internal packages
+│   ├── config/            # Configuration management
+│   ├── logger/            # Log management
+│   ├── ssl/               # SSL certificate management
+│   ├── proxy/             # Proxy management
+│   ├── security/          # Security management
+│   ├── web/               # Web server
+│   └── graceful/          # Graceful restart
+├── web/                   # Web resources
+│   ├── templates/         # HTML templates
+│   └── static/            # Static resources
+├── install.sh             # Installation script
+└── README.md              # Documentation
+```
+
+### Development Environment Setup
+```bash
+# Clone project
+git clone https://github.com/xurenlu/sslcat.git
+cd sslcat
+
+# Install dependencies
+go mod download
+
+# Run development server
+go run main.go --config sslcat.conf --log-level debug
+```
+
+### Contributing Guide
+1. Fork project
+2. Create feature branch
+3. Commit changes
+4. Push to branch
+5. Create Pull Request
 
 ## License
 
@@ -509,4 +517,3 @@ If you encounter issues or have suggestions:
 - Support for web management panel
 - Support for security protection mechanisms
 - Support for graceful restart functionality
-- Optimized for China mainland network environment
