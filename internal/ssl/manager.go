@@ -833,3 +833,25 @@ func (m *Manager) ListCertificatesFromDisk() []CertificateInfo {
 	m.certMutex.RUnlock()
 	return certs
 }
+
+// HasValidSSLCertificates 检查是否有有效的非自签名证书
+func (m *Manager) HasValidSSLCertificates() bool {
+	certs := m.GetCertificateList()
+	for _, cert := range certs {
+		if !cert.SelfSigned && cert.Status == "有效" {
+			return true
+		}
+	}
+	return false
+}
+
+// GetFirstValidSSLDomain 获取第一个有效的非自签名SSL证书域名
+func (m *Manager) GetFirstValidSSLDomain() string {
+	certs := m.GetCertificateList()
+	for _, cert := range certs {
+		if !cert.SelfSigned && cert.Status == "有效" {
+			return cert.Domain
+		}
+	}
+	return ""
+}

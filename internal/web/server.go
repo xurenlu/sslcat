@@ -37,6 +37,8 @@ type Server struct {
 	pendingDiff       *config.ConfigDiff
 	// Token 管理
 	tokenStore *security.TokenStore
+	// 验证码管理
+	captchaManager *CaptchaManager
 }
 
 // NewServer 创建Web服务器
@@ -79,6 +81,9 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 
 	// 初始化 TokenStore
 	server.tokenStore = security.NewTokenStore("./data/tokens.json")
+	
+	// 初始化验证码管理器
+	server.captchaManager = NewCaptchaManager()
 
 	server.setupRoutes()
 	return server
@@ -151,6 +156,7 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security-logs", s.handleAPISecurityLogs)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/audit", s.handleAPIAudit)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/tls-fingerprints", s.handleAPITLSFingerprints)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/captcha", s.handleAPICaptcha)
 
 	// Token 管理路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/tokens", s.handleTokensPage)

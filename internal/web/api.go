@@ -147,3 +147,33 @@ func (s *Server) handleAPITLSFingerprints(w http.ResponseWriter, r *http.Request
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"fingerprints": stats})
 }
+
+// handleAPICaptcha 处理验证码API请求
+func (s *Server) handleAPICaptcha(w http.ResponseWriter, r *http.Request) {
+	// 验证码API不需要登录认证，但只有在需要验证码时才能访问
+	if !s.sslManager.HasValidSSLCertificates() {
+		w.WriteHeader(http.StatusNotFound)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"error":"captcha not required"}`))
+		return
+	}
+
+	if r.Method == "GET" {
+		// 生成新的验证码
+		captchaData, err := s.captchaManager.GenerateCaptcha()
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"error":"failed to generate captcha"}`))
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(captchaData)
+		return
+	}
+
+	w.WriteHeader(http.StatusMethodNotAllowed)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"error":"method not allowed"}`))
+}

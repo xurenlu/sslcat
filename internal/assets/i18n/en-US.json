@@ -246,6 +246,8 @@
   "default.enter_admin": "Enter Admin Panel",
   "default.configure_hint": "Please configure domain forwarding rules via the admin panel",
   "login.invalid": "Invalid username or password",
+  "captcha.required": "Please complete human verification",
+  "captcha.invalid": "Captcha incorrect, please try again",
   "proxy.edit_rule": "Edit Proxy Rule",
   "common.back": "Back",
   "common.upload": "Upload",

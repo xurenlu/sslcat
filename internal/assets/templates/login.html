@@ -93,8 +93,25 @@
                                 <input type="password" class="form-control" id="password" name="password" required>
                             </div>
                             
+                            {{if .RequireCaptcha}}
+                            <div class="mb-4" id="captcha-container">
+                                <label for="captcha" class="form-label">
+                                    <i class="bi bi-shield-check"></i> 真人验证
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light" id="captcha-question">正在加载...</span>
+                                    <input type="number" class="form-control" id="captcha" name="captcha" placeholder="请输入答案" required>
+                                    <button type="button" class="btn btn-outline-secondary" id="refresh-captcha">
+                                        <i class="bi bi-arrow-clockwise"></i>
+                                    </button>
+                                </div>
+                                <input type="hidden" id="captcha-session-id" name="captcha_session_id">
+                                <div class="form-text">请计算上述数学题的答案以验证您是真人</div>
+                            </div>
+                            {{end}}
+                            
                             <div class="d-grid">
-                                <button type="submit" class="btn btn-primary btn-login">
+                                <button type="submit" class="btn btn-primary btn-login" id="login-submit">
                                     <i class="bi bi-box-arrow-in-right"></i> {{t "login.submit"}}
                                 </button>
                             </div>
@@ -113,5 +130,48 @@
     </div>
     
     <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    {{if .RequireCaptcha}}
+    <script>
+        {{.JSDecodeFunction}}
+        
+        // 加载验证码
+        function loadCaptcha() {
+            const questionElement = document.getElementById('captcha-question');
+            const submitButton = document.getElementById('login-submit');
+            
+            questionElement.textContent = '正在加载...';
+            submitButton.disabled = true;
+            
+            fetch('{{.AdminPrefix}}/api/captcha')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('网络请求失败');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    loadCaptchaQuestion(data);
+                    submitButton.disabled = false;
+                })
+                .catch(error => {
+                    console.error('加载验证码失败:', error);
+                    questionElement.textContent = '验证码加载失败，请刷新页面';
+                    submitButton.disabled = false;
+                });
+        }
+        
+        // 页面加载完成后初始化验证码
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCaptcha();
+            
+            // 刷新验证码按钮事件
+            document.getElementById('refresh-captcha').addEventListener('click', function() {
+                loadCaptcha();
+                document.getElementById('captcha').value = '';
+            });
+        });
+    </script>
+    {{end}}
 </body>
 </html>

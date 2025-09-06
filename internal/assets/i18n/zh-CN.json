@@ -210,6 +210,8 @@
   "default.enter_admin": "进入管理面板",
   "default.configure_hint": "请通过管理面板配置域名转发规则",
   "login.invalid": "用户名或密码错误",
+  "captcha.required": "请完成真人验证",
+  "captcha.invalid": "验证码错误，请重试",
   "proxy.edit_rule": "编辑代理规则",
   "common.back": "返回",
   "common.upload": "上传",

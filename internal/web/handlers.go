@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 )
 
@@ -26,10 +27,20 @@ func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
+		// 检查是否需要验证码（有真实SSL证书时启用）
+		requireCaptcha := s.sslManager.HasValidSSLCertificates()
+		
 		data := map[string]interface{}{
-			"AdminPrefix": s.config.AdminPrefix,
-			"Error":       "",
+			"AdminPrefix":     s.config.AdminPrefix,
+			"Error":           "",
+			"RequireCaptcha":  requireCaptcha,
 		}
+		
+		// 如果需要验证码，添加JS解码函数
+		if requireCaptcha {
+			data["JSDecodeFunction"] = s.captchaManager.GetJSDecodeFunction()
+		}
+		
 		s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
 		return
 	}
@@ -112,6 +123,23 @@ func (s *Server) handleDefault(w http.ResponseWriter, r *http.Request, domain st
 func (s *Server) processLogin(w http.ResponseWriter, r *http.Request) {
 	username := r.FormValue("username")
 	password := r.FormValue("password")
+
+	// 如果需要验证码，先验证验证码
+	if s.sslManager.HasValidSSLCertificates() {
+		captchaAnswer := r.FormValue("captcha")
+		sessionID := r.FormValue("captcha_session_id")
+		
+		if captchaAnswer == "" || sessionID == "" {
+			s.renderLoginError(w, r, s.translator.T("captcha.required"))
+			return
+		}
+		
+		// 验证验证码答案
+		if answer, err := strconv.Atoi(captchaAnswer); err != nil || !s.captchaManager.VerifyCaptcha(sessionID, answer) {
+			s.renderLoginError(w, r, s.translator.T("captcha.invalid"))
+			return
+		}
+	}
 
 	// 计算有效管理员密码：优先使用密码文件，其次使用配置中的密码
 	effective := s.getEffectiveAdminPassword()
@@ -440,4 +468,23 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+}
+
+// renderLoginError 渲染登录错误页面
+func (s *Server) renderLoginError(w http.ResponseWriter, r *http.Request, errorMsg string) {
+	// 检查是否需要验证码
+	requireCaptcha := s.sslManager.HasValidSSLCertificates()
+	
+	data := map[string]interface{}{
+		"AdminPrefix":    s.config.AdminPrefix,
+		"Error":          errorMsg,
+		"RequireCaptcha": requireCaptcha,
+	}
+	
+	// 如果需要验证码，添加JS解码函数
+	if requireCaptcha {
+		data["JSDecodeFunction"] = s.captchaManager.GetJSDecodeFunction()
+	}
+	
+	s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
 }
