@@ -5,12 +5,12 @@
 ```bash
 # 1) 一键安装（Linux）
 # 面向中国大陆用户（通过 sslcat.com 加速）
-curl -fsSL https://sslcat.com/xurenlu/sslcat/main/scripts/install-from-release-zh.sh | sudo bash -s -- -v 1.0.10
+curl -fsSL https://sslcat.com/xurenlu/sslcat/main/scripts/install-from-release-zh.sh | sudo bash -s -- -v 1.0.11
 # 非大陆用户可直接使用 GitHubusercontent：
-# curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/scripts/install-from-release.sh | sudo bash -s -- -v 1.0.10
+# curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/scripts/install-from-release.sh | sudo bash -s -- -v 1.0.11
 
 # 2) macOS 本地快速试用（或自行下载 darwin 包）
-curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.0.10/sslcat_1.0.10_darwin_arm64.tar.gz -o sslcat.tgz
+curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.0.11/sslcat_1.0.11_darwin_arm64.tar.gz -o sslcat.tgz
 tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
 sslcat --config sslcat.conf --port 8080
 # 浏览器访问: http://localhost:8080/sslcat-panel/
@@ -49,6 +49,7 @@ SSLcat 是一个功能强大的 SSL 代理服务器，支持自动证书管理�
 - 支持证书自动续期
 - 支持测试环境和生产环境
 - 证书缓存和性能优化
+- **批量证书操作**：一键下载/导入所有证书（ZIP 格式）
 
 ### 🔄 智能域名转发
 - 基于域名的智能代理转发
@@ -61,6 +62,8 @@ SSLcat 是一个功能强大的 SSL 代理服务器，支持自动证书管理�
 - 防暴力破解保护
 - User-Agent 验证
 - 访问日志记录
+- **TLS 客户端指纹识别**：基于 ClientHello 特征的客户端识别
+- **生产环境优化**：更宽松的安全阈值，适合高流量场景
 
 ### 🎛️ Web 管理面板
 - 直观的 Web 界面
@@ -68,6 +71,8 @@ SSLcat 是一个功能强大的 SSL 代理服务器，支持自动证书管理�
 - 代理规则管理
 - SSL 证书管理
 - 安全设置配置
+- **API Token 管理**：支持只读/读写权限的 API 访问控制
+- **TLS 指纹统计**：实时展示客户端指纹分析数据
 
 ### 🔄 平滑重启
 - 零停机时间重启
