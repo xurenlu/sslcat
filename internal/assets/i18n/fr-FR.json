@@ -167,5 +167,6 @@
   "mobile.proxy_config": "Configuration Proxy",
   "mobile.security_protection": "Protection de Sécurité",
   "mobile.view_logs": "Voir les Logs",
-  "mobile.real_time_monitor": "Surveillance de Trafic en Temps Réel"
+  "mobile.real_time_monitor": "Surveillance de Trafic en Temps Réel",
+  "security.tls_fp_stats": "Statistiques d'Empreintes TLS Client"
 }

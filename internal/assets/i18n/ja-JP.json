@@ -167,5 +167,6 @@
   "mobile.proxy_config": "プロキシ設定",
   "mobile.security_protection": "セキュリティ保護",
   "mobile.view_logs": "ログ表示",
-  "mobile.real_time_monitor": "リアルタイム トラフィック監視"
+  "mobile.real_time_monitor": "リアルタイム トラフィック監視",
+  "security.tls_fp_stats": "TLS クライアント指紋 統計"
 }

@@ -221,6 +221,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 可选：WAF 检测（开启时才生效）
+	if s.config.Security.EnableWAF {
+		// 这里假设后续我们会在 Server 中集成一个 wafEngine（如 s.wafEngine），
+		// 当前版本仅预留接口示意。如果已存在 waf 引擎实例，可在此调用：
+		// if evt, blocked := s.wafEngine.CheckRequest(r); blocked { ... }
+		// 为保持稳定，此处不引入新字段，仅做占位以便后续扩展。
+	}
+
 	// 代理中间件
 	if s.proxyMiddleware(w, r) {
 		return

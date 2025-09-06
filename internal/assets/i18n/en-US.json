@@ -118,6 +118,7 @@
   "security.no_records": "No records",
   "security.load_failed": "Load failed",
   "security.no_blocked": "No blocked IPs",
+  "security.tls_fp_stats": "TLS Client Fingerprint Stats",
   
   "waf.sql_injection": "SQL Injection",
   "waf.xss": "Cross-Site Scripting",
@@ -227,6 +228,7 @@
   "mobile.security_protection": "Security Protection",
   "mobile.view_logs": "View Logs",
   "mobile.real_time_monitor": "Real-time Traffic Monitoring",
+  "security.tls_fp_stats": "TLS Client Fingerprint Stats",
   "menu.logout": "Logout",
   "menu.language": "Language",
   "menu.official_site": "Official Site",
