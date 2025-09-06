@@ -503,10 +503,10 @@ If you encounter issues or have suggestions:
 
 ## Changelog
 
-### v1.0.0 (2024-01-01)
-- Initial release
-- Support for automatic SSL certificate management
-- Support for domain proxy forwarding
-- Support for web management panel
-- Support for security protection mechanisms
-- Support for graceful restart functionality
+For complete version update history, please refer to: **[CHANGELOG.md](CHANGELOG.md)**
+
+### Latest Version v1.0.11 (2025-01-03)
+- 🎉 Complete multilingual support (Chinese, English, Japanese, Spanish, French, Russian)
+- 🔒 Enhanced security settings: First login requires admin panel path configuration
+- 📚 Documentation structure optimization and user experience improvements
+- 🔧 Unified version management and build optimization

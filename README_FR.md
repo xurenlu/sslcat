@@ -501,12 +501,12 @@ Si vous rencontrez des problèmes ou avez des suggestions :
 3. Créer un nouveau Issue
 4. Contacter les mainteneurs
 
-## Changelog
+## Journal des Modifications
 
-### v1.0.0 (2024-01-01)
-- Version initiale
-- Support pour la gestion automatique des certificats SSL
-- Support pour le transfert proxy de domaines
-- Support pour le panneau d'administration web
-- Support pour les mécanismes de protection de sécurité
-- Support pour la fonctionnalité de redémarrage gracieux
+Pour l'historique complet des mises à jour de version, veuillez consulter : **[CHANGELOG.md](CHANGELOG.md)**
+
+### Dernière Version v1.0.11 (2025-01-03)
+- 🎉 Support multilingue complet (chinois, anglais, japonais, espagnol, français, russe)
+- 🔒 Paramètres de sécurité améliorés : La première connexion nécessite la configuration du chemin du panneau
+- 📚 Optimisation de la structure de documentation et améliorations de l'expérience utilisateur
+- 🔧 Gestion unifiée des versions et optimisation de construction

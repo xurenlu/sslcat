@@ -527,12 +527,12 @@ Si encuentras problemas o tienes sugerencias:
 3. Crear un nuevo Issue
 4. Contactar a los mantenedores
 
-## Changelog
+## Registro de Cambios
 
-### v1.0.0 (2024-01-01)
-- Lanzamiento inicial
-- Soporte para gestión automática de certificados SSL
-- Soporte para reenvío de proxy de dominios
-- Soporte para panel de administración web
-- Soporte para mecanismos de protección de seguridad
-- Soporte para funcionalidad de reinicio elegante
+Para el historial completo de actualizaciones de versión, consulte: **[CHANGELOG.md](CHANGELOG.md)**
+
+### Última Versión v1.0.11 (2025-01-03)
+- 🎉 Soporte completo multilingüe (chino, inglés, japonés, español, francés, ruso)
+- 🔒 Configuraciones de seguridad mejoradas: El primer login requiere configuración de ruta del panel
+- 📚 Optimización de estructura de documentación y mejoras de experiencia de usuario
+- 🔧 Gestión unificada de versiones y optimización de construcción
