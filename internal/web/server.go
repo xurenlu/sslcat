@@ -287,8 +287,33 @@ func (s *Server) proxyMiddleware(w http.ResponseWriter, r *http.Request) bool {
 		return true
 	}
 
-	// 没有找到代理配置，直接返回 404，避免暴露面板路径
-	http.NotFound(w, r)
+	// 没有找到代理配置，依据配置项处理
+	switch s.config.Proxy.UnmatchedBehavior {
+	case "302":
+		target := s.config.Proxy.UnmatchedRedirectURL
+		if target == "" {
+			target = "https://sslcat.com"
+		}
+		s.log.Warnf("Unmatched proxy for host=%s path=%s, redirecting to %s", host, r.URL.Path, target)
+		http.Redirect(w, r, target, http.StatusFound)
+	case "blank":
+		s.log.Warnf("Unmatched proxy for host=%s path=%s, returning blank", host, r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+	case "404":
+		s.log.Warnf("Unmatched proxy for host=%s path=%s, returning 404", host, r.URL.Path)
+		http.NotFound(w, r)
+	default: // "502"
+		s.log.Warnf("Unmatched proxy for host=%s path=%s, returning 502", host, r.URL.Path)
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusBadGateway)
+		w.Write([]byte("\n  ____  ____  _      _      _          \n" +
+			" / ___||  _ \\| | ___| | ___| |_ __ _ \n" +
+			" \\___ \\| |_) | |/ _ \\ |/ _ \\ __/ _` |\n" +
+			"  ___) |  __/| |  __/ |  __/ || (_| |\n" +
+			" |____/|_|   |_|\\___|_|\\___|\\__\\__,_|\n\n" +
+			"This server is enhanced and managed by SSLcat.\n" +
+			"Visit: https://sslcat.com\n"))
+	}
 	return true
 }
 

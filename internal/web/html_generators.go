@@ -621,9 +621,9 @@ func (s *Server) generateSecurityManagementHTML(data map[string]interface{}) str
                                 <h5 class="mb-0">%s</h5>
                             </div>
                             <div class="card-body">
-                                <p><strong>%s:</strong> 90/1min</p>
-                                <p><strong>%s:</strong> 300/5min</p>
-                                <p><strong>%s:</strong> 5s</p>
+                                <p><strong>%s:</strong> %d/1min</p>
+                                <p><strong>%s:</strong> %d/5min</p>
+                                <p><strong>%s:</strong> %s</p>
                                 <p><strong>%s:</strong> ON</p>
                             </div>
                         </div>
@@ -634,7 +634,7 @@ func (s *Server) generateSecurityManagementHTML(data map[string]interface{}) str
                     <div class="col-md-6">
                         <div class="card">
                             <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0">TLS 客户端指纹统计</h5>
+                                <h5 class="mb-0">%s</h5>
                                 <a class="btn btn-sm btn-outline-secondary" href="%s/api/tls-fingerprints">JSON</a>
                             </div>
                             <div class="card-body">
@@ -742,7 +742,8 @@ func (s *Server) generateSecurityManagementHTML(data map[string]interface{}) str
 		thIP, thBlockTime, thActions,
 		s.generateBlockedIPsTable(data),
 		securityConfig,
-		maxAttempts, maxAttempts5, blockDuration, uaCheck,
+		maxAttempts, s.config.Security.MaxAttempts, maxAttempts5, s.config.Security.MaxAttempts5Min, blockDuration, s.config.Security.BlockDuration.String(), uaCheck,
+		s.translator.T("security.tls_fp_stats"),
 		data["AdminPrefix"].(string), loading,
 		auditLog, data["AdminPrefix"].(string), exportJSON,
 		auditTime, auditUser, auditAction, auditDetail, loading,

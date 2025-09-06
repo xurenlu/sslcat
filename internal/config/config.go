@@ -55,6 +55,10 @@ type AdminConfig struct {
 // ProxyConfig 代理配置
 type ProxyConfig struct {
 	Rules []ProxyRule `json:"rules"`
+	// 未命中代理规则时的行为: "404" | "302" | "blank" | "502"
+	UnmatchedBehavior   string `json:"unmatched_behavior"`
+	// 当 UnmatchedBehavior=="302" 时的跳转URL
+	UnmatchedRedirectURL string `json:"unmatched_redirect_url"`
 }
 
 // ProxyRule 代理规则
@@ -168,7 +172,9 @@ func Load(configFile string) (*Config, error) {
 			PasswordFile: "./data/admin.pass",
 		},
 		Proxy: ProxyConfig{
-			Rules: []ProxyRule{},
+			Rules:               []ProxyRule{},
+			UnmatchedBehavior:   "502",
+			UnmatchedRedirectURL: "",
 		},
 		Security: SecurityConfig{
 			MaxAttempts:      900,
@@ -182,8 +188,8 @@ func Load(configFile string) (*Config, error) {
 				"Safari/",
 				"Edge/",
 			},
-			UAInvalidMax1Min: 30,
-			UAInvalidMax5Min: 100,
+			UAInvalidMax1Min:        30,
+			UAInvalidMax5Min:        100,
 			TLSFingerprintWindowSec: 60,
 			TLSFingerprintMaxPerMin: 60000,
 			TLSFingerprintTopN:      20,
