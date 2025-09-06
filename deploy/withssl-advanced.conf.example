@@ -9,7 +9,8 @@
     "staging": false,
     "auto_renew": true,
     "cert_dir": "./data/ssl/certs",
-    "key_dir": "./data/ssl/keys"
+    "key_dir": "./data/ssl/keys",
+    "disable_self_signed": true
   },
   "proxy": {
     "rules": [

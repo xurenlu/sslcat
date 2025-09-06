@@ -27,14 +27,14 @@ import (
 
 // Manager SSL证书管理器
 type Manager struct {
-	config     *config.Config
-	certCache  map[string]*tls.Certificate
-	certMutex  sync.RWMutex
-	stopChan   chan struct{}
-	log        *logrus.Entry
-	notifier   *notify.Notifier
-	lastNotify map[string]string
-	acmeMgr    *autocert.Manager
+	config      *config.Config
+	certCache   map[string]*tls.Certificate
+	certMutex   sync.RWMutex
+	stopChan    chan struct{}
+	log         *logrus.Entry
+	notifier    *notify.Notifier
+	lastNotify  map[string]string
+	acmeMgr     *autocert.Manager
 	defaultCert *tls.Certificate
 }
 
@@ -54,8 +54,11 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 	}
 
 	// 初始化一个默认自签证书（用于未允许域名回退，避免写盘）
-	if cert, err := manager.generateSelfSignedCert("localhost"); err == nil {
-		manager.defaultCert = cert
+	// 若禁用自签，则不生成默认证书
+	if !cfg.SSL.DisableSelfSigned {
+		if cert, err := manager.generateSelfSignedCert("localhost"); err == nil {
+			manager.defaultCert = cert
+		}
 	}
 
 	// 初始化 ACME/Let's Encrypt（当配置了 Email 且仅允许配置域名时启用）
@@ -268,7 +271,12 @@ func (m *Manager) GetCertificate(domain string) (*tls.Certificate, error) {
 		return wildcardCert, nil
 	}
 
-	// 如果没有证书，生成自签名证书作为临时方案
+	// 如果没有证书
+	if m.config.SSL.DisableSelfSigned {
+		m.log.Warnf("域名 %s 无可用证书，且已禁用自签名回退", domain)
+		return nil, fmt.Errorf("no certificate for %s and self-signed disabled", domain)
+	}
+	// 生成自签名证书作为临时方案
 	m.log.Infof("为域名 %s 生成自签名证书", domain)
 	return m.generateSelfSignedCert(domain)
 }
@@ -371,6 +379,18 @@ func (m *Manager) renewExpiringCerts() {
 		// 检查证书是否即将过期（30天内）
 		if m.isCertExpiringSoon(certPath) {
 			m.log.Infof("证书即将过期，开始续期: %s", domain)
+			if m.config.SSL.DisableSelfSigned {
+				if m.acmeMgr != nil && m.isAllowedDomain(domain) {
+					if _, err := m.acmeMgr.GetCertificate(&tls.ClientHelloInfo{ServerName: domain}); err != nil {
+						m.log.Errorf("ACME 续期证书失败 %s: %v", domain, err)
+					} else {
+						m.log.Infof("ACME 已触发续期流程: %s", domain)
+					}
+				} else {
+					m.log.Warnf("已禁用自签续期，且 ACME 不可用或域名未允许: %s", domain)
+				}
+				continue
+			}
 			if _, err := m.generateSelfSignedCert(domain); err != nil {
 				m.log.Errorf("续期证书失败 %s: %v", domain, err)
 			}
@@ -528,6 +548,40 @@ func (m *Manager) HTTPChallengeHandler(h http.Handler) http.Handler {
 		return m.acmeMgr.HTTPHandler(h)
 	}
 	return h
+}
+
+// EnableACME 运行中启用/重建 ACME 管理器（根据当前配置）
+func (m *Manager) EnableACME() error {
+	email := strings.TrimSpace(m.config.SSL.Email)
+	if email == "" {
+		return fmt.Errorf("empty acme email")
+	}
+	acmeCacheDir := filepath.Join(filepath.Dir(m.config.SSL.CertDir), "acme-cache")
+	if err := os.MkdirAll(acmeCacheDir, 0755); err != nil {
+		m.log.Warnf("创建 ACME 缓存目录失败: %v", err)
+	}
+	mgr := &autocert.Manager{
+		Prompt: autocert.AcceptTOS,
+		Cache:  autocert.DirCache(acmeCacheDir),
+		Email:  email,
+		HostPolicy: func(ctx context.Context, host string) error {
+			host = strings.ToLower(host)
+			if m.isAllowedDomain(host) {
+				return nil
+			}
+			return fmt.Errorf("acme: host not allowed: %s", host)
+		},
+	}
+	client := &acme.Client{}
+	if m.config.SSL.Staging {
+		client.DirectoryURL = "https://acme-staging-v02.api.letsencrypt.org/directory"
+	} else {
+		client.DirectoryURL = "https://acme-v02.api.letsencrypt.org/directory"
+	}
+	mgr.Client = client
+	m.acmeMgr = mgr
+	m.log.Infof("ACME 已启用（邮箱: %s, staging=%v）", email, m.config.SSL.Staging)
+	return nil
 }
 
 // EnsureDomainCert 主动为指定域名申请（或加载）证书（当启用 ACME 时）

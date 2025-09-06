@@ -894,6 +894,18 @@ func (s *Server) handleSettingsSave(w http.ResponseWriter, r *http.Request) {
 			s.config.Admin.Password = newPassword
 		}
 
+		// SSL 邮箱与禁用自签
+		if v := strings.TrimSpace(r.FormValue("ssl_email")); v != "" {
+			s.config.SSL.Email = v
+			// 尝试启用 ACME
+			if err := s.sslManager.EnableACME(); err != nil {
+				s.log.Warnf("启用 ACME 失败: %v", err)
+			}
+		}
+		if v := r.FormValue("ssl_disable_self_signed"); v != "" {
+			s.config.SSL.DisableSelfSigned = (v == "on" || v == "true" || v == "1")
+		}
+
 		// 保存配置
 		s.config.Save(s.config.ConfigFile)
 	}
@@ -1160,10 +1172,10 @@ func (s *Server) generateProxyRulesTable(data map[string]interface{}) string {
                     <tr>
                         <td>%s</td>
                         <td>%s</td>
-                        <td><span class="badge bg-success">` + s.translator.T("proxy.active") + `</span></td>
+                        <td><span class="badge bg-success">`+s.translator.T("proxy.active")+`</span></td>
                         <td>
-                            <a href="%s/proxy/edit?index=%d" class="btn btn-sm btn-outline-primary">` + s.translator.T("proxy.edit") + `</a>
-                            <a href="%s/proxy/delete?index=%d" class="btn btn-sm btn-outline-danger" onclick="return confirm('` + s.translator.T("proxy.delete_confirm") + `')">` + s.translator.T("proxy.delete") + `</a>
+                            <a href="%s/proxy/edit?index=%d" class="btn btn-sm btn-outline-primary">`+s.translator.T("proxy.edit")+`</a>
+                            <a href="%s/proxy/delete?index=%d" class="btn btn-sm btn-outline-danger" onclick="return confirm('`+s.translator.T("proxy.delete_confirm")+`')">`+s.translator.T("proxy.delete")+`</a>
                         </td>
                     </tr>`,
 			rule.Domain, rule.Target, data["AdminPrefix"].(string), i, data["AdminPrefix"].(string), i))
@@ -1373,9 +1385,9 @@ func (s *Server) generateSSLCertsTable(data map[string]interface{}) string {
 				<td>%s</td>
 				<td>%s</td>
 				<td>
-					<a class="btn btn-sm btn-outline-primary" href="%s/ssl/download?domain=%s&type=cert">` + s.translator.T("ssl.download_cert") + `</a>
-					<a class="btn btn-sm btn-outline-secondary" href="%s/ssl/download?domain=%s&type=key">` + s.translator.T("ssl.download_key") + `</a>
-					<a class="btn btn-sm btn-outline-danger" href="%s/ssl/delete?domain=%s" onclick="return confirm('` + s.translator.T("ssl.delete_confirm") + `')">` + s.translator.T("proxy.delete") + `</a>
+					<a class="btn btn-sm btn-outline-primary" href="%s/ssl/download?domain=%s&type=cert">`+s.translator.T("ssl.download_cert")+`</a>
+					<a class="btn btn-sm btn-outline-secondary" href="%s/ssl/download?domain=%s&type=key">`+s.translator.T("ssl.download_key")+`</a>
+					<a class="btn btn-sm btn-outline-danger" href="%s/ssl/delete?domain=%s" onclick="return confirm('`+s.translator.T("ssl.delete_confirm")+`')">`+s.translator.T("proxy.delete")+`</a>
 				</td>
 			</tr>`,
 			c.Domain,
@@ -1536,9 +1548,9 @@ func (s *Server) generateSecurityManagementHTML(data map[string]interface{}) str
                                     <table class="table table-sm table-striped">
                                         <thead>
                                             <tr>
-                                                <th style="width: 22%">%s</th>
-                                                <th style="width: 18%">%s</th>
-                                                <th style="width: 20%">%s</th>
+                                                <th style="width: 22%%">%s</th>
+                                                <th style="width: 18%%">%s</th>
+                                                <th style="width: 20%%">%s</th>
                                                 <th>%s</th>
                                             </tr>
                                         </thead>
@@ -1629,6 +1641,7 @@ func (s *Server) generateSettingsHTML(data map[string]interface{}) string {
                 <div class="card">
                     <div class="card-body">
                         <form method="POST" action="%s/settings/save">
+                            <h5 class="mb-3">系统设置</h5>
                             <div class="mb-3">
                                 <label for="admin_prefix" class="form-label">%s</label>
                                 <input type="text" class="form-control" id="admin_prefix" name="admin_prefix" 
@@ -1643,6 +1656,17 @@ func (s *Server) generateSettingsHTML(data map[string]interface{}) string {
                                 <label for="admin_password" class="form-label">%s</label>
                                 <input type="password" class="form-control" id="admin_password" name="admin_password" 
                                        placeholder="留空表示不修改">
+                            </div>
+                            <hr>
+                            <h5 class="mb-3">SSL 设置</h5>
+                            <div class="mb-3">
+                                <label for="ssl_email" class="form-label">ACME 邮箱（Let's Encrypt）</label>
+                                <input type="email" class="form-control" id="ssl_email" name="ssl_email" value="%s" placeholder="admin@example.com">
+                                <div class="form-text">填写有效邮箱以启用 ACME 自动签发与到期提醒</div>
+                            </div>
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="ssl_disable_self_signed" name="ssl_disable_self_signed" %s>
+                                <label class="form-check-label" for="ssl_disable_self_signed">禁用自签名证书回退</label>
                             </div>
                             <button type="submit" class="btn btn-primary">%s</button>
                             <a href="%s/config/export" class="btn btn-outline-secondary ms-2">%s</a>
@@ -1665,6 +1689,13 @@ func (s *Server) generateSettingsHTML(data map[string]interface{}) string {
 		adminUserLabel,
 		s.config.Admin.Username,
 		adminPassLabel,
+		s.config.SSL.Email,
+		func() string {
+			if s.config.SSL.DisableSelfSigned {
+				return "checked"
+			}
+			return ""
+		}(),
 		saveBtn,
 		data["AdminPrefix"].(string), exportBtn,
 		data["AdminPrefix"].(string), importPreview,
@@ -2063,7 +2094,7 @@ func (s *Server) handleWizard(w http.ResponseWriter, r *http.Request) {
 	<div class="card mb-3"><div class="card-body">
 		<h5 class="card-title">步骤二：基础配置</h5>
 		<form method="POST" action="%s/wizard/step2" class="row g-3">
-			<div class="col-md-6"><label class="form-label">证书邮箱(可留空)</label><input class="form-control" name="email" value="%s"></div>
+			<div class="col-md-6"><label class="form-label">证书邮箱(必填，用于 Let's Encrypt)</label><input class="form-control" type="email" name="email" value="%s" required></div>
 			<div class="col-md-6 form-check mt-4"><input class="form-check-input" type="checkbox" name="auto_renew" %s id="ar"><label class="form-check-label" for="ar">启用自动续期</label></div>
 			<div class="col-12"><button class="btn btn-primary" type="submit">保存基础配置</button></div>
 		</form>
@@ -2124,11 +2155,18 @@ func (s *Server) handleWizardStep2(w http.ResponseWriter, r *http.Request) {
 	}
 	email := strings.TrimSpace(r.FormValue("email"))
 	auto := r.FormValue("auto_renew") == "on"
+	if email == "" || !strings.Contains(email, "@") || !strings.Contains(email, ".") {
+		http.Error(w, "请填写合法的邮箱地址（用于 ACME）", http.StatusBadRequest)
+		return
+	}
 	s.config.SSL.Email = email
 	s.config.SSL.AutoRenew = auto
 	if err := s.config.Save(s.config.ConfigFile); err != nil {
 		http.Error(w, "保存失败: "+err.Error(), http.StatusInternalServerError)
 		return
+	}
+	if err := s.sslManager.EnableACME(); err != nil {
+		s.log.Warnf("启用 ACME 失败: %v", err)
 	}
 	s.audit("wizard_step2_saved", email)
 	http.Redirect(w, r, s.config.AdminPrefix+"/wizard", http.StatusFound)
@@ -2162,6 +2200,10 @@ func (s *Server) handleWizardFinish(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method != "POST" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if strings.TrimSpace(s.config.SSL.Email) == "" {
+		http.Error(w, "请先在向导第二步填写用于 ACME 的证书邮箱", http.StatusBadRequest)
 		return
 	}
 	s.config.Admin.FirstRun = false

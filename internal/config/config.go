@@ -29,12 +29,13 @@ type ServerConfig struct {
 
 // SSLConfig SSL证书配置
 type SSLConfig struct {
-	Email     string   `json:"email"`
-	Staging   bool     `json:"staging"`
-	Domains   []string `json:"domains"`
-	CertDir   string   `json:"cert_dir"`
-	KeyDir    string   `json:"key_dir"`
-	AutoRenew bool     `json:"auto_renew"`
+	Email             string   `json:"email"`
+	Staging           bool     `json:"staging"`
+	Domains           []string `json:"domains"`
+	CertDir           string   `json:"cert_dir"`
+	KeyDir            string   `json:"key_dir"`
+	AutoRenew         bool     `json:"auto_renew"`
+	DisableSelfSigned bool     `json:"disable_self_signed"`
 }
 
 // AdminConfig 管理面板配置
@@ -81,10 +82,11 @@ func Load(configFile string) (*Config, error) {
 			Debug: false,
 		},
 		SSL: SSLConfig{
-			Staging:   false,
-			CertDir:   "./data/certs",
-			KeyDir:    "./data/keys",
-			AutoRenew: true,
+			Staging:           false,
+			CertDir:           "./data/certs",
+			KeyDir:            "./data/keys",
+			AutoRenew:         true,
+			DisableSelfSigned: true,
 		},
 		Admin: AdminConfig{
 			Username:     "admin",

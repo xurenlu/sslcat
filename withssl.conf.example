@@ -10,7 +10,8 @@
     "domains": [],
     "cert_dir": "/var/lib/sslcat/certs",
     "key_dir": "/var/lib/sslcat/keys",
-    "auto_renew": true
+    "auto_renew": true,
+    "disable_self_signed": true
   },
   "admin": {
     "username": "admin",
