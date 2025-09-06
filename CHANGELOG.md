@@ -1,3 +1,23 @@
+## [1.0.20] - 2025-09-07
+
+### Added
+- Admin 面板显示公网 IPv4（来自 ip4.dev/myip）以便用户自行解析域名
+- IP 访问到 AdminPrefix 时，若存在有效 LE 证书且域名解析到本机公网 IP，则强制跳转至 https://{domain}{AdminPrefix}
+- 每 30 秒自动校验可用域名与 DNS 指向，实时更新跳转策略
+- 代理规则管理页新增 enabled 与 ssl_only 开关（ssl_only 将 HTTP 自动 301 到 HTTPS）
+
+### Changed
+- 404/502 未命中代理响应改为简洁纯文本
+- 安装脚本下载地址切换至新命名：
+  - GitHub: https://github.com/xurenlu/sslcat/releases/download/v${VER}/sslcat_v${VER}_${OS}-${ARCH}${EXT}
+  - 中国大陆镜像: https://sslcat.com/xurenlu/sslcat/releases/download/v${VER}/sslcat_v${VER}_${OS}-${ARCH}${EXT}
+  （失败自动切换主/备）
+- 代理转发参数修正：若 Target 已含协议则直接使用，避免重复协议造成崩溃
+
+### Fixed
+- 修复未启用规则也被展示为“活跃”的状态显示问题
+- 修复 302 未命中行为必须填写重定向 URL 的校验
+
 ## [1.0.15] - 2025-01-03
 - Switch all logs to English across core modules
 - Add runtime ACME temporary allowlist for panel-initiated requests
