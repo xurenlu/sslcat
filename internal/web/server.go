@@ -1,13 +1,10 @@
 package web
 
 import (
-	"archive/zip"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"

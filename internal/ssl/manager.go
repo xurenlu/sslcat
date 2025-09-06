@@ -27,15 +27,16 @@ import (
 
 // Manager SSL证书管理器
 type Manager struct {
-	config      *config.Config
-	certCache   map[string]*tls.Certificate
-	certMutex   sync.RWMutex
-	stopChan    chan struct{}
-	log         *logrus.Entry
-	notifier    *notify.Notifier
-	lastNotify  map[string]string
-	acmeMgr     *autocert.Manager
-	defaultCert *tls.Certificate
+	config        *config.Config
+	certCache     map[string]*tls.Certificate
+	certMutex     sync.RWMutex
+	stopChan      chan struct{}
+	log           *logrus.Entry
+	notifier      *notify.Notifier
+	lastNotify    map[string]string
+	acmeMgr       *autocert.Manager
+	defaultCert   *tls.Certificate
+	onClientHello func(*tls.ClientHelloInfo)
 }
 
 // NewManager 创建SSL管理器
@@ -493,12 +494,20 @@ func matchDomain(domain, pattern string) bool {
 	return false
 }
 
+// SetOnClientHello 设置客户端握手钩子
+func (m *Manager) SetOnClientHello(fn func(*tls.ClientHelloInfo)) {
+	m.onClientHello = fn
+}
+
 // GetTLSConfig 获取用于HTTPS服务器的TLS配置
 func (m *Manager) GetTLSConfig() *tls.Config {
 	// 若启用 ACME，优先使用 ACME 的证书获取逻辑（仅允许域名）
 	if m.acmeMgr != nil {
 		return &tls.Config{
 			GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+				if m.onClientHello != nil {
+					m.onClientHello(hello)
+				}
 				host := hello.ServerName
 				if host == "" {
 					host = "localhost"
@@ -525,6 +534,9 @@ func (m *Manager) GetTLSConfig() *tls.Config {
 	// 默认：使用本地缓存/磁盘并在缺失时自签
 	return &tls.Config{
 		GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+			if m.onClientHello != nil {
+				m.onClientHello(hello)
+			}
 			host := hello.ServerName
 			if host == "" {
 				host = "localhost"

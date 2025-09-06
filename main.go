@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"net"
@@ -19,7 +20,6 @@ import (
 	"github.com/xurenlu/sslcat/internal/ssl"
 	"github.com/xurenlu/sslcat/internal/web"
 
-	http3 "github.com/quic-go/quic-go/http3"
 	"github.com/sirupsen/logrus"
 )
 
@@ -70,7 +70,7 @@ func main() {
 		log.Fatalf("加载配置失败: %v", err)
 	}
 
-	// 设置命令行参数覆盖配置
+	// 覆盖配置
 	if *adminPrefix != "/sslcat-panel" {
 		cfg.AdminPrefix = *adminPrefix
 	}
@@ -87,7 +87,7 @@ func main() {
 		cfg.Server.Host = *host
 	}
 
-	// 创建必要的目录（如果没有权限则跳过）
+	// 创建必要目录
 	if err := os.MkdirAll("/etc/sslcat", 0755); err != nil {
 		log.Warnf("无法创建系统配置目录，使用当前目录: %v", err)
 	}
@@ -95,76 +95,58 @@ func main() {
 		log.Warnf("无法创建系统数据目录，使用当前目录: %v", err)
 	}
 
-	// 初始化SSL管理器
+	// 初始化模块
 	sslManager, err := ssl.NewManager(cfg)
 	if err != nil {
 		log.Fatalf("初始化SSL管理器失败: %v", err)
 	}
-
-	// 初始化安全管理器
 	securityManager := security.NewManager(cfg)
-
-	// 初始化代理管理器
 	proxyManager := proxy.NewManager(cfg, sslManager, securityManager)
-
-	// 初始化Web服务器
 	webServer := web.NewServer(cfg, proxyManager, securityManager, sslManager)
 
-	// 设置日志级别
+	// 日志级别
 	if cfg.Server.Debug {
 		logrus.SetLevel(logrus.DebugLevel)
 	} else {
 		logrus.SetLevel(logrus.InfoLevel)
 	}
 
-	// 启动SSL管理器
+	// 启动子模块
 	if err := sslManager.Start(); err != nil {
 		log.Fatalf("启动SSL管理器失败: %v", err)
 	}
-
-	// 启动代理管理器
 	if err := proxyManager.Start(); err != nil {
 		log.Fatalf("启动代理管理器失败: %v", err)
 	}
-
-	// 启动安全管理器
 	securityManager.Start()
 
-	// 创建HTTP服务器
+	// 注册 TLS ClientHello 指纹回调
+	sslManager.SetOnClientHello(func(hello *tls.ClientHelloInfo) {
+		// 生成一个简单指纹：SNI + 曲线/签名算法数量 + ALPN数量
+		sni := strings.ToLower(strings.TrimSpace(hello.ServerName))
+		cipherCount := len(hello.SupportedCurves) + len(hello.SignatureSchemes)
+		alpnCount := len(hello.SupportedProtos)
+		raw := fmt.Sprintf("sni=%s;c=%d;a=%d", sni, cipherCount, alpnCount)
+		fp := security.HashTLSRaw(raw)
+		securityManager.LogTLSFingerprint(fp, "")
+	})
+
+	// 启动HTTP(S)
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
 		Handler:      webServer,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  120 * time.Second,
-		TLSConfig:    sslManager.GetTLSConfig(), // 使用SSL管理器的TLS配置
+		TLSConfig:    sslManager.GetTLSConfig(),
 	}
-
-	// 启动Web服务器
 	go func() {
 		log.Infof("HTTPS服务器启动在 %s (支持多域名SSL证书)", server.Addr)
-
-		// 如果是443端口，启动HTTPS服务器
 		if cfg.Server.Port == 443 || cfg.Server.Port == 8443 {
-			// 启动 HTTP/3 (QUIC)
-			h3s := &http3.Server{
-				Addr:      server.Addr,
-				Handler:   webServer,
-				TLSConfig: sslManager.GetTLSConfig(),
-			}
-			go func() {
-				log.Infof("HTTP/3(QUIC)服务器启动在 %s/udp", server.Addr)
-				if err := h3s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-					log.Errorf("HTTP/3 启动失败: %v", err)
-				}
-			}()
-
 			if err := server.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
 				log.Fatalf("HTTPS服务器启动失败: %v", err)
 			}
 		} else {
-			// 其他端口启动HTTP服务器
-			log.Warnf("在非标准端口 %d 启动HTTP服务器", cfg.Server.Port)
 			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				log.Fatalf("HTTP服务器启动失败: %v", err)
 			}
@@ -219,26 +201,16 @@ func main() {
 		}()
 	}
 
-	// 等待中断信号
+	// 等待信号
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
-
 	sig := <-quit
 	log.Infof("收到信号 %v，开始优雅关闭...", sig)
-
-	// 优雅关闭
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-
-	// 停止各个服务
 	securityManager.Stop()
 	proxyManager.Stop()
 	sslManager.Stop()
-
-	// 关闭HTTP服务器
-	if err := server.Shutdown(ctx); err != nil {
-		log.Errorf("服务器关闭失败: %v", err)
-	}
-
+	_ = server.Shutdown(ctx)
 	log.Info("SSLcat 服务器已关闭")
 }
