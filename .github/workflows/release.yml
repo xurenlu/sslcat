@@ -14,7 +14,7 @@ env:
   BIN_NAME: sslcat
 
 jobs:
-  build-and-release:
+  build:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -87,6 +87,25 @@ jobs:
             tar -C build -czf artifacts/${NAME}.tar.gz ${BIN_NAME}${{ matrix.ext }}
           fi
           ls -lh artifacts
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.arch_tag }}
+          path: artifacts/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -lah artifacts/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
