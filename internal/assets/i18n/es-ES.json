@@ -173,6 +173,8 @@
   "ssl.type.ca": "CA",
   "security.export_json": "Exportar JSON",
   "audit.time": "Hora",
+  "audit.user_ip": "Usuario/IP",
+  "audit.action": "Acción",
   "audit.detail": "Detalle",
   "security.no_blocked": "Sin IPs bloqueadas"
 }

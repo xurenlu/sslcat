@@ -173,6 +173,8 @@
   "ssl.type.ca": "CA",
   "security.export_json": "JSON をエクスポート",
   "audit.time": "時刻",
+  "audit.user_ip": "ユーザー/IP",
+  "audit.action": "アクション",
   "audit.detail": "詳細",
   "security.no_blocked": "ブロックされたIPはありません"
 }

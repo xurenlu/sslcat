@@ -173,6 +173,8 @@
   "ssl.type.ca": "ЦС",
   "security.export_json": "Экспорт JSON",
   "audit.time": "Время",
+  "audit.user_ip": "Пользователь/IP",
+  "audit.action": "Действие",
   "audit.detail": "Подробности",
   "security.no_blocked": "Нет заблокированных IP"
 }

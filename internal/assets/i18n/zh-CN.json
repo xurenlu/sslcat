@@ -250,6 +250,8 @@
   "ssl.type.ca": "CA",
   "security.export_json": "导出JSON",
   "audit.time": "时间",
+  "audit.user_ip": "用户/IP",
+  "audit.action": "动作",
   "audit.detail": "详情",
   "security.no_blocked": "暂无封禁IP"
 }
