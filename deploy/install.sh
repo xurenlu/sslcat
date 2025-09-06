@@ -329,7 +329,9 @@ show_install_info() {
     echo "重启服务: systemctl restart withssl"
     echo "停止服务: systemctl stop withssl"
     echo
-    echo "管理面板: https://your-domain/sslcat-panel"
+    # 获取公网IP
+    PUBLIC_IP=$(curl -s https://ip4.dev/myip | tr -d '\n' | xargs)
+    echo "管理面板: http://$PUBLIC_IP:80/sslcat-panel/ 或 https://<你的域名>/sslcat-panel/"
     echo "默认用户名: admin"
     echo "默认密码: admin*9527"
     echo

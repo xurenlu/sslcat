@@ -781,5 +781,43 @@ func (m *Manager) ListCertificatesFromDisk() []CertificateInfo {
 			SelfSigned: selfSigned,
 		})
 	}
+	// 合并内存缓存中的证书（如 ACME 刚获取）
+	m.certMutex.RLock()
+	for domain, cert := range m.certCache {
+		if cert == nil || len(cert.Certificate) == 0 {
+			continue
+		}
+		// 若磁盘已有则跳过
+		exists := false
+		for _, c := range certs {
+			if strings.EqualFold(c.Domain, domain) {
+				exists = true
+				break
+			}
+		}
+		if exists {
+			continue
+		}
+		x509Cert, err := x509.ParseCertificate(cert.Certificate[0])
+		if err != nil {
+			continue
+		}
+		status := "有效"
+		if time.Now().After(x509Cert.NotAfter) {
+			status = "过期"
+		} else if time.Now().Add(30 * 24 * time.Hour).After(x509Cert.NotAfter) {
+			status = "即将过期"
+		}
+		selfSigned := x509Cert.Issuer.String() == x509Cert.Subject.String()
+		certs = append(certs, CertificateInfo{
+			Domain:     domain,
+			IssuedAt:   x509Cert.NotBefore,
+			ExpiresAt:  x509Cert.NotAfter,
+			Status:     status,
+			IsWildcard: strings.HasPrefix(domain, "*."),
+			SelfSigned: selfSigned,
+		})
+	}
+	m.certMutex.RUnlock()
 	return certs
 }

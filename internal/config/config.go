@@ -98,9 +98,9 @@ func Load(configFile string) (*Config, error) {
 			Rules: []ProxyRule{},
 		},
 		Security: SecurityConfig{
-			MaxAttempts:      3,
-			BlockDurationStr: "1m",
-			MaxAttempts5Min:  10,
+			MaxAttempts:      90,
+			BlockDurationStr: "5s",
+			MaxAttempts5Min:  300,
 			BlockFile:        "./data/sslcat.block",
 			AllowedUserAgents: []string{
 				"Mozilla/",

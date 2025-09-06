@@ -89,8 +89,11 @@ sudo systemctl daemon-reload
 sudo systemctl enable sslcat || true
 sudo systemctl restart sslcat || sudo systemctl start sslcat || true
 
+# 获取公网IP
+PUBLIC_IP=$(curl -s https://ip4.dev/myip | tr -d '\n' | xargs)
+
 echo "[sslcat] 安装完成: /opt/sslcat/sslcat"
 echo "[sslcat] 配置: /etc/sslcat/sslcat.conf"
-echo "[sslcat] 管理面板: https://<你的域名或IP>/sslcat-panel/ (首次登录将强制改密)"
+echo "[sslcat] 管理面板: http://$PUBLIC_IP:80/sslcat-panel/ 或 https://<你的域名>/sslcat-panel/ (首次登录将强制改密)"
 
 

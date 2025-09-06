@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -26,6 +27,16 @@ var (
 	version = "1.0.10"
 	build   = "dev"
 )
+
+// isIPHost 检查Host是否为IP地址
+func isIPHost(host string) bool {
+	// 移除端口号（如果有的话）
+	if idx := strings.Index(host, ":"); idx != -1 {
+		host = host[:idx]
+	}
+	// 检查是否为有效的IP地址
+	return net.ParseIP(host) != nil
+}
 
 func main() {
 	var (
@@ -166,6 +177,19 @@ func main() {
 			redirectServer := &http.Server{
 				Addr: fmt.Sprintf("%s:80", cfg.Server.Host),
 				Handler: sslManager.HTTPChallengeHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					// 检查Host是否为IP地址，如果是IP则不重定向到HTTPS
+					if isIPHost(r.Host) {
+						// IP访问时，检查是否有代理配置
+						if rule := proxyManager.GetProxyConfig(r.Host); rule != nil {
+							proxyManager.ProxyRequest(w, r, rule)
+							return
+						}
+						// IP访问且无代理配置时，返回默认页面
+						webServer.ServeHTTP(w, r)
+						return
+					}
+
+					// 域名访问的处理逻辑
 					// 检查是否是管理面板路径或API路径
 					if strings.HasPrefix(r.URL.Path, cfg.AdminPrefix) {
 						// 管理面板路径重定向到HTTPS

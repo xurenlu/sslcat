@@ -37,6 +37,8 @@ type Server struct {
 	pendingImportJSON string
 	pendingImport     *config.Config
 	pendingDiff       *config.ConfigDiff
+	// Token 管理
+	tokenStore *security.TokenStore
 }
 
 // NewServer 创建Web服务器
@@ -76,6 +78,9 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 			"component": "web_server",
 		}),
 	}
+
+	// 初始化 TokenStore
+	server.tokenStore = security.NewTokenStore("./data/tokens.json")
 
 	server.setupRoutes()
 	return server
@@ -135,6 +140,11 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl-certs", s.handleAPISSLCerts)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security-logs", s.handleAPISecurityLogs)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/audit", s.handleAPIAudit)
+
+	// Token 管理路由
+	s.mux.HandleFunc(s.config.AdminPrefix+"/tokens", s.handleTokens)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/tokens/generate", s.handleTokenGenerate)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/tokens/delete", s.handleTokenDelete)
 
 	// 设置根路径
 	s.mux.HandleFunc("/", s.handleRoot)
@@ -653,12 +663,21 @@ func (s *Server) handleSSLGenerate(w http.ResponseWriter, r *http.Request) {
 				domainList[i] = strings.TrimSpace(domain)
 			}
 
-			// 生成证书
-			_, err := s.sslManager.GenerateMultiDomainCert(domainList)
-			if err != nil {
-				s.log.Errorf("生成证书失败: %v", err)
-				http.Error(w, "生成证书失败: "+err.Error(), http.StatusInternalServerError)
-				return
+			// 申请证书（使用 ACME，如果可用）
+			var firstErr error
+			for _, d := range domainList {
+				d = strings.ToLower(strings.TrimSpace(d))
+				if d == "" {
+					continue
+				}
+				if s.sslManager != nil {
+					if err := s.sslManager.EnsureDomainCert(d); err != nil && firstErr == nil {
+						firstErr = err
+					}
+				}
+			}
+			if firstErr != nil {
+				s.log.Warnf("申请证书(ACME)出现问题: %v", firstErr)
 			}
 
 			// 重定向回SSL管理页面
@@ -989,8 +1008,33 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 
 // API处理器
 
+func (s *Server) authorizeAPI(w http.ResponseWriter, r *http.Request, readOnly bool) bool {
+	// 1) 如果是面板登录用户（cookie session），允许访问；写接口也允许
+	if c, err := r.Cookie("sslcat_session"); err == nil && c.Value == "authenticated" {
+		return true
+	}
+	// 2) 检查 Authorization: Bearer <token>
+	authz := r.Header.Get("Authorization")
+	if strings.HasPrefix(strings.ToLower(authz), "bearer ") {
+		tok := strings.TrimSpace(authz[len("Bearer "):])
+		if role, ok := s.tokenStore.Validate(tok); ok {
+			if readOnly {
+				return true
+			}
+			// 写操作需要 write 角色
+			if role == security.TokenRoleWrite {
+				return true
+			}
+		}
+	}
+	w.WriteHeader(http.StatusUnauthorized)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"error":"unauthorized"}`))
+	return false
+}
+
 func (s *Server) handleAPIStats(w http.ResponseWriter, r *http.Request) {
-	if !s.checkAuth(w, r) {
+	if !s.authorizeAPI(w, r, true) {
 		return
 	}
 
@@ -1000,7 +1044,7 @@ func (s *Server) handleAPIStats(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAPIProxyRules(w http.ResponseWriter, r *http.Request) {
-	if !s.checkAuth(w, r) {
+	if !s.authorizeAPI(w, r, true) {
 		return
 	}
 
@@ -1009,7 +1053,7 @@ func (s *Server) handleAPIProxyRules(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAPISSLCerts(w http.ResponseWriter, r *http.Request) {
-	if !s.checkAuth(w, r) {
+	if !s.authorizeAPI(w, r, true) {
 		return
 	}
 
@@ -1019,7 +1063,7 @@ func (s *Server) handleAPISSLCerts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAPISecurityLogs(w http.ResponseWriter, r *http.Request) {
-	if !s.checkAuth(w, r) {
+	if !s.authorizeAPI(w, r, true) {
 		return
 	}
 
@@ -1057,7 +1101,7 @@ func (s *Server) handleAPISecurityLogs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAPIAudit(w http.ResponseWriter, r *http.Request) {
-	if !s.checkAuth(w, r) {
+	if !s.authorizeAPI(w, r, true) {
 		return
 	}
 	data, err := os.ReadFile("./data/audit.log")
@@ -1321,7 +1365,7 @@ func (s *Server) generateProxyEditHTML(data map[string]interface{}) string {
 
 func (s *Server) generateSSLManagementHTML(data map[string]interface{}) string {
 	title := s.translator.T("ssl.title")
-	genBtn := s.translator.T("ssl.generate")
+	genBtn := s.translator.T("ssl.request_cert")
 	thDomain := s.translator.T("ssl.columns.domain")
 	thIssued := s.translator.T("ssl.columns.issued")
 	thExpires := s.translator.T("ssl.columns.expires")
@@ -1402,7 +1446,7 @@ func (s *Server) generateSSLManagementHTML(data map[string]interface{}) string {
 func (s *Server) generateSSLCertsTable(data map[string]interface{}) string {
 	certs, _ := data["Certificates"].([]ssl.CertificateInfo)
 	if len(certs) == 0 {
-		return `<tr><td colspan="5" class="text-center">` + s.translator.T("ssl.none") + `</td></tr>`
+		return `<tr><td colspan="6" class="text-center">` + s.translator.T("ssl.none") + `</td></tr>`
 	}
 	var b strings.Builder
 	for _, c := range certs {
@@ -1437,11 +1481,11 @@ func (s *Server) generateSSLCertsTable(data map[string]interface{}) string {
 }
 
 func (s *Server) generateSSLGenerateHTML(data map[string]interface{}) string {
-	pageTitle := s.translator.T("ssl.generate")
+	pageTitle := s.translator.T("ssl.request_cert")
 	back := s.translator.T("common.back")
 	labelDomains := s.translator.T("ssl.domain")
 	help := s.translator.T("ssl.generate_help")
-	btnGenerate := s.translator.T("ssl.generate")
+	btnGenerate := s.translator.T("ssl.request_cert")
 	btnCancel := s.translator.T("proxy.cancel")
 	return fmt.Sprintf(`
 <!DOCTYPE html>
@@ -1743,7 +1787,12 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 	navSecurity := s.translator.T("nav.security")
 	navSettings := s.translator.T("nav.settings")
 	logout := s.translator.T("menu.logout")
-	official := s.translator.T("menu.official_site")
+	official := s.translator.T("menu.官方站点")
+	if official == "menu.官方站点" {
+		// fallback: 若未翻译，使用已有键
+		official = s.translator.T("menu.official_site")
+	}
+	navTokens := "Token 管理"
 	return fmt.Sprintf(`
                 <nav class="d-md-block sidebar collapse">
                     <div class="position-sticky pt-3">
@@ -1788,6 +1837,11 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
                             <li class="nav-item">
                                 <a class="nav-link %s" href="%s/security">
                                     <i class="bi bi-shield-check"></i> %s
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link %s" href="%s/tokens">
+                                    <i class="bi bi-key"></i> %s
                                 </a>
                             </li>
                             <li class="nav-item">
@@ -1839,6 +1893,14 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 		}(),
 		adminPrefix,
 		navSecurity,
+		func() string {
+			if activePage == "tokens" {
+				return "active"
+			}
+			return ""
+		}(),
+		adminPrefix,
+		navTokens,
 		func() string {
 			if activePage == "settings" {
 				return "active"
@@ -2263,4 +2325,91 @@ func (s *Server) audit(action, detail string) {
 		m := map[string]any{"ts": t, "level": "info", "action": action, "detail": detail}
 		s.notifier.SendJSON(m)
 	}
+}
+
+func (s *Server) handleTokens(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	tokens := s.tokenStore.List()
+	var rows strings.Builder
+	for _, t := range tokens {
+		rows.WriteString(fmt.Sprintf(`<tr><td>%s</td><td>%s</td><td>%s</td><td>
+			<a class="btn btn-sm btn-outline-danger" href="%s/tokens/delete?token=%s" onclick="return confirm('确认删除该Token?')">删除</a>
+		</td></tr>`,
+			t.Token, string(t.Role), t.CreatedAt.Format("2006-01-02 15:04:05"), s.config.AdminPrefix, t.Token))
+	}
+	if rows.Len() == 0 {
+		rows.WriteString(`<tr><td colspan="4" class="text-center">暂无Token</td></tr>`)
+	}
+	html := fmt.Sprintf(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Token 管理</title>
+	<link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"></head><body>
+	<div class="container-fluid"><div class="row">
+	<div class="col-md-2">%s</div>
+	<main class="col-md-10">
+		<div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
+			<h1 class="h2">Token 管理</h1>
+			<a class="btn btn-primary" href="%s/tokens/generate">生成Token</a>
+		</div>
+		<div class="card"><div class="card-body">
+			<table class="table table-striped"><thead><tr><th>Token</th><th>权限</th><th>创建时间</th><th>操作</th></tr></thead>
+			<tbody>%s</tbody></table>
+		</div></div>
+	</main></div></div></body></html>`,
+		s.generateSidebar(s.config.AdminPrefix, "tokens"), s.config.AdminPrefix, rows.String())
+	w.Write([]byte(html))
+}
+
+func (s *Server) handleTokenGenerate(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	if r.Method == "GET" {
+		fmt.Fprintf(w, `<!DOCTYPE html><html><head><meta charset="utf-8"><title>生成Token</title>
+		<link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"></head><body>
+		<div class="container mt-4"><h3>生成Token</h3>
+		<form method="POST" class="mt-3">
+			<div class="mb-3"><label class="form-label">权限</label>
+				<select class="form-select" name="role">
+					<option value="read">只读</option>
+					<option value="write">读写</option>
+				</select>
+			</div>
+			<div class="mb-3"><label class="form-label">备注</label>
+				<input class="form-control" name="note" placeholder="可选">
+			</div>
+			<button class="btn btn-primary" type="submit">生成</button>
+			<a class="btn btn-secondary" href="%s/tokens">返回</a>
+		</form></div></body></html>`, s.config.AdminPrefix)
+		return
+	}
+	if r.Method == "POST" {
+		role := r.FormValue("role")
+		note := r.FormValue("note")
+		if role == "read" || role == "write" {
+			if _, err := s.tokenStore.Generate(security.TokenRole(role), note); err != nil {
+				http.Error(w, "生成Token失败: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			http.Redirect(w, r, s.config.AdminPrefix+"/tokens", http.StatusFound)
+			return
+		}
+		http.Error(w, "role无效", http.StatusBadRequest)
+		return
+	}
+	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+}
+
+func (s *Server) handleTokenDelete(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	t := strings.TrimSpace(r.URL.Query().Get("token"))
+	if t == "" {
+		http.Error(w, "缺少token", http.StatusBadRequest)
+		return
+	}
+	_ = s.tokenStore.Delete(t)
+	http.Redirect(w, r, s.config.AdminPrefix+"/tokens", http.StatusFound)
 }
