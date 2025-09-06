@@ -3,20 +3,16 @@
 ## ⏱️ Démarrage Rapide avec SSLcat en 1 Minute
 
 ```bash
-# 1) Installation en un clic (Linux)
-# Pour les utilisateurs en Chine continentale (accéléré via sslcat.com)
-curl -fsSL https://sslcat.com/xurenlu/sslcat/main/scripts/install-from-release-zh.sh | sudo bash -s -- -v 1.0.11
-# Les utilisateurs hors Chine continentale peuvent utiliser directement GitHub raw :
-# curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/scripts/install-from-release.sh | sudo bash -s -- -v 1.0.11
-
-# 2) Test rapide local macOS (ou télécharger le paquet darwin manuellement)
+# 1) Test rapide local macOS (ou télécharger le paquet darwin manuellement)
 curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.0.11/sslcat_1.0.11_darwin_arm64.tar.gz -o sslcat.tgz
 tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
 sslcat --config sslcat.conf --port 8080
 # Accès navigateur : http://localhost:8080/sslcat-panel/
-# Première connexion : admin / admin*9527 (forcera le changement de mot de passe et générera admin.pass)
+# Première connexion : admin / admin*9527
+# ⚠️ La première connexion forcera : 1) Changement de mot de passe 2) Chemin personnalisé du panneau
+# Veuillez vous souvenir du nouveau chemin du panneau d'administration !
 
-# 3) Optionnel : Démarrage en un clic avec Docker Compose
+# 2) Optionnel : Démarrage en un clic avec Docker Compose
 docker compose up -d
 ```
 
@@ -104,29 +100,7 @@ unzip main.zip
 cd sslcat-main
 ```
 
-## 🚀 Installation Rapide
-
-### Installation Automatique (Recommandé)
-
-```bash
-# Télécharger le script d'installation depuis GitHub
-curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/install.sh -o install.sh
-
-# Exécuter le script d'installation
-sudo bash install.sh
-```
-
-### Déploiement Intégré (Fichier Unique)
-
-```bash
-# Générer le paquet de déploiement intégré
-./deploy-embedded.sh
-
-# Ou générer la version Linux
-./deploy-embedded.sh linux
-
-# Puis télécharger le répertoire deploy/ sur le serveur
-```
+## 🚀 Installation et Déploiement
 
 ### Installation Manuelle
 
@@ -274,11 +248,30 @@ sudo journalctl -u sslcat -p err
 ## Panneau d'Administration Web
 
 ### Accéder au Panneau d'Administration
-1. Ouvrir le navigateur et visiter : `https://your-domain/sslcat-panel`
-2. Se connecter avec les identifiants par défaut :
+
+**⚠️ Important : Méthode d'Accès Initial**
+
+Comme le système n'a pas de certificats SSL lors de la première installation, veuillez utiliser la méthode suivante pour l'accès initial :
+
+1. **Premier Accès** (en utilisant l'adresse IP du serveur) :
+   ```
+   http://YOUR_SERVER_IP/sslcat-panel
+   ```
+   Note : Utilisez `http://` (pas https) car il n'y a pas encore de certificats SSL
+
+2. **Après avoir configuré le domaine et obtenu les certificats** :
+   ```
+   https://your-domain/your-custom-panel-path
+   ```
+
+**Processus de Connexion :**
+1. Se connecter avec les identifiants par défaut :
    - Nom d'utilisateur : `admin`
    - Mot de passe : `admin*9527`
-3. Changer le mot de passe après la première connexion
+2. La première connexion forcera :
+   - Changer le mot de passe administrateur
+   - Personnaliser le chemin d'accès du panneau (pour la sécurité)
+3. **Veuillez vous souvenir du nouveau chemin du panneau !** Le système redirigera automatiquement vers le nouveau chemin
 
 ### Fonctions du Panneau d'Administration
 - **Tableau de Bord** : Voir l'état du système et les statistiques

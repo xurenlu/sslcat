@@ -3,20 +3,16 @@
 ## ⏱️ 一分钟快速上手 SSLcat
 
 ```bash
-# 1) 一键安装（Linux）
-# 面向中国大陆用户（通过 sslcat.com 加速）
-curl -fsSL https://sslcat.com/xurenlu/sslcat/main/scripts/install-from-release-zh.sh | sudo bash -s -- -v 1.0.11
-# 非大陆用户可直接使用 GitHubusercontent：
-# curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/scripts/install-from-release.sh | sudo bash -s -- -v 1.0.11
-
-# 2) macOS 本地快速试用（或自行下载 darwin 包）
+# 1) macOS 本地快速试用（或自行下载 darwin 包）
 curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.0.11/sslcat_1.0.11_darwin_arm64.tar.gz -o sslcat.tgz
 tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
 sslcat --config sslcat.conf --port 8080
 # 浏览器访问: http://localhost:8080/sslcat-panel/
-# 首次登录：admin / admin*9527（会强制要求修改密码并生成 admin.pass）
+# 首次登录：admin / admin*9527
+# ⚠️ 首次登录会强制要求：1) 修改密码 2) 自定义管理面板路径
+# 请务必记住新的管理面板路径！
 
-# 3) 可选：Docker Compose 一键起
+# 2) 可选：Docker Compose 一键起
 docker compose up -d
 ```
 
@@ -105,29 +101,7 @@ unzip main.zip
 cd sslcat-main
 ```
 
-## 🚀 快速安装
-
-### 自动安装（推荐）
-
-```bash
-# 从GitHub下载安装脚本
-curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/install.sh -o install.sh
-
-# 运行安装脚本
-sudo bash install.sh
-```
-
-### 嵌入式部署（单文件）
-
-```bash
-# 生成嵌入式部署包
-./deploy-embedded.sh
-
-# 或生成Linux版本
-./deploy-embedded.sh linux
-
-# 然后上传deploy/目录到服务器即可
-```
+## 🚀 安装部署
 
 ### 手动安装
 
@@ -275,11 +249,30 @@ sudo journalctl -u sslcat -p err
 ## Web 管理面板
 
 ### 访问管理面板
-1. 打开浏览器访问: `https://your-domain/sslcat-panel`
-2. 使用默认用户名和密码登录:
+
+**⚠️ 重要提醒：初始访问方式**
+
+由于系统刚安装时还没有SSL证书，请使用以下方式初始访问：
+
+1. **首次访问**（使用服务器IP地址）:
+   ```
+   http://YOUR_SERVER_IP/sslcat-panel
+   ```
+   注意：使用 `http://`（非https），因为还没有SSL证书
+
+2. **配置域名和获取证书后**:
+   ```
+   https://your-domain/your-custom-panel-path
+   ```
+
+**登录流程：**
+1. 使用默认用户名和密码登录:
    - 用户名: `admin`
    - 密码: `admin*9527`
-3. 首次登录后请立即修改密码
+2. 首次登录会强制要求:
+   - 修改管理员密码
+   - 自定义管理面板访问路径（安全考虑）
+3. **请务必记住新的管理面板路径！**系统会自动跳转到新路径
 
 ### 管理面板功能
 - **仪表板**: 查看系统状态和统计信息

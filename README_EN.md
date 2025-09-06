@@ -3,20 +3,16 @@
 ## ⏱️ Quick Start with SSLcat in 1 Minute
 
 ```bash
-# 1) One-click installation (Linux)
-# For users in mainland China (accelerated via sslcat.com)
-curl -fsSL https://sslcat.com/xurenlu/sslcat/main/scripts/install-from-release-zh.sh | sudo bash -s -- -v 1.0.11
-# Non-mainland users can directly use GitHub raw content:
-# curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/scripts/install-from-release.sh | sudo bash -s -- -v 1.0.11
-
-# 2) macOS local quick test (or download darwin package manually)
+# 1) macOS local quick test (or download darwin package manually)
 curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.0.11/sslcat_1.0.11_darwin_arm64.tar.gz -o sslcat.tgz
 tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
 sslcat --config sslcat.conf --port 8080
 # Browser access: http://localhost:8080/sslcat-panel/
-# First login: admin / admin*9527 (will force password change and generate admin.pass)
+# First login: admin / admin*9527
+# ⚠️ First login will force: 1) Password change 2) Custom admin panel path
+# Please remember the new admin panel path!
 
-# 3) Optional: Docker Compose one-click start
+# 2) Optional: Docker Compose one-click start
 docker compose up -d
 ```
 
@@ -104,29 +100,7 @@ unzip main.zip
 cd sslcat-main
 ```
 
-## 🚀 Quick Installation
-
-### Automatic Installation (Recommended)
-
-```bash
-# Download installation script from GitHub
-curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/install.sh -o install.sh
-
-# Run installation script
-sudo bash install.sh
-```
-
-### Embedded Deployment (Single File)
-
-```bash
-# Generate embedded deployment package
-./deploy-embedded.sh
-
-# Or generate Linux version
-./deploy-embedded.sh linux
-
-# Then upload deploy/ directory to server
-```
+## 🚀 Installation and Deployment
 
 ### Manual Installation
 
@@ -274,11 +248,30 @@ sudo journalctl -u sslcat -p err
 ## Web Management Panel
 
 ### Access Management Panel
-1. Open browser and visit: `https://your-domain/sslcat-panel`
-2. Login with default credentials:
+
+**⚠️ Important: Initial Access Method**
+
+Since the system doesn't have SSL certificates when first installed, please use the following method for initial access:
+
+1. **First Access** (using server IP address):
+   ```
+   http://YOUR_SERVER_IP/sslcat-panel
+   ```
+   Note: Use `http://` (not https) because there are no SSL certificates yet
+
+2. **After configuring domain and obtaining certificates**:
+   ```
+   https://your-domain/your-custom-panel-path
+   ```
+
+**Login Process:**
+1. Login with default credentials:
    - Username: `admin`
    - Password: `admin*9527`
-3. Change password after first login
+2. First login will force:
+   - Change administrator password
+   - Customize admin panel access path (for security)
+3. **Please remember the new admin panel path!** The system will automatically redirect to the new path
 
 ### Management Panel Features
 - **Dashboard**: View system status and statistics

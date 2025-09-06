@@ -104,29 +104,7 @@ unzip main.zip
 cd sslcat-main
 ```
 
-## 🚀 クイックインストール
-
-### 自動インストール（推奨）
-
-```bash
-# GitHubからインストールスクリプトをダウンロード
-curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/install.sh -o install.sh
-
-# インストールスクリプトを実行
-sudo bash install.sh
-```
-
-### 組み込みデプロイ（単一ファイル）
-
-```bash
-# 組み込みデプロイパッケージを生成
-./deploy-embedded.sh
-
-# またはLinuxバージョンを生成
-./deploy-embedded.sh linux
-
-# その後deploy/ディレクトリをサーバーにアップロード
-```
+## 🚀 インストールとデプロイ
 
 ### 手動インストール
 
@@ -274,11 +252,30 @@ sudo journalctl -u sslcat -p err
 ## Web管理パネル
 
 ### 管理パネルへのアクセス
-1. ブラウザを開き訪問: `https://your-domain/sslcat-panel`
-2. デフォルト認証情報でログイン:
+
+**⚠️ 重要：初期アクセス方法**
+
+システムを初めてインストールした時はSSL証明書がないため、初期アクセスには以下の方法を使用してください：
+
+1. **初回アクセス**（サーバーIPアドレスを使用）：
+   ```
+   http://YOUR_SERVER_IP/sslcat-panel
+   ```
+   注意：`http://`（httpsではない）を使用、SSL証明書がまだないため
+
+2. **ドメイン設定と証明書取得後**：
+   ```
+   https://your-domain/your-custom-panel-path
+   ```
+
+**ログインプロセス：**
+1. デフォルト認証情報でログイン:
    - ユーザー名: `admin`
    - パスワード: `admin*9527`
-3. 初回ログイン後にパスワードを変更
+2. 初回ログインで強制：
+   - 管理者パスワードの変更
+   - 管理パネルアクセスパスのカスタマイズ（セキュリティのため）
+3. **新しい管理パネルパスを必ず記憶してください！**システムが自動で新しいパスにリダイレクトします
 
 ### 管理パネル機能
 - **ダッシュボード**: システム状態と統計を表示

@@ -274,11 +274,30 @@ sudo journalctl -u sslcat -p err
 ## Panel de Administración Web
 
 ### Acceder al Panel de Administración
-1. Abrir navegador y visitar: `https://your-domain/sslcat-panel`
-2. Login con credenciales por defecto:
+
+**⚠️ Importante: Método de Acceso Inicial**
+
+Como el sistema no tiene certificados SSL cuando se instala por primera vez, por favor usa el siguiente método para el acceso inicial:
+
+1. **Primer Acceso** (usando dirección IP del servidor):
+   ```
+   http://YOUR_SERVER_IP/sslcat-panel
+   ```
+   Nota: Usa `http://` (no https) porque aún no hay certificados SSL
+
+2. **Después de configurar dominio y obtener certificados**:
+   ```
+   https://your-domain/your-custom-panel-path
+   ```
+
+**Proceso de Login:**
+1. Login con credenciales por defecto:
    - Nombre de usuario: `admin`
    - Contraseña: `admin*9527`
-3. Cambiar contraseña después del primer login
+2. El primer login forzará:
+   - Cambiar contraseña del administrador
+   - Personalizar ruta de acceso del panel (por seguridad)
+3. **¡Por favor recuerda la nueva ruta del panel!** El sistema redirigirá automáticamente a la nueva ruta
 
 ### Funciones del Panel de Administración
 - **Dashboard**: Ver estado del sistema y estadísticas
