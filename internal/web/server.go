@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"github.com/xurenlu/sslcat/internal/ssl"
 
 	"github.com/sirupsen/logrus"
+	"io"
 )
 
 // ClusterManager 集群管理器接口
@@ -45,6 +47,8 @@ type Server struct {
 	mux              *http.ServeMux
 	log              *logrus.Entry
 	startTime        time.Time
+	leRedirectHost   string
+	lastLECheck      time.Time
 	// 导入配置暂存
 	pendingImportJSON string
 	pendingImport     *config.Config
@@ -107,6 +111,9 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	}
 
 	server.setupRoutes()
+
+	// 启动定时检查有效LE证书对应域名是否解析到本机公网IP
+	go server.refreshLEPreferredHostLoop()
 	return server
 }
 
@@ -193,6 +200,21 @@ func (s *Server) setupRoutes() {
 
 // ServeHTTP 实现http.Handler接口
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// 若通过IP访问且存在可用的LE域名，强制跳转到 https://域名 + AdminPrefix（仅限管理面板路径或根）
+	host := r.Host
+	hostOnly := host
+	if idx := strings.Index(host, ":"); idx != -1 {
+		hostOnly = host[:idx]
+	}
+	if net.ParseIP(hostOnly) != nil {
+		// 允许通过 IP 访问的条件：没有可用域名，或无法获取公网IP
+		if s.leRedirectHost != "" && s.isPathAdminOrRoot(r.URL.Path) {
+			target := "https://" + s.leRedirectHost + s.config.AdminPrefix
+			http.Redirect(w, r, target, http.StatusMovedPermanently)
+			return
+		}
+	}
+
 	// 语言切换：如果存在 ?lang= 参数，则设置 cookie 并重定向到去掉 lang 的同一路径
 	if langParam := r.URL.Query().Get("lang"); langParam != "" {
 		if s.isSupportedLanguage(langParam) {
@@ -439,4 +461,71 @@ func (s *Server) audit(action, detail string) {
 		m := map[string]any{"ts": t, "level": "info", "action": action, "detail": detail}
 		s.notifier.SendJSON(m)
 	}
+}
+
+func (s *Server) isPathAdminOrRoot(p string) bool {
+	if p == "/" || strings.HasPrefix(p, s.config.AdminPrefix) {
+		return true
+	}
+	return false
+}
+
+// 每30秒刷新一次首选LE域名（证书有效且解析到本机公网IP）
+func (s *Server) refreshLEPreferredHostLoop() {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			s.refreshLEPreferredHost()
+		}
+	}
+}
+
+func (s *Server) refreshLEPreferredHost() {
+	if s.sslManager == nil {
+		s.leRedirectHost = ""
+		return
+	}
+	domain := s.sslManager.GetFirstValidLEDomain()
+	if domain == "" {
+		s.leRedirectHost = ""
+		return
+	}
+	// 查询公网IP
+	publicIP := s.fetchPublicIPv4()
+	if publicIP == "" {
+		// 获取不到公网IP，允许IP访问
+		s.leRedirectHost = ""
+		return
+	}
+	// DNS 解析 domain 并检查是否包含本机公网IP
+	ips, err := net.LookupIP(domain)
+	if err != nil {
+		s.leRedirectHost = ""
+		return
+	}
+	for _, ip := range ips {
+		if ip.To4() != nil && ip.String() == publicIP {
+			s.leRedirectHost = domain
+			return
+		}
+	}
+	s.leRedirectHost = ""
+}
+
+func (s *Server) fetchPublicIPv4() string {
+	client := &http.Client{Timeout: 5 * time.Second}
+	req, _ := http.NewRequest("GET", "https://ip4.dev/myip", nil)
+	resp, err := client.Do(req)
+	if err != nil || resp.StatusCode != 200 {
+		return ""
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	ip := strings.TrimSpace(string(b))
+	if net.ParseIP(ip) == nil {
+		return ""
+	}
+	return ip
 }

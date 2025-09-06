@@ -992,3 +992,66 @@ func (m *Manager) GetFirstValidSSLDomain() string {
 	}
 	return ""
 }
+
+// GetFirstValidLEDomain 获取第一个有效的由 Let's Encrypt 签发的域名
+func (m *Manager) GetFirstValidLEDomain() string {
+    // 先检查内存缓存
+    m.certMutex.RLock()
+    for domain, cert := range m.certCache {
+        if cert == nil || len(cert.Certificate) == 0 {
+            continue
+        }
+        x509Cert, err := x509.ParseCertificate(cert.Certificate[0])
+        if err != nil {
+            continue
+        }
+        if time.Now().After(x509Cert.NotAfter) {
+            continue
+        }
+        // 非自签名且签发者包含 Let's Encrypt
+        if x509Cert.Issuer.String() != x509Cert.Subject.String() &&
+            (strings.Contains(strings.ToLower(x509Cert.Issuer.CommonName), "let's encrypt") ||
+                strings.Contains(strings.ToLower(strings.Join(x509Cert.Issuer.Organization, ",")), "let's encrypt") ||
+                strings.Contains(strings.ToLower(x509Cert.Issuer.String()), "let's encrypt")) {
+            m.certMutex.RUnlock()
+            return domain
+        }
+    }
+    m.certMutex.RUnlock()
+
+    // 再扫描磁盘证书目录
+    certDir := m.config.SSL.CertDir
+    entries, err := os.ReadDir(certDir)
+    if err != nil {
+        return ""
+    }
+    for _, e := range entries {
+        if e.IsDir() {
+            continue
+        }
+        name := e.Name()
+        if !strings.HasSuffix(strings.ToLower(name), ".crt") {
+            continue
+        }
+        pemBytes, err := os.ReadFile(filepath.Join(certDir, name))
+        if err != nil {
+            continue
+        }
+        block, _ := pem.Decode(pemBytes)
+        if block == nil || block.Type != "CERTIFICATE" {
+            continue
+        }
+        x509Cert, err := x509.ParseCertificate(block.Bytes)
+        if err != nil || time.Now().After(x509Cert.NotAfter) {
+            continue
+        }
+        if x509Cert.Issuer.String() != x509Cert.Subject.String() &&
+            (strings.Contains(strings.ToLower(x509Cert.Issuer.CommonName), "let's encrypt") ||
+                strings.Contains(strings.ToLower(strings.Join(x509Cert.Issuer.Organization, ",")), "let's encrypt") ||
+                strings.Contains(strings.ToLower(x509Cert.Issuer.String()), "let's encrypt")) {
+            domain := strings.TrimSuffix(name, ".crt")
+            return domain
+        }
+    }
+    return ""
+}
