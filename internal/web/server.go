@@ -287,8 +287,8 @@ func (s *Server) proxyMiddleware(w http.ResponseWriter, r *http.Request) bool {
 		return true
 	}
 
-	// 没有找到代理配置，返回默认页面
-	s.handleDefault(w, r, host)
+	// 没有找到代理配置，直接返回 404，避免暴露面板路径
+	http.NotFound(w, r)
 	return true
 }
 

@@ -183,6 +183,22 @@ func (m *Manager) Start() error {
 	// 周期性证书到期提醒
 	go m.expiryNotifier()
 
+	// 周期性从 acme-cache 同步证书到 certs/keys（每30秒）
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				if _, err := m.SyncACMECertsToDisk(); err != nil {
+					m.log.Debugf("ACME sync skipped or failed: %v", err)
+				}
+			case <-m.stopChan:
+				return
+			}
+		}
+	}()
+
 	return nil
 }
 
@@ -613,6 +629,11 @@ func (m *Manager) EnsureDomainCert(domain string) error {
 	_, err := m.acmeMgr.GetCertificate(&tls.ClientHelloInfo{ServerName: domain})
 	if err != nil {
 		m.log.Warnf("ACME certificate request failed %s: %v", domain, err)
+	} else {
+		// 申请成功后主动同步一次
+		if _, syncErr := m.SyncACMECertsToDisk(); syncErr != nil {
+			m.log.Debugf("ACME post-issue sync failed: %v", syncErr)
+		}
 	}
 	return err
 }
