@@ -131,7 +131,7 @@ func (m *Manager) LogAccess(ip, userAgent, path string, success bool) {
 	defer m.mutex.Unlock()
 
 	// 检查User-Agent是否合法
-	if !m.isValidUserAgent(userAgent) {
+	if m.config.Security.EnableUAFilter && !m.isValidUserAgent(userAgent) {
 		m.log.Warnf("Suspicious User-Agent: %s from %s", userAgent, ip)
 		now := time.Now()
 		// 记录1分钟/5分钟窗口内的无效UA

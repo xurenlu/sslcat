@@ -301,7 +301,16 @@ func (s *Server) proxyMiddleware(w http.ResponseWriter, r *http.Request) bool {
 		w.WriteHeader(http.StatusOK)
 	case "404":
 		s.log.Warnf("Unmatched proxy for host=%s path=%s, returning 404", host, r.URL.Path)
-		http.NotFound(w, r)
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("\n  ____  ____  _      _      _          \n" +
+			" / ___||  _ \\| | ___| | ___| |_ __ _ \n" +
+			" \\___ \\| |_) | |/ _ \\ |/ _ \\ __/ _` |\n" +
+			"  ___) |  __/| |  __/ |  __/ || (_| |\n" +
+			" |____/|_|   |_|\\___|_|\\___|\\__\\__,_|\n\n" +
+			"This server is enhanced and managed by SSLcat.\n" +
+			"Visit: https://sslcat.com\n"))
+		return true
 	default: // "502"
 		s.log.Warnf("Unmatched proxy for host=%s path=%s, returning 502", host, r.URL.Path)
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")

@@ -85,6 +85,11 @@ type SecurityConfig struct {
 	TLSFingerprintMaxPerMin int `json:"tls_fp_max_per_min"`
 	TLSFingerprintTopN      int `json:"tls_fp_top_n"`
 
+	// 安全功能开关
+	EnableUAFilter bool `json:"enable_ua_filter"`
+	EnableWAF      bool `json:"enable_waf"`
+	EnableDDOS     bool `json:"enable_ddos"`
+
 	// 解析后的时间字段
 	BlockDuration time.Duration `json:"-"`
 }
@@ -188,11 +193,14 @@ func Load(configFile string) (*Config, error) {
 				"Safari/",
 				"Edge/",
 			},
-			UAInvalidMax1Min:        30,
-			UAInvalidMax5Min:        100,
+			UAInvalidMax1Min: 30,
+			UAInvalidMax5Min: 100,
 			TLSFingerprintWindowSec: 60,
 			TLSFingerprintMaxPerMin: 60000,
 			TLSFingerprintTopN:      20,
+			EnableUAFilter:          false,
+			EnableWAF:               false,
+			EnableDDOS:              true,
 		},
 		AdminPrefix: "/sslcat-panel",
 		Cluster: ClusterConfig{
