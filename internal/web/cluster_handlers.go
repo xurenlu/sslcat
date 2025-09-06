@@ -7,8 +7,7 @@ import (
 
 // handleClusterSettings 处理集群设置页面
 func (s *Server) handleClusterSettings(w http.ResponseWriter, r *http.Request) {
-	if !s.isAuthenticated(r) {
-		http.Redirect(w, r, s.config.AdminPrefix+"/login", http.StatusFound)
+	if !s.checkAuth(w, r) {
 		return
 	}
 
@@ -27,13 +26,12 @@ func (s *Server) handleClusterSettings(w http.ResponseWriter, r *http.Request) {
 		data["Nodes"] = s.clusterManager.GetNodes()
 	}
 
-	s.renderTemplate(w, "cluster_settings.html", data)
+	s.templateRenderer.Render(w, "cluster_settings.html", data)
 }
 
 // handleClusterSetSlave 设置为Slave模式
 func (s *Server) handleClusterSetSlave(w http.ResponseWriter, r *http.Request) {
-	if !s.isAuthenticated(r) {
-		s.sendJSONError(w, "Unauthorized", http.StatusUnauthorized)
+	if !s.checkAuth(w, r) {
 		return
 	}
 
@@ -77,7 +75,7 @@ func (s *Server) handleClusterSetSlave(w http.ResponseWriter, r *http.Request) {
 
 	// 保存配置
 	if err := s.config.Save(s.config.ConfigFile); err != nil {
-		s.logger.Error("Failed to save config: ", err)
+		s.log.Error("Failed to save config: ", err)
 		s.sendJSONError(w, "Failed to save configuration", http.StatusInternalServerError)
 		return
 	}
@@ -88,7 +86,7 @@ func (s *Server) handleClusterSetSlave(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.clusterManager.SetSlaveMode(request.MasterHost, request.MasterPort, request.AuthKey); err != nil {
-		s.logger.Error("Failed to set slave mode: ", err)
+		s.log.Error("Failed to set slave mode: ", err)
 		s.sendJSONError(w, "Failed to set slave mode", http.StatusInternalServerError)
 		return
 	}
@@ -101,8 +99,7 @@ func (s *Server) handleClusterSetSlave(w http.ResponseWriter, r *http.Request) {
 
 // handleClusterSetStandalone 设置为独立模式
 func (s *Server) handleClusterSetStandalone(w http.ResponseWriter, r *http.Request) {
-	if !s.isAuthenticated(r) {
-		s.sendJSONError(w, "Unauthorized", http.StatusUnauthorized)
+	if !s.checkAuth(w, r) {
 		return
 	}
 
@@ -120,7 +117,7 @@ func (s *Server) handleClusterSetStandalone(w http.ResponseWriter, r *http.Reque
 
 	// 保存配置
 	if err := s.config.Save(s.config.ConfigFile); err != nil {
-		s.logger.Error("Failed to save config: ", err)
+		s.log.Error("Failed to save config: ", err)
 		s.sendJSONError(w, "Failed to save configuration", http.StatusInternalServerError)
 		return
 	}
@@ -128,7 +125,7 @@ func (s *Server) handleClusterSetStandalone(w http.ResponseWriter, r *http.Reque
 	// 停止集群管理器
 	if s.clusterManager != nil {
 		if err := s.clusterManager.SetStandaloneMode(); err != nil {
-			s.logger.Error("Failed to set standalone mode: ", err)
+			s.log.Error("Failed to set standalone mode: ", err)
 			s.sendJSONError(w, "Failed to set standalone mode", http.StatusInternalServerError)
 			return
 		}
@@ -142,8 +139,7 @@ func (s *Server) handleClusterSetStandalone(w http.ResponseWriter, r *http.Reque
 
 // handleClusterNodes 获取集群节点信息
 func (s *Server) handleClusterNodes(w http.ResponseWriter, r *http.Request) {
-	if !s.isAuthenticated(r) {
-		s.sendJSONError(w, "Unauthorized", http.StatusUnauthorized)
+	if !s.checkAuth(w, r) {
 		return
 	}
 
@@ -213,7 +209,7 @@ func (s *Server) requireNonSlaveModeHTML(next http.HandlerFunc) http.HandlerFunc
 				"Message": "在Slave模式下不允许此操作",
 				"Config":  s.config,
 			}
-			s.renderTemplate(w, "error.html", data)
+			s.templateRenderer.Render(w, "error.html", data)
 			return
 		}
 		next.ServeHTTP(w, r)

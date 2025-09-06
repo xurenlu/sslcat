@@ -81,6 +81,7 @@ type SyncRequest struct {
 	Data      map[string]interface{} `json:"data"`
 	AuthKey   string                 `json:"auth_key"`
 	NodeID    string                 `json:"node_id"`
+	NodeInfo  *NodeInfo              `json:"node_info,omitempty"`
 }
 
 // SyncResponse 同步响应
