@@ -316,27 +316,41 @@ func (s *Server) proxyMiddleware(w http.ResponseWriter, r *http.Request) bool {
 		w.WriteHeader(http.StatusOK)
 	case "404":
 		s.log.Warnf("Unmatched proxy for host=%s path=%s, returning 404", host, r.URL.Path)
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("\n  ____  ____  _      _      _          \n" +
-			" / ___||  _ \\| | ___| | ___| |_ __ _ \n" +
-			" \\___ \\| |_) | |/ _ \\ |/ _ \\ __/ _` |\n" +
-			"  ___) |  __/| |  __/ |  __/ || (_| |\n" +
-			" |____/|_|   |_|\\___|_|\\___|\\__\\__,_|\n\n" +
-			"This server is enhanced and managed by SSLcat.\n" +
-			"Visit: https://sslcat.com\n"))
+		html404 := "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>404 Not Found - SSLcat</title></head><body style=\"font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\">" +
+			"<h1>404 Not Found</h1>" +
+			"<pre>\n" +
+			"  _____  _____ _      _           _      \n" +
+			" / ____|/ ____| |    | |         | |     \n" +
+			"| (___ | (___ | | ___| |__   __ _| |_    \n" +
+			" \\___ \\ \\___ \\| |/ _ \\ '_ \\ / _` | __|   \n" +
+			" ____) |____) | |  __/ | | | (_| | |_    \n" +
+			"|_____/|_____/|_|\\___|_| |_|\\__,_|\\__|   \n" +
+			"               SSLcat                    \n" +
+			"</pre>" +
+			"<p>This server is enhanced and managed by <a href=\"https://sslcat.com\" target=\"_blank\" rel=\"noopener\">sslcat.com</a>.</p>" +
+			"</body></html>"
+		w.Write([]byte(html404))
 		return true
 	default: // "502"
 		s.log.Warnf("Unmatched proxy for host=%s path=%s, returning 502", host, r.URL.Path)
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusBadGateway)
-		w.Write([]byte("\n  ____  ____  _      _      _          \n" +
-			" / ___||  _ \\| | ___| | ___| |_ __ _ \n" +
-			" \\___ \\| |_) | |/ _ \\ |/ _ \\ __/ _` |\n" +
-			"  ___) |  __/| |  __/ |  __/ || (_| |\n" +
-			" |____/|_|   |_|\\___|_|\\___|\\__\\__,_|\n\n" +
-			"This server is enhanced and managed by SSLcat.\n" +
-			"Visit: https://sslcat.com\n"))
+		html502 := "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>502 Bad Gateway - SSLcat</title></head><body style=\"font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\">" +
+			"<h1>502 Bad Gateway</h1>" +
+			"<pre>\n" +
+			"  _____  _____ _      _           _      \n" +
+			" / ____|/ ____| |    | |         | |     \n" +
+			"| (___ | (___ | | ___| |__   __ _| |_    \n" +
+			" \\___ \\ \\___ \\| |/ _ \\ '_ \\ / _` | __|   \n" +
+			" ____) |____) | |  __/ | | | (_| | |_    \n" +
+			"|_____/|_____/|_|\\___|_| |_|\\__,_|\\__|   \n" +
+			"               SSLcat                    \n" +
+			"</pre>" +
+			"<p>This server is enhanced and managed by <a href=\"https://sslcat.com\" target=\"_blank\" rel=\"noopener\">sslcat.com</a>.</p>" +
+			"</body></html>"
+		w.Write([]byte(html502))
 	}
 	return true
 }
