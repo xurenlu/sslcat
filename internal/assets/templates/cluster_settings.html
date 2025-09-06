@@ -1,0 +1,454 @@
+{{template "base.html" .}}
+
+{{define "content"}}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">
+                <i class="fas fa-network-wired"></i> 集群设置
+            </h2>
+
+            <!-- 当前集群状态 -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle"></i> 当前状态
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <strong>节点模式:</strong>
+                            {{if .IsStandaloneMode}}
+                                <span class="badge badge-secondary">独立模式</span>
+                            {{else if .IsMasterMode}}
+                                <span class="badge badge-primary">Master模式</span>
+                            {{else if .IsSlaveMode}}
+                                <span class="badge badge-info">Slave模式</span>
+                            {{end}}
+                        </div>
+                        <div class="col-md-4">
+                            <strong>节点ID:</strong> <code>{{.NodeID}}</code>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>节点名称:</strong> {{.NodeName}}
+                        </div>
+                    </div>
+
+                    {{if .IsSlaveMode}}
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <strong>Master地址:</strong> {{.Config.Cluster.Master.Host}}:{{.Config.Cluster.Master.Port}}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>同步状态:</strong> 
+                            <span class="badge badge-success">已连接</span>
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+
+            {{if .IsSlaveMode}}
+            <!-- Slave模式说明 -->
+            <div class="alert alert-info">
+                <h6><i class="fas fa-info-circle"></i> Slave模式限制</h6>
+                <p class="mb-2">在Slave模式下，本节点的配置和证书将从Master节点自动同步，您只能:</p>
+                <ul class="mb-0">
+                    <li>修改管理员密码</li>
+                    <li>修改管理面板路径</li>
+                    <li>解除Slave模式</li>
+                    <li>查看集群状态</li>
+                </ul>
+            </div>
+
+            <!-- 解除Slave模式 -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-unlink"></i> 解除Slave模式
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p>解除Slave模式后，此节点将恢复为独立模式，不再从Master同步配置。</p>
+                    <button type="button" class="btn btn-warning" onclick="setStandaloneMode()">
+                        <i class="fas fa-unlink"></i> 解除Slave模式
+                    </button>
+                </div>
+            </div>
+            {{else}}
+            <!-- 设置为Slave模式 -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-link"></i> 设置为Slave模式
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="slaveForm">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="masterHost">Master节点地址</label>
+                                    <input type="text" class="form-control" id="masterHost" name="masterHost" 
+                                           placeholder="例如: 192.168.1.100" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="masterPort">Master节点端口</label>
+                                    <input type="number" class="form-control" id="masterPort" name="masterPort" 
+                                           value="8443" min="1" max="65535" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="authKey">认证密钥</label>
+                            <input type="password" class="form-control" id="authKey" name="authKey" 
+                                   placeholder="Master节点的集群认证密钥" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-link"></i> 设置为Slave模式
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {{end}}
+
+            <!-- 集群节点列表 -->
+            {{if .Nodes}}
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-server"></i> 集群节点
+                        <button class="btn btn-sm btn-outline-secondary float-right" onclick="refreshNodes()">
+                            <i class="fas fa-sync-alt"></i> 刷新
+                        </button>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover" id="nodesTable">
+                            <thead>
+                                <tr>
+                                    <th>节点名称</th>
+                                    <th>节点ID</th>
+                                    <th>模式</th>
+                                    <th>IP:端口</th>
+                                    <th>状态</th>
+                                    <th>证书数</th>
+                                    <th>配置MD5</th>
+                                    <th>最后通信</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- 通过JS动态加载 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {{end}}
+        </div>
+    </div>
+</div>
+
+<script>
+// 设置为Slave模式
+{{if not .IsSlaveMode}}
+document.getElementById('slaveForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const masterHost = document.getElementById('masterHost').value;
+    const masterPort = parseInt(document.getElementById('masterPort').value);
+    const authKey = document.getElementById('authKey').value;
+    
+    if (!masterHost || !masterPort || !authKey) {
+        showAlert('请填写所有字段', 'danger');
+        return;
+    }
+    
+    fetch('{{.Config.AdminPrefix}}/api/cluster/set-slave', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            master_host: masterHost,
+            master_port: masterPort,
+            auth_key: authKey
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('已设置为Slave模式，正在重新加载...', 'success');
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+        } else {
+            showAlert('设置失败: ' + data.error, 'danger');
+        }
+    })
+    .catch(error => {
+        showAlert('请求失败: ' + error.message, 'danger');
+    });
+});
+{{end}}
+
+{{if .IsSlaveMode}}
+// 解除Slave模式
+function setStandaloneMode() {
+    if (!confirm('确定要解除Slave模式吗？解除后将恢复为独立模式。')) {
+        return;
+    }
+    
+    fetch('{{.Config.AdminPrefix}}/api/cluster/set-standalone', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('已解除Slave模式，正在重新加载...', 'success');
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+        } else {
+            showAlert('操作失败: ' + data.error, 'danger');
+        }
+    })
+    .catch(error => {
+        showAlert('请求失败: ' + error.message, 'danger');
+    });
+}
+{{end}}
+
+// 刷新节点列表
+function refreshNodes() {
+    fetch('{{.Config.AdminPrefix}}/api/cluster/nodes')
+    .then(response => response.json())
+    .then(data => {
+        updateNodesTable(data.nodes || {});
+    })
+    .catch(error => {
+        console.error('Failed to refresh nodes:', error);
+    });
+}
+
+// 更新节点表格
+function updateNodesTable(nodes) {
+    const tbody = document.querySelector('#nodesTable tbody');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+    
+    for (const [nodeId, node] of Object.entries(nodes)) {
+        const row = tbody.insertRow();
+        
+        // 格式化配置MD5显示（只显示前8位）
+        const configMD5Short = node.config_md5 ? node.config_md5.substring(0, 8) + '...' : 'N/A';
+        const configMD5Full = node.config_md5 || 'N/A';
+        
+        // 格式化IP和端口
+        const ipPort = node.ip_address && node.service_port ? 
+                      `${node.ip_address}:${node.service_port}` : 
+                      (node.host && node.port ? `${node.host}:${node.port}` : 'N/A');
+        
+        row.innerHTML = `
+            <td>
+                <strong>${node.name || 'N/A'}</strong>
+                ${node.version ? `<br><small class="text-muted">v${node.version}</small>` : ''}
+            </td>
+            <td><code>${nodeId.substring(0, 8)}...</code></td>
+            <td>
+                ${node.mode === 'master' ? '<span class="badge badge-primary">Master</span>' : 
+                  node.mode === 'slave' ? '<span class="badge badge-info">Slave</span>' : 
+                  '<span class="badge badge-secondary">独立</span>'}
+            </td>
+            <td>
+                <code>${ipPort}</code>
+                ${node.uptime ? `<br><small class="text-muted">运行 ${formatUptime(node.uptime)}</small>` : ''}
+            </td>
+            <td>
+                ${node.status === 'online' ? '<span class="badge badge-success">在线</span>' : 
+                  '<span class="badge badge-secondary">离线</span>'}
+                ${node.last_heartbeat ? `<br><small class="text-muted">${getTimeAgo(node.last_heartbeat)}</small>` : ''}
+            </td>
+            <td>
+                <span class="badge badge-light">${node.cert_count || 0}</span>
+                ${node.ssl_domains ? `<br><small class="text-muted">${node.ssl_domains} 域名</small>` : ''}
+            </td>
+            <td>
+                <code title="${configMD5Full}">${configMD5Short}</code>
+                ${node.proxy_rules ? `<br><small class="text-muted">${node.proxy_rules} 规则</small>` : ''}
+            </td>
+            <td>
+                <small>${node.last_seen ? new Date(node.last_seen).toLocaleString() : 'N/A'}</small>
+            </td>
+            <td>
+                <button class="btn btn-sm btn-outline-info" onclick="showNodeDetails('${nodeId}')">
+                    <i class="fas fa-info-circle"></i>
+                </button>
+            </td>
+        `;
+    }
+}
+
+// 格式化运行时间
+function formatUptime(seconds) {
+    if (!seconds) return 'N/A';
+    
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    
+    if (days > 0) {
+        return `${days}天${hours}小时`;
+    } else if (hours > 0) {
+        return `${hours}小时${minutes}分钟`;
+    } else if (minutes > 0) {
+        return `${minutes}分钟`;
+    } else {
+        return `${seconds}秒`;
+    }
+}
+
+// 获取时间差
+function getTimeAgo(timestamp) {
+    if (!timestamp) return 'N/A';
+    
+    const now = new Date();
+    const time = new Date(timestamp);
+    const diffSeconds = Math.floor((now - time) / 1000);
+    
+    if (diffSeconds < 60) {
+        return `${diffSeconds}秒前`;
+    } else if (diffSeconds < 3600) {
+        return `${Math.floor(diffSeconds / 60)}分钟前`;
+    } else if (diffSeconds < 86400) {
+        return `${Math.floor(diffSeconds / 3600)}小时前`;
+    } else {
+        return `${Math.floor(diffSeconds / 86400)}天前`;
+    }
+}
+
+// 显示节点详细信息
+function showNodeDetails(nodeId) {
+    fetch('{{.Config.AdminPrefix}}/api/cluster/nodes')
+    .then(response => response.json())
+    .then(data => {
+        const node = data.nodes[nodeId];
+        if (!node) {
+            showAlert('节点信息不存在', 'danger');
+            return;
+        }
+        
+        // 创建详细信息模态框
+        const modal = document.createElement('div');
+        modal.className = 'modal fade';
+        modal.innerHTML = `
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">节点详情 - ${node.name}</h5>
+                        <button type="button" class="close" data-dismiss="modal">
+                            <span>&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <table class="table table-sm">
+                                    <tr><th>节点ID</th><td><code>${node.id}</code></td></tr>
+                                    <tr><th>节点名称</th><td>${node.name}</td></tr>
+                                    <tr><th>运行模式</th><td>
+                                        ${node.mode === 'master' ? '<span class="badge badge-primary">Master</span>' : 
+                                          node.mode === 'slave' ? '<span class="badge badge-info">Slave</span>' : 
+                                          '<span class="badge badge-secondary">独立</span>'}
+                                    </td></tr>
+                                    <tr><th>版本</th><td>${node.version || 'N/A'}</td></tr>
+                                    <tr><th>IP地址</th><td><code>${node.ip_address || 'N/A'}</code></td></tr>
+                                    <tr><th>服务端口</th><td><code>${node.service_port || 'N/A'}</code></td></tr>
+                                </table>
+                            </div>
+                            <div class="col-md-6">
+                                <table class="table table-sm">
+                                    <tr><th>状态</th><td>
+                                        ${node.status === 'online' ? '<span class="badge badge-success">在线</span>' : 
+                                          '<span class="badge badge-secondary">离线</span>'}
+                                    </td></tr>
+                                    <tr><th>运行时间</th><td>${formatUptime(node.uptime)}</td></tr>
+                                    <tr><th>证书数量</th><td><span class="badge badge-light">${node.cert_count || 0}</span></td></tr>
+                                    <tr><th>代理规则</th><td><span class="badge badge-light">${node.proxy_rules || 0}</span></td></tr>
+                                    <tr><th>SSL域名</th><td><span class="badge badge-light">${node.ssl_domains || 0}</span></td></tr>
+                                    <tr><th>最后通信</th><td><small>${node.last_seen ? new Date(node.last_seen).toLocaleString() : 'N/A'}</small></td></tr>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <h6>配置信息</h6>
+                                <table class="table table-sm">
+                                    <tr><th>配置MD5</th><td><code>${node.config_md5 || 'N/A'}</code></td></tr>
+                                    <tr><th>同步启用</th><td>
+                                        ${node.sync_enabled ? '<span class="badge badge-success">是</span>' : 
+                                          '<span class="badge badge-secondary">否</span>'}
+                                    </td></tr>
+                                    <tr><th>最后同步</th><td><small>${node.last_sync ? new Date(node.last_sync).toLocaleString() : '从未同步'}</small></td></tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        $(modal).modal('show');
+        
+        // 模态框关闭后移除元素
+        $(modal).on('hidden.bs.modal', function() {
+            modal.remove();
+        });
+    })
+    .catch(error => {
+        showAlert('获取节点详情失败: ' + error.message, 'danger');
+    });
+}
+
+// 页面加载完成后自动刷新节点列表
+document.addEventListener('DOMContentLoaded', function() {
+    {{if .Nodes}}
+    refreshNodes();
+    {{end}}
+});
+
+// 显示提示信息
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="close" data-dismiss="alert">
+            <span>&times;</span>
+        </button>
+    `;
+    
+    const container = document.querySelector('.container');
+    container.insertBefore(alertDiv, container.firstChild);
+    
+    // 3秒后自动消失
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 3000);
+}
+</script>
+{{end}}

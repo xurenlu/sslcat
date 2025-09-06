@@ -505,8 +505,9 @@ If you encounter issues or have suggestions:
 
 For complete version update history, please refer to: **[CHANGELOG.md](CHANGELOG.md)**
 
-### Latest Version v1.0.12 (2025-01-03)
-- 🎉 Complete multilingual support (Chinese, English, Japanese, Spanish, French, Russian)
-- 🔒 Enhanced security settings: First login requires admin panel path configuration
-- 📚 Documentation structure optimization and user experience improvements
-- 🔧 Unified version management and build optimization
+### Latest Version v1.0.13 (2025-01-03)
+- 🌐 Master-Slave cluster architecture: Multi-node deployment support for high availability
+- 🔄 Automatic configuration synchronization: Real-time config push from Master to all Slave nodes
+- 🔒 Permission separation control: Strict functional restrictions in Slave mode
+- 🖥️ Cluster management interface: Complete node status monitoring and management
+- 📊 Detailed monitoring information: IP address, port, certificate count, config MD5, and more

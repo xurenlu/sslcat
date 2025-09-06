@@ -531,8 +531,9 @@ Si encuentras problemas o tienes sugerencias:
 
 Para el historial completo de actualizaciones de versión, consulte: **[CHANGELOG.md](CHANGELOG.md)**
 
-### Última Versión v1.0.12 (2025-01-03)
-- 🎉 Soporte completo multilingüe (chino, inglés, japonés, español, francés, ruso)
-- 🔒 Configuraciones de seguridad mejoradas: El primer login requiere configuración de ruta del panel
-- 📚 Optimización de estructura de documentación y mejoras de experiencia de usuario
-- 🔧 Gestión unificada de versiones y optimización de construcción
+### Última Versión v1.0.13 (2025-01-03)
+- 🌐 Arquitectura de clúster Master-Slave: Soporte para despliegue multi-nodo con alta disponibilidad
+- 🔄 Sincronización automática de configuración: Envío en tiempo real desde Master a todos los nodos Slave
+- 🔒 Control de separación de permisos: Restricciones funcionales estrictas en modo Slave
+- 🖥️ Interfaz de gestión de clúster: Monitoreo completo del estado de nodos y gestión
+- 📊 Información de monitoreo detallada: Dirección IP, puerto, recuento de certificados, MD5 de configuración, y más

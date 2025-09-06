@@ -1,6 +1,9 @@
 package config
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -18,6 +21,9 @@ type Config struct {
 	Security    SecurityConfig `json:"security"`
 	AdminPrefix string         `json:"admin_prefix"`
 	ConfigFile  string         `json:"-"` // 配置文件路径，不序列化
+
+	// 集群配置
+	Cluster ClusterConfig `json:"cluster"`
 }
 
 // ServerConfig 服务器配置
@@ -76,6 +82,66 @@ type SecurityConfig struct {
 	BlockDuration time.Duration `json:"-"`
 }
 
+// ClusterConfig 集群配置
+type ClusterConfig struct {
+	// 集群模式: "master", "slave", "standalone"
+	Mode string `json:"mode"`
+
+	// 节点ID（自动生成）
+	NodeID string `json:"node_id"`
+
+	// 节点名称
+	NodeName string `json:"node_name"`
+
+	// Master配置（当模式为slave时使用）
+	Master MasterConfig `json:"master"`
+
+	// 同步配置
+	Sync SyncConfig `json:"sync"`
+
+	// 集群通信端口
+	Port int `json:"port"`
+
+	// 集群通信密钥
+	AuthKey string `json:"auth_key"`
+}
+
+// MasterConfig Master节点配置
+type MasterConfig struct {
+	// Master节点地址
+	Host string `json:"host"`
+
+	// Master节点端口
+	Port int `json:"port"`
+
+	// 认证密钥
+	AuthKey string `json:"auth_key"`
+
+	// 连接超时时间（秒）
+	Timeout int `json:"timeout"`
+
+	// 重连间隔（秒）
+	RetryInterval int `json:"retry_interval"`
+}
+
+// SyncConfig 同步配置
+type SyncConfig struct {
+	// 是否启用配置同步
+	ConfigEnabled bool `json:"config_enabled"`
+
+	// 是否启用证书同步
+	CertEnabled bool `json:"cert_enabled"`
+
+	// 同步间隔（秒）
+	Interval int `json:"interval"`
+
+	// 同步超时时间（秒）
+	Timeout int `json:"timeout"`
+
+	// 排除的配置项
+	ExcludeConfigs []string `json:"exclude_configs"`
+}
+
 // Load 加载配置文件
 func Load(configFile string) (*Config, error) {
 	// 设置默认值
@@ -118,6 +184,29 @@ func Load(configFile string) (*Config, error) {
 			TLSFingerprintTopN:      20,
 		},
 		AdminPrefix: "/sslcat-panel",
+		Cluster: ClusterConfig{
+			Mode:     "standalone",
+			NodeID:   generateNodeID(),
+			NodeName: "Node-1",
+			Master: MasterConfig{
+				Timeout:       30,
+				RetryInterval: 10,
+			},
+			Sync: SyncConfig{
+				ConfigEnabled: true,
+				CertEnabled:   true,
+				Interval:      30,
+				Timeout:       10,
+				ExcludeConfigs: []string{
+					"admin.password",
+					"admin.password_file",
+					"admin_prefix",
+					"cluster",
+				},
+			},
+			Port:    8443,
+			AuthKey: "",
+		},
 	}
 
 	// 如果配置文件存在，则加载
@@ -164,6 +253,109 @@ func Load(configFile string) (*Config, error) {
 	config.ConfigFile = configFile
 
 	return config, nil
+}
+
+// generateNodeID 生成节点ID
+func generateNodeID() string {
+	// 使用时间戳和随机数生成节点ID
+	data := make([]byte, 8)
+	_, err := rand.Read(data)
+	if err != nil {
+		// 如果随机数生成失败，使用时间戳
+		data = []byte(fmt.Sprintf("%d", time.Now().UnixNano()))
+	}
+	timestamp := time.Now().Unix()
+	combined := fmt.Sprintf("%d-%x", timestamp, data)
+	hash := sha256.Sum256([]byte(combined))
+	return hex.EncodeToString(hash[:8])
+}
+
+// IsSlaveMode 检查是否为Slave模式
+func (c *Config) IsSlaveMode() bool {
+	return c.Cluster.Mode == "slave"
+}
+
+// IsMasterMode 检查是否为Master模式
+func (c *Config) IsMasterMode() bool {
+	return c.Cluster.Mode == "master"
+}
+
+// IsStandaloneMode 检查是否为独立模式
+func (c *Config) IsStandaloneMode() bool {
+	return c.Cluster.Mode == "standalone" || c.Cluster.Mode == ""
+}
+
+// 实现集群配置接口方法
+func (c *Config) GetClusterMode() string {
+	return c.Cluster.Mode
+}
+
+func (c *Config) GetNodeID() string {
+	return c.Cluster.NodeID
+}
+
+func (c *Config) GetNodeName() string {
+	return c.Cluster.NodeName
+}
+
+func (c *Config) GetMasterConfig() interface{} {
+	return struct {
+		Host          string
+		Port          int
+		AuthKey       string
+		Timeout       int
+		RetryInterval int
+	}{
+		Host:          c.Cluster.Master.Host,
+		Port:          c.Cluster.Master.Port,
+		AuthKey:       c.Cluster.Master.AuthKey,
+		Timeout:       c.Cluster.Master.Timeout,
+		RetryInterval: c.Cluster.Master.RetryInterval,
+	}
+}
+
+func (c *Config) GetSyncConfig() interface{} {
+	return struct {
+		ConfigEnabled  bool
+		CertEnabled    bool
+		Interval       int
+		Timeout        int
+		ExcludeConfigs []string
+	}{
+		ConfigEnabled:  c.Cluster.Sync.ConfigEnabled,
+		CertEnabled:    c.Cluster.Sync.CertEnabled,
+		Interval:       c.Cluster.Sync.Interval,
+		Timeout:        c.Cluster.Sync.Timeout,
+		ExcludeConfigs: c.Cluster.Sync.ExcludeConfigs,
+	}
+}
+
+func (c *Config) GetClusterPort() int {
+	return c.Cluster.Port
+}
+
+func (c *Config) GetClusterAuthKey() string {
+	return c.Cluster.AuthKey
+}
+
+func (c *Config) GetServicePort() int {
+	return c.Server.Port
+}
+
+func (c *Config) GetCertDir() string {
+	return c.SSL.CertDir
+}
+
+func (c *Config) GetProxyRules() []interface{} {
+	rules := make([]interface{}, len(c.Proxy.Rules))
+	for i, rule := range c.Proxy.Rules {
+		rules[i] = rule
+	}
+	return rules
+}
+
+func (c *Config) GetSSLDomains() []string {
+	return c.SSL.Domains
 }
 
 // Save 保存配置文件

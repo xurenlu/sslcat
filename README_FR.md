@@ -505,8 +505,9 @@ Si vous rencontrez des problèmes ou avez des suggestions :
 
 Pour l'historique complet des mises à jour de version, veuillez consulter : **[CHANGELOG.md](CHANGELOG.md)**
 
-### Dernière Version v1.0.12 (2025-01-03)
-- 🎉 Support multilingue complet (chinois, anglais, japonais, espagnol, français, russe)
-- 🔒 Paramètres de sécurité améliorés : La première connexion nécessite la configuration du chemin du panneau
-- 📚 Optimisation de la structure de documentation et améliorations de l'expérience utilisateur
-- 🔧 Gestion unifiée des versions et optimisation de construction
+### Dernière Version v1.0.13 (2025-01-03)
+- 🌐 Architecture de cluster Master-Slave : Support de déploiement multi-nœuds pour haute disponibilité
+- 🔄 Synchronisation automatique de configuration : Poussée en temps réel du Master vers tous les nœuds Slave
+- 🔒 Contrôle de séparation des permissions : Restrictions fonctionnelles strictes en mode Slave
+- 🖥️ Interface de gestion de cluster : Surveillance complète de l'état des nœuds et gestion
+- 📊 Informations de surveillance détaillées : Adresse IP, port, nombre de certificats, MD5 de configuration, et plus

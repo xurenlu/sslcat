@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/xurenlu/sslcat/internal/assets"
+	"github.com/xurenlu/sslcat/internal/cluster"
 	"github.com/xurenlu/sslcat/internal/config"
 	"github.com/xurenlu/sslcat/internal/i18n"
 	"github.com/xurenlu/sslcat/internal/notify"
@@ -16,8 +18,20 @@ import (
 	"github.com/xurenlu/sslcat/internal/ssl"
 
 	"github.com/sirupsen/logrus"
-	"github.com/xurenlu/sslcat/internal/assets"
 )
+
+// ClusterManager 集群管理器接口
+type ClusterManager interface {
+	Start() error
+	Stop()
+	IsSlaveMode() bool
+	IsMasterMode() bool
+	IsStandaloneMode() bool
+	GetNodes() map[string]interface{}
+	SetSlaveMode(masterHost string, masterPort int, authKey string) error
+	SetStandaloneMode() error
+	HandleSyncRequest(w http.ResponseWriter, r *http.Request)
+}
 
 // Server Web服务器
 type Server struct {
@@ -39,6 +53,7 @@ type Server struct {
 	tokenStore *security.TokenStore
 	// 验证码管理
 	captchaManager *CaptchaManager
+	clusterManager ClusterManager
 }
 
 // NewServer 创建Web服务器
@@ -81,9 +96,15 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 
 	// 初始化 TokenStore
 	server.tokenStore = security.NewTokenStore("./data/tokens.json")
-	
+
 	// 初始化验证码管理器
 	server.captchaManager = NewCaptchaManager()
+
+	// 初始化集群管理器（如果需要）
+	if cfg.Cluster.Mode != "standalone" && cfg.Cluster.Mode != "" {
+		configAdapter := NewConfigAdapter(cfg)
+		server.clusterManager = cluster.NewManager(configAdapter, logrus.StandardLogger())
+	}
 
 	server.setupRoutes()
 	return server
