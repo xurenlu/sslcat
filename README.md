@@ -4,7 +4,7 @@
 
 ```bash
 # 1) macOS 本地快速试用（或自行下载 darwin 包）
-curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.0.11/sslcat_1.0.11_darwin_arm64.tar.gz -o sslcat.tgz
+curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.0.12/sslcat_1.0.12_darwin_arm64.tar.gz -o sslcat.tgz
 tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
 sslcat --config sslcat.conf --port 8080
 # 浏览器访问: http://localhost:8080/sslcat-panel/
@@ -506,7 +506,7 @@ go run main.go --config sslcat.conf --log-level debug
 
 查看完整的版本更新历史，请参阅：**[CHANGELOG.md](CHANGELOG.md)**
 
-### 最新版本 v1.0.11 (2025-01-03)
+### 最新版本 v1.0.12 (2025-01-03)
 - 🎉 完整多语言支持（中、英、日、西、法、俄）
 - 🔒 强化安全设置：首次登录必须设置管理面板路径
 - 📚 文档结构优化和用户体验改进

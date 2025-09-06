@@ -19,8 +19,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$VER" ]]; then
-  echo "[sslcat] 你未指定版本，默认安装 v1.0.11"
-  VER="1.0.11"
+  echo "[sslcat] 你未指定版本，默认安装 v1.0.12"
+  VER="1.0.12"
 fi
 
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')

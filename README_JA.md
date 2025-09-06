@@ -10,7 +10,7 @@ curl -fsSL https://sslcat.com/xurenlu/sslcat/main/scripts/install-from-release-z
 # curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/scripts/install-from-release.sh | sudo bash -s -- -v 1.0.11
 
 # 2) macOS ローカル クイックテスト（またはdarwinパッケージを手動ダウンロード）
-curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.0.11/sslcat_1.0.11_darwin_arm64.tar.gz -o sslcat.tgz
+curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.0.12/sslcat_1.0.12_darwin_arm64.tar.gz -o sslcat.tgz
 tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
 sslcat --config sslcat.conf --port 8080
 # ブラウザアクセス: http://localhost:8080/sslcat-panel/
@@ -509,7 +509,7 @@ go run main.go --config sslcat.conf --log-level debug
 
 完全なバージョン更新履歴はこちらを参照してください：**[CHANGELOG.md](CHANGELOG.md)**
 
-### 最新バージョン v1.0.11 (2025-01-03)
+### 最新バージョン v1.0.12 (2025-01-03)
 - 🎉 完全な多言語サポート（中国語、英語、日本語、スペイン語、フランス語、ロシア語）
 - 🔒 セキュリティ設定強化：初回ログイン時に管理パネルパス設定が必須
 - 📚 ドキュメント構造最適化とユーザーエクスペリエンス改善

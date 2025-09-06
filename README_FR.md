@@ -4,7 +4,7 @@
 
 ```bash
 # 1) Test rapide local macOS (ou télécharger le paquet darwin manuellement)
-curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.0.11/sslcat_1.0.11_darwin_arm64.tar.gz -o sslcat.tgz
+curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.0.12/sslcat_1.0.12_darwin_arm64.tar.gz -o sslcat.tgz
 tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
 sslcat --config sslcat.conf --port 8080
 # Accès navigateur : http://localhost:8080/sslcat-panel/
@@ -505,7 +505,7 @@ Si vous rencontrez des problèmes ou avez des suggestions :
 
 Pour l'historique complet des mises à jour de version, veuillez consulter : **[CHANGELOG.md](CHANGELOG.md)**
 
-### Dernière Version v1.0.11 (2025-01-03)
+### Dernière Version v1.0.12 (2025-01-03)
 - 🎉 Support multilingue complet (chinois, anglais, japonais, espagnol, français, russe)
 - 🔒 Paramètres de sécurité améliorés : La première connexion nécessite la configuration du chemin du panneau
 - 📚 Optimisation de la structure de documentation et améliorations de l'expérience utilisateur

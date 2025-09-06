@@ -10,7 +10,7 @@ curl -fsSL https://sslcat.com/xurenlu/sslcat/main/scripts/install-from-release-z
 # curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/scripts/install-from-release.sh | sudo bash -s -- -v 1.0.11
 
 # 2) Prueba rápida local en macOS (o descargar paquete darwin manualmente)
-curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.0.11/sslcat_1.0.11_darwin_arm64.tar.gz -o sslcat.tgz
+curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.0.12/sslcat_1.0.12_darwin_arm64.tar.gz -o sslcat.tgz
 tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
 sslcat --config sslcat.conf --port 8080
 # Acceso por navegador: http://localhost:8080/sslcat-panel/
@@ -531,7 +531,7 @@ Si encuentras problemas o tienes sugerencias:
 
 Para el historial completo de actualizaciones de versión, consulte: **[CHANGELOG.md](CHANGELOG.md)**
 
-### Última Versión v1.0.11 (2025-01-03)
+### Última Versión v1.0.12 (2025-01-03)
 - 🎉 Soporte completo multilingüe (chino, inglés, japonés, español, francés, ruso)
 - 🔒 Configuraciones de seguridad mejoradas: El primer login requiere configuración de ruta del panel
 - 📚 Optimización de estructura de documentación y mejoras de experiencia de usuario
