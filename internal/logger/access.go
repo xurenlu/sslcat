@@ -43,16 +43,16 @@ type AccessLog struct {
 
 // AccessLogger 访问日志记录器
 type AccessLogger struct {
-	format     LogFormat
-	writer     io.Writer
-	file       *os.File
-	mutex      sync.Mutex
-	enabled    bool
-	logPath    string
-	maxSize    int64 // 最大文件大小 (字节)
-	maxFiles   int   // 最大文件数量
+	format      LogFormat
+	writer      io.Writer
+	file        *os.File
+	mutex       sync.Mutex
+	enabled     bool
+	logPath     string
+	maxSize     int64 // 最大文件大小 (字节)
+	maxFiles    int   // 最大文件数量
 	currentSize int64
-	log        *logrus.Entry
+	log         *logrus.Entry
 }
 
 // NewAccessLogger 创建访问日志记录器
@@ -131,7 +131,7 @@ func (a *AccessLogger) rotateLogFile() error {
 func (a *AccessLogger) cleanOldFiles() {
 	dir := filepath.Dir(a.logPath)
 	filename := filepath.Base(a.logPath)
-	
+
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return
@@ -237,11 +237,11 @@ func (a *AccessLogger) formatJSON(log *AccessLog) string {
 }
 
 // LogRequest 记录HTTP请求
-func (a *AccessLogger) LogRequest(r *http.Request, statusCode int, bytesSent int64, 
+func (a *AccessLogger) LogRequest(r *http.Request, statusCode int, bytesSent int64,
 	requestTime time.Duration, upstreamAddr string, upstreamTime time.Duration) {
-	
+
 	clientIP := a.getClientIP(r)
-	
+
 	accessLog := &AccessLog{
 		Timestamp:    time.Now(),
 		ClientIP:     clientIP,
@@ -258,7 +258,7 @@ func (a *AccessLogger) LogRequest(r *http.Request, statusCode int, bytesSent int
 		Host:         r.Host,
 		RequestID:    r.Header.Get("X-Request-ID"),
 	}
-	
+
 	a.Log(accessLog)
 }
 
@@ -336,4 +336,22 @@ func (a *AccessLogger) GetStats() map[string]interface{} {
 	}
 
 	return stats
+}
+
+// SetMaxSize 设置最大文件大小（字节）
+func (a *AccessLogger) SetMaxSize(size int64) {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+	if size > 0 {
+		a.maxSize = size
+	}
+}
+
+// SetMaxFiles 设置最大保留文件数
+func (a *AccessLogger) SetMaxFiles(n int) {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+	if n > 0 {
+		a.maxFiles = n
+	}
 }

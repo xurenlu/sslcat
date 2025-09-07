@@ -152,10 +152,13 @@ func (s *Server) handleAPITLSFingerprints(w http.ResponseWriter, r *http.Request
 func (s *Server) handleAPICaptcha(w http.ResponseWriter, r *http.Request) {
 	// 验证码API不需要登录认证，但只有在需要验证码时才能访问
 	if !s.sslManager.HasValidSSLCertificates() {
-		w.WriteHeader(http.StatusNotFound)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"error":"captcha not required"}`))
-		return
+		// 调试模式允许在无证书时使用 captcha API
+		if !(strings.EqualFold(r.URL.Query().Get("debug"), "true") || r.URL.Query().Get("debug") == "1") {
+			w.WriteHeader(http.StatusNotFound)
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"error":"captcha not required"}`))
+			return
+		}
 	}
 
 	if r.Method == "GET" {

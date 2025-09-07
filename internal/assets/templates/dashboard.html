@@ -74,12 +74,22 @@
                                 <i class="bi bi-gear"></i> {{t "nav.settings"}}
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{.AdminPrefix}}/static-sites">
+                                <i class="bi bi-file-earmark-text"></i> {{t "nav.static_sites"}}
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{.AdminPrefix}}/php-sites">
+                                <i class="bi bi-code-square"></i> {{t "nav.php_sites"}}
+                            </a>
+                        </li>
                     </ul>
                     
                     <hr>
                     <div class="dropdown">
                         <a href="{{.AdminPrefix}}/logout" class="btn btn-outline-danger btn-sm">
-                            <i class="bi bi-box-arrow-right"></i> 退出
+                            <i class="bi bi-box-arrow-right"></i> {{t "menu.logout"}}
                         </a>
                     </div>
                 </div>

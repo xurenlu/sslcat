@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/xurenlu/sslcat/internal/assets"
-	"github.com/xurenlu/sslcat/internal/cluster"
 	"github.com/xurenlu/sslcat/internal/config"
 	"github.com/xurenlu/sslcat/internal/i18n"
+	"github.com/xurenlu/sslcat/internal/logger"
 	"github.com/xurenlu/sslcat/internal/notify"
 	"github.com/xurenlu/sslcat/internal/proxy"
 	"github.com/xurenlu/sslcat/internal/security"
@@ -59,6 +59,10 @@ type Server struct {
 	// 验证码管理
 	captchaManager *CaptchaManager
 	clusterManager ClusterManager
+	// 审计轮转器
+	auditRotator *logger.Rotator
+	// 访问日志记录器
+	accessLogger *logger.AccessLogger
 }
 
 // NewServer 创建Web服务器
@@ -105,10 +109,31 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	// 初始化验证码管理器
 	server.captchaManager = NewCaptchaManager()
 
-	// 初始化集群管理器（如果需要）
-	if cfg.Cluster.Mode != "standalone" && cfg.Cluster.Mode != "" {
-		configAdapter := NewConfigAdapter(cfg)
-		server.clusterManager = cluster.NewManager(configAdapter, logrus.StandardLogger())
+	// 初始化审计日志轮转器（10MB*10）
+	if rot, err := logger.NewRotator("./data/audit.log", 10*1024*1024, 10); err == nil {
+		server.auditRotator = rot
+	}
+
+	// 初始化访问日志记录器（可配置）
+	if cfg.Server.AccessLogEnabled {
+		format := logger.FormatNginx
+		switch strings.ToLower(cfg.Server.AccessLogFormat) {
+		case "apache":
+			format = logger.FormatApache
+		case "json":
+			format = logger.FormatJSON
+		}
+		al, err := logger.NewAccessLogger(format, cfg.Server.AccessLogPath, true)
+		if err == nil {
+			// 覆盖默认大小/数量
+			if cfg.Server.AccessLogMaxSize > 0 {
+				al.SetMaxSize(cfg.Server.AccessLogMaxSize)
+			}
+			if cfg.Server.AccessLogMaxFiles > 0 {
+				al.SetMaxFiles(cfg.Server.AccessLogMaxFiles)
+			}
+			server.accessLogger = al
+		}
 	}
 
 	server.setupRoutes()
@@ -164,6 +189,16 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/settings/save", s.handleSettingsSave)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/settings/first-setup", s.handleFirstTimeSetup)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/settings/change-password", s.handleChangePassword)
+
+	// 静态站点管理
+	s.mux.HandleFunc(s.config.AdminPrefix+"/static-sites", s.handleStaticSites)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/static-sites/add", s.handleStaticSitesAdd)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/static-sites/delete", s.handleStaticSitesDelete)
+
+	// PHP 站点管理
+	s.mux.HandleFunc(s.config.AdminPrefix+"/php-sites", s.handlePHPSites)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/php-sites/add", s.handlePHPSitesAdd)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/php-sites/delete", s.handlePHPSitesDelete)
 
 	// 紧急修复（忘记密码）
 	s.mux.HandleFunc(s.config.AdminPrefix+"/help/recover", s.handleRecoverHelp)
@@ -302,6 +337,16 @@ func (s *Server) proxyMiddleware(w http.ResponseWriter, r *http.Request) bool {
 	// 如果是管理面板路径，跳过代理
 	if strings.HasPrefix(r.URL.Path, s.config.AdminPrefix) {
 		return false
+	}
+
+	// 若命中 PHP 站点，则先交给 PHP 处理
+	if s.tryServePHP(w, r) {
+		return true
+	}
+
+	// 若匹配静态站点，则直接本地文件服务
+	if s.serveStatic(w, r) {
+		return true
 	}
 
 	// 获取域名
@@ -454,10 +499,15 @@ func (s *Server) audit(action, detail string) {
 	rec := map[string]string{"time": t, "user": s.config.Admin.Username, "action": action, "detail": detail}
 	b, _ := json.Marshal(rec)
 	_ = os.MkdirAll("./data", 0755)
-	f, err := os.OpenFile("./data/audit.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err == nil {
-		defer f.Close()
-		f.Write(append(b, '\n'))
+	// 使用轮转写入器（若可用）
+	if s.auditRotator != nil {
+		_, _ = s.auditRotator.Write(append(b, '\n'))
+	} else {
+		f, err := os.OpenFile("./data/audit.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err == nil {
+			defer f.Close()
+			f.Write(append(b, '\n'))
+		}
 	}
 	if s.notifier != nil && s.notifier.Enabled() {
 		m := map[string]any{"ts": t, "level": "info", "action": action, "detail": detail}
@@ -471,11 +521,8 @@ func (s *Server) audit(action, detail string) {
 func (s *Server) refreshLEPreferredHostLoop() {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-			s.refreshLEPreferredHost()
-		}
+	for range ticker.C {
+		s.refreshLEPreferredHost()
 	}
 }
 

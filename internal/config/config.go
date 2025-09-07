@@ -24,6 +24,10 @@ type Config struct {
 
 	// 集群配置
 	Cluster ClusterConfig `json:"cluster"`
+	// 静态站点
+	StaticSites []StaticSite `json:"static_sites"`
+	// PHP 站点
+	PHPSites []PHPSite `json:"php_sites"`
 }
 
 // ServerConfig 服务器配置
@@ -31,6 +35,12 @@ type ServerConfig struct {
 	Host  string `json:"host"`
 	Port  int    `json:"port"`
 	Debug bool   `json:"debug"`
+	// 访问日志
+	AccessLogEnabled  bool   `json:"access_log_enabled"`
+	AccessLogFormat   string `json:"access_log_format"` // nginx|apache|json
+	AccessLogPath     string `json:"access_log_path"`
+	AccessLogMaxSize  int64  `json:"access_log_max_size"` // bytes
+	AccessLogMaxFiles int    `json:"access_log_max_files"`
 }
 
 // SSLConfig SSL证书配置
@@ -154,14 +164,37 @@ type SyncConfig struct {
 	ExcludeConfigs []string `json:"exclude_configs"`
 }
 
+// StaticSite 静态站点配置
+type StaticSite struct {
+	Domain  string `json:"domain"`
+	Root    string `json:"root"`
+	Index   string `json:"index"`
+	Enabled bool   `json:"enabled"`
+}
+
+// PHPSite PHP 站点配置
+type PHPSite struct {
+	Domain   string            `json:"domain"`
+	Root     string            `json:"root"`
+	Index    string            `json:"index"`
+	Enabled  bool              `json:"enabled"`
+	FCGIAddr string            `json:"fcgi_addr"` // unix:/path/php-fpm.sock 或 127.0.0.1:9000
+	Vars     map[string]string `json:"vars"`
+}
+
 // Load 加载配置文件
 func Load(configFile string) (*Config, error) {
 	// 设置默认值
 	config := &Config{
 		Server: ServerConfig{
-			Host:  "0.0.0.0",
-			Port:  443,
-			Debug: false,
+			Host:              "0.0.0.0",
+			Port:              443,
+			Debug:             false,
+			AccessLogEnabled:  true,
+			AccessLogFormat:   "nginx",
+			AccessLogPath:     "./data/access.log",
+			AccessLogMaxSize:  100 * 1024 * 1024,
+			AccessLogMaxFiles: 10,
 		},
 		SSL: SSLConfig{
 			Staging:           false,
@@ -226,6 +259,8 @@ func Load(configFile string) (*Config, error) {
 			Port:    8443,
 			AuthKey: "",
 		},
+		StaticSites: []StaticSite{},
+		PHPSites:    []PHPSite{},
 	}
 
 	// 如果配置文件存在，则加载

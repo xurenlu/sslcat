@@ -87,6 +87,35 @@ func main() {
 		cfg.Server.Host = *host
 	}
 
+	// 启动时输出关键配置（不打印密码）
+	log.WithFields(logrus.Fields{
+		"config_file":             cfg.ConfigFile,
+		"admin_prefix":            cfg.AdminPrefix,
+		"server.host":             cfg.Server.Host,
+		"server.port":             cfg.Server.Port,
+		"server.debug":            cfg.Server.Debug,
+		"access_log.enabled":      cfg.Server.AccessLogEnabled,
+		"access_log.format":       cfg.Server.AccessLogFormat,
+		"access_log.path":         cfg.Server.AccessLogPath,
+		"access_log.max_size":     cfg.Server.AccessLogMaxSize,
+		"access_log.max_files":    cfg.Server.AccessLogMaxFiles,
+		"ssl.email":               cfg.SSL.Email,
+		"ssl.staging":             cfg.SSL.Staging,
+		"ssl.auto_renew":          cfg.SSL.AutoRenew,
+		"ssl.disable_self_signed": cfg.SSL.DisableSelfSigned,
+		"ssl.cert_dir":            cfg.SSL.CertDir,
+		"ssl.key_dir":             cfg.SSL.KeyDir,
+		"admin.username":          cfg.Admin.Username,
+		"admin.password_file":     cfg.Admin.PasswordFile,
+		"proxy.rules_count":       len(cfg.Proxy.Rules),
+		"static_sites.count":      len(cfg.StaticSites),
+		"php_sites.count":         len(cfg.PHPSites),
+		"cluster.mode":            cfg.Cluster.Mode,
+		"security.enable_waf":     cfg.Security.EnableWAF,
+		"security.enable_ddos":    cfg.Security.EnableDDOS,
+		"security.ua_filter":      cfg.Security.EnableUAFilter,
+	}).Info("Effective configuration loaded")
+
 	// 创建必要目录
 	if err := os.MkdirAll("/etc/sslcat", 0755); err != nil {
 		log.Warnf("failed to create system config dir, falling back to CWD: %v", err)

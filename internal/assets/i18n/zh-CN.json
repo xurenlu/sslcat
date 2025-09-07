@@ -10,6 +10,8 @@
   "nav.monitoring": "监控统计",
   "nav.logs": "日志管理",
   "nav.settings": "系统设置",
+  "nav.static_sites": "静态站点",
+  "nav.php_sites": "PHP 站点",
   
   "login.title": "管理员登录",
   "login.username": "用户名",

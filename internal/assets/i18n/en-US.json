@@ -10,6 +10,8 @@
   "nav.monitoring": "Monitoring & Stats",
   "nav.logs": "Log Management",
   "nav.settings": "System Settings",
+  "nav.static_sites": "Static Sites",
+  "nav.php_sites": "PHP Sites",
   
   "login.title": "Administrator Login",
   "login.username": "Username",

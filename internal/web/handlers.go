@@ -30,11 +30,17 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		// 检查是否需要验证码（有真实SSL证书时启用）
 		requireCaptcha := s.sslManager.HasValidSSLCertificates()
+		// 调试模式：?debug=true 或 1 强制开启验证码
+		debugForced := strings.EqualFold(r.URL.Query().Get("debug"), "true") || r.URL.Query().Get("debug") == "1"
+		if !requireCaptcha && debugForced {
+			requireCaptcha = true
+		}
 
 		data := map[string]interface{}{
 			"AdminPrefix":    s.config.AdminPrefix,
 			"Error":          "",
 			"RequireCaptcha": requireCaptcha,
+			"Debug":          debugForced,
 		}
 
 		// 如果需要验证码，添加JS解码函数（标记为 template.JS，避免被转义）
@@ -126,7 +132,8 @@ func (s *Server) processLogin(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 
 	// 如果需要验证码，先验证验证码
-	if s.sslManager.HasValidSSLCertificates() {
+	debugForced := r.FormValue("captcha_debug") == "1" || strings.EqualFold(r.URL.Query().Get("debug"), "true") || r.URL.Query().Get("debug") == "1"
+	if s.sslManager.HasValidSSLCertificates() || debugForced {
 		captchaAnswer := r.FormValue("captcha")
 		sessionID := r.FormValue("captcha_session_id")
 
@@ -490,11 +497,17 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 func (s *Server) renderLoginError(w http.ResponseWriter, r *http.Request, errorMsg string) {
 	// 检查是否需要验证码
 	requireCaptcha := s.sslManager.HasValidSSLCertificates()
+	// 调试模式：错误页也支持通过 ?debug=true 强制显示验证码
+	debugForced := strings.EqualFold(r.URL.Query().Get("debug"), "true") || r.URL.Query().Get("debug") == "1"
+	if !requireCaptcha && debugForced {
+		requireCaptcha = true
+	}
 
 	data := map[string]interface{}{
 		"AdminPrefix":    s.config.AdminPrefix,
 		"Error":          errorMsg,
 		"RequireCaptcha": requireCaptcha,
+		"Debug":          debugForced,
 	}
 
 	// 如果需要验证码，添加JS解码函数（标记为 template.JS，避免被转义）

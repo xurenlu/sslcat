@@ -78,7 +78,7 @@
                         </div>
                         {{end}}
                         
-                        <form method="POST" action="{{.AdminPrefix}}/login">
+                        <form method="POST" action="{{.AdminPrefix}}/login{{if .Debug}}?debug=true{{end}}">
                             <div class="mb-3">
                                 <label for="username" class="form-label">
                                     <i class="bi bi-person"></i> {{t "login.username"}}
@@ -106,6 +106,7 @@
                                     </button>
                                 </div>
                                 <input type="hidden" id="captcha-session-id" name="captcha_session_id">
+                                {{if .Debug}}<input type="hidden" name="captcha_debug" value="1">{{end}}
                                 <div class="form-text">请计算上述数学题的答案以验证您是真人</div>
                             </div>
                             {{end}}

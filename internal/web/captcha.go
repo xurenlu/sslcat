@@ -29,6 +29,7 @@ type CaptchaData struct {
 	SessionID       string `json:"session_id"`
 	EncodedQuestion string `json:"encoded_question"`
 	Salt            string `json:"salt"`
+	Offset          int    `json:"offset"`
 }
 
 // NewCaptchaManager 创建验证码管理器
@@ -36,10 +37,10 @@ func NewCaptchaManager() *CaptchaManager {
 	cm := &CaptchaManager{
 		sessions: make(map[string]CaptchaSession),
 	}
-	
+
 	// 启动清理goroutine，每5分钟清理过期session
 	go cm.cleanup()
-	
+
 	return cm
 }
 
@@ -54,21 +55,23 @@ func (c *CaptchaManager) GenerateCaptcha() (*CaptchaData, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	num1 := int(a.Int64()) + 1
 	num2 := int(b.Int64()) + 1
 	answer := num1 + num2
-	
+
 	// 生成会话ID和盐值
 	sessionID := c.generateSessionID()
 	salt := c.generateSalt()
-	
+	// 计算偏移量（与前端共享）
+	offset := c.getSaltOffset(salt)
+
 	// 生成问题文本
 	question := fmt.Sprintf("%d + %d = ?", num1, num2)
-	
+
 	// 编码问题
 	encodedQuestion := c.encodeQuestion(question, salt)
-	
+
 	// 存储会话
 	c.mutex.Lock()
 	c.sessions[sessionID] = CaptchaSession{
@@ -77,11 +80,12 @@ func (c *CaptchaManager) GenerateCaptcha() (*CaptchaData, error) {
 		Salt:      salt,
 	}
 	c.mutex.Unlock()
-	
+
 	return &CaptchaData{
 		SessionID:       sessionID,
 		EncodedQuestion: encodedQuestion,
 		Salt:            salt,
+		Offset:          offset,
 	}, nil
 }
 
@@ -89,20 +93,20 @@ func (c *CaptchaManager) GenerateCaptcha() (*CaptchaData, error) {
 func (c *CaptchaManager) VerifyCaptcha(sessionID string, userAnswer int) bool {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	
+
 	session, exists := c.sessions[sessionID]
 	if !exists {
 		return false
 	}
-	
+
 	// 删除使用过的session（一次性使用）
 	delete(c.sessions, sessionID)
-	
+
 	// 检查session是否过期（10分钟）
 	if time.Since(session.CreatedAt) > 10*time.Minute {
 		return false
 	}
-	
+
 	return session.Answer == userAnswer
 }
 
@@ -111,7 +115,7 @@ func (c *CaptchaManager) VerifyCaptcha(sessionID string, userAnswer int) bool {
 func (c *CaptchaManager) encodeQuestion(question, salt string) string {
 	// 使用盐值生成偏移量
 	offset := c.getSaltOffset(salt)
-	
+
 	// 字符偏移
 	encoded := make([]byte, len(question))
 	for i, char := range []byte(question) {
@@ -123,7 +127,7 @@ func (c *CaptchaManager) encodeQuestion(question, salt string) string {
 			encoded[i] = char
 		}
 	}
-	
+
 	// Base64编码
 	return base64.StdEncoding.EncodeToString(encoded)
 }
@@ -154,7 +158,7 @@ func (c *CaptchaManager) generateSalt() string {
 func (c *CaptchaManager) cleanup() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
-	
+
 	for range ticker.C {
 		c.mutex.Lock()
 		now := time.Now()
@@ -171,13 +175,13 @@ func (c *CaptchaManager) cleanup() {
 // 这个函数返回用于前端解码的JavaScript代码
 func (c *CaptchaManager) GetJSDecodeFunction() string {
 	return `
-function decodeCaptchaQuestion(encodedQuestion, salt) {
+function decodeCaptchaQuestion(encodedQuestion, salt, offset) {
     try {
         // Base64解码
         const decoded = atob(encodedQuestion);
         
-        // 生成偏移量（与Go端逻辑保持一致）
-        const offset = getSaltOffset(salt);
+        // 使用服务端提供的偏移量；若缺失则回退本地计算
+        const usedOffset = (typeof offset === 'number' && !Number.isNaN(offset)) ? offset : getSaltOffset(salt);
         
         // 字符偏移解码
         let question = '';
@@ -185,7 +189,7 @@ function decodeCaptchaQuestion(encodedQuestion, salt) {
             const charCode = decoded.charCodeAt(i);
             if (charCode >= 32 && charCode <= 126) {
                 // 反向偏移
-                let shifted = charCode - 32 - offset;
+                let shifted = charCode - 32 - usedOffset;
                 if (shifted < 0) {
                     shifted += 95;
                 }
@@ -219,7 +223,7 @@ function loadCaptchaQuestion(captchaData) {
         return;
     }
     
-    const question = decodeCaptchaQuestion(captchaData.encoded_question, captchaData.salt);
+    const question = decodeCaptchaQuestion(captchaData.encoded_question, captchaData.salt, captchaData.offset);
     document.getElementById('captcha-question').textContent = question;
     document.getElementById('captcha-session-id').value = captchaData.session_id;
 }
