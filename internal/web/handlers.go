@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"html/template"
 	"net/http"
 	"os"
 	"runtime"
@@ -36,9 +37,9 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			"RequireCaptcha": requireCaptcha,
 		}
 
-		// 如果需要验证码，添加JS解码函数
+		// 如果需要验证码，添加JS解码函数（标记为 template.JS，避免被转义）
 		if requireCaptcha {
-			data["JSDecodeFunction"] = s.captchaManager.GetJSDecodeFunction()
+			data["JSDecodeFunction"] = template.JS(s.captchaManager.GetJSDecodeFunction())
 		}
 
 		s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
@@ -496,9 +497,9 @@ func (s *Server) renderLoginError(w http.ResponseWriter, r *http.Request, errorM
 		"RequireCaptcha": requireCaptcha,
 	}
 
-	// 如果需要验证码，添加JS解码函数
+	// 如果需要验证码，添加JS解码函数（标记为 template.JS，避免被转义）
 	if requireCaptcha {
-		data["JSDecodeFunction"] = s.captchaManager.GetJSDecodeFunction()
+		data["JSDecodeFunction"] = template.JS(s.captchaManager.GetJSDecodeFunction())
 	}
 
 	s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
