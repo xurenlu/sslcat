@@ -1,3 +1,11 @@
+## [1.0.21] - 2025-09-07
+
+### Fixed
+- 登录页验证码脚本注入使用 template.JS，修复 `loadCaptchaQuestion is not defined` 报错
+
+### Improved
+- 代理上游连接复用与 HTTP/2 强制尝试已在文档中强调，提示实际性能收益场景
+
 ## [1.0.20] - 2025-09-07
 
 ### Added

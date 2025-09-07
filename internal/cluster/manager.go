@@ -402,7 +402,7 @@ func (m *Manager) CollectNodeInfo() *NodeInfo {
 		ID:            m.nodeID,
 		Name:          m.config.GetNodeName(),
 		Mode:          m.mode,
-		Version:       "1.0.13", // TODO: 从配置或构建信息获取
+		Version:       "1.0.21", // TODO: 从配置或构建信息获取
 		SyncEnabled:   true,
 		Status:        "online",
 		LastHeartbeat: time.Now(),
