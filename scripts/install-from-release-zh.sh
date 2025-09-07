@@ -32,7 +32,7 @@ case "$ARCH_RAW" in
   *) echo "[sslcat] 不支持的架构: $ARCH_RAW" >&2; exit 1 ;;
 esac
 
-PREFERRED="sslcat_${VER}_${OS}_${ARCH}"
+PREFERRED="sslcat_v${VER}_${OS}_${ARCH}"
 EXT=.tar.gz
 [[ "$OS" == "windows" ]] && EXT=.zip
 
