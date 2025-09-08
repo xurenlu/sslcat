@@ -1,6 +1,7 @@
 ## [1.1.0] - 2025-09-08
 
 ### Added
+- Static Sites and PHP Sites management support
 - Configurable server timeouts: `read_timeout_sec`, `write_timeout_sec`, `idle_timeout_sec`
 - Configurable `max_upload_bytes` (default 1 GiB) for uploads
 - Language selector and official site link added to Dashboard/Static Sites/PHP Sites sidebars

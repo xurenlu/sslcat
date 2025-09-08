@@ -510,6 +510,7 @@ go run main.go --config sslcat.conf --log-level debug
 完全なバージョン更新履歴はこちらを参照してください：**[CHANGELOG.md](CHANGELOG.md)**
 
 ### 最新バージョン v1.1.0 (2025-09-08)
+- 追加：静的サイトと PHP サイトの管理サポート
 - サーバーのタイムアウトを設定可能に：`read_timeout_sec`、`write_timeout_sec`、`idle_timeout_sec`（デフォルト：読み書き30分、アイドル120秒）
 - アップロード強化：`max_upload_bytes`（デフォルト 1 GiB）；単一証明書とZIP一括アップロードはストリーミング処理＋総量制限でメモリ使用を回避
 - UI一貫性：サイドバー順序を統一；Dashboard/静的サイト/PHPサイトに「言語」「公式サイト」を追加；一部ページのアイコン欠落を修正

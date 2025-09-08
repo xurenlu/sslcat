@@ -532,6 +532,7 @@ Si encuentras problemas o tienes sugerencias:
 Para el historial completo de actualizaciones de versión, consulte: **[CHANGELOG.md](CHANGELOG.md)**
 
 ### Última Versión v1.1.0 (2025-09-08)
+- Añadido: soporte de gestión para Sitios Estáticos y Sitios PHP
 - Tiempos de espera configurables del servidor: `read_timeout_sec`, `write_timeout_sec`, `idle_timeout_sec` (por defecto: 30min lectura/escritura, 120s inactivo)
 - Carga mejorada: `max_upload_bytes` (por defecto 1 GiB); cargas individuales y ZIP por streaming con límite total para evitar uso de memoria
 - Consistencia UI: orden unificado de la barra lateral; añadido "Idioma" y "Sitio Oficial" en Dashboard/Sitios Estáticos/Sitios PHP; corregidos iconos faltantes

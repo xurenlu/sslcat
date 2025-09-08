@@ -507,6 +507,7 @@ go run main.go --config sslcat.conf --log-level debug
 查看完整的版本更新历史，请参阅：**[CHANGELOG.md](CHANGELOG.md)**
 
 ### 最新版本 v1.1.0 (2025-09-08)
+- 新增站点类型：静态站点与 PHP 站点（含管理页面）
 - 服务器超时可配：新增 `read_timeout_sec`、`write_timeout_sec`、`idle_timeout_sec`（默认读/写各 30 分钟，空闲 120 秒）
 - 上传能力增强：新增 `max_upload_bytes`（默认 1 GiB）；单证书与 ZIP 批量上传全程流式处理并带总量限制，避免占用内存
 - 界面一致性：统一侧边栏顺序；在 Dashboard/静态站点/PHP 站点补齐“语言选择”“官方网站”入口；修复部分页面图标缺失
