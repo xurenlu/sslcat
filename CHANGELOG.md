@@ -1,3 +1,19 @@
+## [1.1.0] - 2025-09-08
+
+### Added
+- Configurable server timeouts: `read_timeout_sec`, `write_timeout_sec`, `idle_timeout_sec`
+- Configurable `max_upload_bytes` (default 1 GiB) for uploads
+- Language selector and official site link added to Dashboard/Static Sites/PHP Sites sidebars
+
+### Changed
+- Single certificate and ZIP bulk uploads now stream to disk with total-size limits to avoid memory usage
+- Unified sidebar order across pages; fixed missing icons on dynamic pages
+- Temporarily disabled login captcha (kept implementation for future re-enable)
+
+### Docs
+- Updated multilingual READMEs to v1.1.0
+- Updated roadmap to v1.1.0 status
+
 ## [1.0.21] - 2025-09-07
 
 ### Fixed

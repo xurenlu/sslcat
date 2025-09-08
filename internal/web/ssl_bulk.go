@@ -72,6 +72,13 @@ func (s *Server) handleSSLBulkUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == "POST" {
+		// 限制上传体积
+		maxUpload := s.config.Server.MaxUploadBytes
+		if maxUpload <= 0 {
+			maxUpload = 1 << 30
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, maxUpload)
+
 		file, _, err := r.FormFile("zip")
 		if err != nil {
 			http.Error(w, "读取文件失败", http.StatusBadRequest)
@@ -86,19 +93,15 @@ func (s *Server) handleSSLBulkUpload(w http.ResponseWriter, r *http.Request) {
 		}
 		defer os.Remove(tmp.Name())
 		buf := make([]byte, 32*1024)
-		for {
-			n, er := file.Read(buf)
-			if n > 0 {
-				if _, err := tmp.Write(buf[:n]); err != nil {
-					http.Error(w, "写入临时文件失败", http.StatusInternalServerError)
-					return
-				}
-			}
-			if er != nil {
-				break
-			}
+		if _, err := io.CopyBuffer(tmp, file, buf); err != nil {
+			http.Error(w, "写入临时文件失败", http.StatusInternalServerError)
+			return
 		}
-		if err := unzipToDirs(tmp.Name(), []string{s.config.SSL.CertDir, s.config.SSL.KeyDir}); err != nil {
+		if _, err := tmp.Seek(0, 0); err != nil {
+			http.Error(w, "临时文件不可读", http.StatusInternalServerError)
+			return
+		}
+		if err := unzipToDirs(tmp.Name(), []string{s.config.SSL.CertDir, s.config.SSL.KeyDir}, maxUpload); err != nil {
 			http.Error(w, "解压失败: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -117,12 +120,13 @@ func (s *Server) handleSSLBulkUpload(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 }
 
-func unzipToDirs(zipPath string, targetDirs []string) error {
+func unzipToDirs(zipPath string, targetDirs []string, maxTotal int64) error {
 	r, err := zip.OpenReader(zipPath)
 	if err != nil {
 		return err
 	}
 	defer r.Close()
+	var total int64
 	for _, f := range r.File {
 		// 仅处理文件
 		if f.FileInfo().IsDir() {
@@ -138,11 +142,38 @@ func unzipToDirs(zipPath string, targetDirs []string) error {
 		if err != nil {
 			continue
 		}
-		defer rc.Close()
-		content, _ := io.ReadAll(rc)
+		// 目标文件
 		base := filepath.Base(f.Name)
-		_ = os.MkdirAll(destDir, 0755)
-		_ = os.WriteFile(filepath.Join(destDir, base), content, 0600)
+		if err := os.MkdirAll(destDir, 0755); err != nil {
+			rc.Close()
+			return err
+		}
+		dstPath := filepath.Join(destDir, base)
+		dst, err := os.OpenFile(dstPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+		if err != nil {
+			rc.Close()
+			return err
+		}
+		// 计算该文件允许的最大剩余额度
+		remaining := maxTotal - total
+		if remaining <= 0 {
+			dst.Close()
+			rc.Close()
+			return fmt.Errorf("extracted size exceeds limit")
+		}
+		// 限流拷贝
+		limited := &io.LimitedReader{R: rc, N: remaining}
+		buf := make([]byte, 32*1024)
+		n, copyErr := io.CopyBuffer(dst, limited, buf)
+		total += n
+		dst.Close()
+		rc.Close()
+		if copyErr != nil && copyErr != io.EOF {
+			return copyErr
+		}
+		if total > maxTotal {
+			return fmt.Errorf("extracted size exceeds limit")
+		}
 	}
 	return nil
 }

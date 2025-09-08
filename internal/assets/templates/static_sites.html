@@ -15,14 +15,31 @@
         <div class="text-center mb-4">
           <h4 class="navbar-brand text-primary">SSLcat</h4>
           <small class="text-muted">{{t "app.description"}}</small>
+          <div class="mt-2">
+            <a class="btn btn-sm btn-outline-primary" href="https://sslcat.com" target="_blank" rel="noopener">官方网站</a>
+          </div>
+        </div>
+        <div class="dropdown mb-3 px-3">
+          <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            语言 Language
+          </button>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="?lang=zh-CN">简体中文</a></li>
+            <li><a class="dropdown-item" href="?lang=en-US">English</a></li>
+            <li><a class="dropdown-item" href="?lang=ja-JP">日本語</a></li>
+            <li><a class="dropdown-item" href="?lang=es-ES">Español</a></li>
+            <li><a class="dropdown-item" href="?lang=fr-FR">Français</a></li>
+            <li><a class="dropdown-item" href="?lang=ru-RU">Русский</a></li>
+          </ul>
         </div>
         <ul class="nav flex-column">
           <li class="nav-item"><a class="nav-link" href="{{.AdminPrefix}}/"><i class="bi bi-speedometer2"></i> {{t "nav.dashboard"}}</a></li>
           <li class="nav-item"><a class="nav-link" href="{{.AdminPrefix}}/proxy"><i class="bi bi-arrow-left-right"></i> {{t "nav.proxy"}}</a></li>
+          <li class="nav-item"><a class="nav-link active" href="{{.AdminPrefix}}/static-sites"><i class="bi bi-file-earmark-text"></i> {{t "nav.static_sites"}}</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{.AdminPrefix}}/php-sites"><i class="bi bi-code-square"></i> {{t "nav.php_sites"}}</a></li>
           <li class="nav-item"><a class="nav-link" href="{{.AdminPrefix}}/ssl"><i class="bi bi-shield-lock"></i> {{t "nav.ssl"}}</a></li>
           <li class="nav-item"><a class="nav-link" href="{{.AdminPrefix}}/security"><i class="bi bi-shield-check"></i> {{t "nav.security"}}</a></li>
           <li class="nav-item"><a class="nav-link" href="{{.AdminPrefix}}/settings"><i class="bi bi-gear"></i> {{t "nav.settings"}}</a></li>
-          <li class="nav-item"><a class="nav-link active" href="{{.AdminPrefix}}/static-sites"><i class="bi bi-file-earmark-text"></i> 静态站点</a></li>
         </ul>
         <hr>
         <div class="dropdown">

@@ -505,6 +505,13 @@ Si vous rencontrez des problèmes ou avez des suggestions :
 
 Pour l'historique complet des mises à jour de version, veuillez consulter : **[CHANGELOG.md](CHANGELOG.md)**
 
+### Dernière Version v1.1.0 (2025-09-08)
+- Délais serveur configurables : `read_timeout_sec`, `write_timeout_sec`, `idle_timeout_sec` (par défaut : lecture/écriture 30min, idle 120s)
+- Téléversement amélioré : `max_upload_bytes` (par défaut 1 GiB) ; téléversements cert seul et ZIP en streaming avec limite totale pour éviter l'usage mémoire
+- Cohérence UI : ordre de barre latérale unifié ; ajout de "Langue" et "Site Officiel" sur Tableau de bord/Sites statiques/Sites PHP ; correction d'icônes manquantes
+- Connexion & sécurité : captcha désactivé temporairement (réactivable)
+- Docs & i18n : READMEs multilingues mis à jour ; feuille de route mise à jour
+
 ### Dernière Version v1.0.15 (2025-01-03)
 - 🌐 Architecture de cluster Master-Slave : Support de déploiement multi-nœuds pour haute disponibilité
 - 🔄 Synchronisation automatique de configuration : Poussée en temps réel du Master vers tous les nœuds Slave

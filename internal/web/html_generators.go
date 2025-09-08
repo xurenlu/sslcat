@@ -14,6 +14,8 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 	title := s.translator.T("app.description")
 	navDashboard := s.translator.T("nav.dashboard")
 	navProxy := s.translator.T("nav.proxy")
+	navStatic := s.translator.T("nav.static_sites")
+	navPHP := s.translator.T("nav.php_sites")
 	navSSL := s.translator.T("nav.ssl")
 	navSecurity := s.translator.T("nav.security")
 	navSettings := s.translator.T("nav.settings")
@@ -23,7 +25,6 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 		// fallback: 若未翻译，使用已有键
 		official = s.translator.T("menu.official_site")
 	}
-	navTokens := "Token 管理"
 	return fmt.Sprintf(`
                 <nav class="d-md-block sidebar collapse">
                     <div class="position-sticky pt-3">
@@ -61,6 +62,16 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
                                 </a>
                             </li>
                             <li class="nav-item">
+                                <a class="nav-link %s" href="%s/static-sites">
+                                    <i class="bi bi-file-earmark-text"></i> %s
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link %s" href="%s/php-sites">
+                                    <i class="bi bi-code-square"></i> %s
+                                </a>
+                            </li>
+                            <li class="nav-item">
                                 <a class="nav-link %s" href="%s/ssl">
                                     <i class="bi bi-shield-lock"></i> %s
                                 </a>
@@ -68,11 +79,6 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
                             <li class="nav-item">
                                 <a class="nav-link %s" href="%s/security">
                                     <i class="bi bi-shield-check"></i> %s
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link %s" href="%s/tokens">
-                                    <i class="bi bi-key"></i> %s
                                 </a>
                             </li>
                             <li class="nav-item">
@@ -109,6 +115,22 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 		adminPrefix,
 		navProxy,
 		func() string {
+			if activePage == "static-sites" {
+				return "active"
+			}
+			return ""
+		}(),
+		adminPrefix,
+		navStatic,
+		func() string {
+			if activePage == "php-sites" {
+				return "active"
+			}
+			return ""
+		}(),
+		adminPrefix,
+		navPHP,
+		func() string {
 			if activePage == "ssl" {
 				return "active"
 			}
@@ -124,14 +146,6 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 		}(),
 		adminPrefix,
 		navSecurity,
-		func() string {
-			if activePage == "tokens" {
-				return "active"
-			}
-			return ""
-		}(),
-		adminPrefix,
-		navTokens,
 		func() string {
 			if activePage == "settings" {
 				return "active"
@@ -314,6 +328,7 @@ func (s *Server) generateProxyAddHTML(data map[string]interface{}) string {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>添加代理规则 - SSLcat</title>
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
 </head>
 <body>
     <div class="container-fluid">
@@ -373,6 +388,7 @@ func (s *Server) generateProxyEditHTML(data map[string]interface{}) string {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>编辑代理规则 - SSLcat</title>
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
 </head>
 <body>
     <div class="container-fluid">
@@ -513,6 +529,7 @@ func (s *Server) generateSSLManagementHTML(data map[string]interface{}) string {
 		genBtn,
 		data["AdminPrefix"].(string),
 		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string),
 		thDomain, thIssued, thExpires, thStatus, thActions, thType,
 		s.generateSSLCertsTable(data),
 		uploadTitle, uploadNote,
@@ -534,6 +551,7 @@ func (s *Server) generateSSLGenerateHTML(data map[string]interface{}) string {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>%s - SSLcat</title>
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
 </head>
 <body>
     <div class="container-fluid">
@@ -790,13 +808,14 @@ func (s *Server) generateSettingsHTML(data map[string]interface{}) string {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>%s - SSLcat</title>
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
 </head>
 <body>
     <div class="container-fluid">
         <div class="row">
             <div class="col-md-2">%s</div>
             <main class="col-md-10">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <div class="d-flex justify_content_between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">%s</h1>
                 </div>
                 
@@ -847,8 +866,8 @@ func (s *Server) generateSettingsHTML(data map[string]interface{}) string {
                                 <input type="text" class="form-control" id="proxy_unmatched_redirect_url" name="proxy_unmatched_redirect_url" value="%s" placeholder="https://example.com/"> 
                             </div>
                             <button type="submit" class="btn btn-primary">%s</button>
-                            <a href="%s/config/export" class="btn btn-outline-secondary ms-2">%s</a>
-                            <a href="%s/config/import" class="btn btn-outline-primary ms-2">%s</a>
+                            <a href="%s/config/export" class="btn btn-outline_secondary ms-2">%s</a>
+                            <a href="%s/config/import" class="btn btn-outline_primary ms-2">%s</a>
                             <a href="%s/config/preview" class="btn btn-warning ms-2">%s</a>
                         </form>
                     </div>

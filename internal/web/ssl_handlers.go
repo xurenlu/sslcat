@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -101,6 +102,13 @@ func (s *Server) handleSSLUpload(w http.ResponseWriter, r *http.Request) {
 		</form></div></body></html>`, s.config.AdminPrefix)
 		return
 	case "POST":
+		// 限制最大请求体，避免内存占用（MaxBytesReader 作用于 Body 读取层）
+		maxUpload := s.config.Server.MaxUploadBytes
+		if maxUpload <= 0 {
+			maxUpload = 1 << 30 // fallback 1GiB
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, maxUpload)
+
 		domain := strings.TrimSpace(r.FormValue("domain"))
 		if domain == "" {
 			http.Error(w, "missing domain", http.StatusBadRequest)
@@ -123,11 +131,11 @@ func (s *Server) handleSSLUpload(w http.ResponseWriter, r *http.Request) {
 		certPath := s.config.SSL.CertDir + "/" + domain + ".crt"
 		keyPath := s.config.SSL.KeyDir + "/" + domain + ".key"
 
-		if err := writeAllFromReader(certFile, certPath, 0644); err != nil {
+		if err := streamToFile(certFile, certPath, 0644); err != nil {
 			http.Error(w, "failed to save certificate", http.StatusInternalServerError)
 			return
 		}
-		if err := writeAllFromReader(keyFile, keyPath, 0600); err != nil {
+		if err := streamToFile(keyFile, keyPath, 0600); err != nil {
 			http.Error(w, "failed to save private key", http.StatusInternalServerError)
 			return
 		}
@@ -173,22 +181,15 @@ func (s *Server) handleSSLDownload(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, path)
 }
 
-func writeAllFromReader(rdr interface{ Read([]byte) (int, error) }, dest string, mode os.FileMode) error {
-	data := make([]byte, 0, 64*1024)
-	buf := make([]byte, 32*1024)
-	for {
-		n, err := rdr.Read(buf)
-		if n > 0 {
-			data = append(data, buf[:n]...)
-		}
-		if err != nil {
-			break
-		}
-		if n == 0 {
-			break
-		}
+func streamToFile(r io.Reader, dest string, mode os.FileMode) error {
+	f, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
+	if err != nil {
+		return err
 	}
-	return os.WriteFile(dest, data, mode)
+	defer f.Close()
+	buf := make([]byte, 32*1024)
+	_, err = io.CopyBuffer(f, r, buf)
+	return err
 }
 
 func (s *Server) handleSSLDelete(w http.ResponseWriter, r *http.Request) {

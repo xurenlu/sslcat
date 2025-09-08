@@ -2,11 +2,9 @@ package web
 
 import (
 	"fmt"
-	"html/template"
 	"net/http"
 	"os"
 	"runtime"
-	"strconv"
 	"strings"
 )
 
@@ -28,24 +26,14 @@ func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		// 检查是否需要验证码（有真实SSL证书时启用）
-		requireCaptcha := s.sslManager.HasValidSSLCertificates()
-		// 调试模式：?debug=true 或 1 强制开启验证码
+		// 关闭验证码功能
 		debugForced := strings.EqualFold(r.URL.Query().Get("debug"), "true") || r.URL.Query().Get("debug") == "1"
-		if !requireCaptcha && debugForced {
-			requireCaptcha = true
-		}
 
 		data := map[string]interface{}{
 			"AdminPrefix":    s.config.AdminPrefix,
 			"Error":          "",
-			"RequireCaptcha": requireCaptcha,
+			"RequireCaptcha": false,
 			"Debug":          debugForced,
-		}
-
-		// 如果需要验证码，添加JS解码函数（标记为 template.JS，避免被转义）
-		if requireCaptcha {
-			data["JSDecodeFunction"] = template.JS(s.captchaManager.GetJSDecodeFunction())
 		}
 
 		s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
@@ -130,24 +118,6 @@ func (s *Server) handleDefault(w http.ResponseWriter, r *http.Request, domain st
 func (s *Server) processLogin(w http.ResponseWriter, r *http.Request) {
 	username := r.FormValue("username")
 	password := r.FormValue("password")
-
-	// 如果需要验证码，先验证验证码
-	debugForced := r.FormValue("captcha_debug") == "1" || strings.EqualFold(r.URL.Query().Get("debug"), "true") || r.URL.Query().Get("debug") == "1"
-	if s.sslManager.HasValidSSLCertificates() || debugForced {
-		captchaAnswer := r.FormValue("captcha")
-		sessionID := r.FormValue("captcha_session_id")
-
-		if captchaAnswer == "" || sessionID == "" {
-			s.renderLoginError(w, r, s.translator.T("captcha.required"))
-			return
-		}
-
-		// 验证验证码答案
-		if answer, err := strconv.Atoi(captchaAnswer); err != nil || !s.captchaManager.VerifyCaptcha(sessionID, answer) {
-			s.renderLoginError(w, r, s.translator.T("captcha.invalid"))
-			return
-		}
-	}
 
 	// 计算有效管理员密码：优先使用密码文件，其次使用配置中的密码
 	effective := s.getEffectiveAdminPassword()
@@ -495,24 +465,12 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 
 // renderLoginError 渲染登录错误页面
 func (s *Server) renderLoginError(w http.ResponseWriter, r *http.Request, errorMsg string) {
-	// 检查是否需要验证码
-	requireCaptcha := s.sslManager.HasValidSSLCertificates()
-	// 调试模式：错误页也支持通过 ?debug=true 强制显示验证码
-	debugForced := strings.EqualFold(r.URL.Query().Get("debug"), "true") || r.URL.Query().Get("debug") == "1"
-	if !requireCaptcha && debugForced {
-		requireCaptcha = true
-	}
-
+	// 关闭验证码功能
 	data := map[string]interface{}{
 		"AdminPrefix":    s.config.AdminPrefix,
 		"Error":          errorMsg,
-		"RequireCaptcha": requireCaptcha,
-		"Debug":          debugForced,
-	}
-
-	// 如果需要验证码，添加JS解码函数（标记为 template.JS，避免被转义）
-	if requireCaptcha {
-		data["JSDecodeFunction"] = template.JS(s.captchaManager.GetJSDecodeFunction())
+		"RequireCaptcha": false,
+		"Debug":          false,
 	}
 
 	s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)

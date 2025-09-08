@@ -222,7 +222,7 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security-logs", s.handleAPISecurityLogs)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/audit", s.handleAPIAudit)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/tls-fingerprints", s.handleAPITLSFingerprints)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/captcha", s.handleAPICaptcha)
+	// s.mux.HandleFunc(s.config.AdminPrefix+"/api/captcha", s.handleAPICaptcha) // 关闭验证码API
 
 	// Token 管理路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/tokens", s.handleTokensPage)

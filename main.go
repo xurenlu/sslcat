@@ -24,7 +24,7 @@ import (
 )
 
 var (
-	version = "1.0.21"
+	version = "1.1.0"
 	build   = "dev"
 )
 
@@ -114,6 +114,10 @@ func main() {
 		"security.enable_waf":     cfg.Security.EnableWAF,
 		"security.enable_ddos":    cfg.Security.EnableDDOS,
 		"security.ua_filter":      cfg.Security.EnableUAFilter,
+		"server.read_timeout":     cfg.Server.ReadTimeoutSec,
+		"server.write_timeout":    cfg.Server.WriteTimeoutSec,
+		"server.idle_timeout":     cfg.Server.IdleTimeoutSec,
+		"server.max_upload_bytes": cfg.Server.MaxUploadBytes,
 	}).Info("Effective configuration loaded")
 
 	// 创建必要目录
@@ -160,13 +164,27 @@ func main() {
 		securityManager.LogTLSFingerprint(fp, "")
 	})
 
+	// 组装服务端超时
+	readTimeout := time.Duration(cfg.Server.ReadTimeoutSec) * time.Second
+	writeTimeout := time.Duration(cfg.Server.WriteTimeoutSec) * time.Second
+	idleTimeout := time.Duration(cfg.Server.IdleTimeoutSec) * time.Second
+	if cfg.Server.ReadTimeoutSec <= 0 {
+		readTimeout = 30 * time.Second
+	}
+	if cfg.Server.WriteTimeoutSec <= 0 {
+		writeTimeout = 30 * time.Second
+	}
+	if cfg.Server.IdleTimeoutSec <= 0 {
+		idleTimeout = 120 * time.Second
+	}
+
 	// 启动HTTP(S)
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
 		Handler:      webServer,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  120 * time.Second,
+		ReadTimeout:  readTimeout,
+		WriteTimeout: writeTimeout,
+		IdleTimeout:  idleTimeout,
 		TLSConfig:    sslManager.GetTLSConfig(),
 	}
 	go func() {
@@ -219,8 +237,8 @@ func main() {
 					httpsURL := fmt.Sprintf("https://%s%s", r.Host, r.RequestURI)
 					http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
 				})),
-				ReadTimeout:  10 * time.Second,
-				WriteTimeout: 10 * time.Second,
+				ReadTimeout:  readTimeout,
+				WriteTimeout: writeTimeout,
 			}
 
 			log.Infof("HTTP redirect server listening on %s:80", cfg.Server.Host)

@@ -41,6 +41,13 @@ type ServerConfig struct {
 	AccessLogPath     string `json:"access_log_path"`
 	AccessLogMaxSize  int64  `json:"access_log_max_size"` // bytes
 	AccessLogMaxFiles int    `json:"access_log_max_files"`
+
+	// 客户端连接超时（秒）
+	ReadTimeoutSec  int `json:"read_timeout_sec"`
+	WriteTimeoutSec int `json:"write_timeout_sec"`
+	IdleTimeoutSec  int `json:"idle_timeout_sec"`
+	// 最大上传大小（字节），用于限制 multipart 上传体积
+	MaxUploadBytes int64 `json:"max_upload_bytes"`
 }
 
 // SSLConfig SSL证书配置
@@ -195,6 +202,10 @@ func Load(configFile string) (*Config, error) {
 			AccessLogPath:     "./data/access.log",
 			AccessLogMaxSize:  100 * 1024 * 1024,
 			AccessLogMaxFiles: 10,
+			ReadTimeoutSec:    1800,    // 30分钟
+			WriteTimeoutSec:   1800,    // 30分钟
+			IdleTimeoutSec:    120,     // 2分钟（可调）
+			MaxUploadBytes:    1 << 30, // 1 GiB
 		},
 		SSL: SSLConfig{
 			Staging:           false,

@@ -505,6 +505,13 @@ If you encounter issues or have suggestions:
 
 For complete version update history, please refer to: **[CHANGELOG.md](CHANGELOG.md)**
 
+### Latest Version v1.1.0 (2025-09-08)
+- Configurable server timeouts: added `read_timeout_sec`, `write_timeout_sec`, `idle_timeout_sec` (defaults: 30min read/write, 120s idle)
+- Enhanced upload capability: added `max_upload_bytes` (default 1 GiB); both single-cert and ZIP bulk uploads are fully streaming with total-size limit to avoid memory usage
+- UI consistency: unified sidebar order; added "Language" and "Official Site" entries to Dashboard/Static Sites/PHP Sites; fixed missing icons on some pages
+- Login & security: temporarily disabled login captcha (can be re-enabled later)
+- Docs & i18n: multilingual READMEs updated; roadmap updated
+
 ### Latest Version v1.0.15 (2025-01-03)
 - 🌐 Master-Slave cluster architecture: Multi-node deployment support for high availability
 - 🔄 Automatic configuration synchronization: Real-time config push from Master to all Slave nodes
