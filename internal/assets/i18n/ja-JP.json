@@ -50,6 +50,7 @@
   "ssl.renew": "更新",
   "ssl.view": "表示",
   "ssl.delete": "削除",
+  "ssl.acme_email_required": "ACME のメールが未設定です。証明書を申請する前に、設定で有効なメールアドレスを設定してください。",
   
   "proxy.title": "プロキシ設定",
   "proxy.add_rule": "ルール追加",

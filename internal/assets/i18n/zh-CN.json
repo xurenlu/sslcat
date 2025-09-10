@@ -53,6 +53,7 @@
   "ssl.view": "查看",
   "ssl.delete": "删除",
   "ssl.generate_help": "输入要申请证书的域名，多个域名用逗号分隔（将通过 Let's Encrypt 自动申请）",
+  "ssl.acme_email_required": "未设置 ACME 邮箱，无法申请证书。请前往【系统设置】填写有效邮箱后重试。",
   
   "proxy.title": "代理配置",
   "proxy.add_rule": "添加代理规则",

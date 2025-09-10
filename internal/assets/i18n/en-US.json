@@ -53,6 +53,8 @@
   "ssl.view": "View",
   "ssl.delete": "Delete",
   "ssl.generate": "Generate Certificate",
+  "ssl.generate_help": "Enter domains to generate certificates, separate by comma",
+  "ssl.acme_email_required": "ACME email is not set. Please go to Settings and set a valid email before requesting certificates.",
   "ssl.columns.domain": "Domain",
   "ssl.columns.issued": "Issued At",
   "ssl.columns.expires": "Expires At",
@@ -65,7 +67,6 @@
   "ssl.download_cert": "Download Cert",
   "ssl.download_key": "Download Key",
   "ssl.delete_confirm": "Delete this certificate?",
-  "ssl.generate_help": "Enter domains to generate certificates, separate by comma",
   
   "proxy.title": "Proxy Configuration",
   "proxy.add_rule": "Add Rule",

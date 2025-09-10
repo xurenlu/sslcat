@@ -50,6 +50,7 @@
   "ssl.renew": "Renouveler",
   "ssl.view": "Voir",
   "ssl.delete": "Supprimer",
+  "ssl.acme_email_required": "L'email ACME n'est pas défini. Veuillez aller dans Paramètres et renseigner un email valide avant de demander des certificats.",
   
   "proxy.title": "Configuration Proxy",
   "proxy.add_rule": "Ajouter une Règle",

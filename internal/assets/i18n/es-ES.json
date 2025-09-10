@@ -50,6 +50,7 @@
   "ssl.renew": "Renovar",
   "ssl.view": "Ver",
   "ssl.delete": "Eliminar",
+  "ssl.acme_email_required": "No se ha configurado el correo de ACME. Ve a Configuración y establece un correo válido antes de solicitar certificados.",
   
   "proxy.title": "Configuración de Proxy",
   "proxy.add_rule": "Agregar Regla",

@@ -34,6 +34,12 @@ func (s *Server) handleSSLGenerate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == "POST" {
+		// 若未设置 ACME 邮箱，提示并中止
+		if strings.TrimSpace(s.config.SSL.Email) == "" {
+			http.Error(w, s.translator.T("ssl.acme_email_required"), http.StatusBadRequest)
+			return
+		}
+
 		domains := r.FormValue("domains")
 		if domains != "" {
 			domainList := strings.Split(domains, ",")
