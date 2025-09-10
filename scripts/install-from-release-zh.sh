@@ -1,26 +1,111 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# sslcat 中国区一键安装脚本（通过 sslcat.com 代理加速）
+# sslcat 一键安装脚本（通过 sslcat.com 代理亦可）
 # 用法：
 #   curl -fsSL https://sslcat.com/xurenlu/sslcat/main/scripts/install-from-release-zh.sh | sudo bash -s -- -v 1.0.4
 
 VER=""
 DEST_LINUX="/opt/sslcat"
 CONF_LINUX="/etc/sslcat/sslcat.conf"
+LANG_CODE=""
 
+normalize_lang() {
+  local x="${1,,}"
+  case "$x" in
+    zh*|cn*) echo zh;;
+    en*|us*) echo en;;
+    fr*|fr-*) echo fr;;
+    es*|es-*) echo es;;
+    ja*|jp*) echo ja;;
+    *) echo en;;
+  esac
+}
+
+detect_lang() {
+  local c="${LANGUAGE:-}"; [[ -n "$c" ]] || c="${LC_ALL:-}"; [[ -n "$c" ]] || c="${LC_MESSAGES:-}"; [[ -n "$c" ]] || c="${LANG:-}"; [[ -n "$c" ]] || c="en"
+  LANG_CODE="$(normalize_lang "$c")"
+}
+
+set_lang() {
+  local u="${1:-}"
+  if [[ -n "$u" ]]; then LANG_CODE="$(normalize_lang "$u")"; else detect_lang; fi
+}
+
+i18n() {
+  local key="$1"
+  case "$LANG_CODE:$key" in
+    zh:missing_version) echo "[sslcat] 你未指定版本，默认安装 v%s";;
+    en:missing_version) echo "[sslcat] You didn't specify a version; defaulting to v%s";;
+    fr:missing_version) echo "[sslcat] Vous n'avez pas spécifié de version ; utilisation par défaut v%s";;
+    es:missing_version) echo "[sslcat] No especificaste versión; usando por defecto v%s";;
+    ja:missing_version) echo "[sslcat] バージョンが指定されていません。デフォルトは v%s です";;
+
+    zh:unsupported_arch) echo "[sslcat] 不支持的架构: %s";;
+    en:unsupported_arch) echo "[sslcat] Unsupported architecture: %s";;
+    fr:unsupported_arch) echo "[sslcat] Architecture non prise en charge : %s";;
+    es:unsupported_arch) echo "[sslcat] Arquitectura no soportada: %s";;
+    ja:unsupported_arch) echo "[sslcat] サポートされていないアーキテクチャです: %s";;
+
+    zh:prefer_download) echo "[sslcat] 优先使用中国大陆镜像: %s";;
+    en:prefer_download) echo "[sslcat] Prefer China mirror: %s";;
+    fr:prefer_download) echo "[sslcat] Miroir Chine prioritaire : %s";;
+    es:prefer_download) echo "[sslcat] Preferir espejo de China: %s";;
+    ja:prefer_download) echo "[sslcat] 中国ミラーを優先: %s";;
+
+    zh:mirror_failed_fallback_github) echo "[sslcat] 镜像下载失败，改用 GitHub 原地址: %s";;
+    en:mirror_failed_fallback_github) echo "[sslcat] Mirror download failed, falling back to GitHub: %s";;
+    fr:mirror_failed_fallback_github) echo "[sslcat] Échec du miroir, utilisation de GitHub : %s";;
+    es:mirror_failed_fallback_github) echo "[sslcat] Falló el espejo, usando GitHub: %s";;
+    ja:mirror_failed_fallback_github) echo "[sslcat] ミラーのダウンロードに失敗。GitHub にフォールバック: %s";;
+
+    zh:installed_path) echo "[sslcat] 安装完成: %s";;
+    en:installed_path) echo "[sslcat] Installed: %s";;
+    fr:installed_path) echo "[sslcat] Installé : %s";;
+    es:installed_path) echo "[sslcat] Instalado: %s";;
+    ja:installed_path) echo "[sslcat] インストール完了: %s";;
+
+    zh:run_hint) echo "[sslcat] 运行: %s";;
+    en:run_hint) echo "[sslcat] Run: %s";;
+    fr:run_hint) echo "[sslcat] Exécuter : %s";;
+    es:run_hint) echo "[sslcat] Ejecuta: %s";;
+    ja:run_hint) echo "[sslcat] 実行: %s";;
+
+    zh:config_path) echo "[sslcat] 配置: %s";;
+    en:config_path) echo "[sslcat] Config: %s";;
+    fr:config_path) echo "[sslcat] Configuration : %s";;
+    es:config_path) echo "[sslcat] Configuración: %s";;
+    ja:config_path) echo "[sslcat] 設定: %s";;
+
+    zh:panel_hint) echo "[sslcat] 管理面板: http://%s:80/sslcat-panel/ 或 https://<你的域名>/sslcat-panel/ (首次登录将强制改密)";;
+    en:panel_hint) echo "[sslcat] Admin panel: http://%s:80/sslcat-panel/ or https://<your-domain>/sslcat-panel/ (you will be asked to change password on first login)";;
+    fr:panel_hint) echo "[sslcat] Panneau d'admin : http://%s:80/sslcat-panel/ ou https://<votre-domaine>/sslcat-panel/ (changement de mot de passe au premier login)";;
+    es:panel_hint) echo "[sslcat] Panel de administración: http://%s:80/sslcat-panel/ o https://<tu-dominio>/sslcat-panel/ (se solicitará cambiar la contraseña en el primer inicio)";;
+    ja:panel_hint) echo "[sslcat] 管理パネル: http://%s:80/sslcat-panel/ または https://<あなたのドメイン>/sslcat-panel/（初回ログイン時にパスワード変更が必要）";;
+
+    *) echo "[sslcat] %s";;
+  esac
+}
+
+msg() { local fmt; fmt="$(i18n "$1")"; shift; printf "$fmt\n" "$@"; }
+msg_err() { local fmt; fmt="$(i18n "$1")"; shift; printf "$fmt\n" "$@" >&2; }
+
+USER_LANG=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -v|--version)
-      VER="${2:-}"
-      shift 2 ;;
+      VER="${2:-}"; shift 2 ;;
+    -l|--lang)
+      USER_LANG="${2:-}"; shift 2 ;;
     *) shift ;;
   esac
 done
 
+set_lang "$USER_LANG"
+
 if [[ -z "$VER" ]]; then
-	echo "[sslcat] 你未指定版本，默认安装 v1.0.13"
-	VER="1.0.13"
+  VER="1.0.13"
+  msg missing_version "$VER"
 fi
 
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -29,7 +114,7 @@ case "$ARCH_RAW" in
   x86_64|amd64) ARCH=amd64 ;;
   aarch64|arm64) ARCH=arm64 ;;
   armv7l|armv7|armhf) ARCH=arm ;;
-  *) echo "[sslcat] 不支持的架构: $ARCH_RAW" >&2; exit 1 ;;
+  *) msg_err unsupported_arch "$ARCH_RAW"; exit 1 ;;
 esac
 
 PREFERRED="sslcat_v${VER}_${OS}-${ARCH}"
@@ -40,17 +125,17 @@ EXT=.tar.gz
 TMP=$(mktemp -d)
 URL_CN="https://sslcat.com/xurenlu/sslcat/releases/download/v${VER}/sslcat_v${VER}_${OS}-${ARCH}${EXT}"
 URL_GH="https://github.com/xurenlu/sslcat/releases/download/v${VER}/sslcat_v${VER}_${OS}-${ARCH}${EXT}"
-echo "[sslcat] 优先使用中国大陆镜像: $URL_CN"
+msg prefer_download "$URL_CN"
 if ! curl -fsSL "$URL_CN" -o "$TMP/pkg${EXT}"; then
-  echo "[sslcat] 镜像下载失败，改用 GitHub 原地址: $URL_GH"
+  msg mirror_failed_fallback_github "$URL_GH"
   curl -fsSL "$URL_GH" -o "$TMP/pkg${EXT}"
 fi
 
 if [[ "$OS" == "darwin" ]]; then
   tar -xzf "$TMP/pkg${EXT}" -C "$TMP"
   sudo install -m 0755 "$TMP/sslcat" /usr/local/bin/sslcat
-  echo "[sslcat] 安装完成: /usr/local/bin/sslcat"
-  echo "[sslcat] 运行: sslcat --config sslcat.conf --port 8080"
+  msg installed_path "/usr/local/bin/sslcat"
+  msg run_hint "sslcat --config sslcat.conf --port 8080"
   exit 0
 fi
 
@@ -96,8 +181,8 @@ sudo systemctl restart sslcat || sudo systemctl start sslcat || true
 # 获取公网IP
 PUBLIC_IP=$(curl -s https://ip4.dev/myip | tr -d '\n' | xargs)
 
-echo "[sslcat] 安装完成: /opt/sslcat/sslcat"
-echo "[sslcat] 配置: /etc/sslcat/sslcat.conf"
-echo "[sslcat] 管理面板: http://$PUBLIC_IP:80/sslcat-panel/ 或 https://<你的域名>/sslcat-panel/ (首次登录将强制改密)"
+msg installed_path "$DEST_LINUX/sslcat"
+msg config_path "$CONF_LINUX"
+msg panel_hint "$PUBLIC_IP"
 
 
