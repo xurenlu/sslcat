@@ -178,6 +178,7 @@
     </script>
     {{end}}
 
+    {{if and .PowNonce (not .RequireTOTP)}}
     <script>
     // 简单 PoW：寻找满足 sha256(nonce+":"+solution) 前导零的解
     // 在提交按钮点击时计算，避免阻塞页面首次渲染
@@ -221,7 +222,7 @@
         if (btn) {
             btn.addEventListener('click', async function(ev){
                 const solInput = document.getElementById('pow_solution');
-                if (solInput && !solInput.value) {
+                if (solInput && !solInput.value && nonce) {
                     ev.preventDefault();
                     btn.disabled = true;
                     btn.innerText = '计算中…';
@@ -242,5 +243,6 @@
         }
     })();
     </script>
+    {{end}}
 </body>
 </html>

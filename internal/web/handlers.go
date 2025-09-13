@@ -734,12 +734,36 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 
 // renderLoginError 渲染登录错误页面
 func (s *Server) renderLoginError(w http.ResponseWriter, r *http.Request, errorMsg string) {
-	// 关闭验证码功能
+	// 重新生成完整表单数据
+	clientIP := s.getClientIP(r)
+	nonce := ""
+	bits := 0
+	enablePoW := s.config.Security.EnablePoW && !s.config.Admin.EnableTOTP
+	if enablePoW {
+		n, b := s.powManager.Issue(clientIP)
+		nonce, bits = n, b
+		if s.config.Security.PoWBits > 0 {
+			bits = s.config.Security.PoWBits
+		}
+	}
+	startTs := time.Now().UnixMilli()
+	honeypotName := "hp_" + func() string {
+		if nonce == "" {
+			return "seed000"
+		}
+		return nonce[:6]
+	}()
+	
 	data := map[string]interface{}{
 		"AdminPrefix":    s.config.AdminPrefix,
 		"Error":          errorMsg,
-		"RequireCaptcha": false,
+		"RequireCaptcha": s.config.Security.EnableCaptcha,
+		"RequireTOTP":    s.config.Admin.EnableTOTP,
 		"Debug":          false,
+		"PowNonce":       nonce,
+		"PowBits":        bits,
+		"HoneypotName":   honeypotName,
+		"FormStartTs":    startTs,
 	}
 
 	s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
