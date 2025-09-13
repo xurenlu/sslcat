@@ -412,10 +412,35 @@ func (s *Server) processLogin(w http.ResponseWriter, r *http.Request) {
 	s.securityManager.LogAccess(clientIP, r.Header.Get("User-Agent"), r.URL.Path, false)
 	s.audit("login_failed", clientIP)
 
-	// 显示错误页面（带紧急修复链接，模板内根据 Error 判断显示链接）
+	// 显示错误页面（重新生成完整表单数据）
+	nonce := ""
+	bits := 0
+	enablePoWForFinal := s.config.Security.EnablePoW && !s.config.Admin.EnableTOTP
+	if enablePoWForFinal {
+		n, b := s.powManager.Issue(clientIP)
+		nonce, bits = n, b
+		if s.config.Security.PoWBits > 0 {
+			bits = s.config.Security.PoWBits
+		}
+	}
+	startTs := time.Now().UnixMilli()
+	honeypotName := "hp_" + func() string {
+		if nonce == "" {
+			return "seed000"
+		}
+		return nonce[:6]
+	}()
+	
 	data := map[string]interface{}{
-		"AdminPrefix": s.config.AdminPrefix,
-		"Error":       s.translator.T("login.invalid"),
+		"AdminPrefix":    s.config.AdminPrefix,
+		"Error":          s.translator.T("login.invalid"),
+		"RequireCaptcha": s.config.Security.EnableCaptcha,
+		"RequireTOTP":    s.config.Admin.EnableTOTP,
+		"Debug":          false,
+		"PowNonce":       nonce,
+		"PowBits":        bits,
+		"HoneypotName":   honeypotName,
+		"FormStartTs":    startTs,
 	}
 	s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
 }
