@@ -80,49 +80,45 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		s.log.Infof("Form parsed, values: username='%s', password_len=%d",
 			r.FormValue("username"), len(r.FormValue("password")))
 
-		// 蜜罐：临时完全跳过检测
-		s.log.Infof("Skipping honeypot check for debugging")
-		if false { // 完全禁用蜜罐检测
-			for k, v := range r.Form {
-				if strings.HasPrefix(k, "hp_") {
-					s.log.Infof("Honeypot field detected: %s='%s'", k, strings.Join(v, ","))
-					if len(v) > 0 && strings.TrimSpace(v[0]) != "" {
-						s.log.Infof("HONEYPOT TRIGGERED: field %s has value '%s'", k, v[0])
-						clientIP := s.getClientIP(r)
-						n2, b2 := "", 0
-						enablePoW := s.config.Security.EnablePoW && !s.config.Admin.EnableTOTP
-						if enablePoW {
-							n2, b2 = s.powManager.Issue(clientIP)
-						}
-						hp := "hp_" + func() string {
-							if n2 == "" {
-								return "seed000"
-							}
-							return n2[:6]
-						}()
-						startTs := time.Now().UnixMilli()
-						data := map[string]interface{}{
-							"AdminPrefix":    s.config.AdminPrefix,
-							"Error":          "疑似自动化提交（蜜罐触发）",
-							"RequireCaptcha": s.config.Security.EnableCaptcha,
-							"RequireTOTP":    s.config.Admin.EnableTOTP,
-							"Debug":          false,
-							"PowNonce":       n2,
-							"PowBits": func() int {
-								if s.config.Security.PoWBits > 0 {
-									return s.config.Security.PoWBits
-								}
-								return b2
-							}(),
-							"HoneypotName": hp,
-							"FormStartTs":  startTs,
-						}
-						s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
-						return
+		// 蜜罐：检测非空值填写（空值不算填写）
+		for k, v := range r.Form {
+			if strings.HasPrefix(k, "hp_") && len(v) > 0 {
+				trimmed := strings.TrimSpace(v[0])
+				if trimmed != "" {
+					clientIP := s.getClientIP(r)
+					n2, b2 := "", 0
+					enablePoW := s.config.Security.EnablePoW && !s.config.Admin.EnableTOTP
+					if enablePoW {
+						n2, b2 = s.powManager.Issue(clientIP)
 					}
+					hp := "hp_" + func() string {
+						if n2 == "" {
+							return "seed000"
+						}
+						return n2[:6]
+					}()
+					startTs := time.Now().UnixMilli()
+					data := map[string]interface{}{
+						"AdminPrefix":    s.config.AdminPrefix,
+						"Error":          "疑似自动化提交（蜜罐触发）",
+						"RequireCaptcha": s.config.Security.EnableCaptcha && !s.config.Admin.EnableTOTP,
+						"RequireTOTP":    s.config.Admin.EnableTOTP,
+						"Debug":          false,
+						"PowNonce":       n2,
+						"PowBits": func() int {
+							if s.config.Security.PoWBits > 0 {
+								return s.config.Security.PoWBits
+							}
+							return b2
+						}(),
+						"HoneypotName": hp,
+						"FormStartTs":  startTs,
+					}
+					s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
+					return
 				}
 			}
-		} // 结束禁用的蜜罐检测
+		}
 
 		// 最小填写时长：<MinFormMs 拒绝
 		s.log.Infof("Checking minimum form duration...")
@@ -176,11 +172,8 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// PoW 校验（按开关，TOTP启用时跳过）
-		s.log.Infof("Checking PoW...")
 		enablePoW := s.config.Security.EnablePoW && !s.config.Admin.EnableTOTP
-		s.log.Infof("PoW enabled: %v (EnablePoW=%v, EnableTOTP=%v)", enablePoW, s.config.Security.EnablePoW, s.config.Admin.EnableTOTP)
-		// 临时禁用 PoW 检测
-		if false && enablePoW {
+		if enablePoW {
 			n := strings.TrimSpace(r.FormValue("pow_nonce"))
 			sol := strings.TrimSpace(r.FormValue("pow_solution"))
 			s.log.Infof("PoW values: nonce='%s', solution='%s'", n, sol)
@@ -215,9 +208,9 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			s.log.Infof("PoW disabled, skipping check")
 		}
 
-		// 图形验证码校验（按开关）
-		s.log.Infof("Checking captcha...")
-		if s.config.Security.EnableCaptcha {
+		// 图形验证码校验（按开关，TOTP启用时跳过）
+		enableCaptcha := s.config.Security.EnableCaptcha && !s.config.Admin.EnableTOTP
+		if enableCaptcha {
 			sid := strings.TrimSpace(r.FormValue("captcha_session_id"))
 			code := strings.TrimSpace(r.FormValue("captcha_text"))
 			if sid == "" || code == "" || !s.captchaManager.VerifyCaptchaString(sid, code) {
