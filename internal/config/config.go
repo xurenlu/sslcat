@@ -372,7 +372,7 @@ func Load(configFile string) (*Config, error) {
 			config.Admin.Password = strings.TrimSpace(string(b))
 		}
 	}
-	
+
 	// 确保TOTP密钥文件目录存在，并加载TOTP密钥
 	if config.Admin.TOTPSecretFile != "" {
 		if err := os.MkdirAll(filepath.Dir(config.Admin.TOTPSecretFile), 0755); err != nil {
@@ -383,6 +383,12 @@ func Load(configFile string) (*Config, error) {
 			if secret != "" {
 				config.Admin.TOTPSecret = secret
 				config.Admin.EnableTOTP = true // 有密钥文件就自动启用
+			}
+		} else {
+			// 文件不存在或读取失败，自动关闭TOTP
+			if config.Admin.EnableTOTP {
+				config.Admin.EnableTOTP = false
+				config.Admin.TOTPSecret = ""
 			}
 		}
 	}
