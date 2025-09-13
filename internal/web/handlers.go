@@ -80,56 +80,64 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		s.log.Infof("Form parsed, values: username='%s', password_len=%d",
 			r.FormValue("username"), len(r.FormValue("password")))
 
-		// 蜜罐：任何以 hp_ 开头的字段被填写则拒绝（临时禁用调试）
-		for k, v := range r.Form {
-			if strings.HasPrefix(k, "hp_") {
-				s.log.Infof("Honeypot field detected: %s='%s'", k, strings.Join(v, ","))
-				// 临时禁用蜜罐检测，只记录不拦截
-				if false && len(v) > 0 && strings.TrimSpace(v[0]) != "" {
-					s.log.Infof("HONEYPOT TRIGGERED: field %s has value '%s'", k, v[0])
-					clientIP := s.getClientIP(r)
-					n2, b2 := "", 0
-					enablePoW := s.config.Security.EnablePoW && !s.config.Admin.EnableTOTP
-					if enablePoW {
-						n2, b2 = s.powManager.Issue(clientIP)
-					}
-					hp := "hp_" + func() string {
-						if n2 == "" {
-							return "seed000"
+		// 蜜罐：临时完全跳过检测
+		s.log.Infof("Skipping honeypot check for debugging")
+		if false { // 完全禁用蜜罐检测
+			for k, v := range r.Form {
+				if strings.HasPrefix(k, "hp_") {
+					s.log.Infof("Honeypot field detected: %s='%s'", k, strings.Join(v, ","))
+					if len(v) > 0 && strings.TrimSpace(v[0]) != "" {
+						s.log.Infof("HONEYPOT TRIGGERED: field %s has value '%s'", k, v[0])
+						clientIP := s.getClientIP(r)
+						n2, b2 := "", 0
+						enablePoW := s.config.Security.EnablePoW && !s.config.Admin.EnableTOTP
+						if enablePoW {
+							n2, b2 = s.powManager.Issue(clientIP)
 						}
-						return n2[:6]
-					}()
-					startTs := time.Now().UnixMilli()
-					data := map[string]interface{}{
-						"AdminPrefix":    s.config.AdminPrefix,
-						"Error":          "疑似自动化提交（蜜罐触发）",
-						"RequireCaptcha": s.config.Security.EnableCaptcha,
-						"RequireTOTP":    s.config.Admin.EnableTOTP,
-						"Debug":          false,
-						"PowNonce":       n2,
-						"PowBits": func() int {
-							if s.config.Security.PoWBits > 0 {
-								return s.config.Security.PoWBits
+						hp := "hp_" + func() string {
+							if n2 == "" {
+								return "seed000"
 							}
-							return b2
-						}(),
-						"HoneypotName": hp,
-						"FormStartTs":  startTs,
+							return n2[:6]
+						}()
+						startTs := time.Now().UnixMilli()
+						data := map[string]interface{}{
+							"AdminPrefix":    s.config.AdminPrefix,
+							"Error":          "疑似自动化提交（蜜罐触发）",
+							"RequireCaptcha": s.config.Security.EnableCaptcha,
+							"RequireTOTP":    s.config.Admin.EnableTOTP,
+							"Debug":          false,
+							"PowNonce":       n2,
+							"PowBits": func() int {
+								if s.config.Security.PoWBits > 0 {
+									return s.config.Security.PoWBits
+								}
+								return b2
+							}(),
+							"HoneypotName": hp,
+							"FormStartTs":  startTs,
+						}
+						s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
+						return
 					}
-					s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
-					return
 				}
 			}
-		}
+		} // 结束禁用的蜜罐检测
 
 		// 最小填写时长：<MinFormMs 拒绝
+		s.log.Infof("Checking minimum form duration...")
 		if ts := strings.TrimSpace(r.FormValue("form_start_ts")); ts != "" {
+			s.log.Infof("form_start_ts found: %s", ts)
 			if ms, err := strconv.ParseInt(ts, 10, 64); err == nil {
+				s.log.Infof("Parsed timestamp: %d", ms)
 				minMs := int64(800)
 				if s.config.Security.MinFormMs > 0 {
 					minMs = int64(s.config.Security.MinFormMs)
 				}
-				if time.Now().UnixMilli()-ms < minMs {
+				duration := time.Now().UnixMilli()-ms
+				s.log.Infof("Form duration: %dms, required: %dms", duration, minMs)
+				if duration < minMs {
+					s.log.Infof("FORM TOO FAST: %dms < %dms", duration, minMs)
 					clientIP := s.getClientIP(r)
 					n2, b2 := "", 0
 					if s.config.Security.EnablePoW {
@@ -160,10 +168,15 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 					s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
 					return
 				}
+			} else {
+				s.log.Infof("Failed to parse form_start_ts: %s", ts)
 			}
+		} else {
+			s.log.Infof("No form_start_ts found")
 		}
 
 		// PoW 校验（按开关，TOTP启用时跳过）
+		s.log.Infof("Checking PoW...")
 		enablePoW := s.config.Security.EnablePoW && !s.config.Admin.EnableTOTP
 		if enablePoW {
 			n := strings.TrimSpace(r.FormValue("pow_nonce"))
