@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/xurenlu/sslcat/internal/logger"
 	"github.com/sirupsen/logrus"
 )
 
@@ -89,6 +90,8 @@ type Protector struct {
 	thresholds map[ProtectionLevel]ThresholdConfig
 
 	log *logrus.Entry
+	// 持久化轮转
+	rotator *logger.Rotator
 }
 
 // ThresholdConfig 阈值配置
@@ -123,6 +126,11 @@ func NewProtector() *Protector {
 
 	// 启动清理协程
 	go p.cleanupRoutine()
+
+	// 初始化轮转器（10MB*10）
+	if rot, err := logger.NewRotator("./data/ddos_attacks.log", 10*1024*1024, 10); err == nil {
+		p.rotator = rot
+	}
 
 	return p
 }
@@ -354,7 +362,7 @@ func (p *Protector) recordAttack(clientIP, userAgent, url, method, attackType, s
 
 	p.attacks = append(p.attacks, attack)
 
-	// JSON Lines 持久化
+	// JSON Lines 持久化（优先轮转器）
 	rec := map[string]any{
 		"time":     attack.Timestamp.Format(time.RFC3339),
 		"id":       attack.ID,
@@ -368,10 +376,14 @@ func (p *Protector) recordAttack(clientIP, userAgent, url, method, attackType, s
 		"reason":   attack.Reason,
 	}
 	if b, err := json.Marshal(rec); err == nil {
-		_ = os.MkdirAll("./data", 0755)
-		if f, err := os.OpenFile("./data/ddos_attacks.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
-			_, _ = f.Write(append(b, '\n'))
-			_ = f.Close()
+		if p.rotator != nil {
+			_, _ = p.rotator.Write(append(b, '\n'))
+		} else {
+			_ = os.MkdirAll("./data", 0755)
+			if f, err := os.OpenFile("./data/ddos_attacks.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+				_, _ = f.Write(append(b, '\n'))
+				_ = f.Close()
+			}
 		}
 	}
 

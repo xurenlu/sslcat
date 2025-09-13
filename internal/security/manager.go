@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/xurenlu/sslcat/internal/config"
+	"github.com/xurenlu/sslcat/internal/logger"
 
 	"github.com/sirupsen/logrus"
 )
@@ -56,6 +57,8 @@ type Manager struct {
 	mutex       sync.RWMutex
 	log         *logrus.Entry
 	stopChan    chan struct{}
+	// TLS 指纹持久化
+	tlsFPRotator *logger.Rotator
 }
 
 // NewManager 创建安全管理器
@@ -85,12 +88,20 @@ func (m *Manager) Start() {
 
 	// 启动清理任务
 	go m.cleanupTask()
+
+	// 初始化 TLS 指纹日志轮转器（10MB*10）
+	if rot, err := logger.NewRotator("./data/tls_fp.log", 10*1024*1024, 10); err == nil {
+		m.tlsFPRotator = rot
+	}
 }
 
 // Stop 停止安全管理器
 func (m *Manager) Stop() {
 	m.log.Info("Stopping security manager")
 	close(m.stopChan)
+	if m.tlsFPRotator != nil {
+		_ = m.tlsFPRotator.Close()
+	}
 }
 
 // AccessLogsSnapshot 返回当前访问日志的只读快照（深拷贝切片，避免并发问题）
@@ -225,17 +236,21 @@ func (m *Manager) LogTLSFingerprint(fingerprint, ip string) {
 		m.log.Warnf("TLS fingerprint too active fp=%s count=%d ip=%s", fingerprint, len(pruned), ip)
 	}
 
-	// 追加写入 JSON Lines（持久化）
+	// 追加写入 JSON Lines（轮转器优先）
 	rec := map[string]any{
 		"time": time.Now().Format(time.RFC3339),
 		"fp":   fingerprint,
 		"ip":   ip,
 	}
 	if b, err := json.Marshal(rec); err == nil {
-		_ = os.MkdirAll("./data", 0755)
-		if f, err := os.OpenFile("./data/tls_fp.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
-			_, _ = f.Write(append(b, '\n'))
-			_ = f.Close()
+		if m.tlsFPRotator != nil {
+			_, _ = m.tlsFPRotator.Write(append(b, '\n'))
+		} else {
+			_ = os.MkdirAll("./data", 0755)
+			if f, err := os.OpenFile("./data/tls_fp.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+				_, _ = f.Write(append(b, '\n'))
+				_ = f.Close()
+			}
 		}
 	}
 }
@@ -271,6 +286,42 @@ func (m *Manager) GetTLSFingerprintStats() []TLSFPStat {
 		tmp = tmp[:topN]
 	}
 	return tmp
+}
+
+type TLSFPStatEx struct {
+	FP       string `json:"fp"`
+	Count    int    `json:"count"`
+	LastSeen string `json:"last_seen"`
+}
+
+func (m *Manager) GetTLSFingerprintStatsEx() []TLSFPStatEx {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	now := time.Now()
+	window := time.Duration(m.config.Security.TLSFingerprintWindowSec) * time.Second
+	if window <= 0 {
+		window = time.Minute
+	}
+	cut := now.Add(-window)
+	var out []TLSFPStatEx
+	for fp, times := range m.tlsFPCounts {
+		cnt := 0
+		last := time.Time{}
+		for _, t := range times {
+			if t.After(cut) {
+				cnt++
+				if t.After(last) { last = t }
+			}
+		}
+		if cnt > 0 {
+			out = append(out, TLSFPStatEx{FP: fp, Count: cnt, LastSeen: last.Format(time.RFC3339)})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Count > out[j].Count })
+	if top := m.config.Security.TLSFingerprintTopN; top > 0 && len(out) > top {
+		out = out[:top]
+	}
+	return out
 }
 
 // HashTLSRaw 计算原始字符串的 SHA256 指纹

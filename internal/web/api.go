@@ -171,6 +171,15 @@ func (s *Server) handleAPITLSFingerprints(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// 扩展输出（包含 last_seen）
+	type ex interface{ GetTLSFingerprintStatsEx() []struct{ FP string; Count int; LastSeen string } }
+	if exm, ok := interface{}(s.securityManager).(ex); ok {
+		stats := exm.GetTLSFingerprintStatsEx()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"fingerprints": stats})
+		return
+	}
+	// 回退到原始统计
 	stats := s.securityManager.GetTLSFingerprintStats()
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"fingerprints": stats})
