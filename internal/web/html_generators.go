@@ -1060,6 +1060,14 @@ func (s *Server) generateSettingsHTML(data map[string]interface{}) string {
 
 func (s *Server) generateCDNCacheHTML(data map[string]interface{}) string {
 	cdn := data["CDN"].(config.CDNCacheConfig)
+	
+	// 获取实时统计
+	cdnStats := map[string]interface{}{"enabled": false}
+	if pm, ok := interface{}(s.proxyManager).(interface{ GetCDNCache() interface{ Stats() map[string]interface{} } }); ok {
+		if cache := pm.GetCDNCache(); cache != nil {
+			cdnStats = cache.Stats()
+		}
+	}
 	return fmt.Sprintf(`
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -1077,6 +1085,45 @@ func (s *Server) generateCDNCacheHTML(data map[string]interface{}) string {
             <main class="col-md-10">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">类CDN缓存</h1>
+                    <div class="btn-group">
+                        <a class="btn btn-outline-secondary" href="%s/api/cdn-cache/stats">统计JSON</a>
+                    </div>
+                </div>
+
+                <!-- 缓存统计 -->
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title">%.1f%%</h5>
+                                <p class="card-text">命中率</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title">%d</h5>
+                                <p class="card-text">缓存对象</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title">%.1f%%</h5>
+                                <p class="card-text">容量利用率</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title">%d/%d</h5>
+                                <p class="card-text">命中/未命中</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="card mb-3">
@@ -1149,6 +1196,12 @@ func (s *Server) generateCDNCacheHTML(data map[string]interface{}) string {
 </body>
 </html>`,
 		s.generateSidebar(data["AdminPrefix"].(string), "cdn-cache"),
+		data["AdminPrefix"].(string),
+		func() float64 { if v, ok := cdnStats["hit_rate"].(float64); ok { return v }; return 0 }(),
+		func() int64 { if v, ok := cdnStats["objects"].(int64); ok { return v }; return 0 }(),
+		func() float64 { if v, ok := cdnStats["utilization"].(float64); ok { return v }; return 0 }(),
+		func() int64 { if v, ok := cdnStats["hits"].(int64); ok { return v }; return 0 }(),
+		func() int64 { if v, ok := cdnStats["misses"].(int64); ok { return v }; return 0 }(),
 		data["AdminPrefix"].(string),
 		map[bool]string{true: "checked"}[cdn.Enabled],
 		cdn.CacheDir,

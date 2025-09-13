@@ -25,6 +25,9 @@ type CDNCache struct {
 	cfg   *config.Config
 	log   *logrus.Entry
 	mutex sync.Mutex
+	// 统计计数器
+	hits   int64
+	misses int64
 }
 
 type objectMeta struct {
@@ -50,6 +53,10 @@ func NewCDNCache(cfg *config.Config) *CDNCache {
 // ServeIfFresh 若命中缓存且未过期，直接回源本地文件
 func (c *CDNCache) ServeIfFresh(w http.ResponseWriter, r *http.Request) bool {
 	if c == nil || !c.isEnabled() {
+		// 统计未命中（未启用）
+		if c != nil {
+			c.misses++
+		}
 		return false
 	}
 	// 仅缓存 GET/HEAD
@@ -60,12 +67,16 @@ func (c *CDNCache) ServeIfFresh(w http.ResponseWriter, r *http.Request) bool {
 	filePath, metaPath := c.cachePaths(r)
 	meta, err := c.readMeta(metaPath)
 	if err != nil || meta == nil {
+		// 统计未命中（无元数据）
+		c.misses++
 		return false
 	}
 	// 过期检查
 	if meta.ExpiresAtUnix > 0 && time.Now().Unix() >= meta.ExpiresAtUnix {
 		_ = os.Remove(filePath)
 		_ = os.Remove(metaPath)
+		// 统计未命中（已过期）
+		c.misses++
 		return false
 	}
 	// 回写头
@@ -98,6 +109,8 @@ func (c *CDNCache) ServeIfFresh(w http.ResponseWriter, r *http.Request) bool {
 
 	// 更新访问时间
 	c.touch(metaPath, meta)
+	// 统计命中
+	c.hits++
 	return true
 }
 
@@ -301,14 +314,14 @@ func (c *CDNCache) StartCleaner() {
 	}()
 }
 
-// Stats 返回缓存的简单统计（对象数与总大小）
+// Stats 返回缓存的详细统计
 func (c *CDNCache) Stats() map[string]any {
 	if !c.isEnabled() {
 		return map[string]any{"enabled": false}
 	}
 	base := c.cfg.CDNCache.CacheDir
-	var total int64
-	var count int64
+	var totalSize int64
+	var objectCount int64
 	_ = filepath.Walk(base, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info == nil || info.IsDir() {
 			return nil
@@ -316,14 +329,25 @@ func (c *CDNCache) Stats() map[string]any {
 		if strings.HasSuffix(path, ".meta.json") {
 			return nil
 		}
-		total += info.Size()
-		count++
+		totalSize += info.Size()
+		objectCount++
 		return nil
 	})
+	
+	hitRate := float64(0)
+	if c.hits+c.misses > 0 {
+		hitRate = float64(c.hits) / float64(c.hits+c.misses) * 100
+	}
+	
 	return map[string]any{
-		"enabled": true,
-		"objects": count,
-		"bytes":   total,
+		"enabled":     true,
+		"objects":     objectCount,
+		"total_size":  totalSize,
+		"hits":        c.hits,
+		"misses":      c.misses,
+		"hit_rate":    hitRate,
+		"max_size":    c.cfg.CDNCache.MaxSizeBytes,
+		"utilization": float64(totalSize) / float64(c.cfg.CDNCache.MaxSizeBytes) * 100,
 	}
 }
 
