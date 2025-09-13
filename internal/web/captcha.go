@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	
+	"github.com/sirupsen/logrus"
 )
 
 // CaptchaManager 验证码管理器
@@ -119,14 +121,24 @@ func (c *CaptchaManager) VerifyCaptchaString(sessionID string, userAnswer string
 
 	session, exists := c.sessions[sessionID]
 	if !exists {
+		logrus.Debugf("Captcha verification failed: session %s not found", sessionID)
 		return false
 	}
 	// 一次性使用
 	delete(c.sessions, sessionID)
 	if time.Since(session.CreatedAt) > 10*time.Minute {
+		logrus.Debugf("Captcha verification failed: session %s expired", sessionID)
 		return false
 	}
-	return strings.EqualFold(strings.TrimSpace(session.AnswerStr), strings.TrimSpace(userAnswer))
+	
+	expected := strings.TrimSpace(session.AnswerStr)
+	actual := strings.TrimSpace(userAnswer)
+	result := strings.EqualFold(expected, actual)
+	
+	logrus.Debugf("Captcha verification: sessionID=%s, expected='%s', actual='%s', result=%v", 
+		sessionID, expected, actual, result)
+	
+	return result
 }
 
 // GenerateImageCaptcha 生成图形验证码（增强字符集、长度6，至少1个数字和1个特殊符号）
