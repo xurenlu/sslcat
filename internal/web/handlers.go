@@ -210,10 +210,15 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 		// 图形验证码校验（按开关，TOTP启用时跳过）
 		enableCaptcha := s.config.Security.EnableCaptcha && !s.config.Admin.EnableTOTP
+		s.log.Infof("Captcha check: enabled=%v (EnableCaptcha=%v, EnableTOTP=%v)", enableCaptcha, s.config.Security.EnableCaptcha, s.config.Admin.EnableTOTP)
 		if enableCaptcha {
 			sid := strings.TrimSpace(r.FormValue("captcha_session_id"))
 			code := strings.TrimSpace(r.FormValue("captcha_text"))
-			if sid == "" || code == "" || !s.captchaManager.VerifyCaptchaString(sid, code) {
+			s.log.Infof("Captcha values: sid='%s', code='%s'", sid, code)
+			captchaResult := s.captchaManager.VerifyCaptchaString(sid, code)
+			s.log.Infof("Captcha verification result: %v", captchaResult)
+			if sid == "" || code == "" || !captchaResult {
+				s.log.Infof("CAPTCHA FAILED: sid_empty=%v, code_empty=%v, verify_result=%v", sid == "", code == "", captchaResult)
 				clientIP := s.getClientIP(r)
 				n2, b2 := s.powManager.Issue(clientIP)
 				hp := "hp_" + n2[:6]
@@ -237,20 +242,23 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 				s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
 				return
 			}
+		} else {
+			s.log.Infof("Captcha disabled, skipping check")
 		}
 
 		// 用户名密码校验（支持 bcrypt/明文，明文将自动迁移为 bcrypt）
+		s.log.Infof("Starting password verification...")
 		username := r.FormValue("username")
 		password := r.FormValue("password")
 		totpCode := strings.TrimSpace(r.FormValue("totp_code"))
 
-		s.log.Debugf("Login attempt: username='%s', password_len=%d, expected_username='%s'",
+		s.log.Infof("Login attempt: username='%s', password_len=%d, expected_username='%s'",
 			username, len(password), s.config.Admin.Username)
 
 		usernameMatch := username == s.config.Admin.Username
 		passwordMatch := s.verifyAdminPassword(password)
 
-		s.log.Debugf("Login verification: username_match=%v, password_match=%v", usernameMatch, passwordMatch)
+		s.log.Infof("Login verification: username_match=%v, password_match=%v", usernameMatch, passwordMatch)
 
 		if usernameMatch && passwordMatch {
 			// TOTP 二次验证（如果启用）
@@ -437,14 +445,20 @@ func (s *Server) handleDefault(w http.ResponseWriter, r *http.Request, domain st
 }
 
 func (s *Server) processLogin(w http.ResponseWriter, r *http.Request) {
+	s.log.Infof("=== processLogin called ===")
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 
-	// 计算有效管理员密码：优先使用密码文件，其次使用配置中的密码
-	effective := s.getEffectiveAdminPassword()
+	s.log.Infof("processLogin: username='%s', password_len=%d", username, len(password))
 
-	// 验证用户名和密码
-	if username == s.config.Admin.Username && password == effective {
+	// 使用新的验证方法（支持bcrypt）
+	usernameMatch := username == s.config.Admin.Username
+	passwordMatch := s.verifyAdminPassword(password)
+
+	s.log.Infof("processLogin verification: username_match=%v, password_match=%v", usernameMatch, passwordMatch)
+
+	if usernameMatch && passwordMatch {
+		s.log.Infof("✅ LOGIN SUCCESS - Setting session cookie")
 		// 设置session cookie
 		http.SetCookie(w, &http.Cookie{
 			Name:     "sslcat_session",
