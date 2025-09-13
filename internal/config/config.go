@@ -69,8 +69,9 @@ type AdminConfig struct {
 	FirstRun     bool   `json:"first_run"`
 	PasswordFile string `json:"password_file"`
 	// TOTP 二次验证
-	EnableTOTP bool   `json:"enable_totp"`
-	TOTPSecret string `json:"totp_secret,omitempty"`
+	EnableTOTP     bool   `json:"enable_totp"`
+	TOTPSecret     string `json:"totp_secret,omitempty"`
+	TOTPSecretFile string `json:"totp_secret_file"`
 }
 
 // ProxyConfig 代理配置
@@ -252,10 +253,12 @@ func Load(configFile string) (*Config, error) {
 			DisableSelfSigned: true,
 		},
 		Admin: AdminConfig{
-			Username:     "admin",
-			Password:     "admin*9527",
-			FirstRun:     true,
-			PasswordFile: "./data/admin.pass",
+			Username:       "admin",
+			Password:       "admin*9527",
+			FirstRun:       true,
+			PasswordFile:   "./data/admin.pass",
+			EnableTOTP:     false,
+			TOTPSecretFile: "./data/admin.totp",
 		},
 		Proxy: ProxyConfig{
 			Rules:                []ProxyRule{},
@@ -367,6 +370,20 @@ func Load(configFile string) (*Config, error) {
 		}
 		if b, err := os.ReadFile(config.Admin.PasswordFile); err == nil {
 			config.Admin.Password = strings.TrimSpace(string(b))
+		}
+	}
+	
+	// 确保TOTP密钥文件目录存在，并加载TOTP密钥
+	if config.Admin.TOTPSecretFile != "" {
+		if err := os.MkdirAll(filepath.Dir(config.Admin.TOTPSecretFile), 0755); err != nil {
+			return nil, fmt.Errorf("创建TOTP密钥文件目录失败: %w", err)
+		}
+		if b, err := os.ReadFile(config.Admin.TOTPSecretFile); err == nil {
+			secret := strings.TrimSpace(string(b))
+			if secret != "" {
+				config.Admin.TOTPSecret = secret
+				config.Admin.EnableTOTP = true // 有密钥文件就自动启用
+			}
 		}
 	}
 
@@ -487,10 +504,11 @@ func (c *Config) Save(configFile string) error {
 		return fmt.Errorf("创建配置目录失败 (%s): %w", configDir, err)
 	}
 
-	// 序列化时避免写入明文密码
+	// 序列化时避免写入敏感信息
 	shadow := *c
 	shadow.Security.BlockDurationStr = c.Security.BlockDuration.String()
 	shadow.Admin.Password = ""
+	shadow.Admin.TOTPSecret = "" // 不保存TOTP密钥到配置文件
 
 	data, err := json.MarshalIndent(&shadow, "", "  ")
 	if err != nil {

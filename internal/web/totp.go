@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"image/png"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/pquerna/otp/totp"
 )
@@ -93,6 +95,10 @@ func (s *Server) handleTOTPSetup(w http.ResponseWriter, r *http.Request) {
 			// 禁用 TOTP
 			s.config.Admin.EnableTOTP = false
 			s.config.Admin.TOTPSecret = ""
+			// 删除TOTP密钥文件
+			if s.config.Admin.TOTPSecretFile != "" {
+				_ = os.Remove(s.config.Admin.TOTPSecretFile)
+			}
 			_ = s.config.Save(s.config.ConfigFile)
 			http.Redirect(w, r, s.config.AdminPrefix+"/settings", http.StatusFound)
 			return
@@ -114,6 +120,14 @@ func (s *Server) handleTOTPSetup(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
+			// 保存TOTP密钥到文件
+			if s.config.Admin.TOTPSecretFile != "" {
+				if err := os.WriteFile(s.config.Admin.TOTPSecretFile, []byte(secret+"\n"), 0600); err != nil {
+					http.Error(w, "Failed to save TOTP secret: "+err.Error(), http.StatusInternalServerError)
+					return
+				}
+			}
+			
 			// 保存配置
 			s.config.Admin.EnableTOTP = true
 			s.config.Admin.TOTPSecret = secret
@@ -129,8 +143,29 @@ func (s *Server) handleTOTPSetup(w http.ResponseWriter, r *http.Request) {
 
 // verifyTOTP 验证 TOTP 代码
 func (s *Server) verifyTOTP(code string) bool {
-	if !s.config.Admin.EnableTOTP || s.config.Admin.TOTPSecret == "" {
+	if !s.config.Admin.EnableTOTP {
 		return true // TOTP 未启用时直接通过
 	}
-	return totp.Validate(code, s.config.Admin.TOTPSecret)
+	
+	// 获取有效的TOTP密钥
+	secret := s.getEffectiveTOTPSecret()
+	if secret == "" {
+		return true // 无密钥时直接通过
+	}
+	
+	return totp.Validate(code, secret)
+}
+
+// getEffectiveTOTPSecret 获取有效的TOTP密钥：优先从文件读取
+func (s *Server) getEffectiveTOTPSecret() string {
+	secretFile := s.config.Admin.TOTPSecretFile
+	if secretFile != "" {
+		if b, err := os.ReadFile(secretFile); err == nil {
+			secret := strings.TrimSpace(string(b))
+			if secret != "" {
+				return secret
+			}
+		}
+	}
+	return s.config.Admin.TOTPSecret
 }
