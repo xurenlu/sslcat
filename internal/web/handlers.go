@@ -32,7 +32,7 @@ func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	// 使用Info级别确保能看到日志
 	s.log.Infof("=== handleLogin called: method=%s, path=%s ===", r.Method, r.URL.Path)
-	
+
 	if r.Method == "GET" {
 		debugForced := strings.EqualFold(r.URL.Query().Get("debug"), "true") || r.URL.Query().Get("debug") == "1"
 
@@ -77,46 +77,48 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		s.log.Infof("=== POST login received ===")
 		_ = r.ParseForm()
-		s.log.Infof("Form parsed, values: username='%s', password_len=%d", 
+		s.log.Infof("Form parsed, values: username='%s', password_len=%d",
 			r.FormValue("username"), len(r.FormValue("password")))
 
-		// 蜜罐：任何以 hp_ 开头的字段被填写则拒绝
+		// 蜜罐：任何以 hp_ 开头的字段被填写则拒绝（临时禁用调试）
 		for k, v := range r.Form {
 			if strings.HasPrefix(k, "hp_") {
 				s.log.Infof("Honeypot field detected: %s='%s'", k, strings.Join(v, ","))
-				if len(v) > 0 && strings.TrimSpace(v[0]) != "" {
+				// 临时禁用蜜罐检测，只记录不拦截
+				if false && len(v) > 0 && strings.TrimSpace(v[0]) != "" {
 					s.log.Infof("HONEYPOT TRIGGERED: field %s has value '%s'", k, v[0])
-				clientIP := s.getClientIP(r)
-				n2, b2 := "", 0
-				enablePoW := s.config.Security.EnablePoW && !s.config.Admin.EnableTOTP
-				if enablePoW {
-					n2, b2 = s.powManager.Issue(clientIP)
-				}
-				hp := "hp_" + func() string {
-					if n2 == "" {
-						return "seed000"
+					clientIP := s.getClientIP(r)
+					n2, b2 := "", 0
+					enablePoW := s.config.Security.EnablePoW && !s.config.Admin.EnableTOTP
+					if enablePoW {
+						n2, b2 = s.powManager.Issue(clientIP)
 					}
-					return n2[:6]
-				}()
-				startTs := time.Now().UnixMilli()
-				data := map[string]interface{}{
-					"AdminPrefix":    s.config.AdminPrefix,
-					"Error":          "疑似自动化提交（蜜罐触发）",
-					"RequireCaptcha": s.config.Security.EnableCaptcha,
-					"RequireTOTP":    s.config.Admin.EnableTOTP,
-					"Debug":          false,
-					"PowNonce":       n2,
-					"PowBits": func() int {
-						if s.config.Security.PoWBits > 0 {
-							return s.config.Security.PoWBits
+					hp := "hp_" + func() string {
+						if n2 == "" {
+							return "seed000"
 						}
-						return b2
-					}(),
-					"HoneypotName": hp,
-					"FormStartTs":  startTs,
+						return n2[:6]
+					}()
+					startTs := time.Now().UnixMilli()
+					data := map[string]interface{}{
+						"AdminPrefix":    s.config.AdminPrefix,
+						"Error":          "疑似自动化提交（蜜罐触发）",
+						"RequireCaptcha": s.config.Security.EnableCaptcha,
+						"RequireTOTP":    s.config.Admin.EnableTOTP,
+						"Debug":          false,
+						"PowNonce":       n2,
+						"PowBits": func() int {
+							if s.config.Security.PoWBits > 0 {
+								return s.config.Security.PoWBits
+							}
+							return b2
+						}(),
+						"HoneypotName": hp,
+						"FormStartTs":  startTs,
+					}
+					s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
+					return
 				}
-				s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
-				return
 			}
 		}
 
@@ -227,12 +229,12 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		password := r.FormValue("password")
 		totpCode := strings.TrimSpace(r.FormValue("totp_code"))
 
-		s.log.Debugf("Login attempt: username='%s', password_len=%d, expected_username='%s'", 
+		s.log.Debugf("Login attempt: username='%s', password_len=%d, expected_username='%s'",
 			username, len(password), s.config.Admin.Username)
 
 		usernameMatch := username == s.config.Admin.Username
 		passwordMatch := s.verifyAdminPassword(password)
-		
+
 		s.log.Debugf("Login verification: username_match=%v, password_match=%v", usernameMatch, passwordMatch)
 
 		if usernameMatch && passwordMatch {
@@ -321,12 +323,12 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 func (s *Server) verifyAdminPassword(input string) bool {
 	passFile := s.config.Admin.PasswordFile
 	stored := strings.TrimSpace(s.config.Admin.Password)
-	
+
 	s.log.Debugf("=== Password Verification Debug ===")
 	s.log.Debugf("Password file: %s", passFile)
 	s.log.Debugf("Config password: '%s'", stored)
 	s.log.Debugf("Input password: '%s' (len=%d)", input, len(input))
-	
+
 	// 优先从文件读取
 	if passFile != "" {
 		if b, err := os.ReadFile(passFile); err == nil {
@@ -336,16 +338,16 @@ func (s *Server) verifyAdminPassword(input string) bool {
 			s.log.Debugf("Failed to read password file %s: %v", passFile, err)
 		}
 	}
-	
+
 	if stored == "" {
 		s.log.Debug("No password found in file or config")
 		return false
 	}
-	
+
 	// 检查是否为bcrypt格式
 	isBcrypt := strings.HasPrefix(stored, "$2a$") || strings.HasPrefix(stored, "$2b$") || strings.HasPrefix(stored, "$2y$")
 	s.log.Debugf("Password format: bcrypt=%v, stored_prefix='%s'", isBcrypt, stored[:min(10, len(stored))])
-	
+
 	if isBcrypt {
 		err := bcrypt.CompareHashAndPassword([]byte(stored), []byte(input))
 		if err == nil {
@@ -355,7 +357,7 @@ func (s *Server) verifyAdminPassword(input string) bool {
 		s.log.Debugf("❌ bcrypt password verification FAILED: %v", err)
 		return false
 	}
-	
+
 	// 明文比较（常量时间）
 	s.log.Debugf("Comparing plaintext: stored='%s' vs input='%s'", stored, input)
 	if subtle.ConstantTimeCompare([]byte(stored), []byte(input)) == 1 {
@@ -371,13 +373,15 @@ func (s *Server) verifyAdminPassword(input string) bool {
 		}
 		return true
 	}
-	
+
 	s.log.Debug("❌ Password verification FAILED - no match")
 	return false
 }
 
 func min(a, b int) int {
-	if a < b { return a }
+	if a < b {
+		return a
+	}
 	return b
 }
 
@@ -478,7 +482,7 @@ func (s *Server) processLogin(w http.ResponseWriter, r *http.Request) {
 		}
 		return nonce[:6]
 	}()
-	
+
 	data := map[string]interface{}{
 		"AdminPrefix":    s.config.AdminPrefix,
 		"Error":          s.translator.T("login.invalid"),
@@ -826,7 +830,7 @@ func (s *Server) renderLoginError(w http.ResponseWriter, r *http.Request, errorM
 		}
 		return nonce[:6]
 	}()
-	
+
 	data := map[string]interface{}{
 		"AdminPrefix":    s.config.AdminPrefix,
 		"Error":          errorMsg,

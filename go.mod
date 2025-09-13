@@ -6,13 +6,13 @@ toolchain go1.24.7
 
 require github.com/sirupsen/logrus v1.9.3
 
-require golang.org/x/crypto v0.23.0
-
 require (
-	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
-	github.com/pquerna/otp v1.5.0 // indirect
-	golang.org/x/image v0.31.0 // indirect
+	github.com/pquerna/otp v1.5.0
+	golang.org/x/crypto v0.23.0
+	golang.org/x/image v0.31.0
 )
+
+require github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
 
 require (
 	github.com/fsnotify/fsnotify v1.6.0
