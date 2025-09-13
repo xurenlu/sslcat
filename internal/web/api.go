@@ -6,13 +6,13 @@ import (
 	"image/color"
 	"image/draw"
 	"image/png"
+	"io"
 	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
-	"io"
 
 	"math"
 
@@ -189,14 +189,18 @@ func (s *Server) handleAPITLSFingerprints(w http.ResponseWriter, r *http.Request
 	}
 	if exm, ok := interface{}(s.securityManager).(ex); ok {
 		stats := exm.GetTLSFingerprintStatsEx()
-		if limit > 0 && len(stats) > limit { stats = stats[:limit] }
+		if limit > 0 && len(stats) > limit {
+			stats = stats[:limit]
+		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"fingerprints": stats})
 		return
 	}
 	// 回退到原始统计
 	stats := s.securityManager.GetTLSFingerprintStats()
-	if limit > 0 && len(stats) > limit { stats = stats[:limit] }
+	if limit > 0 && len(stats) > limit {
+		stats = stats[:limit]
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"fingerprints": stats})
 }
@@ -225,12 +229,16 @@ func (s *Server) handleAPISecurityAttacks(w http.ResponseWriter, r *http.Request
 	lines := strings.Split(string(data), "\n")
 	// 取末尾 limit 行
 	start := 0
-	if len(lines) > limit { start = len(lines) - limit }
+	if len(lines) > limit {
+		start = len(lines) - limit
+	}
 	type attack map[string]any
 	var out []attack
 	for i := start; i < len(lines); i++ {
 		ln := strings.TrimSpace(lines[i])
-		if ln == "" { continue }
+		if ln == "" {
+			continue
+		}
 		var rec attack
 		if err := json.Unmarshal([]byte(ln), &rec); err == nil {
 			out = append(out, rec)

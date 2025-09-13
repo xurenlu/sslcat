@@ -303,8 +303,30 @@ func (s *Server) generateSSLCertsTable(data map[string]interface{}) string {
 }
 
 func (s *Server) generateBlockedIPsTable(data map[string]interface{}) string {
-	// 暂时返回示例，实际应该从SecurityManager获取
-	return `<tr><td colspan="3" class="text-center">` + s.translator.T("security.no_blocked") + `</td></tr>`
+	blockedIPs, ok := data["BlockedIPs"].([]interface{})
+	if !ok || len(blockedIPs) == 0 {
+		return `<tr><td colspan="3" class="text-center text-muted">暂无封禁IP</td></tr>`
+	}
+	var rows strings.Builder
+	for _, item := range blockedIPs {
+		if blocked, ok := item.(map[string]interface{}); ok {
+			ip := blocked["ip"].(string)
+			blockTime := blocked["block_time"].(string)
+			rows.WriteString(fmt.Sprintf(`
+				<tr>
+					<td>%s</td>
+					<td>%s</td>
+					<td>
+						<form method="POST" action="%s/security/unblock" class="d-inline">
+							<input type="hidden" name="ip" value="%s">
+							<button class="btn btn-sm btn-outline-danger" type="submit">解除封禁</button>
+						</form>
+					</td>
+				</tr>`,
+				ip, blockTime, data["AdminPrefix"].(string), ip))
+		}
+	}
+	return rows.String()
 }
 
 // 辅助函数来安全地获取配置值
@@ -657,32 +679,27 @@ func (s *Server) generateSSLGenerateHTML(data map[string]interface{}) string {
 }
 
 func (s *Server) generateSecurityManagementHTML(data map[string]interface{}) string {
-	title := s.translator.T("security.title")
-	blockedIPs := s.translator.T("security.blocked_ips")
-	thIP := s.translator.T("security.ip")
-	thBlockTime := s.translator.T("security.block_time")
-	thActions := s.translator.T("security.actions")
-	securityConfig := s.translator.T("security.config")
-	maxAttempts := s.translator.T("security.max_attempts")
-	maxAttempts5 := s.translator.T("security.max_attempts_5min")
-	blockDuration := s.translator.T("security.block_duration")
-	uaCheck := s.translator.T("security.ua_check")
-	auditLog := s.translator.T("security.audit_log")
-	exportJSON := s.translator.T("security.export_json")
-	auditTime := s.translator.T("audit.time")
-	auditUser := s.translator.T("audit.user_ip")
-	auditAction := s.translator.T("audit.action")
-	auditDetail := s.translator.T("audit.detail")
-	loading := s.translator.T("security.loading")
-	noRecords := s.translator.T("security.no_records")
-	loadFailed := s.translator.T("security.load_failed")
+	// DDoS 统计
+	ddosStats := data["DDOSStats"].(map[string]interface{})
+	ddosStatus := "关闭"
+	blockedClients := 0
+	totalAttacks := 0
+	if enabled, ok := ddosStats["enabled"].(bool); ok && enabled {
+		ddosStatus = "启用"
+	}
+	if v, ok := ddosStats["blocked_clients"].(int); ok {
+		blockedClients = v
+	}
+	if v, ok := ddosStats["total_attacks"].(int); ok {
+		totalAttacks = v
+	}
 	return fmt.Sprintf(`
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>%s - SSLcat</title>
+    <title>安全设置 - SSLcat</title>
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
 </head>
@@ -692,23 +709,69 @@ func (s *Server) generateSecurityManagementHTML(data map[string]interface{}) str
             <div class="col-md-2">%s</div>
             <main class="col-md-10">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">%s</h1>
+                    <h1 class="h2">安全设置</h1>
                 </div>
                 
+                <!-- 安全配置表单 -->
+                <div class="card mb-3">
+                    <div class="card-header"><h5>人机验证与防护设置</h5></div>
+                    <div class="card-body">
+                        <form method="POST" action="%s/security/save">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>人机验证</h6>
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" name="enable_captcha" %s>
+                                        <label class="form-check-label">启用图形验证码</label>
+                                    </div>
+                                    <div class="form-check form-switch mb-3">
+                                        <input class="form-check-input" type="checkbox" name="enable_pow" %s>
+                                        <label class="form-check-label">启用客户端 PoW</label>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">PoW 难度（比特数）</label>
+                                        <input class="form-control" name="pow_bits" value="%d" placeholder="18">
+                                        <div class="form-text">10-30，越大越难，客户端耗时更久</div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">最小填写时长（毫秒）</label>
+                                        <input class="form-control" name="min_form_ms" value="%d" placeholder="800">
+                                        <div class="form-text">小于此时长的提交将被拒绝</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>DDoS 防护</h6>
+                                    <div class="form-check form-switch mb-3">
+                                        <input class="form-check-input" type="checkbox" name="enable_ddos" %s>
+                                        <label class="form-check-label">启用 DDoS 防护</label>
+                                    </div>
+                                    <div class="alert alert-info">
+                                        <small>
+                                            当前状态：%s<br>
+                                            封禁客户端：%d<br>
+                                            总攻击数：%d
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary" type="submit">保存设置</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- 被封禁IP与最近攻击 -->
                 <div class="row">
                     <div class="col-md-6">
                         <div class="card">
-                            <div class="card-header">
-                                <h5 class="mb-0">%s</h5>
-                            </div>
+                            <div class="card-header"><h5>被封禁IP</h5></div>
                             <div class="card-body">
                                 <div class="table-responsive">
                                     <table class="table table-sm">
                                         <thead>
                                             <tr>
-                                                <th>%s</th>
-                                                <th>%s</th>
-                                                <th>%s</th>
+                                                <th>IP地址</th>
+                                                <th>封禁时间</th>
+                                                <th>操作</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -721,24 +784,37 @@ func (s *Server) generateSecurityManagementHTML(data map[string]interface{}) str
                     </div>
                     <div class="col-md-6">
                         <div class="card">
-                            <div class="card-header">
-                                <h5 class="mb-0">%s</h5>
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">最近攻击</h5>
+                                <a class="btn btn-sm btn-outline-secondary" href="%s/api/security/attacks">JSON</a>
                             </div>
                             <div class="card-body">
-                                <p><strong>%s:</strong> %d/1min</p>
-                                <p><strong>%s:</strong> %d/5min</p>
-                                <p><strong>%s:</strong> %s</p>
-                                <p><strong>%s:</strong> ON</p>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>时间</th>
+                                                <th>IP</th>
+                                                <th>类型</th>
+                                                <th>状态</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="attacks-body">
+                                            <tr><td colspan="4" class="text-center text-muted">加载中...</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
+                <!-- TLS指纹与审计日志 -->
                 <div class="row mt-3">
                     <div class="col-md-6">
                         <div class="card">
                             <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0">%s</h5>
+                                <h5 class="mb-0">TLS 指纹统计</h5>
                                 <a class="btn btn-sm btn-outline-secondary" href="%s/api/tls-fingerprints">JSON</a>
                             </div>
                             <div class="card-body">
@@ -752,7 +828,7 @@ func (s *Server) generateSecurityManagementHTML(data map[string]interface{}) str
                                             </tr>
                                         </thead>
                                         <tbody id="tls-fingerprint-body">
-                                            <tr><td colspan="3" class="text-center text-muted">%s</td></tr>
+                                            <tr><td colspan="3" class="text-center text-muted">加载中...</td></tr>
                                         </tbody>
                                     </table>
                                 </div>
@@ -762,22 +838,22 @@ func (s *Server) generateSecurityManagementHTML(data map[string]interface{}) str
                     <div class="col-md-6">
                         <div class="card">
                             <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0">%s</h5>
-                                <a class="btn btn-sm btn-outline-secondary" href="%s/api/audit?download=1">%s</a>
+                                <h5 class="mb-0">审计日志</h5>
+                                <a class="btn btn-sm btn-outline-secondary" href="%s/api/audit?download=1">导出JSON</a>
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">
                                     <table class="table table-sm table-striped">
                                         <thead>
                                             <tr>
-                                                <th style="width: 22%%">%s</th>
-                                                <th style="width: 18%%">%s</th>
-                                                <th style="width: 20%%">%s</th>
-                                                <th>%s</th>
+                                                <th style="width: 22%%">时间</th>
+                                                <th style="width: 18%%">用户/IP</th>
+                                                <th style="width: 20%%">操作</th>
+                                                <th>详情</th>
                                             </tr>
                                         </thead>
                                         <tbody id="audit-body">
-                                            <tr><td colspan="4" class="text-center text-muted">%s</td></tr>
+                                            <tr><td colspan="4" class="text-center text-muted">加载中...</td></tr>
                                         </tbody>
                                     </table>
                                 </div>
@@ -788,71 +864,90 @@ func (s *Server) generateSecurityManagementHTML(data map[string]interface{}) str
             </main>
         </div>
     </div>
+    
     <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
     // 加载 TLS 指纹统计
-    (function(){
-      fetch('%s/api/tls-fingerprints').then(r=>r.json()).then(data=>{
+    fetch('%s/api/tls-fingerprints?limit=10').then(r=>r.json()).then(data=>{
         const body = document.getElementById('tls-fingerprint-body');
         body.innerHTML = '';
         const fingerprints = (data && data.fingerprints) || [];
         if (fingerprints.length === 0) {
-          body.innerHTML = '<tr><td colspan="3" class="text-center text-muted">暂无数据</td></tr>';
-          return;
+            body.innerHTML = '<tr><td colspan="3" class="text-center text-muted">暂无数据</td></tr>';
+            return;
         }
-        fingerprints.slice(0, 10).forEach(fp=>{
-          const tr = document.createElement('tr');
-          tr.innerHTML = '<td><code>'+(fp.fp||'').substring(0,16)+'...</code></td>'+
-                         '<td>'+(fp.count||0)+'</td>'+
-                         '<td>'+(fp.last_seen||'')+'</td>';
-          body.appendChild(tr);
+        fingerprints.forEach(fp=>{
+            const tr = document.createElement('tr');
+            tr.innerHTML = '<td><code>'+(fp.fp||'').substring(0,16)+'...</code></td>'+
+                           '<td>'+(fp.count||0)+'</td>'+
+                           '<td>'+(fp.last_seen||'').substring(11,19)+'</td>';
+            body.appendChild(tr);
         });
-      }).catch(()=>{
-        const body = document.getElementById('tls-fingerprint-body');
-        body.innerHTML = '<tr><td colspan="3" class="text-center text-muted">加载失败</td></tr>';
-      });
-    })();
+    }).catch(()=>{
+        document.getElementById('tls-fingerprint-body').innerHTML = '<tr><td colspan="3" class="text-center text-muted">加载失败</td></tr>';
+    });
+    
+    // 加载最近攻击
+    fetch('%s/api/security/attacks?limit=20').then(r=>r.json()).then(data=>{
+        const body = document.getElementById('attacks-body');
+        body.innerHTML = '';
+        const attacks = (data && data.attacks) || [];
+        if (attacks.length === 0) {
+            body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">暂无攻击</td></tr>';
+            return;
+        }
+        attacks.slice(-10).forEach(att=>{
+            const tr = document.createElement('tr');
+            const badge = att.blocked ? '<span class="badge bg-danger">已阻止</span>' : '<span class="badge bg-warning">检测</span>';
+            tr.innerHTML = '<td>'+(att.time||'').substring(11,19)+'</td>'+
+                           '<td>'+(att.ip||'')+'</td>'+
+                           '<td>'+(att.type||'')+'</td>'+
+                           '<td>'+badge+'</td>';
+            body.appendChild(tr);
+        });
+    }).catch(()=>{
+        document.getElementById('attacks-body').innerHTML = '<tr><td colspan="4" class="text-center text-muted">加载失败</td></tr>';
+    });
     
     // 加载审计日志
-    (function(){
-      fetch('%s/api/audit').then(r=>r.json()).then(data=>{
+    fetch(document.location.pathname.split('/')[1]+'/api/audit').then(r=>r.json()).then(data=>{
         const body = document.getElementById('audit-body');
         body.innerHTML = '';
         const logs = (data && data.logs) || [];
         if (logs.length === 0) {
-          body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">%s</td></tr>';
-          return;
+            body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">暂无记录</td></tr>';
+            return;
         }
-        logs.slice(-50).forEach(it=>{
-          const tr = document.createElement('tr');
-          tr.innerHTML = '<td>'+(it.time||'')+'</td>'+
-                         '<td>'+(it.user||'')+'</td>'+
-                         '<td>'+(it.action||'')+'</td>'+
-                         '<td><code>'+(it.detail||'')+'</code></td>';
-          body.appendChild(tr);
+        logs.slice(-20).forEach(it=>{
+            const tr = document.createElement('tr');
+            tr.innerHTML = '<td>'+(it.time||'').substring(11,19)+'</td>'+
+                           '<td>'+(it.user||'')+'</td>'+
+                           '<td>'+(it.action||'')+'</td>'+
+                           '<td><code>'+(it.detail||'').substring(0,40)+'</code></td>';
+            body.appendChild(tr);
         });
-      }).catch(()=>{
-        const body = document.getElementById('audit-body');
-        body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">%s</td></tr>';
-      });
-    })();
+    }).catch(()=>{
+        document.getElementById('audit-body').innerHTML = '<tr><td colspan="4" class="text-center text-muted">加载失败</td></tr>';
+    });
     </script>
 </body>
 </html>`,
-		title,
 		s.generateSidebar(data["AdminPrefix"].(string), "security"),
-		title,
-		blockedIPs,
-		thIP, thBlockTime, thActions,
-		s.generateBlockedIPsTable(data),
-		securityConfig,
-		maxAttempts, s.config.Security.MaxAttempts, maxAttempts5, s.config.Security.MaxAttempts5Min, blockDuration, s.config.Security.BlockDuration.String(), uaCheck,
-		s.translator.T("security.tls_fp_stats"),
-		data["AdminPrefix"].(string), loading,
-		auditLog, data["AdminPrefix"].(string), exportJSON,
-		auditTime, auditUser, auditAction, auditDetail, loading,
 		data["AdminPrefix"].(string),
-		data["AdminPrefix"].(string), noRecords, loadFailed)
+		map[bool]string{true: "checked"}[s.config.Security.EnableCaptcha],
+		map[bool]string{true: "checked"}[s.config.Security.EnablePoW],
+		s.config.Security.PoWBits,
+		s.config.Security.MinFormMs,
+		map[bool]string{true: "checked"}[s.config.Security.EnableDDOS],
+		ddosStatus,
+		blockedClients,
+		totalAttacks,
+		s.generateBlockedIPsTable(data),
+		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string))
 }
 
 func (s *Server) generateSettingsHTML(data map[string]interface{}) string {

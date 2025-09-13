@@ -14,6 +14,7 @@ import (
 
 	"github.com/xurenlu/sslcat/internal/assets"
 	"github.com/xurenlu/sslcat/internal/config"
+	"github.com/xurenlu/sslcat/internal/ddos"
 	"github.com/xurenlu/sslcat/internal/i18n"
 	"github.com/xurenlu/sslcat/internal/logger"
 	"github.com/xurenlu/sslcat/internal/notify"
@@ -65,6 +66,8 @@ type Server struct {
 	captchaManager *CaptchaManager
 	// PoW 管理器
 	powManager *PowManager
+	// DDoS 防护器
+	ddosProtector  *ddos.Protector
 	clusterManager ClusterManager
 	// 审计轮转器
 	auditRotator *logger.Rotator
@@ -117,6 +120,8 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	server.captchaManager = NewCaptchaManager()
 	// 初始化 PoW 管理器
 	server.powManager = NewPowManager()
+	// 初始化 DDoS 防护器
+	server.ddosProtector = ddos.NewProtector()
 
 	// 初始化审计日志轮转器（10MB*10）
 	if rot, err := logger.NewRotator("./data/audit.log", 10*1024*1024, 10); err == nil {
@@ -324,6 +329,7 @@ func (s *Server) setupRoutes() {
 
 	// 安全设置路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/security", s.handleSecurity)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/security/save", s.handleSecuritySave)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/security/blocked-ips", s.handleBlockedIPs)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/security/unblock", s.handleUnblock)
 
@@ -437,6 +443,15 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// 当前版本仅预留接口示意。如果已存在 waf 引擎实例，可在此调用：
 		// if evt, blocked := s.wafEngine.CheckRequest(r); blocked { ... }
 		// 为保持稳定，此处不引入新字段，仅做占位以便后续扩展。
+	}
+
+	// DDoS 防护检测（开启时才生效）
+	if s.config.Security.EnableDDOS && s.ddosProtector != nil {
+		if blocked, reason := s.ddosProtector.CheckRequest(r); blocked {
+			s.log.Warnf("DDoS protection blocked request from %s: %s", s.getClientIP(r), reason)
+			http.Error(w, "Request blocked by DDoS protection", http.StatusTooManyRequests)
+			return
+		}
 	}
 
 	// 代理中间件
