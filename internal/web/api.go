@@ -13,10 +13,11 @@ import (
 	"strings"
 	"time"
 
+	"math"
+
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
 	"golang.org/x/image/math/fixed"
-	"math"
 )
 
 // API处理器
@@ -208,23 +209,23 @@ func (s *Server) handleAPICaptcha(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"error":"method not allowed"}`))
 }
 
-// drawCaptchaImage 生成清晰、略带干扰且带轻微旋转的验证码图片
+// drawCaptchaImage 生成清晰、带适度干扰且带轻微旋转的验证码图片
 func drawCaptchaImage(text string) image.Image {
-	// 画布尺寸更大
+	// 更大画布与更显著字符
 	w, h := 220, 72
 	img := image.NewRGBA(image.Rect(0, 0, w, h))
 	// 背景
 	bg := color.RGBA{250, 251, 253, 255}
 	draw.Draw(img, img.Bounds(), &image.Uniform{bg}, image.Point{}, draw.Src)
 
-	// 轻微干扰线（3-4条）
+	// 干扰线：在原基础上额外增加约 5 条，并加深颜色
 	rand.Seed(time.Now().UnixNano())
-	lines := 3 + rand.Intn(2)
+	lines := 8 + rand.Intn(3) // 8~10 条
 	for i := 0; i < lines; i++ {
-		c := color.RGBA{180, 190, 200, 255}
+		c := color.RGBA{uint8(120 + rand.Intn(40)), uint8(130 + rand.Intn(40)), uint8(140 + rand.Intn(40)), 255}
 		x1, y1 := rand.Intn(w), rand.Intn(h)
 		x2, y2 := rand.Intn(w), rand.Intn(h)
-		steps := 180
+		steps := 220
 		for s := 0; s < steps; s++ {
 			t := float64(s) / float64(steps)
 			x := int(float64(x1) + t*float64(x2-x1))
@@ -234,19 +235,25 @@ func drawCaptchaImage(text string) image.Image {
 			}
 		}
 	}
-	// 适度噪点（随画布放大而增加）
-	for i := 0; i < 350; i++ {
+
+	// 噪点：随机小块（1~2 px），数量略增
+	for i := 0; i < 450; i++ {
 		x, y := rand.Intn(w), rand.Intn(h)
-		c := color.RGBA{200, 205, 210, 255}
-		img.SetRGBA(x, y, c)
+		rw, rh := 1+rand.Intn(2), 1+rand.Intn(2)
+		c := color.RGBA{uint8(190 + rand.Intn(40)), uint8(195 + rand.Intn(40)), uint8(200 + rand.Intn(40)), 255}
+		for yy := y; yy < y+rh && yy < h; yy++ {
+			for xx := x; xx < x+rw && xx < w; xx++ {
+				img.SetRGBA(xx, yy, c)
+			}
+		}
 	}
 
-	// 将每个字符单独绘制到小画布，再放大、旋转后贴到主画布
+	// 将每个字符单独绘制到小画布，放大、轻微旋转后粘贴
 	col := color.RGBA{16, 16, 16, 255}
 	face := basicfont.Face7x13
 	per := w / (len(text) + 1)
 
-	// 最近邻放大
+	// 最近邻 2x 放大
 	scale2x := func(src *image.RGBA) *image.RGBA {
 		sw := src.Bounds().Dx()
 		sh := src.Bounds().Dy()
@@ -260,22 +267,18 @@ func drawCaptchaImage(text string) image.Image {
 		}
 		return dst
 	}
-	// 旋转（最近邻），角度单位弧度，返回新图（包含足够边距）
+	// 最近邻旋转（-18°~+18°），返回含边距的新图
 	rotate := func(src *image.RGBA, rad float64) *image.RGBA {
 		cw := src.Bounds().Dx()
 		ch := src.Bounds().Dy()
-		// 目标尺寸留出边距，避免裁剪
 		mw, mh := cw+16, ch+16
 		dst := image.NewRGBA(image.Rect(0, 0, mw, mh))
-		// 预填透明
-		// 旋转中心
 		cx := float64(cw) / 2
 		cy := float64(ch) / 2
 		cosv := math.Cos(rad)
 		sinv := math.Sin(rad)
 		for y := 0; y < mh; y++ {
 			for x := 0; x < mw; x++ {
-				// 映射到 src
 				sx := float64(x-8) - cx
 				sy := float64(y-8) - cy
 				ox := +cosv*sx + sinv*sy + cx
@@ -295,25 +298,24 @@ func drawCaptchaImage(text string) image.Image {
 
 	for i := 0; i < len(text); i++ {
 		ch := string(text[i])
-		// 小画布绘制字符
+		// 小画布绘制字符（带白色阴影）
 		sW, sH := 24, 28
 		small := image.NewRGBA(image.Rect(0, 0, sW, sH))
-		// 先绘制白色阴影提升可读性
 		shadow := &font.Drawer{Dst: small, Src: &image.Uniform{color.RGBA{255, 255, 255, 255}}, Face: face}
-		shadow.Dot = fixed.P(3, 16)
+		shadow.Dot = fixed.P(4, 17)
 		shadow.DrawString(ch)
 		dr := &font.Drawer{Dst: small, Src: &image.Uniform{col}, Face: face}
-		dr.Dot = fixed.P(2, 15)
+		dr.Dot = fixed.P(3, 16)
 		dr.DrawString(ch)
 
 		// 放大 2x
 		big := scale2x(small)
-		// 随机轻微旋转（-12° ~ +12°）
-		deg := (rand.Float64()*24 - 12) * math.Pi / 180
+		// 旋转角度扩大（-18° ~ +18°）
+		deg := (rand.Float64()*36 - 18) * math.Pi / 180
 		rot := rotate(big, deg)
 		// 贴到主画布，居中于分配区块
 		px := (i+1)*per - rot.Bounds().Dx()/2
-		py := (h-rot.Bounds().Dy())/2
+		py := (h - rot.Bounds().Dy()) / 2
 		for y := 0; y < rot.Bounds().Dy(); y++ {
 			for x := 0; x < rot.Bounds().Dx(); x++ {
 				c := rot.RGBAAt(x, y)
