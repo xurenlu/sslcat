@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/xurenlu/sslcat/internal/logger"
 	"github.com/sirupsen/logrus"
+	"github.com/xurenlu/sslcat/internal/logger"
 )
 
 // ProtectionLevel 防护级别

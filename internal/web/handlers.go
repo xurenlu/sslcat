@@ -738,3 +738,28 @@ func (s *Server) handleCDNCacheClear(w http.ResponseWriter, r *http.Request) {
 	}
 	http.Redirect(w, r, s.config.AdminPrefix+"/cdn-cache", http.StatusFound)
 }
+
+func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	// 清除session cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "sslcat_session",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+	})
+	// 重定向到登录页
+	http.Redirect(w, r, s.config.AdminPrefix+"/login", http.StatusFound)
+}
+
+func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	stats := s.getSystemStats()
+	data := map[string]interface{}{
+		"AdminPrefix": s.config.AdminPrefix,
+		"Stats":       stats,
+	}
+	s.templateRenderer.DetectLanguageAndRender(w, r, "dashboard.html", data)
+}

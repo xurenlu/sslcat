@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"io"
 
 	"math"
 
@@ -171,18 +172,72 @@ func (s *Server) handleAPITLSFingerprints(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	limit := 0
+	if q := strings.TrimSpace(r.URL.Query().Get("limit")); q != "" {
+		if v, err := strconv.Atoi(q); err == nil && v > 0 {
+			limit = v
+		}
+	}
+
 	// 扩展输出（包含 last_seen）
-	type ex interface{ GetTLSFingerprintStatsEx() []struct{ FP string; Count int; LastSeen string } }
+	type ex interface {
+		GetTLSFingerprintStatsEx() []struct {
+			FP       string
+			Count    int
+			LastSeen string
+		}
+	}
 	if exm, ok := interface{}(s.securityManager).(ex); ok {
 		stats := exm.GetTLSFingerprintStatsEx()
+		if limit > 0 && len(stats) > limit { stats = stats[:limit] }
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"fingerprints": stats})
 		return
 	}
 	// 回退到原始统计
 	stats := s.securityManager.GetTLSFingerprintStats()
+	if limit > 0 && len(stats) > limit { stats = stats[:limit] }
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"fingerprints": stats})
+}
+
+// handleAPISecurityAttacks 读取最近N条 DDoS 攻击（JSONL）
+func (s *Server) handleAPISecurityAttacks(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizeAPI(w, r, true) {
+		return
+	}
+	limit := 100
+	if q := strings.TrimSpace(r.URL.Query().Get("limit")); q != "" {
+		if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 2000 {
+			limit = v
+		}
+	}
+	path := "./data/ddos_attacks.log"
+	f, err := os.Open(path)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("{\"attacks\":[]}"))
+		return
+	}
+	defer f.Close()
+	// 读取全部行（文件通常较小，已做轮转）
+	data, _ := io.ReadAll(f)
+	lines := strings.Split(string(data), "\n")
+	// 取末尾 limit 行
+	start := 0
+	if len(lines) > limit { start = len(lines) - limit }
+	type attack map[string]any
+	var out []attack
+	for i := start; i < len(lines); i++ {
+		ln := strings.TrimSpace(lines[i])
+		if ln == "" { continue }
+		var rec attack
+		if err := json.Unmarshal([]byte(ln), &rec); err == nil {
+			out = append(out, rec)
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"attacks": out})
 }
 
 // handleAPICaptcha 处理验证码API请求
