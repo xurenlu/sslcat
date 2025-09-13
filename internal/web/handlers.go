@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
+	"crypto/subtle"
 
 	"github.com/xurenlu/sslcat/internal/config"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // 基础页面处理器
@@ -148,42 +149,62 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		s.processLogin(w, r)
+		// 用户名密码校验（支持 bcrypt/明文，明文将自动迁移为 bcrypt）
+		username := r.FormValue("username")
+		password := r.FormValue("password")
+		if username == s.config.Admin.Username && s.verifyAdminPassword(password) {
+			s.processLogin(w, r)
+			return
+		}
+
+		// 登录失败，记录安全日志
+		clientIP := s.getClientIP(r)
+		s.securityManager.LogAccess(clientIP, r.Header.Get("User-Agent"), r.URL.Path, false)
+		s.audit("login_failed", clientIP)
+
+		// 显示错误页面
+		data := map[string]interface{}{
+			"AdminPrefix": s.config.AdminPrefix,
+			"Error":       s.translator.T("login.invalid"),
+		}
+		s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
 		return
 	}
 
 	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 }
 
-func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
-	// 清除session cookie
-	http.SetCookie(w, &http.Cookie{
-		Name:     "sslcat_session",
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-	})
-
-	// 重定向到登录页面
-	http.Redirect(w, r, s.config.AdminPrefix+"/login", http.StatusFound)
-}
-
-func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
-	// 检查认证
-	if !s.checkAuth(w, r) {
-		return
+// verifyAdminPassword 校验管理员密码；支持 bcrypt；若存储为明文且匹配，会自动迁移为 bcrypt
+func (s *Server) verifyAdminPassword(input string) bool {
+	passFile := s.config.Admin.PasswordFile
+	stored := strings.TrimSpace(s.config.Admin.Password)
+	// 优先从文件读取
+	if passFile != "" {
+		if b, err := os.ReadFile(passFile); err == nil {
+			stored = strings.TrimSpace(string(b))
+		}
 	}
-
-	stats := s.getSystemStats()
-
-	data := map[string]interface{}{
-		"AdminPrefix": s.config.AdminPrefix,
-		"Stats":       stats,
-		"GoVersion":   runtime.Version(),
+	if stored == "" {
+		return false
 	}
-
-	s.templateRenderer.DetectLanguageAndRender(w, r, "dashboard.html", data)
+	// bcrypt 前缀
+	if strings.HasPrefix(stored, "$2a$") || strings.HasPrefix(stored, "$2b$") || strings.HasPrefix(stored, "$2y$") {
+		if err := bcrypt.CompareHashAndPassword([]byte(stored), []byte(input)); err == nil {
+			return true
+		}
+		return false
+	}
+	// 明文比较（常量时间），并尝试迁移为 bcrypt
+	if subtle.ConstantTimeCompare([]byte(stored), []byte(input)) == 1 {
+		// 迁移为 bcrypt
+		if passFile != "" {
+			if hash, err := bcrypt.GenerateFromPassword([]byte(input), bcrypt.DefaultCost); err == nil {
+				_ = os.WriteFile(passFile, append(hash, '\n'), 0600)
+			}
+		}
+		return true
+	}
+	return false
 }
 
 func (s *Server) handleMobile(w http.ResponseWriter, r *http.Request) {
@@ -377,7 +398,12 @@ func (s *Server) handleSettingsSave(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if newPassword := r.FormValue("admin_password"); newPassword != "" {
-			s.config.Admin.Password = newPassword
+			// 存储 bcrypt 哈希
+			if hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost); err == nil {
+				_ = os.WriteFile(s.config.Admin.PasswordFile, append(hash, '\n'), 0600)
+				// 避免明文落入配置
+				s.config.Admin.Password = ""
+			}
 		}
 
 		// SSL 邮箱与禁用自签
@@ -499,10 +525,15 @@ func (s *Server) handleFirstTimeSetup(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// 更新内存与持久化密码文件
+		// 更新内存与持久化密码文件（bcrypt）
 		s.config.Admin.Password = "" // 避免将明文写入 withssl.conf
-		if err := os.WriteFile(s.config.Admin.PasswordFile, []byte(newPassword+"\n"), 0600); err != nil {
-			http.Error(w, "failed to write password file: "+err.Error(), http.StatusInternalServerError)
+		if hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost); err == nil {
+			if err := os.WriteFile(s.config.Admin.PasswordFile, append(hash, '\n'), 0600); err != nil {
+				http.Error(w, "failed to write password file: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+		} else {
+			http.Error(w, "failed to hash password", http.StatusInternalServerError)
 			return
 		}
 
@@ -553,10 +584,15 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "passwords do not match or empty", http.StatusBadRequest)
 			return
 		}
-		// 更新内存与持久化密码文件
+		// 更新内存与持久化密码文件（bcrypt）
 		s.config.Admin.Password = "" // 避免将明文写入 withssl.conf
-		if err := os.WriteFile(s.config.Admin.PasswordFile, []byte(newp+"\n"), 0600); err != nil {
-			http.Error(w, "failed to write password file: "+err.Error(), http.StatusInternalServerError)
+		if hash, err := bcrypt.GenerateFromPassword([]byte(newp), bcrypt.DefaultCost); err == nil {
+			if err := os.WriteFile(s.config.Admin.PasswordFile, append(hash, '\n'), 0600); err != nil {
+				http.Error(w, "failed to write password file: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+		} else {
+			http.Error(w, "failed to hash password", http.StatusInternalServerError)
 			return
 		}
 		// 保存配置（不包含密码）
