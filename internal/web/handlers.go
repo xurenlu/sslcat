@@ -82,7 +82,10 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 		// 蜜罐：任何以 hp_ 开头的字段被填写则拒绝
 		for k, v := range r.Form {
-			if strings.HasPrefix(k, "hp_") && len(v) > 0 && strings.TrimSpace(v[0]) != "" {
+			if strings.HasPrefix(k, "hp_") {
+				s.log.Infof("Honeypot field detected: %s='%s'", k, strings.Join(v, ","))
+				if len(v) > 0 && strings.TrimSpace(v[0]) != "" {
+					s.log.Infof("HONEYPOT TRIGGERED: field %s has value '%s'", k, v[0])
 				clientIP := s.getClientIP(r)
 				n2, b2 := "", 0
 				enablePoW := s.config.Security.EnablePoW && !s.config.Admin.EnableTOTP
