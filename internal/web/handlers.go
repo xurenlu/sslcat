@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/xurenlu/sslcat/internal/config"
 )
@@ -31,11 +32,23 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		debugForced := strings.EqualFold(r.URL.Query().Get("debug"), "true") || r.URL.Query().Get("debug") == "1"
 
+		// 下发无第三方的人机验证要素：PoW 挑战、蜜罐字段名、最小耗时戳
+		clientIP := s.getClientIP(r)
+		nonce, bits := s.powManager.Issue(clientIP)
+		startTs := time.Now().UnixMilli()
+		honeypotName := "hp_" + nonce[:6]
+
 		data := map[string]interface{}{
 			"AdminPrefix":    s.config.AdminPrefix,
 			"Error":          "",
 			"RequireCaptcha": true,
 			"Debug":          debugForced,
+			// PoW
+			"PowNonce":       nonce,
+			"PowBits":        bits,
+			// 蜜罐与时长
+			"HoneypotName":   honeypotName,
+			"FormStartTs":    startTs,
 		}
 
 		s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
@@ -43,15 +56,93 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == "POST" {
+		_ = r.ParseForm()
+
+		// 蜜罐：任何以 hp_ 开头的字段被填写则拒绝
+		for k, v := range r.Form {
+			if strings.HasPrefix(k, "hp_") && len(v) > 0 && strings.TrimSpace(v[0]) != "" {
+				clientIP := s.getClientIP(r)
+				n2, b2 := s.powManager.Issue(clientIP)
+				hp := "hp_" + n2[:6]
+				startTs := time.Now().UnixMilli()
+				data := map[string]interface{}{
+					"AdminPrefix":    s.config.AdminPrefix,
+					"Error":          "疑似自动化提交（蜜罐触发）",
+					"RequireCaptcha": true,
+					"Debug":          false,
+					"PowNonce":       n2,
+					"PowBits":        b2,
+					"HoneypotName":   hp,
+					"FormStartTs":    startTs,
+				}
+				s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
+				return
+			}
+		}
+
+		// 最小填写时长：<800ms 拒绝
+		if ts := strings.TrimSpace(r.FormValue("form_start_ts")); ts != "" {
+			if ms, err := strconv.ParseInt(ts, 10, 64); err == nil {
+				if time.Now().UnixMilli()-ms < 800 {
+					clientIP := s.getClientIP(r)
+					n2, b2 := s.powManager.Issue(clientIP)
+					hp := "hp_" + n2[:6]
+					startTs := time.Now().UnixMilli()
+					data := map[string]interface{}{
+						"AdminPrefix":    s.config.AdminPrefix,
+						"Error":          "提交过快，请重试",
+						"RequireCaptcha": true,
+						"Debug":          false,
+						"PowNonce":       n2,
+						"PowBits":        b2,
+						"HoneypotName":   hp,
+						"FormStartTs":    startTs,
+					}
+					s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
+					return
+				}
+			}
+		}
+
+		// PoW 校验
+		n := strings.TrimSpace(r.FormValue("pow_nonce"))
+		sol := strings.TrimSpace(r.FormValue("pow_solution"))
+		if n == "" || sol == "" || !s.powManager.Verify(n, sol) {
+			clientIP := s.getClientIP(r)
+			n2, b2 := s.powManager.Issue(clientIP)
+			hp := "hp_" + n2[:6]
+			startTs := time.Now().UnixMilli()
+			data := map[string]interface{}{
+				"AdminPrefix":    s.config.AdminPrefix,
+				"Error":          "人机校验失败，请重试",
+				"RequireCaptcha": true,
+				"Debug":          false,
+				"PowNonce":       n2,
+				"PowBits":        b2,
+				"HoneypotName":   hp,
+				"FormStartTs":    startTs,
+			}
+			s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
+			return
+		}
+
 		// 图形验证码校验
 		sid := strings.TrimSpace(r.FormValue("captcha_session_id"))
 		code := strings.TrimSpace(r.FormValue("captcha_text"))
 		if sid == "" || code == "" || !s.captchaManager.VerifyCaptchaString(sid, code) {
+			clientIP := s.getClientIP(r)
+			n2, b2 := s.powManager.Issue(clientIP)
+			hp := "hp_" + n2[:6]
+			startTs := time.Now().UnixMilli()
 			data := map[string]interface{}{
 				"AdminPrefix":    s.config.AdminPrefix,
 				"Error":          "验证码错误，请重试",
 				"RequireCaptcha": true,
 				"Debug":          false,
+				"PowNonce":       n2,
+				"PowBits":        b2,
+				"HoneypotName":   hp,
+				"FormStartTs":    startTs,
 			}
 			s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
 			return

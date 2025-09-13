@@ -93,6 +93,16 @@
                                 <input type="password" class="form-control" id="password" name="password" required>
                             </div>
                             
+                            <!-- 蜜罐（随机字段名），后端渲染变量 .HoneypotName -->
+                            <div style="position:absolute;left:-9999px;top:-9999px;">
+                                <input type="text" name="{{.HoneypotName}}" autocomplete="off" tabindex="-1">
+                            </div>
+                            <input type="hidden" name="form_start_ts" id="form_start_ts" value="{{.FormStartTs}}">
+
+                            <!-- PoW 隐藏字段 -->
+                            <input type="hidden" id="pow_nonce" name="pow_nonce" value="{{.PowNonce}}">
+                            <input type="hidden" id="pow_solution" name="pow_solution" value="">
+
                             {{if .RequireCaptcha}}
                             <div class="mb-4" id="captcha-container">
                                 <label for="captcha_image" class="form-label">
@@ -157,5 +167,70 @@
         });
     </script>
     {{end}}
+
+    <script>
+    // 简单 PoW：寻找满足 sha256(nonce+":"+solution) 前导零的解
+    // 在提交按钮点击时计算，避免阻塞页面首次渲染
+    (function(){
+        const bits = Number("{{.PowBits}}") || 18;
+        const nonce = document.getElementById('pow_nonce') ? document.getElementById('pow_nonce').value : '';
+        async function sha256Hex(str){
+            const enc = new TextEncoder();
+            const buf = await crypto.subtle.digest('SHA-256', enc.encode(str));
+            const arr = Array.from(new Uint8Array(buf));
+            return arr.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+        function leadingZeroBitsFromHex(hex){
+            let count = 0;
+            for (let i = 0; i < hex.length; i++) {
+                const v = parseInt(hex[i], 16);
+                if (v === 0) { count += 4; continue; }
+                // 统计该半字节的前导零位
+                if (v < 2) count += 3;
+                else if (v < 4) count += 2;
+                else if (v < 8) count += 1;
+                return count;
+            }
+            return count;
+        }
+        async function solve(){
+            if (!nonce) return '';
+            let counter = Math.floor(Math.random()*1e6);
+            while (true) {
+                const sol = String(counter);
+                const hex = await sha256Hex(nonce+":"+sol);
+                if (leadingZeroBitsFromHex(hex) >= bits) {
+                    return sol;
+                }
+                counter++;
+                // 让步给 UI
+                if (counter % 2000 === 0) await new Promise(r=>setTimeout(r,0));
+            }
+        }
+        const btn = document.getElementById('login-submit');
+        if (btn) {
+            btn.addEventListener('click', async function(ev){
+                const solInput = document.getElementById('pow_solution');
+                if (solInput && !solInput.value) {
+                    ev.preventDefault();
+                    btn.disabled = true;
+                    btn.innerText = '计算中…';
+                    try {
+                        const sol = await solve();
+                        solInput.value = sol;
+                        btn.innerText = '{{t "login.submit"}}';
+                        btn.disabled = false;
+                        btn.closest('form').submit();
+                    } catch(e) {
+                        btn.innerText = '{{t "login.submit"}}';
+                        btn.disabled = false;
+                        var msg = document.getElementById('pow-msg');
+                        if (msg) { msg.textContent = '本地PoW计算失败，请重试'; msg.className='text-danger small mt-2'; }
+                    }
+                }
+            });
+        }
+    })();
+    </script>
 </body>
 </html>

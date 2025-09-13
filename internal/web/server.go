@@ -63,6 +63,8 @@ type Server struct {
 	tokenStore *security.TokenStore
 	// 验证码管理
 	captchaManager *CaptchaManager
+	// PoW 管理器
+	powManager *PowManager
 	clusterManager ClusterManager
 	// 审计轮转器
 	auditRotator *logger.Rotator
@@ -113,6 +115,8 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 
 	// 初始化验证码管理器
 	server.captchaManager = NewCaptchaManager()
+	// 初始化 PoW 管理器
+	server.powManager = NewPowManager()
 
 	// 初始化审计日志轮转器（10MB*10）
 	if rot, err := logger.NewRotator("./data/audit.log", 10*1024*1024, 10); err == nil {
