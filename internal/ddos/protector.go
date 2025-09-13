@@ -155,10 +155,10 @@ func (p *Protector) initThresholds() {
 			ChallengeMode:     false,
 		},
 		LevelMedium: {
-			RequestsPerMinute: 600,
-			RequestsPerHour:   36000,
-			BlockDuration:     30 * time.Minute,
-			SuspiciousUA:      true,
+			RequestsPerMinute: 3000,  // 提高到每分钟3000次（50次/秒）
+			RequestsPerHour:   180000, // 提高到每小时18万次
+			BlockDuration:     5 * time.Minute, // 缩短封禁时间
+			SuspiciousUA:      false,  // 关闭可疑UA检测，避免误判
 			GeoBlocking:       false,
 			ChallengeMode:     false,
 		},
@@ -253,11 +253,20 @@ func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
 
 // checkRateLimit 检查请求频率限制
 func (p *Protector) checkRateLimit(client *ClientInfo, threshold ThresholdConfig, now time.Time) (bool, string) {
-	// 检查每分钟请求数
+	// 检查每分钟请求数 - 改为滑动窗口计算
 	if threshold.RequestsPerMinute > 0 {
+		// 只有在最近1分钟内有足够多的请求才检查速率
 		minuteAgo := now.Add(-time.Minute)
-		if client.LastRequest.After(minuteAgo) && client.RequestRate > float64(threshold.RequestsPerMinute) {
-			return true, "每分钟请求数超限"
+		if client.FirstRequest.After(minuteAgo) {
+			// 在1分钟内的请求，按实际时间计算速率
+			duration := now.Sub(client.FirstRequest)
+			if duration.Seconds() > 0 {
+				actualRate := float64(client.RequestCount) / duration.Minutes()
+				// 只有当请求数>10且速率超限时才拦截，避免短时间少量请求被误判
+				if client.RequestCount > 10 && actualRate > float64(threshold.RequestsPerMinute) {
+					return true, fmt.Sprintf("每分钟请求数超限: %.1f > %d", actualRate, threshold.RequestsPerMinute)
+				}
+			}
 		}
 	}
 
@@ -337,8 +346,8 @@ func (p *Protector) isSuspiciousPattern(r *http.Request, client *ClientInfo) boo
 		}
 	}
 
-	// 检查异常请求频率
-	if client.RequestRate > 10 { // 每分钟超过10个请求
+	// 检查异常请求频率 - 放宽阈值
+	if client.RequestRate > 120 { // 每分钟超过120个请求（2次/秒）
 		return true
 	}
 
