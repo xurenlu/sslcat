@@ -218,7 +218,15 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		password := r.FormValue("password")
 		totpCode := strings.TrimSpace(r.FormValue("totp_code"))
 
-		if username == s.config.Admin.Username && s.verifyAdminPassword(password) {
+		s.log.Debugf("Login attempt: username='%s', password_len=%d, expected_username='%s'", 
+			username, len(password), s.config.Admin.Username)
+
+		usernameMatch := username == s.config.Admin.Username
+		passwordMatch := s.verifyAdminPassword(password)
+		
+		s.log.Debugf("Login verification: username_match=%v, password_match=%v", usernameMatch, passwordMatch)
+
+		if usernameMatch && passwordMatch {
 			// TOTP 二次验证（如果启用）
 			if s.config.Admin.EnableTOTP && !s.verifyTOTP(totpCode) {
 				clientIP := s.getClientIP(r)
@@ -304,46 +312,58 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 func (s *Server) verifyAdminPassword(input string) bool {
 	passFile := s.config.Admin.PasswordFile
 	stored := strings.TrimSpace(s.config.Admin.Password)
+	
+	s.log.Debugf("=== Password Verification Debug ===")
+	s.log.Debugf("Password file: %s", passFile)
+	s.log.Debugf("Config password: '%s'", stored)
+	s.log.Debugf("Input password: '%s' (len=%d)", input, len(input))
+	
 	// 优先从文件读取
 	if passFile != "" {
 		if b, err := os.ReadFile(passFile); err == nil {
 			stored = strings.TrimSpace(string(b))
+			s.log.Debugf("Read from password file: '%s' (len=%d)", stored, len(stored))
 		} else {
 			s.log.Debugf("Failed to read password file %s: %v", passFile, err)
 		}
 	}
+	
 	if stored == "" {
 		s.log.Debug("No password found in file or config")
 		return false
 	}
 	
-	// 调试信息
-	s.log.Debugf("Password verification: file=%s, stored_prefix=%s, input_len=%d", 
-		passFile, stored[:min(10, len(stored))], len(input))
+	// 检查是否为bcrypt格式
+	isBcrypt := strings.HasPrefix(stored, "$2a$") || strings.HasPrefix(stored, "$2b$") || strings.HasPrefix(stored, "$2y$")
+	s.log.Debugf("Password format: bcrypt=%v, stored_prefix='%s'", isBcrypt, stored[:min(10, len(stored))])
 	
-	// bcrypt 前缀
-	if strings.HasPrefix(stored, "$2a$") || strings.HasPrefix(stored, "$2b$") || strings.HasPrefix(stored, "$2y$") {
+	if isBcrypt {
 		err := bcrypt.CompareHashAndPassword([]byte(stored), []byte(input))
 		if err == nil {
-			s.log.Debug("bcrypt password verification successful")
+			s.log.Debug("✅ bcrypt password verification SUCCESSFUL")
 			return true
 		}
-		s.log.Debugf("bcrypt password verification failed: %v", err)
+		s.log.Debugf("❌ bcrypt password verification FAILED: %v", err)
 		return false
 	}
-	// 明文比较（常量时间），并尝试迁移为 bcrypt
+	
+	// 明文比较（常量时间）
+	s.log.Debugf("Comparing plaintext: stored='%s' vs input='%s'", stored, input)
 	if subtle.ConstantTimeCompare([]byte(stored), []byte(input)) == 1 {
-		s.log.Debug("Plain password matched, migrating to bcrypt")
+		s.log.Debug("✅ Plain password matched, migrating to bcrypt")
 		// 迁移为 bcrypt
 		if passFile != "" {
 			if hash, err := bcrypt.GenerateFromPassword([]byte(input), bcrypt.DefaultCost); err == nil {
 				_ = os.WriteFile(passFile, append(hash, '\n'), 0600)
 				s.log.Debug("Password migrated to bcrypt successfully")
+			} else {
+				s.log.Debugf("Failed to migrate password to bcrypt: %v", err)
 			}
 		}
 		return true
 	}
-	s.log.Debug("Password verification failed")
+	
+	s.log.Debug("❌ Password verification FAILED - no match")
 	return false
 }
 
