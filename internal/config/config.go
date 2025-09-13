@@ -296,7 +296,7 @@ func Load(configFile string) (*Config, error) {
 			EnableDDOS:              true,
 			EnableCaptcha:           true,
 			EnablePoW:               true,
-			PoWBits:                 16,  // 降低到16位，约2^15次尝试，快很多
+			PoWBits:                 16, // 降低到16位，约2^15次尝试，快很多
 			MinFormMs:               800,
 		},
 		AdminPrefix: "/sslcat-panel",

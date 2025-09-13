@@ -131,9 +131,9 @@ func (c *CaptchaManager) VerifyCaptchaString(sessionID string, userAnswer string
 
 // GenerateImageCaptcha 生成图形验证码（增强字符集、长度6，至少1个数字和1个特殊符号）
 func (c *CaptchaManager) GenerateImageCaptcha() (string, string, error) {
-	letters := "ABCDEFGHJKLMNPQRSTUVWXYZ"
+	letters := "ABCDEFGHJKMNPQRSTUVWXYZ"  // 移除容易混淆的 I 和 L
 	digits := "234578" // 区分度高的数字
-	special := "!?*%$@#"
+	special := "?*%$@#"  // 移除感叹号（与i相似）
 	all := letters + digits + special
 
 	pick := func(set string) (byte, error) {
