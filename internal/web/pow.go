@@ -28,7 +28,7 @@ type PowManager struct {
 func NewPowManager() *PowManager {
 	pm := &PowManager{
 		sessions:   make(map[string]PowSession),
-		defaultBits: 18,                 // 约 2^18 次尝试，客户端 ~100-300ms（视设备而定）
+		defaultBits: 16,                 // 约 2^16 次尝试，客户端 ~50-150ms（更快）
 		ttl:         2 * time.Minute,     // PoW 有效期
 	}
 	// 清理过期
