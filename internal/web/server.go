@@ -448,8 +448,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// 为保持稳定，此处不引入新字段，仅做占位以便后续扩展。
 	}
 
-	// DDoS 防护检测（开启时才生效）
-	if s.config.Security.EnableDDOS && s.ddosProtector != nil {
+	// DDoS 防护检测（开启时才生效，但跳过管理面板登录）
+	if s.config.Security.EnableDDOS && s.ddosProtector != nil && !strings.HasPrefix(r.URL.Path, s.config.AdminPrefix+"/login") {
 		if blocked, reason := s.ddosProtector.CheckRequest(r); blocked {
 			s.log.Warnf("DDoS protection blocked request from %s: %s", s.getClientIP(r), reason)
 			http.Error(w, "Request blocked by DDoS protection", http.StatusTooManyRequests)
