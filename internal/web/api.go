@@ -228,19 +228,23 @@ func drawCaptchaImage(text string) image.Image {
 		}
 	}
 	// 少量噪点
-	for i := 0; i < 200; i++ {
+	for i := 0; i < 120; i++ {
 		x, y := rand.Intn(w), rand.Intn(h)
-		c := color.RGBA{200, 205, 210, 255}
+		c := color.RGBA{205, 208, 212, 255}
 		img.SetRGBA(x, y, c)
 	}
-	// 使用 basicfont 清晰绘制黑色文本
-	col := color.RGBA{20, 20, 20, 255}
+	// 使用 basicfont 绘制黑色文本，并做轻度加粗（多次偏移绘制）
+	col := color.RGBA{16, 16, 16, 255}
 	drawer := &font.Drawer{Dst: img, Src: &image.Uniform{col}, Face: basicfont.Face7x13}
 	textW := len(text) * 8
 	x := (w - textW) / 2
 	y := (h + 13) / 2
-	drawer.Dot = fixed.P(x<<6, y<<6)
-	drawer.DrawString(text)
+	// 轻度加粗：原点+偏移绘制
+	offsets := []image.Point{{0, 0}, {1, 0}, {0, 1}}
+	for _, off := range offsets {
+		drawer.Dot = fixed.P(x+off.X, y+off.Y)
+		drawer.DrawString(text)
+	}
 	return img
 }
 
