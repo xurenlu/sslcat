@@ -323,7 +323,8 @@ func (s *Server) verifyAdminPassword(input string) bool {
 	
 	// bcrypt 前缀
 	if strings.HasPrefix(stored, "$2a$") || strings.HasPrefix(stored, "$2b$") || strings.HasPrefix(stored, "$2y$") {
-		if err := bcrypt.CompareHashAndPassword([]byte(stored), []byte(input)); err == nil {
+		err := bcrypt.CompareHashAndPassword([]byte(stored), []byte(input))
+		if err == nil {
 			s.log.Debug("bcrypt password verification successful")
 			return true
 		}
