@@ -112,6 +112,12 @@ type SecurityConfig struct {
 	EnableWAF      bool `json:"enable_waf"`
 	EnableDDOS     bool `json:"enable_ddos"`
 
+	// 人机验证配置
+	EnableCaptcha bool `json:"enable_captcha"`
+	EnablePoW     bool `json:"enable_pow"`
+	PoWBits       int  `json:"pow_bits"`
+	MinFormMs     int  `json:"min_form_ms"`
+
 	// 解析后的时间字段
 	BlockDuration time.Duration `json:"-"`
 }
@@ -282,6 +288,10 @@ func Load(configFile string) (*Config, error) {
 			EnableUAFilter:          false,
 			EnableWAF:               false,
 			EnableDDOS:              true,
+			EnableCaptcha:           true,
+			EnablePoW:               true,
+			PoWBits:                 18,
+			MinFormMs:               800,
 		},
 		AdminPrefix: "/sslcat-panel",
 		Cluster: ClusterConfig{
