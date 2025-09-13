@@ -310,8 +310,13 @@ func drawCaptchaImage(text string) image.Image {
 
 		// 放大 2x
 		big := scale2x(small)
-		// 旋转角度扩大（-18° ~ +18°）
-		deg := (rand.Float64()*36 - 18) * math.Pi / 180
+		// 数字/特殊字符更大旋转幅度，字母也更大
+		var deg float64
+		if strings.ContainsRune("234578?*%$@#", rune(text[i])) {
+			deg = (rand.Float64()*56 - 28) * math.Pi / 180 // ±28°
+		} else {
+			deg = (rand.Float64()*44 - 22) * math.Pi / 180 // ±22°
+		}
 		rot := rotate(big, deg)
 		// 贴到主画布，居中于分配区块
 		px := (i+1)*per - rot.Bounds().Dx()/2

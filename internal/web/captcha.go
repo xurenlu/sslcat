@@ -46,7 +46,7 @@ func NewCaptchaManager() *CaptchaManager {
 	return cm
 }
 
-// GenerateCaptcha 生成验证码
+// GenerateCaptcha 生成验证码（数学题，保留）
 func (c *CaptchaManager) GenerateCaptcha() (*CaptchaData, error) {
 	// 生成两个1-20的随机数
 	a, err := rand.Int(rand.Reader, big.NewInt(20))
@@ -129,17 +129,42 @@ func (c *CaptchaManager) VerifyCaptchaString(sessionID string, userAnswer string
 	return strings.EqualFold(strings.TrimSpace(session.AnswerStr), strings.TrimSpace(userAnswer))
 }
 
-// GenerateImageCaptcha 生成图形验证码（仅创建会话与答案字符串）
+// GenerateImageCaptcha 生成图形验证码（增强字符集、长度6，至少1个数字和1个特殊符号）
 func (c *CaptchaManager) GenerateImageCaptcha() (string, string, error) {
-	const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-	b := make([]byte, 5)
-	for i := range b {
-		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(chars))))
+	letters := "ABCDEFGHJKLMNPQRSTUVWXYZ"
+	digits := "234578" // 区分度高的数字
+	special := "!?*%$@#"
+	all := letters + digits + special
+
+	pick := func(set string) (byte, error) {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(set))))
+		if err != nil {
+			return 'A', err
+		}
+		return set[n.Int64()], nil
+	}
+
+	b := make([]byte, 6)
+	// 确保包含至少一个数字和一个特殊符号
+	ch, err := pick(digits)
+	if err != nil {
+		return "", "", err
+	}
+	b[0] = ch
+	ch, err = pick(special)
+	if err != nil {
+		return "", "", err
+	}
+	b[1] = ch
+	// 剩余位置随机
+	for i := 2; i < len(b); i++ {
+		ch, err = pick(all)
 		if err != nil {
 			return "", "", err
 		}
-		b[i] = chars[n.Int64()]
+		b[i] = ch
 	}
+
 	code := string(b)
 	sessionID := c.generateSessionID()
 	c.mutex.Lock()
