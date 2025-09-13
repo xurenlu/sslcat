@@ -4,7 +4,7 @@
 
 ```bash
 # 1) macOS 本地快速试用（或自行下载 darwin 包）
-curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.1.0/sslcat_v1.1.0_darwin-arm64.tar.gz -o sslcat.tgz
+curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.1.2/sslcat_v1.1.2_darwin-arm64.tar.gz -o sslcat.tgz
 tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
 sslcat --config sslcat.conf --port 8080
 # 浏览器访问: http://localhost:8080/sslcat-panel/
@@ -506,7 +506,8 @@ go run main.go --config sslcat.conf --log-level debug
 
 查看完整的版本更新历史，请参阅：**[CHANGELOG.md](CHANGELOG.md)**
 
-### 最新版本 v1.1.0 (2025-09-08)
+### 最新版本 v1.1.2 (2025-09-13)
+- 新增：无第三方人机验证（PoW+蜜罐+最小填写时长）并与图形验证码叠加
 - 新增站点类型：静态站点与 PHP 站点（含管理页面）
 - 服务器超时可配：新增 `read_timeout_sec`、`write_timeout_sec`、`idle_timeout_sec`（默认读/写各 30 分钟，空闲 120 秒）
 - 上传能力增强：新增 `max_upload_bytes`（默认 1 GiB）；单证书与 ZIP 批量上传全程流式处理并带总量限制，避免占用内存
