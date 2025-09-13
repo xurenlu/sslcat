@@ -397,6 +397,7 @@ func (s *Server) setupRoutes() {
 
 // ServeHTTP 实现http.Handler接口
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.log.Debugf("=== ServeHTTP: %s %s from %s ===", r.Method, r.URL.Path, s.getClientIP(r))
 	// 若通过IP访问且存在可用的LE域名，强制跳转到 https://域名 + AdminPrefix（仅限管理面板路径或根）
 	host := r.Host
 	hostOnly := host
@@ -463,6 +464,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 处理请求
+	s.log.Debugf("Routing to mux for: %s %s", r.Method, r.URL.Path)
 	s.mux.ServeHTTP(w, r)
 }
 
