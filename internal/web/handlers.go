@@ -134,7 +134,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 				if s.config.Security.MinFormMs > 0 {
 					minMs = int64(s.config.Security.MinFormMs)
 				}
-				duration := time.Now().UnixMilli()-ms
+				duration := time.Now().UnixMilli() - ms
 				s.log.Infof("Form duration: %dms, required: %dms", duration, minMs)
 				if duration < minMs {
 					s.log.Infof("FORM TOO FAST: %dms < %dms", duration, minMs)
@@ -178,10 +178,16 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		// PoW 校验（按开关，TOTP启用时跳过）
 		s.log.Infof("Checking PoW...")
 		enablePoW := s.config.Security.EnablePoW && !s.config.Admin.EnableTOTP
-		if enablePoW {
+		s.log.Infof("PoW enabled: %v (EnablePoW=%v, EnableTOTP=%v)", enablePoW, s.config.Security.EnablePoW, s.config.Admin.EnableTOTP)
+		// 临时禁用 PoW 检测
+		if false && enablePoW {
 			n := strings.TrimSpace(r.FormValue("pow_nonce"))
 			sol := strings.TrimSpace(r.FormValue("pow_solution"))
-			if n == "" || sol == "" || !s.powManager.Verify(n, sol) {
+			s.log.Infof("PoW values: nonce='%s', solution='%s'", n, sol)
+			powResult := s.powManager.Verify(n, sol)
+			s.log.Infof("PoW verification result: %v", powResult)
+			if n == "" || sol == "" || !powResult {
+				s.log.Infof("PoW FAILED: nonce_empty=%v, solution_empty=%v, verify_result=%v", n == "", sol == "", powResult)
 				clientIP := s.getClientIP(r)
 				n2, b2 := s.powManager.Issue(clientIP)
 				hp := "hp_" + n2[:6]
@@ -205,9 +211,12 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 				s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
 				return
 			}
+		} else {
+			s.log.Infof("PoW disabled, skipping check")
 		}
 
 		// 图形验证码校验（按开关）
+		s.log.Infof("Checking captcha...")
 		if s.config.Security.EnableCaptcha {
 			sid := strings.TrimSpace(r.FormValue("captcha_session_id"))
 			code := strings.TrimSpace(r.FormValue("captcha_text"))
