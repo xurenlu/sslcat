@@ -5,7 +5,10 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
+
+	"github.com/xurenlu/sslcat/internal/config"
 )
 
 // 基础页面处理器
@@ -474,4 +477,108 @@ func (s *Server) renderLoginError(w http.ResponseWriter, r *http.Request, errorM
 	}
 
 	s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
+}
+
+// CDN 缓存设置页
+func (s *Server) handleCDNCache(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	data := map[string]interface{}{
+		"AdminPrefix": s.config.AdminPrefix,
+		"CDN":         s.config.CDNCache,
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	html := s.generateCDNCacheHTML(data)
+	w.Write([]byte(html))
+}
+
+// 保存 CDN 缓存设置
+func (s *Server) handleCDNCacheSave(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	enabled := r.FormValue("enabled") == "on" || r.FormValue("enabled") == "true" || r.FormValue("enabled") == "1"
+	cacheDir := strings.TrimSpace(r.FormValue("cache_dir"))
+	maxSize := strings.TrimSpace(r.FormValue("max_size_bytes"))
+	defTTL := strings.TrimSpace(r.FormValue("default_ttl_seconds"))
+	cleanInt := strings.TrimSpace(r.FormValue("clean_interval_seconds"))
+	maxObj := strings.TrimSpace(r.FormValue("max_object_bytes"))
+
+	if cacheDir != "" {
+		s.config.CDNCache.CacheDir = cacheDir
+	}
+	s.config.CDNCache.Enabled = enabled
+	if v, err := strconv.ParseInt(maxSize, 10, 64); err == nil && v >= 0 {
+		s.config.CDNCache.MaxSizeBytes = v
+	}
+	if v, err := strconv.Atoi(defTTL); err == nil && v >= 0 {
+		s.config.CDNCache.DefaultTTLSeconds = v
+	}
+	if v, err := strconv.Atoi(cleanInt); err == nil && v > 0 {
+		s.config.CDNCache.CleanIntervalSec = v
+	}
+	if v, err := strconv.ParseInt(maxObj, 10, 64); err == nil && v >= 0 {
+		s.config.CDNCache.MaxObjectBytes = v
+	}
+
+	// 规则：每行 matchType|patternOrMediaCSV|ttl
+	rulesRaw := strings.TrimSpace(r.FormValue("rules"))
+	var rules []config.CDNCacheRule
+	if rulesRaw != "" {
+		for _, line := range strings.Split(rulesRaw, "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			parts := strings.Split(line, "|")
+			if len(parts) < 3 {
+				continue
+			}
+			matchType := strings.TrimSpace(parts[0])
+			ttl, _ := strconv.Atoi(strings.TrimSpace(parts[2]))
+			if strings.EqualFold(matchType, "media") {
+				medias := []string{}
+				for _, m := range strings.Split(parts[1], ",") {
+					m = strings.TrimSpace(m)
+					if m != "" {
+						medias = append(medias, m)
+					}
+				}
+				rules = append(rules, config.CDNCacheRule{MatchType: "media", MediaTypes: medias, TTLSeconds: ttl})
+			} else {
+				rules = append(rules, config.CDNCacheRule{MatchType: matchType, Pattern: strings.TrimSpace(parts[1]), TTLSeconds: ttl})
+			}
+		}
+	}
+	s.config.CDNCache.Rules = rules
+	if s.config.CDNCache.CacheDir != "" {
+		_ = os.MkdirAll(s.config.CDNCache.CacheDir, 0755)
+	}
+	_ = s.config.Save(s.config.ConfigFile)
+	http.Redirect(w, r, s.config.AdminPrefix+"/cdn-cache", http.StatusFound)
+}
+
+// 一键清理缓存
+func (s *Server) handleCDNCacheClear(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	t := strings.TrimSpace(r.FormValue("type"))
+	pattern := strings.TrimSpace(r.FormValue("pattern"))
+	medias := strings.TrimSpace(r.FormValue("media_types"))
+	if pm, ok := interface{}(s.proxyManager).(interface {
+		PurgeCDN(string, string, string) error
+	}); ok {
+		_ = pm.PurgeCDN(t, pattern, medias)
+	}
+	http.Redirect(w, r, s.config.AdminPrefix+"/cdn-cache", http.StatusFound)
 }

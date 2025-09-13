@@ -46,6 +46,23 @@ func (s *Server) handleAPIStats(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(stats)
 }
 
+// handleAPICDNCacheStats 返回类CDN缓存的简单统计
+func (s *Server) handleAPICDNCacheStats(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizeAPI(w, r, true) {
+		return
+	}
+	// 通过 proxyManager 间接访问 cdn cache
+	type cacher interface{ Stats() map[string]any }
+	var stats map[string]any = map[string]any{"enabled": false}
+	if pm, ok := interface{}(s.proxyManager).(interface{ GetCDNCache() cacher }); ok {
+		if c := pm.GetCDNCache(); c != nil {
+			stats = c.Stats()
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(stats)
+}
+
 func (s *Server) handleAPIProxyRules(w http.ResponseWriter, r *http.Request) {
 	if !s.authorizeAPI(w, r, true) {
 		return

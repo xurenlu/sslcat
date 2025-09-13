@@ -19,6 +19,7 @@ type Config struct {
 	Admin       AdminConfig    `json:"admin"`
 	Proxy       ProxyConfig    `json:"proxy"`
 	Security    SecurityConfig `json:"security"`
+	CDNCache    CDNCacheConfig `json:"cdn_cache"`
 	AdminPrefix string         `json:"admin_prefix"`
 	ConfigFile  string         `json:"-"` // 配置文件路径，不序列化
 
@@ -85,6 +86,10 @@ type ProxyRule struct {
 	Port    int    `json:"port"`
 	Enabled bool   `json:"enabled"`
 	SSLOnly bool   `json:"ssl_only"`
+	// 每域名的类CDN设置
+	CDNEnabled           bool   `json:"cdn_enabled"`
+	CDNPreset            string `json:"cdn_preset"`      // none|static|images
+	CDNDefaultTTLSeconds int    `json:"cdn_ttl_seconds"` // 0 表示使用全局规则
 }
 
 // SecurityConfig 安全配置
@@ -109,6 +114,29 @@ type SecurityConfig struct {
 
 	// 解析后的时间字段
 	BlockDuration time.Duration `json:"-"`
+}
+
+// CDNCacheRule CDN 类缓存规则
+type CDNCacheRule struct {
+	// 匹配类型: prefix | suffix | media
+	MatchType string `json:"match_type"`
+	// 当 MatchType==media 时按 Content-Type 前缀匹配，如 image/, text/css
+	MediaTypes []string `json:"media_types,omitempty"`
+	// 当 MatchType==prefix/suffix 时按路径匹配
+	Pattern string `json:"pattern,omitempty"`
+	// 该规则命中的 TTL（秒）
+	TTLSeconds int `json:"ttl_seconds"`
+}
+
+// CDNCacheConfig CDN 类缓存配置
+type CDNCacheConfig struct {
+	Enabled           bool           `json:"enabled"`
+	CacheDir          string         `json:"cache_dir"`
+	MaxSizeBytes      int64          `json:"max_size_bytes"`
+	DefaultTTLSeconds int            `json:"default_ttl_seconds"`
+	CleanIntervalSec  int            `json:"clean_interval_seconds"`
+	MaxObjectBytes    int64          `json:"max_object_bytes"`
+	Rules             []CDNCacheRule `json:"rules"`
 }
 
 // ClusterConfig 集群配置
@@ -225,6 +253,15 @@ func Load(configFile string) (*Config, error) {
 			UnmatchedBehavior:    "502",
 			UnmatchedRedirectURL: "",
 		},
+		CDNCache: CDNCacheConfig{
+			Enabled:           false,
+			CacheDir:          "./data/cache/static",
+			MaxSizeBytes:      5 * 1024 * 1024 * 1024, // 5GB
+			DefaultTTLSeconds: 3600,                   // 1h
+			CleanIntervalSec:  60,                     // 1min
+			MaxObjectBytes:    20 * 1024 * 1024,       // 20MB
+			Rules:             []CDNCacheRule{},
+		},
 		Security: SecurityConfig{
 			MaxAttempts:      900,
 			BlockDurationStr: "5s",
@@ -303,6 +340,12 @@ func Load(configFile string) (*Config, error) {
 	}
 	if err := os.MkdirAll(config.SSL.KeyDir, 0755); err != nil {
 		return nil, fmt.Errorf("创建密钥目录失败: %w", err)
+	}
+	// 创建 CDN 缓存目录（若配置启用或指定目录）
+	if config.CDNCache.CacheDir != "" {
+		if err := os.MkdirAll(config.CDNCache.CacheDir, 0755); err != nil {
+			return nil, fmt.Errorf("创建CDN缓存目录失败: %w", err)
+		}
 	}
 	// 确保密码文件目录存在，并且如存在则覆盖内存密码
 	if config.Admin.PasswordFile != "" {

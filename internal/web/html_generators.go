@@ -19,6 +19,7 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 	navSSL := s.translator.T("nav.ssl")
 	navSecurity := s.translator.T("nav.security")
 	navSettings := s.translator.T("nav.settings")
+	navCDN := "类CDN缓存"
 	logout := s.translator.T("menu.logout")
 	official := s.translator.T("menu.官方站点")
 	if official == "menu.官方站点" {
@@ -84,6 +85,11 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
                             <li class="nav-item">
                                 <a class="nav-link %s" href="%s/settings">
                                     <i class="bi bi-gear"></i> %s
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link %s" href="%s/cdn-cache">
+                                    <i class="bi bi-hdd"></i> %s
                                 </a>
                             </li>
                         </ul>
@@ -154,6 +160,14 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 		}(),
 		adminPrefix,
 		navSettings,
+		func() string {
+			if activePage == "cdn-cache" {
+				return "active"
+			}
+			return ""
+		}(),
+		adminPrefix,
+		navCDN,
 		adminPrefix,
 		logout)
 }
@@ -363,6 +377,26 @@ func (s *Server) generateProxyAddHTML(data map[string]interface{}) string {
                                 <input class="form-check-input" type="checkbox" id="ssl_only" name="ssl_only">
                                 <label class="form-check-label" for="ssl_only">仅限HTTPS（HTTP访问将自动301到HTTPS）</label>
                             </div>
+                            <hr>
+                            <h6>类CDN缓存（针对该域名）</h6>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="cdn_enabled" name="cdn_enabled">
+                                <label class="form-check-label" for="cdn_enabled">启用域名级CDN缓存</label>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">预设</label>
+                                    <select class="form-select" name="cdn_preset">
+                                        <option value="none">自定义/无预设</option>
+                                        <option value="static">静态资源（.js,.css,.png,.jpg,.ico,.woff2）</option>
+                                        <option value="images">图片（image/*）</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">默认TTL（秒，留空使用全局）</label>
+                                    <input class="form-control" name="cdn_ttl_seconds" placeholder="例如 86400">
+                                </div>
+                            </div>
                             <button type="submit" class="btn btn-primary">添加规则</button>
                             <a href="%s/proxy" class="btn btn-secondary">取消</a>
                         </form>
@@ -421,6 +455,26 @@ func (s *Server) generateProxyEditHTML(data map[string]interface{}) string {
                                 <input class="form-check-input" type="checkbox" id="ssl_only" name="ssl_only" %s>
                                 <label class="form-check-label" for="ssl_only">仅限HTTPS（HTTP访问将自动301到HTTPS）</label>
                             </div>
+                            <hr>
+                            <h6>类CDN缓存（针对该域名）</h6>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="cdn_enabled" name="cdn_enabled" %s>
+                                <label class="form-check-label" for="cdn_enabled">启用域名级CDN缓存</label>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">预设</label>
+                                    <select class="form-select" name="cdn_preset">
+                                        <option value="none" %s>自定义/无预设</option>
+                                        <option value="static" %s>静态资源（.js,.css,.png,.jpg,.ico,.woff2）</option>
+                                        <option value="images" %s>图片（image/*）</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">默认TTL（秒，留空使用全局）</label>
+                                    <input class="form-control" name="cdn_ttl_seconds" value="%s" placeholder="例如 86400">
+                                </div>
+                            </div>
                             <button type="submit" class="btn btn-primary">保存更改</button>
                             <a href="%s/proxy" class="btn btn-secondary">取消</a>
                         </form>
@@ -437,6 +491,16 @@ func (s *Server) generateProxyEditHTML(data map[string]interface{}) string {
 		rule.Target,
 		map[bool]string{true: "checked"}[rule.Enabled],
 		map[bool]string{true: "checked"}[rule.SSLOnly],
+		map[bool]string{true: "checked"}[rule.CDNEnabled],
+		map[bool]string{true: "selected"}[rule.CDNPreset == "none"],
+		map[bool]string{true: "selected"}[rule.CDNPreset == "static"],
+		map[bool]string{true: "selected"}[rule.CDNPreset == "images"],
+		func() string {
+			if rule.CDNDefaultTTLSeconds > 0 {
+				return fmt.Sprintf("%d", rule.CDNDefaultTTLSeconds)
+			}
+			return ""
+		}(),
 		data["AdminPrefix"].(string))
 }
 
@@ -897,4 +961,128 @@ func (s *Server) generateSettingsHTML(data map[string]interface{}) string {
 		data["AdminPrefix"].(string), exportBtn,
 		data["AdminPrefix"].(string), importPreview,
 		data["AdminPrefix"].(string), viewLastDiff)
+}
+
+func (s *Server) generateCDNCacheHTML(data map[string]interface{}) string {
+	cdn := data["CDN"].(config.CDNCacheConfig)
+	return fmt.Sprintf(`
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>类CDN缓存 - SSLcat</title>
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-2">%s</div>
+            <main class="col-md-10">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">类CDN缓存</h1>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <form method="POST" action="%s/cdn-cache/save">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="enabled" name="enabled" %s>
+                                <label class="form-check-label" for="enabled">启用类CDN缓存</label>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">缓存目录</label>
+                                <input class="form-control" name="cache_dir" value="%s" placeholder="./data/cache/static">
+                            </div>
+                            <div class="row">
+                              <div class="col-md-4 mb-3">
+                                <label class="form-label">最大缓存体积（字节）</label>
+                                <input class="form-control" name="max_size_bytes" value="%d">
+                              </div>
+                              <div class="col-md-4 mb-3">
+                                <label class="form-label">默认TTL（秒）</label>
+                                <input class="form-control" name="default_ttl_seconds" value="%d">
+                              </div>
+                              <div class="col-md-4 mb-3">
+                                <label class="form-label">清理间隔（秒）</label>
+                                <input class="form-control" name="clean_interval_seconds" value="%d">
+                              </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">单对象最大体积（字节）</label>
+                                <input class="form-control" name="max_object_bytes" value="%d">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">规则（每行：matchType|patternOrMediaCSV|ttlSeconds）</label>
+                                <textarea class="form-control" name="rules" rows="8" placeholder="prefix|/assets/|86400&#10;suffix|.js|86400&#10;media|image/,text/css|86400">%s</textarea>
+                                <div class="form-text">matchType: prefix/suffix/media。media 时第二列以逗号分隔多个类型前缀</div>
+                            </div>
+                            <button class="btn btn-primary" type="submit">保存设置</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <h5>一键清理</h5>
+                        <form class="row g-2" method="POST" action="%s/cdn-cache/clear">
+                            <div class="col-md-3">
+                                <select class="form-select" name="type">
+                                    <option value="all">全部</option>
+                                    <option value="prefix">按前缀</option>
+                                    <option value="suffix">按后缀</option>
+                                    <option value="media">按媒体类型</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <input class="form-control" name="pattern" placeholder="当选择前缀/后缀时填写">
+                            </div>
+                            <div class="col-md-4">
+                                <input class="form-control" name="media_types" placeholder="media模式：image/,text/css">
+                            </div>
+                            <div class="col-md-1">
+                                <button class="btn btn-danger w-100" type="submit">清理</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+            </main>
+        </div>
+    </div>
+</body>
+</html>`,
+		s.generateSidebar(data["AdminPrefix"].(string), "cdn-cache"),
+		data["AdminPrefix"].(string),
+		map[bool]string{true: "checked"}[cdn.Enabled],
+		cdn.CacheDir,
+		cdn.MaxSizeBytes,
+		cdn.DefaultTTLSeconds,
+		cdn.CleanIntervalSec,
+		cdn.MaxObjectBytes,
+		s.formatCDNRules(cdn.Rules),
+		data["AdminPrefix"].(string))
+}
+
+func (s *Server) formatCDNRules(rules []config.CDNCacheRule) string {
+	if len(rules) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	for _, r := range rules {
+		if strings.EqualFold(r.MatchType, "media") {
+			b.WriteString("media|")
+			b.WriteString(strings.Join(r.MediaTypes, ","))
+			b.WriteString("|")
+			b.WriteString(fmt.Sprintf("%d\n", r.TTLSeconds))
+		} else {
+			b.WriteString(r.MatchType)
+			b.WriteString("|")
+			b.WriteString(r.Pattern)
+			b.WriteString("|")
+			b.WriteString(fmt.Sprintf("%d\n", r.TTLSeconds))
+		}
+	}
+	return b.String()
 }

@@ -281,9 +281,43 @@ func (m *Manager) applySync(data map[string]interface{}) error {
 
 // applyConfigSync 应用配置同步
 func (m *Manager) applyConfigSync(configData interface{}) error {
-	// TODO: 实现配置同步逻辑
-	m.logger.Debug("Config sync applied")
+	// 最小实现：把 configData 序列化为 JSON 持久化为配置文件（默认路径）
+	b, err := json.Marshal(configData)
+	if err != nil {
+		return err
+	}
+	const path = "/etc/sslcat/sslcat.conf"
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(path, b, 0644); err != nil {
+		return err
+	}
+	m.logger.Infof("cluster config synced to %s (%d bytes)", path, len(b))
 	return nil
+}
+
+// exportSanitizedConfigJSON 导出脱敏并过滤后的配置 JSON
+func (m *Manager) exportSanitizedConfigJSON(sync SyncConfig) []byte {
+	// 通过 json.Marshal(m.config) 获取接口对象的 JSON，不稳定；此处让 Master 端只负责过滤掉敏感与排除项，避免深拷贝困难。
+	// 由 Web 层提供的导出功能更完备，但此处最小实现，先把可能的敏感键去掉。
+	type anyMap = map[string]interface{}
+	raw, _ := json.Marshal(m.config) // 可能包含接口元信息，但 ConfigAdapter 返回的纯 struct 字段足够
+	var obj anyMap
+	if err := json.Unmarshal(raw, &obj); err != nil {
+		return []byte("{}")
+	}
+	// 脱敏：admin.password 清空
+	if admin, ok := obj["admin"].(anyMap); ok {
+		delete(admin, "password")
+		obj["admin"] = admin
+	}
+	// 按 ExcludeConfigs 删除键（顶层）
+	for _, key := range sync.ExcludeConfigs {
+		delete(obj, key)
+	}
+	out, _ := json.Marshal(obj)
+	return out
 }
 
 // applyCertSync 应用证书同步
@@ -350,8 +384,15 @@ func (m *Manager) HandleSyncRequest(w http.ResponseWriter, r *http.Request) {
 
 	syncConfig := m.config.GetSyncConfig()
 	if syncConfig.ConfigEnabled {
-		// TODO: 获取配置数据
-		syncData["config"] = map[string]interface{}{}
+		// 导出当前配置为 JSON（脱敏），并按 ExcludeConfigs 过滤
+		cfgJSON := m.exportSanitizedConfigJSON(syncConfig)
+		var cfgObj map[string]interface{}
+		if err := json.Unmarshal(cfgJSON, &cfgObj); err == nil {
+			syncData["config"] = cfgObj
+		} else {
+			m.logger.Errorf("failed to build config for sync: %v", err)
+			syncData["config"] = map[string]interface{}{}
+		}
 	}
 
 	if syncConfig.CertEnabled {

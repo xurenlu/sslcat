@@ -1,11 +1,14 @@
 package web
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -20,6 +23,7 @@ import (
 
 	"io"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/sirupsen/logrus"
 )
 
@@ -50,6 +54,7 @@ type Server struct {
 	startTime        time.Time
 	leRedirectHost   string
 	lastLECheck      time.Time
+	lastConfigHash   string
 	// 导入配置暂存
 	pendingImportJSON string
 	pendingImport     *config.Config
@@ -138,9 +143,143 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 
 	server.setupRoutes()
 
+	// 初始化配置文件哈希并启动热加载监听（Slave 模式）
+	server.initConfigWatch()
+
 	// 启动定时检查有效LE证书对应域名是否解析到本机公网IP
 	go server.refreshLEPreferredHostLoop()
 	return server
+}
+
+// initConfigWatch 计算初始哈希并启动后台监听
+func (s *Server) initConfigWatch() {
+	path := s.config.ConfigFile
+	if path == "" {
+		path = "/etc/sslcat/sslcat.conf"
+	}
+	if b, err := os.ReadFile(path); err == nil {
+		sum := sha256.Sum256(b)
+		s.lastConfigHash = hex.EncodeToString(sum[:])
+	}
+	go s.watchConfigFileLoop()
+	go s.watchConfigFileFS()
+}
+
+// watchConfigFileLoop 定时检查配置文件变化并热加载（仅在 Slave 模式生效）
+func (s *Server) watchConfigFileLoop() {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		if !s.config.IsSlaveMode() {
+			continue
+		}
+		path := s.config.ConfigFile
+		if path == "" {
+			path = "/etc/sslcat/sslcat.conf"
+		}
+		b, err := os.ReadFile(path)
+		if err != nil || len(b) == 0 {
+			continue
+		}
+		sum := sha256.Sum256(b)
+		hash := hex.EncodeToString(sum[:])
+		if hash == s.lastConfigHash || hash == "" {
+			continue
+		}
+		var newCfg config.Config
+		if err := json.Unmarshal(b, &newCfg); err != nil {
+			s.log.Warnf("Failed to parse synced config: %v", err)
+			continue
+		}
+		// 保持配置文件路径
+		newCfg.ConfigFile = s.config.ConfigFile
+		// 应用新配置（就地更新）
+		oldPrefix := s.config.AdminPrefix
+		s.applyConfigInPlace(&newCfg)
+		s.lastConfigHash = hash
+		// 若前缀变化，重建路由
+		if oldPrefix != s.config.AdminPrefix {
+			s.mux = http.NewServeMux()
+			s.setupRoutes()
+		}
+		s.log.Infof("Config reloaded from %s (cluster sync)", path)
+	}
+}
+
+// watchConfigFileFS 使用 fsnotify 监听文件变化，触发热加载
+func (s *Server) watchConfigFileFS() {
+	// 仅 Slave 模式生效
+	if !s.config.IsSlaveMode() {
+		return
+	}
+	path := s.config.ConfigFile
+	if path == "" {
+		path = "/etc/sslcat/sslcat.conf"
+	}
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		s.log.Warnf("fsnotify init failed: %v", err)
+		return
+	}
+	defer watcher.Close()
+
+	dir := filepath.Dir(path)
+	if err := watcher.Add(dir); err != nil {
+		s.log.Warnf("fsnotify add failed: %v", err)
+		return
+	}
+	for {
+		select {
+		case ev, ok := <-watcher.Events:
+			if !ok {
+				return
+			}
+			// 关注写入或重命名到目标文件
+			if ev.Name == path && (ev.Op&fsnotify.Write == fsnotify.Write || ev.Op&fsnotify.Create == fsnotify.Create || ev.Op&fsnotify.Rename == fsnotify.Rename) {
+				// 轻微延迟，等待写完成
+				time.Sleep(150 * time.Millisecond)
+				if b, err := os.ReadFile(path); err == nil && len(b) > 0 {
+					var newCfg config.Config
+					if err := json.Unmarshal(b, &newCfg); err == nil {
+						newCfg.ConfigFile = s.config.ConfigFile
+						oldPrefix := s.config.AdminPrefix
+						s.applyConfigInPlace(&newCfg)
+						// 计算新哈希
+						sum := sha256.Sum256(b)
+						s.lastConfigHash = hex.EncodeToString(sum[:])
+						if oldPrefix != s.config.AdminPrefix {
+							s.mux = http.NewServeMux()
+							s.setupRoutes()
+						}
+						s.log.Infof("Config reloaded by fsnotify from %s", path)
+					}
+				}
+			}
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return
+			}
+			s.log.Debugf("fsnotify error: %v", err)
+		}
+	}
+}
+
+// applyConfigInPlace 将 newCfg 内容拷贝到现有 s.config，保持指针不变
+func (s *Server) applyConfigInPlace(newCfg *config.Config) {
+	if newCfg == nil {
+		return
+	}
+	// 顶层字段拷贝
+	s.config.Server = newCfg.Server
+	s.config.SSL = newCfg.SSL
+	s.config.Admin = newCfg.Admin
+	s.config.Proxy = newCfg.Proxy
+	s.config.Security = newCfg.Security
+	s.config.AdminPrefix = newCfg.AdminPrefix
+	s.config.Cluster = newCfg.Cluster
+	s.config.StaticSites = newCfg.StaticSites
+	s.config.PHPSites = newCfg.PHPSites
+	s.config.CDNCache = newCfg.CDNCache
 }
 
 // UpdateConfig 更新配置并重新设置路由
@@ -190,6 +329,11 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/settings/first-setup", s.handleFirstTimeSetup)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/settings/change-password", s.handleChangePassword)
 
+	// CDN 缓存设置与管理
+	s.mux.HandleFunc(s.config.AdminPrefix+"/cdn-cache", s.handleCDNCache)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/cdn-cache/save", s.handleCDNCacheSave)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/cdn-cache/clear", s.handleCDNCacheClear)
+
 	// 静态站点管理
 	s.mux.HandleFunc(s.config.AdminPrefix+"/static-sites", s.handleStaticSites)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/static-sites/add", s.handleStaticSitesAdd)
@@ -222,6 +366,7 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security-logs", s.handleAPISecurityLogs)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/audit", s.handleAPIAudit)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/tls-fingerprints", s.handleAPITLSFingerprints)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/cdn-cache/stats", s.handleAPICDNCacheStats)
 	// s.mux.HandleFunc(s.config.AdminPrefix+"/api/captcha", s.handleAPICaptcha) // 关闭验证码API
 
 	// Token 管理路由

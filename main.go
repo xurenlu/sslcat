@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/xurenlu/sslcat/internal/cache"
 	"github.com/xurenlu/sslcat/internal/config"
 	"github.com/xurenlu/sslcat/internal/logger"
 	"github.com/xurenlu/sslcat/internal/proxy"
@@ -24,7 +25,7 @@ import (
 )
 
 var (
-	version = "1.1.0"
+	version = "1.1.1"
 	build   = "dev"
 )
 
@@ -134,7 +135,9 @@ func main() {
 		log.Fatalf("failed to init SSL manager: %v", err)
 	}
 	securityManager := security.NewManager(cfg)
-	proxyManager := proxy.NewManager(cfg, sslManager, securityManager)
+	cdnCache := cache.NewCDNCache(cfg)
+	cdnCache.StartCleaner()
+	proxyManager := proxy.NewManager(cfg, sslManager, securityManager, cdnCache)
 	webServer := web.NewServer(cfg, proxyManager, securityManager, sslManager)
 
 	// 日志级别

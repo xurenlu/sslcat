@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/xurenlu/sslcat/internal/cache"
 	"github.com/xurenlu/sslcat/internal/config"
 	"github.com/xurenlu/sslcat/internal/security"
 	"github.com/xurenlu/sslcat/internal/ssl"
@@ -27,16 +28,18 @@ type Manager struct {
 	securityManager *security.Manager
 	proxyCache      map[string]*httputil.ReverseProxy
 	cacheMutex      sync.RWMutex
+	cdnCache        *cache.CDNCache
 	log             *logrus.Entry
 }
 
 // NewManager 创建代理管理器
-func NewManager(cfg *config.Config, sslMgr *ssl.Manager, secMgr *security.Manager) *Manager {
+func NewManager(cfg *config.Config, sslMgr *ssl.Manager, secMgr *security.Manager, cdn *cache.CDNCache) *Manager {
 	return &Manager{
 		config:          cfg,
 		sslManager:      sslMgr,
 		securityManager: secMgr,
 		proxyCache:      make(map[string]*httputil.ReverseProxy),
+		cdnCache:        cdn,
 		log: logrus.WithFields(logrus.Fields{
 			"component": "proxy_manager",
 		}),
@@ -54,13 +57,35 @@ func (m *Manager) Stop() {
 	m.log.Info("Stopping proxy manager")
 }
 
+// PurgeCDN 清理 CDN 缓存
+func (m *Manager) PurgeCDN(matchType, pattern, mediaCSV string) error {
+	if m.cdnCache == nil {
+		return nil
+	}
+	if matchType == "" || strings.EqualFold(matchType, "all") {
+		return m.cdnCache.PurgeAll()
+	}
+	return m.cdnCache.PurgeByCondition(matchType, pattern, mediaCSV)
+}
+
 // GetProxyConfig 获取指定域名的代理配置
 func (m *Manager) GetProxyConfig(domain string) *config.ProxyRule {
 	return m.config.GetProxyRule(domain)
 }
 
+// GetCDNCache 返回缓存器（只读访问）
+func (m *Manager) GetCDNCache() interface{ Stats() map[string]any } {
+	return m.cdnCache
+}
+
 // ProxyRequest 代理请求
 func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *config.ProxyRule) {
+	// CDN 缓存直出（仅 GET/HEAD，且全局或域名启用）
+	if m.cdnCache != nil && (m.config.CDNCache.Enabled || (rule != nil && rule.CDNEnabled)) {
+		if m.cdnCache.ServeIfFresh(w, r) {
+			return
+		}
+	}
 	// 获取或创建反向代理
 	proxy := m.getOrCreateProxy(rule)
 
@@ -92,6 +117,33 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 	r.Header.Set("X-Original-Method", r.Method)
 
 	// 执行代理
+	// 在 ModifyResponse 中做缓存落盘（全局或域名启用）
+	originalModify := proxy.ModifyResponse
+	proxy.ModifyResponse = func(resp *http.Response) error {
+		if originalModify != nil {
+			if err := originalModify(resp); err != nil {
+				return err
+			}
+		}
+		// 移除可能的安全头，让目标服务器自己设置
+		resp.Header.Del("Strict-Transport-Security")
+		resp.Header.Del("X-Frame-Options")
+		resp.Header.Del("X-Content-Type-Options")
+		// 添加代理标识
+		resp.Header.Set("X-Proxy-By", "SSLcat")
+		// CDN 缓存落盘（全局或域名启用）
+		if m.cdnCache != nil && (m.config.CDNCache.Enabled || (rule != nil && rule.CDNEnabled)) {
+			if rule != nil && rule.CDNDefaultTTLSeconds > 0 {
+				resp.Header.Set("X-SSLcat-CDN-Default-TTL", strconv.Itoa(rule.CDNDefaultTTLSeconds))
+			}
+			m.cdnCache.MaybeStore(resp)
+			if rule != nil {
+				resp.Header.Del("X-SSLcat-CDN-Default-TTL")
+			}
+		}
+		return nil
+	}
+
 	proxy.ServeHTTP(w, r)
 }
 
@@ -186,18 +238,6 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 	}
 
 	// 修改响应
-	proxy.ModifyResponse = func(resp *http.Response) error {
-		// 移除可能的安全头，让目标服务器自己设置
-		resp.Header.Del("Strict-Transport-Security")
-		resp.Header.Del("X-Frame-Options")
-		resp.Header.Del("X-Content-Type-Options")
-
-		// 添加代理标识
-		resp.Header.Set("X-Proxy-By", "SSLcat")
-
-		return nil
-	}
-
 	// 缓存代理
 	m.cacheMutex.Lock()
 	m.proxyCache[key] = proxy

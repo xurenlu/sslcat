@@ -3,6 +3,7 @@ package web
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/xurenlu/sslcat/internal/config"
 )
@@ -42,11 +43,22 @@ func (s *Server) handleProxyAdd(w http.ResponseWriter, r *http.Request) {
 			// 添加新规则到配置
 			enabled := r.FormValue("enabled") == "on"
 			sslOnly := r.FormValue("ssl_only") == "on"
+			cdnEnabled := r.FormValue("cdn_enabled") == "on"
+			cdnPreset := r.FormValue("cdn_preset")
+			cdnTTL := 0
+			if v := strings.TrimSpace(r.FormValue("cdn_ttl_seconds")); v != "" {
+				if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+					cdnTTL = n
+				}
+			}
 			newRule := config.ProxyRule{
-				Domain:  domain,
-				Target:  target,
-				Enabled: enabled,
-				SSLOnly: sslOnly,
+				Domain:               domain,
+				Target:               target,
+				Enabled:              enabled,
+				SSLOnly:              sslOnly,
+				CDNEnabled:           cdnEnabled,
+				CDNPreset:            cdnPreset,
+				CDNDefaultTTLSeconds: cdnTTL,
 			}
 			s.config.Proxy.Rules = append(s.config.Proxy.Rules, newRule)
 
@@ -100,6 +112,15 @@ func (s *Server) handleProxyEdit(w http.ResponseWriter, r *http.Request) {
 			s.config.Proxy.Rules[index].Target = target
 			s.config.Proxy.Rules[index].Enabled = enabled
 			s.config.Proxy.Rules[index].SSLOnly = sslOnly
+			s.config.Proxy.Rules[index].CDNEnabled = r.FormValue("cdn_enabled") == "on"
+			s.config.Proxy.Rules[index].CDNPreset = r.FormValue("cdn_preset")
+			if v := strings.TrimSpace(r.FormValue("cdn_ttl_seconds")); v != "" {
+				if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+					s.config.Proxy.Rules[index].CDNDefaultTTLSeconds = n
+				}
+			} else {
+				s.config.Proxy.Rules[index].CDNDefaultTTLSeconds = 0
+			}
 
 			// 保存配置
 			s.config.Save(s.config.ConfigFile)
