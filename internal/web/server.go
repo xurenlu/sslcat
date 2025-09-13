@@ -338,6 +338,7 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/settings/save", s.handleSettingsSave)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/settings/first-setup", s.handleFirstTimeSetup)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/settings/change-password", s.handleChangePassword)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/settings/totp", s.handleTOTPSetup)
 
 	// CDN 缓存设置与管理
 	s.mux.HandleFunc(s.config.AdminPrefix+"/cdn-cache", s.handleCDNCache)

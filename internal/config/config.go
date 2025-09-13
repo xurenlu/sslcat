@@ -68,6 +68,9 @@ type AdminConfig struct {
 	Password     string `json:"password,omitempty"`
 	FirstRun     bool   `json:"first_run"`
 	PasswordFile string `json:"password_file"`
+	// TOTP 二次验证
+	EnableTOTP bool   `json:"enable_totp"`
+	TOTPSecret string `json:"totp_secret,omitempty"`
 }
 
 // ProxyConfig 代理配置

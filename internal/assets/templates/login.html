@@ -120,6 +120,16 @@
                             </div>
                             {{end}}
                             
+                            {{if .RequireTOTP}}
+                            <div class="mb-4">
+                                <label for="totp_code" class="form-label">
+                                    <i class="bi bi-phone"></i> TOTP验证码
+                                </label>
+                                <input type="text" class="form-control" id="totp_code" name="totp_code" placeholder="123456" maxlength="6" pattern="[0-9]{6}" required>
+                                <div class="form-text">请输入您的身份验证应用中的6位数字</div>
+                            </div>
+                            {{end}}
+                            
                             <div class="d-grid">
                                 <button type="submit" class="btn btn-primary btn-login" id="login-submit">
                                     <i class="bi bi-box-arrow-in-right"></i> {{t "login.submit"}}

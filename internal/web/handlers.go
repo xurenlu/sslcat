@@ -51,6 +51,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			"AdminPrefix":    s.config.AdminPrefix,
 			"Error":          "",
 			"RequireCaptcha": s.config.Security.EnableCaptcha,
+			"RequireTOTP":    s.config.Admin.EnableTOTP,
 			"Debug":          debugForced,
 			// PoW
 			"PowNonce":       nonce,
@@ -168,7 +169,31 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		// 用户名密码校验（支持 bcrypt/明文，明文将自动迁移为 bcrypt）
 		username := r.FormValue("username")
 		password := r.FormValue("password")
+		totpCode := strings.TrimSpace(r.FormValue("totp_code"))
+		
 		if username == s.config.Admin.Username && s.verifyAdminPassword(password) {
+			// TOTP 二次验证（如果启用）
+			if s.config.Admin.EnableTOTP && !s.verifyTOTP(totpCode) {
+				clientIP := s.getClientIP(r)
+				n2, b2 := "", 0
+				if s.config.Security.EnablePoW { n2, b2 = s.powManager.Issue(clientIP) }
+				hp := "hp_" + func() string { if n2=="" { return "seed000" } ; return n2[:6] }()
+				startTs := time.Now().UnixMilli()
+				data := map[string]interface{}{
+					"AdminPrefix":    s.config.AdminPrefix,
+					"Error":          "TOTP验证码错误",
+					"RequireCaptcha": s.config.Security.EnableCaptcha,
+					"RequireTOTP":    s.config.Admin.EnableTOTP,
+					"Debug":          false,
+					"PowNonce":       n2,
+					"PowBits":        func() int { if s.config.Security.PoWBits>0 { return s.config.Security.PoWBits }; return b2 }(),
+					"HoneypotName":   hp,
+					"FormStartTs":    startTs,
+				}
+				s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
+				return
+			}
+			
 			s.processLogin(w, r)
 			return
 		}

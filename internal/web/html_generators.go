@@ -1025,6 +1025,7 @@ func (s *Server) generateSettingsHTML(data map[string]interface{}) string {
                                 <input type="text" class="form-control" id="proxy_unmatched_redirect_url" name="proxy_unmatched_redirect_url" value="%s" placeholder="https://example.com/"> 
                             </div>
                             <button type="submit" class="btn btn-primary">%s</button>
+                            <a href="%s/settings/totp" class="btn btn-outline-info ms-2">TOTP设置</a>
                             <a href="%s/config/export" class="btn btn-outline_secondary ms-2">%s</a>
                             <a href="%s/config/import" class="btn btn-outline_primary ms-2">%s</a>
                             <a href="%s/config/preview" class="btn btn-warning ms-2">%s</a>
@@ -1053,6 +1054,7 @@ func (s *Server) generateSettingsHTML(data map[string]interface{}) string {
 		map[bool]string{true: "selected"}[s.config.Proxy.UnmatchedBehavior == "blank"],
 		s.config.Proxy.UnmatchedRedirectURL,
 		saveBtn,
+		data["AdminPrefix"].(string),
 		data["AdminPrefix"].(string), exportBtn,
 		data["AdminPrefix"].(string), importPreview,
 		data["AdminPrefix"].(string), viewLastDiff)
