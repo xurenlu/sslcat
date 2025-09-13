@@ -397,7 +397,8 @@ func (s *Server) setupRoutes() {
 
 // ServeHTTP 实现http.Handler接口
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.log.Debugf("=== ServeHTTP: %s %s from %s ===", r.Method, r.URL.Path, s.getClientIP(r))
+	// 使用Info级别确保能看到日志
+	s.log.Infof("=== ServeHTTP: %s %s from %s ===", r.Method, r.URL.Path, s.getClientIP(r))
 	// 若通过IP访问且存在可用的LE域名，强制跳转到 https://域名 + AdminPrefix（仅限管理面板路径或根）
 	host := r.Host
 	hostOnly := host

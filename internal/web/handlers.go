@@ -30,7 +30,8 @@ func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
-	s.log.Debugf("=== handleLogin called: method=%s, path=%s ===", r.Method, r.URL.Path)
+	// 使用Info级别确保能看到日志
+	s.log.Infof("=== handleLogin called: method=%s, path=%s ===", r.Method, r.URL.Path)
 	
 	if r.Method == "GET" {
 		debugForced := strings.EqualFold(r.URL.Query().Get("debug"), "true") || r.URL.Query().Get("debug") == "1"
@@ -74,9 +75,9 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == "POST" {
-		s.log.Debugf("=== POST login received ===")
+		s.log.Infof("=== POST login received ===")
 		_ = r.ParseForm()
-		s.log.Debugf("Form parsed, values: username='%s', password_len=%d", 
+		s.log.Infof("Form parsed, values: username='%s', password_len=%d", 
 			r.FormValue("username"), len(r.FormValue("password")))
 
 		// 蜜罐：任何以 hp_ 开头的字段被填写则拒绝
