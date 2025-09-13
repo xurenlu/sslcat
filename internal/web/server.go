@@ -367,6 +367,8 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/audit", s.handleAPIAudit)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/tls-fingerprints", s.handleAPITLSFingerprints)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/cdn-cache/stats", s.handleAPICDNCacheStats)
+	// 图形验证码
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/captcha/image", s.handleAPIImageCaptcha)
 	// s.mux.HandleFunc(s.config.AdminPrefix+"/api/captcha", s.handleAPICaptcha) // 关闭验证码API
 
 	// Token 管理路由

@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"strings"
 	"sync"
 	"time"
 )
@@ -20,6 +21,7 @@ type CaptchaManager struct {
 // CaptchaSession 验证码会话数据
 type CaptchaSession struct {
 	Answer    int       `json:"answer"`
+	AnswerStr string    `json:"answer_str"`
 	CreatedAt time.Time `json:"created_at"`
 	Salt      string    `json:"salt"`
 }
@@ -108,6 +110,42 @@ func (c *CaptchaManager) VerifyCaptcha(sessionID string, userAnswer int) bool {
 	}
 
 	return session.Answer == userAnswer
+}
+
+// VerifyCaptchaString 校验字符串验证码
+func (c *CaptchaManager) VerifyCaptchaString(sessionID string, userAnswer string) bool {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	session, exists := c.sessions[sessionID]
+	if !exists {
+		return false
+	}
+	// 一次性使用
+	delete(c.sessions, sessionID)
+	if time.Since(session.CreatedAt) > 10*time.Minute {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(session.AnswerStr), strings.TrimSpace(userAnswer))
+}
+
+// GenerateImageCaptcha 生成图形验证码（仅创建会话与答案字符串）
+func (c *CaptchaManager) GenerateImageCaptcha() (string, string, error) {
+	const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+	b := make([]byte, 5)
+	for i := range b {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(chars))))
+		if err != nil {
+			return "", "", err
+		}
+		b[i] = chars[n.Int64()]
+	}
+	code := string(b)
+	sessionID := c.generateSessionID()
+	c.mutex.Lock()
+	c.sessions[sessionID] = CaptchaSession{AnswerStr: code, CreatedAt: time.Now()}
+	c.mutex.Unlock()
+	return sessionID, code, nil
 }
 
 // encodeQuestion 编码问题文本

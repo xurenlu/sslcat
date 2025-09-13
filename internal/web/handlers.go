@@ -29,13 +29,12 @@ func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		// 关闭验证码功能
 		debugForced := strings.EqualFold(r.URL.Query().Get("debug"), "true") || r.URL.Query().Get("debug") == "1"
 
 		data := map[string]interface{}{
 			"AdminPrefix":    s.config.AdminPrefix,
 			"Error":          "",
-			"RequireCaptcha": false,
+			"RequireCaptcha": true,
 			"Debug":          debugForced,
 		}
 
@@ -44,6 +43,20 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == "POST" {
+		// 图形验证码校验
+		sid := strings.TrimSpace(r.FormValue("captcha_session_id"))
+		code := strings.TrimSpace(r.FormValue("captcha_text"))
+		if sid == "" || code == "" || !s.captchaManager.VerifyCaptchaString(sid, code) {
+			data := map[string]interface{}{
+				"AdminPrefix":    s.config.AdminPrefix,
+				"Error":          "验证码错误，请重试",
+				"RequireCaptcha": true,
+				"Debug":          false,
+			}
+			s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
+			return
+		}
+
 		s.processLogin(w, r)
 		return
 	}

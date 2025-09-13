@@ -2,6 +2,14 @@ package web
 
 import (
 	"encoding/json"
+	"golang.org/x/image/font"
+	"golang.org/x/image/font/basicfont"
+	"golang.org/x/image/math/fixed"
+	"image"
+	"image/color"
+	"image/draw"
+	"image/png"
+	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
@@ -196,4 +204,65 @@ func (s *Server) handleAPICaptcha(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusMethodNotAllowed)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(`{"error":"method not allowed"}`))
+}
+
+// drawCaptchaImage 生成清晰、低干扰的验证码图片
+func drawCaptchaImage(text string) image.Image {
+	w, h := 160, 56
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	// 背景
+	bg := color.RGBA{250, 251, 253, 255}
+	draw.Draw(img, img.Bounds(), &image.Uniform{bg}, image.Point{}, draw.Src)
+	// 少量干扰线
+	rand.Seed(time.Now().UnixNano())
+	for i := 0; i < 2; i++ {
+		c := color.RGBA{180, 190, 200, 255}
+		x1, y1 := rand.Intn(w), rand.Intn(h)
+		x2, y2 := rand.Intn(w), rand.Intn(h)
+		steps := 120
+		for s := 0; s < steps; s++ {
+			t := float64(s) / float64(steps)
+			x := int(float64(x1) + t*float64(x2-x1))
+			y := int(float64(y1) + t*float64(y2-y1))
+			img.SetRGBA(x, y, c)
+		}
+	}
+	// 少量噪点
+	for i := 0; i < 200; i++ {
+		x, y := rand.Intn(w), rand.Intn(h)
+		c := color.RGBA{200, 205, 210, 255}
+		img.SetRGBA(x, y, c)
+	}
+	// 使用 basicfont 清晰绘制黑色文本
+	col := color.RGBA{20, 20, 20, 255}
+	drawer := &font.Drawer{Dst: img, Src: &image.Uniform{col}, Face: basicfont.Face7x13}
+	textW := len(text) * 8
+	x := (w - textW) / 2
+	y := (h + 13) / 2
+	drawer.Dot = fixed.P(x<<6, y<<6)
+	drawer.DrawString(text)
+	return img
+}
+
+// handleAPIImageCaptcha 返回带干扰线与噪点的图形验证码
+func (s *Server) handleAPIImageCaptcha(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	// 生成会话与答案
+	sid, code, err := s.captchaManager.GenerateImageCaptcha()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"error":"captcha generation failed"}`))
+		return
+	}
+	// 绘制并返回 PNG
+	img := drawCaptchaImage(code)
+	w.Header().Set("X-Captcha-Session", sid)
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Content-Type", "image/png")
+	_ = png.Encode(w, img)
 }

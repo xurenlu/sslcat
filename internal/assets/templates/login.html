@@ -95,19 +95,18 @@
                             
                             {{if .RequireCaptcha}}
                             <div class="mb-4" id="captcha-container">
-                                <label for="captcha" class="form-label">
-                                    <i class="bi bi-shield-check"></i> 真人验证
+                                <label for="captcha_image" class="form-label">
+                                    <i class="bi bi-shield-check"></i> 图形验证码
                                 </label>
-                                <div class="input-group">
-                                    <span class="input-group-text bg-light" id="captcha-question">正在加载...</span>
-                                    <input type="number" class="form-control" id="captcha" name="captcha" placeholder="请输入答案" required>
-                                    <button type="button" class="btn btn-outline-secondary" id="refresh-captcha">
+                                <div class="d-flex align-items-center mb-2">
+                                    <img id="captcha-image" alt="captcha" style="height:48px;border-radius:6px;border:1px solid #e9ecef;background:#fff;" />
+                                    <button type="button" class="btn btn-outline-secondary ms-2" id="refresh-captcha">
                                         <i class="bi bi-arrow-clockwise"></i>
                                     </button>
                                 </div>
+                                <input type="text" class="form-control" id="captcha_text" name="captcha_text" placeholder="请输入图片中的字符" required>
                                 <input type="hidden" id="captcha-session-id" name="captcha_session_id">
-                                {{if .Debug}}<input type="hidden" name="captcha_debug" value="1">{{end}}
-                                <div class="form-text">请计算上述数学题的答案以验证您是真人</div>
+                                <div class="form-text">不区分大小写</div>
                             </div>
                             {{end}}
                             
@@ -134,42 +133,26 @@
     
     {{if .RequireCaptcha}}
     <script>
-        {{.JSDecodeFunction}}
-        
-        // 加载验证码
         function loadCaptcha() {
-            const questionElement = document.getElementById('captcha-question');
-            const submitButton = document.getElementById('login-submit');
-            
-            questionElement.textContent = '正在加载...';
-            submitButton.disabled = true;
-            
-            fetch('{{.AdminPrefix}}/api/captcha')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('网络请求失败');
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    loadCaptchaQuestion(data);
-                    submitButton.disabled = false;
-                })
-                .catch(error => {
-                    console.error('加载验证码失败:', error);
-                    questionElement.textContent = '验证码加载失败，请刷新页面';
-                    submitButton.disabled = false;
-                });
+            const img = document.getElementById('captcha-image');
+            const sidInput = document.getElementById('captcha-session-id');
+            const url = '{{.AdminPrefix}}/api/captcha/image?_=' + Date.now();
+            fetch(url).then(resp => {
+                const sid = resp.headers.get('X-Captcha-Session');
+                sidInput.value = sid || '';
+                return resp.blob();
+            }).then(blob => {
+                const objUrl = URL.createObjectURL(blob);
+                img.src = objUrl;
+            }).catch(() => {
+                img.alt = '验证码加载失败';
+            });
         }
-        
-        // 页面加载完成后初始化验证码
         document.addEventListener('DOMContentLoaded', function() {
             loadCaptcha();
-            
-            // 刷新验证码按钮事件
             document.getElementById('refresh-captcha').addEventListener('click', function() {
                 loadCaptcha();
-                document.getElementById('captcha').value = '';
+                document.getElementById('captcha_text').value = '';
             });
         });
     </script>
