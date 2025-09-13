@@ -1,9 +1,11 @@
 package ddos
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -351,6 +353,27 @@ func (p *Protector) recordAttack(clientIP, userAgent, url, method, attackType, s
 	}
 
 	p.attacks = append(p.attacks, attack)
+
+	// JSON Lines 持久化
+	rec := map[string]any{
+		"time":     attack.Timestamp.Format(time.RFC3339),
+		"id":       attack.ID,
+		"ip":       attack.ClientIP,
+		"ua":       attack.UserAgent,
+		"url":      attack.URL,
+		"method":   attack.Method,
+		"type":     attack.AttackType,
+		"severity": attack.Severity,
+		"blocked":  attack.Blocked,
+		"reason":   attack.Reason,
+	}
+	if b, err := json.Marshal(rec); err == nil {
+		_ = os.MkdirAll("./data", 0755)
+		if f, err := os.OpenFile("./data/ddos_attacks.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+			_, _ = f.Write(append(b, '\n'))
+			_ = f.Close()
+		}
+	}
 
 	// 保持攻击记录数量限制
 	if len(p.attacks) > p.maxAttacks {

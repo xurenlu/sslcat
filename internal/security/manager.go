@@ -224,6 +224,20 @@ func (m *Manager) LogTLSFingerprint(fingerprint, ip string) {
 	if len(pruned) > maxPerMin {
 		m.log.Warnf("TLS fingerprint too active fp=%s count=%d ip=%s", fingerprint, len(pruned), ip)
 	}
+
+	// 追加写入 JSON Lines（持久化）
+	rec := map[string]any{
+		"time": time.Now().Format(time.RFC3339),
+		"fp":   fingerprint,
+		"ip":   ip,
+	}
+	if b, err := json.Marshal(rec); err == nil {
+		_ = os.MkdirAll("./data", 0755)
+		if f, err := os.OpenFile("./data/tls_fp.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+			_, _ = f.Write(append(b, '\n'))
+			_ = f.Close()
+		}
+	}
 }
 
 // GetTLSFingerprintStats 返回最近窗口内的指纹计数（按降序）
