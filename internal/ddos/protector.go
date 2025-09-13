@@ -155,10 +155,10 @@ func (p *Protector) initThresholds() {
 			ChallengeMode:     false,
 		},
 		LevelMedium: {
-			RequestsPerMinute: 3000,  // 提高到每分钟3000次（50次/秒）
-			RequestsPerHour:   180000, // 提高到每小时18万次
+			RequestsPerMinute: 3000,            // 提高到每分钟3000次（50次/秒）
+			RequestsPerHour:   180000,          // 提高到每小时18万次
 			BlockDuration:     5 * time.Minute, // 缩短封禁时间
-			SuspiciousUA:      false,  // 关闭可疑UA检测，避免误判
+			SuspiciousUA:      false,           // 关闭可疑UA检测，避免误判
 			GeoBlocking:       false,
 			ChallengeMode:     false,
 		},

@@ -998,6 +998,16 @@ func (s *Server) generateSettingsHTML(data map[string]interface{}) string {
                                        placeholder="留空表示不修改">
                             </div>
                             <hr>
+                            <h5 class="mb-3">安全认证</h5>
+                            <div class="mb-3">
+                                <label class="form-label">TOTP 二次验证</label>
+                                <div class="d-flex align-items-center">
+                                    <span class="badge %s me-2">%s</span>
+                                    <a href="%s/settings/totp" class="btn btn-sm btn-outline-info">%s</a>
+                                </div>
+                                <div class="form-text">为管理员账户启用基于时间的一次性密码验证</div>
+                            </div>
+                            <hr>
                             <h5 class="mb-3">SSL 设置</h5>
                             <div class="mb-3">
                                 <label for="ssl_email" class="form-label">ACME 邮箱（Let's Encrypt）</label>
@@ -1046,6 +1056,10 @@ func (s *Server) generateSettingsHTML(data map[string]interface{}) string {
 		adminUserLabel,
 		s.getConfigAdminUsername(data),
 		adminPassLabel,
+		map[bool]string{true: "bg-success", false: "bg-secondary"}[s.config.Admin.EnableTOTP],
+		map[bool]string{true: "已启用", false: "未启用"}[s.config.Admin.EnableTOTP],
+		data["AdminPrefix"].(string),
+		map[bool]string{true: "管理TOTP", false: "设置TOTP"}[s.config.Admin.EnableTOTP],
 		s.getConfigSSLEmail(data),
 		s.getConfigSSLDisableSelfSigned(data),
 		map[bool]string{true: "selected"}[s.config.Proxy.UnmatchedBehavior == "502"],
