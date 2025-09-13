@@ -384,7 +384,7 @@ func drawCaptchaImage(text string) image.Image {
 		big := scale2x(small)
 		// 数字/特殊字符更大旋转幅度，字母也更大
 		var deg float64
-		if strings.ContainsRune("234578?*%$@#", rune(text[i])) {
+		if strings.ContainsRune("23457?*%$@#", rune(text[i])) {
 			deg = (rand.Float64()*56 - 28) * math.Pi / 180 // ±28°
 		} else {
 			deg = (rand.Float64()*44 - 22) * math.Pi / 180 // ±22°
