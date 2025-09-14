@@ -4,7 +4,7 @@
 
 ```bash
 # 1) macOS local quick test (or download darwin package manually)
-curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.1.2/sslcat_v1.1.2_darwin-arm64.tar.gz -o sslcat.tgz
+curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.1.3/sslcat_v1.1.3_darwin-arm64.tar.gz -o sslcat.tgz
 tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
 sslcat --config sslcat.conf --port 8080
 # Browser access: http://localhost:8080/sslcat-panel/
@@ -505,7 +505,7 @@ If you encounter issues or have suggestions:
 
 For complete version update history, please refer to: **[CHANGELOG.md](CHANGELOG.md)**
 
-### Latest Version v1.1.2 (2025-09-13)
+### Latest Version v1.1.3 (2025-09-14)
 - Added: Third-party-free human verification (PoW + honeypot + min duration) combined with image captcha
 - Added: Static Sites and PHP Sites management support
 - Configurable server timeouts: added `read_timeout_sec`, `write_timeout_sec`, `idle_timeout_sec` (defaults: 30min read/write, 120s idle)

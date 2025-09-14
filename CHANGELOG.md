@@ -1,3 +1,31 @@
+## [1.1.3] - 2025-09-14
+
+### Added
+- **完整 CRUD API**：新增代理规则、SSL证书、系统设置、静态/PHP站点的完整 API 支持
+- **第三方客户端支持**：标准化 RESTful API，支持外部客户端完整管理 SSLcat
+- **API 端点扩展**：12+ 新增 API 端点，涵盖所有核心功能的增删改查
+- **多语言国际化**：为安全、CDN、TOTP 页面新增 35+ 翻译键
+- **API 标准化**：统一响应格式、错误处理和认证机制
+
+### API Endpoints
+- `POST /api/proxy-rules/manage` - 添加/更新代理规则
+- `DELETE /api/proxy-rules/delete` - 删除代理规则  
+- `POST /api/ssl/generate` - 申请 SSL 证书
+- `POST /api/ssl/upload` - 上传 SSL 证书
+- `DELETE /api/ssl/delete` - 删除 SSL 证书
+- `GET /api/settings` - 获取系统设置
+- `PUT /api/settings/update` - 更新系统设置
+- `POST /api/security/unblock` - 解除 IP 封禁
+- `GET|POST /api/static-sites` - 静态站点管理
+- `GET|POST /api/php-sites` - PHP 站点管理
+
+### Internationalization
+- 安全防护页面多语言支持（验证码、PoW、DDoS 设置）
+- CDN 缓存页面多语言支持（统计、配置）
+- TOTP 二次验证页面多语言支持（设置、扫码）
+
+---
+
 ## [1.1.2] - 2025-09-13
 
 ### Added
