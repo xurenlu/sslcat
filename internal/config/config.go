@@ -60,11 +60,11 @@ type SSLConfig struct {
 	KeyDir            string   `json:"key_dir"`
 	AutoRenew         bool     `json:"auto_renew"`
 	DisableSelfSigned bool     `json:"disable_self_signed"`
-	
+
 	// DNS验证配置
-	DNSProviders      []DNSProvider `json:"dns_providers"`
-	DefaultDNSProvider string       `json:"default_dns_provider"`
-	ChallengeMethods   []string     `json:"challenge_methods"` // ["http-01", "dns-01"]
+	DNSProviders       []DNSProvider `json:"dns_providers"`
+	DefaultDNSProvider string        `json:"default_dns_provider"`
+	ChallengeMethods   []string      `json:"challenge_methods"` // ["http-01", "dns-01"]
 }
 
 // DNSProvider DNS服务商配置
@@ -275,12 +275,12 @@ func Load(configFile string) (*Config, error) {
 			MaxUploadBytes:    1 << 30, // 1 GiB
 		},
 		SSL: SSLConfig{
-			Staging:           false,
-			CertDir:           "./data/certs",
-			KeyDir:            "./data/keys",
-			AutoRenew:         true,
-			DisableSelfSigned: true,
-			DNSProviders:      []DNSProvider{},
+			Staging:            false,
+			CertDir:            "./data/certs",
+			KeyDir:             "./data/keys",
+			AutoRenew:          true,
+			DisableSelfSigned:  true,
+			DNSProviders:       []DNSProvider{},
 			DefaultDNSProvider: "",
 			ChallengeMethods:   []string{"http-01"},
 		},

@@ -22,19 +22,19 @@ func (s *Server) handleAPIDNSProviders(w http.ResponseWriter, r *http.Request) {
 
 	// 获取可用的DNS服务商
 	availableProviders := []string{"cloudflare", "aliyun", "tencent", "aws", "godaddy", "custom"}
-	
+
 	// 获取已配置的服务商
 	configuredProviders := make([]map[string]interface{}, 0, len(s.config.SSL.DNSProviders))
 	for _, provider := range s.config.SSL.DNSProviders {
 		configuredProviders = append(configuredProviders, map[string]interface{}{
-			"name":      provider.Name,
-			"type":      provider.Type,
-			"enabled":   provider.Enabled,
-			"priority":  provider.Priority,
-			"has_key":   provider.APIKey != "",
+			"name":       provider.Name,
+			"type":       provider.Type,
+			"enabled":    provider.Enabled,
+			"priority":   provider.Priority,
+			"has_key":    provider.APIKey != "",
 			"has_secret": provider.APISecret != "",
-			"zone_id":   provider.ZoneID,
-			"endpoint":  provider.Endpoint,
+			"zone_id":    provider.ZoneID,
+			"endpoint":   provider.Endpoint,
 		})
 	}
 
@@ -133,9 +133,9 @@ func (s *Server) handleAPIDNSProvidersPost(w http.ResponseWriter, r *http.Reques
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
+		"success":  true,
 		"provider": newProvider,
-		"action":  map[bool]string{true: "updated", false: "created"}[existingIndex >= 0],
+		"action":   map[bool]string{true: "updated", false: "created"}[existingIndex >= 0],
 	})
 }
 
@@ -193,7 +193,7 @@ func (s *Server) handleAPIDNSProvidersDelete(w http.ResponseWriter, r *http.Requ
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":       true,
+		"success":          true,
 		"deleted_provider": deletedProvider,
 	})
 }
@@ -227,7 +227,7 @@ func (s *Server) handleAPIDNSValidate(w http.ResponseWriter, r *http.Request) {
 
 	// 验证DNS服务商
 	err := s.sslManager.ValidateDNSProvider(req.Name)
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	if err != nil {
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -272,7 +272,7 @@ func (s *Server) handleAPIDNSRequestCert(w http.ResponseWriter, r *http.Request)
 
 	// 使用DNS验证申请证书
 	err := s.sslManager.RequestCertificateWithDNS(req.Domain, req.Provider)
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	if err != nil {
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -281,9 +281,9 @@ func (s *Server) handleAPIDNSRequestCert(w http.ResponseWriter, r *http.Request)
 		})
 	} else {
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": true,
-			"message": "Certificate requested successfully",
-			"domain":  req.Domain,
+			"success":  true,
+			"message":  "Certificate requested successfully",
+			"domain":   req.Domain,
 			"provider": req.Provider,
 		})
 	}
@@ -301,7 +301,7 @@ func (s *Server) handleAPIDNSConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		DefaultProvider string   `json:"default_provider"`
+		DefaultProvider  string   `json:"default_provider"`
 		ChallengeMethods []string `json:"challenge_methods"`
 	}
 

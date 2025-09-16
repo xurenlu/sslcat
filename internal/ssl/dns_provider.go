@@ -10,19 +10,19 @@ import (
 type DNSProviderInterface interface {
 	// SetTXTRecord 设置TXT记录
 	SetTXTRecord(ctx context.Context, domain, name, value string, ttl int) error
-	
+
 	// DeleteTXTRecord 删除TXT记录
 	DeleteTXTRecord(ctx context.Context, domain, name string) error
-	
+
 	// GetTXTRecord 获取TXT记录值
 	GetTXTRecord(ctx context.Context, domain, name string) (string, error)
-	
+
 	// WaitForPropagation 等待DNS记录传播
 	WaitForPropagation(ctx context.Context, domain, name, value string) error
-	
+
 	// GetProviderName 获取服务商名称
 	GetProviderName() string
-	
+
 	// Validate 验证配置
 	Validate() error
 }
@@ -87,7 +87,7 @@ func (m *DNSProviderManager) SetTXTRecordWithProvider(ctx context.Context, provi
 	if err != nil {
 		return err
 	}
-	
+
 	m.log.Infof("Setting TXT record via %s: %s.%s = %s", providerName, name, domain, value)
 	return provider.SetTXTRecord(ctx, domain, name, value, ttl)
 }
@@ -98,7 +98,7 @@ func (m *DNSProviderManager) DeleteTXTRecordWithProvider(ctx context.Context, pr
 	if err != nil {
 		return err
 	}
-	
+
 	m.log.Infof("Deleting TXT record via %s: %s.%s", providerName, name, domain)
 	return provider.DeleteTXTRecord(ctx, domain, name)
 }
@@ -109,7 +109,7 @@ func (m *DNSProviderManager) WaitForPropagationWithProvider(ctx context.Context,
 	if err != nil {
 		return err
 	}
-	
+
 	m.log.Infof("Waiting for DNS propagation via %s: %s.%s", providerName, name, domain)
 	return provider.WaitForPropagation(ctx, domain, name, value)
 }
@@ -131,7 +131,7 @@ func (m *DNSProviderManager) CreateDNSChallenge(ctx context.Context, providerNam
 	if err != nil {
 		return nil, fmt.Errorf("failed to set TXT record: %w", err)
 	}
-	
+
 	// 等待DNS传播
 	err = m.WaitForPropagationWithProvider(ctx, providerName, domain, recordName, recordValue)
 	if err != nil {
@@ -139,7 +139,7 @@ func (m *DNSProviderManager) CreateDNSChallenge(ctx context.Context, providerNam
 		_ = m.DeleteTXTRecordWithProvider(ctx, providerName, domain, recordName)
 		return nil, fmt.Errorf("DNS propagation failed: %w", err)
 	}
-	
+
 	challenge := &DNSChallengeInfo{
 		Domain:      domain,
 		RecordName:  recordName,
@@ -148,7 +148,7 @@ func (m *DNSProviderManager) CreateDNSChallenge(ctx context.Context, providerNam
 		CreatedAt:   time.Now(),
 		ExpiresAt:   time.Now().Add(24 * time.Hour), // 24小时后过期
 	}
-	
+
 	m.log.Infof("DNS challenge created successfully: %s.%s", recordName, domain)
 	return challenge, nil
 }
@@ -158,13 +158,13 @@ func (m *DNSProviderManager) CleanupDNSChallenge(ctx context.Context, challenge 
 	if challenge == nil {
 		return nil
 	}
-	
+
 	err := m.DeleteTXTRecordWithProvider(ctx, challenge.Provider, challenge.Domain, challenge.RecordName)
 	if err != nil {
 		m.log.Warnf("Failed to cleanup DNS challenge record %s.%s: %v", challenge.RecordName, challenge.Domain, err)
 		return err
 	}
-	
+
 	m.log.Infof("DNS challenge cleaned up: %s.%s", challenge.RecordName, challenge.Domain)
 	return nil
 }

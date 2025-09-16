@@ -15,9 +15,9 @@ func (s *Server) handleDNS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := map[string]interface{}{
-		"AdminPrefix": s.config.AdminPrefix,
-		"Providers":   s.config.SSL.DNSProviders,
-		"DefaultProvider": s.config.SSL.DefaultDNSProvider,
+		"AdminPrefix":      s.config.AdminPrefix,
+		"Providers":        s.config.SSL.DNSProviders,
+		"DefaultProvider":  s.config.SSL.DefaultDNSProvider,
 		"ChallengeMethods": s.config.SSL.ChallengeMethods,
 	}
 
@@ -206,10 +206,10 @@ func (s *Server) handleDNSConfig(w http.ResponseWriter, r *http.Request) {
 
 	// 显示配置表单
 	data := map[string]interface{}{
-		"AdminPrefix": s.config.AdminPrefix,
-		"DefaultProvider": s.config.SSL.DefaultDNSProvider,
+		"AdminPrefix":      s.config.AdminPrefix,
+		"DefaultProvider":  s.config.SSL.DefaultDNSProvider,
 		"ChallengeMethods": s.config.SSL.ChallengeMethods,
-		"Providers": s.config.SSL.DNSProviders,
+		"Providers":        s.config.SSL.DNSProviders,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

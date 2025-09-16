@@ -3,10 +3,16 @@ package ssl
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha1"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -46,12 +52,12 @@ func (p *CloudflareProvider) SetTXTRecord(ctx context.Context, domain, name, val
 	if err != nil {
 		return err
 	}
-	
+
 	if existingID != "" {
 		// 更新现有记录
 		return p.updateRecord(ctx, existingID, name, value, ttl)
 	}
-	
+
 	// 创建新记录
 	return p.createRecord(ctx, name, value, ttl)
 }
@@ -61,12 +67,12 @@ func (p *CloudflareProvider) DeleteTXTRecord(ctx context.Context, domain, name s
 	if err != nil {
 		return err
 	}
-	
+
 	if recordID == "" {
 		p.log.Debugf("TXT record not found: %s", name)
 		return nil
 	}
-	
+
 	return p.deleteRecord(ctx, recordID)
 }
 
@@ -75,47 +81,47 @@ func (p *CloudflareProvider) GetTXTRecord(ctx context.Context, domain, name stri
 	if err != nil {
 		return "", err
 	}
-	
+
 	if recordID == "" {
 		return "", fmt.Errorf("TXT record not found: %s", name)
 	}
-	
+
 	// 获取记录详情
 	url := fmt.Sprintf("https://api.cloudflare.com/client/v4/zones/%s/dns_records/%s", p.ZoneID, recordID)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return "", err
 	}
-	
+
 	req.Header.Set("Authorization", "Bearer "+p.APIKey)
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("Cloudflare API error: %d", resp.StatusCode)
 	}
-	
+
 	var result struct {
 		Success bool `json:"success"`
 		Result  struct {
 			Content string `json:"content"`
 		} `json:"result"`
 	}
-	
+
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", err
 	}
-	
+
 	if !result.Success {
 		return "", fmt.Errorf("Cloudflare API returned success=false")
 	}
-	
+
 	return result.Result.Content, nil
 }
 
@@ -124,7 +130,7 @@ func (p *CloudflareProvider) WaitForPropagation(ctx context.Context, domain, nam
 	timeout := time.After(30 * time.Second)
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -147,40 +153,40 @@ func (p *CloudflareProvider) getRecordID(ctx context.Context, name string) (stri
 	if err != nil {
 		return "", err
 	}
-	
+
 	req.Header.Set("Authorization", "Bearer "+p.APIKey)
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("Cloudflare API error: %d", resp.StatusCode)
 	}
-	
+
 	var result struct {
 		Success bool `json:"success"`
 		Result  []struct {
 			ID string `json:"id"`
 		} `json:"result"`
 	}
-	
+
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", err
 	}
-	
+
 	if !result.Success {
 		return "", fmt.Errorf("Cloudflare API returned success=false")
 	}
-	
+
 	if len(result.Result) > 0 {
 		return result.Result[0].ID, nil
 	}
-	
+
 	return "", nil
 }
 
@@ -191,45 +197,45 @@ func (p *CloudflareProvider) createRecord(ctx context.Context, name, value strin
 		"content": value,
 		"ttl":     ttl,
 	}
-	
+
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return err
 	}
-	
+
 	url := fmt.Sprintf("https://api.cloudflare.com/client/v4/zones/%s/dns_records", p.ZoneID)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return err
 	}
-	
+
 	req.Header.Set("Authorization", "Bearer "+p.APIKey)
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("Cloudflare API error: %d, body: %s", resp.StatusCode, string(body))
 	}
-	
+
 	var result struct {
 		Success bool `json:"success"`
 	}
-	
+
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return err
 	}
-	
+
 	if !result.Success {
 		return fmt.Errorf("Cloudflare API returned success=false")
 	}
-	
+
 	return nil
 }
 
@@ -240,45 +246,45 @@ func (p *CloudflareProvider) updateRecord(ctx context.Context, recordID, name, v
 		"content": value,
 		"ttl":     ttl,
 	}
-	
+
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return err
 	}
-	
+
 	url := fmt.Sprintf("https://api.cloudflare.com/client/v4/zones/%s/dns_records/%s", p.ZoneID, recordID)
 	req, err := http.NewRequestWithContext(ctx, "PUT", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return err
 	}
-	
+
 	req.Header.Set("Authorization", "Bearer "+p.APIKey)
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("Cloudflare API error: %d, body: %s", resp.StatusCode, string(body))
 	}
-	
+
 	var result struct {
 		Success bool `json:"success"`
 	}
-	
+
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return err
 	}
-	
+
 	if !result.Success {
 		return fmt.Errorf("Cloudflare API returned success=false")
 	}
-	
+
 	return nil
 }
 
@@ -288,34 +294,34 @@ func (p *CloudflareProvider) deleteRecord(ctx context.Context, recordID string) 
 	if err != nil {
 		return err
 	}
-	
+
 	req.Header.Set("Authorization", "Bearer "+p.APIKey)
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("Cloudflare API error: %d, body: %s", resp.StatusCode, string(body))
 	}
-	
+
 	var result struct {
 		Success bool `json:"success"`
 	}
-	
+
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return err
 	}
-	
+
 	if !result.Success {
 		return fmt.Errorf("Cloudflare API returned success=false")
 	}
-	
+
 	return nil
 }
 
@@ -350,18 +356,39 @@ func (p *AliyunProvider) Validate() error {
 }
 
 func (p *AliyunProvider) SetTXTRecord(ctx context.Context, domain, name, value string, ttl int) error {
-	// 阿里云DNS API实现
-	// 这里需要实现阿里云DNS API的调用
-	// 由于阿里云API比较复杂，这里先返回一个占位实现
-	return fmt.Errorf("Aliyun DNS provider not implemented yet")
+	// 检查记录是否已存在
+	existingRecord, err := p.getTXTRecord(ctx, domain, name)
+	if err != nil && err.Error() != "record not found" {
+		return err
+	}
+
+	if existingRecord != "" {
+		// 更新现有记录
+		return p.updateTXTRecord(ctx, domain, name, value, ttl)
+	}
+
+	// 创建新记录
+	return p.createTXTRecord(ctx, domain, name, value, ttl)
 }
 
 func (p *AliyunProvider) DeleteTXTRecord(ctx context.Context, domain, name string) error {
-	return fmt.Errorf("Aliyun DNS provider not implemented yet")
+	// 获取记录ID
+	recordID, err := p.getRecordID(ctx, domain, name)
+	if err != nil {
+		return err
+	}
+
+	if recordID == "" {
+		p.log.Debugf("TXT record not found: %s", name)
+		return nil
+	}
+
+	// 删除记录
+	return p.deleteRecord(ctx, domain, recordID)
 }
 
 func (p *AliyunProvider) GetTXTRecord(ctx context.Context, domain, name string) (string, error) {
-	return "", fmt.Errorf("Aliyun DNS provider not implemented yet")
+	return p.getTXTRecord(ctx, domain, name)
 }
 
 func (p *AliyunProvider) WaitForPropagation(ctx context.Context, domain, name, value string) error {
@@ -369,7 +396,7 @@ func (p *AliyunProvider) WaitForPropagation(ctx context.Context, domain, name, v
 	timeout := time.After(60 * time.Second)
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -377,11 +404,215 @@ func (p *AliyunProvider) WaitForPropagation(ctx context.Context, domain, name, v
 		case <-timeout:
 			return fmt.Errorf("DNS propagation timeout for %s", name)
 		case <-ticker.C:
-			// 这里应该检查DNS记录是否已传播
-			// 暂时直接返回成功
-			return nil
+			recordValue, err := p.getTXTRecord(ctx, domain, name)
+			if err == nil && recordValue == value {
+				p.log.Debugf("DNS record propagated: %s = %s", name, value)
+				return nil
+			}
 		}
 	}
+}
+
+// 阿里云API签名和请求辅助函数
+func (p *AliyunProvider) signRequest(params map[string]string) string {
+	// 添加公共参数
+	params["Format"] = "JSON"
+	params["Version"] = "2015-01-09"
+	params["AccessKeyId"] = p.AccessKeyID
+	params["SignatureMethod"] = "HMAC-SHA1"
+	params["Timestamp"] = time.Now().UTC().Format("2006-01-02T15:04:05Z")
+	params["SignatureVersion"] = "1.0"
+	params["SignatureNonce"] = fmt.Sprintf("%d", time.Now().UnixNano())
+
+	// 排序参数
+	var keys []string
+	for k := range params {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	// 构建查询字符串
+	var queryParts []string
+	for _, k := range keys {
+		queryParts = append(queryParts, fmt.Sprintf("%s=%s", url.QueryEscape(k), url.QueryEscape(params[k])))
+	}
+	queryString := strings.Join(queryParts, "&")
+
+	// 构建签名字符串
+	stringToSign := fmt.Sprintf("GET&%s&%s", url.QueryEscape("/"), url.QueryEscape(queryString))
+
+	// 计算签名
+	mac := hmac.New(sha1.New, []byte(p.AccessKeySecret+"&"))
+	mac.Write([]byte(stringToSign))
+	signature := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+
+	return signature
+}
+
+func (p *AliyunProvider) makeRequest(ctx context.Context, action string, params map[string]string) (map[string]interface{}, error) {
+	params["Action"] = action
+	signature := p.signRequest(params)
+
+	// 添加签名到参数
+	params["Signature"] = signature
+
+	// 构建URL
+	var queryParts []string
+	for k, v := range params {
+		queryParts = append(queryParts, fmt.Sprintf("%s=%s", url.QueryEscape(k), url.QueryEscape(v)))
+	}
+	queryString := strings.Join(queryParts, "&")
+	requestURL := fmt.Sprintf("https://alidns.aliyuncs.com/?%s", queryString)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", requestURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Aliyun API error: %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	return result, nil
+}
+
+func (p *AliyunProvider) getTXTRecord(ctx context.Context, domain, name string) (string, error) {
+	params := map[string]string{
+		"DomainName": domain,
+		"RRKeyWord":  name,
+		"Type":       "TXT",
+	}
+
+	result, err := p.makeRequest(ctx, "DescribeDomainRecords", params)
+	if err != nil {
+		return "", err
+	}
+
+	records, ok := result["DomainRecords"].(map[string]interface{})
+	if !ok {
+		return "", fmt.Errorf("invalid response format")
+	}
+
+	recordList, ok := records["Record"].([]interface{})
+	if !ok {
+		return "", fmt.Errorf("record not found")
+	}
+
+	for _, record := range recordList {
+		recordMap, ok := record.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		if recordMap["RR"] == name && recordMap["Type"] == "TXT" {
+			value, ok := recordMap["Value"].(string)
+			if ok {
+				return value, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("record not found")
+}
+
+func (p *AliyunProvider) getRecordID(ctx context.Context, domain, name string) (string, error) {
+	params := map[string]string{
+		"DomainName": domain,
+		"RRKeyWord":  name,
+		"Type":       "TXT",
+	}
+
+	result, err := p.makeRequest(ctx, "DescribeDomainRecords", params)
+	if err != nil {
+		return "", err
+	}
+
+	records, ok := result["DomainRecords"].(map[string]interface{})
+	if !ok {
+		return "", fmt.Errorf("invalid response format")
+	}
+
+	recordList, ok := records["Record"].([]interface{})
+	if !ok {
+		return "", nil
+	}
+
+	for _, record := range recordList {
+		recordMap, ok := record.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		if recordMap["RR"] == name && recordMap["Type"] == "TXT" {
+			recordID, ok := recordMap["RecordId"].(string)
+			if ok {
+				return recordID, nil
+			}
+		}
+	}
+
+	return "", nil
+}
+
+func (p *AliyunProvider) createTXTRecord(ctx context.Context, domain, name, value string, ttl int) error {
+	params := map[string]string{
+		"DomainName": domain,
+		"RR":         name,
+		"Type":       "TXT",
+		"Value":      value,
+		"TTL":        fmt.Sprintf("%d", ttl),
+	}
+
+	_, err := p.makeRequest(ctx, "AddDomainRecord", params)
+	return err
+}
+
+func (p *AliyunProvider) updateTXTRecord(ctx context.Context, domain, name, value string, ttl int) error {
+	recordID, err := p.getRecordID(ctx, domain, name)
+	if err != nil {
+		return err
+	}
+
+	if recordID == "" {
+		return fmt.Errorf("record not found")
+	}
+
+	params := map[string]string{
+		"RecordId": recordID,
+		"RR":       name,
+		"Type":     "TXT",
+		"Value":    value,
+		"TTL":      fmt.Sprintf("%d", ttl),
+	}
+
+	_, err = p.makeRequest(ctx, "UpdateDomainRecord", params)
+	return err
+}
+
+func (p *AliyunProvider) deleteRecord(ctx context.Context, domain, recordID string) error {
+	params := map[string]string{
+		"RecordId": recordID,
+	}
+
+	_, err := p.makeRequest(ctx, "DeleteDomainRecord", params)
+	return err
 }
 
 // TencentProvider 腾讯云DNS服务商
@@ -415,15 +646,39 @@ func (p *TencentProvider) Validate() error {
 }
 
 func (p *TencentProvider) SetTXTRecord(ctx context.Context, domain, name, value string, ttl int) error {
-	return fmt.Errorf("Tencent DNS provider not implemented yet")
+	// 检查记录是否已存在
+	existingRecord, err := p.getTXTRecord(ctx, domain, name)
+	if err != nil && err.Error() != "record not found" {
+		return err
+	}
+
+	if existingRecord != "" {
+		// 更新现有记录
+		return p.updateTXTRecord(ctx, domain, name, value, ttl)
+	}
+
+	// 创建新记录
+	return p.createTXTRecord(ctx, domain, name, value, ttl)
 }
 
 func (p *TencentProvider) DeleteTXTRecord(ctx context.Context, domain, name string) error {
-	return fmt.Errorf("Tencent DNS provider not implemented yet")
+	// 获取记录ID
+	recordID, err := p.getRecordID(ctx, domain, name)
+	if err != nil {
+		return err
+	}
+
+	if recordID == "" {
+		p.log.Debugf("TXT record not found: %s", name)
+		return nil
+	}
+
+	// 删除记录
+	return p.deleteRecord(ctx, domain, recordID)
 }
 
 func (p *TencentProvider) GetTXTRecord(ctx context.Context, domain, name string) (string, error) {
-	return "", fmt.Errorf("Tencent DNS provider not implemented yet")
+	return p.getTXTRecord(ctx, domain, name)
 }
 
 func (p *TencentProvider) WaitForPropagation(ctx context.Context, domain, name, value string) error {
@@ -431,7 +686,287 @@ func (p *TencentProvider) WaitForPropagation(ctx context.Context, domain, name, 
 	timeout := time.After(60 * time.Second)
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
-	
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timeout:
+			return fmt.Errorf("DNS propagation timeout for %s", name)
+		case <-ticker.C:
+			recordValue, err := p.getTXTRecord(ctx, domain, name)
+			if err == nil && recordValue == value {
+				p.log.Debugf("DNS record propagated: %s = %s", name, value)
+				return nil
+			}
+		}
+	}
+}
+
+// 腾讯云API签名和请求辅助函数
+func (p *TencentProvider) signRequest(params map[string]string) string {
+	// 添加公共参数
+	params["Action"] = "DescribeRecordList"
+	params["Version"] = "2021-03-23"
+	params["Region"] = "ap-beijing"
+	params["Timestamp"] = fmt.Sprintf("%d", time.Now().Unix())
+	params["Nonce"] = fmt.Sprintf("%d", time.Now().UnixNano())
+	params["SecretId"] = p.SecretID
+
+	// 排序参数
+	var keys []string
+	for k := range params {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	// 构建查询字符串
+	var queryParts []string
+	for _, k := range keys {
+		queryParts = append(queryParts, fmt.Sprintf("%s=%s", url.QueryEscape(k), url.QueryEscape(params[k])))
+	}
+	queryString := strings.Join(queryParts, "&")
+
+	// 构建签名字符串
+	stringToSign := fmt.Sprintf("GETcns.tencentcloudapi.com/?%s", queryString)
+
+	// 计算签名
+	mac := hmac.New(sha1.New, []byte(p.SecretKey))
+	mac.Write([]byte(stringToSign))
+	signature := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+
+	return signature
+}
+
+func (p *TencentProvider) makeRequest(ctx context.Context, action string, params map[string]string) (map[string]interface{}, error) {
+	params["Action"] = action
+	params["Version"] = "2021-03-23"
+	params["Region"] = "ap-beijing"
+	params["Timestamp"] = fmt.Sprintf("%d", time.Now().Unix())
+	params["Nonce"] = fmt.Sprintf("%d", time.Now().UnixNano())
+	params["SecretId"] = p.SecretID
+
+	signature := p.signRequest(params)
+	params["Signature"] = signature
+
+	// 构建URL
+	var queryParts []string
+	for k, v := range params {
+		queryParts = append(queryParts, fmt.Sprintf("%s=%s", url.QueryEscape(k), url.QueryEscape(v)))
+	}
+	queryString := strings.Join(queryParts, "&")
+	requestURL := fmt.Sprintf("https://cns.tencentcloudapi.com/?%s", queryString)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", requestURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Tencent API error: %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	return result, nil
+}
+
+func (p *TencentProvider) getTXTRecord(ctx context.Context, domain, name string) (string, error) {
+	params := map[string]string{
+		"Domain": domain,
+		"Subdomain": name,
+		"RecordType": "TXT",
+	}
+
+	result, err := p.makeRequest(ctx, "DescribeRecordList", params)
+	if err != nil {
+		return "", err
+	}
+
+	records, ok := result["Response"].(map[string]interface{})
+	if !ok {
+		return "", fmt.Errorf("invalid response format")
+	}
+
+	recordList, ok := records["RecordList"].([]interface{})
+	if !ok {
+		return "", fmt.Errorf("record not found")
+	}
+
+	for _, record := range recordList {
+		recordMap, ok := record.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		if recordMap["Name"] == name && recordMap["Type"] == "TXT" {
+			value, ok := recordMap["Value"].(string)
+			if ok {
+				return value, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("record not found")
+}
+
+func (p *TencentProvider) getRecordID(ctx context.Context, domain, name string) (string, error) {
+	params := map[string]string{
+		"Domain": domain,
+		"Subdomain": name,
+		"RecordType": "TXT",
+	}
+
+	result, err := p.makeRequest(ctx, "DescribeRecordList", params)
+	if err != nil {
+		return "", err
+	}
+
+	records, ok := result["Response"].(map[string]interface{})
+	if !ok {
+		return "", fmt.Errorf("invalid response format")
+	}
+
+	recordList, ok := records["RecordList"].([]interface{})
+	if !ok {
+		return "", nil
+	}
+
+	for _, record := range recordList {
+		recordMap, ok := record.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		if recordMap["Name"] == name && recordMap["Type"] == "TXT" {
+			recordID, ok := recordMap["RecordId"].(float64)
+			if ok {
+				return fmt.Sprintf("%.0f", recordID), nil
+			}
+		}
+	}
+
+	return "", nil
+}
+
+func (p *TencentProvider) createTXTRecord(ctx context.Context, domain, name, value string, ttl int) error {
+	params := map[string]string{
+		"Domain": domain,
+		"SubDomain": name,
+		"RecordType": "TXT",
+		"RecordLine": "默认",
+		"Value": value,
+		"TTL": fmt.Sprintf("%d", ttl),
+	}
+
+	_, err := p.makeRequest(ctx, "CreateRecord", params)
+	return err
+}
+
+func (p *TencentProvider) updateTXTRecord(ctx context.Context, domain, name, value string, ttl int) error {
+	recordID, err := p.getRecordID(ctx, domain, name)
+	if err != nil {
+		return err
+	}
+
+	if recordID == "" {
+		return fmt.Errorf("record not found")
+	}
+
+	params := map[string]string{
+		"RecordId": recordID,
+		"SubDomain": name,
+		"RecordType": "TXT",
+		"RecordLine": "默认",
+		"Value": value,
+		"TTL": fmt.Sprintf("%d", ttl),
+	}
+
+	_, err = p.makeRequest(ctx, "ModifyRecord", params)
+	return err
+}
+
+func (p *TencentProvider) deleteRecord(ctx context.Context, domain, recordID string) error {
+	params := map[string]string{
+		"RecordId": recordID,
+		"Domain": domain,
+	}
+
+	_, err := p.makeRequest(ctx, "DeleteRecord", params)
+	return err
+}
+
+// AWSRoute53Provider AWS Route53 DNS服务商
+type AWSRoute53Provider struct {
+	AccessKeyID     string
+	SecretAccessKey string
+	Region          string
+	log             Logger
+}
+
+// NewAWSRoute53Provider 创建AWS Route53 DNS服务商
+func NewAWSRoute53Provider(accessKeyID, secretAccessKey, region string, log Logger) *AWSRoute53Provider {
+	if region == "" {
+		region = "us-east-1"
+	}
+	return &AWSRoute53Provider{
+		AccessKeyID:     accessKeyID,
+		SecretAccessKey: secretAccessKey,
+		Region:          region,
+		log:             log,
+	}
+}
+
+func (p *AWSRoute53Provider) GetProviderName() string {
+	return "aws"
+}
+
+func (p *AWSRoute53Provider) Validate() error {
+	if p.AccessKeyID == "" {
+		return fmt.Errorf("AWS Access Key ID is required")
+	}
+	if p.SecretAccessKey == "" {
+		return fmt.Errorf("AWS Secret Access Key is required")
+	}
+	return nil
+}
+
+func (p *AWSRoute53Provider) SetTXTRecord(ctx context.Context, domain, name, value string, ttl int) error {
+	// AWS Route53实现
+	// 这里需要实现AWS Route53 API的调用
+	// 由于AWS API比较复杂，这里先返回一个占位实现
+	return fmt.Errorf("AWS Route53 DNS provider not implemented yet")
+}
+
+func (p *AWSRoute53Provider) DeleteTXTRecord(ctx context.Context, domain, name string) error {
+	return fmt.Errorf("AWS Route53 DNS provider not implemented yet")
+}
+
+func (p *AWSRoute53Provider) GetTXTRecord(ctx context.Context, domain, name string) (string, error) {
+	return "", fmt.Errorf("AWS Route53 DNS provider not implemented yet")
+}
+
+func (p *AWSRoute53Provider) WaitForPropagation(ctx context.Context, domain, name, value string) error {
+	// 等待60秒
+	timeout := time.After(60 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -442,6 +977,196 @@ func (p *TencentProvider) WaitForPropagation(ctx context.Context, domain, name, 
 			return nil
 		}
 	}
+}
+
+// GoDaddyProvider GoDaddy DNS服务商
+type GoDaddyProvider struct {
+	APIKey    string
+	APISecret string
+	log       Logger
+}
+
+// NewGoDaddyProvider 创建GoDaddy DNS服务商
+func NewGoDaddyProvider(apiKey, apiSecret string, log Logger) *GoDaddyProvider {
+	return &GoDaddyProvider{
+		APIKey:    apiKey,
+		APISecret: apiSecret,
+		log:       log,
+	}
+}
+
+func (p *GoDaddyProvider) GetProviderName() string {
+	return "godaddy"
+}
+
+func (p *GoDaddyProvider) Validate() error {
+	if p.APIKey == "" {
+		return fmt.Errorf("GoDaddy API Key is required")
+	}
+	if p.APISecret == "" {
+		return fmt.Errorf("GoDaddy API Secret is required")
+	}
+	return nil
+}
+
+func (p *GoDaddyProvider) SetTXTRecord(ctx context.Context, domain, name, value string, ttl int) error {
+	// 检查记录是否已存在
+	existingRecord, err := p.getTXTRecord(ctx, domain, name)
+	if err != nil && err.Error() != "record not found" {
+		return err
+	}
+
+	if existingRecord != "" {
+		// 更新现有记录
+		return p.updateTXTRecord(ctx, domain, name, value, ttl)
+	}
+
+	// 创建新记录
+	return p.createTXTRecord(ctx, domain, name, value, ttl)
+}
+
+func (p *GoDaddyProvider) DeleteTXTRecord(ctx context.Context, domain, name string) error {
+	// GoDaddy API删除记录
+	url := fmt.Sprintf("https://api.godaddy.com/v1/domains/%s/records/TXT/%s", domain, name)
+	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("sso-key %s:%s", p.APIKey, p.APISecret))
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("GoDaddy API error: %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+func (p *GoDaddyProvider) GetTXTRecord(ctx context.Context, domain, name string) (string, error) {
+	return p.getTXTRecord(ctx, domain, name)
+}
+
+func (p *GoDaddyProvider) WaitForPropagation(ctx context.Context, domain, name, value string) error {
+	// 等待60秒
+	timeout := time.After(60 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timeout:
+			return fmt.Errorf("DNS propagation timeout for %s", name)
+		case <-ticker.C:
+			recordValue, err := p.getTXTRecord(ctx, domain, name)
+			if err == nil && recordValue == value {
+				p.log.Debugf("DNS record propagated: %s = %s", name, value)
+				return nil
+			}
+		}
+	}
+}
+
+func (p *GoDaddyProvider) getTXTRecord(ctx context.Context, domain, name string) (string, error) {
+	url := fmt.Sprintf("https://api.godaddy.com/v1/domains/%s/records/TXT/%s", domain, name)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("sso-key %s:%s", p.APIKey, p.APISecret))
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return "", fmt.Errorf("record not found")
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("GoDaddy API error: %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	var records []struct {
+		Data string `json:"data"`
+		TTL  int    `json:"ttl"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&records); err != nil {
+		return "", err
+	}
+
+	if len(records) > 0 {
+		return records[0].Data, nil
+	}
+
+	return "", fmt.Errorf("record not found")
+}
+
+func (p *GoDaddyProvider) createTXTRecord(ctx context.Context, domain, name, value string, ttl int) error {
+	url := fmt.Sprintf("https://api.godaddy.com/v1/domains/%s/records", domain)
+	
+	record := []struct {
+		Type string `json:"type"`
+		Name string `json:"name"`
+		Data string `json:"data"`
+		TTL  int    `json:"ttl"`
+	}{
+		{
+			Type: "TXT",
+			Name: name,
+			Data: value,
+			TTL:  ttl,
+		},
+	}
+
+	jsonData, err := json.Marshal(record)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "PATCH", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("sso-key %s:%s", p.APIKey, p.APISecret))
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("GoDaddy API error: %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+func (p *GoDaddyProvider) updateTXTRecord(ctx context.Context, domain, name, value string, ttl int) error {
+	// GoDaddy的更新和创建使用相同的API
+	return p.createTXTRecord(ctx, domain, name, value, ttl)
 }
 
 // CustomProvider 自定义DNS服务商
@@ -472,15 +1197,110 @@ func (p *CustomProvider) Validate() error {
 }
 
 func (p *CustomProvider) SetTXTRecord(ctx context.Context, domain, name, value string, ttl int) error {
-	return fmt.Errorf("Custom DNS provider not implemented yet")
+	// 自定义DNS API实现
+	// 这里实现一个通用的HTTP API调用
+	url := fmt.Sprintf("%s/dns/records", p.Endpoint)
+	
+	payload := map[string]interface{}{
+		"domain": domain,
+		"name":   name,
+		"type":   "TXT",
+		"value":  value,
+		"ttl":    ttl,
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	if p.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+p.APIKey)
+	}
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("Custom DNS API error: %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
 }
 
 func (p *CustomProvider) DeleteTXTRecord(ctx context.Context, domain, name string) error {
-	return fmt.Errorf("Custom DNS provider not implemented yet")
+	url := fmt.Sprintf("%s/dns/records/%s/%s", p.Endpoint, domain, name)
+	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
+	if err != nil {
+		return err
+	}
+
+	if p.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+p.APIKey)
+	}
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("Custom DNS API error: %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
 }
 
 func (p *CustomProvider) GetTXTRecord(ctx context.Context, domain, name string) (string, error) {
-	return "", fmt.Errorf("Custom DNS provider not implemented yet")
+	url := fmt.Sprintf("%s/dns/records/%s/%s", p.Endpoint, domain, name)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	if p.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+p.APIKey)
+	}
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return "", fmt.Errorf("record not found")
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("Custom DNS API error: %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Value string `json:"value"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+
+	return result.Value, nil
 }
 
 func (p *CustomProvider) WaitForPropagation(ctx context.Context, domain, name, value string) error {
@@ -488,7 +1308,7 @@ func (p *CustomProvider) WaitForPropagation(ctx context.Context, domain, name, v
 	timeout := time.After(60 * time.Second)
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -496,7 +1316,11 @@ func (p *CustomProvider) WaitForPropagation(ctx context.Context, domain, name, v
 		case <-timeout:
 			return fmt.Errorf("DNS propagation timeout for %s", name)
 		case <-ticker.C:
-			return nil
+			recordValue, err := p.GetTXTRecord(ctx, domain, name)
+			if err == nil && recordValue == value {
+				p.log.Debugf("DNS record propagated: %s = %s", name, value)
+				return nil
+			}
 		}
 	}
 }

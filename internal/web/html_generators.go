@@ -764,7 +764,7 @@ func (s *Server) generateDNSManagementHTML(data map[string]interface{}) string {
 	providers, _ := data["Providers"].([]config.DNSProvider)
 	defaultProvider, _ := data["DefaultProvider"].(string)
 	challengeMethods, _ := data["ChallengeMethods"].([]string)
-	
+
 	return fmt.Sprintf(`
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -873,14 +873,14 @@ func (s *Server) generateDNSProvidersTable(providers []config.DNSProvider, admin
 	if len(providers) == 0 {
 		return `<tr><td colspan="6" class="text-center">暂无DNS服务商配置</td></tr>`
 	}
-	
+
 	var rows strings.Builder
 	for i, provider := range providers {
 		statusBadge := `<span class="badge bg-secondary">未启用</span>`
 		if provider.Enabled {
 			statusBadge = `<span class="badge bg-success">已启用</span>`
 		}
-		
+
 		// 配置状态
 		configStatus := `<span class="badge bg-warning">配置不完整</span>`
 		if provider.APIKey != "" {
@@ -890,7 +890,7 @@ func (s *Server) generateDNSProvidersTable(providers []config.DNSProvider, admin
 				configStatus = `<span class="badge bg-success">配置完整</span>`
 			}
 		}
-		
+
 		rows.WriteString(fmt.Sprintf(`
                     <tr>
                         <td>%s</td>
@@ -1075,7 +1075,7 @@ func (s *Server) generateDNSAddHTML(data map[string]interface{}) string {
 // generateDNSEditHTML 生成编辑DNS服务商页面HTML
 func (s *Server) generateDNSEditHTML(data map[string]interface{}) string {
 	provider := data["Provider"].(config.DNSProvider)
-	
+
 	return fmt.Sprintf(`
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -1265,7 +1265,7 @@ func (s *Server) generateDNSConfigHTML(data map[string]interface{}) string {
 	defaultProvider, _ := data["DefaultProvider"].(string)
 	challengeMethods, _ := data["ChallengeMethods"].([]string)
 	providers, _ := data["Providers"].([]config.DNSProvider)
-	
+
 	return fmt.Sprintf(`
 <!DOCTYPE html>
 <html lang="zh-CN">

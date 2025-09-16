@@ -70,7 +70,7 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 
 	// 初始化DNS服务商
 	manager.initializeDNSProviders()
-	
+
 	// 初始化 ACME/Let's Encrypt（当配置了 Email 且仅允许配置域名时启用）
 	if strings.TrimSpace(cfg.SSL.Email) != "" {
 		acmeCacheDir := filepath.Join(filepath.Dir(cfg.SSL.CertDir), "acme-cache")
@@ -1068,9 +1068,9 @@ func (m *Manager) initializeDNSProviders() {
 		if !provider.Enabled {
 			continue
 		}
-		
+
 		var dnsProvider DNSProviderInterface
-		
+
 		switch strings.ToLower(provider.Type) {
 		case "cloudflare":
 			dnsProvider = NewCloudflareProvider(provider.APIKey, provider.ZoneID, m.log)
@@ -1078,18 +1078,22 @@ func (m *Manager) initializeDNSProviders() {
 			dnsProvider = NewAliyunProvider(provider.APIKey, provider.APISecret, m.log)
 		case "tencent":
 			dnsProvider = NewTencentProvider(provider.APIKey, provider.APISecret, m.log)
+		case "aws":
+			dnsProvider = NewAWSRoute53Provider(provider.APIKey, provider.APISecret, "us-east-1", m.log)
+		case "godaddy":
+			dnsProvider = NewGoDaddyProvider(provider.APIKey, provider.APISecret, m.log)
 		case "custom":
 			dnsProvider = NewCustomProvider(provider.Endpoint, provider.APIKey, m.log)
 		default:
 			m.log.Warnf("Unknown DNS provider type: %s", provider.Type)
 			continue
 		}
-		
+
 		if err := dnsProvider.Validate(); err != nil {
 			m.log.Warnf("DNS provider %s validation failed: %v", provider.Name, err)
 			continue
 		}
-		
+
 		m.dnsManager.RegisterProvider(provider.Name, dnsProvider)
 		m.log.Infof("Initialized DNS provider: %s (%s)", provider.Name, provider.Type)
 	}
@@ -1100,18 +1104,18 @@ func (m *Manager) RequestCertificateWithDNS(domain, providerName string) error {
 	if m.acmeMgr == nil {
 		return fmt.Errorf("ACME not enabled")
 	}
-	
+
 	// 检查是否支持DNS验证
 	if !m.supportsDNSChallenge() {
 		return fmt.Errorf("DNS challenge not supported")
 	}
-	
+
 	// 获取DNS服务商
 	_, err := m.dnsManager.GetProvider(providerName)
 	if err != nil {
 		return fmt.Errorf("DNS provider not found: %s", providerName)
 	}
-	
+
 	// 创建ACME客户端
 	client := &acme.Client{}
 	if m.config.SSL.Staging {
@@ -1119,31 +1123,31 @@ func (m *Manager) RequestCertificateWithDNS(domain, providerName string) error {
 	} else {
 		client.DirectoryURL = "https://acme-v02.api.letsencrypt.org/directory"
 	}
-	
+
 	// 创建账户
 	account := &acme.Account{
 		Contact: []string{"mailto:" + m.config.SSL.Email},
 	}
-	
+
 	ctx := context.Background()
 	account, err = client.Register(ctx, account, acme.AcceptTOS)
 	if err != nil {
 		return fmt.Errorf("failed to register ACME account: %w", err)
 	}
-	
+
 	// 创建订单
 	order, err := client.AuthorizeOrder(ctx, acme.DomainIDs(domain))
 	if err != nil {
 		return fmt.Errorf("failed to create authorization order: %w", err)
 	}
-	
+
 	// 处理授权
 	for _, authzURL := range order.AuthzURLs {
 		authz, err := client.GetAuthorization(ctx, authzURL)
 		if err != nil {
 			return fmt.Errorf("failed to get authorization: %w", err)
 		}
-		
+
 		// 查找DNS挑战
 		var challenge *acme.Challenge
 		for _, c := range authz.Challenges {
@@ -1152,73 +1156,73 @@ func (m *Manager) RequestCertificateWithDNS(domain, providerName string) error {
 				break
 			}
 		}
-		
+
 		if challenge == nil {
 			return fmt.Errorf("no DNS challenge found for domain: %s", domain)
 		}
-		
+
 		// 生成DNS挑战记录
 		keyAuth, err := client.DNS01ChallengeRecord(challenge.Token)
 		if err != nil {
 			return fmt.Errorf("failed to generate DNS challenge record: %w", err)
 		}
-		
+
 		// 确定记录名称
 		recordName := GetACMEChallengeRecordNameForWildcard(domain)
-		
+
 		// 创建DNS挑战
 		challengeInfo, err := m.dnsManager.CreateDNSChallenge(ctx, providerName, domain, recordName, keyAuth)
 		if err != nil {
 			return fmt.Errorf("failed to create DNS challenge: %w", err)
 		}
-		
+
 		// 清理函数
 		defer func() {
 			if cleanupErr := m.dnsManager.CleanupDNSChallenge(ctx, challengeInfo); cleanupErr != nil {
 				m.log.Warnf("Failed to cleanup DNS challenge: %v", cleanupErr)
 			}
 		}()
-		
+
 		// 接受挑战
 		_, err = client.Accept(ctx, challenge)
 		if err != nil {
 			return fmt.Errorf("failed to accept challenge: %w", err)
 		}
-		
+
 		// 等待挑战完成
 		_, err = client.WaitAuthorization(ctx, authz.URI)
 		if err != nil {
 			return fmt.Errorf("authorization failed: %w", err)
 		}
 	}
-	
+
 	// 生成私钥
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return fmt.Errorf("failed to generate private key: %w", err)
 	}
-	
+
 	// 创建CSR
 	csr, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{
-		Subject: pkix.Name{CommonName: domain},
+		Subject:  pkix.Name{CommonName: domain},
 		DNSNames: []string{domain},
 	}, privateKey)
 	if err != nil {
 		return fmt.Errorf("failed to create CSR: %w", err)
 	}
-	
+
 	// 提交CSR
 	cert, _, err := client.CreateOrderCert(ctx, order.FinalizeURL, csr, true)
 	if err != nil {
 		return fmt.Errorf("failed to create certificate: %w", err)
 	}
-	
+
 	// 保存证书
 	err = m.saveCertificate(domain, cert, privateKey)
 	if err != nil {
 		return fmt.Errorf("failed to save certificate: %w", err)
 	}
-	
+
 	m.log.Infof("Successfully obtained certificate for domain: %s using DNS provider: %s", domain, providerName)
 	return nil
 }
@@ -1240,7 +1244,7 @@ func (m *Manager) saveCertificate(domain string, certDER [][]byte, privateKey *r
 		Type:  "RSA PRIVATE KEY",
 		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
 	})
-	
+
 	// 编码证书
 	var certPEM []byte
 	for _, der := range certDER {
@@ -1249,29 +1253,29 @@ func (m *Manager) saveCertificate(domain string, certDER [][]byte, privateKey *r
 			Bytes: der,
 		})...)
 	}
-	
+
 	// 保存文件
 	certPath := filepath.Join(m.config.SSL.CertDir, domain+".crt")
 	keyPath := filepath.Join(m.config.SSL.KeyDir, domain+".key")
-	
+
 	if err := os.WriteFile(certPath, certPEM, 0644); err != nil {
 		return fmt.Errorf("failed to save certificate file: %w", err)
 	}
-	
+
 	if err := os.WriteFile(keyPath, keyPEM, 0600); err != nil {
 		return fmt.Errorf("failed to save private key file: %w", err)
 	}
-	
+
 	// 加载到缓存
 	cert, err := tls.X509KeyPair(certPEM, keyPEM)
 	if err != nil {
 		return fmt.Errorf("failed to parse certificate: %w", err)
 	}
-	
+
 	m.certMutex.Lock()
 	m.certCache[domain] = &cert
 	m.certMutex.Unlock()
-	
+
 	return nil
 }
 
