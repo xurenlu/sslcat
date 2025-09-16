@@ -4,7 +4,7 @@
 
 ```bash
 # 1) macOS 本地快速试用（或自行下载 darwin 包）
-curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.1.3/sslcat_v1.1.3_darwin-arm64.tar.gz -o sslcat.tgz
+curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.2.0/sslcat_v1.2.0_darwin-arm64.tar.gz -o sslcat.tgz
 tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
 sslcat --config sslcat.conf --port 8080
 # 浏览器访问: http://localhost:8080/sslcat-panel/
@@ -506,12 +506,12 @@ go run main.go --config sslcat.conf --log-level debug
 
 查看完整的版本更新历史，请参阅：**[CHANGELOG.md](CHANGELOG.md)**
 
-### 最新版本 v1.1.3 (2025-09-14)
-- 新增：完整 CRUD API 支持，可用于第三方客户端开发
-- 新增：12+ API 端点，涵盖代理、SSL、设置、站点管理
-- 改进：多语言国际化支持，新增 35+ 翻译键
-- 服务器超时可配：新增 `read_timeout_sec`、`write_timeout_sec`、`idle_timeout_sec`（默认读/写各 30 分钟，空闲 120 秒）
-- 上传能力增强：新增 `max_upload_bytes`（默认 1 GiB）；单证书与 ZIP 批量上传全程流式处理并带总量限制，避免占用内存
+### 最新版本 v1.2.0 (2025-01-15)
+- 新增：DNS验证SSL证书申请，支持Cloudflare、阿里云、腾讯云、GoDaddy等DNS服务商
+- 新增：代理访问控制功能，为代理规则添加用户名/密码验证
+- 新增：通配符证书支持，通过DNS验证支持`*.example.com`类型证书
+- 新增：DNS服务商管理界面，完整的配置、编辑、删除和状态监控
+- 新增：代理认证界面，美观的登录页面和用户管理功能
 - 界面一致性：统一侧边栏顺序；在 Dashboard/静态站点/PHP 站点补齐“语言选择”“官方网站”入口；修复部分页面图标缺失
 - 登录与安全：暂时关闭登录验证码（后续可按需恢复）
 - 文档与国际化：多语言 README 同步更新；路线图文档更新
