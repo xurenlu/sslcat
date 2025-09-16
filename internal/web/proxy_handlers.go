@@ -51,6 +51,52 @@ func (s *Server) handleProxyAdd(w http.ResponseWriter, r *http.Request) {
 					cdnTTL = n
 				}
 			}
+
+			// 处理访问控制字段
+			authEnabled := r.FormValue("auth_enabled") == "on"
+			var authUsers []config.ProxyAuthUser
+			var authSessionTimeout int = 3600
+			var authCookieDomain string = domain
+
+			if authEnabled {
+				// 解析用户列表
+				form := r.Form
+				for key := range form {
+					if strings.HasPrefix(key, "auth_users[") && strings.HasSuffix(key, "][username]") {
+						// 提取索引
+						indexStart := strings.Index(key, "[") + 1
+						indexEnd := strings.Index(key, "]")
+						if indexStart > 0 && indexEnd > indexStart {
+							userIndex := key[indexStart:indexEnd]
+							usernameKey := "auth_users[" + userIndex + "][username]"
+							passwordKey := "auth_users[" + userIndex + "][password]"
+
+							username := strings.TrimSpace(r.FormValue(usernameKey))
+							password := strings.TrimSpace(r.FormValue(passwordKey))
+
+							if username != "" && password != "" {
+								authUsers = append(authUsers, config.ProxyAuthUser{
+									Username: username,
+									Password: password,
+								})
+							}
+						}
+					}
+				}
+
+				// 会话超时时间
+				if v := strings.TrimSpace(r.FormValue("auth_session_timeout")); v != "" {
+					if n, err := strconv.Atoi(v); err == nil && n >= 300 {
+						authSessionTimeout = n
+					}
+				}
+
+				// Cookie域名
+				if v := strings.TrimSpace(r.FormValue("auth_cookie_domain")); v != "" {
+					authCookieDomain = v
+				}
+			}
+
 			newRule := config.ProxyRule{
 				Domain:               domain,
 				Target:               target,
@@ -59,6 +105,11 @@ func (s *Server) handleProxyAdd(w http.ResponseWriter, r *http.Request) {
 				CDNEnabled:           cdnEnabled,
 				CDNPreset:            cdnPreset,
 				CDNDefaultTTLSeconds: cdnTTL,
+				// 访问控制字段
+				AuthEnabled:        authEnabled,
+				AuthUsers:          authUsers,
+				AuthSessionTimeout: authSessionTimeout,
+				AuthCookieDomain:   authCookieDomain,
 			}
 			s.config.Proxy.Rules = append(s.config.Proxy.Rules, newRule)
 
@@ -120,6 +171,62 @@ func (s *Server) handleProxyEdit(w http.ResponseWriter, r *http.Request) {
 				}
 			} else {
 				s.config.Proxy.Rules[index].CDNDefaultTTLSeconds = 0
+			}
+
+			// 处理访问控制字段
+			s.config.Proxy.Rules[index].AuthEnabled = r.FormValue("auth_enabled") == "on"
+
+			if s.config.Proxy.Rules[index].AuthEnabled {
+				// 解析用户列表
+				var authUsers []config.ProxyAuthUser
+				form := r.Form
+
+				for key := range form {
+					if strings.HasPrefix(key, "auth_users[") && strings.HasSuffix(key, "][username]") {
+						// 提取索引
+						indexStart := strings.Index(key, "[") + 1
+						indexEnd := strings.Index(key, "]")
+						if indexStart > 0 && indexEnd > indexStart {
+							userIndex := key[indexStart:indexEnd]
+							usernameKey := "auth_users[" + userIndex + "][username]"
+							passwordKey := "auth_users[" + userIndex + "][password]"
+
+							username := strings.TrimSpace(r.FormValue(usernameKey))
+							password := strings.TrimSpace(r.FormValue(passwordKey))
+
+							if username != "" && password != "" {
+								authUsers = append(authUsers, config.ProxyAuthUser{
+									Username: username,
+									Password: password,
+								})
+							}
+						}
+					}
+				}
+
+				s.config.Proxy.Rules[index].AuthUsers = authUsers
+
+				// 会话超时时间
+				if v := strings.TrimSpace(r.FormValue("auth_session_timeout")); v != "" {
+					if n, err := strconv.Atoi(v); err == nil && n >= 300 {
+						s.config.Proxy.Rules[index].AuthSessionTimeout = n
+					} else {
+						s.config.Proxy.Rules[index].AuthSessionTimeout = 3600 // 默认1小时
+					}
+				} else {
+					s.config.Proxy.Rules[index].AuthSessionTimeout = 3600
+				}
+
+				// Cookie域名
+				s.config.Proxy.Rules[index].AuthCookieDomain = strings.TrimSpace(r.FormValue("auth_cookie_domain"))
+				if s.config.Proxy.Rules[index].AuthCookieDomain == "" {
+					s.config.Proxy.Rules[index].AuthCookieDomain = domain
+				}
+			} else {
+				// 未开启认证时清空相关字段
+				s.config.Proxy.Rules[index].AuthUsers = nil
+				s.config.Proxy.Rules[index].AuthSessionTimeout = 0
+				s.config.Proxy.Rules[index].AuthCookieDomain = ""
 			}
 
 			// 保存配置

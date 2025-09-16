@@ -94,6 +94,18 @@ type ProxyRule struct {
 	CDNEnabled           bool   `json:"cdn_enabled"`
 	CDNPreset            string `json:"cdn_preset"`      // none|static|images
 	CDNDefaultTTLSeconds int    `json:"cdn_ttl_seconds"` // 0 表示使用全局规则
+
+	// 访问控制设置
+	AuthEnabled        bool            `json:"auth_enabled"`         // 是否开启访问控制
+	AuthUsers          []ProxyAuthUser `json:"auth_users,omitempty"` // 用户密码列表
+	AuthSessionTimeout int             `json:"auth_session_timeout"` // 登录有效期（秒），默认3600
+	AuthCookieDomain   string          `json:"auth_cookie_domain"`   // Cookie作用域，默认为代理域名
+}
+
+// ProxyAuthUser 代理访问控制用户
+type ProxyAuthUser struct {
+	Username string `json:"username"`
+	Password string `json:"password"` // 明文存储（内部使用，不暴露给前端）
 }
 
 // SecurityConfig 安全配置

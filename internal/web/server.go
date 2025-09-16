@@ -73,6 +73,8 @@ type Server struct {
 	auditRotator *logger.Rotator
 	// 访问日志记录器
 	accessLogger *logger.AccessLogger
+	// 代理访问控制管理器
+	proxyAuthManager *ProxyAuthManager
 }
 
 // NewServer 创建Web服务器
@@ -122,6 +124,9 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	server.powManager = NewPowManager()
 	// 初始化 DDoS 防护器
 	server.ddosProtector = ddos.NewProtector()
+
+	// 初始化代理访问控制管理器
+	server.proxyAuthManager = NewProxyAuthManager(server.log)
 
 	// 初始化审计日志轮转器（10MB*10）
 	if rot, err := logger.NewRotator("./data/audit.log", 10*1024*1024, 10); err == nil {
@@ -489,6 +494,29 @@ func (s *Server) isSupportedLanguage(lang string) bool {
 	return false
 }
 
+// ProxyRequestWithAuth 带访问控制的代理请求处理
+func (s *Server) ProxyRequestWithAuth(w http.ResponseWriter, r *http.Request, rule *config.ProxyRule) {
+	// 如果未开启认证，直接代理
+	if !rule.AuthEnabled {
+		s.proxyManager.ProxyRequest(w, r, rule)
+		return
+	}
+
+	// 检查是否已通过认证
+	if s.proxyAuthManager.CheckAuth(r, rule) {
+		s.proxyManager.ProxyRequest(w, r, rule)
+		return
+	}
+
+	// 处理登录请求
+	if s.proxyAuthManager.ProcessLogin(w, r, rule) {
+		return
+	}
+
+	// 显示登录页面
+	s.proxyAuthManager.ShowLoginPage(w, r, rule, "")
+}
+
 // securityMiddleware 安全中间件
 func (s *Server) securityMiddleware(w http.ResponseWriter, r *http.Request) bool {
 	// 获取客户端信息
@@ -550,8 +578,8 @@ func (s *Server) proxyMiddleware(w http.ResponseWriter, r *http.Request) bool {
 			http.Redirect(w, r, target, http.StatusMovedPermanently)
 			return true
 		}
-		// 执行代理
-		s.proxyManager.ProxyRequest(w, r, rule)
+		// 执行代理（带访问控制）
+		s.ProxyRequestWithAuth(w, r, rule)
 		return true
 	}
 

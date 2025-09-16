@@ -210,6 +210,7 @@ func (s *Server) generateProxyManagementHTML(data map[string]interface{}) string
                                         <th>%s</th>
                                         <th>%s</th>
                                         <th>%s</th>
+                                        <th>认证</th>
                                         <th>%s</th>
                                     </tr>
                                 </thead>
@@ -241,7 +242,7 @@ func (s *Server) generateProxyManagementHTML(data map[string]interface{}) string
 func (s *Server) generateProxyRulesTable(data map[string]interface{}) string {
 	rules, ok := data["Rules"].([]config.ProxyRule)
 	if !ok || len(rules) == 0 {
-		return `<tr><td colspan="4" class="text-center">` + s.translator.T("proxy.no_rules") + `</td></tr>`
+		return `<tr><td colspan="5" class="text-center">` + s.translator.T("proxy.no_rules") + `</td></tr>`
 	}
 
 	var rows strings.Builder
@@ -250,8 +251,17 @@ func (s *Server) generateProxyRulesTable(data map[string]interface{}) string {
 		if rule.Enabled {
 			statusBadge = `<span class="badge bg-success">` + s.translator.T("common.enabled") + `</span>`
 		}
+
+		// 认证状态
+		authBadge := `<span class="badge bg-secondary">未开启</span>`
+		if rule.AuthEnabled {
+			userCount := len(rule.AuthUsers)
+			authBadge = fmt.Sprintf(`<span class="badge bg-warning">已开启 (%d用户)</span>`, userCount)
+		}
+
 		rows.WriteString(fmt.Sprintf(`
                     <tr>
+                        <td>%s</td>
                         <td>%s</td>
                         <td>%s</td>
                         <td>%s</td>
@@ -260,7 +270,7 @@ func (s *Server) generateProxyRulesTable(data map[string]interface{}) string {
                             <a href="%s/proxy/delete?index=%d" class="btn btn-sm btn-outline-danger" onclick="return confirm('`+s.translator.T("proxy.delete_confirm")+`')">`+s.translator.T("proxy.delete")+`</a>
                         </td>
                     </tr>`,
-			rule.Domain, rule.Target, statusBadge, data["AdminPrefix"].(string), i, data["AdminPrefix"].(string), i))
+			rule.Domain, rule.Target, statusBadge, authBadge, data["AdminPrefix"].(string), i, data["AdminPrefix"].(string), i))
 	}
 	return rows.String()
 }
@@ -419,6 +429,95 @@ func (s *Server) generateProxyAddHTML(data map[string]interface{}) string {
                                     <input class="form-control" name="cdn_ttl_seconds" placeholder="例如 86400">
                                 </div>
                             </div>
+                            
+                            <hr>
+                            <h6>访问控制</h6>
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="auth_enabled" name="auth_enabled" 
+                                       onchange="toggleAuthSettings()">
+                                <label class="form-check-label" for="auth_enabled">启用登录验证</label>
+                            </div>
+                            
+                            <div id="auth_settings" style="display: none;">
+                                <div class="card border-primary mb-3">
+                                    <div class="card-header">
+                                        <strong>认证配置</strong>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">登录有效期（秒）</label>
+                                                <input type="number" class="form-control" name="auth_session_timeout" 
+                                                       value="3600" min="300" max="86400" placeholder="3600">
+                                                <div class="form-text">建议1小时(3600秒)到24小时(86400秒)</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Cookie域名（留空自动设置）</label>
+                                                <input type="text" class="form-control" name="auth_cookie_domain" 
+                                                       placeholder="自动使用代理域名">
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">
+                                                <strong>用户账号</strong>
+                                                <button type="button" class="btn btn-sm btn-outline-primary ms-2" 
+                                                        onclick="addAuthUser()">
+                                                    <i class="bi bi-plus"></i> 添加用户
+                                                </button>
+                                            </label>
+                                            <div id="auth_users_container">
+                                                <div class="text-muted">点击"添加用户"按钮添加用户账号</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <script>
+                            function toggleAuthSettings() {
+                                const enabled = document.getElementById('auth_enabled').checked;
+                                const settings = document.getElementById('auth_settings');
+                                settings.style.display = enabled ? 'block' : 'none';
+                            }
+                            
+                            function addAuthUser() {
+                                const container = document.getElementById('auth_users_container');
+                                
+                                // 如果是首次添加，清空提示文本
+                                if (container.children.length === 1 && container.firstElementChild.classList.contains('text-muted')) {
+                                    container.innerHTML = '';
+                                }
+                                
+                                const userIndex = container.children.length;
+                                const userHtml = 
+                                    '<div class="row mb-2 auth-user-row">' +
+                                        '<div class="col-md-5">' +
+                                            '<input type="text" class="form-control" name="auth_users[' + userIndex + '][username]" placeholder="用户名" required>' +
+                                        '</div>' +
+                                        '<div class="col-md-5">' +
+                                            '<input type="password" class="form-control" name="auth_users[' + userIndex + '][password]" placeholder="密码" required>' +
+                                        '</div>' +
+                                        '<div class="col-md-2">' +
+                                            '<button type="button" class="btn btn-outline-danger" onclick="removeAuthUser(this)">' +
+                                                '<i class="bi bi-trash"></i>' +
+                                            '</button>' +
+                                        '</div>' +
+                                    '</div>';
+                                container.insertAdjacentHTML('beforeend', userHtml);
+                            }
+                            
+                            function removeAuthUser(button) {
+                                const container = document.getElementById('auth_users_container');
+                                button.closest('.auth-user-row').remove();
+                                
+                                // 如果删除后没有用户了，显示提示文本
+                                if (container.children.length === 0) {
+                                    container.innerHTML = '<div class="text-muted">点击"添加用户"按钮添加用户账号</div>';
+                                }
+                            }
+                            </script>
+                            
                             <button type="submit" class="btn btn-primary">添加规则</button>
                             <a href="%s/proxy" class="btn btn-secondary">取消</a>
                         </form>
@@ -497,6 +596,86 @@ func (s *Server) generateProxyEditHTML(data map[string]interface{}) string {
                                     <input class="form-control" name="cdn_ttl_seconds" value="%s" placeholder="例如 86400">
                                 </div>
                             </div>
+                            
+                            <hr>
+                            <h6>访问控制</h6>
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="auth_enabled" name="auth_enabled" %s 
+                                       onchange="toggleAuthSettings()">
+                                <label class="form-check-label" for="auth_enabled">启用登录验证</label>
+                            </div>
+                            
+                            <div id="auth_settings" style="display: %s;">
+                                <div class="card border-primary mb-3">
+                                    <div class="card-header">
+                                        <strong>认证配置</strong>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">登录有效期（秒）</label>
+                                                <input type="number" class="form-control" name="auth_session_timeout" 
+                                                       value="%s" min="300" max="86400" placeholder="3600">
+                                                <div class="form-text">建议1小时(3600秒)到24小时(86400秒)</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Cookie域名（留空自动设置）</label>
+                                                <input type="text" class="form-control" name="auth_cookie_domain" 
+                                                       value="%s" placeholder="自动使用代理域名">
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">
+                                                <strong>用户账号</strong>
+                                                <button type="button" class="btn btn-sm btn-outline-primary ms-2" 
+                                                        onclick="addAuthUser()">
+                                                    <i class="bi bi-plus"></i> 添加用户
+                                                </button>
+                                            </label>
+                                            <div id="auth_users_container">%s</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <script>
+                            function toggleAuthSettings() {
+                                const enabled = document.getElementById('auth_enabled').checked;
+                                const settings = document.getElementById('auth_settings');
+                                settings.style.display = enabled ? 'block' : 'none';
+                            }
+                            
+                            function addAuthUser() {
+                                const container = document.getElementById('auth_users_container');
+                                const userIndex = container.children.length;
+                                const userHtml = 
+                                    '<div class="row mb-2 auth-user-row">' +
+                                        '<div class="col-md-5">' +
+                                            '<input type="text" class="form-control" name="auth_users[' + userIndex + '][username]" placeholder="用户名" required>' +
+                                        '</div>' +
+                                        '<div class="col-md-5">' +
+                                            '<input type="password" class="form-control" name="auth_users[' + userIndex + '][password]" placeholder="密码" required>' +
+                                        '</div>' +
+                                        '<div class="col-md-2">' +
+                                            '<button type="button" class="btn btn-outline-danger" onclick="removeAuthUser(this)">' +
+                                                '<i class="bi bi-trash"></i>' +
+                                            '</button>' +
+                                        '</div>' +
+                                    '</div>';
+                                container.insertAdjacentHTML('beforeend', userHtml);
+                            }
+                            
+                            function removeAuthUser(button) {
+                                button.closest('.auth-user-row').remove();
+                            }
+                            
+                            // 初始化显示状态
+                            document.addEventListener('DOMContentLoaded', function() {
+                                toggleAuthSettings();
+                            });
+                            </script>
+                            
                             <button type="submit" class="btn btn-primary">保存更改</button>
                             <a href="%s/proxy" class="btn btn-secondary">取消</a>
                         </form>
@@ -523,7 +702,46 @@ func (s *Server) generateProxyEditHTML(data map[string]interface{}) string {
 			}
 			return ""
 		}(),
+		// 访问控制相关字段
+		map[bool]string{true: "checked"}[rule.AuthEnabled],
+		map[bool]string{true: "block", false: "none"}[rule.AuthEnabled],
+		func() string {
+			if rule.AuthSessionTimeout > 0 {
+				return fmt.Sprintf("%d", rule.AuthSessionTimeout)
+			}
+			return "3600"
+		}(),
+		rule.AuthCookieDomain,
+		s.generateAuthUsersHTML(rule.AuthUsers),
 		data["AdminPrefix"].(string))
+}
+
+// generateAuthUsersHTML 生成认证用户的HTML
+func (s *Server) generateAuthUsersHTML(users []config.ProxyAuthUser) string {
+	if len(users) == 0 {
+		return `<div class="text-muted">暂无用户，点击"添加用户"按钮添加</div>`
+	}
+
+	var html strings.Builder
+	for i, user := range users {
+		html.WriteString(fmt.Sprintf(`
+		<div class="row mb-2 auth-user-row">
+			<div class="col-md-5">
+				<input type="text" class="form-control" name="auth_users[%d][username]" 
+					   value="%s" placeholder="用户名" required>
+			</div>
+			<div class="col-md-5">
+				<input type="password" class="form-control" name="auth_users[%d][password]" 
+					   value="%s" placeholder="密码" required>
+			</div>
+			<div class="col-md-2">
+				<button type="button" class="btn btn-outline-danger" onclick="removeAuthUser(this)">
+					<i class="bi bi-trash"></i>
+				</button>
+			</div>
+		</div>`, i, user.Username, i, user.Password))
+	}
+	return html.String()
 }
 
 func (s *Server) generateSSLManagementHTML(data map[string]interface{}) string {
@@ -1076,10 +1294,12 @@ func (s *Server) generateSettingsHTML(data map[string]interface{}) string {
 
 func (s *Server) generateCDNCacheHTML(data map[string]interface{}) string {
 	cdn := data["CDN"].(config.CDNCacheConfig)
-	
+
 	// 获取实时统计
 	cdnStats := map[string]interface{}{"enabled": false}
-	if pm, ok := interface{}(s.proxyManager).(interface{ GetCDNCache() interface{ Stats() map[string]interface{} } }); ok {
+	if pm, ok := interface{}(s.proxyManager).(interface {
+		GetCDNCache() interface{ Stats() map[string]interface{} }
+	}); ok {
 		if cache := pm.GetCDNCache(); cache != nil {
 			cdnStats = cache.Stats()
 		}
@@ -1213,11 +1433,36 @@ func (s *Server) generateCDNCacheHTML(data map[string]interface{}) string {
 </html>`,
 		s.generateSidebar(data["AdminPrefix"].(string), "cdn-cache"),
 		data["AdminPrefix"].(string),
-		func() float64 { if v, ok := cdnStats["hit_rate"].(float64); ok { return v }; return 0 }(),
-		func() int64 { if v, ok := cdnStats["objects"].(int64); ok { return v }; return 0 }(),
-		func() float64 { if v, ok := cdnStats["utilization"].(float64); ok { return v }; return 0 }(),
-		func() int64 { if v, ok := cdnStats["hits"].(int64); ok { return v }; return 0 }(),
-		func() int64 { if v, ok := cdnStats["misses"].(int64); ok { return v }; return 0 }(),
+		func() float64 {
+			if v, ok := cdnStats["hit_rate"].(float64); ok {
+				return v
+			}
+			return 0
+		}(),
+		func() int64 {
+			if v, ok := cdnStats["objects"].(int64); ok {
+				return v
+			}
+			return 0
+		}(),
+		func() float64 {
+			if v, ok := cdnStats["utilization"].(float64); ok {
+				return v
+			}
+			return 0
+		}(),
+		func() int64 {
+			if v, ok := cdnStats["hits"].(int64); ok {
+				return v
+			}
+			return 0
+		}(),
+		func() int64 {
+			if v, ok := cdnStats["misses"].(int64); ok {
+				return v
+			}
+			return 0
+		}(),
 		data["AdminPrefix"].(string),
 		map[bool]string{true: "checked"}[cdn.Enabled],
 		cdn.CacheDir,

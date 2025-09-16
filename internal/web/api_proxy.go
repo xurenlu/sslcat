@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -28,6 +29,12 @@ func (s *Server) handleAPIProxyRulesPost(w http.ResponseWriter, r *http.Request)
 		CDNEnabled           bool   `json:"cdn_enabled"`
 		CDNPreset            string `json:"cdn_preset"`
 		CDNDefaultTTLSeconds int    `json:"cdn_ttl_seconds"`
+
+		// 访问控制字段
+		AuthEnabled        bool                   `json:"auth_enabled"`
+		AuthUsers          []config.ProxyAuthUser `json:"auth_users"`
+		AuthSessionTimeout int                    `json:"auth_session_timeout"`
+		AuthCookieDomain   string                 `json:"auth_cookie_domain"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -40,6 +47,39 @@ func (s *Server) handleAPIProxyRulesPost(w http.ResponseWriter, r *http.Request)
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": "domain and target are required"})
 		return
+	}
+
+	// 验证访问控制配置
+	if req.AuthEnabled {
+		if len(req.AuthUsers) == 0 {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "auth_users are required when auth is enabled"})
+			return
+		}
+
+		// 验证用户名和密码不为空
+		for i, user := range req.AuthUsers {
+			if strings.TrimSpace(user.Username) == "" || strings.TrimSpace(user.Password) == "" {
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("username and password are required for user %d", i+1)})
+				return
+			}
+		}
+
+		// 设置默认会话超时时间
+		if req.AuthSessionTimeout <= 0 {
+			req.AuthSessionTimeout = 3600 // 默认1小时
+		}
+
+		// 设置默认cookie域名
+		if req.AuthCookieDomain == "" {
+			req.AuthCookieDomain = req.Domain
+		}
+	} else {
+		// 未开启认证时，清空相关字段
+		req.AuthUsers = nil
+		req.AuthSessionTimeout = 0
+		req.AuthCookieDomain = ""
 	}
 
 	// 检查是否已存在该域名
@@ -59,6 +99,12 @@ func (s *Server) handleAPIProxyRulesPost(w http.ResponseWriter, r *http.Request)
 		CDNEnabled:           req.CDNEnabled,
 		CDNPreset:            req.CDNPreset,
 		CDNDefaultTTLSeconds: req.CDNDefaultTTLSeconds,
+
+		// 访问控制字段
+		AuthEnabled:        req.AuthEnabled,
+		AuthUsers:          req.AuthUsers,
+		AuthSessionTimeout: req.AuthSessionTimeout,
+		AuthCookieDomain:   req.AuthCookieDomain,
 	}
 
 	if existingIndex >= 0 {
