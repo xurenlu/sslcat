@@ -10,6 +10,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -630,18 +631,153 @@ func (m *Manager) EnsureDomainCert(domain string) error {
 	if domain == "" {
 		return fmt.Errorf("empty domain")
 	}
-	// 临时放行该域名以触发申请（避免必须写入配置）
-	m.AllowDomainTemporary(domain, 24*time.Hour)
-	_, err := m.acmeMgr.GetCertificate(&tls.ClientHelloInfo{ServerName: domain})
-	if err != nil {
-		m.log.Warnf("ACME certificate request failed %s: %v", domain, err)
-	} else {
-		// 申请成功后主动同步一次
-		if _, syncErr := m.SyncACMECertsToDisk(); syncErr != nil {
-			m.log.Debugf("ACME post-issue sync failed: %v", syncErr)
+
+	// 使用智能重试机制申请证书
+	return m.ensureDomainCertWithRetry(domain, 3) // 最多重试3次
+}
+
+// ensureDomainCertWithRetry 带重试机制的证书申请
+func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error {
+	var lastErr error
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		m.log.Infof("Certificate request attempt %d/%d for domain: %s", attempt, maxRetries, domain)
+
+		// 第一次尝试时检查域名解析
+		if attempt == 1 {
+			if resolved, info, err := m.checkDomainResolution(domain); err != nil {
+				m.log.Warnf("Domain resolution check failed for %s: %v", domain, err)
+			} else {
+				m.log.Infof("Domain resolution check for %s: %s", domain, info)
+				if !resolved {
+					m.log.Warnf("Domain %s may not resolve to this server, HTTP-01 validation might fail", domain)
+				}
+			}
+		}
+
+		// 临时放行该域名以触发申请（避免必须写入配置）
+		m.AllowDomainTemporary(domain, 24*time.Hour)
+
+		// 尝试HTTP-01验证
+		_, err := m.acmeMgr.GetCertificate(&tls.ClientHelloInfo{ServerName: domain})
+		if err == nil {
+			// 申请成功，同步证书
+			if _, syncErr := m.SyncACMECertsToDisk(); syncErr != nil {
+				m.log.Debugf("ACME post-issue sync failed: %v", syncErr)
+			}
+			m.log.Infof("Certificate request successful for domain: %s (attempt %d)", domain, attempt)
+			return nil
+		}
+
+		lastErr = err
+		m.log.Warnf("HTTP-01 validation failed for %s (attempt %d): %v", domain, attempt, err)
+
+		// 如果HTTP-01失败且配置了DNS服务商，尝试DNS-01验证
+		if m.supportsDNSChallenge() && m.hasAvailableDNSProvider() {
+			m.log.Infof("Attempting DNS-01 validation for domain: %s", domain)
+			if dnsErr := m.tryDNSValidation(domain); dnsErr == nil {
+				m.log.Infof("DNS-01 validation successful for domain: %s", domain)
+				return nil
+			} else {
+				m.log.Warnf("DNS-01 validation also failed for %s: %v", domain, dnsErr)
+			}
+		}
+
+		// 如果不是最后一次尝试，等待一段时间后重试
+		if attempt < maxRetries {
+			waitTime := time.Duration(attempt*10) * time.Second // 递增等待时间
+			m.log.Infof("Waiting %v before retry for domain: %s", waitTime, domain)
+			time.Sleep(waitTime)
 		}
 	}
-	return err
+
+	m.log.Errorf("All certificate request attempts failed for domain: %s, last error: %v", domain, lastErr)
+	return fmt.Errorf("certificate request failed after %d attempts: %w", maxRetries, lastErr)
+}
+
+// hasAvailableDNSProvider 检查是否有可用的DNS服务商
+func (m *Manager) hasAvailableDNSProvider() bool {
+	providers := m.dnsManager.ListProviders()
+	return len(providers) > 0
+}
+
+// tryDNSValidation 尝试使用DNS验证申请证书
+func (m *Manager) tryDNSValidation(domain string) error {
+	providers := m.dnsManager.ListProviders()
+	if len(providers) == 0 {
+		return fmt.Errorf("no DNS providers available")
+	}
+
+	// 使用第一个可用的DNS服务商
+	providerName := providers[0]
+	m.log.Infof("Using DNS provider: %s for domain: %s", providerName, domain)
+
+	return m.RequestCertificateWithDNS(domain, providerName)
+}
+
+// checkDomainResolution 检查域名解析状态
+func (m *Manager) checkDomainResolution(domain string) (bool, string, error) {
+	// 使用系统DNS解析检查域名
+	ips, err := net.LookupIP(domain)
+	if err != nil {
+		return false, "", fmt.Errorf("domain resolution failed: %w", err)
+	}
+
+	if len(ips) == 0 {
+		return false, "", fmt.Errorf("no IP addresses found for domain")
+	}
+
+	// 获取当前服务器IP
+	serverIPs, err := m.getServerIPs()
+	if err != nil {
+		m.log.Warnf("Failed to get server IPs: %v", err)
+		return true, fmt.Sprintf("Domain resolves to: %v", ips), nil // 仍然返回成功，但记录警告
+	}
+
+	// 检查域名是否解析到当前服务器
+	for _, domainIP := range ips {
+		for _, serverIP := range serverIPs {
+			if domainIP.Equal(serverIP) {
+				return true, fmt.Sprintf("Domain correctly resolves to server IP: %s", domainIP.String()), nil
+			}
+		}
+	}
+
+	return false, fmt.Sprintf("Domain resolves to: %v, but server IPs are: %v", ips, serverIPs), nil
+}
+
+// getServerIPs 获取当前服务器的IP地址
+func (m *Manager) getServerIPs() ([]net.IP, error) {
+	var ips []net.IP
+
+	// 获取所有网络接口
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, iface := range interfaces {
+		// 跳过回环接口和未启用的接口
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+
+		for _, addr := range addrs {
+			if ipNet, ok := addr.(*net.IPNet); ok {
+				// 只添加IPv4地址
+				if ipNet.IP.To4() != nil {
+					ips = append(ips, ipNet.IP)
+				}
+			}
+		}
+	}
+
+	return ips, nil
 }
 
 // isAllowedDomain 仅允许配置中的域名（代理规则或 ssl.domains）
@@ -1101,6 +1237,11 @@ func (m *Manager) initializeDNSProviders() {
 
 // RequestCertificateWithDNS 使用DNS验证申请证书
 func (m *Manager) RequestCertificateWithDNS(domain, providerName string) error {
+	return m.requestCertificateWithDNSRetry(domain, providerName, 2) // DNS验证最多重试2次
+}
+
+// requestCertificateWithDNSRetry 带重试机制的DNS验证证书申请
+func (m *Manager) requestCertificateWithDNSRetry(domain, providerName string, maxRetries int) error {
 	if m.acmeMgr == nil {
 		return fmt.Errorf("ACME not enabled")
 	}
@@ -1116,6 +1257,32 @@ func (m *Manager) RequestCertificateWithDNS(domain, providerName string) error {
 		return fmt.Errorf("DNS provider not found: %s", providerName)
 	}
 
+	var lastErr error
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		m.log.Infof("DNS certificate request attempt %d/%d for domain: %s using provider: %s", attempt, maxRetries, domain, providerName)
+
+		err := m.performDNSChallenge(domain, providerName)
+		if err == nil {
+			m.log.Infof("DNS certificate request successful for domain: %s (attempt %d)", domain, attempt)
+			return nil
+		}
+
+		lastErr = err
+		m.log.Warnf("DNS certificate request failed for %s (attempt %d): %v", domain, attempt, err)
+
+		// 如果不是最后一次尝试，等待一段时间后重试
+		if attempt < maxRetries {
+			waitTime := time.Duration(attempt*15) * time.Second // DNS验证等待时间稍长
+			m.log.Infof("Waiting %v before DNS retry for domain: %s", waitTime, domain)
+			time.Sleep(waitTime)
+		}
+	}
+
+	return fmt.Errorf("DNS certificate request failed after %d attempts: %w", maxRetries, lastErr)
+}
+
+// performDNSChallenge 执行DNS挑战验证
+func (m *Manager) performDNSChallenge(domain, providerName string) error {
 	// 创建ACME客户端
 	client := &acme.Client{}
 	if m.config.SSL.Staging {
@@ -1130,6 +1297,7 @@ func (m *Manager) RequestCertificateWithDNS(domain, providerName string) error {
 	}
 
 	ctx := context.Background()
+	var err error
 	account, err = client.Register(ctx, account, acme.AcceptTOS)
 	if err != nil {
 		return fmt.Errorf("failed to register ACME account: %w", err)
