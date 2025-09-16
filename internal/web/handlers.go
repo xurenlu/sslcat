@@ -37,24 +37,8 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		debugForced := strings.EqualFold(r.URL.Query().Get("debug"), "true") || r.URL.Query().Get("debug") == "1"
 
 		// 下发人机验证要素（TOTP启用时禁用PoW）
-		clientIP := s.getClientIP(r)
-		nonce := ""
-		bits := 0
-		enablePoW := s.config.Security.EnablePoW && !s.config.Admin.EnableTOTP
-		if enablePoW {
-			n, b := s.powManager.Issue(clientIP)
-			nonce, bits = n, b
-			if s.config.Security.PoWBits > 0 {
-				bits = s.config.Security.PoWBits
-			}
-		}
 		startTs := time.Now().UnixMilli()
-		honeypotName := "hp_" + func() string {
-			if nonce == "" {
-				return "seed000"
-			}
-			return nonce[:6]
-		}()
+		honeypotName := "hp_seed000"
 
 		data := map[string]interface{}{
 			"AdminPrefix":    s.config.AdminPrefix,
@@ -62,12 +46,8 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			"RequireCaptcha": s.config.Security.EnableCaptcha,
 			"RequireTOTP":    s.config.Admin.EnableTOTP,
 			"Debug":          debugForced,
-			// PoW
-			"PowNonce": nonce,
-			"PowBits":  bits,
-			// 蜜罐与时长
-			"HoneypotName": honeypotName,
-			"FormStartTs":  startTs,
+			"HoneypotName":   honeypotName,
+			"FormStartTs":    startTs,
 		}
 
 		s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
@@ -85,18 +65,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			if strings.HasPrefix(k, "hp_") && len(v) > 0 {
 				trimmed := strings.TrimSpace(v[0])
 				if trimmed != "" {
-					clientIP := s.getClientIP(r)
-					n2, b2 := "", 0
-					enablePoW := s.config.Security.EnablePoW && !s.config.Admin.EnableTOTP
-					if enablePoW {
-						n2, b2 = s.powManager.Issue(clientIP)
-					}
-					hp := "hp_" + func() string {
-						if n2 == "" {
-							return "seed000"
-						}
-						return n2[:6]
-					}()
+					hp := "hp_seed000"
 					startTs := time.Now().UnixMilli()
 					data := map[string]interface{}{
 						"AdminPrefix":    s.config.AdminPrefix,
@@ -104,15 +73,8 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 						"RequireCaptcha": s.config.Security.EnableCaptcha && !s.config.Admin.EnableTOTP,
 						"RequireTOTP":    s.config.Admin.EnableTOTP,
 						"Debug":          false,
-						"PowNonce":       n2,
-						"PowBits": func() int {
-							if s.config.Security.PoWBits > 0 {
-								return s.config.Security.PoWBits
-							}
-							return b2
-						}(),
-						"HoneypotName": hp,
-						"FormStartTs":  startTs,
+						"HoneypotName":   hp,
+						"FormStartTs":    startTs,
 					}
 					s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
 					return
@@ -134,32 +96,15 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 				s.log.Infof("Form duration: %dms, required: %dms", duration, minMs)
 				if duration < minMs {
 					s.log.Infof("FORM TOO FAST: %dms < %dms", duration, minMs)
-					clientIP := s.getClientIP(r)
-					n2, b2 := "", 0
-					if s.config.Security.EnablePoW {
-						n2, b2 = s.powManager.Issue(clientIP)
-					}
-					hp := "hp_" + func() string {
-						if n2 == "" {
-							return "seed000"
-						}
-						return n2[:6]
-					}()
+					hp := "hp_seed000"
 					startTs := time.Now().UnixMilli()
 					data := map[string]interface{}{
 						"AdminPrefix":    s.config.AdminPrefix,
 						"Error":          "提交过快，请重试",
 						"RequireCaptcha": s.config.Security.EnableCaptcha,
 						"Debug":          false,
-						"PowNonce":       n2,
-						"PowBits": func() int {
-							if s.config.Security.PoWBits > 0 {
-								return s.config.Security.PoWBits
-							}
-							return b2
-						}(),
-						"HoneypotName": hp,
-						"FormStartTs":  startTs,
+						"HoneypotName":   hp,
+						"FormStartTs":    startTs,
 					}
 					s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
 					return
@@ -169,43 +114,6 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			}
 		} else {
 			s.log.Infof("No form_start_ts found")
-		}
-
-		// PoW 校验（按开关，TOTP启用时跳过）
-		enablePoW := s.config.Security.EnablePoW && !s.config.Admin.EnableTOTP
-		if enablePoW {
-			n := strings.TrimSpace(r.FormValue("pow_nonce"))
-			sol := strings.TrimSpace(r.FormValue("pow_solution"))
-			s.log.Infof("PoW values: nonce='%s', solution='%s'", n, sol)
-			powResult := s.powManager.Verify(n, sol)
-			s.log.Infof("PoW verification result: %v", powResult)
-			if n == "" || sol == "" || !powResult {
-				s.log.Infof("PoW FAILED: nonce_empty=%v, solution_empty=%v, verify_result=%v", n == "", sol == "", powResult)
-				clientIP := s.getClientIP(r)
-				n2, b2 := s.powManager.Issue(clientIP)
-				hp := "hp_" + n2[:6]
-				startTs := time.Now().UnixMilli()
-				data := map[string]interface{}{
-					"AdminPrefix":    s.config.AdminPrefix,
-					"Error":          "人机校验失败，请重试",
-					"RequireCaptcha": s.config.Security.EnableCaptcha,
-					"RequireTOTP":    s.config.Admin.EnableTOTP,
-					"Debug":          false,
-					"PowNonce":       n2,
-					"PowBits": func() int {
-						if s.config.Security.PoWBits > 0 {
-							return s.config.Security.PoWBits
-						}
-						return b2
-					}(),
-					"HoneypotName": hp,
-					"FormStartTs":  startTs,
-				}
-				s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
-				return
-			}
-		} else {
-			s.log.Infof("PoW disabled, skipping check")
 		}
 
 		// 图形验证码校验（按开关，TOTP启用时跳过）
@@ -219,9 +127,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			s.log.Infof("Captcha verification result: %v", captchaResult)
 			if sid == "" || code == "" || !captchaResult {
 				s.log.Infof("CAPTCHA FAILED: sid_empty=%v, code_empty=%v, verify_result=%v", sid == "", code == "", captchaResult)
-				clientIP := s.getClientIP(r)
-				n2, b2 := s.powManager.Issue(clientIP)
-				hp := "hp_" + n2[:6]
+				hp := "hp_seed000"
 				startTs := time.Now().UnixMilli()
 				data := map[string]interface{}{
 					"AdminPrefix":    s.config.AdminPrefix,
@@ -229,15 +135,8 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 					"RequireCaptcha": s.config.Security.EnableCaptcha,
 					"RequireTOTP":    s.config.Admin.EnableTOTP,
 					"Debug":          false,
-					"PowNonce":       n2,
-					"PowBits": func() int {
-						if s.config.Security.PoWBits > 0 {
-							return s.config.Security.PoWBits
-						}
-						return b2
-					}(),
-					"HoneypotName": hp,
-					"FormStartTs":  startTs,
+					"HoneypotName":   hp,
+					"FormStartTs":    startTs,
 				}
 				s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
 				return
@@ -263,18 +162,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		if usernameMatch && passwordMatch {
 			// TOTP 二次验证（如果启用）
 			if s.config.Admin.EnableTOTP && !s.verifyTOTP(totpCode) {
-				clientIP := s.getClientIP(r)
-				n2, b2 := "", 0
-				enablePoW := s.config.Security.EnablePoW && !s.config.Admin.EnableTOTP
-				if enablePoW {
-					n2, b2 = s.powManager.Issue(clientIP)
-				}
-				hp := "hp_" + func() string {
-					if n2 == "" {
-						return "seed000"
-					}
-					return n2[:6]
-				}()
+				hp := "hp_seed000"
 				startTs := time.Now().UnixMilli()
 				data := map[string]interface{}{
 					"AdminPrefix":    s.config.AdminPrefix,
@@ -282,15 +170,8 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 					"RequireCaptcha": s.config.Security.EnableCaptcha,
 					"RequireTOTP":    s.config.Admin.EnableTOTP,
 					"Debug":          false,
-					"PowNonce":       n2,
-					"PowBits": func() int {
-						if s.config.Security.PoWBits > 0 {
-							return s.config.Security.PoWBits
-						}
-						return b2
-					}(),
-					"HoneypotName": hp,
-					"FormStartTs":  startTs,
+					"HoneypotName":   hp,
+					"FormStartTs":    startTs,
 				}
 				s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
 				return
@@ -306,23 +187,8 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		s.audit("login_failed", clientIP)
 
 		// 显示错误页面（重新生成完整表单数据）
-		nonce := ""
-		bits := 0
-		enablePoWForError := s.config.Security.EnablePoW && !s.config.Admin.EnableTOTP
-		if enablePoWForError {
-			n, b := s.powManager.Issue(clientIP)
-			nonce, bits = n, b
-			if s.config.Security.PoWBits > 0 {
-				bits = s.config.Security.PoWBits
-			}
-		}
 		startTs := time.Now().UnixMilli()
-		honeypotName := "hp_" + func() string {
-			if nonce == "" {
-				return "seed000"
-			}
-			return nonce[:6]
-		}()
+		honeypotName := "hp_seed000"
 
 		data := map[string]interface{}{
 			"AdminPrefix":    s.config.AdminPrefix,
@@ -330,8 +196,6 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			"RequireCaptcha": s.config.Security.EnableCaptcha,
 			"RequireTOTP":    s.config.Admin.EnableTOTP,
 			"Debug":          false,
-			"PowNonce":       nonce,
-			"PowBits":        bits,
 			"HoneypotName":   honeypotName,
 			"FormStartTs":    startTs,
 		}
@@ -494,23 +358,8 @@ func (s *Server) processLogin(w http.ResponseWriter, r *http.Request) {
 	s.audit("login_failed", clientIP)
 
 	// 显示错误页面（重新生成完整表单数据）
-	nonce := ""
-	bits := 0
-	enablePoWForFinal := s.config.Security.EnablePoW && !s.config.Admin.EnableTOTP
-	if enablePoWForFinal {
-		n, b := s.powManager.Issue(clientIP)
-		nonce, bits = n, b
-		if s.config.Security.PoWBits > 0 {
-			bits = s.config.Security.PoWBits
-		}
-	}
 	startTs := time.Now().UnixMilli()
-	honeypotName := "hp_" + func() string {
-		if nonce == "" {
-			return "seed000"
-		}
-		return nonce[:6]
-	}()
+	honeypotName := "hp_seed000"
 
 	data := map[string]interface{}{
 		"AdminPrefix":    s.config.AdminPrefix,
@@ -518,8 +367,6 @@ func (s *Server) processLogin(w http.ResponseWriter, r *http.Request) {
 		"RequireCaptcha": s.config.Security.EnableCaptcha,
 		"RequireTOTP":    s.config.Admin.EnableTOTP,
 		"Debug":          false,
-		"PowNonce":       nonce,
-		"PowBits":        bits,
 		"HoneypotName":   honeypotName,
 		"FormStartTs":    startTs,
 	}
@@ -841,24 +688,8 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 // renderLoginError 渲染登录错误页面
 func (s *Server) renderLoginError(w http.ResponseWriter, r *http.Request, errorMsg string) {
 	// 重新生成完整表单数据
-	clientIP := s.getClientIP(r)
-	nonce := ""
-	bits := 0
-	enablePoW := s.config.Security.EnablePoW && !s.config.Admin.EnableTOTP
-	if enablePoW {
-		n, b := s.powManager.Issue(clientIP)
-		nonce, bits = n, b
-		if s.config.Security.PoWBits > 0 {
-			bits = s.config.Security.PoWBits
-		}
-	}
 	startTs := time.Now().UnixMilli()
-	honeypotName := "hp_" + func() string {
-		if nonce == "" {
-			return "seed000"
-		}
-		return nonce[:6]
-	}()
+	honeypotName := "hp_seed000"
 
 	data := map[string]interface{}{
 		"AdminPrefix":    s.config.AdminPrefix,
@@ -866,8 +697,6 @@ func (s *Server) renderLoginError(w http.ResponseWriter, r *http.Request, errorM
 		"RequireCaptcha": s.config.Security.EnableCaptcha,
 		"RequireTOTP":    s.config.Admin.EnableTOTP,
 		"Debug":          false,
-		"PowNonce":       nonce,
-		"PowBits":        bits,
 		"HoneypotName":   honeypotName,
 		"FormStartTs":    startTs,
 	}

@@ -18,22 +18,20 @@ func (s *Server) handleAPISettings(w http.ResponseWriter, r *http.Request) {
 
 	// 返回非敏感的配置信息
 	settings := map[string]interface{}{
-		"admin_prefix":    s.config.AdminPrefix,
-		"admin_username":  s.config.Admin.Username,
-		"ssl_email":       s.config.SSL.Email,
-		"ssl_disable_self_signed": s.config.SSL.DisableSelfSigned,
-		"proxy_unmatched_behavior": s.config.Proxy.UnmatchedBehavior,
+		"admin_prefix":                 s.config.AdminPrefix,
+		"admin_username":               s.config.Admin.Username,
+		"ssl_email":                    s.config.SSL.Email,
+		"ssl_disable_self_signed":      s.config.SSL.DisableSelfSigned,
+		"proxy_unmatched_behavior":     s.config.Proxy.UnmatchedBehavior,
 		"proxy_unmatched_redirect_url": s.config.Proxy.UnmatchedRedirectURL,
 		"security": map[string]interface{}{
 			"enable_captcha":   s.config.Security.EnableCaptcha,
-			"enable_pow":       s.config.Security.EnablePoW,
 			"enable_ddos":      s.config.Security.EnableDDOS,
 			"enable_waf":       s.config.Security.EnableWAF,
 			"enable_ua_filter": s.config.Security.EnableUAFilter,
-			"pow_bits":         s.config.Security.PoWBits,
 			"min_form_ms":      s.config.Security.MinFormMs,
 		},
-		"cdn_cache": s.config.CDNCache,
+		"cdn_cache":    s.config.CDNCache,
 		"totp_enabled": s.config.Admin.EnableTOTP,
 	}
 
@@ -53,20 +51,18 @@ func (s *Server) handleAPISettingsUpdate(w http.ResponseWriter, r *http.Request)
 	}
 
 	var req struct {
-		AdminPrefix    string `json:"admin_prefix,omitempty"`
-		AdminUsername  string `json:"admin_username,omitempty"`
-		SSLEmail       string `json:"ssl_email,omitempty"`
-		SSLDisableSelfSigned *bool `json:"ssl_disable_self_signed,omitempty"`
-		ProxyUnmatchedBehavior string `json:"proxy_unmatched_behavior,omitempty"`
+		AdminPrefix               string `json:"admin_prefix,omitempty"`
+		AdminUsername             string `json:"admin_username,omitempty"`
+		SSLEmail                  string `json:"ssl_email,omitempty"`
+		SSLDisableSelfSigned      *bool  `json:"ssl_disable_self_signed,omitempty"`
+		ProxyUnmatchedBehavior    string `json:"proxy_unmatched_behavior,omitempty"`
 		ProxyUnmatchedRedirectURL string `json:"proxy_unmatched_redirect_url,omitempty"`
-		Security struct {
-			EnableCaptcha   *bool `json:"enable_captcha,omitempty"`
-			EnablePoW       *bool `json:"enable_pow,omitempty"`
-			EnableDDOS      *bool `json:"enable_ddos,omitempty"`
-			EnableWAF       *bool `json:"enable_waf,omitempty"`
-			EnableUAFilter  *bool `json:"enable_ua_filter,omitempty"`
-			PoWBits         *int  `json:"pow_bits,omitempty"`
-			MinFormMs       *int  `json:"min_form_ms,omitempty"`
+		Security                  struct {
+			EnableCaptcha  *bool `json:"enable_captcha,omitempty"`
+			EnableDDOS     *bool `json:"enable_ddos,omitempty"`
+			EnableWAF      *bool `json:"enable_waf,omitempty"`
+			EnableUAFilter *bool `json:"enable_ua_filter,omitempty"`
+			MinFormMs      *int  `json:"min_form_ms,omitempty"`
 		} `json:"security,omitempty"`
 	}
 
@@ -103,9 +99,6 @@ func (s *Server) handleAPISettingsUpdate(w http.ResponseWriter, r *http.Request)
 	if req.Security.EnableCaptcha != nil {
 		s.config.Security.EnableCaptcha = *req.Security.EnableCaptcha
 	}
-	if req.Security.EnablePoW != nil {
-		s.config.Security.EnablePoW = *req.Security.EnablePoW
-	}
 	if req.Security.EnableDDOS != nil {
 		s.config.Security.EnableDDOS = *req.Security.EnableDDOS
 	}
@@ -114,9 +107,6 @@ func (s *Server) handleAPISettingsUpdate(w http.ResponseWriter, r *http.Request)
 	}
 	if req.Security.EnableUAFilter != nil {
 		s.config.Security.EnableUAFilter = *req.Security.EnableUAFilter
-	}
-	if req.Security.PoWBits != nil && *req.Security.PoWBits >= 10 && *req.Security.PoWBits <= 30 {
-		s.config.Security.PoWBits = *req.Security.PoWBits
 	}
 	if req.Security.MinFormMs != nil && *req.Security.MinFormMs >= 0 && *req.Security.MinFormMs <= 10000 {
 		s.config.Security.MinFormMs = *req.Security.MinFormMs

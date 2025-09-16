@@ -2,6 +2,7 @@ package web
 
 import (
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -64,8 +65,6 @@ type Server struct {
 	tokenStore *security.TokenStore
 	// 验证码管理
 	captchaManager *CaptchaManager
-	// PoW 管理器
-	powManager *PowManager
 	// DDoS 防护器
 	ddosProtector  *ddos.Protector
 	clusterManager ClusterManager
@@ -120,8 +119,6 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 
 	// 初始化验证码管理器
 	server.captchaManager = NewCaptchaManager()
-	// 初始化 PoW 管理器
-	server.powManager = NewPowManager()
 	// 初始化 DDoS 防护器
 	server.ddosProtector = ddos.NewProtector()
 
@@ -562,6 +559,65 @@ func (s *Server) securityMiddleware(w http.ResponseWriter, r *http.Request) bool
 	return true
 }
 
+// hasValidCertificate 检查域名是否有有效的非自签名证书
+func (s *Server) hasValidCertificate(domain string) bool {
+	// 尝试获取证书
+	cert, err := s.sslManager.GetCertificate(domain)
+	if err != nil || cert == nil || len(cert.Certificate) == 0 {
+		return false
+	}
+
+	// 解析证书
+	x509Cert, err := x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		return false
+	}
+
+	// 检查证书是否过期
+	if time.Now().After(x509Cert.NotAfter) {
+		return false
+	}
+
+	// 检查是否为自签名证书（自签名证书不应该强制HTTPS）
+	isSelfSigned := x509Cert.Issuer.String() == x509Cert.Subject.String()
+
+	// 如果是自签名证书，认为没有有效证书
+	if isSelfSigned {
+		return false
+	}
+
+	// 检查是否包含该域名
+	if !s.domainMatchesCert(domain, x509Cert) {
+		return false
+	}
+
+	return true
+}
+
+// domainMatchesCert 检查域名是否匹配证书
+func (s *Server) domainMatchesCert(domain string, cert *x509.Certificate) bool {
+	// 检查Subject Common Name
+	if cert.Subject.CommonName == domain {
+		return true
+	}
+
+	// 检查SAN（Subject Alternative Names）
+	for _, san := range cert.DNSNames {
+		if san == domain {
+			return true
+		}
+		// 支持通配符匹配
+		if strings.HasPrefix(san, "*.") {
+			wildcardDomain := san[2:] // 去掉 "*."
+			if strings.HasSuffix(domain, "."+wildcardDomain) || domain == wildcardDomain {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 // proxyMiddleware 代理中间件
 func (s *Server) proxyMiddleware(w http.ResponseWriter, r *http.Request) bool {
 	// 如果是管理面板路径，跳过代理
@@ -588,12 +644,22 @@ func (s *Server) proxyMiddleware(w http.ResponseWriter, r *http.Request) bool {
 	// 查找代理配置
 	rule := s.proxyManager.GetProxyConfig(host)
 	if rule != nil && rule.Enabled {
-		// 若仅允许HTTPS且当前为HTTP，则跳转到HTTPS
+		// 若仅允许HTTPS且当前为HTTP，需要检查是否有有效证书
 		if rule.SSLOnly && r.TLS == nil {
-			target := "https://" + host + r.URL.RequestURI()
-			s.log.Warnf("SSL-only rule, redirecting http->https for host=%s", host)
-			http.Redirect(w, r, target, http.StatusMovedPermanently)
-			return true
+			// 检查是否为本地IP或localhost，这些不需要强制HTTPS
+			if net.ParseIP(host) != nil || host == "localhost" || strings.HasPrefix(host, "127.") || strings.HasPrefix(host, "::1") {
+				s.log.Debugf("SSL-only rule ignored for local IP/hostname: %s", host)
+			} else {
+				// 检查是否有有效的非自签名证书
+				if s.hasValidCertificate(host) {
+					target := "https://" + host + r.URL.RequestURI()
+					s.log.Warnf("SSL-only rule, redirecting http->https for host=%s", host)
+					http.Redirect(w, r, target, http.StatusMovedPermanently)
+					return true
+				} else {
+					s.log.Debugf("SSL-only rule ignored for %s: no valid certificate found", host)
+				}
+			}
 		}
 		// 执行代理（带访问控制）
 		s.ProxyRequestWithAuth(w, r, rule)

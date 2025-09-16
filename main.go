@@ -29,11 +29,15 @@ var (
 	build   = "dev"
 )
 
-// isIPHost 检查Host是否为IP地址
+// isIPHost 检查Host是否为IP地址或localhost
 func isIPHost(host string) bool {
 	// 移除端口号（如果有的话）
 	if idx := strings.Index(host, ":"); idx != -1 {
 		host = host[:idx]
+	}
+	// 检查是否为localhost
+	if host == "localhost" {
+		return true
 	}
 	// 检查是否为有效的IP地址
 	return net.ParseIP(host) != nil

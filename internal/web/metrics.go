@@ -14,11 +14,11 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
-	
+
 	// 系统统计
 	stats := s.getSystemStats()
 	uptime := time.Since(s.startTime).Seconds()
-	
+
 	// 安全统计
 	secStats := s.securityManager.GetSecurityStats()
 	blockedIPs := 0
@@ -54,7 +54,9 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 
 	// CDN 缓存统计
 	cdnStats := map[string]interface{}{}
-	if pm, ok := interface{}(s.proxyManager).(interface{ GetCDNCache() interface{ Stats() map[string]interface{} } }); ok {
+	if pm, ok := interface{}(s.proxyManager).(interface {
+		GetCDNCache() interface{ Stats() map[string]interface{} }
+	}); ok {
 		if cache := pm.GetCDNCache(); cache != nil {
 			cdnStats = cache.Stats()
 		}
@@ -172,7 +174,7 @@ sslcat_config_enabled{feature="ua_filter"} %d
 		cdnMisses,
 		cdnSize,
 		map[bool]int{true: 1, false: 0}[s.config.Security.EnableCaptcha],
-		map[bool]int{true: 1, false: 0}[s.config.Security.EnablePoW],
+		0, // PoW功能已移除
 		map[bool]int{true: 1, false: 0}[s.config.Security.EnableDDOS],
 		map[bool]int{true: 1, false: 0}[s.config.Security.EnableWAF],
 		map[bool]int{true: 1, false: 0}[s.config.Security.EnableUAFilter])
