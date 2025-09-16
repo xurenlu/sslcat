@@ -326,6 +326,13 @@ func (s *Server) setupRoutes() {
 	// SSL管理路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/ssl", s.handleSSL)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/ssl/generate", s.handleSSLGenerate)
+	
+	// DNS管理路由
+	s.mux.HandleFunc(s.config.AdminPrefix+"/dns", s.handleDNS)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/dns/add", s.handleDNSAdd)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/dns/edit", s.handleDNSEdit)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/dns/delete", s.handleDNSDelete)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/dns/config", s.handleDNSConfig)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/ssl/upload", s.handleSSLUpload)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/ssl/download", s.handleSSLDownload)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/ssl/delete", s.handleSSLDelete)
@@ -382,6 +389,14 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/proxy-rules/delete", s.handleAPIProxyRulesDelete)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl-certs", s.handleAPISSLCerts)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl/generate", s.handleAPISSLGenerate)
+	
+	// DNS API路由
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/providers", s.handleAPIDNSProviders)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/providers/manage", s.handleAPIDNSProvidersPost)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/providers/delete", s.handleAPIDNSProvidersDelete)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/validate", s.handleAPIDNSValidate)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/request-cert", s.handleAPIDNSRequestCert)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/config", s.handleAPIDNSConfig)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl/upload", s.handleAPISSLUpload)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl/delete", s.handleAPISSLDelete)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/settings", s.handleAPISettings)

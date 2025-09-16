@@ -60,6 +60,23 @@ type SSLConfig struct {
 	KeyDir            string   `json:"key_dir"`
 	AutoRenew         bool     `json:"auto_renew"`
 	DisableSelfSigned bool     `json:"disable_self_signed"`
+	
+	// DNS验证配置
+	DNSProviders      []DNSProvider `json:"dns_providers"`
+	DefaultDNSProvider string       `json:"default_dns_provider"`
+	ChallengeMethods   []string     `json:"challenge_methods"` // ["http-01", "dns-01"]
+}
+
+// DNSProvider DNS服务商配置
+type DNSProvider struct {
+	Name      string `json:"name"`       // 服务商名称
+	Type      string `json:"type"`       // cloudflare/aliyun/tencent/aws/godaddy/custom
+	Enabled   bool   `json:"enabled"`    // 是否启用
+	APIKey    string `json:"api_key"`    // API密钥
+	APISecret string `json:"api_secret"` // API密钥(部分服务商需要)
+	ZoneID    string `json:"zone_id"`    // 域名区域ID
+	Endpoint  string `json:"endpoint"`   // 自定义API端点
+	Priority  int    `json:"priority"`   // 优先级，数字越小优先级越高
 }
 
 // AdminConfig 管理面板配置
@@ -263,6 +280,9 @@ func Load(configFile string) (*Config, error) {
 			KeyDir:            "./data/keys",
 			AutoRenew:         true,
 			DisableSelfSigned: true,
+			DNSProviders:      []DNSProvider{},
+			DefaultDNSProvider: "",
+			ChallengeMethods:   []string{"http-01"},
 		},
 		Admin: AdminConfig{
 			Username:       "admin",

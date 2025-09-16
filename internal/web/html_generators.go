@@ -17,6 +17,7 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 	navStatic := s.translator.T("nav.static_sites")
 	navPHP := s.translator.T("nav.php_sites")
 	navSSL := s.translator.T("nav.ssl")
+	navDNS := "DNS配置"
 	navSecurity := s.translator.T("nav.security")
 	navSettings := s.translator.T("nav.settings")
 	navCDN := "类CDN缓存"
@@ -75,6 +76,11 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
                             <li class="nav-item">
                                 <a class="nav-link %s" href="%s/ssl">
                                     <i class="bi bi-shield-lock"></i> %s
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link %s" href="%s/dns">
+                                    <i class="bi bi-globe"></i> %s
                                 </a>
                             </li>
                             <li class="nav-item">
@@ -144,6 +150,14 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 		}(),
 		adminPrefix,
 		navSSL,
+		func() string {
+			if activePage == "dns" {
+				return "active"
+			}
+			return ""
+		}(),
+		adminPrefix,
+		navDNS,
 		func() string {
 			if activePage == "security" {
 				return "active"
@@ -742,6 +756,607 @@ func (s *Server) generateAuthUsersHTML(users []config.ProxyAuthUser) string {
 		</div>`, i, user.Username, i, user.Password))
 	}
 	return html.String()
+}
+
+// generateDNSManagementHTML 生成DNS管理页面HTML
+func (s *Server) generateDNSManagementHTML(data map[string]interface{}) string {
+	title := "DNS配置管理"
+	providers, _ := data["Providers"].([]config.DNSProvider)
+	defaultProvider, _ := data["DefaultProvider"].(string)
+	challengeMethods, _ := data["ChallengeMethods"].([]string)
+	
+	return fmt.Sprintf(`
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>%s - SSLcat</title>
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-2">%s</div>
+            <main class="col-md-10">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">%s</h1>
+                    <div>
+                        <a href="%s/dns/add" class="btn btn-primary me-2">
+                            <i class="bi bi-plus-circle"></i> 添加DNS服务商
+                        </a>
+                        <a href="%s/dns/config" class="btn btn-outline-secondary">
+                            <i class="bi bi-gear"></i> 全局配置
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">当前配置</h5>
+                            </div>
+                            <div class="card-body">
+                                <p><strong>默认DNS服务商:</strong> %s</p>
+                                <p><strong>支持的验证方式:</strong> %s</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">使用说明</h5>
+                            </div>
+                            <div class="card-body">
+                                <p class="mb-1">• DNS验证支持通配符证书申请</p>
+                                <p class="mb-1">• 无需开放80端口即可申请证书</p>
+                                <p class="mb-0">• 支持多个DNS服务商配置</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">DNS服务商列表</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>名称</th>
+                                        <th>类型</th>
+                                        <th>状态</th>
+                                        <th>优先级</th>
+                                        <th>配置状态</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    %s
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>`,
+		title,
+		s.generateSidebar(data["AdminPrefix"].(string), "dns"),
+		title,
+		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string),
+		func() string {
+			if defaultProvider == "" {
+				return "未设置"
+			}
+			return defaultProvider
+		}(),
+		func() string {
+			if len(challengeMethods) == 0 {
+				return "未设置"
+			}
+			return strings.Join(challengeMethods, ", ")
+		}(),
+		s.generateDNSProvidersTable(providers, data["AdminPrefix"].(string)))
+}
+
+// generateDNSProvidersTable 生成DNS服务商表格
+func (s *Server) generateDNSProvidersTable(providers []config.DNSProvider, adminPrefix string) string {
+	if len(providers) == 0 {
+		return `<tr><td colspan="6" class="text-center">暂无DNS服务商配置</td></tr>`
+	}
+	
+	var rows strings.Builder
+	for i, provider := range providers {
+		statusBadge := `<span class="badge bg-secondary">未启用</span>`
+		if provider.Enabled {
+			statusBadge = `<span class="badge bg-success">已启用</span>`
+		}
+		
+		// 配置状态
+		configStatus := `<span class="badge bg-warning">配置不完整</span>`
+		if provider.APIKey != "" {
+			if provider.Type == "cloudflare" && provider.ZoneID != "" {
+				configStatus = `<span class="badge bg-success">配置完整</span>`
+			} else if provider.Type != "cloudflare" {
+				configStatus = `<span class="badge bg-success">配置完整</span>`
+			}
+		}
+		
+		rows.WriteString(fmt.Sprintf(`
+                    <tr>
+                        <td>%s</td>
+                        <td><span class="badge bg-info">%s</span></td>
+                        <td>%s</td>
+                        <td>%d</td>
+                        <td>%s</td>
+                        <td>
+                            <a href="%s/dns/edit?index=%d" class="btn btn-sm btn-outline-primary">编辑</a>
+                            <a href="%s/dns/delete?index=%d" class="btn btn-sm btn-outline-danger" onclick="return confirm('确定要删除这个DNS服务商吗？')">删除</a>
+                        </td>
+                    </tr>`,
+			provider.Name, provider.Type, statusBadge, provider.Priority, configStatus, adminPrefix, i, adminPrefix, i))
+	}
+	return rows.String()
+}
+
+// generateDNSAddHTML 生成添加DNS服务商页面HTML
+func (s *Server) generateDNSAddHTML(data map[string]interface{}) string {
+	return fmt.Sprintf(`
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>添加DNS服务商 - SSLcat</title>
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-2">%s</div>
+            <main class="col-md-10">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">添加DNS服务商</h1>
+                    <a href="%s/dns" class="btn btn-secondary">返回</a>
+                </div>
+                
+                <div class="card">
+                    <div class="card-body">
+                        <form method="POST">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="name" class="form-label">服务商名称</label>
+                                    <input type="text" class="form-control" id="name" name="name" required 
+                                           placeholder="例如: my-cloudflare">
+                                    <div class="form-text">用于标识这个DNS服务商配置</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="type" class="form-label">服务商类型</label>
+                                    <select class="form-select" id="type" name="type" required onchange="toggleProviderFields()">
+                                        <option value="">请选择服务商类型</option>
+                                        <option value="cloudflare">Cloudflare</option>
+                                        <option value="aliyun">阿里云DNS</option>
+                                        <option value="tencent">腾讯云DNS</option>
+                                        <option value="aws">AWS Route53</option>
+                                        <option value="godaddy">GoDaddy</option>
+                                        <option value="custom">自定义API</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="enabled" name="enabled" checked>
+                                <label class="form-check-label" for="enabled">启用此服务商</label>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="priority" class="form-label">优先级</label>
+                                    <input type="number" class="form-control" id="priority" name="priority" 
+                                           value="1" min="1" max="100">
+                                    <div class="form-text">数字越小优先级越高</div>
+                                </div>
+                            </div>
+                            
+                            <hr>
+                            <h6>API配置</h6>
+                            
+                            <div id="cloudflare-fields" style="display: none;">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="api_key" class="form-label">API Token</label>
+                                        <input type="password" class="form-control" id="api_key" name="api_key" 
+                                               placeholder="Cloudflare API Token">
+                                        <div class="form-text">需要 Zone:Read, DNS:Edit 权限</div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="zone_id" class="form-label">Zone ID</label>
+                                        <input type="text" class="form-control" id="zone_id" name="zone_id" 
+                                               placeholder="域名对应的Zone ID">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="aliyun-fields" style="display: none;">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="api_key" class="form-label">Access Key ID</label>
+                                        <input type="text" class="form-control" id="api_key" name="api_key" 
+                                               placeholder="阿里云Access Key ID">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="api_secret" class="form-label">Access Key Secret</label>
+                                        <input type="password" class="form-control" id="api_secret" name="api_secret" 
+                                               placeholder="阿里云Access Key Secret">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="tencent-fields" style="display: none;">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="api_key" class="form-label">Secret ID</label>
+                                        <input type="text" class="form-control" id="api_key" name="api_key" 
+                                               placeholder="腾讯云Secret ID">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="api_secret" class="form-label">Secret Key</label>
+                                        <input type="password" class="form-control" id="api_secret" name="api_secret" 
+                                               placeholder="腾讯云Secret Key">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="custom-fields" style="display: none;">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="api_key" class="form-label">API Key</label>
+                                        <input type="password" class="form-control" id="api_key" name="api_key" 
+                                               placeholder="自定义API密钥">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="endpoint" class="form-label">API端点</label>
+                                        <input type="url" class="form-control" id="endpoint" name="endpoint" 
+                                               placeholder="https://api.example.com">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary">添加服务商</button>
+                            <a href="%s/dns" class="btn btn-secondary">取消</a>
+                        </form>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <script>
+    function toggleProviderFields() {
+        const type = document.getElementById('type').value;
+        
+        // 隐藏所有字段组
+        document.getElementById('cloudflare-fields').style.display = 'none';
+        document.getElementById('aliyun-fields').style.display = 'none';
+        document.getElementById('tencent-fields').style.display = 'none';
+        document.getElementById('custom-fields').style.display = 'none';
+        
+        // 显示对应的字段组
+        if (type === 'cloudflare') {
+            document.getElementById('cloudflare-fields').style.display = 'block';
+        } else if (type === 'aliyun') {
+            document.getElementById('aliyun-fields').style.display = 'block';
+        } else if (type === 'tencent') {
+            document.getElementById('tencent-fields').style.display = 'block';
+        } else if (type === 'custom') {
+            document.getElementById('custom-fields').style.display = 'block';
+        }
+    }
+    </script>
+    
+    <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>`,
+		s.generateSidebar(data["AdminPrefix"].(string), "dns"),
+		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string))
+}
+
+// generateDNSEditHTML 生成编辑DNS服务商页面HTML
+func (s *Server) generateDNSEditHTML(data map[string]interface{}) string {
+	provider := data["Provider"].(config.DNSProvider)
+	
+	return fmt.Sprintf(`
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>编辑DNS服务商 - SSLcat</title>
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-2">%s</div>
+            <main class="col-md-10">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">编辑DNS服务商</h1>
+                    <a href="%s/dns" class="btn btn-secondary">返回</a>
+                </div>
+                
+                <div class="card">
+                    <div class="card-body">
+                        <form method="POST">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="name" class="form-label">服务商名称</label>
+                                    <input type="text" class="form-control" id="name" name="name" required 
+                                           value="%s">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="type" class="form-label">服务商类型</label>
+                                    <select class="form-select" id="type" name="type" required onchange="toggleProviderFields()">
+                                        <option value="cloudflare" %s>Cloudflare</option>
+                                        <option value="aliyun" %s>阿里云DNS</option>
+                                        <option value="tencent" %s>腾讯云DNS</option>
+                                        <option value="aws" %s>AWS Route53</option>
+                                        <option value="godaddy" %s>GoDaddy</option>
+                                        <option value="custom" %s>自定义API</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="enabled" name="enabled" %s>
+                                <label class="form-check-label" for="enabled">启用此服务商</label>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="priority" class="form-label">优先级</label>
+                                    <input type="number" class="form-control" id="priority" name="priority" 
+                                           value="%d" min="1" max="100">
+                                </div>
+                            </div>
+                            
+                            <hr>
+                            <h6>API配置</h6>
+                            
+                            <div id="cloudflare-fields" style="display: %s;">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="api_key" class="form-label">API Token</label>
+                                        <input type="password" class="form-control" id="api_key" name="api_key" 
+                                               value="%s" placeholder="Cloudflare API Token">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="zone_id" class="form-label">Zone ID</label>
+                                        <input type="text" class="form-control" id="zone_id" name="zone_id" 
+                                               value="%s" placeholder="域名对应的Zone ID">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="aliyun-fields" style="display: %s;">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="api_key" class="form-label">Access Key ID</label>
+                                        <input type="text" class="form-control" id="api_key" name="api_key" 
+                                               value="%s" placeholder="阿里云Access Key ID">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="api_secret" class="form-label">Access Key Secret</label>
+                                        <input type="password" class="form-control" id="api_secret" name="api_secret" 
+                                               value="%s" placeholder="阿里云Access Key Secret">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="tencent-fields" style="display: %s;">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="api_key" class="form-label">Secret ID</label>
+                                        <input type="text" class="form-control" id="api_key" name="api_key" 
+                                               value="%s" placeholder="腾讯云Secret ID">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="api_secret" class="form-label">Secret Key</label>
+                                        <input type="password" class="form-control" id="api_secret" name="api_secret" 
+                                               value="%s" placeholder="腾讯云Secret Key">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="custom-fields" style="display: %s;">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="api_key" class="form-label">API Key</label>
+                                        <input type="password" class="form-control" id="api_key" name="api_key" 
+                                               value="%s" placeholder="自定义API密钥">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="endpoint" class="form-label">API端点</label>
+                                        <input type="url" class="form-control" id="endpoint" name="endpoint" 
+                                               value="%s" placeholder="https://api.example.com">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary">保存更改</button>
+                            <a href="%s/dns" class="btn btn-secondary">取消</a>
+                        </form>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <script>
+    function toggleProviderFields() {
+        const type = document.getElementById('type').value;
+        
+        // 隐藏所有字段组
+        document.getElementById('cloudflare-fields').style.display = 'none';
+        document.getElementById('aliyun-fields').style.display = 'none';
+        document.getElementById('tencent-fields').style.display = 'none';
+        document.getElementById('custom-fields').style.display = 'none';
+        
+        // 显示对应的字段组
+        if (type === 'cloudflare') {
+            document.getElementById('cloudflare-fields').style.display = 'block';
+        } else if (type === 'aliyun') {
+            document.getElementById('aliyun-fields').style.display = 'block';
+        } else if (type === 'tencent') {
+            document.getElementById('tencent-fields').style.display = 'block';
+        } else if (type === 'custom') {
+            document.getElementById('custom-fields').style.display = 'block';
+        }
+    }
+    
+    // 初始化显示状态
+    document.addEventListener('DOMContentLoaded', function() {
+        toggleProviderFields();
+    });
+    </script>
+    
+    <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>`,
+		s.generateSidebar(data["AdminPrefix"].(string), "dns"),
+		data["AdminPrefix"].(string),
+		provider.Name,
+		map[bool]string{true: "selected"}[provider.Type == "cloudflare"],
+		map[bool]string{true: "selected"}[provider.Type == "aliyun"],
+		map[bool]string{true: "selected"}[provider.Type == "tencent"],
+		map[bool]string{true: "selected"}[provider.Type == "aws"],
+		map[bool]string{true: "selected"}[provider.Type == "godaddy"],
+		map[bool]string{true: "selected"}[provider.Type == "custom"],
+		map[bool]string{true: "checked"}[provider.Enabled],
+		provider.Priority,
+		map[bool]string{true: "block", false: "none"}[provider.Type == "cloudflare"],
+		provider.APIKey,
+		provider.ZoneID,
+		map[bool]string{true: "block", false: "none"}[provider.Type == "aliyun"],
+		provider.APIKey,
+		provider.APISecret,
+		map[bool]string{true: "block", false: "none"}[provider.Type == "tencent"],
+		provider.APIKey,
+		provider.APISecret,
+		map[bool]string{true: "block", false: "none"}[provider.Type == "custom"],
+		provider.APIKey,
+		provider.Endpoint,
+		data["AdminPrefix"].(string))
+}
+
+// generateDNSConfigHTML 生成DNS全局配置页面HTML
+func (s *Server) generateDNSConfigHTML(data map[string]interface{}) string {
+	defaultProvider, _ := data["DefaultProvider"].(string)
+	challengeMethods, _ := data["ChallengeMethods"].([]string)
+	providers, _ := data["Providers"].([]config.DNSProvider)
+	
+	return fmt.Sprintf(`
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DNS全局配置 - SSLcat</title>
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-2">%s</div>
+            <main class="col-md-10">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">DNS全局配置</h1>
+                    <a href="%s/dns" class="btn btn-secondary">返回</a>
+                </div>
+                
+                <div class="card">
+                    <div class="card-body">
+                        <form method="POST">
+                            <div class="mb-3">
+                                <label for="default_provider" class="form-label">默认DNS服务商</label>
+                                <select class="form-select" id="default_provider" name="default_provider">
+                                    <option value="">请选择默认服务商</option>
+                                    %s
+                                </select>
+                                <div class="form-text">用于自动申请证书时的默认DNS服务商</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">支持的验证方式</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="http-01" name="challenge_methods" value="http-01" %s>
+                                    <label class="form-check-label" for="http-01">
+                                        HTTP-01 验证
+                                    </label>
+                                    <div class="form-text">需要80端口可访问，适用于单域名证书</div>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="dns-01" name="challenge_methods" value="dns-01" %s>
+                                    <label class="form-check-label" for="dns-01">
+                                        DNS-01 验证
+                                    </label>
+                                    <div class="form-text">通过DNS记录验证，支持通配符证书</div>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary">保存配置</button>
+                            <a href="%s/dns" class="btn btn-secondary">取消</a>
+                        </form>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>`,
+		s.generateSidebar(data["AdminPrefix"].(string), "dns"),
+		data["AdminPrefix"].(string),
+		func() string {
+			var options strings.Builder
+			for _, provider := range providers {
+				selected := ""
+				if provider.Name == defaultProvider {
+					selected = "selected"
+				}
+				options.WriteString(fmt.Sprintf(`<option value="%s" %s>%s (%s)</option>`, provider.Name, selected, provider.Name, provider.Type))
+			}
+			return options.String()
+		}(),
+		func() string {
+			for _, method := range challengeMethods {
+				if method == "http-01" {
+					return "checked"
+				}
+			}
+			return ""
+		}(),
+		func() string {
+			for _, method := range challengeMethods {
+				if method == "dns-01" {
+					return "checked"
+				}
+			}
+			return ""
+		}(),
+		data["AdminPrefix"].(string))
 }
 
 func (s *Server) generateSSLManagementHTML(data map[string]interface{}) string {
