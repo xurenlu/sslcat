@@ -4,7 +4,7 @@
 
 ```bash
 # 1) macOS 本地快速试用（或自行下载 darwin 包）
-curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.2.0/sslcat_v1.2.0_darwin-arm64.tar.gz -o sslcat.tgz
+curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.2.1/sslcat_v1.2.1_darwin-arm64.tar.gz -o sslcat.tgz
 tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
 sslcat --config sslcat.conf --port 8080
 # 浏览器访问: http://localhost:8080/sslcat-panel/
@@ -506,12 +506,12 @@ go run main.go --config sslcat.conf --log-level debug
 
 查看完整的版本更新历史，请参阅：**[CHANGELOG.md](CHANGELOG.md)**
 
-### 最新版本 v1.2.0 (2025-01-15)
-- 新增：DNS验证SSL证书申请，支持Cloudflare、阿里云、腾讯云、GoDaddy等DNS服务商
-- 新增：代理访问控制功能，为代理规则添加用户名/密码验证
-- 新增：通配符证书支持，通过DNS验证支持`*.example.com`类型证书
-- 新增：DNS服务商管理界面，完整的配置、编辑、删除和状态监控
-- 新增：代理认证界面，美观的登录页面和用户管理功能
+### 最新版本 v1.2.1 (2025-01-15)
+- 新增：智能重试机制，SSL证书申请失败时自动重试，HTTP-01失败自动切换到DNS-01验证
+- 新增：域名解析预检查，申请前检查域名是否解析到当前服务器，提前预警验证失败
+- 新增：重试状态跟踪，详细的重试过程日志和用户反馈，支持手动触发重试
+- 新增：API重试端点，新增`/api/ssl/retry`和`/api/ssl/retry-config`端点
+- 优化：增强的错误处理和日志记录系统，支持批量域名申请的重试机制
 - 界面一致性：统一侧边栏顺序；在 Dashboard/静态站点/PHP 站点补齐“语言选择”“官方网站”入口；修复部分页面图标缺失
 - 登录与安全：暂时关闭登录验证码（后续可按需恢复）
 - 文档与国际化：多语言 README 同步更新；路线图文档更新

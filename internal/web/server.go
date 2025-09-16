@@ -389,6 +389,8 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/proxy-rules/delete", s.handleAPIProxyRulesDelete)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl-certs", s.handleAPISSLCerts)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl/generate", s.handleAPISSLGenerate)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl/retry", s.handleAPISSLRetry)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl/retry-config", s.handleAPISSLRetryConfig)
 
 	// DNS API路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/providers", s.handleAPIDNSProviders)

@@ -47,21 +47,48 @@ func (s *Server) handleSSLGenerate(w http.ResponseWriter, r *http.Request) {
 				domainList[i] = strings.TrimSpace(domain)
 			}
 
-			// 申请证书（使用 ACME，如果可用）
-			var firstErr error
+			// 申请证书（使用智能重试机制）
+			results := make(map[string]interface{})
+			var successCount, failureCount int
+
 			for _, d := range domainList {
 				d = strings.ToLower(strings.TrimSpace(d))
 				if d == "" {
 					continue
 				}
+
+				s.log.Infof("Starting certificate request for domain: %s", d)
 				if s.sslManager != nil {
-					if err := s.sslManager.EnsureDomainCert(d); err != nil && firstErr == nil {
-						firstErr = err
+					if err := s.sslManager.EnsureDomainCert(d); err != nil {
+						results[d] = map[string]interface{}{
+							"success": false,
+							"error":   err.Error(),
+						}
+						failureCount++
+						s.log.Errorf("Certificate request failed for domain %s: %v", d, err)
+					} else {
+						results[d] = map[string]interface{}{
+							"success": true,
+							"message": "Certificate request successful",
+						}
+						successCount++
+						s.log.Infof("Certificate request successful for domain: %s", d)
 					}
+				} else {
+					results[d] = map[string]interface{}{
+						"success": false,
+						"error":   "SSL manager not available",
+					}
+					failureCount++
 				}
 			}
-			if firstErr != nil {
-				s.log.Warnf("ACME certificate request issue: %v", firstErr)
+
+			// 记录总体结果
+			s.log.Infof("Certificate request batch completed: %d successful, %d failed", successCount, failureCount)
+
+			// 如果有失败，记录详细信息
+			if failureCount > 0 {
+				s.log.Warnf("Some certificate requests failed: %+v", results)
 			}
 
 			// 重定向回SSL管理页面
