@@ -1557,15 +1557,6 @@ func (s *Server) generateSecurityManagementHTML(data map[string]interface{}) str
                                         <input class="form-check-input" type="checkbox" name="enable_captcha" %s>
                                         <label class="form-check-label">启用图形验证码</label>
                                     </div>
-                                    <div class="form-check form-switch mb-3">
-                                        <input class="form-check-input" type="checkbox" name="enable_pow" %s>
-                                        <label class="form-check-label">启用客户端 PoW</label>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">PoW 难度（比特数）</label>
-                                        <input class="form-control" name="pow_bits" value="%d" placeholder="18">
-                                        <div class="form-text">10-30，越大越难，客户端耗时更久</div>
-                                    </div>
                                     <div class="mb-3">
                                         <label class="form-label">最小填写时长（毫秒）</label>
                                         <input class="form-control" name="min_form_ms" value="%d" placeholder="800">
@@ -1700,6 +1691,7 @@ func (s *Server) generateSecurityManagementHTML(data map[string]interface{}) str
     
     <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+    
     // 加载 TLS 指纹统计
     fetch('%s/api/tls-fingerprints?limit=10').then(r=>r.json()).then(data=>{
         const body = document.getElementById('tls-fingerprint-body');
@@ -1768,8 +1760,6 @@ func (s *Server) generateSecurityManagementHTML(data map[string]interface{}) str
 		s.generateSidebar(data["AdminPrefix"].(string), "security"),
 		data["AdminPrefix"].(string),
 		map[bool]string{true: "checked"}[s.config.Security.EnableCaptcha],
-		map[bool]string{true: "checked"}[s.config.Security.EnablePoW],
-		s.config.Security.PoWBits,
 		s.config.Security.MinFormMs,
 		map[bool]string{true: "checked"}[s.config.Security.EnableDDOS],
 		ddosStatus,

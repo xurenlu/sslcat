@@ -147,8 +147,6 @@ type SecurityConfig struct {
 
 	// 人机验证配置
 	EnableCaptcha bool `json:"enable_captcha"`
-	EnablePoW     bool `json:"enable_pow"`
-	PoWBits       int  `json:"pow_bits"`
 	MinFormMs     int  `json:"min_form_ms"`
 
 	// 解析后的时间字段
@@ -327,8 +325,6 @@ func Load(configFile string) (*Config, error) {
 			EnableWAF:               false,
 			EnableDDOS:              true,
 			EnableCaptcha:           true,
-			EnablePoW:               true,
-			PoWBits:                 16, // 降低到16位，约2^15次尝试，快很多
 			MinFormMs:               800,
 		},
 		AdminPrefix: "/sslcat-panel",

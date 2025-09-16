@@ -71,14 +71,6 @@ func (s *Server) handleSecuritySave(w http.ResponseWriter, r *http.Request) {
 
 	// 人机验证开关
 	s.config.Security.EnableCaptcha = r.FormValue("enable_captcha") == "on"
-	s.config.Security.EnablePoW = r.FormValue("enable_pow") == "on"
-
-	// PoW 参数
-	if bits := strings.TrimSpace(r.FormValue("pow_bits")); bits != "" {
-		if v, err := strconv.Atoi(bits); err == nil && v >= 10 && v <= 30 {
-			s.config.Security.PoWBits = v
-		}
-	}
 	if minMs := strings.TrimSpace(r.FormValue("min_form_ms")); minMs != "" {
 		if v, err := strconv.Atoi(minMs); err == nil && v >= 0 && v <= 10000 {
 			s.config.Security.MinFormMs = v

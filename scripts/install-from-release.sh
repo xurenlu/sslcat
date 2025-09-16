@@ -147,12 +147,102 @@ sudo install -m 0755 "$TMP/sslcat" "$DEST_LINUX/sslcat"
 if [[ ! -f "$CONF_LINUX" ]]; then
   sudo bash -c "cat > $CONF_LINUX" <<'JSON'
 {
-  "server": {"host": "0.0.0.0", "port": 443, "debug": false},
-  "ssl": {"staging": false, "cert_dir": "/var/lib/sslcat/certs", "key_dir": "/var/lib/sslcat/keys", "auto_renew": true},
-  "admin": {"username": "admin", "first_run": true, "password_file": "/var/lib/sslcat/admin.pass"},
-  "proxy": {"rules": []},
-  "security": {"max_attempts": 3, "block_duration": "1m", "max_attempts_5min": 10, "block_file": "/var/lib/sslcat/sslcat.block", "allowed_user_agents": ["Mozilla/","Chrome/","Firefox/","Safari/","Edge/"]},
-  "admin_prefix": "/sslcat-panel"
+  "server": {
+    "host": "0.0.0.0",
+    "port": 443,
+    "debug": false,
+    "access_log_enabled": true,
+    "access_log_format": "nginx",
+    "access_log_path": "/var/lib/sslcat/logs/access.log",
+    "access_log_max_size": 104857600,
+    "access_log_max_files": 10,
+    "read_timeout_sec": 1800,
+    "write_timeout_sec": 1800,
+    "idle_timeout_sec": 120,
+    "max_upload_bytes": 1073741824
+  },
+  "ssl": {
+    "email": "",
+    "staging": false,
+    "domains": [],
+    "cert_dir": "/var/lib/sslcat/certs",
+    "key_dir": "/var/lib/sslcat/keys",
+    "auto_renew": true,
+    "disable_self_signed": false
+  },
+  "admin": {
+    "username": "admin",
+    "first_run": true,
+    "password_file": "/var/lib/sslcat/admin.pass",
+    "enable_totp": false,
+    "totp_secret_file": "/var/lib/sslcat/admin.totp"
+  },
+  "proxy": {
+    "rules": [],
+    "unmatched_behavior": "502",
+    "unmatched_redirect_url": ""
+  },
+  "security": {
+    "max_attempts": 3,
+    "block_duration": "0s",
+    "max_attempts_5min": 10,
+    "block_file": "/var/lib/sslcat/withssl.block",
+    "allowed_user_agents": [
+      "Mozilla/",
+      "Chrome/",
+      "Firefox/",
+      "Safari/",
+      "Edge/"
+    ],
+    "ua_invalid_max_1min": 30,
+    "ua_invalid_max_5min": 100,
+    "tls_fp_window_sec": 60,
+    "tls_fp_max_per_min": 60000,
+    "tls_fp_top_n": 20,
+    "enable_ua_filter": false,
+    "enable_waf": false,
+    "enable_ddos": true,
+    "enable_captcha": true,
+    "min_form_ms": 800
+  },
+  "cdn_cache": {
+    "enabled": false,
+    "cache_dir": "/var/lib/sslcat/cache/static",
+    "max_size_bytes": 5368709120,
+    "default_ttl_seconds": 3600,
+    "clean_interval_seconds": 60,
+    "max_object_bytes": 20971520,
+    "rules": []
+  },
+  "admin_prefix": "/sslcat-panel",
+  "cluster": {
+    "mode": "standalone",
+    "node_id": "",
+    "node_name": "Node-1",
+    "master": {
+      "host": "",
+      "port": 0,
+      "auth_key": "",
+      "timeout": 30,
+      "retry_interval": 10
+    },
+    "sync": {
+      "config_enabled": true,
+      "cert_enabled": true,
+      "interval": 30,
+      "timeout": 10,
+      "exclude_configs": [
+        "admin.password",
+        "admin.password_file",
+        "admin_prefix",
+        "cluster"
+      ]
+    },
+    "port": 8443,
+    "auth_key": ""
+  },
+  "static_sites": [],
+  "php_sites": []
 }
 JSON
 fi
