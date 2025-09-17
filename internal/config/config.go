@@ -538,6 +538,11 @@ func (c *Config) Save(configFile string) error {
 		return fmt.Errorf("创建配置目录失败 (%s): %w", configDir, err)
 	}
 
+	// 验证配置完整性
+	if err := c.Validate(); err != nil {
+		return fmt.Errorf("配置验证失败: %w", err)
+	}
+
 	// 序列化时避免写入敏感信息
 	shadow := *c
 	shadow.Security.BlockDurationStr = c.Security.BlockDuration.String()
@@ -549,9 +554,18 @@ func (c *Config) Save(configFile string) error {
 		return fmt.Errorf("序列化配置失败: %w", err)
 	}
 
-	if err := os.WriteFile(configFile, data, 0644); err != nil {
-		return fmt.Errorf("写入配置文件失败 (%s): %w", configFile, err)
+	// 创建临时文件，然后原子性重命名
+	tempFile := configFile + ".tmp"
+	if err := os.WriteFile(tempFile, data, 0644); err != nil {
+		return fmt.Errorf("写入临时配置文件失败 (%s): %w", tempFile, err)
 	}
+
+	// 原子性重命名
+	if err := os.Rename(tempFile, configFile); err != nil {
+		os.Remove(tempFile) // 清理临时文件
+		return fmt.Errorf("重命名配置文件失败 (%s -> %s): %w", tempFile, configFile, err)
+	}
+
 	return nil
 }
 
@@ -576,6 +590,34 @@ func (c *Config) AddProxyRule(rule ProxyRule) {
 	}
 	// 添加新规则
 	c.Proxy.Rules = append(c.Proxy.Rules, rule)
+}
+
+// Validate 验证配置完整性
+func (c *Config) Validate() error {
+	// 验证代理规则
+	for i, rule := range c.Proxy.Rules {
+		if rule.Domain == "" {
+			return fmt.Errorf("代理规则 %d: 域名不能为空", i)
+		}
+		if rule.Target == "" {
+			return fmt.Errorf("代理规则 %d: 目标地址不能为空", i)
+		}
+		if rule.Port < 0 || rule.Port > 65535 {
+			return fmt.Errorf("代理规则 %d: 端口号必须在0-65535范围内", i)
+		}
+	}
+
+	// 验证SSL配置
+	if c.SSL.Email == "" && !c.SSL.DisableSelfSigned {
+		return fmt.Errorf("SSL配置: 当禁用自签名证书时，必须提供邮箱地址")
+	}
+
+	// 验证服务器配置
+	if c.Server.Port < 1 || c.Server.Port > 65535 {
+		return fmt.Errorf("服务器配置: 端口号必须在1-65535范围内")
+	}
+
+	return nil
 }
 
 // RemoveProxyRule 删除代理规则
