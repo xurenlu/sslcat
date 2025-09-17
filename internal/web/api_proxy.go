@@ -24,6 +24,7 @@ func (s *Server) handleAPIProxyRulesPost(w http.ResponseWriter, r *http.Request)
 	var req struct {
 		Domain               string `json:"domain"`
 		Target               string `json:"target"`
+		Port                 int    `json:"port"`
 		Enabled              bool   `json:"enabled"`
 		SSLOnly              bool   `json:"ssl_only"`
 		CDNEnabled           bool   `json:"cdn_enabled"`
@@ -94,6 +95,7 @@ func (s *Server) handleAPIProxyRulesPost(w http.ResponseWriter, r *http.Request)
 	newRule := config.ProxyRule{
 		Domain:               req.Domain,
 		Target:               req.Target,
+		Port:                 req.Port,
 		Enabled:              req.Enabled,
 		SSLOnly:              req.SSLOnly,
 		CDNEnabled:           req.CDNEnabled,
@@ -117,10 +119,14 @@ func (s *Server) handleAPIProxyRulesPost(w http.ResponseWriter, r *http.Request)
 
 	// 保存配置
 	if err := s.config.Save(s.config.ConfigFile); err != nil {
+		s.log.Errorf("Failed to save config: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "failed to save config"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "failed to save config: " + err.Error()})
 		return
 	}
+
+	// 记录配置保存成功
+	s.log.Infof("Proxy rule saved successfully: %s -> %s:%d", req.Domain, req.Target, req.Port)
 
 	// 尝试预取证书
 	if s.sslManager != nil {
@@ -179,10 +185,14 @@ func (s *Server) handleAPIProxyRulesDelete(w http.ResponseWriter, r *http.Reques
 
 	// 保存配置
 	if err := s.config.Save(s.config.ConfigFile); err != nil {
+		s.log.Errorf("Failed to save config after deletion: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "failed to save config"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "failed to save config: " + err.Error()})
 		return
 	}
+
+	// 记录配置删除成功
+	s.log.Infof("Proxy rule deleted successfully: %s -> %s:%d", deletedRule.Domain, deletedRule.Target, deletedRule.Port)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
