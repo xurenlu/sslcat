@@ -95,6 +95,11 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
                                 </a>
                             </li>
                             <li class="nav-item">
+                                <a class="nav-link %s" href="%s/cluster">
+                                    <i class="bi bi-diagram-3"></i> 集群管理
+                                </a>
+                            </li>
+                            <li class="nav-item">
                                 <a class="nav-link %s" href="%s/cdn-cache">
                                     <i class="bi bi-hdd"></i> %s
                                 </a>
@@ -185,6 +190,13 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 		}(),
 		adminPrefix,
 		navSettings,
+		func() string {
+			if activePage == "cluster" {
+				return "active"
+			}
+			return ""
+		}(),
+		adminPrefix,
 		func() string {
 			if activePage == "cdn-cache" {
 				return "active"

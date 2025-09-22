@@ -448,6 +448,13 @@ func (s *Server) setupRoutes() {
 	// Git Server 管理页面路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/git-server", s.handleGitServer)
 
+	// 集群管理路由
+	s.mux.HandleFunc(s.config.AdminPrefix+"/cluster", s.handleClusterSettings)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/cluster/set-slave", s.handleClusterSetSlave)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/cluster/set-standalone", s.handleClusterSetStandalone)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/cluster/nodes", s.handleClusterNodes)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/cluster/sync", s.handleClusterSync)
+
 	// Runner API 路由
 	s.registerRunnerRoutes()
 }
