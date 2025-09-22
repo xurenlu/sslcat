@@ -389,6 +389,8 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/notifications/test", s.handleNotificationTest)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/notifications/stats", s.handleNotificationStats)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/notifications/history", s.handleNotificationHistory)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/notifications/test-channels", s.handleNotificationTestChannels)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/notifications/config", s.handleNotificationConfig)
 
 	// CDN 缓存设置已整合到代理配置中
 

@@ -148,6 +148,58 @@ func (s *Server) handleNotificationHistory(w http.ResponseWriter, r *http.Reques
 	json.NewEncoder(w).Encode(history)
 }
 
+// handleNotificationTestChannels 测试通知渠道
+func (s *Server) handleNotificationTestChannels(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+
+	// 检查权限
+	currentUser := s.getCurrentUser(r)
+	if currentUser == nil || currentUser.Role != RoleSuperAdmin {
+		http.Error(w, "权限不足", http.StatusForbidden)
+		return
+	}
+
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 测试所有通知渠道
+	results := s.notificationIntegrator.GetManager().TestNotificationChannels()
+
+	// 返回测试结果
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"results": results,
+	})
+}
+
+// handleNotificationConfig 获取通知配置
+func (s *Server) handleNotificationConfig(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+
+	// 检查权限
+	currentUser := s.getCurrentUser(r)
+	if currentUser == nil || (currentUser.Role != RoleSuperAdmin && currentUser.Role != RoleAdmin) {
+		http.Error(w, "权限不足", http.StatusForbidden)
+		return
+	}
+
+	// 返回当前通知配置
+	config := s.config.Notification
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"config":  config,
+	})
+}
+
 // parseLevel 解析通知级别
 func parseLevel(level string) int {
 	switch level {

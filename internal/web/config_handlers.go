@@ -87,8 +87,8 @@ func (s *Server) handleConfigImport(w http.ResponseWriter, r *http.Request) {
 	s.pendingDiff = &d
 
 	// 调试：记录差异信息
-	s.log.Infof("Config import diff: Server=%d, SSL=%d, Admin=%d, Security=%d, ProxyAdded=%d, ProxyRemoved=%d, ProxyModified=%d",
-		len(d.ServerChanges), len(d.SSLChanges), len(d.AdminChanges), len(d.SecurityChanges),
+	s.log.Infof("Config import diff: Server=%d, SSL=%d, Admin=%d, Security=%d, Notification=%d, ProxyAdded=%d, ProxyRemoved=%d, ProxyModified=%d",
+		len(d.ServerChanges), len(d.SSLChanges), len(d.AdminChanges), len(d.SecurityChanges), len(d.NotificationChanges),
 		len(d.ProxyAdded), len(d.ProxyRemoved), len(d.ProxyModified))
 
 	http.Redirect(w, r, s.config.AdminPrefix+"/config/preview", http.StatusFound)
@@ -137,7 +137,7 @@ func (s *Server) handleConfigApply(w http.ResponseWriter, r *http.Request) {
 func (s *Server) renderDiffHTML(d config.ConfigDiff) string {
 	// 检查是否有任何变更
 	hasChanges := len(d.ServerChanges) > 0 || len(d.SSLChanges) > 0 || len(d.AdminChanges) > 0 ||
-		len(d.SecurityChanges) > 0 || len(d.ProxyAdded) > 0 || len(d.ProxyRemoved) > 0 ||
+		len(d.SecurityChanges) > 0 || len(d.NotificationChanges) > 0 || len(d.ProxyAdded) > 0 || len(d.ProxyRemoved) > 0 ||
 		len(d.ProxyModified) > 0 || d.AdminPrefix != nil
 
 	section := func(title string, rows []config.KeyChange) string {
@@ -229,6 +229,7 @@ func (s *Server) renderDiffHTML(d config.ConfigDiff) string {
 	b.WriteString(section("SSL", d.SSLChanges))
 	b.WriteString(section("Admin", d.AdminChanges))
 	b.WriteString(section("Security", d.SecurityChanges))
+	b.WriteString(section("Notification", d.NotificationChanges))
 	if d.AdminPrefix != nil {
 		b.WriteString(section("Admin Prefix", []config.KeyChange{*d.AdminPrefix}))
 	}
