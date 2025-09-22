@@ -31,6 +31,8 @@ type Config struct {
 	PHPSites []PHPSite `json:"php_sites"`
 	// Runner 配置
 	Runners RunnerConfig `json:"runners"`
+	// 威胁情报配置
+	ThreatIntel ThreatIntelConfig `json:"threat_intel"`
 }
 
 // ServerConfig 服务器配置
@@ -342,6 +344,89 @@ type PHPMonitoringConfig struct {
 	LogFile     string `json:"log_file"`
 	LogMaxSize  int64  `json:"log_max_size"` // 字节
 	LogMaxFiles int    `json:"log_max_files"`
+}
+
+// ThreatIntelConfig 威胁情报配置
+type ThreatIntelConfig struct {
+	// 是否启用威胁情报
+	Enabled bool `json:"enabled"`
+
+	// 威胁情报源配置
+	Sources map[string]ThreatIntelSourceConfig `json:"sources"`
+
+	// 检测配置
+	Detection DetectionConfig `json:"detection"`
+
+	// 更新配置
+	Update UpdateConfig `json:"update"`
+
+	// 日志配置
+	Log LogConfig `json:"log"`
+}
+
+// ThreatIntelSourceConfig 威胁情报源配置
+type ThreatIntelSourceConfig struct {
+	Name       string        `json:"name"`
+	URL        string        `json:"url"`
+	APIKey     string        `json:"api_key"`
+	Enabled    bool          `json:"enabled"`
+	UpdateFreq time.Duration `json:"update_freq"`
+	Timeout    time.Duration `json:"timeout"`
+	MaxRetries int           `json:"max_retries"`
+}
+
+// DetectionConfig 检测配置
+type DetectionConfig struct {
+	// 是否启用实时检测
+	RealTimeEnabled bool `json:"real_time_enabled"`
+
+	// 检测阈值
+	ThreatScoreThreshold float64 `json:"threat_score_threshold"`
+
+	// 自动响应
+	AutoResponse AutoResponseConfig `json:"auto_response"`
+
+	// 白名单
+	Whitelist []string `json:"whitelist"`
+}
+
+// AutoResponseConfig 自动响应配置
+type AutoResponseConfig struct {
+	// 是否启用自动响应
+	Enabled bool `json:"enabled"`
+
+	// 响应动作
+	Actions []string `json:"actions"` // block|monitor|log|alert
+
+	// 响应阈值
+	ResponseThreshold float64 `json:"response_threshold"`
+}
+
+// UpdateConfig 更新配置
+type UpdateConfig struct {
+	// 更新频率
+	UpdateFreq time.Duration `json:"update_freq"`
+
+	// 并发更新数
+	ConcurrentUpdates int `json:"concurrent_updates"`
+
+	// 更新超时
+	UpdateTimeout time.Duration `json:"update_timeout"`
+}
+
+// LogConfig 日志配置
+type LogConfig struct {
+	// 日志级别
+	Level string `json:"level"`
+
+	// 日志文件
+	LogFile string `json:"log_file"`
+
+	// 最大文件大小
+	MaxSize int64 `json:"max_size"`
+
+	// 最大文件数
+	MaxFiles int `json:"max_files"`
 }
 
 // RunnerConfig Runner 配置
