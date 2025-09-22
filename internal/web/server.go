@@ -18,6 +18,7 @@ import (
 	"github.com/xurenlu/sslcat/internal/ddos"
 	"github.com/xurenlu/sslcat/internal/i18n"
 	"github.com/xurenlu/sslcat/internal/logger"
+	"github.com/xurenlu/sslcat/internal/notification"
 	"github.com/xurenlu/sslcat/internal/notify"
 	"github.com/xurenlu/sslcat/internal/proxy"
 	"github.com/xurenlu/sslcat/internal/runner"
@@ -79,6 +80,8 @@ type Server struct {
 	userManager *UserManager
 	// 会话管理器
 	sessionManager *SessionManager
+	// 通知集成器
+	notificationIntegrator *notification.NotificationIntegrator
 	// Runner 模块
 	localRunner  *runner.LocalRunner
 	dockerRunner *runner.DockerRunner
@@ -86,7 +89,7 @@ type Server struct {
 }
 
 // NewServer 创建Web服务器
-func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Manager, sslMgr *ssl.Manager, localRunner *runner.LocalRunner, dockerRunner *runner.DockerRunner, gitServer *runner.GitServer) *Server {
+func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Manager, sslMgr *ssl.Manager, localRunner *runner.LocalRunner, dockerRunner *runner.DockerRunner, gitServer *runner.GitServer, notificationIntegrator *notification.NotificationIntegrator) *Server {
 	// 初始化翻译器（从嵌入读取）
 	translator := i18n.NewTranslator(i18n.LangZhCN, "")
 	// 通过嵌入 i18n 文件加载翻译
@@ -132,7 +135,7 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	// 初始化验证码管理器
 	server.captchaManager = NewCaptchaManager()
 	// 初始化 DDoS 防护器
-	server.ddosProtector = ddos.NewProtector()
+	server.ddosProtector = ddos.NewProtector(notificationIntegrator)
 
 	// 初始化代理访问控制管理器
 	server.proxyAuthManager = NewProxyAuthManager(server.log)
@@ -146,6 +149,9 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 
 	// 初始化会话管理器
 	server.sessionManager = NewSessionManager(server.log)
+
+	// 设置通知集成器
+	server.notificationIntegrator = notificationIntegrator
 
 	// 初始化审计日志轮转器（10MB*10）
 	if rot, err := logger.NewRotator("./data/audit.log", 10*1024*1024, 10); err == nil {
@@ -377,6 +383,12 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/users/edit", s.handleUserEdit)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/users/delete", s.handleUserDelete)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/users/logs", s.handleUserLogs)
+
+	// 通知管理路由
+	s.mux.HandleFunc(s.config.AdminPrefix+"/notifications", s.handleNotifications)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/notifications/test", s.handleNotificationTest)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/notifications/stats", s.handleNotificationStats)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/notifications/history", s.handleNotificationHistory)
 
 	// CDN 缓存设置已整合到代理配置中
 

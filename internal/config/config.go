@@ -33,6 +33,8 @@ type Config struct {
 	Runners RunnerConfig `json:"runners"`
 	// 威胁情报配置
 	ThreatIntel ThreatIntelConfig `json:"threat_intel"`
+	// 通知配置
+	Notification NotificationConfig `json:"notification"`
 }
 
 // ServerConfig 服务器配置
@@ -919,4 +921,50 @@ func (c *Config) RemoveProxyRule(domain string) {
 			return
 		}
 	}
+}
+
+// NotificationConfig 通知配置
+type NotificationConfig struct {
+	Enabled  bool           `json:"enabled"`  // 是否启用通知系统
+	Channels ChannelsConfig `json:"channels"` // 通知渠道配置
+}
+
+// ChannelsConfig 通知渠道配置
+type ChannelsConfig struct {
+	Email   EmailChannelConfig   `json:"email"`   // 邮件通知配置
+	Webhook WebhookChannelConfig `json:"webhook"` // Webhook通知配置
+	Syslog  SyslogChannelConfig  `json:"syslog"`  // 系统日志通知配置
+	Console ConsoleChannelConfig `json:"console"` // 控制台通知配置
+}
+
+// EmailChannelConfig 邮件通知渠道配置
+type EmailChannelConfig struct {
+	Enabled  bool     `json:"enabled"`   // 是否启用
+	SMTPHost string   `json:"smtp_host"` // SMTP服务器地址
+	SMTPPort int      `json:"smtp_port"` // SMTP端口
+	Username string   `json:"username"`  // 用户名
+	Password string   `json:"password"`  // 密码
+	From     string   `json:"from"`      // 发件人地址
+	To       []string `json:"to"`        // 收件人地址列表
+	UseTLS   bool     `json:"use_tls"`   // 是否使用TLS
+}
+
+// WebhookChannelConfig Webhook通知渠道配置
+type WebhookChannelConfig struct {
+	Enabled bool              `json:"enabled"` // 是否启用
+	URL     string            `json:"url"`     // Webhook URL
+	Headers map[string]string `json:"headers"` // 自定义HTTP头部
+	Timeout int               `json:"timeout"` // 超时时间（秒）
+}
+
+// SyslogChannelConfig 系统日志通知渠道配置
+type SyslogChannelConfig struct {
+	Enabled bool   `json:"enabled"` // 是否启用
+	Address string `json:"address"` // syslog服务器地址
+	Network string `json:"network"` // 网络协议 (udp/tcp)
+}
+
+// ConsoleChannelConfig 控制台通知渠道配置
+type ConsoleChannelConfig struct {
+	Enabled bool `json:"enabled"` // 是否启用
 }
