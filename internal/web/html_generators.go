@@ -1060,7 +1060,7 @@ func (s *Server) generateDNSManagementHTML(data map[string]interface{}) string {
                 </div>
                 
                 <div class="row mb-4">
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <div class="card">
                             <div class="card-header">
                                 <h5 class="mb-0">当前配置</h5>
@@ -1071,7 +1071,25 @@ func (s *Server) generateDNSManagementHTML(data map[string]interface{}) string {
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">服务商状态</h5>
+                                <button class="btn btn-sm btn-outline-primary" onclick="refreshHealthStatus()">
+                                    <i class="bi bi-arrow-clockwise"></i> 刷新
+                                </button>
+                            </div>
+                            <div class="card-body" id="health-status">
+                                <div class="text-center">
+                                    <div class="spinner-border spinner-border-sm" role="status">
+                                        <span class="visually-hidden">加载中...</span>
+                                    </div>
+                                    <p class="mt-2 mb-0">检查服务商状态中...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
                         <div class="card">
                             <div class="card-header">
                                 <h5 class="mb-0">使用说明</h5>
@@ -1079,7 +1097,8 @@ func (s *Server) generateDNSManagementHTML(data map[string]interface{}) string {
                             <div class="card-body">
                                 <p class="mb-1">• DNS验证支持通配符证书申请</p>
                                 <p class="mb-1">• 无需开放80端口即可申请证书</p>
-                                <p class="mb-0">• 支持多个DNS服务商配置</p>
+                                <p class="mb-1">• 支持多个DNS服务商配置</p>
+                                <p class="mb-0">• 自动故障转移和负载均衡</p>
                             </div>
                         </div>
                     </div>
@@ -1098,7 +1117,7 @@ func (s *Server) generateDNSManagementHTML(data map[string]interface{}) string {
                                         <th>类型</th>
                                         <th>状态</th>
                                         <th>优先级</th>
-                                        <th>配置状态</th>
+                                        <th>健康状态</th>
                                         <th>操作</th>
                                     </tr>
                                 </thead>
@@ -1112,12 +1131,159 @@ func (s *Server) generateDNSManagementHTML(data map[string]interface{}) string {
             </main>
         </div>
     </div>
+    
+    <script>
+    // 页面加载时检查健康状态
+    document.addEventListener('DOMContentLoaded', function() {
+        refreshHealthStatus();
+    });
+
+    // 刷新健康状态
+    function refreshHealthStatus() {
+        const healthStatusDiv = document.getElementById('health-status');
+        healthStatusDiv.innerHTML = 
+            '<div class="text-center">' +
+                '<div class="spinner-border spinner-border-sm" role="status">' +
+                    '<span class="visually-hidden">加载中...</span>' +
+                '</div>' +
+                '<p class="mt-2 mb-0">检查服务商状态中...</p>' +
+            '</div>';
+
+        fetch('%s/api/dns/health')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateHealthDisplay(data.health);
+                } else {
+                    healthStatusDiv.innerHTML = 
+                        '<div class="alert alert-warning mb-0">' +
+                            '<i class="bi bi-exclamation-triangle"></i> 无法获取健康状态' +
+                        '</div>';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                healthStatusDiv.innerHTML = 
+                    '<div class="alert alert-danger mb-0">' +
+                        '<i class="bi bi-x-circle"></i> 健康状态检查失败' +
+                    '</div>';
+            });
+    }
+
+    // 更新健康状态显示
+    function updateHealthDisplay(health) {
+        const healthStatusDiv = document.getElementById('health-status');
+        
+        if (Object.keys(health).length === 0) {
+            healthStatusDiv.innerHTML = 
+                '<div class="alert alert-info mb-0">' +
+                    '<i class="bi bi-info-circle"></i> 暂无DNS服务商' +
+                '</div>';
+            return;
+        }
+
+        let html = '<div class="row">';
+        for (const [provider, status] of Object.entries(health)) {
+            const isHealthy = status === 'healthy';
+            const badgeClass = isHealthy ? 'bg-success' : 'bg-danger';
+            const icon = isHealthy ? 'bi-check-circle' : 'bi-x-circle';
+            
+            html += 
+                '<div class="col-6 mb-2">' +
+                    '<div class="d-flex align-items-center">' +
+                        '<span class="badge ' + badgeClass + ' me-2">' +
+                            '<i class="bi ' + icon + '"></i>' +
+                        '</span>' +
+                        '<small>' + provider + '</small>' +
+                    '</div>' +
+                '</div>';
+        }
+        html += '</div>';
+        
+        healthStatusDiv.innerHTML = html;
+
+        // 更新表格中的健康状态
+        updateTableHealthStatus(health);
+    }
+
+    // 更新表格中的健康状态
+    function updateTableHealthStatus(health) {
+        for (const [provider, status] of Object.entries(health)) {
+            const elements = document.querySelectorAll('[data-provider="' + provider + '"]');
+            elements.forEach(element => {
+                const isHealthy = status === 'healthy';
+                const badgeClass = isHealthy ? 'bg-success' : 'bg-danger';
+                const text = isHealthy ? '正常' : '异常';
+                
+                element.className = 'badge ' + badgeClass;
+                element.textContent = text;
+                element.title = status;
+            });
+        }
+    }
+
+    // 测试DNS服务商
+    function testProvider(providerName) {
+        const button = event.target;
+        const originalText = button.textContent;
+        
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 测试中...';
+
+        fetch('%s/api/dns/test', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ provider: providerName })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('success', '测试成功', 'DNS服务商连接正常');
+            } else {
+                showAlert('danger', '测试失败', data.error || '未知错误');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('danger', '测试失败', '网络错误');
+        })
+        .finally(() => {
+            button.disabled = false;
+            button.textContent = originalText;
+        });
+    }
+
+    // 显示提示信息
+    function showAlert(type, title, message) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-' + type + ' alert-dismissible fade show';
+        alertDiv.innerHTML = 
+            '<strong>' + title + '</strong> ' + message +
+            '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+        
+        // 在页面顶部显示提示
+        const container = document.querySelector('.container-fluid');
+        container.insertBefore(alertDiv, container.firstChild);
+        
+        // 5秒后自动隐藏
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
+    }
+    </script>
+    
     <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>`,
 		title,
 		s.generateSidebar(data["AdminPrefix"].(string), "dns"),
 		title,
+		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string),
 		data["AdminPrefix"].(string),
 		data["AdminPrefix"].(string),
 		func() string {
@@ -1148,15 +1314,15 @@ func (s *Server) generateDNSProvidersTable(providers []config.DNSProvider, admin
 			statusBadge = `<span class="badge bg-success">已启用</span>`
 		}
 
-		// 配置状态
-		configStatus := `<span class="badge bg-warning">配置不完整</span>`
-		if provider.APIKey != "" {
-			if provider.Type == "cloudflare" && provider.ZoneID != "" {
-				configStatus = `<span class="badge bg-success">配置完整</span>`
-			} else if provider.Type != "cloudflare" {
-				configStatus = `<span class="badge bg-success">配置完整</span>`
-			}
-		}
+		// 配置状态（暂时注释掉，因为健康状态会显示更准确的信息）
+		// configStatus := `<span class="badge bg-warning">配置不完整</span>`
+		// if provider.APIKey != "" {
+		// 	if provider.Type == "cloudflare" && provider.ZoneID != "" {
+		// 		configStatus = `<span class="badge bg-success">配置完整</span>`
+		// 	} else if provider.Type != "cloudflare" {
+		// 		configStatus = `<span class="badge bg-success">配置完整</span>`
+		// 	}
+		// }
 
 		rows.WriteString(fmt.Sprintf(`
                     <tr>
@@ -1164,13 +1330,14 @@ func (s *Server) generateDNSProvidersTable(providers []config.DNSProvider, admin
                         <td><span class="badge bg-info">%s</span></td>
                         <td>%s</td>
                         <td>%d</td>
-                        <td>%s</td>
+                        <td><span class="badge bg-light text-dark" id="health-%d" data-provider="%s">检查中...</span></td>
                         <td>
                             <a href="%s/dns/edit?index=%d" class="btn btn-sm btn-outline-primary">编辑</a>
+                            <button class="btn btn-sm btn-outline-info" onclick="testProvider('%s')">测试</button>
                             <a href="%s/dns/delete?index=%d" class="btn btn-sm btn-outline-danger" onclick="return confirm('确定要删除这个DNS服务商吗？')">删除</a>
                         </td>
                     </tr>`,
-			provider.Name, provider.Type, statusBadge, provider.Priority, configStatus, adminPrefix, i, adminPrefix, i))
+			provider.Name, provider.Type, statusBadge, provider.Priority, i, provider.Name, adminPrefix, i, provider.Name, adminPrefix, i))
 	}
 	return rows.String()
 }

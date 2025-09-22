@@ -1230,8 +1230,8 @@ func (m *Manager) initializeDNSProviders() {
 			continue
 		}
 
-		m.dnsManager.RegisterProvider(provider.Name, dnsProvider)
-		m.log.Infof("Initialized DNS provider: %s (%s)", provider.Name, provider.Type)
+		m.dnsManager.RegisterProviderWithPriority(provider.Name, dnsProvider, provider.Priority)
+		m.log.Infof("Initialized DNS provider: %s (%s) with priority %d", provider.Name, provider.Type, provider.Priority)
 	}
 }
 
@@ -1338,8 +1338,8 @@ func (m *Manager) performDNSChallenge(domain, providerName string) error {
 		// 确定记录名称
 		recordName := GetACMEChallengeRecordNameForWildcard(domain)
 
-		// 创建DNS挑战
-		challengeInfo, err := m.dnsManager.CreateDNSChallenge(ctx, providerName, domain, recordName, keyAuth)
+		// 创建DNS挑战，使用故障转移机制
+		challengeInfo, err := m.dnsManager.CreateDNSChallengeWithFailover(ctx, domain, recordName, keyAuth)
 		if err != nil {
 			return fmt.Errorf("failed to create DNS challenge: %w", err)
 		}
@@ -1455,4 +1455,32 @@ func (m *Manager) GetDNSProviders() []string {
 // ValidateDNSProvider 验证DNS服务商配置
 func (m *Manager) ValidateDNSProvider(providerName string) error {
 	return m.dnsManager.ValidateProvider(providerName)
+}
+
+// GetDNSProviderHealth 获取DNS提供程序健康状态
+func (m *Manager) GetDNSProviderHealth() map[string]string {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	return m.dnsManager.GetProviderHealth(ctx)
+}
+
+// TestDNSProvider 测试DNS提供程序连接
+func (m *Manager) TestDNSProvider(name string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	return m.dnsManager.TestProvider(ctx, name)
+}
+
+// CreateDNSChallenge 创建DNS挑战记录
+func (m *Manager) CreateDNSChallenge(domain, recordName, recordValue, providerName string) (*DNSChallengeInfo, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	return m.dnsManager.CreateDNSChallenge(ctx, providerName, domain, recordName, recordValue)
+}
+
+// CreateDNSChallengeWithFailover 使用故障转移创建DNS挑战记录
+func (m *Manager) CreateDNSChallengeWithFailover(domain, recordName, recordValue string) (*DNSChallengeInfo, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	return m.dnsManager.CreateDNSChallengeWithFailover(ctx, domain, recordName, recordValue)
 }

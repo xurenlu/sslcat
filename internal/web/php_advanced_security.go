@@ -21,16 +21,16 @@ type AdvancedPHPSecurity struct {
 
 // SecurityScanResult 安全扫描结果
 type SecurityScanResult struct {
-	Domain        string                 `json:"domain"`
-	ScanTime      time.Time              `json:"scan_time"`
-	TotalIssues   int                   `json:"total_issues"`
-	CriticalIssues int                  `json:"critical_issues"`
-	HighIssues    int                   `json:"high_issues"`
-	MediumIssues  int                   `json:"medium_issues"`
-	LowIssues     int                   `json:"low_issues"`
-	Issues        []SecurityIssue       `json:"issues"`
+	Domain          string                   `json:"domain"`
+	ScanTime        time.Time                `json:"scan_time"`
+	TotalIssues     int                      `json:"total_issues"`
+	CriticalIssues  int                      `json:"critical_issues"`
+	HighIssues      int                      `json:"high_issues"`
+	MediumIssues    int                      `json:"medium_issues"`
+	LowIssues       int                      `json:"low_issues"`
+	Issues          []SecurityIssue          `json:"issues"`
 	Recommendations []SecurityRecommendation `json:"recommendations"`
-	SecurityScore int                   `json:"security_score"`
+	SecurityScore   int                      `json:"security_score"`
 }
 
 // SecurityIssue 安全问题
@@ -67,9 +67,9 @@ func NewAdvancedPHPSecurity(cfg *config.Config) *AdvancedPHPSecurity {
 // PerformAdvancedSecurityScan 执行高级安全扫描
 func (aps *AdvancedPHPSecurity) PerformAdvancedSecurityScan(domain string) (*SecurityScanResult, error) {
 	result := &SecurityScanResult{
-		Domain:   domain,
-		ScanTime: time.Now(),
-		Issues:   []SecurityIssue{},
+		Domain:          domain,
+		ScanTime:        time.Now(),
+		Issues:          []SecurityIssue{},
 		Recommendations: []SecurityRecommendation{},
 	}
 
@@ -99,7 +99,7 @@ func (aps *AdvancedPHPSecurity) PerformAdvancedSecurityScan(domain string) (*Sec
 
 	// 计算安全评分
 	result.calculateSecurityScore()
-	
+
 	// 生成安全建议
 	aps.generateSecurityRecommendations(result)
 
@@ -171,7 +171,7 @@ func (aps *AdvancedPHPSecurity) scanFileUploadSecurity(site *config.PHPSite, res
 func (aps *AdvancedPHPSecurity) scanCodeInjectionVulnerabilities(site *config.PHPSite, result *SecurityScanResult) {
 	// 扫描 PHP 文件中的危险函数
 	phpFiles := aps.findPHPFiles(site.Root)
-	
+
 	for _, file := range phpFiles {
 		issues := aps.scanFileForCodeInjection(file)
 		result.Issues = append(result.Issues, issues...)
@@ -181,7 +181,7 @@ func (aps *AdvancedPHPSecurity) scanCodeInjectionVulnerabilities(site *config.PH
 // scanFileForCodeInjection 扫描单个文件的代码注入
 func (aps *AdvancedPHPSecurity) scanFileForCodeInjection(filePath string) []SecurityIssue {
 	var issues []SecurityIssue
-	
+
 	file, err := os.Open(filePath)
 	if err != nil {
 		return issues
@@ -190,32 +190,32 @@ func (aps *AdvancedPHPSecurity) scanFileForCodeInjection(filePath string) []Secu
 
 	scanner := bufio.NewScanner(file)
 	lineNum := 0
-	
+
 	// 危险函数模式
 	dangerousPatterns := map[string]string{
-		`eval\s*\(`:                    "eval() 函数",
-		`exec\s*\(`:                    "exec() 函数",
-		`system\s*\(`:                  "system() 函数",
-		`shell_exec\s*\(`:              "shell_exec() 函数",
-		`passthru\s*\(`:                "passthru() 函数",
-		`proc_open\s*\(`:               "proc_open() 函数",
-		`popen\s*\(`:                   "popen() 函数",
-		`file_get_contents\s*\(\s*\$`:  "file_get_contents() 使用变量",
-		`include\s*\(\s*\$`:            "include() 使用变量",
-		`require\s*\(\s*\$`:            "require() 使用变量",
+		`eval\s*\(`:                   "eval() 函数",
+		`exec\s*\(`:                   "exec() 函数",
+		`system\s*\(`:                 "system() 函数",
+		`shell_exec\s*\(`:             "shell_exec() 函数",
+		`passthru\s*\(`:               "passthru() 函数",
+		`proc_open\s*\(`:              "proc_open() 函数",
+		`popen\s*\(`:                  "popen() 函数",
+		`file_get_contents\s*\(\s*\$`: "file_get_contents() 使用变量",
+		`include\s*\(\s*\$`:           "include() 使用变量",
+		`require\s*\(\s*\$`:           "require() 使用变量",
 	}
 
 	for scanner.Scan() {
 		lineNum++
 		line := scanner.Text()
-		
+
 		for pattern, description := range dangerousPatterns {
 			if matched, _ := regexp.MatchString(pattern, line); matched {
 				severity := "high"
 				if strings.Contains(pattern, "eval") || strings.Contains(pattern, "exec") || strings.Contains(pattern, "system") {
 					severity = "critical"
 				}
-				
+
 				issues = append(issues, SecurityIssue{
 					ID:          fmt.Sprintf("code_injection_%d_%d", lineNum, len(issues)),
 					Type:        "code_injection",
@@ -231,14 +231,14 @@ func (aps *AdvancedPHPSecurity) scanFileForCodeInjection(filePath string) []Secu
 			}
 		}
 	}
-	
+
 	return issues
 }
 
 // scanSQLInjectionVulnerabilities 扫描 SQL 注入漏洞
 func (aps *AdvancedPHPSecurity) scanSQLInjectionVulnerabilities(site *config.PHPSite, result *SecurityScanResult) {
 	phpFiles := aps.findPHPFiles(site.Root)
-	
+
 	for _, file := range phpFiles {
 		issues := aps.scanFileForSQLInjection(file)
 		result.Issues = append(result.Issues, issues...)
@@ -248,7 +248,7 @@ func (aps *AdvancedPHPSecurity) scanSQLInjectionVulnerabilities(site *config.PHP
 // scanFileForSQLInjection 扫描单个文件的 SQL 注入
 func (aps *AdvancedPHPSecurity) scanFileForSQLInjection(filePath string) []SecurityIssue {
 	var issues []SecurityIssue
-	
+
 	file, err := os.Open(filePath)
 	if err != nil {
 		return issues
@@ -257,22 +257,22 @@ func (aps *AdvancedPHPSecurity) scanFileForSQLInjection(filePath string) []Secur
 
 	scanner := bufio.NewScanner(file)
 	lineNum := 0
-	
+
 	// SQL 注入模式
 	sqlPatterns := map[string]string{
-		`mysql_query\s*\(\s*["\']\s*SELECT.*\$`:     "mysql_query() 直接拼接变量",
-		`mysqli_query\s*\(\s*["\']\s*SELECT.*\$`:   "mysqli_query() 直接拼接变量",
-		`PDO::query\s*\(\s*["\']\s*SELECT.*\$`:     "PDO::query() 直接拼接变量",
-		`SELECT.*\$.*FROM`:                         "SQL 查询中直接使用变量",
-		`INSERT.*\$.*INTO`:                         "INSERT 语句中直接使用变量",
-		`UPDATE.*\$.*SET`:                          "UPDATE 语句中直接使用变量",
-		`DELETE.*\$.*FROM`:                         "DELETE 语句中直接使用变量",
+		`mysql_query\s*\(\s*["\']\s*SELECT.*\$`:  "mysql_query() 直接拼接变量",
+		`mysqli_query\s*\(\s*["\']\s*SELECT.*\$`: "mysqli_query() 直接拼接变量",
+		`PDO::query\s*\(\s*["\']\s*SELECT.*\$`:   "PDO::query() 直接拼接变量",
+		`SELECT.*\$.*FROM`:                       "SQL 查询中直接使用变量",
+		`INSERT.*\$.*INTO`:                       "INSERT 语句中直接使用变量",
+		`UPDATE.*\$.*SET`:                        "UPDATE 语句中直接使用变量",
+		`DELETE.*\$.*FROM`:                       "DELETE 语句中直接使用变量",
 	}
 
 	for scanner.Scan() {
 		lineNum++
 		line := scanner.Text()
-		
+
 		for pattern, description := range sqlPatterns {
 			if matched, _ := regexp.MatchString(pattern, line); matched {
 				issues = append(issues, SecurityIssue{
@@ -290,14 +290,14 @@ func (aps *AdvancedPHPSecurity) scanFileForSQLInjection(filePath string) []Secur
 			}
 		}
 	}
-	
+
 	return issues
 }
 
 // scanXSSVulnerabilities 扫描 XSS 漏洞
 func (aps *AdvancedPHPSecurity) scanXSSVulnerabilities(site *config.PHPSite, result *SecurityScanResult) {
 	phpFiles := aps.findPHPFiles(site.Root)
-	
+
 	for _, file := range phpFiles {
 		issues := aps.scanFileForXSS(file)
 		result.Issues = append(result.Issues, issues...)
@@ -307,7 +307,7 @@ func (aps *AdvancedPHPSecurity) scanXSSVulnerabilities(site *config.PHPSite, res
 // scanFileForXSS 扫描单个文件的 XSS 漏洞
 func (aps *AdvancedPHPSecurity) scanFileForXSS(filePath string) []SecurityIssue {
 	var issues []SecurityIssue
-	
+
 	file, err := os.Open(filePath)
 	if err != nil {
 		return issues
@@ -316,21 +316,21 @@ func (aps *AdvancedPHPSecurity) scanFileForXSS(filePath string) []SecurityIssue 
 
 	scanner := bufio.NewScanner(file)
 	lineNum := 0
-	
+
 	// XSS 模式
 	xssPatterns := map[string]string{
-		`echo\s+\$`:                    "echo 直接输出变量",
-		`print\s+\$`:                   "print 直接输出变量",
-		`printf\s+["\'].*\$.*["\']`:    "printf 直接输出变量",
-		`<.*\$.*>`:                     "HTML 中直接使用变量",
-		`javascript:.*\$`:              "JavaScript 中使用变量",
+		`echo\s+\$`:                      "echo 直接输出变量",
+		`print\s+\$`:                     "print 直接输出变量",
+		`printf\s+["\'].*\$.*["\']`:      "printf 直接输出变量",
+		`<.*\$.*>`:                       "HTML 中直接使用变量",
+		`javascript:.*\$`:                "JavaScript 中使用变量",
 		`onclick\s*=\s*["\'].*\$.*["\']`: "onclick 事件中使用变量",
 	}
 
 	for scanner.Scan() {
 		lineNum++
 		line := scanner.Text()
-		
+
 		for pattern, description := range xssPatterns {
 			if matched, _ := regexp.MatchString(pattern, line); matched {
 				issues = append(issues, SecurityIssue{
@@ -348,14 +348,14 @@ func (aps *AdvancedPHPSecurity) scanFileForXSS(filePath string) []SecurityIssue 
 			}
 		}
 	}
-	
+
 	return issues
 }
 
 // scanPathTraversalVulnerabilities 扫描路径遍历漏洞
 func (aps *AdvancedPHPSecurity) scanPathTraversalVulnerabilities(site *config.PHPSite, result *SecurityScanResult) {
 	phpFiles := aps.findPHPFiles(site.Root)
-	
+
 	for _, file := range phpFiles {
 		issues := aps.scanFileForPathTraversal(file)
 		result.Issues = append(result.Issues, issues...)
@@ -365,7 +365,7 @@ func (aps *AdvancedPHPSecurity) scanPathTraversalVulnerabilities(site *config.PH
 // scanFileForPathTraversal 扫描单个文件的路径遍历
 func (aps *AdvancedPHPSecurity) scanFileForPathTraversal(filePath string) []SecurityIssue {
 	var issues []SecurityIssue
-	
+
 	file, err := os.Open(filePath)
 	if err != nil {
 		return issues
@@ -374,7 +374,7 @@ func (aps *AdvancedPHPSecurity) scanFileForPathTraversal(filePath string) []Secu
 
 	scanner := bufio.NewScanner(file)
 	lineNum := 0
-	
+
 	// 路径遍历模式
 	pathPatterns := map[string]string{
 		`include\s*\(\s*\$`:           "include() 使用变量",
@@ -388,7 +388,7 @@ func (aps *AdvancedPHPSecurity) scanFileForPathTraversal(filePath string) []Secu
 	for scanner.Scan() {
 		lineNum++
 		line := scanner.Text()
-		
+
 		for pattern, description := range pathPatterns {
 			if matched, _ := regexp.MatchString(pattern, line); matched {
 				issues = append(issues, SecurityIssue{
@@ -406,7 +406,7 @@ func (aps *AdvancedPHPSecurity) scanFileForPathTraversal(filePath string) []Secu
 			}
 		}
 	}
-	
+
 	return issues
 }
 
@@ -516,7 +516,7 @@ func (aps *AdvancedPHPSecurity) scanFilePermissions(site *config.PHPSite, result
 // scanSensitiveDataExposure 扫描敏感数据泄露
 func (aps *AdvancedPHPSecurity) scanSensitiveDataExposure(site *config.PHPSite, result *SecurityScanResult) {
 	phpFiles := aps.findPHPFiles(site.Root)
-	
+
 	for _, file := range phpFiles {
 		issues := aps.scanFileForSensitiveData(file)
 		result.Issues = append(result.Issues, issues...)
@@ -526,7 +526,7 @@ func (aps *AdvancedPHPSecurity) scanSensitiveDataExposure(site *config.PHPSite, 
 // scanFileForSensitiveData 扫描单个文件的敏感数据
 func (aps *AdvancedPHPSecurity) scanFileForSensitiveData(filePath string) []SecurityIssue {
 	var issues []SecurityIssue
-	
+
 	file, err := os.Open(filePath)
 	if err != nil {
 		return issues
@@ -535,20 +535,20 @@ func (aps *AdvancedPHPSecurity) scanFileForSensitiveData(filePath string) []Secu
 
 	scanner := bufio.NewScanner(file)
 	lineNum := 0
-	
+
 	// 敏感数据模式
 	sensitivePatterns := map[string]string{
-		`password\s*=\s*["\'][^"\']+["\']`:     "硬编码密码",
-		`api_key\s*=\s*["\'][^"\']+["\']`:      "硬编码 API 密钥",
-		`secret\s*=\s*["\'][^"\']+["\']`:       "硬编码密钥",
-		`token\s*=\s*["\'][^"\']+["\']`:        "硬编码令牌",
+		`password\s*=\s*["\'][^"\']+["\']`:         "硬编码密码",
+		`api_key\s*=\s*["\'][^"\']+["\']`:          "硬编码 API 密钥",
+		`secret\s*=\s*["\'][^"\']+["\']`:           "硬编码密钥",
+		`token\s*=\s*["\'][^"\']+["\']`:            "硬编码令牌",
 		`mysql_connect\s*\([^)]*["\'][^"\']+["\']`: "硬编码数据库密码",
 	}
 
 	for scanner.Scan() {
 		lineNum++
 		line := scanner.Text()
-		
+
 		for pattern, description := range sensitivePatterns {
 			if matched, _ := regexp.MatchString(pattern, line); matched {
 				issues = append(issues, SecurityIssue{
@@ -566,30 +566,30 @@ func (aps *AdvancedPHPSecurity) scanFileForSensitiveData(filePath string) []Secu
 			}
 		}
 	}
-	
+
 	return issues
 }
 
 // findPHPFiles 查找 PHP 文件
 func (aps *AdvancedPHPSecurity) findPHPFiles(rootDir string) []string {
 	var phpFiles []string
-	
+
 	err := filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		
+
 		if !info.IsDir() && strings.HasSuffix(strings.ToLower(path), ".php") {
 			phpFiles = append(phpFiles, path)
 		}
-		
+
 		return nil
 	})
-	
+
 	if err != nil {
 		aps.log.Warnf("Error walking directory %s: %v", rootDir, err)
 	}
-	
+
 	return phpFiles
 }
 
@@ -609,18 +609,18 @@ func (result *SecurityScanResult) calculateSecurityScore() {
 			result.LowIssues++
 		}
 	}
-	
+
 	// 计算安全评分 (0-100)
 	score := 100
 	score -= result.CriticalIssues * 20
 	score -= result.HighIssues * 10
 	score -= result.MediumIssues * 5
 	score -= result.LowIssues * 2
-	
+
 	if score < 0 {
 		score = 0
 	}
-	
+
 	result.SecurityScore = score
 }
 
@@ -636,7 +636,7 @@ func (aps *AdvancedPHPSecurity) generateSecurityRecommendations(result *Security
 			Action:      "fix_critical_issues",
 		})
 	}
-	
+
 	if result.HighIssues > 0 {
 		result.Recommendations = append(result.Recommendations, SecurityRecommendation{
 			Type:        "high",
@@ -646,7 +646,7 @@ func (aps *AdvancedPHPSecurity) generateSecurityRecommendations(result *Security
 			Action:      "fix_high_risk_issues",
 		})
 	}
-	
+
 	// 通用安全建议
 	result.Recommendations = append(result.Recommendations, SecurityRecommendation{
 		Type:        "general",
@@ -655,7 +655,7 @@ func (aps *AdvancedPHPSecurity) generateSecurityRecommendations(result *Security
 		Priority:    "medium",
 		Action:      "enable_security_headers",
 	})
-	
+
 	result.Recommendations = append(result.Recommendations, SecurityRecommendation{
 		Type:        "general",
 		Title:       "定期更新依赖包",
@@ -742,11 +742,11 @@ func (aps *AdvancedPHPSecurity) removeDangerousFileTypes(site *config.PHPSite) e
 	if site.SecurityConfig == nil {
 		return nil
 	}
-	
+
 	// 移除危险的文件类型
 	dangerousExts := []string{".php", ".phtml", ".php3", ".php4", ".php5", ".php7", ".phps", ".pht", ".phtm"}
 	var newAllowed []string
-	
+
 	for _, ext := range site.SecurityConfig.AllowedExtensions {
 		isDangerous := false
 		for _, dangerous := range dangerousExts {
@@ -759,7 +759,7 @@ func (aps *AdvancedPHPSecurity) removeDangerousFileTypes(site *config.PHPSite) e
 			newAllowed = append(newAllowed, ext)
 		}
 	}
-	
+
 	site.SecurityConfig.AllowedExtensions = newAllowed
 	return nil
 }
