@@ -316,34 +316,76 @@ func (s *Server) processLogin(w http.ResponseWriter, r *http.Request) {
 
 	s.log.Infof("processLogin: username='%s', password_len=%d", username, len(password))
 
-	// 使用新的验证方法（支持bcrypt）
-	usernameMatch := username == s.config.Admin.Username
-	passwordMatch := s.verifyAdminPassword(password)
+	// 多账户认证逻辑
+	var authenticatedUser *User
+	var isSuperAdmin bool
 
-	s.log.Infof("processLogin verification: username_match=%v, password_match=%v", usernameMatch, passwordMatch)
+	// 1. 首先尝试普通用户认证
+	user, err := s.userManager.AuthenticateUser(username, password)
+	if err == nil {
+		authenticatedUser = user
+		s.log.Infof("普通用户认证成功: %s (角色: %s)", username, user.Role)
+	} else {
+		s.log.Debugf("普通用户认证失败: %v", err)
 
-	if usernameMatch && passwordMatch {
+		// 2. 如果普通用户认证失败，尝试超级管理员认证
+		usernameMatch := username == s.config.Admin.Username
+		passwordMatch := s.verifyAdminPassword(password)
+
+		if usernameMatch && passwordMatch {
+			// 创建超级管理员用户对象
+			authenticatedUser = &User{
+				Username: username,
+				Role:     RoleSuperAdmin,
+				IsActive: true,
+			}
+			isSuperAdmin = true
+			s.log.Infof("超级管理员认证成功: %s", username)
+		}
+	}
+
+	if authenticatedUser != nil {
 		s.log.Infof("✅ LOGIN SUCCESS - Setting session cookie")
-		// 设置session cookie
-		http.SetCookie(w, &http.Cookie{
-			Name:     "sslcat_session",
-			Value:    "authenticated",
-			Path:     "/",
-			MaxAge:   3600 * 8, // 8小时
-			HttpOnly: true,
-			Secure:   r.TLS != nil,
-		})
+
+		// 创建会话
+		clientIP := s.getClientIP(r)
+		userAgent := r.Header.Get("User-Agent")
+		session, err := s.sessionManager.CreateSession(
+			authenticatedUser.Username,
+			authenticatedUser.Role,
+			clientIP,
+			userAgent,
+		)
+		if err != nil {
+			s.log.Errorf("创建会话失败: %v", err)
+			s.renderLoginError(w, r, "登录失败，请重试")
+			return
+		}
+
+		// 设置会话Cookie
+		s.sessionManager.SetSessionCookie(w, session.SessionID, r.TLS != nil)
+
+		// 记录用户操作日志
+		s.userManager.LogUserAction(
+			authenticatedUser.Username,
+			"login_success",
+			"system",
+			fmt.Sprintf("用户登录成功，角色: %s", authenticatedUser.Role),
+			clientIP,
+			userAgent,
+		)
 
 		// 审计
-		s.audit("login_success", "admin")
+		s.audit("login_success", authenticatedUser.Username)
 
-		// 如果首次运行或未设置过密码/邮箱，要求强制设置
-		if s.needFirstTimeSetup() {
+		// 超级管理员首次设置检查
+		if isSuperAdmin && s.needFirstTimeSetup() {
 			http.Redirect(w, r, s.config.AdminPrefix+"/settings/first-setup", http.StatusFound)
 			return
 		}
-		// 若处于首启向导状态
-		if s.needWizard() {
+
+		// 超级管理员向导检查
+		if isSuperAdmin && s.needWizard() {
 			http.Redirect(w, r, s.config.AdminPrefix+"/wizard", http.StatusFound)
 			return
 		}
@@ -359,12 +401,17 @@ func (s *Server) processLogin(w http.ResponseWriter, r *http.Request) {
 	s.audit("login_failed", clientIP)
 
 	// 显示错误页面（重新生成完整表单数据）
+	s.renderLoginError(w, r, s.translator.T("login.invalid"))
+}
+
+// renderLoginError 渲染登录错误页面
+func (s *Server) renderLoginError(w http.ResponseWriter, r *http.Request, errorMsg string) {
 	startTs := time.Now().UnixMilli()
 	honeypotName := "hp_seed000"
 
 	data := map[string]interface{}{
 		"AdminPrefix":    s.config.AdminPrefix,
-		"Error":          s.translator.T("login.invalid"),
+		"Error":          errorMsg,
 		"RequireCaptcha": s.config.Security.EnableCaptcha,
 		"RequireTOTP":    s.config.Admin.EnableTOTP,
 		"Debug":          false,
@@ -686,25 +733,6 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 }
 
-// renderLoginError 渲染登录错误页面
-func (s *Server) renderLoginError(w http.ResponseWriter, r *http.Request, errorMsg string) {
-	// 重新生成完整表单数据
-	startTs := time.Now().UnixMilli()
-	honeypotName := "hp_seed000"
-
-	data := map[string]interface{}{
-		"AdminPrefix":    s.config.AdminPrefix,
-		"Error":          errorMsg,
-		"RequireCaptcha": s.config.Security.EnableCaptcha,
-		"RequireTOTP":    s.config.Admin.EnableTOTP,
-		"Debug":          false,
-		"HoneypotName":   honeypotName,
-		"FormStartTs":    startTs,
-	}
-
-	s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
-}
-
 // CDN 缓存设置页
 func (s *Server) handleCDNCache(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
@@ -810,6 +838,23 @@ func (s *Server) handleCDNCacheClear(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	// 获取当前会话
+	session, exists := s.sessionManager.GetSessionFromRequest(r)
+	if exists {
+		// 记录登出日志
+		s.userManager.LogUserAction(
+			session.Username,
+			"logout",
+			"system",
+			"用户登出",
+			s.getClientIP(r),
+			r.Header.Get("User-Agent"),
+		)
+
+		// 删除会话
+		s.sessionManager.DeleteSession(session.SessionID)
+	}
+
 	// 清除session cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     "sslcat_session",
@@ -818,6 +863,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   -1,
 		HttpOnly: true,
 	})
+
 	// 重定向到登录页
 	http.Redirect(w, r, s.config.AdminPrefix+"/login", http.StatusFound)
 }
