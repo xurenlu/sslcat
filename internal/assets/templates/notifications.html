@@ -68,6 +68,9 @@
                         <button class="btn btn-outline-primary" onclick="refreshNotifications()">
                             <i class="bi bi-arrow-clockwise"></i> 刷新
                         </button>
+                        <button class="btn btn-success" onclick="testNotificationChannels()">
+                            <i class="bi bi-gear"></i> 测试渠道
+                        </button>
                         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#testModal">
                             <i class="bi bi-send"></i> 测试通知
                         </button>
@@ -257,6 +260,31 @@
             })
             .catch(error => {
                 alert('发送失败: ' + error.message);
+            });
+        }
+
+        function testNotificationChannels() {
+            if (!confirm('这将测试所有启用的通知渠道，确定继续吗？')) {
+                return;
+            }
+
+            fetch('{{.AdminPrefix}}/api/notifications/test-channels', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    let message = '通知渠道测试结果：\n\n';
+                    for (const [channel, result] of Object.entries(data.results)) {
+                        message += `${channel}: ${result}\n`;
+                    }
+                    alert(message);
+                } else {
+                    alert('测试失败: ' + (data.message || '未知错误'));
+                }
+            })
+            .catch(error => {
+                alert('测试失败: ' + error.message);
             });
         }
 
