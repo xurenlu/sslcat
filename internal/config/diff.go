@@ -24,15 +24,16 @@ type ProxyRuleChange struct {
 
 // ConfigDiff 总体差异
 type ConfigDiff struct {
-	ServerChanges   []KeyChange       `json:"server_changes"`
-	SSLChanges      []KeyChange       `json:"ssl_changes"`
-	AdminChanges    []KeyChange       `json:"admin_changes"`
-	SecurityChanges []KeyChange       `json:"security_changes"`
-	AdminPrefix     *KeyChange        `json:"admin_prefix,omitempty"`
-	ProxyAdded      []ProxyRule       `json:"proxy_added"`
-	ProxyRemoved    []ProxyRule       `json:"proxy_removed"`
-	ProxyModified   []ProxyRuleChange `json:"proxy_modified"`
-	HasChanges      bool              `json:"has_changes"`
+	ServerChanges      []KeyChange       `json:"server_changes"`
+	SSLChanges         []KeyChange       `json:"ssl_changes"`
+	AdminChanges       []KeyChange       `json:"admin_changes"`
+	SecurityChanges    []KeyChange       `json:"security_changes"`
+	NotificationChanges []KeyChange      `json:"notification_changes"`
+	AdminPrefix        *KeyChange        `json:"admin_prefix,omitempty"`
+	ProxyAdded         []ProxyRule       `json:"proxy_added"`
+	ProxyRemoved       []ProxyRule       `json:"proxy_removed"`
+	ProxyModified      []ProxyRuleChange `json:"proxy_modified"`
+	HasChanges         bool              `json:"has_changes"`
 }
 
 func stringOf[T any](v T) string { return fmt.Sprintf("%v", v) }
@@ -108,6 +109,9 @@ func CompareConfigs(cur, prop *Config) ConfigDiff {
 	diff.SecurityChanges = append(diff.SecurityChanges, simpleDiff("security.tls_fp_max_per_min", cur.Security.TLSFingerprintMaxPerMin, prop.Security.TLSFingerprintMaxPerMin)...)
 	diff.SecurityChanges = append(diff.SecurityChanges, simpleDiff("security.tls_fp_top_n", cur.Security.TLSFingerprintTopN, prop.Security.TLSFingerprintTopN)...)
 
+	// Notification 配置比较
+	diff.NotificationChanges = compareNotificationConfigs(cur.Notification, prop.Notification)
+
 	if cur.AdminPrefix != prop.AdminPrefix {
 		kc := KeyChange{Key: "admin_prefix", Old: cur.AdminPrefix, New: prop.AdminPrefix}
 		diff.AdminPrefix = &kc
@@ -155,7 +159,7 @@ func CompareConfigs(cur, prop *Config) ConfigDiff {
 	}
 
 	// 标记是否有变更
-	total := len(diff.ServerChanges) + len(diff.SSLChanges) + len(diff.AdminChanges) + len(diff.SecurityChanges) + len(diff.ProxyAdded) + len(diff.ProxyRemoved) + len(diff.ProxyModified)
+	total := len(diff.ServerChanges) + len(diff.SSLChanges) + len(diff.AdminChanges) + len(diff.SecurityChanges) + len(diff.NotificationChanges) + len(diff.ProxyAdded) + len(diff.ProxyRemoved) + len(diff.ProxyModified)
 	if diff.AdminPrefix != nil {
 		total++
 	}
@@ -173,4 +177,108 @@ func simpleDiff[T comparable](key string, a, b T) []KeyChange {
 		return nil
 	}
 	return []KeyChange{{Key: key, Old: stringOf(a), New: stringOf(b)}}
+}
+
+// compareNotificationConfigs 比较通知配置
+func compareNotificationConfigs(cur, prop NotificationConfig) []KeyChange {
+	var changes []KeyChange
+	
+	// 基本配置
+	changes = append(changes, simpleDiff("notification.enabled", cur.Enabled, prop.Enabled)...)
+	
+	// 邮件配置
+	emailChanges := compareEmailChannelConfigs(cur.Channels.Email, prop.Channels.Email)
+	changes = append(changes, emailChanges...)
+	
+	// Webhook配置
+	webhookChanges := compareWebhookChannelConfigs(cur.Channels.Webhook, prop.Channels.Webhook)
+	changes = append(changes, webhookChanges...)
+	
+	// 系统日志配置
+	syslogChanges := compareSyslogChannelConfigs(cur.Channels.Syslog, prop.Channels.Syslog)
+	changes = append(changes, syslogChanges...)
+	
+	// 控制台配置
+	consoleChanges := compareConsoleChannelConfigs(cur.Channels.Console, prop.Channels.Console)
+	changes = append(changes, consoleChanges...)
+	
+	return changes
+}
+
+// compareEmailChannelConfigs 比较邮件渠道配置
+func compareEmailChannelConfigs(cur, prop EmailChannelConfig) []KeyChange {
+	var changes []KeyChange
+	prefix := "notification.channels.email."
+	
+	changes = append(changes, simpleDiff(prefix+"enabled", cur.Enabled, prop.Enabled)...)
+	changes = append(changes, simpleDiff(prefix+"smtp_host", cur.SMTPHost, prop.SMTPHost)...)
+	changes = append(changes, simpleDiff(prefix+"smtp_port", cur.SMTPPort, prop.SMTPPort)...)
+	changes = append(changes, simpleDiff(prefix+"username", cur.Username, prop.Username)...)
+	
+	// 密码需要特殊处理，不显示明文
+	if cur.Password != prop.Password {
+		changes = append(changes, KeyChange{
+			Key: prefix + "password",
+			Old: "(已设置)",
+			New: "(已修改)",
+		})
+	}
+	
+	changes = append(changes, simpleDiff(prefix+"from", cur.From, prop.From)...)
+	
+	// To字段需要特殊处理数组
+	if !reflect.DeepEqual(cur.To, prop.To) {
+		changes = append(changes, KeyChange{
+			Key: prefix + "to",
+			Old: fmt.Sprintf("[%s]", strings.Join(cur.To, ", ")),
+			New: fmt.Sprintf("[%s]", strings.Join(prop.To, ", ")),
+		})
+	}
+	
+	changes = append(changes, simpleDiff(prefix+"use_tls", cur.UseTLS, prop.UseTLS)...)
+	
+	return changes
+}
+
+// compareWebhookChannelConfigs 比较Webhook渠道配置
+func compareWebhookChannelConfigs(cur, prop WebhookChannelConfig) []KeyChange {
+	var changes []KeyChange
+	prefix := "notification.channels.webhook."
+	
+	changes = append(changes, simpleDiff(prefix+"enabled", cur.Enabled, prop.Enabled)...)
+	changes = append(changes, simpleDiff(prefix+"url", cur.URL, prop.URL)...)
+	changes = append(changes, simpleDiff(prefix+"timeout", cur.Timeout, prop.Timeout)...)
+	
+	// Headers需要特殊处理
+	if !reflect.DeepEqual(cur.Headers, prop.Headers) {
+		changes = append(changes, KeyChange{
+			Key: prefix + "headers",
+			Old: stringOf(cur.Headers),
+			New: stringOf(prop.Headers),
+		})
+	}
+	
+	return changes
+}
+
+// compareSyslogChannelConfigs 比较系统日志渠道配置
+func compareSyslogChannelConfigs(cur, prop SyslogChannelConfig) []KeyChange {
+	var changes []KeyChange
+	prefix := "notification.channels.syslog."
+	
+	changes = append(changes, simpleDiff(prefix+"enabled", cur.Enabled, prop.Enabled)...)
+	changes = append(changes, simpleDiff(prefix+"address", cur.Address, prop.Address)...)
+	changes = append(changes, simpleDiff(prefix+"network", cur.Network, prop.Network)...)
+	
+	return changes
+}
+
+// compareConsoleChannelConfigs 比较控制台渠道配置
+func compareConsoleChannelConfigs(cur, prop ConsoleChannelConfig) []KeyChange {
+	var changes []KeyChange
+	prefix := "notification.channels.console."
+	
+	changes = append(changes, simpleDiff(prefix+"enabled", cur.Enabled, prop.Enabled)...)
+	
+	return changes
 }
