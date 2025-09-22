@@ -128,15 +128,40 @@
         <div class="card mb-4">
           <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="mb-0"><i class="bi bi-shield-check"></i> 安全扫描结果</h5>
-            <button class="btn btn-sm btn-outline-primary" onclick="runSecurityScan()">
-              <i class="bi bi-arrow-clockwise"></i> 重新扫描
-            </button>
+            <div>
+              <button class="btn btn-sm btn-outline-primary me-2" onclick="runSecurityScan()">
+                <i class="bi bi-arrow-clockwise"></i> 重新扫描
+              </button>
+              <button class="btn btn-sm btn-outline-success" onclick="runAdvancedSecurityScan()">
+                <i class="bi bi-shield-plus"></i> 高级扫描
+              </button>
+            </div>
           </div>
           <div class="card-body">
             <div id="securityScanResults">
               <div class="text-center text-muted">
                 <i class="bi bi-hourglass-split"></i> 正在扫描安全漏洞...
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 高级安全扫描结果 -->
+        <div class="card mb-4" id="advancedScanResults" style="display: none;">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-shield-plus"></i> 高级安全扫描结果</h5>
+            <div>
+              <button class="btn btn-sm btn-outline-warning me-2" onclick="showAutoFixOptions()">
+                <i class="bi bi-tools"></i> 自动修复
+              </button>
+              <button class="btn btn-sm btn-outline-info" onclick="showRecommendations()">
+                <i class="bi bi-lightbulb"></i> 安全建议
+              </button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div id="advancedScanContent">
+              <!-- 高级扫描内容将在这里显示 -->
             </div>
           </div>
         </div>
@@ -424,6 +449,169 @@ function runSecurityScan() {
 function refreshSecurityStatus() {
   if (!currentDomain) return;
   loadSiteSecurity();
+}
+
+// 高级安全扫描
+function runAdvancedSecurityScan() {
+  if (!currentDomain) return;
+  
+  document.getElementById('advancedScanResults').style.display = 'block';
+  document.getElementById('advancedScanContent').innerHTML = `
+    <div class="text-center text-muted">
+      <i class="bi bi-hourglass-split"></i> 正在执行高级安全扫描...
+    </div>
+  `;
+  
+  fetch(`{{.AdminPrefix}}/api/php-security/advanced-scan?domain=${currentDomain}`)
+    .then(response => response.json())
+    .then(data => {
+      displayAdvancedScanResults(data);
+    })
+    .catch(error => {
+      document.getElementById('advancedScanContent').innerHTML = `
+        <div class="alert alert-danger">
+          <i class="bi bi-exclamation-triangle"></i> 高级安全扫描失败: ${error.message}
+        </div>
+      `;
+    });
+}
+
+// 显示高级扫描结果
+function displayAdvancedScanResults(data) {
+  const container = document.getElementById('advancedScanContent');
+  
+  let html = `
+    <div class="row mb-3">
+      <div class="col-md-3">
+        <div class="card text-center">
+          <div class="card-body">
+            <h6>安全评分</h6>
+            <h3 class="text-${data.security_score >= 80 ? 'success' : data.security_score >= 60 ? 'warning' : 'danger'}">${data.security_score}/100</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card text-center">
+          <div class="card-body">
+            <h6>总问题数</h6>
+            <h3 class="text-primary">${data.total_issues}</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card text-center">
+          <div class="card-body">
+            <h6>关键问题</h6>
+            <h3 class="text-danger">${data.critical_issues}</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card text-center">
+          <div class="card-body">
+            <h6>高风险</h6>
+            <h3 class="text-warning">${data.high_issues}</h3>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  if (data.issues && data.issues.length > 0) {
+    html += '<h6>发现的安全问题</h6><div class="table-responsive"><table class="table table-sm">';
+    html += '<thead><tr><th>类型</th><th>严重程度</th><th>描述</th><th>文件</th><th>操作</th></tr></thead><tbody>';
+    
+    data.issues.forEach(issue => {
+      const severityClass = issue.severity === 'critical' ? 'danger' : 
+                          issue.severity === 'high' ? 'warning' : 
+                          issue.severity === 'medium' ? 'info' : 'secondary';
+      
+      html += `
+        <tr>
+          <td><span class="badge bg-${severityClass}">${issue.type}</span></td>
+          <td><span class="badge bg-${severityClass}">${issue.severity}</span></td>
+          <td>${issue.title}</td>
+          <td><code>${issue.file || 'N/A'}</code></td>
+          <td>
+            ${issue.fixable ? `<button class="btn btn-sm btn-outline-primary" onclick="autoFixIssue('${issue.id}')">自动修复</button>` : '<span class="text-muted">需手动修复</span>'}
+          </td>
+        </tr>
+      `;
+    });
+    
+    html += '</tbody></table></div>';
+  }
+  
+  container.innerHTML = html;
+}
+
+// 自动修复单个问题
+function autoFixIssue(issueId) {
+  if (!currentDomain) return;
+  
+  fetch(`{{.AdminPrefix}}/api/php-security/auto-fix`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      domain: currentDomain,
+      issue_ids: [issueId]
+    })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      alert('安全问题已自动修复！');
+      runAdvancedSecurityScan(); // 重新扫描
+    } else {
+      alert('自动修复失败: ' + data.message);
+    }
+  })
+  .catch(error => {
+    alert('自动修复失败: ' + error.message);
+  });
+}
+
+// 显示自动修复选项
+function showAutoFixOptions() {
+  // 这里可以实现批量自动修复功能
+  alert('批量自动修复功能开发中...');
+}
+
+// 显示安全建议
+function showRecommendations() {
+  if (!currentDomain) return;
+  
+  fetch(`{{.AdminPrefix}}/api/php-security/recommendations?domain=${currentDomain}`)
+    .then(response => response.json())
+    .then(data => {
+      let html = '<h6>安全建议</h6><div class="list-group">';
+      
+      data.recommendations.forEach(rec => {
+        const priorityClass = rec.priority === 'high' ? 'danger' : 
+                             rec.priority === 'medium' ? 'warning' : 'info';
+        
+        html += `
+          <div class="list-group-item">
+            <div class="d-flex w-100 justify-content-between">
+              <h6 class="mb-1">${rec.title}</h6>
+              <small class="badge bg-${priorityClass}">${rec.priority}</small>
+            </div>
+            <p class="mb-1">${rec.description}</p>
+            <small>类型: ${rec.type}</small>
+          </div>
+        `;
+      });
+      
+      html += '</div>';
+      
+      // 显示在模态框中或直接替换内容
+      document.getElementById('advancedScanContent').innerHTML = html;
+    })
+    .catch(error => {
+      alert('获取安全建议失败: ' + error.message);
+    });
 }
 
 // 页面加载时自动选择第一个站点
