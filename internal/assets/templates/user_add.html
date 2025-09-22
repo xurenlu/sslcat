@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>添加用户 - SSLcat</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{.AdminPrefix}}/dashboard">
+                <i class="bi bi-shield-lock"></i> SSLcat
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{{.AdminPrefix}}/users">
+                    <i class="bi bi-arrow-left"></i> 返回用户列表
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h4><i class="bi bi-person-plus"></i> 添加用户</h4>
+                    </div>
+                    <div class="card-body">
+                        {{if .Error}}
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle"></i> {{.Error}}
+                        </div>
+                        {{end}}
+
+                        <form method="POST">
+                            <div class="mb-3">
+                                <label for="username" class="form-label">用户名 *</label>
+                                <input type="text" class="form-control" id="username" name="username" 
+                                       placeholder="请输入用户名" required>
+                                <div class="form-text">用户名长度至少3个字符，只能包含字母、数字和下划线</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="password" class="form-label">密码 *</label>
+                                <input type="password" class="form-control" id="password" name="password" 
+                                       placeholder="请输入密码" required>
+                                <div class="form-text">密码长度至少6个字符</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="role" class="form-label">角色 *</label>
+                                <select class="form-select" id="role" name="role" required>
+                                    <option value="">请选择角色</option>
+                                    {{range $key, $value := .UserRoles}}
+                                    <option value="{{$key}}">{{$value}}</option>
+                                    {{end}}
+                                </select>
+                                <div class="form-text">
+                                    <strong>角色说明：</strong><br>
+                                    • <strong>超级管理员</strong>：拥有所有权限，可以管理其他用户<br>
+                                    • <strong>管理员</strong>：可以管理代理、SSL证书等，但不能管理用户<br>
+                                    • <strong>操作员</strong>：可以查看和操作代理规则，但不能修改系统设置<br>
+                                    • <strong>只读用户</strong>：只能查看系统状态，不能进行任何修改操作
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="email" class="form-label">邮箱</label>
+                                <input type="email" class="form-control" id="email" name="email" 
+                                       placeholder="请输入邮箱地址（可选）">
+                                <div class="form-text">邮箱地址用于接收系统通知</div>
+                            </div>
+
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                <a href="{{.AdminPrefix}}/users" class="btn btn-secondary me-md-2">
+                                    <i class="bi bi-arrow-left"></i> 取消
+                                </a>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-check"></i> 创建用户
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 表单验证
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const role = document.getElementById('role').value;
+
+            if (username.length < 3) {
+                alert('用户名长度至少3个字符');
+                e.preventDefault();
+                return;
+            }
+
+            if (password.length < 6) {
+                alert('密码长度至少6个字符');
+                e.preventDefault();
+                return;
+            }
+
+            if (!role) {
+                alert('请选择用户角色');
+                e.preventDefault();
+                return;
+            }
+
+            // 用户名格式验证
+            const usernameRegex = /^[a-zA-Z0-9_]+$/;
+            if (!usernameRegex.test(username)) {
+                alert('用户名只能包含字母、数字和下划线');
+                e.preventDefault();
+                return;
+            }
+        });
+    </script>
+</body>
+</html>
