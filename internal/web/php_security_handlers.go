@@ -239,7 +239,7 @@ func (s *Server) handleAPIPHPAdvancedSecurityScan(w http.ResponseWriter, r *http
 
 	// 创建高级安全扫描器
 	advancedSecurity := NewAdvancedPHPSecurity(s.config)
-	
+
 	// 执行高级安全扫描
 	scanResult, err := advancedSecurity.PerformAdvancedSecurityScan(domain)
 	if err != nil {
@@ -279,7 +279,7 @@ func (s *Server) handleAPIPHPSecurityAutoFix(w http.ResponseWriter, r *http.Requ
 
 	// 创建高级安全扫描器
 	advancedSecurity := NewAdvancedPHPSecurity(s.config)
-	
+
 	// 执行自动修复
 	err := advancedSecurity.AutoFixSecurityIssues(req.Domain, req.IssueIDs)
 	if err != nil {
@@ -313,7 +313,7 @@ func (s *Server) handleAPIPHPSecurityRecommendations(w http.ResponseWriter, r *h
 
 	// 创建高级安全扫描器
 	advancedSecurity := NewAdvancedPHPSecurity(s.config)
-	
+
 	// 执行安全扫描获取建议
 	scanResult, err := advancedSecurity.PerformAdvancedSecurityScan(domain)
 	if err != nil {
@@ -323,10 +323,10 @@ func (s *Server) handleAPIPHPSecurityRecommendations(w http.ResponseWriter, r *h
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"domain":         domain,
+		"domain":          domain,
 		"recommendations": scanResult.Recommendations,
-		"security_score": scanResult.SecurityScore,
-		"total_issues":   scanResult.TotalIssues,
+		"security_score":  scanResult.SecurityScore,
+		"total_issues":    scanResult.TotalIssues,
 	})
 }
 
@@ -357,9 +357,9 @@ func (pss *PHPSecurityScanner) ScanForVulnerabilities(domain string) ([]string, 
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var vulnerabilities []string
-	
+
 	// 根据扫描结果生成漏洞报告
 	if scanResult.TotalIssues == 0 {
 		vulnerabilities = append(vulnerabilities, "✅ 未发现安全漏洞")
@@ -377,11 +377,11 @@ func (pss *PHPSecurityScanner) ScanForVulnerabilities(domain string) ([]string, 
 		if scanResult.LowIssues > 0 {
 			vulnerabilities = append(vulnerabilities, fmt.Sprintf("🔸 发现 %d 个低风险安全问题", scanResult.LowIssues))
 		}
-		
+
 		// 显示安全评分
 		vulnerabilities = append(vulnerabilities, fmt.Sprintf("📊 安全评分: %d/100", scanResult.SecurityScore))
 	}
-	
+
 	return vulnerabilities, nil
 }
 
