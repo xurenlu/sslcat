@@ -345,3 +345,124 @@ func (s *Server) handleAPIDNSConfig(w http.ResponseWriter, r *http.Request) {
 		"message": "DNS configuration updated successfully",
 	})
 }
+
+// handleAPIDNSHealth 获取DNS提供程序健康状态
+func (s *Server) handleAPIDNSHealth(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizeAPI(w, r, true) {
+		return
+	}
+
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 获取提供程序健康状态
+	health := s.sslManager.GetDNSProviderHealth()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"health":  health,
+	})
+}
+
+// handleAPIDNSTest 测试DNS提供程序连接
+func (s *Server) handleAPIDNSTest(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizeAPI(w, r, true) {
+		return
+	}
+
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Provider string `json:"provider"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
+		return
+	}
+
+	if req.Provider == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "provider name is required"})
+		return
+	}
+
+	// 测试提供程序连接
+	err := s.sslManager.TestDNSProvider(req.Provider)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+	} else {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"message": "DNS provider test successful",
+		})
+	}
+}
+
+// handleAPIDNSChallenge 创建DNS挑战记录
+func (s *Server) handleAPIDNSChallenge(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizeAPI(w, r, false) {
+		return
+	}
+
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Domain      string `json:"domain"`
+		RecordName  string `json:"record_name"`
+		RecordValue string `json:"record_value"`
+		Provider    string `json:"provider,omitempty"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
+		return
+	}
+
+	if req.Domain == "" || req.RecordName == "" || req.RecordValue == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "domain, record_name, and record_value are required"})
+		return
+	}
+
+	// 创建DNS挑战
+	var challenge interface{}
+	var err error
+
+	if req.Provider != "" {
+		// 使用指定的提供程序
+		challenge, err = s.sslManager.CreateDNSChallenge(req.Domain, req.RecordName, req.RecordValue, req.Provider)
+	} else {
+		// 使用故障转移机制
+		challenge, err = s.sslManager.CreateDNSChallengeWithFailover(req.Domain, req.RecordName, req.RecordValue)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+	} else {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":   true,
+			"challenge": challenge,
+		})
+	}
+}
