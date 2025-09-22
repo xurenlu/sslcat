@@ -38,12 +38,16 @@
           <li class="nav-item"><a class="nav-link" href="{{.AdminPrefix}}/static-sites"><i class="bi bi-file-earmark-text"></i> {{t "nav.static_sites"}}</a></li>
           <li class="nav-item"><a class="nav-link active" href="{{.AdminPrefix}}/php-sites"><i class="bi bi-code-square"></i> {{t "nav.php_sites"}}</a></li>
           <li class="nav-item"><a class="nav-link" href="{{.AdminPrefix}}/ssl"><i class="bi bi-shield-lock"></i> {{t "nav.ssl"}}</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{.AdminPrefix}}/dns"><i class="bi bi-globe"></i> DNS配置</a></li>
           <li class="nav-item"><a class="nav-link" href="{{.AdminPrefix}}/security"><i class="bi bi-shield-check"></i> {{t "nav.security"}}</a></li>
           <li class="nav-item"><a class="nav-link" href="{{.AdminPrefix}}/settings"><i class="bi bi-gear"></i> {{t "nav.settings"}}</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{.AdminPrefix}}/cdn-cache"><i class="bi bi-hdd"></i> 类CDN缓存</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{.AdminPrefix}}/runners"><i class="bi bi-terminal"></i> Runners管理</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{.AdminPrefix}}/git-server"><i class="bi bi-git"></i> Git Server</a></li>
         </ul>
         <hr>
         <div class="dropdown">
-          <a href="{{.AdminPrefix}}/logout" class="btn btn-outline-danger btn-sm"><i class="bi bi-box-arrow-right"></i> 退出</a>
+          <a href="{{.AdminPrefix}}/logout" class="btn btn-outline-danger btn-sm"><i class="bi bi-box-arrow-right"></i> {{t "menu.logout"}}</a>
         </div>
       </div>
     </nav>
