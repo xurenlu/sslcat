@@ -43,6 +43,7 @@ func (s *Server) handleProxyAdd(w http.ResponseWriter, r *http.Request) {
 			// 添加新规则到配置
 			enabled := r.FormValue("enabled") == "on"
 			sslOnly := r.FormValue("ssl_only") == "on"
+			optimizeHostHeader := r.FormValue("optimize_host_header") == "on"
 			cdnEnabled := r.FormValue("cdn_enabled") == "on"
 			cdnPreset := r.FormValue("cdn_preset")
 			cdnTTL := 0
@@ -51,6 +52,15 @@ func (s *Server) handleProxyAdd(w http.ResponseWriter, r *http.Request) {
 					cdnTTL = n
 				}
 			}
+
+			// 处理云存储配置字段
+			cloudStorageType := r.FormValue("cloud_storage_type")
+			cloudStorageRegion := r.FormValue("cloud_storage_region")
+			cloudStorageBucket := r.FormValue("cloud_storage_bucket")
+			cloudStorageEndpoint := r.FormValue("cloud_storage_endpoint")
+			cloudStoragePath := r.FormValue("cloud_storage_path")
+			cloudStorageAccessKey := r.FormValue("cloud_storage_access_key")
+			cloudStorageSecretKey := r.FormValue("cloud_storage_secret_key")
 
 			// 处理访问控制字段
 			authEnabled := r.FormValue("auth_enabled") == "on"
@@ -102,9 +112,18 @@ func (s *Server) handleProxyAdd(w http.ResponseWriter, r *http.Request) {
 				Target:               target,
 				Enabled:              enabled,
 				SSLOnly:              sslOnly,
+				OptimizeHostHeader:   optimizeHostHeader,
 				CDNEnabled:           cdnEnabled,
 				CDNPreset:            cdnPreset,
 				CDNDefaultTTLSeconds: cdnTTL,
+				// 云存储配置字段
+				CloudStorageType:      cloudStorageType,
+				CloudStorageRegion:    cloudStorageRegion,
+				CloudStorageBucket:    cloudStorageBucket,
+				CloudStorageEndpoint:  cloudStorageEndpoint,
+				CloudStoragePath:      cloudStoragePath,
+				CloudStorageAccessKey: cloudStorageAccessKey,
+				CloudStorageSecretKey: cloudStorageSecretKey,
 				// 访问控制字段
 				AuthEnabled:        authEnabled,
 				AuthUsers:          authUsers,
@@ -157,12 +176,14 @@ func (s *Server) handleProxyEdit(w http.ResponseWriter, r *http.Request) {
 		target := r.FormValue("target")
 		enabled := r.FormValue("enabled") == "on"
 		sslOnly := r.FormValue("ssl_only") == "on"
+		optimizeHostHeader := r.FormValue("optimize_host_header") == "on"
 
 		if domain != "" && target != "" {
 			s.config.Proxy.Rules[index].Domain = domain
 			s.config.Proxy.Rules[index].Target = target
 			s.config.Proxy.Rules[index].Enabled = enabled
 			s.config.Proxy.Rules[index].SSLOnly = sslOnly
+			s.config.Proxy.Rules[index].OptimizeHostHeader = optimizeHostHeader
 			s.config.Proxy.Rules[index].CDNEnabled = r.FormValue("cdn_enabled") == "on"
 			s.config.Proxy.Rules[index].CDNPreset = r.FormValue("cdn_preset")
 			if v := strings.TrimSpace(r.FormValue("cdn_ttl_seconds")); v != "" {
@@ -172,6 +193,15 @@ func (s *Server) handleProxyEdit(w http.ResponseWriter, r *http.Request) {
 			} else {
 				s.config.Proxy.Rules[index].CDNDefaultTTLSeconds = 0
 			}
+
+			// 更新云存储配置字段
+			s.config.Proxy.Rules[index].CloudStorageType = r.FormValue("cloud_storage_type")
+			s.config.Proxy.Rules[index].CloudStorageRegion = r.FormValue("cloud_storage_region")
+			s.config.Proxy.Rules[index].CloudStorageBucket = r.FormValue("cloud_storage_bucket")
+			s.config.Proxy.Rules[index].CloudStorageEndpoint = r.FormValue("cloud_storage_endpoint")
+			s.config.Proxy.Rules[index].CloudStoragePath = r.FormValue("cloud_storage_path")
+			s.config.Proxy.Rules[index].CloudStorageAccessKey = r.FormValue("cloud_storage_access_key")
+			s.config.Proxy.Rules[index].CloudStorageSecretKey = r.FormValue("cloud_storage_secret_key")
 
 			// 处理访问控制字段
 			s.config.Proxy.Rules[index].AuthEnabled = r.FormValue("auth_enabled") == "on"

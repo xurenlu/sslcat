@@ -20,6 +20,7 @@ import (
 	"github.com/xurenlu/sslcat/internal/logger"
 	"github.com/xurenlu/sslcat/internal/notify"
 	"github.com/xurenlu/sslcat/internal/proxy"
+	"github.com/xurenlu/sslcat/internal/runner"
 	"github.com/xurenlu/sslcat/internal/security"
 	"github.com/xurenlu/sslcat/internal/ssl"
 
@@ -74,10 +75,14 @@ type Server struct {
 	accessLogger *logger.AccessLogger
 	// 代理访问控制管理器
 	proxyAuthManager *ProxyAuthManager
+	// Runner 模块
+	localRunner  *runner.LocalRunner
+	dockerRunner *runner.DockerRunner
+	gitServer    *runner.GitServer
 }
 
 // NewServer 创建Web服务器
-func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Manager, sslMgr *ssl.Manager) *Server {
+func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Manager, sslMgr *ssl.Manager, localRunner *runner.LocalRunner, dockerRunner *runner.DockerRunner, gitServer *runner.GitServer) *Server {
 	// 初始化翻译器（从嵌入读取）
 	translator := i18n.NewTranslator(i18n.LangZhCN, "")
 	// 通过嵌入 i18n 文件加载翻译
@@ -109,6 +114,9 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		translator:       translator,
 		mux:              http.NewServeMux(),
 		startTime:        time.Now(),
+		localRunner:      localRunner,
+		dockerRunner:     dockerRunner,
+		gitServer:        gitServer,
 		log: logrus.WithFields(logrus.Fields{
 			"component": "web_server",
 		}),
@@ -349,10 +357,7 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/settings/change-password", s.handleChangePassword)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/settings/totp", s.handleTOTPSetup)
 
-	// CDN 缓存设置与管理
-	s.mux.HandleFunc(s.config.AdminPrefix+"/cdn-cache", s.handleCDNCache)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/cdn-cache/save", s.handleCDNCacheSave)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/cdn-cache/clear", s.handleCDNCacheClear)
+	// CDN 缓存设置已整合到代理配置中
 
 	// 静态站点管理
 	s.mux.HandleFunc(s.config.AdminPrefix+"/static-sites", s.handleStaticSites)
@@ -363,6 +368,8 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/php-sites", s.handlePHPSites)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/php-sites/add", s.handlePHPSitesAdd)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/php-sites/delete", s.handlePHPSitesDelete)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/php-sites/security", s.handlePHPSecurity)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/php-sites/optimization", s.handlePHPOptimization)
 
 	// 紧急修复（忘记密码）
 	s.mux.HandleFunc(s.config.AdminPrefix+"/help/recover", s.handleRecoverHelp)
@@ -405,11 +412,17 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/static-sites/delete", s.handleAPIStaticSitesDelete)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/php-sites", s.handleAPIPHPSites)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/php-sites/delete", s.handleAPIPHPSitesDelete)
+	// PHP 安全功能 API
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/php-security/status", s.handleAPIPHPSecurityStatus)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/php-security/scan", s.handleAPIPHPSecurityScan)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/php-security/performance", s.handleAPIPHPSecurityPerformance)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/php-security/errors", s.handleAPIPHPSecurityErrors)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/php-security/config", s.handleAPIPHPSecurityConfig)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security-logs", s.handleAPISecurityLogs)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/audit", s.handleAPIAudit)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/tls-fingerprints", s.handleAPITLSFingerprints)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/attacks", s.handleAPISecurityAttacks)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/cdn-cache/stats", s.handleAPICDNCacheStats)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/cloud-storage/detect", s.handleAPICloudStorageDetect)
 	// Prometheus 指标
 	s.mux.HandleFunc("/metrics", s.handleMetrics)
 	// 图形验证码
@@ -424,6 +437,51 @@ func (s *Server) setupRoutes() {
 	// 证书批量操作
 	s.mux.HandleFunc(s.config.AdminPrefix+"/ssl/download-all", s.handleSSLDownloadAll)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/ssl/upload-all", s.handleSSLBulkUpload)
+
+	// Runners 管理页面路由
+	s.mux.HandleFunc(s.config.AdminPrefix+"/runners", s.handleRunners)
+
+	// Git Server 管理页面路由
+	s.mux.HandleFunc(s.config.AdminPrefix+"/git-server", s.handleGitServer)
+
+	// Runner API 路由
+	s.registerRunnerRoutes()
+}
+
+// registerRunnerRoutes 注册 Runner API 路由
+func (s *Server) registerRunnerRoutes() {
+	// 创建 API 处理器
+	localAPI := NewLocalRunnerAPI(s.localRunner)
+	dockerAPI := NewDockerRunnerAPI(s.dockerRunner)
+	gitAPI := NewGitServerAPI(s.gitServer)
+	runtimeAPI := NewRuntimeDetectorAPI()
+
+	// Local Runner API 路由
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/local-runner/tasks", localAPI.ListTasks)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/local-runner/task", localAPI.GetTask)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/local-runner/task/add", localAPI.AddTask)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/local-runner/task/start", localAPI.StartTask)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/local-runner/task/stop", localAPI.StopTask)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/local-runner/task/remove", localAPI.RemoveTask)
+
+	// Docker Runner API 路由
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/docker-runner/tasks", dockerAPI.ListTasks)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/docker-runner/task", dockerAPI.GetTask)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/docker-runner/task/add", dockerAPI.AddTask)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/docker-runner/task/start", dockerAPI.StartTask)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/docker-runner/task/stop", dockerAPI.StopTask)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/docker-runner/task/remove", dockerAPI.RemoveTask)
+
+	// Git 服务器 API 路由
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/repos", gitAPI.ListRepositories)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/repo", gitAPI.GetRepository)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/repo/add", gitAPI.AddRepository)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/repo/update", gitAPI.UpdateRepository)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/repo/remove", gitAPI.RemoveRepository)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/execute", gitAPI.ExecuteCommand)
+
+	// 运行时检测 API 路由
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/runtime-detector/detect", runtimeAPI.DetectProject)
 }
 
 // ServeHTTP 实现http.Handler接口

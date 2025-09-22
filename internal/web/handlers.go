@@ -2,6 +2,7 @@ package web
 
 import (
 	"crypto/subtle"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -819,6 +820,77 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	})
 	// 重定向到登录页
 	http.Redirect(w, r, s.config.AdminPrefix+"/login", http.StatusFound)
+}
+
+// handleAPICloudStorageDetect 云存储服务检测API
+func (s *Server) handleAPICloudStorageDetect(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	target := r.URL.Query().Get("target")
+	if target == "" {
+		http.Error(w, "target parameter required", http.StatusBadRequest)
+		return
+	}
+
+	// 使用proxy manager的检测功能
+	if pm, ok := interface{}(s.proxyManager).(interface {
+		DetectCloudStorageInfo(target string) interface{}
+	}); ok {
+		info := pm.DetectCloudStorageInfo(target)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"data":    info,
+		})
+		return
+	}
+
+	// 简单的检测逻辑
+	targetLower := strings.ToLower(target)
+	var cloudInfo interface{}
+
+	if strings.Contains(targetLower, "aliyuncs.com") || strings.Contains(targetLower, "oss-") {
+		cloudInfo = map[string]interface{}{
+			"type":        "aliyun_oss",
+			"name":        "阿里云OSS",
+			"icon":        "🌩️",
+			"description": "检测到阿里云OSS服务，建议启用云存储优化配置",
+		}
+	} else if strings.Contains(targetLower, "amazonaws.com") || strings.Contains(targetLower, ".s3.") {
+		cloudInfo = map[string]interface{}{
+			"type":        "aws_s3",
+			"name":        "AWS S3",
+			"icon":        "☁️",
+			"description": "检测到AWS S3服务，建议启用云存储优化配置",
+		}
+	} else if strings.Contains(targetLower, "qcloud.com") || strings.Contains(targetLower, "myqcloud.com") || strings.Contains(targetLower, ".cos.") {
+		cloudInfo = map[string]interface{}{
+			"type":        "tencent_cos",
+			"name":        "腾讯云COS",
+			"icon":        "🔵",
+			"description": "检测到腾讯云COS服务，建议启用云存储优化配置",
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if cloudInfo != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"data":    cloudInfo,
+		})
+	} else {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"data":    nil,
+		})
+	}
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {

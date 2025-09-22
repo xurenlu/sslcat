@@ -17,6 +17,7 @@ import (
 	"github.com/xurenlu/sslcat/internal/config"
 	"github.com/xurenlu/sslcat/internal/logger"
 	"github.com/xurenlu/sslcat/internal/proxy"
+	"github.com/xurenlu/sslcat/internal/runner"
 	"github.com/xurenlu/sslcat/internal/security"
 	"github.com/xurenlu/sslcat/internal/ssl"
 	"github.com/xurenlu/sslcat/internal/web"
@@ -142,7 +143,13 @@ func main() {
 	cdnCache := cache.NewCDNCache(cfg)
 	cdnCache.StartCleaner()
 	proxyManager := proxy.NewManager(cfg, sslManager, securityManager, cdnCache)
-	webServer := web.NewServer(cfg, proxyManager, securityManager, sslManager)
+
+	// 初始化 Runner 模块
+	localRunner := runner.NewLocalRunner(cfg)
+	dockerRunner := runner.NewDockerRunner(cfg)
+	gitServer := runner.NewGitServer(cfg)
+
+	webServer := web.NewServer(cfg, proxyManager, securityManager, sslManager, localRunner, dockerRunner, gitServer)
 
 	// 日志级别
 	if cfg.Server.Debug {
@@ -159,6 +166,17 @@ func main() {
 		log.Fatalf("启动代理管理器失败: %v", err)
 	}
 	securityManager.Start()
+
+	// 启动 Runner 模块
+	if err := localRunner.Start(); err != nil {
+		log.Warnf("启动 Local Runner 失败: %v", err)
+	}
+	if err := dockerRunner.Start(); err != nil {
+		log.Warnf("启动 Docker Runner 失败: %v", err)
+	}
+	if err := gitServer.Start(); err != nil {
+		log.Warnf("启动 Git 服务器失败: %v", err)
+	}
 
 	// 注册 TLS ClientHello 指纹回调
 	sslManager.SetOnClientHello(func(hello *tls.ClientHelloInfo) {
@@ -265,6 +283,12 @@ func main() {
 	securityManager.Stop()
 	proxyManager.Stop()
 	sslManager.Stop()
+
+	// 停止 Runner 模块
+	localRunner.Stop()
+	dockerRunner.Stop()
+	gitServer.Stop()
+
 	_ = server.Shutdown(ctx)
 	log.Info("SSLcat server stopped")
 }
