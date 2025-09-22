@@ -75,6 +75,10 @@ type Server struct {
 	accessLogger *logger.AccessLogger
 	// 代理访问控制管理器
 	proxyAuthManager *ProxyAuthManager
+	// 用户管理器
+	userManager *UserManager
+	// 会话管理器
+	sessionManager *SessionManager
 	// Runner 模块
 	localRunner  *runner.LocalRunner
 	dockerRunner *runner.DockerRunner
@@ -132,6 +136,16 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 
 	// 初始化代理访问控制管理器
 	server.proxyAuthManager = NewProxyAuthManager(server.log)
+
+	// 初始化用户管理器
+	userManager, err := NewUserManager(server.log, "./data")
+	if err != nil {
+		logrus.Fatalf("初始化用户管理器失败: %v", err)
+	}
+	server.userManager = userManager
+
+	// 初始化会话管理器
+	server.sessionManager = NewSessionManager(server.log)
 
 	// 初始化审计日志轮转器（10MB*10）
 	if rot, err := logger.NewRotator("./data/audit.log", 10*1024*1024, 10); err == nil {
@@ -356,6 +370,13 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/settings/first-setup", s.handleFirstTimeSetup)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/settings/change-password", s.handleChangePassword)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/settings/totp", s.handleTOTPSetup)
+
+	// 用户管理路由
+	s.mux.HandleFunc(s.config.AdminPrefix+"/users", s.handleUsers)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/users/add", s.handleUserAdd)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/users/edit", s.handleUserEdit)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/users/delete", s.handleUserDelete)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/users/logs", s.handleUserLogs)
 
 	// CDN 缓存设置已整合到代理配置中
 
@@ -817,12 +838,41 @@ func (s *Server) isCommonBotUserAgent(ua string) bool {
 }
 
 func (s *Server) checkAuth(w http.ResponseWriter, r *http.Request) bool {
-	session, err := r.Cookie("sslcat_session")
-	if err != nil || session.Value != "authenticated" {
+	// 使用新的会话管理器检查认证
+	session, exists := s.sessionManager.GetSessionFromRequest(r)
+	if !exists {
 		http.Redirect(w, r, s.config.AdminPrefix+"/login", http.StatusFound)
 		return false
 	}
+
+	// 记录用户访问日志
+	s.userManager.LogUserAction(
+		session.Username,
+		"page_access",
+		r.URL.Path,
+		fmt.Sprintf("访问页面: %s", r.URL.Path),
+		s.getClientIP(r),
+		r.Header.Get("User-Agent"),
+	)
+
 	return true
+}
+
+// getCurrentUser 获取当前登录用户信息
+func (s *Server) getCurrentUser(r *http.Request) *User {
+	session, exists := s.sessionManager.GetSessionFromRequest(r)
+	if !exists {
+		return nil
+	}
+
+	// 从数据库获取用户信息
+	user, err := s.userManager.GetUserByUsername(session.Username)
+	if err != nil {
+		s.log.Warnf("获取用户信息失败: %v", err)
+		return nil
+	}
+
+	return user
 }
 
 func (s *Server) getSystemStats() map[string]interface{} {

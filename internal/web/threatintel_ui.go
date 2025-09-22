@@ -1,11 +1,9 @@
 package web
 
 import (
-	"fmt"
 	"html/template"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -37,19 +35,19 @@ func (tiu *ThreatIntelUI) RegisterRoutes(router *http.ServeMux) {
 	// 威胁情报主页面
 	router.HandleFunc("/threatintel", tiu.ThreatIntelPage)
 	router.HandleFunc("/threatintel/", tiu.ThreatIntelPage)
-	
+
 	// IOC管理页面
 	router.HandleFunc("/threatintel/iocs", tiu.IOCsPage)
 	router.HandleFunc("/threatintel/iocs/", tiu.IOCsPage)
-	
+
 	// 威胁情报源管理页面
 	router.HandleFunc("/threatintel/sources", tiu.SourcesPage)
 	router.HandleFunc("/threatintel/sources/", tiu.SourcesPage)
-	
+
 	// 统计报告页面
 	router.HandleFunc("/threatintel/reports", tiu.ReportsPage)
 	router.HandleFunc("/threatintel/reports/", tiu.ReportsPage)
-	
+
 	// 实时检测页面
 	router.HandleFunc("/threatintel/detection", tiu.DetectionPage)
 	router.HandleFunc("/threatintel/detection/", tiu.DetectionPage)
@@ -59,23 +57,23 @@ func (tiu *ThreatIntelUI) RegisterRoutes(router *http.ServeMux) {
 func (tiu *ThreatIntelUI) ThreatIntelPage(w http.ResponseWriter, r *http.Request) {
 	// 获取威胁统计
 	stats := tiu.manager.GetThreatStats()
-	
+
 	// 获取威胁情报报告
 	report := tiu.api.GetThreatIntelligenceReport()
-	
+
 	data := map[string]interface{}{
-		"Title":           "威胁情报中心",
-		"Stats":           stats,
-		"Report":          report,
-		"CurrentTime":     time.Now().Format("2006-01-02 15:04:05"),
-		"ActiveSources":   len(tiu.manager.sources),
-		"TotalIOCs":       stats["total_iocs"],
-		"CriticalCount":   stats["critical_count"],
-		"HighCount":       stats["high_count"],
-		"MediumCount":     stats["medium_count"],
-		"LowCount":        stats["low_count"],
+		"Title":         "威胁情报中心",
+		"Stats":         stats,
+		"Report":        report,
+		"CurrentTime":   time.Now().Format("2006-01-02 15:04:05"),
+		"ActiveSources": 0, // TODO: 实现获取活跃源数量
+		"TotalIOCs":     stats["total_iocs"],
+		"CriticalCount": stats["critical_count"],
+		"HighCount":     stats["high_count"],
+		"MediumCount":   stats["medium_count"],
+		"LowCount":      stats["low_count"],
 	}
-	
+
 	tmpl := `
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -151,13 +149,13 @@ func (tiu *ThreatIntelUI) ThreatIntelPage(w http.ResponseWriter, r *http.Request
     </div>
 </body>
 </html>`
-	
+
 	t, err := template.New("threatintel").Parse(tmpl)
 	if err != nil {
 		http.Error(w, "模板解析错误", http.StatusInternalServerError)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	t.Execute(w, data)
 }
@@ -169,14 +167,14 @@ func (tiu *ThreatIntelUI) IOCsPage(w http.ResponseWriter, r *http.Request) {
 	page, _ := strconv.Atoi(query.Get("page"))
 	limit, _ := strconv.Atoi(query.Get("limit"))
 	threatLevel := query.Get("threat_level")
-	
+
 	if page <= 0 {
 		page = 1
 	}
 	if limit <= 0 {
 		limit = 20
 	}
-	
+
 	// 模拟IOC数据
 	iocs := []map[string]interface{}{
 		{
@@ -202,7 +200,7 @@ func (tiu *ThreatIntelUI) IOCsPage(w http.ResponseWriter, r *http.Request) {
 			"last_seen":    "2024-01-01T00:00:00Z",
 		},
 	}
-	
+
 	data := map[string]interface{}{
 		"Title":       "IOC管理",
 		"IOCs":        iocs,
@@ -211,7 +209,7 @@ func (tiu *ThreatIntelUI) IOCsPage(w http.ResponseWriter, r *http.Request) {
 		"ThreatLevel": threatLevel,
 		"TotalPages":  1,
 	}
-	
+
 	tmpl := `
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -296,13 +294,13 @@ func (tiu *ThreatIntelUI) IOCsPage(w http.ResponseWriter, r *http.Request) {
     </div>
 </body>
 </html>`
-	
+
 	t, err := template.New("iocs").Parse(tmpl)
 	if err != nil {
 		http.Error(w, "模板解析错误", http.StatusInternalServerError)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	t.Execute(w, data)
 }
@@ -340,12 +338,12 @@ func (tiu *ThreatIntelUI) SourcesPage(w http.ResponseWriter, r *http.Request) {
 			"ioc_count":   1200,
 		},
 	}
-	
+
 	data := map[string]interface{}{
 		"Title":   "威胁情报源管理",
 		"Sources": sources,
 	}
-	
+
 	tmpl := `
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -405,13 +403,13 @@ func (tiu *ThreatIntelUI) SourcesPage(w http.ResponseWriter, r *http.Request) {
     </div>
 </body>
 </html>`
-	
+
 	t, err := template.New("sources").Parse(tmpl)
 	if err != nil {
 		http.Error(w, "模板解析错误", http.StatusInternalServerError)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	t.Execute(w, data)
 }
@@ -420,16 +418,16 @@ func (tiu *ThreatIntelUI) SourcesPage(w http.ResponseWriter, r *http.Request) {
 func (tiu *ThreatIntelUI) ReportsPage(w http.ResponseWriter, r *http.Request) {
 	// 获取威胁统计
 	stats := tiu.manager.GetThreatStats()
-	
+
 	// 获取威胁情报报告
 	report := tiu.api.GetThreatIntelligenceReport()
-	
+
 	data := map[string]interface{}{
 		"Title":  "威胁情报统计报告",
 		"Stats":  stats,
 		"Report": report,
 	}
-	
+
 	tmpl := `
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -514,13 +512,13 @@ func (tiu *ThreatIntelUI) ReportsPage(w http.ResponseWriter, r *http.Request) {
     </div>
 </body>
 </html>`
-	
+
 	t, err := template.New("reports").Parse(tmpl)
 	if err != nil {
 		http.Error(w, "模板解析错误", http.StatusInternalServerError)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	t.Execute(w, data)
 }
@@ -530,7 +528,7 @@ func (tiu *ThreatIntelUI) DetectionPage(w http.ResponseWriter, r *http.Request) 
 	data := map[string]interface{}{
 		"Title": "实时威胁检测",
 	}
-	
+
 	tmpl := `
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -612,24 +610,23 @@ func (tiu *ThreatIntelUI) DetectionPage(w http.ResponseWriter, r *http.Request) 
             
             resultDiv.style.display = 'block';
             resultDiv.className = 'result ' + (isThreat ? 'threat' : 'safe');
-            resultDiv.innerHTML = `
-                <h4>检测结果</h4>
-                <p><strong>检测值:</strong> ${checkValue}</p>
-                <p><strong>检测类型:</strong> ${checkType}</p>
-                <p><strong>威胁状态:</strong> ${isThreat ? '发现威胁' : '安全'}</p>
-                ${isThreat ? `<p><strong>威胁级别:</strong> ${threatLevel}</p>` : ''}
-            `;
+            resultDiv.innerHTML = 
+                '<h4>检测结果</h4>' +
+                '<p><strong>检测值:</strong> ' + checkValue + '</p>' +
+                '<p><strong>检测类型:</strong> ' + checkType + '</p>' +
+                '<p><strong>威胁状态:</strong> ' + (isThreat ? '发现威胁' : '安全') + '</p>' +
+                (isThreat ? '<p><strong>威胁级别:</strong> ' + threatLevel + '</p>' : '');
         });
     </script>
 </body>
 </html>`
-	
+
 	t, err := template.New("detection").Parse(tmpl)
 	if err != nil {
 		http.Error(w, "模板解析错误", http.StatusInternalServerError)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	t.Execute(w, data)
 }
