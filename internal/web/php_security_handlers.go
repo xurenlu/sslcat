@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/xurenlu/sslcat/internal/config"
@@ -226,6 +225,111 @@ func (s *Server) handleAPIPHPSecurityConfig(w http.ResponseWriter, r *http.Reque
 	json.NewEncoder(w).Encode(configData)
 }
 
+// handleAPIPHPAdvancedSecurityScan 处理高级安全扫描 API
+func (s *Server) handleAPIPHPAdvancedSecurityScan(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+
+	domain := r.URL.Query().Get("domain")
+	if domain == "" {
+		http.Error(w, "domain parameter required", http.StatusBadRequest)
+		return
+	}
+
+	// 创建高级安全扫描器
+	advancedSecurity := NewAdvancedPHPSecurity(s.config)
+	
+	// 执行高级安全扫描
+	scanResult, err := advancedSecurity.PerformAdvancedSecurityScan(domain)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("advanced security scan failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(scanResult)
+}
+
+// handleAPIPHPSecurityAutoFix 处理安全自动修复 API
+func (s *Server) handleAPIPHPSecurityAutoFix(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Domain   string   `json:"domain"`
+		IssueIDs []string `json:"issue_ids"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if req.Domain == "" {
+		http.Error(w, "domain is required", http.StatusBadRequest)
+		return
+	}
+
+	// 创建高级安全扫描器
+	advancedSecurity := NewAdvancedPHPSecurity(s.config)
+	
+	// 执行自动修复
+	err := advancedSecurity.AutoFixSecurityIssues(req.Domain, req.IssueIDs)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("auto fix failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// 保存配置
+	_ = s.config.Save(s.config.ConfigFile)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Security issues fixed successfully",
+		"domain":  req.Domain,
+		"fixed":   len(req.IssueIDs),
+	})
+}
+
+// handleAPIPHPSecurityRecommendations 处理安全建议 API
+func (s *Server) handleAPIPHPSecurityRecommendations(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+
+	domain := r.URL.Query().Get("domain")
+	if domain == "" {
+		http.Error(w, "domain parameter required", http.StatusBadRequest)
+		return
+	}
+
+	// 创建高级安全扫描器
+	advancedSecurity := NewAdvancedPHPSecurity(s.config)
+	
+	// 执行安全扫描获取建议
+	scanResult, err := advancedSecurity.PerformAdvancedSecurityScan(domain)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to get recommendations: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"domain":         domain,
+		"recommendations": scanResult.Recommendations,
+		"security_score": scanResult.SecurityScore,
+		"total_issues":   scanResult.TotalIssues,
+	})
+}
+
 // 辅助函数：创建 PHP 安全扫描器
 func NewPHPSecurityScanner(config *config.Config) *PHPSecurityScanner {
 	return &PHPSecurityScanner{
@@ -247,65 +351,37 @@ type PHPSecurityScanner struct {
 
 // ScanForVulnerabilities 扫描安全漏洞
 func (pss *PHPSecurityScanner) ScanForVulnerabilities(domain string) ([]string, error) {
+	// 使用高级安全扫描器
+	advancedSecurity := NewAdvancedPHPSecurity(pss.config)
+	scanResult, err := advancedSecurity.PerformAdvancedSecurityScan(domain)
+	if err != nil {
+		return nil, err
+	}
+	
 	var vulnerabilities []string
-
-	// 查找对应的 PHP 站点
-	var site *config.PHPSite
-	for i := range pss.config.PHPSites {
-		if strings.EqualFold(pss.config.PHPSites[i].Domain, domain) {
-			site = &pss.config.PHPSites[i]
-			break
-		}
-	}
-
-	if site == nil {
-		return nil, fmt.Errorf("PHP site not found for domain: %s", domain)
-	}
-
-	// 创建 PHP 安全管理器（用于后续扩展）
-	_ = NewPHPSecurity(pss.config)
-
-	// 1. 检查文件上传安全配置
-	if site.SecurityConfig == nil {
-		vulnerabilities = append(vulnerabilities, "⚠️ 未配置文件上传安全限制")
-	} else {
-		if site.SecurityConfig.MaxUploadSize == 0 {
-			vulnerabilities = append(vulnerabilities, "⚠️ 未设置文件上传大小限制")
-		}
-		if len(site.SecurityConfig.AllowedExtensions) == 0 {
-			vulnerabilities = append(vulnerabilities, "⚠️ 未设置允许的文件扩展名白名单")
-		}
-		if len(site.SecurityConfig.BlockedExtensions) == 0 {
-			vulnerabilities = append(vulnerabilities, "⚠️ 未设置禁止的文件扩展名黑名单")
-		}
-	}
-
-	// 2. 检查路径遍历保护
-	if site.SecurityConfig == nil || !site.SecurityConfig.DisablePathTraversal {
-		vulnerabilities = append(vulnerabilities, "⚠️ 未启用路径遍历攻击保护")
-	}
-
-	// 3. 检查代码注入保护
-	if site.SecurityConfig == nil || !site.SecurityConfig.DisableEval {
-		vulnerabilities = append(vulnerabilities, "⚠️ 未禁用 eval() 函数")
-	}
-
-	// 4. 检查 Shell 执行保护
-	if site.SecurityConfig == nil || !site.SecurityConfig.DisableShellExec {
-		vulnerabilities = append(vulnerabilities, "⚠️ 未禁用 Shell 执行函数")
-	}
-
-	// 5. 检查安全响应头
-	// 这里可以检查是否缺少重要的安全响应头
-
-	// 6. 检查 PHP 配置安全性
-	// 这里可以检查 PHP 配置中的安全设置
-
-	// 如果没有发现漏洞，返回安全状态
-	if len(vulnerabilities) == 0 {
+	
+	// 根据扫描结果生成漏洞报告
+	if scanResult.TotalIssues == 0 {
 		vulnerabilities = append(vulnerabilities, "✅ 未发现安全漏洞")
+	} else {
+		// 按严重程度分类显示
+		if scanResult.CriticalIssues > 0 {
+			vulnerabilities = append(vulnerabilities, fmt.Sprintf("🚨 发现 %d 个关键安全问题", scanResult.CriticalIssues))
+		}
+		if scanResult.HighIssues > 0 {
+			vulnerabilities = append(vulnerabilities, fmt.Sprintf("⚠️ 发现 %d 个高风险安全问题", scanResult.HighIssues))
+		}
+		if scanResult.MediumIssues > 0 {
+			vulnerabilities = append(vulnerabilities, fmt.Sprintf("🔶 发现 %d 个中等风险安全问题", scanResult.MediumIssues))
+		}
+		if scanResult.LowIssues > 0 {
+			vulnerabilities = append(vulnerabilities, fmt.Sprintf("🔸 发现 %d 个低风险安全问题", scanResult.LowIssues))
+		}
+		
+		// 显示安全评分
+		vulnerabilities = append(vulnerabilities, fmt.Sprintf("📊 安全评分: %d/100", scanResult.SecurityScore))
 	}
-
+	
 	return vulnerabilities, nil
 }
 

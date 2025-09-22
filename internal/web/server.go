@@ -418,6 +418,10 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/php-security/performance", s.handleAPIPHPSecurityPerformance)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/php-security/errors", s.handleAPIPHPSecurityErrors)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/php-security/config", s.handleAPIPHPSecurityConfig)
+	// 高级安全功能 API
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/php-security/advanced-scan", s.handleAPIPHPAdvancedSecurityScan)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/php-security/auto-fix", s.handleAPIPHPSecurityAutoFix)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/php-security/recommendations", s.handleAPIPHPSecurityRecommendations)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security-logs", s.handleAPISecurityLogs)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/audit", s.handleAPIAudit)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/tls-fingerprints", s.handleAPITLSFingerprints)
