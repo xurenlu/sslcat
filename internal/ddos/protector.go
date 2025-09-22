@@ -12,6 +12,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/xurenlu/sslcat/internal/logger"
+	"github.com/xurenlu/sslcat/internal/notification"
 )
 
 // ProtectionLevel 防护级别
@@ -92,6 +93,8 @@ type Protector struct {
 	log *logrus.Entry
 	// 持久化轮转
 	rotator *logger.Rotator
+	// 通知集成器
+	notificationIntegrator *notification.NotificationIntegrator
 }
 
 // ThresholdConfig 阈值配置
@@ -105,17 +108,18 @@ type ThresholdConfig struct {
 }
 
 // NewProtector 创建DDoS防护器
-func NewProtector() *Protector {
+func NewProtector(notificationIntegrator *notification.NotificationIntegrator) *Protector {
 	p := &Protector{
-		enabled:         true,
-		level:           LevelMedium,
-		clients:         make(map[string]*ClientInfo),
-		attacks:         make([]Attack, 0),
-		cleanupInterval: 5 * time.Minute,
-		stopChan:        make(chan struct{}),
-		blockDuration:   1 * time.Hour,
-		maxClients:      10000,
-		maxAttacks:      1000,
+		enabled:                true,
+		level:                  LevelMedium,
+		clients:                make(map[string]*ClientInfo),
+		attacks:                make([]Attack, 0),
+		cleanupInterval:        5 * time.Minute,
+		stopChan:               make(chan struct{}),
+		blockDuration:          1 * time.Hour,
+		maxClients:             10000,
+		maxAttacks:             1000,
+		notificationIntegrator: notificationIntegrator,
 		log: logrus.WithFields(logrus.Fields{
 			"component": "ddos_protector",
 		}),
@@ -399,6 +403,18 @@ func (p *Protector) recordAttack(clientIP, userAgent, url, method, attackType, s
 	// 保持攻击记录数量限制
 	if len(p.attacks) > p.maxAttacks {
 		p.attacks = p.attacks[1:]
+	}
+
+	// 发送攻击通知
+	if p.notificationIntegrator != nil {
+		attackInfo := &notification.AttackInfo{
+			ClientIP:  clientIP,
+			UserAgent: userAgent,
+			URL:       url,
+			Reason:    reason,
+			Severity:  severity,
+		}
+		p.notificationIntegrator.SendDDoSAttackNotification(attackInfo)
 	}
 
 	if blocked {

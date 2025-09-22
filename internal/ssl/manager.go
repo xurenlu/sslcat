@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/xurenlu/sslcat/internal/config"
+	"github.com/xurenlu/sslcat/internal/notification"
 	"github.com/xurenlu/sslcat/internal/notify"
 
 	"github.com/sirupsen/logrus"
@@ -42,6 +43,8 @@ type Manager struct {
 	tempAllowedDomains map[string]time.Time
 	// DNS服务商管理器
 	dnsManager *DNSProviderManager
+	// 通知集成器
+	notificationIntegrator *notification.NotificationIntegrator
 }
 
 // NewManager 创建SSL管理器
@@ -106,6 +109,11 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 	}
 
 	return manager, nil
+}
+
+// SetNotificationIntegrator 设置通知集成器
+func (m *Manager) SetNotificationIntegrator(integrator *notification.NotificationIntegrator) {
+	m.notificationIntegrator = integrator
 }
 
 // CertificateInfo 证书信息
@@ -241,6 +249,13 @@ func (m *Manager) notifyExpiringCerts() {
 			}
 			m.lastNotify[key] = stamp
 			m.log.Warnf("Certificate expiring soon: %s, expires in %d days", ci.Domain, days)
+
+			// 发送新通知系统通知
+			if m.notificationIntegrator != nil {
+				m.notificationIntegrator.SendCertExpiringNotification(ci.Domain, days)
+			}
+
+			// 保留原有通知系统
 			if m.notifier != nil && m.notifier.Enabled() {
 				m.notifier.SendJSON(map[string]any{
 					"ts":        time.Now().Format(time.RFC3339),
@@ -692,6 +707,13 @@ func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error
 	}
 
 	m.log.Errorf("All certificate request attempts failed for domain: %s, last error: %v", domain, lastErr)
+
+	// 发送证书申请失败通知
+	if m.notificationIntegrator != nil {
+		reason := fmt.Sprintf("申请失败，尝试了%d次，最后错误: %v", maxRetries, lastErr)
+		m.notificationIntegrator.SendCertFailedNotification(domain, reason)
+	}
+
 	return fmt.Errorf("certificate request failed after %d attempts: %w", maxRetries, lastErr)
 }
 

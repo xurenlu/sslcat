@@ -16,6 +16,7 @@ import (
 	"github.com/xurenlu/sslcat/internal/cache"
 	"github.com/xurenlu/sslcat/internal/config"
 	"github.com/xurenlu/sslcat/internal/logger"
+	"github.com/xurenlu/sslcat/internal/notification"
 	"github.com/xurenlu/sslcat/internal/proxy"
 	"github.com/xurenlu/sslcat/internal/runner"
 	"github.com/xurenlu/sslcat/internal/security"
@@ -134,11 +135,16 @@ func main() {
 		log.Warnf("failed to create system data dir, falling back to CWD: %v", err)
 	}
 
+	// 初始化通知集成器
+	notificationIntegrator := notification.NewNotificationIntegratorFromConfig(cfg.Notification)
+
 	// 初始化模块
 	sslManager, err := ssl.NewManager(cfg)
 	if err != nil {
 		log.Fatalf("failed to init SSL manager: %v", err)
 	}
+	// 设置SSL管理器的通知集成器
+	sslManager.SetNotificationIntegrator(notificationIntegrator)
 	securityManager := security.NewManager(cfg)
 	cdnCache := cache.NewCDNCache(cfg)
 	cdnCache.StartCleaner()
@@ -149,7 +155,7 @@ func main() {
 	dockerRunner := runner.NewDockerRunner(cfg)
 	gitServer := runner.NewGitServer(cfg)
 
-	webServer := web.NewServer(cfg, proxyManager, securityManager, sslManager, localRunner, dockerRunner, gitServer)
+	webServer := web.NewServer(cfg, proxyManager, securityManager, sslManager, localRunner, dockerRunner, gitServer, notificationIntegrator)
 
 	// 日志级别
 	if cfg.Server.Debug {
@@ -157,6 +163,9 @@ func main() {
 	} else {
 		logrus.SetLevel(logrus.InfoLevel)
 	}
+
+	// 发送系统启动通知
+	notificationIntegrator.SendSystemStartupNotification()
 
 	// 启动子模块
 	if err := sslManager.Start(); err != nil {
@@ -278,6 +287,10 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	sig := <-quit
 	log.Infof("Received signal %v, starting graceful shutdown...", sig)
+
+	// 发送系统关闭通知
+	notificationIntegrator.SendSystemShutdownNotification()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	securityManager.Stop()
