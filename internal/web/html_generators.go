@@ -334,9 +334,14 @@ func (s *Server) generateSSLCertsTable(data map[string]interface{}) string {
 				<td>%s</td>
 				<td>%s</td>
 				<td>
-					<a class="btn btn-sm btn-outline-primary" href="%s/ssl/download?domain=%s&type=cert">`+s.translator.T("ssl.download_cert")+`</a>
-					<a class="btn btn-sm btn-outline-secondary" href="%s/ssl/download?domain=%s&type=key">`+s.translator.T("ssl.download_key")+`</a>
-					<a class="btn btn-sm btn-outline-danger" href="%s/ssl/delete?domain=%s" onclick="return confirm('`+s.translator.T("ssl.delete_confirm")+`')">`+s.translator.T("proxy.delete")+`</a>
+					<div class="btn-group" role="group">
+						<a class="btn btn-sm btn-outline-primary" href="%s/ssl/download?domain=%s&type=cert">`+s.translator.T("ssl.download_cert")+`</a>
+						<a class="btn btn-sm btn-outline-secondary" href="%s/ssl/download?domain=%s&type=key">`+s.translator.T("ssl.download_key")+`</a>
+						<button class="btn btn-sm btn-outline-warning" onclick="retrySSL('`+c.Domain+`')" title="重试申请证书">
+							<i class="bi bi-arrow-repeat"></i> 重试
+						</button>
+						<a class="btn btn-sm btn-outline-danger" href="%s/ssl/delete?domain=%s" onclick="return confirm('`+s.translator.T("ssl.delete_confirm")+`')">`+s.translator.T("proxy.delete")+`</a>
+					</div>
 				</td>
 			</tr>`,
 			c.Domain,
@@ -1873,6 +1878,67 @@ func (s *Server) generateSSLManagementHTML(data map[string]interface{}) string {
         </div>
     </div>
     <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/axios@0.27.2/dist/axios.min.js"></script>
+    <script>
+    // SSL重试功能
+    function retrySSL(domain) {
+        if (!confirm('确定要重试申请证书 ' + domain + ' 吗？')) {
+            return;
+        }
+        
+        const button = event.target;
+        const originalText = button.innerHTML;
+        
+        // 显示加载状态
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 重试中...';
+        
+        // 调用重试API
+        axios.post('%s/api/ssl/retry', {
+            domain: domain
+        })
+        .then(function (response) {
+            if (response.data.success) {
+                showAlert('success', '重试成功', '证书申请成功：' + domain);
+                // 刷新页面以显示最新状态
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                showAlert('danger', '重试失败', response.data.error || '未知错误');
+            }
+        })
+        .catch(function (error) {
+            console.error('重试失败:', error);
+            showAlert('danger', '重试失败', '网络错误或服务器错误');
+        })
+        .finally(function () {
+            // 恢复按钮状态
+            button.disabled = false;
+            button.innerHTML = originalText;
+        });
+    }
+    
+    // 显示提示信息
+    function showAlert(type, title, message) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-' + type + ' alert-dismissible fade show';
+        alertDiv.innerHTML = 
+            '<strong>' + title + '</strong> ' + message +
+            '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+        
+        // 在页面顶部显示提示
+        const container = document.querySelector('.container-fluid');
+        container.insertBefore(alertDiv, container.firstChild);
+        
+        // 5秒后自动隐藏
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
+    }
+    </script>
 </body>
 </html>`,
 		title,
@@ -1886,7 +1952,8 @@ func (s *Server) generateSSLManagementHTML(data map[string]interface{}) string {
 		thDomain, thIssued, thExpires, thStatus, thActions, thType,
 		s.generateSSLCertsTable(data),
 		uploadTitle, uploadNote,
-		data["AdminPrefix"].(string), uploadBtn)
+		data["AdminPrefix"].(string), uploadBtn,
+		data["AdminPrefix"].(string))
 }
 
 func (s *Server) generateSSLGenerateHTML(data map[string]interface{}) string {
@@ -2470,6 +2537,8 @@ func (s *Server) generateRunnersManagementHTML(data map[string]interface{}) stri
 		map[bool]string{true: "已启用", false: "已禁用"}[data["LocalEnabled"].(bool)],
 		map[bool]string{true: "bg-success", false: "bg-secondary"}[data["DockerEnabled"].(bool)],
 		map[bool]string{true: "已启用", false: "已禁用"}[data["DockerEnabled"].(bool)],
+		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string),
 		data["AdminPrefix"].(string),
 		data["AdminPrefix"].(string),
 		data["AdminPrefix"].(string),
