@@ -29,6 +29,8 @@ type Config struct {
 	StaticSites []StaticSite `json:"static_sites"`
 	// PHP 站点
 	PHPSites []PHPSite `json:"php_sites"`
+	// Runner 配置
+	Runners RunnerConfig `json:"runners"`
 }
 
 // ServerConfig 服务器配置
@@ -107,10 +109,21 @@ type ProxyRule struct {
 	Port    int    `json:"port"`
 	Enabled bool   `json:"enabled"`
 	SSLOnly bool   `json:"ssl_only"`
+	// HTTP Host头部优化设置
+	OptimizeHostHeader bool `json:"optimize_host_header"`
 	// 每域名的类CDN设置
 	CDNEnabled           bool   `json:"cdn_enabled"`
-	CDNPreset            string `json:"cdn_preset"`      // none|static|images
+	CDNPreset            string `json:"cdn_preset"`      // none|static|images|cloud_storage
 	CDNDefaultTTLSeconds int    `json:"cdn_ttl_seconds"` // 0 表示使用全局规则
+
+	// 云存储后端配置
+	CloudStorageType      string `json:"cloud_storage_type"`       // aliyun_oss|aws_s3|tencent_cos|auto
+	CloudStorageRegion    string `json:"cloud_storage_region"`     // 云存储区域
+	CloudStorageBucket    string `json:"cloud_storage_bucket"`     // 存储桶名称
+	CloudStorageEndpoint  string `json:"cloud_storage_endpoint"`   // 自定义端点
+	CloudStoragePath      string `json:"cloud_storage_path"`       // 存储路径前缀
+	CloudStorageAccessKey string `json:"cloud_storage_access_key"` // 访问密钥
+	CloudStorageSecretKey string `json:"cloud_storage_secret_key"` // 秘密密钥
 
 	// 访问控制设置
 	AuthEnabled        bool            `json:"auth_enabled"`         // 是否开启访问控制
@@ -252,6 +265,174 @@ type PHPSite struct {
 	Enabled  bool              `json:"enabled"`
 	FCGIAddr string            `json:"fcgi_addr"` // unix:/path/php-fpm.sock 或 127.0.0.1:9000
 	Vars     map[string]string `json:"vars"`
+
+	// 新增优化配置
+	OptimizationConfig *PHPOptimizationConfig `json:"optimization_config,omitempty"`
+
+	// 安全配置
+	SecurityConfig *PHPSecurityConfig `json:"security_config,omitempty"`
+
+	// 监控配置
+	MonitoringConfig *PHPMonitoringConfig `json:"monitoring_config,omitempty"`
+}
+
+// PHPOptimizationConfig PHP 优化配置
+type PHPOptimizationConfig struct {
+	// OPcache 配置
+	OPcacheEnabled            bool `json:"opcache_enabled"`
+	OPcacheMemorySize         int  `json:"opcache_memory_size"` // MB
+	OPcacheMaxFiles           int  `json:"opcache_max_files"`
+	OPcacheValidateTimestamps bool `json:"opcache_validate_timestamps"`
+
+	// 性能优化
+	EnableGzipCompression bool `json:"enable_gzip_compression"`
+	EnableStaticCaching   bool `json:"enable_static_caching"`
+	CacheTTL              int  `json:"cache_ttl"` // 秒
+
+	// 安全优化
+	HidePHPVersion            bool `json:"hide_php_version"`
+	DisableDangerousFunctions bool `json:"disable_dangerous_functions"`
+
+	// 框架特定优化
+	LaravelOptimizations bool `json:"laravel_optimizations"`
+	SymfonyOptimizations bool `json:"symfony_optimizations"`
+}
+
+// PHPSecurityConfig PHP 安全配置
+type PHPSecurityConfig struct {
+	// 文件上传安全
+	MaxUploadSize     int64    `json:"max_upload_size"`    // 字节
+	AllowedExtensions []string `json:"allowed_extensions"` // 允许的文件扩展名
+	BlockedExtensions []string `json:"blocked_extensions"` // 禁止的文件扩展名
+
+	// 路径安全
+	DisablePathTraversal bool     `json:"disable_path_traversal"`
+	AllowedPaths         []string `json:"allowed_paths"` // 允许访问的路径
+
+	// 执行安全
+	DisableEval      bool     `json:"disable_eval"`
+	DisableShellExec bool     `json:"disable_shell_exec"`
+	AllowedFunctions []string `json:"allowed_functions"` // 允许的函数
+
+	// 会话安全
+	SessionSecure   bool   `json:"session_secure"`
+	SessionHttpOnly bool   `json:"session_http_only"`
+	SessionSameSite string `json:"session_same_site"` // Strict|Lax|None
+}
+
+// PHPMonitoringConfig PHP 监控配置
+type PHPMonitoringConfig struct {
+	// 性能监控
+	EnablePerformanceMonitoring bool `json:"enable_performance_monitoring"`
+	PerformanceThreshold        int  `json:"performance_threshold"` // 毫秒
+
+	// 错误监控
+	EnableErrorMonitoring bool `json:"enable_error_monitoring"`
+	ErrorReportingLevel   int  `json:"error_reporting_level"`
+	LogSlowQueries        bool `json:"log_slow_queries"`
+	SlowQueryThreshold    int  `json:"slow_query_threshold"` // 毫秒
+
+	// 资源监控
+	EnableResourceMonitoring bool `json:"enable_resource_monitoring"`
+	MemoryLimit              int  `json:"memory_limit"`  // MB
+	CPUThreshold             int  `json:"cpu_threshold"` // 百分比
+
+	// 日志配置
+	LogLevel    string `json:"log_level"` // debug|info|warn|error
+	LogFile     string `json:"log_file"`
+	LogMaxSize  int64  `json:"log_max_size"` // 字节
+	LogMaxFiles int    `json:"log_max_files"`
+}
+
+// RunnerConfig Runner 配置
+type RunnerConfig struct {
+	// Local Runner 配置
+	Local LocalRunnerConfig `json:"local"`
+	// Docker Runner 配置
+	Docker DockerRunnerConfig `json:"docker"`
+	// Git 服务器配置
+	Git GitServerConfig `json:"git"`
+}
+
+// LocalRunnerConfig Local Runner 配置
+type LocalRunnerConfig struct {
+	Enabled bool `json:"enabled"`
+	// 工作目录
+	WorkDir string `json:"work_dir"`
+	// 最大并发运行数
+	MaxConcurrent int `json:"max_concurrent"`
+	// 超时时间（秒）
+	Timeout int `json:"timeout"`
+}
+
+// DockerRunnerConfig Docker Runner 配置
+type DockerRunnerConfig struct {
+	Enabled bool `json:"enabled"`
+	// Docker 镜像前缀
+	ImagePrefix string `json:"image_prefix"`
+	// 工作目录
+	WorkDir string `json:"work_dir"`
+	// 最大并发运行数
+	MaxConcurrent int `json:"max_concurrent"`
+	// 超时时间（秒）
+	Timeout int `json:"timeout"`
+	// 自动清理容器
+	AutoCleanup bool `json:"auto_cleanup"`
+	// 清理间隔（秒）
+	CleanupInterval int `json:"cleanup_interval"`
+}
+
+// GitServerConfig Git 服务器配置
+type GitServerConfig struct {
+	Enabled bool `json:"enabled"`
+	// Git 仓库目录
+	ReposDir string `json:"repos_dir"`
+	// 最大并发克隆数
+	MaxConcurrent int `json:"max_concurrent"`
+	// 克隆超时时间（秒）
+	CloneTimeout int `json:"clone_timeout"`
+	// 自动清理仓库
+	AutoCleanup bool `json:"auto_cleanup"`
+	// 清理间隔（秒）
+	CleanupInterval int `json:"cleanup_interval"`
+}
+
+// LocalRunnerTask Local Runner 任务
+type LocalRunnerTask struct {
+	ID            string            `json:"id"`
+	Name          string            `json:"name"`
+	Type          string            `json:"type"` // "golang" | "springboot"
+	BinaryPath    string            `json:"binary_path"`
+	Port          int               `json:"port"`
+	Env           map[string]string `json:"env"`
+	Args          []string          `json:"args"`
+	ActiveProfile string            `json:"active_profile"` // Spring Boot 专用
+	Enabled       bool              `json:"enabled"`
+	Status        string            `json:"status"` // "running" | "stopped" | "error"
+	PID           int               `json:"pid"`
+	StartTime     int64             `json:"start_time"`
+	ErrorMsg      string            `json:"error_msg"`
+}
+
+// DockerRunnerTask Docker Runner 任务
+type DockerRunnerTask struct {
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	GitURL      string            `json:"git_url"`
+	GitBranch   string            `json:"git_branch"`
+	Runtime     string            `json:"runtime"` // 检测到的运行时类型
+	Port        int               `json:"port"`
+	Env         map[string]string `json:"env"`
+	ContainerID string            `json:"container_id"`
+	ImageName   string            `json:"image_name"`
+	Enabled     bool              `json:"enabled"`
+	Status      string            `json:"status"` // "building" | "running" | "stopped" | "error"
+	StartTime   int64             `json:"start_time"`
+	ErrorMsg    string            `json:"error_msg"`
+	// 检测到的项目信息
+	ProjectType      string `json:"project_type"` // "golang" | "nodejs" | "nextjs" | "python" | "php" | "ruby" | "dockerfile" | "dockercompose"
+	HasDockerfile    bool   `json:"has_dockerfile"`
+	HasDockerCompose bool   `json:"has_docker_compose"`
 }
 
 // Load 加载配置文件
@@ -353,6 +534,31 @@ func Load(configFile string) (*Config, error) {
 		},
 		StaticSites: []StaticSite{},
 		PHPSites:    []PHPSite{},
+		Runners: RunnerConfig{
+			Local: LocalRunnerConfig{
+				Enabled:       false,
+				WorkDir:       "./data/runners/local",
+				MaxConcurrent: 10,
+				Timeout:       300, // 5分钟
+			},
+			Docker: DockerRunnerConfig{
+				Enabled:         false,
+				ImagePrefix:     "sslcat-runner",
+				WorkDir:         "./data/runners/docker",
+				MaxConcurrent:   5,
+				Timeout:         600, // 10分钟
+				AutoCleanup:     true,
+				CleanupInterval: 3600, // 1小时
+			},
+			Git: GitServerConfig{
+				Enabled:         false,
+				ReposDir:        "./data/runners/git",
+				MaxConcurrent:   3,
+				CloneTimeout:    300, // 5分钟
+				AutoCleanup:     true,
+				CleanupInterval: 7200, // 2小时
+			},
+		},
 	}
 
 	// 如果配置文件存在，则加载

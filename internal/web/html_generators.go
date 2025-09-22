@@ -21,6 +21,7 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 	navSecurity := s.translator.T("nav.security")
 	navSettings := s.translator.T("nav.settings")
 	navCDN := "类CDN缓存"
+	navRunners := "Runners管理"
 	logout := s.translator.T("menu.logout")
 	official := s.translator.T("menu.官方站点")
 	if official == "menu.官方站点" {
@@ -96,6 +97,16 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
                             <li class="nav-item">
                                 <a class="nav-link %s" href="%s/cdn-cache">
                                     <i class="bi bi-hdd"></i> %s
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link %s" href="%s/runners">
+                                    <i class="bi bi-terminal"></i> %s
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link %s" href="%s/git-server">
+                                    <i class="bi bi-git"></i> Git Server
                                 </a>
                             </li>
                         </ul>
@@ -182,6 +193,21 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 		}(),
 		adminPrefix,
 		navCDN,
+		func() string {
+			if activePage == "runners" {
+				return "active"
+			}
+			return ""
+		}(),
+		adminPrefix,
+		navRunners,
+		func() string {
+			if activePage == "git-server" {
+				return "active"
+			}
+			return ""
+		}(),
+		adminPrefix,
 		adminPrefix,
 		logout)
 }
@@ -412,16 +438,31 @@ func (s *Server) generateProxyAddHTML(data map[string]interface{}) string {
                             <div class="mb-3">
                                 <label for="target" class="form-label">目标地址</label>
                                 <input type="text" class="form-control" id="target" name="target" required 
-                                       placeholder="http://192.168.1.100:8080">
+                                       placeholder="http://192.168.1.100:8080" onchange="detectCloudStorage()">
                                 <div class="form-text">输入后端服务地址，包括协议和端口</div>
+                                <div id="cloud-storage-detection" class="mt-2" style="display: none;">
+                                    <div class="alert alert-info">
+                                        <i class="bi bi-cloud"></i> <strong>检测到云存储服务</strong>
+                                        <div id="cloud-storage-info"></div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="form-check form-switch mb-3">
-                                <input class="form-check-input" type="checkbox" id="enabled" name="enabled">
+                                <input class="form-check-input" type="checkbox" id="enabled" name="enabled" checked>
                                 <label class="form-check-label" for="enabled">启用该规则</label>
                             </div>
                             <div class="form-check form-switch mb-3">
                                 <input class="form-check-input" type="checkbox" id="ssl_only" name="ssl_only">
                                 <label class="form-check-label" for="ssl_only">仅限HTTPS（HTTP访问将自动301到HTTPS）</label>
+                            </div>
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="optimize_host_header" name="optimize_host_header" onchange="checkCloudStorageWarning()">
+                                <label class="form-check-label" for="optimize_host_header">优化HTTP Host头部</label>
+                                <div class="form-text">当上游使用hostname（非IP）时，自动将Host头部设置为后端服务器地址。主要针对OSS/S3等云存储服务避免防盗链问题</div>
+                            </div>
+                            <div id="cloud-storage-warning" class="alert alert-danger mt-2" style="display: none;">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                <strong>警告：</strong>检测到云存储服务，建议启用"优化HTTP Host头部"选项以避免防盗链问题！
                             </div>
                             <hr>
                             <h6>类CDN缓存（针对该域名）</h6>
@@ -432,15 +473,77 @@ func (s *Server) generateProxyAddHTML(data map[string]interface{}) string {
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">预设</label>
-                                    <select class="form-select" name="cdn_preset">
+                                    <select class="form-select" name="cdn_preset" onchange="toggleCloudStorageConfig()">
                                         <option value="none">自定义/无预设</option>
                                         <option value="static">静态资源（.js,.css,.png,.jpg,.ico,.woff2）</option>
                                         <option value="images">图片（image/*）</option>
+                                        <option value="cloud_storage">云存储优化</option>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">默认TTL（秒，留空使用全局）</label>
                                     <input class="form-control" name="cdn_ttl_seconds" placeholder="例如 86400">
+                                </div>
+                            </div>
+                            
+                            <!-- 云存储配置 -->
+                            <div id="cloud-storage-config" style="display: none;">
+                                <div class="card border-warning mb-3">
+                                    <div class="card-header">
+                                        <strong><i class="bi bi-cloud"></i> 云存储配置</strong>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">云存储类型</label>
+                                                <select class="form-select" name="cloud_storage_type" onchange="updateCloudStorageFields()">
+                                                    <option value="auto">自动检测</option>
+                                                    <option value="aliyun_oss">阿里云OSS</option>
+                                                    <option value="aws_s3">AWS S3</option>
+                                                    <option value="tencent_cos">腾讯云COS</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">存储区域</label>
+                                                <input type="text" class="form-control" name="cloud_storage_region" 
+                                                       placeholder="例如: cn-hangzhou">
+                                            </div>
+                                        </div>
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">存储桶名称</label>
+                                                <input type="text" class="form-control" name="cloud_storage_bucket" 
+                                                       placeholder="例如: my-bucket">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">存储路径前缀</label>
+                                                <input type="text" class="form-control" name="cloud_storage_path" 
+                                                       placeholder="例如: /static/">
+                                            </div>
+                                        </div>
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">访问密钥ID</label>
+                                                <input type="text" class="form-control" name="cloud_storage_access_key" 
+                                                       placeholder="可选，用于签名URL">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">秘密密钥</label>
+                                                <input type="password" class="form-control" name="cloud_storage_secret_key" 
+                                                       placeholder="可选，用于签名URL">
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">自定义端点（可选）</label>
+                                            <input type="text" class="form-control" name="cloud_storage_endpoint" 
+                                                   placeholder="例如: https://custom-endpoint.com">
+                                            <div class="form-text">留空使用默认端点</div>
+                                        </div>
+                                        <div class="alert alert-warning">
+                                            <i class="bi bi-exclamation-triangle"></i>
+                                            <strong>提示：</strong>配置云存储后，系统将自动改写Host头部为后端hostname，并优化请求头部以避免防盗链检查。
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             
@@ -493,6 +596,83 @@ func (s *Server) generateProxyAddHTML(data map[string]interface{}) string {
                                 const enabled = document.getElementById('auth_enabled').checked;
                                 const settings = document.getElementById('auth_settings');
                                 settings.style.display = enabled ? 'block' : 'none';
+                            }
+                            
+                            function detectCloudStorage() {
+                                const target = document.getElementById('target').value;
+                                const detection = document.getElementById('cloud-storage-detection');
+                                const info = document.getElementById('cloud-storage-info');
+                                
+                                if (!target) {
+                                    detection.style.display = 'none';
+                                    checkCloudStorageWarning();
+                                    return;
+                                }
+                                
+                                // 简单的云存储检测
+                                const targetLower = target.toLowerCase();
+                                let cloudInfo = null;
+                                
+                                if (targetLower.includes('aliyuncs.com') || targetLower.includes('oss-')) {
+                                    cloudInfo = {
+                                        type: '阿里云OSS',
+                                        icon: '🌩️',
+                                        description: '检测到阿里云OSS服务，建议启用云存储优化配置'
+                                    };
+                                } else if (targetLower.includes('amazonaws.com') || targetLower.includes('.s3.')) {
+                                    cloudInfo = {
+                                        type: 'AWS S3',
+                                        icon: '☁️',
+                                        description: '检测到AWS S3服务，建议启用云存储优化配置'
+                                    };
+                                } else if (targetLower.includes('qcloud.com') || targetLower.includes('myqcloud.com') || targetLower.includes('.cos.')) {
+                                    cloudInfo = {
+                                        type: '腾讯云COS',
+                                        icon: '🔵',
+                                        description: '检测到腾讯云COS服务，建议启用云存储优化配置'
+                                    };
+                                }
+                                
+                                if (cloudInfo) {
+                                    info.innerHTML = 
+                                        '<div class="mt-1">' +
+                                            '<strong>' + cloudInfo.icon + ' ' + cloudInfo.type + '</strong><br>' +
+                                            cloudInfo.description +
+                                        '</div>';
+                                    detection.style.display = 'block';
+                                } else {
+                                    detection.style.display = 'none';
+                                }
+                                
+                                // 检查是否需要显示警告
+                                checkCloudStorageWarning();
+                            }
+                            
+                            function checkCloudStorageWarning() {
+                                const target = document.getElementById('target').value;
+                                const optimizeHostHeader = document.getElementById('optimize_host_header');
+                                const warning = document.getElementById('cloud-storage-warning');
+                                
+                                if (!target || !optimizeHostHeader || !warning) {
+                                    return;
+                                }
+                                
+                                // 检测是否为云存储服务
+                                const targetLower = target.toLowerCase();
+                                const isCloudStorage = targetLower.includes('aliyuncs.com') || 
+                                                      targetLower.includes('oss-') ||
+                                                      targetLower.includes('amazonaws.com') || 
+                                                      targetLower.includes('.s3.') ||
+                                                      targetLower.includes('qcloud.com') || 
+                                                      targetLower.includes('myqcloud.com') || 
+                                                      targetLower.includes('.cos.');
+                                
+                                // 如果是云存储服务且未启用Host头部优化，显示警告
+                                if (isCloudStorage && !optimizeHostHeader.checked) {
+                                    warning.style.display = 'block';
+                                } else {
+                                    warning.style.display = 'none';
+                                }
                             }
                             
                             function addAuthUser() {
@@ -590,6 +770,15 @@ func (s *Server) generateProxyEditHTML(data map[string]interface{}) string {
                                 <input class="form-check-input" type="checkbox" id="ssl_only" name="ssl_only" %s>
                                 <label class="form-check-label" for="ssl_only">仅限HTTPS（HTTP访问将自动301到HTTPS）</label>
                             </div>
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="optimize_host_header" name="optimize_host_header" %s onchange="checkCloudStorageWarning()">
+                                <label class="form-check-label" for="optimize_host_header">优化HTTP Host头部</label>
+                                <div class="form-text">当上游使用hostname（非IP）时，自动将Host头部设置为后端服务器地址。主要针对OSS/S3等云存储服务避免防盗链问题</div>
+                            </div>
+                            <div id="cloud-storage-warning" class="alert alert-danger mt-2" style="display: none;">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                <strong>警告：</strong>检测到云存储服务，建议启用"优化HTTP Host头部"选项以避免防盗链问题！
+                            </div>
                             <hr>
                             <h6>类CDN缓存（针对该域名）</h6>
                             <div class="form-check form-switch mb-2">
@@ -660,6 +849,83 @@ func (s *Server) generateProxyEditHTML(data map[string]interface{}) string {
                                 settings.style.display = enabled ? 'block' : 'none';
                             }
                             
+                            function detectCloudStorage() {
+                                const target = document.getElementById('target').value;
+                                const detection = document.getElementById('cloud-storage-detection');
+                                const info = document.getElementById('cloud-storage-info');
+                                
+                                if (!target) {
+                                    detection.style.display = 'none';
+                                    checkCloudStorageWarning();
+                                    return;
+                                }
+                                
+                                // 简单的云存储检测
+                                const targetLower = target.toLowerCase();
+                                let cloudInfo = null;
+                                
+                                if (targetLower.includes('aliyuncs.com') || targetLower.includes('oss-')) {
+                                    cloudInfo = {
+                                        type: '阿里云OSS',
+                                        icon: '🌩️',
+                                        description: '检测到阿里云OSS服务，建议启用云存储优化配置'
+                                    };
+                                } else if (targetLower.includes('amazonaws.com') || targetLower.includes('.s3.')) {
+                                    cloudInfo = {
+                                        type: 'AWS S3',
+                                        icon: '☁️',
+                                        description: '检测到AWS S3服务，建议启用云存储优化配置'
+                                    };
+                                } else if (targetLower.includes('qcloud.com') || targetLower.includes('myqcloud.com') || targetLower.includes('.cos.')) {
+                                    cloudInfo = {
+                                        type: '腾讯云COS',
+                                        icon: '🔵',
+                                        description: '检测到腾讯云COS服务，建议启用云存储优化配置'
+                                    };
+                                }
+                                
+                                if (cloudInfo) {
+                                    info.innerHTML = 
+                                        '<div class="mt-1">' +
+                                            '<strong>' + cloudInfo.icon + ' ' + cloudInfo.type + '</strong><br>' +
+                                            cloudInfo.description +
+                                        '</div>';
+                                    detection.style.display = 'block';
+                                } else {
+                                    detection.style.display = 'none';
+                                }
+                                
+                                // 检查是否需要显示警告
+                                checkCloudStorageWarning();
+                            }
+                            
+                            function checkCloudStorageWarning() {
+                                const target = document.getElementById('target').value;
+                                const optimizeHostHeader = document.getElementById('optimize_host_header');
+                                const warning = document.getElementById('cloud-storage-warning');
+                                
+                                if (!target || !optimizeHostHeader || !warning) {
+                                    return;
+                                }
+                                
+                                // 检测是否为云存储服务
+                                const targetLower = target.toLowerCase();
+                                const isCloudStorage = targetLower.includes('aliyuncs.com') || 
+                                                      targetLower.includes('oss-') ||
+                                                      targetLower.includes('amazonaws.com') || 
+                                                      targetLower.includes('.s3.') ||
+                                                      targetLower.includes('qcloud.com') || 
+                                                      targetLower.includes('myqcloud.com') || 
+                                                      targetLower.includes('.cos.');
+                                
+                                // 如果是云存储服务且未启用Host头部优化，显示警告
+                                if (isCloudStorage && !optimizeHostHeader.checked) {
+                                    warning.style.display = 'block';
+                                } else {
+                                    warning.style.display = 'none';
+                                }
+                            }
+                            
                             function addAuthUser() {
                                 const container = document.getElementById('auth_users_container');
                                 const userIndex = container.children.length;
@@ -706,6 +972,7 @@ func (s *Server) generateProxyEditHTML(data map[string]interface{}) string {
 		rule.Target,
 		map[bool]string{true: "checked"}[rule.Enabled],
 		map[bool]string{true: "checked"}[rule.SSLOnly],
+		map[bool]string{true: "checked"}[rule.OptimizeHostHeader],
 		map[bool]string{true: "checked"}[rule.CDNEnabled],
 		map[bool]string{true: "selected"}[rule.CDNPreset == "none"],
 		map[bool]string{true: "selected"}[rule.CDNPreset == "static"],
@@ -1735,7 +2002,7 @@ func (s *Server) generateSecurityManagementHTML(data map[string]interface{}) str
     });
     
     // 加载审计日志
-    fetch(document.location.pathname.split('/')[1]+'/api/audit').then(r=>r.json()).then(data=>{
+    fetch('%s/api/audit').then(r=>r.json()).then(data=>{
         const body = document.getElementById('audit-body');
         body.innerHTML = '';
         const logs = (data && data.logs) || [];
@@ -1767,6 +2034,275 @@ func (s *Server) generateSecurityManagementHTML(data map[string]interface{}) str
 		totalAttacks,
 		s.generateBlockedIPsTable(data),
 		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string))
+}
+
+// generateRunnersManagementHTML 生成Runners管理页面HTML
+func (s *Server) generateRunnersManagementHTML(data map[string]interface{}) string {
+	return fmt.Sprintf(`
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Runners管理 - SSLcat</title>
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-2">%s</div>
+            <main class="col-md-10">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">Runners管理</h1>
+                </div>
+                
+                <!-- Local Runner -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="bi bi-terminal"></i> Local Runner
+                            <span class="badge %s ms-2">%s</span>
+                        </h5>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary" onclick="addLocalTask()">
+                                <i class="bi bi-plus-circle"></i> 添加任务
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>任务名称</th>
+                                        <th>类型</th>
+                                        <th>端口</th>
+                                        <th>状态</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="local-tasks-body">
+                                    <tr><td colspan="5" class="text-center text-muted">加载中...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Docker Runner -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="bi bi-docker"></i> Docker Runner
+                            <span class="badge %s ms-2">%s</span>
+                        </h5>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary" onclick="addDockerTask()">
+                                <i class="bi bi-plus-circle"></i> 添加任务
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>任务名称</th>
+                                        <th>Git URL</th>
+                                        <th>端口</th>
+                                        <th>状态</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="docker-tasks-body">
+                                    <tr><td colspan="5" class="text-center text-muted">加载中...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </main>
+        </div>
+    </div>
+    
+    <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    // 加载Local Runner任务
+    fetch('%s/api/local-runner/tasks').then(r=>r.json()).then(data=>{
+        const body = document.getElementById('local-tasks-body');
+        body.innerHTML = '';
+        const tasks = (data && data.data) || [];
+        if (tasks.length === 0) {
+            body.innerHTML = '<tr><td colspan="5" class="text-center text-muted">暂无任务</td></tr>';
+            return;
+        }
+        tasks.forEach(task=>{
+            const tr = document.createElement('tr');
+            const statusBadge = task.status === 'running' ? 
+                '<span class="badge bg-success">运行中</span>' : 
+                '<span class="badge bg-secondary">已停止</span>';
+            tr.innerHTML = '<td>'+task.name+'</td>'+
+                           '<td>'+task.type+'</td>'+
+                           '<td>'+task.port+'</td>'+
+                           '<td>'+statusBadge+'</td>'+
+                           '<td><button class="btn btn-sm btn-outline-danger" onclick="removeLocalTask(\''+task.id+'\')">删除</button></td>';
+            body.appendChild(tr);
+        });
+    }).catch(()=>{
+        document.getElementById('local-tasks-body').innerHTML = '<tr><td colspan="5" class="text-center text-muted">加载失败</td></tr>';
+    });
+
+    // 加载Docker Runner任务
+    fetch('%s/api/docker-runner/tasks').then(r=>r.json()).then(data=>{
+        const body = document.getElementById('docker-tasks-body');
+        body.innerHTML = '';
+        const tasks = (data && data.data) || [];
+        if (tasks.length === 0) {
+            body.innerHTML = '<tr><td colspan="5" class="text-center text-muted">暂无任务</td></tr>';
+            return;
+        }
+        tasks.forEach(task=>{
+            const tr = document.createElement('tr');
+            const statusBadge = task.status === 'running' ? 
+                '<span class="badge bg-success">运行中</span>' : 
+                '<span class="badge bg-secondary">已停止</span>';
+            tr.innerHTML = '<td>'+task.name+'</td>'+
+                           '<td>'+task.git_url+'</td>'+
+                           '<td>'+task.port+'</td>'+
+                           '<td>'+statusBadge+'</td>'+
+                           '<td><button class="btn btn-sm btn-outline-danger" onclick="removeDockerTask(\''+task.id+'\')">删除</button></td>';
+            body.appendChild(tr);
+        });
+    }).catch(()=>{
+        document.getElementById('docker-tasks-body').innerHTML = '<tr><td colspan="5" class="text-center text-muted">加载失败</td></tr>';
+    });
+
+
+    function addLocalTask() {
+        const modal = document.createElement('div');
+        modal.className = 'modal fade';
+        modal.innerHTML = '<div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">添加Local Runner任务</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="addLocalTaskForm"><div class="mb-3"><label for="taskName" class="form-label">任务名称</label><input type="text" class="form-control" id="taskName" name="name" required></div><div class="mb-3"><label for="taskType" class="form-label">任务类型</label><select class="form-select" id="taskType" name="type" required><option value="web">Web应用</option><option value="api">API服务</option><option value="worker">后台任务</option><option value="custom">自定义</option></select></div><div class="mb-3"><label for="binaryPath" class="form-label">二进制文件路径</label><input type="text" class="form-control" id="binaryPath" name="binary_path" required placeholder="/path/to/your/binary"></div><div class="mb-3"><label for="taskPort" class="form-label">端口号</label><input type="number" class="form-control" id="taskPort" name="port" required min="1" max="65535" placeholder="8080"></div><div class="mb-3"><label for="taskArgs" class="form-label">启动参数（每行一个）</label><textarea class="form-control" id="taskArgs" name="args" rows="3" placeholder="--port=8080&#10;--debug"></textarea></div><div class="mb-3"><label for="taskEnv" class="form-label">环境变量（每行一个，格式：KEY=VALUE）</label><textarea class="form-control" id="taskEnv" name="env" rows="3" placeholder="NODE_ENV=production&#10;PORT=8080"></textarea></div></form></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button type="button" class="btn btn-primary" onclick="submitLocalTask()">添加任务</button></div></div></div>';
+        document.body.appendChild(modal);
+        new bootstrap.Modal(modal).show();
+        modal.addEventListener('hidden.bs.modal', () => modal.remove());
+    }
+
+    function addDockerTask() {
+        const modal = document.createElement('div');
+        modal.className = 'modal fade';
+        modal.innerHTML = '<div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">添加Docker Runner任务</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="addDockerTaskForm"><div class="mb-3"><label for="dockerTaskName" class="form-label">任务名称</label><input type="text" class="form-control" id="dockerTaskName" name="name" required></div><div class="mb-3"><label for="gitUrl" class="form-label">Git仓库URL</label><input type="url" class="form-control" id="gitUrl" name="git_url" required placeholder="https://github.com/user/repo.git"></div><div class="mb-3"><label for="gitBranch" class="form-label">分支</label><input type="text" class="form-control" id="gitBranch" name="git_branch" value="main" placeholder="main"></div><div class="mb-3"><label for="dockerPort" class="form-label">端口号</label><input type="number" class="form-control" id="dockerPort" name="port" required min="1" max="65535" placeholder="8080"></div><div class="mb-3"><label for="dockerEnv" class="form-label">环境变量（每行一个，格式：KEY=VALUE）</label><textarea class="form-control" id="dockerEnv" name="env" rows="3" placeholder="NODE_ENV=production&#10;PORT=8080"></textarea></div></form></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button type="button" class="btn btn-primary" onclick="submitDockerTask()">添加任务</button></div></div></div>';
+        document.body.appendChild(modal);
+        new bootstrap.Modal(modal).show();
+        modal.addEventListener('hidden.bs.modal', () => modal.remove());
+    }
+
+    function removeLocalTask(id) {
+        if (confirm('确定要删除这个任务吗？')) {
+            fetch('%s/api/local-runner/task/remove?id='+id, {method: 'POST'})
+                .then(() => location.reload())
+                .catch(() => alert('删除失败'));
+        }
+    }
+
+    function removeDockerTask(id) {
+        if (confirm('确定要删除这个任务吗？')) {
+            fetch('%s/api/docker-runner/task/remove?id='+id, {method: 'POST'})
+                .then(() => location.reload())
+                .catch(() => alert('删除失败'));
+        }
+    }
+
+
+    function submitLocalTask() {
+        const form = document.getElementById('addLocalTaskForm');
+        const formData = new FormData(form);
+        
+        // 处理参数和环境变量
+        const args = formData.get('args').split('\n').filter(arg => arg.trim());
+        const env = {};
+        formData.get('env').split('\n').forEach(line => {
+            const [key, value] = line.split('=');
+            if (key && value) {
+                env[key.trim()] = value.trim();
+            }
+        });
+        
+        const taskData = {
+            name: formData.get('name'),
+            type: formData.get('type'),
+            binary_path: formData.get('binary_path'),
+            port: parseInt(formData.get('port')),
+            args: args,
+            env: env
+        };
+        
+        fetch('%s/api/local-runner/task/add', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(taskData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('添加失败: ' + (data.error || '未知错误'));
+            }
+        })
+        .catch(() => alert('添加失败'));
+    }
+
+    function submitDockerTask() {
+        const form = document.getElementById('addDockerTaskForm');
+        const formData = new FormData(form);
+        
+        // 处理环境变量
+        const env = {};
+        formData.get('env').split('\n').forEach(line => {
+            const [key, value] = line.split('=');
+            if (key && value) {
+                env[key.trim()] = value.trim();
+            }
+        });
+        
+        const taskData = {
+            name: formData.get('name'),
+            git_url: formData.get('git_url'),
+            git_branch: formData.get('git_branch') || 'main',
+            port: parseInt(formData.get('port')),
+            env: env
+        };
+        
+        fetch('%s/api/docker-runner/task/add', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(taskData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('添加失败: ' + (data.error || '未知错误'));
+            }
+        })
+        .catch(() => alert('添加失败'));
+    }
+    </script>
+</body>
+</html>`,
+		s.generateSidebar(data["AdminPrefix"].(string), "runners"),
+		map[bool]string{true: "bg-success", false: "bg-secondary"}[data["LocalEnabled"].(bool)],
+		map[bool]string{true: "已启用", false: "已禁用"}[data["LocalEnabled"].(bool)],
+		map[bool]string{true: "bg-success", false: "bg-secondary"}[data["DockerEnabled"].(bool)],
+		map[bool]string{true: "已启用", false: "已禁用"}[data["DockerEnabled"].(bool)],
 		data["AdminPrefix"].(string),
 		data["AdminPrefix"].(string),
 		data["AdminPrefix"].(string),
@@ -2099,4 +2635,137 @@ func (s *Server) formatCDNRules(rules []config.CDNCacheRule) string {
 		}
 	}
 	return b.String()
+}
+
+// generateGitServerManagementHTML 生成Git Server管理页面HTML
+func (s *Server) generateGitServerManagementHTML(data map[string]interface{}) string {
+	return fmt.Sprintf(`
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Git Server管理 - SSLcat</title>
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-2">%s</div>
+            <main class="col-md-10">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">Git Server管理</h1>
+                    <div>
+                        <span class="badge %s me-2">%s</span>
+                        <button class="btn btn-primary" onclick="addGitRepo()">
+                            <i class="bi bi-plus-circle"></i> 添加仓库
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 说明卡片 -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Git Server 说明</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>Git Server 是一个类似 Railway、Heroku、Dokku 的部署平台，支持：</p>
+                        <ul>
+                            <li>Git 仓库自动部署</li>
+                            <li>多语言项目支持（Node.js、Python、Go、Java等）</li>
+                            <li>自动构建和部署</li>
+                            <li>环境变量管理</li>
+                            <li>域名绑定</li>
+                            <li>SSL证书自动申请</li>
+                        </ul>
+                        <div class="alert alert-info">
+                            <strong>注意：</strong> 此功能正在开发中，敬请期待！
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 仓库列表 -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">仓库列表</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>仓库名称</th>
+                                        <th>Git URL</th>
+                                        <th>分支</th>
+                                        <th>状态</th>
+                                        <th>最后更新</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="git-repos-body">
+                                    <tr><td colspan="6" class="text-center text-muted">加载中...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    // 加载Git Server仓库
+    fetch('%s/api/git-server/repos').then(r=>r.json()).then(data=>{
+        const body = document.getElementById('git-repos-body');
+        body.innerHTML = '';
+        const repos = (data && data.data) || [];
+        if (repos.length === 0) {
+            body.innerHTML = '<tr><td colspan="6" class="text-center text-muted">暂无仓库</td></tr>';
+            return;
+        }
+        repos.forEach(repo=>{
+            const tr = document.createElement('tr');
+            const statusBadge = repo.status === 'active' ? 
+                '<span class="badge bg-success">活跃</span>' : 
+                '<span class="badge bg-secondary">未激活</span>';
+            tr.innerHTML = '<td>'+repo.name+'</td>'+
+                           '<td><code>'+repo.url+'</code></td>'+
+                           '<td>'+repo.branch+'</td>'+
+                           '<td>'+statusBadge+'</td>'+
+                           '<td>'+(repo.last_updated || '未知')+'</td>'+
+                           '<td>'+
+                               '<button class="btn btn-sm btn-outline-primary me-1" onclick="viewRepo(\''+repo.id+'\')">查看</button>'+
+                               '<button class="btn btn-sm btn-outline-danger" onclick="removeGitRepo(\''+repo.id+'\')">删除</button>'+
+                           '</td>';
+            body.appendChild(tr);
+        });
+    }).catch(()=>{
+        document.getElementById('git-repos-body').innerHTML = '<tr><td colspan="6" class="text-center text-muted">加载失败</td></tr>';
+    });
+
+    function addGitRepo() {
+        alert('Git Server 功能正在开发中，敬请期待！');
+    }
+
+    function viewRepo(id) {
+        alert('查看仓库详情功能正在开发中');
+    }
+
+    function removeGitRepo(id) {
+        if (confirm('确定要删除这个仓库吗？')) {
+            fetch('%s/api/git-server/repo/remove?id='+id, {method: 'POST'})
+                .then(() => location.reload())
+                .catch(() => alert('删除失败'));
+        }
+    }
+    </script>
+</body>
+</html>`,
+		s.generateSidebar(data["AdminPrefix"].(string), "git-server"),
+		map[bool]string{true: "bg-success", false: "bg-secondary"}[data["GitEnabled"].(bool)],
+		map[bool]string{true: "已启用", false: "已禁用"}[data["GitEnabled"].(bool)],
+		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string))
 }

@@ -110,13 +110,10 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 
 	// 检查是否启用了CDN缓存（全局或域名级别）
 	cdnEnabled := m.config.CDNCache.Enabled || (rule != nil && rule.CDNEnabled)
-	isOSS := strings.Contains(strings.ToLower(rule.Target), "aliyuncs.com") ||
-		strings.Contains(strings.ToLower(rule.Target), "amazonaws.com") ||
-		strings.Contains(strings.ToLower(rule.Target), "qcloud.com") ||
-		strings.Contains(strings.ToLower(rule.Target), "myqcloud.com")
+	isCloudStorage := m.isCloudStorageService(rule.Target)
 
-	// 在CDN模式或OSS模式下，预先清理可能存在的代理头部
-	if cdnEnabled || isOSS {
+	// 在CDN模式或云存储模式下，预先清理可能存在的代理头部
+	if cdnEnabled || isCloudStorage {
 		r.Header.Del("X-Forwarded-For")
 		r.Header.Del("X-Forwarded-Host")
 		r.Header.Del("X-Forwarded-Proto")
@@ -127,7 +124,7 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 		r.Header.Del("X-Original-Method")
 
 		// 对于云服务，进行更彻底的头部清理
-		if isOSS {
+		if isCloudStorage {
 			r.Header.Del("X-Forwarded")
 			r.Header.Del("X-Client-IP")
 			r.Header.Del("X-Cluster-Client-IP")
@@ -142,10 +139,10 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 			}
 		}
 
-		m.log.Debugf("Pre-cleaned proxy headers for %s (CDN: %v, 云服务: %v)", r.Host, cdnEnabled, isOSS)
+		m.log.Debugf("Pre-cleaned proxy headers for %s (CDN: %v, 云服务: %v)", r.Host, cdnEnabled, isCloudStorage)
 	}
 
-	if !cdnEnabled && !isOSS {
+	if !cdnEnabled && !isCloudStorage {
 		// 非CDN且非云服务模式：设置标准的代理头部
 		r.Header.Set("X-Forwarded-Proto", scheme)
 		r.Header.Set("X-Forwarded-Host", r.Host)
@@ -167,9 +164,9 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 		m.log.Debugf("Added proxy headers (non-CDN, non-cloud mode) for %s", r.Host)
 	} else {
 		// CDN模式或云服务模式：最小化头部，避免干扰
-		if cdnEnabled && isOSS {
+		if cdnEnabled && isCloudStorage {
 			m.log.Infof("云服务 + CDN mode enabled for %s, skipping proxy headers", r.Host)
-		} else if isOSS {
+		} else if isCloudStorage {
 			m.log.Infof("云服务模式 enabled for %s, skipping proxy headers", r.Host)
 		} else if cdnEnabled {
 			m.log.Infof("CDN mode enabled for %s, skipping proxy headers", r.Host)
@@ -267,7 +264,6 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 	proxy.Director = func(req *http.Request) {
 		// 保存原始Host，因为原始Director会修改它
 		originalHost := req.Host
-		originalHeaderHost := req.Header.Get("Host")
 
 		// 调用原始 Director
 		originalDirector(req)
@@ -281,15 +277,33 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 			req.Header.Set("Host", originalHost)
 			m.log.Debugf("Backend is IP (%s), forwarding original Host: %s", rule.Target, originalHost)
 		} else {
-			// 后端是域名，使用后端配置的域名作为Host
-			// 从完整URL中提取域名和端口
-			backendHost := m.extractHostFromTarget(rule.Target, rule.Port)
+			// 后端是域名，根据配置决定Host头部处理方式
+			if rule.OptimizeHostHeader {
+				// 启用Host头部优化：使用后端配置的域名作为Host
+				backendHost := m.extractHostFromTarget(rule.Target, rule.Port)
 
-			// 关键修复：同时设置 req.Host 和 Header，覆盖原始Director的设置
-			req.Host = backendHost
-			req.Header.Set("Host", backendHost)
+				// 如果是云存储服务，根据配置决定Host头部
+				if m.isCloudStorageService(rule.Target) {
+					// 对于云存储，优先使用配置的端点，否则使用检测到的端点
+					if rule.CloudStorageEndpoint != "" {
+						backendHost = rule.CloudStorageEndpoint
+					} else if cloudInfo := m.detectCloudStorageInfo(rule.Target); cloudInfo != nil {
+						backendHost = cloudInfo.Endpoint
+					}
+					m.log.Infof("云存储模式: 使用端点 %s (配置: %s)", backendHost, rule.CloudStorageEndpoint)
+				}
 
-			m.log.Infof("Backend is domain (%s), setting Host: %s (was: %s, header was: %s)", rule.Target, backendHost, originalHost, originalHeaderHost)
+				// 关键修复：同时设置 req.Host 和 Header，覆盖原始Director的设置
+				req.Host = backendHost
+				req.Header.Set("Host", backendHost)
+
+				m.log.Infof("Host头部优化已启用: 设置Host为 %s (原: %s)", backendHost, originalHost)
+			} else {
+				// 禁用Host头部优化：保持原始的Host头，实现透明代理
+				req.Host = originalHost
+				req.Header.Set("Host", originalHost)
+				m.log.Infof("Host头部优化已禁用: 保持原始Host %s", originalHost)
+			}
 		}
 
 		// 移除 Hop-by-hop 头部
@@ -308,14 +322,11 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 			req.Header.Del(header)
 		}
 
-		// 检查是否需要移除代理头部
-		isOSS := strings.Contains(strings.ToLower(rule.Target), "aliyuncs.com") ||
-			strings.Contains(strings.ToLower(rule.Target), "amazonaws.com") ||
-			strings.Contains(strings.ToLower(rule.Target), "qcloud.com") ||
-			strings.Contains(strings.ToLower(rule.Target), "myqcloud.com")
+		// 检查是否为云存储服务
+		isCloudStorage := m.isCloudStorageService(rule.Target)
 		cdnEnabled := m.config.CDNCache.Enabled || (rule != nil && rule.CDNEnabled)
 
-		if isOSS || cdnEnabled {
+		if isCloudStorage || cdnEnabled {
 			// 移除所有可能干扰的代理头部
 			req.Header.Del("X-Forwarded-Host")
 			req.Header.Del("X-Forwarded-Server")
@@ -327,7 +338,7 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 			req.Header.Del("X-Forwarded-Port")
 
 			// 对于云服务，还需要移除一些额外的头部
-			if isOSS {
+			if isCloudStorage {
 				req.Header.Del("X-Forwarded")
 				req.Header.Del("X-Client-IP")
 				req.Header.Del("X-Cluster-Client-IP")
@@ -342,9 +353,9 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 				}
 			}
 
-			if isOSS && cdnEnabled {
+			if isCloudStorage && cdnEnabled {
 				m.log.Infof("云服务 + CDN mode: removed all proxy headers for target: %s", rule.Target)
-			} else if isOSS {
+			} else if isCloudStorage {
 				m.log.Infof("云服务模式: 已移除防盗链和代理头部 for target: %s", rule.Target)
 			} else if cdnEnabled {
 				m.log.Infof("CDN mode: removed proxy headers for target: %s", rule.Target)
@@ -948,4 +959,131 @@ func (lt *loggingTransport) buildCurlCommand(req *http.Request) string {
 	parts = append(parts, "--insecure") // 忽略SSL证书验证（如果需要）
 
 	return strings.Join(parts, " ")
+}
+
+// CloudStorageInfo 云存储服务信息
+type CloudStorageInfo struct {
+	Type     string `json:"type"`     // aliyun_oss, aws_s3, tencent_cos
+	Name     string `json:"name"`     // 服务名称
+	Region   string `json:"region"`   // 区域
+	Bucket   string `json:"bucket"`   // 存储桶
+	Endpoint string `json:"endpoint"` // 端点
+}
+
+// isCloudStorageService 检测是否为云存储服务
+func (m *Manager) isCloudStorageService(target string) bool {
+	targetLower := strings.ToLower(target)
+	return strings.Contains(targetLower, "aliyuncs.com") ||
+		strings.Contains(targetLower, "amazonaws.com") ||
+		strings.Contains(targetLower, "qcloud.com") ||
+		strings.Contains(targetLower, "myqcloud.com") ||
+		strings.Contains(targetLower, "oss-") ||
+		strings.Contains(targetLower, ".s3.") ||
+		strings.Contains(targetLower, ".cos.")
+}
+
+// detectCloudStorageInfo 检测云存储服务详细信息
+func (m *Manager) detectCloudStorageInfo(target string) *CloudStorageInfo {
+	targetLower := strings.ToLower(target)
+
+	// 阿里云OSS检测
+	if strings.Contains(targetLower, "aliyuncs.com") || strings.Contains(targetLower, "oss-") {
+		// 解析bucket.oss-region.aliyuncs.com格式
+		parts := strings.Split(target, ".")
+		if len(parts) >= 3 {
+			return &CloudStorageInfo{
+				Type:     "aliyun_oss",
+				Name:     "阿里云OSS",
+				Bucket:   parts[0],
+				Region:   extractRegionFromOSS(parts),
+				Endpoint: target,
+			}
+		}
+		return &CloudStorageInfo{
+			Type:     "aliyun_oss",
+			Name:     "阿里云OSS",
+			Endpoint: target,
+		}
+	}
+
+	// AWS S3检测
+	if strings.Contains(targetLower, "amazonaws.com") || strings.Contains(targetLower, ".s3.") {
+		// 解析bucket.s3-region.amazonaws.com格式
+		parts := strings.Split(target, ".")
+		if len(parts) >= 3 {
+			return &CloudStorageInfo{
+				Type:     "aws_s3",
+				Name:     "AWS S3",
+				Bucket:   parts[0],
+				Region:   extractRegionFromS3(parts),
+				Endpoint: target,
+			}
+		}
+		return &CloudStorageInfo{
+			Type:     "aws_s3",
+			Name:     "AWS S3",
+			Endpoint: target,
+		}
+	}
+
+	// 腾讯云COS检测
+	if strings.Contains(targetLower, "qcloud.com") || strings.Contains(targetLower, "myqcloud.com") || strings.Contains(targetLower, ".cos.") {
+		// 解析bucket.cos-region.myqcloud.com格式
+		parts := strings.Split(target, ".")
+		if len(parts) >= 3 {
+			return &CloudStorageInfo{
+				Type:     "tencent_cos",
+				Name:     "腾讯云COS",
+				Bucket:   parts[0],
+				Region:   extractRegionFromCOS(parts),
+				Endpoint: target,
+			}
+		}
+		return &CloudStorageInfo{
+			Type:     "tencent_cos",
+			Name:     "腾讯云COS",
+			Endpoint: target,
+		}
+	}
+
+	return nil
+}
+
+// extractRegionFromOSS 从阿里云OSS域名中提取区域信息
+func extractRegionFromOSS(parts []string) string {
+	if len(parts) < 2 {
+		return ""
+	}
+	// 格式: bucket.oss-region.aliyuncs.com
+	ossPart := parts[1]
+	if strings.HasPrefix(ossPart, "oss-") {
+		return strings.TrimPrefix(ossPart, "oss-")
+	}
+	return ""
+}
+
+// extractRegionFromS3 从AWS S3域名中提取区域信息
+func extractRegionFromS3(parts []string) string {
+	if len(parts) < 2 {
+		return ""
+	}
+	// 格式: bucket.s3-region.amazonaws.com
+	s3Part := parts[1]
+	if strings.HasPrefix(s3Part, "s3-") {
+		return strings.TrimPrefix(s3Part, "s3-")
+	}
+	return ""
+}
+
+// extractRegionFromCOS 从腾讯云COS域名中提取区域信息
+func extractRegionFromCOS(parts []string) string {
+	if len(parts) < 2 {
+		return ""
+	}
+	// 格式: bucket.cos-region.myqcloud.com
+	cosPart := parts[1]
+	if strings.HasPrefix(cosPart, "cos-") {
+		return strings.TrimPrefix(cosPart, "cos-")
+	}
+	return ""
 }
