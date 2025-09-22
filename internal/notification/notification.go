@@ -122,23 +122,23 @@ func NewNotificationManagerFromConfig(configData interface{}) *NotificationManag
 // ValidateNotificationConfig 验证通知配置
 func ValidateNotificationConfig(config interface{}) []string {
 	var errors []string
-	
+
 	// 这里可以添加具体的配置验证逻辑
 	// 例如：验证SMTP配置、Webhook URL格式等
-	
+
 	return errors
 }
 
 // TestNotificationChannels 测试通知渠道
 func (nm *NotificationManager) TestNotificationChannels() map[string]string {
 	results := make(map[string]string)
-	
+
 	for name, channel := range nm.channels {
 		if !channel.IsEnabled() {
 			results[name] = "未启用"
 			continue
 		}
-		
+
 		// 创建测试通知
 		testNotification := &Notification{
 			Type:    TypeSystemStartup,
@@ -150,7 +150,7 @@ func (nm *NotificationManager) TestNotificationChannels() map[string]string {
 				"timestamp": time.Now().Format(time.RFC3339),
 			},
 		}
-		
+
 		// 尝试发送测试通知
 		if err := channel.Send(testNotification); err != nil {
 			results[name] = fmt.Sprintf("测试失败: %v", err)
@@ -158,7 +158,7 @@ func (nm *NotificationManager) TestNotificationChannels() map[string]string {
 			results[name] = "测试成功"
 		}
 	}
-	
+
 	return results
 }
 
