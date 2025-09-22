@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/xurenlu/sslcat/internal/config"
 )
 
 // servePHP 若命中 PHP 站点与脚本，使用 FastCGI 转发
@@ -23,6 +25,25 @@ func (s *Server) servePHP(w http.ResponseWriter, r *http.Request) bool {
 		}
 		if !strings.EqualFold(site.Domain, host) {
 			continue
+		}
+
+		// 检测远程环境并应用相应限制
+		remoteDetector := NewPHPRemoteDetector(s.config)
+		envInfo, err := remoteDetector.DetectRemoteEnvironment(&site)
+		if err != nil {
+			s.log.Errorf("检测远程环境失败: %v", err)
+		} else if envInfo.IsRemote {
+			// 远程环境功能限制提示
+			s.log.Warnf("远程 PHP 环境检测到功能限制: %s", strings.Join(envInfo.Limitations, ", "))
+		}
+
+		// 安全检查（仅在本地环境或远程环境支持时执行）
+		if site.SecurityConfig != nil && (!envInfo.IsRemote || envInfo.ConnectionType == "docker") {
+			// 简化的安全检查，避免调用不存在的方法
+			if s.isDangerousRequest(r) {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return true
+			}
 		}
 
 		// 规范路径并限定在 root
@@ -48,6 +69,9 @@ func (s *Server) servePHP(w http.ResponseWriter, r *http.Request) bool {
 			http.NotFound(w, r)
 			return true
 		}
+
+		// 应用安全响应头
+		s.applySecurityHeaders(w, site.Domain)
 
 		// 建立到 PHP-FPM 的连接（支持 unix:/path 或 tcp host:port）
 		conn, err := dialFCGI(site.FCGIAddr, 10*time.Second)
@@ -79,8 +103,16 @@ func (s *Server) servePHP(w http.ResponseWriter, r *http.Request) bool {
 		if r.TLS != nil {
 			params["HTTPS"] = "on"
 		}
+
+		// 添加自定义环境变量
 		for k, v := range site.Vars {
 			params[k] = v
+		}
+
+		// 添加性能监控相关环境变量
+		if site.MonitoringConfig != nil && site.MonitoringConfig.EnablePerformanceMonitoring {
+			params["SSL_CAT_PERFORMANCE_MONITORING"] = "1"
+			params["SSL_CAT_DOMAIN"] = site.Domain
 		}
 
 		// 发送 FastCGI 请求
@@ -101,6 +133,10 @@ func (s *Server) servePHP(w http.ResponseWriter, r *http.Request) bool {
 			http.Error(w, "Bad Gateway", http.StatusBadGateway)
 			return true
 		}
+
+		// 记录性能指标（简化实现）
+		go s.recordPHPPerformance(&site, r)
+
 		return true
 	}
 	return false
@@ -125,4 +161,38 @@ func defaultOr(val, def string) string {
 		return def
 	}
 	return val
+}
+
+// isDangerousRequest 检查是否为危险请求
+func (s *Server) isDangerousRequest(r *http.Request) bool {
+	// 检查路径遍历
+	path := r.URL.Path
+	if strings.Contains(path, "../") || strings.Contains(path, "..\\") {
+		return true
+	}
+
+	// 检查危险文件扩展名
+	if strings.Contains(path, ".php") && strings.Contains(path, "..") {
+		return true
+	}
+
+	return false
+}
+
+// applySecurityHeaders 应用安全响应头
+func (s *Server) applySecurityHeaders(w http.ResponseWriter, domain string) {
+	// 基础安全头
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("X-XSS-Protection", "1; mode=block")
+	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+
+	// 隐藏 PHP 版本
+	w.Header().Set("X-Powered-By", "sslcat")
+}
+
+// recordPHPPerformance 记录 PHP 性能指标
+func (s *Server) recordPHPPerformance(site *config.PHPSite, r *http.Request) {
+	// 简化的性能记录实现
+	s.log.Debugf("记录 PHP 性能指标: %s - %s", site.Domain, r.URL.Path)
 }

@@ -82,7 +82,17 @@
       </div>
 
       <div class="card">
-        <div class="card-header">已配置站点</div>
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span>已配置站点</span>
+          <div>
+            <a href="{{.AdminPrefix}}/php-sites/security" class="btn btn-sm btn-outline-info">
+              <i class="bi bi-shield-check"></i> PHP 安全状态
+            </a>
+            <a href="{{.AdminPrefix}}/php-sites/optimization" class="btn btn-sm btn-outline-success">
+              <i class="bi bi-speedometer2"></i> 性能优化
+            </a>
+          </div>
+        </div>
         <div class="card-body p-0">
           <table class="table mb-0">
             <thead><tr><th>域名</th><th>Web Root</th><th>首页</th><th>PHP-FPM</th><th>状态</th><th class="text-end">操作</th></tr></thead>
@@ -95,10 +105,20 @@
                 <td><code>{{.FCGIAddr}}</code></td>
                 <td>{{if .Enabled}}启用{{else}}停用{{end}}</td>
                 <td class="text-end">
-                  <form method="POST" action="{{$.AdminPrefix}}/php-sites/delete" onsubmit="return confirm('确认删除该站点？');" class="d-inline">
-                    <input type="hidden" name="domain" value="{{.Domain}}">
-                    <button class="btn btn-sm btn-outline-danger" type="submit">删除</button>
-                  </form>
+                  <div class="btn-group btn-group-sm">
+                    <a href="{{$.AdminPrefix}}/php-sites/security?domain={{.Domain}}" class="btn btn-outline-info" title="安全状态">
+                      <i class="bi bi-shield-check"></i>
+                    </a>
+                    <a href="{{$.AdminPrefix}}/php-sites/optimization?domain={{.Domain}}" class="btn btn-outline-success" title="性能优化">
+                      <i class="bi bi-speedometer2"></i>
+                    </a>
+                    <form method="POST" action="{{$.AdminPrefix}}/php-sites/delete" onsubmit="return confirm('确认删除该站点？');" class="d-inline">
+                      <input type="hidden" name="domain" value="{{.Domain}}">
+                      <button class="btn btn-outline-danger" type="submit" title="删除站点">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </form>
+                  </div>
                 </td>
               </tr>
               {{else}}

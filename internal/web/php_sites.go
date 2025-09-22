@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -14,9 +15,27 @@ func (s *Server) handlePHPSites(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
 		return
 	}
+
+	// 检测远程环境状态
+	remoteDetector := NewPHPRemoteDetector(s.config)
+	siteStatuses := make(map[string]interface{})
+
+	for _, site := range s.config.PHPSites {
+		status, err := remoteDetector.GetRemoteEnvironmentStatus(site.Domain)
+		if err != nil {
+			s.log.Errorf("检测远程环境状态失败 %s: %v", site.Domain, err)
+			status = map[string]interface{}{
+				"domain": site.Domain,
+				"error":  err.Error(),
+			}
+		}
+		siteStatuses[site.Domain] = status
+	}
+
 	data := map[string]interface{}{
-		"AdminPrefix": s.config.AdminPrefix,
-		"Sites":       s.config.PHPSites,
+		"AdminPrefix":  s.config.AdminPrefix,
+		"Sites":        s.config.PHPSites,
+		"SiteStatuses": siteStatuses,
 	}
 	s.templateRenderer.DetectLanguageAndRender(w, r, "php_sites.html", data)
 }
@@ -91,4 +110,73 @@ func (s *Server) handlePHPSitesDelete(w http.ResponseWriter, r *http.Request) {
 func (s *Server) tryServePHP(w http.ResponseWriter, r *http.Request) bool {
 	// 先尝试 PHP；若未命中返回 false
 	return s.servePHP(w, r)
+}
+
+// 获取 PHP 远程环境状态 API
+func (s *Server) handlePHPRemoteStatus(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+
+	domain := r.URL.Query().Get("domain")
+	if domain == "" {
+		http.Error(w, "domain parameter required", http.StatusBadRequest)
+		return
+	}
+
+	remoteDetector := NewPHPRemoteDetector(s.config)
+	status, err := remoteDetector.GetRemoteEnvironmentStatus(domain)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(status)
+}
+
+// 获取远程环境设置指南
+func (s *Server) handlePHPRemoteGuide(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+
+	domain := r.URL.Query().Get("domain")
+	if domain == "" {
+		http.Error(w, "domain parameter required", http.StatusBadRequest)
+		return
+	}
+
+	remoteDetector := NewPHPRemoteDetector(s.config)
+	guide, err := remoteDetector.GenerateRemoteSetupGuide(domain)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Write([]byte(guide))
+}
+
+// 检查远程环境能力
+func (s *Server) handlePHPRemoteCapabilities(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+
+	domain := r.URL.Query().Get("domain")
+	if domain == "" {
+		http.Error(w, "domain parameter required", http.StatusBadRequest)
+		return
+	}
+
+	remoteDetector := NewPHPRemoteDetector(s.config)
+	capabilities, err := remoteDetector.CheckRemoteCapabilities(domain)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(capabilities)
 }
