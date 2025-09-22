@@ -27,6 +27,20 @@ type DNSProviderInterface interface {
 
 	// Validate 验证配置
 	Validate() error
+
+	// ListDomains 获取域名列表
+	ListDomains(ctx context.Context) ([]DomainInfo, error)
+}
+
+// DomainInfo 域名信息
+type DomainInfo struct {
+	Name      string    `json:"name"`       // 域名
+	Type      string    `json:"type"`       // 域名类型 (A, AAAA, CNAME, MX, TXT, etc.)
+	Status    string    `json:"status"`     // 状态 (active, inactive, pending)
+	CreatedAt time.Time `json:"created_at"` // 创建时间
+	UpdatedAt time.Time `json:"updated_at"` // 更新时间
+	TTL       int       `json:"ttl"`        // TTL值
+	Value     string    `json:"value"`      // 记录值
 }
 
 // DNSProviderManager DNS服务商管理器
@@ -487,4 +501,37 @@ func (m *DNSProviderManager) GetProviderHealth(ctx context.Context) map[string]s
 	}
 
 	return health
+}
+
+// ListDomainsWithProvider 使用指定服务商获取域名列表
+func (m *DNSProviderManager) ListDomainsWithProvider(ctx context.Context, providerName string) ([]DomainInfo, error) {
+	provider, err := m.GetProvider(providerName)
+	if err != nil {
+		return nil, err
+	}
+
+	m.log.Infof("Listing domains via %s", providerName)
+	return provider.ListDomains(ctx)
+}
+
+// ListDomainsWithFailover 使用故障转移机制获取域名列表
+func (m *DNSProviderManager) ListDomainsWithFailover(ctx context.Context) (map[string][]DomainInfo, error) {
+	providers := m.GetProvidersByPriority()
+	results := make(map[string][]DomainInfo)
+
+	for _, providerName := range providers {
+		m.log.Infof("Attempting to list domains via provider: %s", providerName)
+
+		domains, err := m.ListDomainsWithProvider(ctx, providerName)
+		if err != nil {
+			m.log.Warnf("Failed to list domains via provider %s: %v", providerName, err)
+			results[providerName] = []DomainInfo{}
+			continue
+		}
+
+		results[providerName] = domains
+		m.log.Infof("Successfully listed %d domains via provider: %s", len(domains), providerName)
+	}
+
+	return results, nil
 }

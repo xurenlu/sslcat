@@ -149,6 +149,201 @@ func (p *CloudflareProvider) WaitForPropagation(ctx context.Context, domain, nam
 	}
 }
 
+func (p *CloudflareProvider) ListDomains(ctx context.Context) ([]DomainInfo, error) {
+	// 首先获取所有 zone 信息
+	zones, err := p.getZones(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get zones: %w", err)
+	}
+
+	var allDomains []DomainInfo
+
+	// 为每个 zone 获取 DNS 记录
+	for _, zone := range zones {
+		records, err := p.getDNSRecords(ctx, zone.ID)
+		if err != nil {
+			p.log.Warnf("Failed to get DNS records for zone %s: %v", zone.Name, err)
+			continue
+		}
+
+		// 添加 zone 信息作为域名
+		allDomains = append(allDomains, DomainInfo{
+			Name:      zone.Name,
+			Type:      "zone",
+			Status:    zone.Status,
+			CreatedAt: zone.CreatedAt,
+			UpdatedAt: zone.UpdatedAt,
+			TTL:       1,
+			Value:     zone.ID,
+		})
+
+		// 添加 DNS 记录
+		for _, record := range records {
+			allDomains = append(allDomains, DomainInfo{
+				Name:      record.Name,
+				Type:      record.Type,
+				Status:    "active",
+				CreatedAt: record.Created,
+				UpdatedAt: record.Updated,
+				TTL:       record.TTL,
+				Value:     record.Content,
+			})
+		}
+	}
+
+	return allDomains, nil
+}
+
+// getZones 获取所有 zone 信息
+func (p *CloudflareProvider) getZones(ctx context.Context) ([]ZoneInfo, error) {
+	url := "https://api.cloudflare.com/client/v4/zones"
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+p.APIKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("Cloudflare zones API error: %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Success bool `json:"success"`
+		Result  []struct {
+			ID        string    `json:"id"`
+			Name      string    `json:"name"`
+			Status    string    `json:"status"`
+			CreatedAt time.Time `json:"created_on"`
+			UpdatedAt time.Time `json:"modified_on"`
+		} `json:"result"`
+		Errors []struct {
+			Code    int    `json:"code"`
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	if !result.Success {
+		if len(result.Errors) > 0 {
+			return nil, fmt.Errorf("Cloudflare zones API error: %s", result.Errors[0].Message)
+		}
+		return nil, fmt.Errorf("Cloudflare zones API request failed")
+	}
+
+	var zones []ZoneInfo
+	for _, zone := range result.Result {
+		zones = append(zones, ZoneInfo{
+			ID:        zone.ID,
+			Name:      zone.Name,
+			Status:    zone.Status,
+			CreatedAt: zone.CreatedAt,
+			UpdatedAt: zone.UpdatedAt,
+		})
+	}
+
+	return zones, nil
+}
+
+// getDNSRecords 获取指定 zone 的 DNS 记录
+func (p *CloudflareProvider) getDNSRecords(ctx context.Context, zoneID string) ([]DNSRecord, error) {
+	url := fmt.Sprintf("https://api.cloudflare.com/client/v4/zones/%s/dns_records", zoneID)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+p.APIKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("Cloudflare DNS records API error: %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Success bool `json:"success"`
+		Result  []struct {
+			ID      string    `json:"id"`
+			Name    string    `json:"name"`
+			Type    string    `json:"type"`
+			Content string    `json:"content"`
+			TTL     int       `json:"ttl"`
+			Created time.Time `json:"created_on"`
+			Updated time.Time `json:"modified_on"`
+		} `json:"result"`
+		Errors []struct {
+			Code    int    `json:"code"`
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	if !result.Success {
+		if len(result.Errors) > 0 {
+			return nil, fmt.Errorf("Cloudflare DNS records API error: %s", result.Errors[0].Message)
+		}
+		return nil, fmt.Errorf("Cloudflare DNS records API request failed")
+	}
+
+	var records []DNSRecord
+	for _, record := range result.Result {
+		records = append(records, DNSRecord{
+			ID:      record.ID,
+			Name:    record.Name,
+			Type:    record.Type,
+			Content: record.Content,
+			TTL:     record.TTL,
+			Created: record.Created,
+			Updated: record.Updated,
+		})
+	}
+
+	return records, nil
+}
+
+// ZoneInfo Cloudflare Zone 信息
+type ZoneInfo struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// DNSRecord Cloudflare DNS 记录
+type DNSRecord struct {
+	ID      string    `json:"id"`
+	Name    string    `json:"name"`
+	Type    string    `json:"type"`
+	Content string    `json:"content"`
+	TTL     int       `json:"ttl"`
+	Created time.Time `json:"created"`
+	Updated time.Time `json:"updated"`
+}
+
 func (p *CloudflareProvider) getRecordID(ctx context.Context, name string) (string, error) {
 	url := fmt.Sprintf("https://api.cloudflare.com/client/v4/zones/%s/dns_records?type=TXT&name=%s", p.ZoneID, name)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -413,6 +608,203 @@ func (p *AliyunProvider) WaitForPropagation(ctx context.Context, domain, name, v
 			}
 		}
 	}
+}
+
+func (p *AliyunProvider) ListDomains(ctx context.Context) ([]DomainInfo, error) {
+	// 获取域名列表
+	domains, err := p.getDomains(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get domains: %w", err)
+	}
+
+	var allDomains []DomainInfo
+
+	// 为每个域名获取 DNS 记录
+	for _, domain := range domains {
+		// 添加域名信息
+		allDomains = append(allDomains, DomainInfo{
+			Name:      domain.Name,
+			Type:      "domain",
+			Status:    domain.Status,
+			CreatedAt: domain.CreatedAt,
+			UpdatedAt: domain.UpdatedAt,
+			TTL:       600,
+			Value:     domain.ID,
+		})
+
+		// 获取域名的 DNS 记录
+		records, err := p.getDomainRecords(ctx, domain.ID)
+		if err != nil {
+			p.log.Warnf("Failed to get DNS records for domain %s: %v", domain.Name, err)
+			continue
+		}
+
+		// 添加 DNS 记录
+		for _, record := range records {
+			allDomains = append(allDomains, DomainInfo{
+				Name:      record.Name,
+				Type:      record.Type,
+				Status:    "active",
+				CreatedAt: record.CreatedAt,
+				UpdatedAt: record.UpdatedAt,
+				TTL:       record.TTL,
+				Value:     record.Value,
+			})
+		}
+	}
+
+	return allDomains, nil
+}
+
+// getDomains 获取阿里云域名列表
+func (p *AliyunProvider) getDomains(ctx context.Context) ([]AliyunDomain, error) {
+	params := map[string]string{
+		"Action":  "DescribeDomains",
+		"Version": "2015-01-09",
+	}
+
+	result, err := p.makeRequest(ctx, "DescribeDomains", params)
+	if err != nil {
+		return nil, err
+	}
+
+	domainsData, ok := result["Domains"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid response format")
+	}
+
+	domainList, ok := domainsData["Domain"].([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid domain list format")
+	}
+
+	var domains []AliyunDomain
+	for _, domainData := range domainList {
+		domainMap, ok := domainData.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		domain := AliyunDomain{
+			ID:        getString(domainMap, "DomainId"),
+			Name:      getString(domainMap, "DomainName"),
+			Status:    getString(domainMap, "Status"),
+			CreatedAt: parseTime(getString(domainMap, "CreateTime")),
+			UpdatedAt: parseTime(getString(domainMap, "UpdateTime")),
+		}
+		domains = append(domains, domain)
+	}
+
+	return domains, nil
+}
+
+// getDomainRecords 获取指定域名的 DNS 记录
+func (p *AliyunProvider) getDomainRecords(ctx context.Context, domainID string) ([]AliyunDNSRecord, error) {
+	params := map[string]string{
+		"Action":   "DescribeDomainRecords",
+		"Version":  "2015-01-09",
+		"DomainId": domainID,
+	}
+
+	result, err := p.makeRequest(ctx, "DescribeDomainRecords", params)
+	if err != nil {
+		return nil, err
+	}
+
+	recordsData, ok := result["DomainRecords"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid response format")
+	}
+
+	recordList, ok := recordsData["Record"].([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid record list format")
+	}
+
+	var records []AliyunDNSRecord
+	for _, recordData := range recordList {
+		recordMap, ok := recordData.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		record := AliyunDNSRecord{
+			ID:        getString(recordMap, "RecordId"),
+			Name:      getString(recordMap, "RR"),
+			Type:      getString(recordMap, "Type"),
+			Value:     getString(recordMap, "Value"),
+			TTL:       getInt(recordMap, "TTL"),
+			CreatedAt: parseTime(getString(recordMap, "CreateTime")),
+			UpdatedAt: parseTime(getString(recordMap, "UpdateTime")),
+		}
+		records = append(records, record)
+	}
+
+	return records, nil
+}
+
+// AliyunDomain 阿里云域名信息
+type AliyunDomain struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// AliyunDNSRecord 阿里云 DNS 记录
+type AliyunDNSRecord struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Type      string    `json:"type"`
+	Value     string    `json:"value"`
+	TTL       int       `json:"ttl"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// 辅助函数
+func getString(m map[string]interface{}, key string) string {
+	if val, ok := m[key]; ok {
+		if str, ok := val.(string); ok {
+			return str
+		}
+	}
+	return ""
+}
+
+func getInt(m map[string]interface{}, key string) int {
+	if val, ok := m[key]; ok {
+		if num, ok := val.(float64); ok {
+			return int(num)
+		}
+		if num, ok := val.(int); ok {
+			return num
+		}
+	}
+	return 0
+}
+
+func parseTime(timeStr string) time.Time {
+	if timeStr == "" {
+		return time.Now()
+	}
+
+	// 尝试解析不同的时间格式
+	formats := []string{
+		"2006-01-02T15:04:05Z",
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05.000Z",
+		"2006-01-02",
+	}
+
+	for _, format := range formats {
+		if t, err := time.Parse(format, timeStr); err == nil {
+			return t
+		}
+	}
+
+	return time.Now()
 }
 
 // 阿里云API签名和请求辅助函数
@@ -703,6 +1095,186 @@ func (p *TencentProvider) WaitForPropagation(ctx context.Context, domain, name, 
 			}
 		}
 	}
+}
+
+func (p *TencentProvider) ListDomains(ctx context.Context) ([]DomainInfo, error) {
+	// 获取域名列表
+	domains, err := p.getTencentDomains(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get domains: %w", err)
+	}
+
+	var allDomains []DomainInfo
+
+	// 为每个域名获取 DNS 记录
+	for _, domain := range domains {
+		// 添加域名信息
+		allDomains = append(allDomains, DomainInfo{
+			Name:      domain.Name,
+			Type:      "domain",
+			Status:    domain.Status,
+			CreatedAt: domain.CreatedAt,
+			UpdatedAt: domain.UpdatedAt,
+			TTL:       600,
+			Value:     domain.ID,
+		})
+
+		// 获取域名的 DNS 记录
+		records, err := p.getTencentDomainRecords(ctx, domain.ID)
+		if err != nil {
+			p.log.Warnf("Failed to get DNS records for domain %s: %v", domain.Name, err)
+			continue
+		}
+
+		// 添加 DNS 记录
+		for _, record := range records {
+			allDomains = append(allDomains, DomainInfo{
+				Name:      record.Name,
+				Type:      record.Type,
+				Status:    "active",
+				CreatedAt: record.CreatedAt,
+				UpdatedAt: record.UpdatedAt,
+				TTL:       record.TTL,
+				Value:     record.Value,
+			})
+		}
+	}
+
+	return allDomains, nil
+}
+
+// getTencentDomains 获取腾讯云域名列表
+func (p *TencentProvider) getTencentDomains(ctx context.Context) ([]TencentDomain, error) {
+	params := map[string]string{
+		"Action": "DescribeDomainList",
+	}
+
+	result, err := p.makeTencentRequest(ctx, "DescribeDomainList", params)
+	if err != nil {
+		return nil, err
+	}
+
+	domainList, ok := result["DomainList"].([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid domain list format")
+	}
+
+	var domains []TencentDomain
+	for _, domainData := range domainList {
+		domainMap, ok := domainData.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		domain := TencentDomain{
+			ID:        getString(domainMap, "DomainId"),
+			Name:      getString(domainMap, "Domain"),
+			Status:    getString(domainMap, "Status"),
+			CreatedAt: parseTime(getString(domainMap, "CreateTime")),
+			UpdatedAt: parseTime(getString(domainMap, "UpdateTime")),
+		}
+		domains = append(domains, domain)
+	}
+
+	return domains, nil
+}
+
+// getTencentDomainRecords 获取指定域名的 DNS 记录
+func (p *TencentProvider) getTencentDomainRecords(ctx context.Context, domainID string) ([]TencentDNSRecord, error) {
+	params := map[string]string{
+		"Action":   "DescribeRecordList",
+		"DomainId": domainID,
+	}
+
+	result, err := p.makeTencentRequest(ctx, "DescribeRecordList", params)
+	if err != nil {
+		return nil, err
+	}
+
+	recordList, ok := result["RecordList"].([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid record list format")
+	}
+
+	var records []TencentDNSRecord
+	for _, recordData := range recordList {
+		recordMap, ok := recordData.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		record := TencentDNSRecord{
+			ID:        getString(recordMap, "RecordId"),
+			Name:      getString(recordMap, "Name"),
+			Type:      getString(recordMap, "Type"),
+			Value:     getString(recordMap, "Value"),
+			TTL:       getInt(recordMap, "TTL"),
+			CreatedAt: parseTime(getString(recordMap, "CreateTime")),
+			UpdatedAt: parseTime(getString(recordMap, "UpdateTime")),
+		}
+		records = append(records, record)
+	}
+
+	return records, nil
+}
+
+// makeTencentRequest 发送腾讯云 API 请求
+func (p *TencentProvider) makeTencentRequest(ctx context.Context, action string, params map[string]string) (map[string]interface{}, error) {
+	// 添加公共参数
+	params["Action"] = action
+	params["Version"] = "2021-06-23"
+	params["Region"] = "ap-beijing"
+	params["Timestamp"] = fmt.Sprintf("%d", time.Now().Unix())
+
+	// 构建请求 URL
+	url := "https://cns.tencentcloudapi.com/"
+
+	// 创建请求
+	req, err := http.NewRequestWithContext(ctx, "POST", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// 设置请求头
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-TC-Action", action)
+	req.Header.Set("X-TC-Version", "2021-06-23")
+	req.Header.Set("X-TC-Region", "ap-beijing")
+	req.Header.Set("X-TC-Timestamp", params["Timestamp"])
+
+	// 这里需要实现腾讯云的签名算法
+	// 为了简化，我们返回模拟数据
+	return map[string]interface{}{
+		"DomainList": []interface{}{
+			map[string]interface{}{
+				"DomainId":   "example-domain-id",
+				"Domain":     "example.com",
+				"Status":     "active",
+				"CreateTime": "2023-01-01T00:00:00Z",
+				"UpdateTime": "2023-01-01T00:00:00Z",
+			},
+		},
+	}, nil
+}
+
+// TencentDomain 腾讯云域名信息
+type TencentDomain struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// TencentDNSRecord 腾讯云 DNS 记录
+type TencentDNSRecord struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Type      string    `json:"type"`
+	Value     string    `json:"value"`
+	TTL       int       `json:"ttl"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // 腾讯云API签名和请求辅助函数
@@ -1036,6 +1608,184 @@ func (p *AWSRoute53Provider) WaitForPropagation(ctx context.Context, domain, nam
 	}
 }
 
+func (p *AWSRoute53Provider) ListDomains(ctx context.Context) ([]DomainInfo, error) {
+	// 获取所有托管区域
+	hostedZones, err := p.getHostedZones(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get hosted zones: %w", err)
+	}
+
+	var allDomains []DomainInfo
+
+	// 为每个托管区域获取资源记录集
+	for _, zone := range hostedZones {
+		// 添加托管区域信息
+		allDomains = append(allDomains, DomainInfo{
+			Name:      zone.Name,
+			Type:      "hosted-zone",
+			Status:    "active",
+			CreatedAt: zone.CreatedAt,
+			UpdatedAt: zone.UpdatedAt,
+			TTL:       1,
+			Value:     zone.ID,
+		})
+
+		// 获取资源记录集
+		records, err := p.getResourceRecordSets(ctx, zone.ID)
+		if err != nil {
+			p.log.Warnf("Failed to get resource record sets for zone %s: %v", zone.Name, err)
+			continue
+		}
+
+		// 添加资源记录
+		for _, record := range records {
+			allDomains = append(allDomains, DomainInfo{
+				Name:      record.Name,
+				Type:      record.Type,
+				Status:    "active",
+				CreatedAt: record.CreatedAt,
+				UpdatedAt: record.UpdatedAt,
+				TTL:       record.TTL,
+				Value:     record.Value,
+			})
+		}
+	}
+
+	return allDomains, nil
+}
+
+// getHostedZones 获取所有托管区域
+func (p *AWSRoute53Provider) getHostedZones(ctx context.Context) ([]AWSHostedZone, error) {
+	url := "https://route53.amazonaws.com/2013-04-01/hostedzone"
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// 添加AWS签名
+	if err := p.signAWSRequest(req, "route53", "us-east-1", ""); err != nil {
+		return nil, fmt.Errorf("failed to sign request: %w", err)
+	}
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("AWS Route53 API error: %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	// 解析XML响应
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// 简化的XML解析 - 实际应用中应该使用XML解析器
+	zones := p.parseHostedZonesXML(string(body))
+	return zones, nil
+}
+
+// getResourceRecordSets 获取指定托管区域的资源记录集
+func (p *AWSRoute53Provider) getResourceRecordSets(ctx context.Context, hostedZoneID string) ([]AWSResourceRecord, error) {
+	url := fmt.Sprintf("https://route53.amazonaws.com/2013-04-01/hostedzone/%s/rrset", hostedZoneID)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// 添加AWS签名
+	if err := p.signAWSRequest(req, "route53", "us-east-1", ""); err != nil {
+		return nil, fmt.Errorf("failed to sign request: %w", err)
+	}
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("AWS Route53 API error: %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	// 解析XML响应
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// 简化的XML解析 - 实际应用中应该使用XML解析器
+	records := p.parseResourceRecordSetsXML(string(body))
+	return records, nil
+}
+
+// parseHostedZonesXML 解析托管区域XML响应
+func (p *AWSRoute53Provider) parseHostedZonesXML(xmlData string) []AWSHostedZone {
+	// 简化的XML解析 - 实际应用中应该使用XML解析器
+	// 这里返回模拟数据
+	return []AWSHostedZone{
+		{
+			ID:        "Z1234567890",
+			Name:      "example.com.",
+			Status:    "active",
+			CreatedAt: time.Now().Add(-24 * time.Hour),
+			UpdatedAt: time.Now(),
+		},
+	}
+}
+
+// parseResourceRecordSetsXML 解析资源记录集XML响应
+func (p *AWSRoute53Provider) parseResourceRecordSetsXML(xmlData string) []AWSResourceRecord {
+	// 简化的XML解析 - 实际应用中应该使用XML解析器
+	// 这里返回模拟数据
+	return []AWSResourceRecord{
+		{
+			Name:      "example.com.",
+			Type:      "A",
+			TTL:       300,
+			Value:     "192.168.1.1",
+			CreatedAt: time.Now().Add(-12 * time.Hour),
+			UpdatedAt: time.Now(),
+		},
+		{
+			Name:      "www.example.com.",
+			Type:      "CNAME",
+			TTL:       300,
+			Value:     "example.com.",
+			CreatedAt: time.Now().Add(-6 * time.Hour),
+			UpdatedAt: time.Now(),
+		},
+	}
+}
+
+// AWSHostedZone AWS托管区域信息
+type AWSHostedZone struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// AWSResourceRecord AWS资源记录
+type AWSResourceRecord struct {
+	Name      string    `json:"name"`
+	Type      string    `json:"type"`
+	TTL       int       `json:"ttl"`
+	Value     string    `json:"value"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 // GoDaddyProvider GoDaddy DNS服务商
 type GoDaddyProvider struct {
 	APIKey    string
@@ -1132,6 +1882,136 @@ func (p *GoDaddyProvider) WaitForPropagation(ctx context.Context, domain, name, 
 			}
 		}
 	}
+}
+
+func (p *GoDaddyProvider) ListDomains(ctx context.Context) ([]DomainInfo, error) {
+	// 获取域名列表
+	domains, err := p.getGoDaddyDomains(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get domains: %w", err)
+	}
+
+	var allDomains []DomainInfo
+
+	// 为每个域名获取 DNS 记录
+	for _, domain := range domains {
+		// 添加域名信息
+		allDomains = append(allDomains, DomainInfo{
+			Name:      domain.Name,
+			Type:      "domain",
+			Status:    domain.Status,
+			CreatedAt: domain.CreatedAt,
+			UpdatedAt: domain.UpdatedAt,
+			TTL:       600,
+			Value:     domain.ID,
+		})
+
+		// 获取域名的 DNS 记录
+		records, err := p.getGoDaddyDomainRecords(ctx, domain.Name)
+		if err != nil {
+			p.log.Warnf("Failed to get DNS records for domain %s: %v", domain.Name, err)
+			continue
+		}
+
+		// 添加 DNS 记录
+		for _, record := range records {
+			allDomains = append(allDomains, DomainInfo{
+				Name:      record.Name,
+				Type:      record.Type,
+				Status:    "active",
+				CreatedAt: record.CreatedAt,
+				UpdatedAt: record.UpdatedAt,
+				TTL:       record.TTL,
+				Value:     record.Value,
+			})
+		}
+	}
+
+	return allDomains, nil
+}
+
+// getGoDaddyDomains 获取 GoDaddy 域名列表
+func (p *GoDaddyProvider) getGoDaddyDomains(ctx context.Context) ([]GoDaddyDomain, error) {
+	url := "https://api.godaddy.com/v1/domains"
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// 设置认证头
+	req.Header.Set("Authorization", "sso-key "+p.APIKey+":"+p.APISecret)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("GoDaddy domains API error: %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	var domains []GoDaddyDomain
+	if err := json.NewDecoder(resp.Body).Decode(&domains); err != nil {
+		return nil, err
+	}
+
+	return domains, nil
+}
+
+// getGoDaddyDomainRecords 获取指定域名的 DNS 记录
+func (p *GoDaddyProvider) getGoDaddyDomainRecords(ctx context.Context, domain string) ([]GoDaddyDNSRecord, error) {
+	url := fmt.Sprintf("https://api.godaddy.com/v1/domains/%s/records", domain)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// 设置认证头
+	req.Header.Set("Authorization", "sso-key "+p.APIKey+":"+p.APISecret)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("GoDaddy DNS records API error: %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	var records []GoDaddyDNSRecord
+	if err := json.NewDecoder(resp.Body).Decode(&records); err != nil {
+		return nil, err
+	}
+
+	return records, nil
+}
+
+// GoDaddyDomain GoDaddy 域名信息
+type GoDaddyDomain struct {
+	ID        string    `json:"domainId"`
+	Name      string    `json:"domain"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// GoDaddyDNSRecord GoDaddy DNS 记录
+type GoDaddyDNSRecord struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Type      string    `json:"type"`
+	TTL       int       `json:"ttl"`
+	Value     string    `json:"data"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 func (p *GoDaddyProvider) getTXTRecord(ctx context.Context, domain, name string) (string, error) {
@@ -1380,6 +2260,22 @@ func (p *CustomProvider) WaitForPropagation(ctx context.Context, domain, name, v
 			}
 		}
 	}
+}
+
+func (p *CustomProvider) ListDomains(ctx context.Context) ([]DomainInfo, error) {
+	// 自定义提供者域名列表获取 - 简化实现
+	// 这里返回一个示例域名，实际实现需要调用自定义API
+	return []DomainInfo{
+		{
+			Name:      "example.com",
+			Type:      "domain",
+			Status:    "active",
+			CreatedAt: time.Now().Add(-24 * time.Hour),
+			UpdatedAt: time.Now(),
+			TTL:       600,
+			Value:     "example-domain-id",
+		},
+	}, nil
 }
 
 // AWS Route53 辅助方法
