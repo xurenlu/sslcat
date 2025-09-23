@@ -49,6 +49,11 @@ const (
 	TypeSystemShutdown NotificationType = "system_shutdown"
 )
 
+// String 返回通知类型的字符串表示
+func (t NotificationType) String() string {
+	return string(t)
+}
+
 // Notification 通知结构
 type Notification struct {
 	ID         string            `json:"id"`
