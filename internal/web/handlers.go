@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -378,15 +379,9 @@ func (s *Server) processLogin(w http.ResponseWriter, r *http.Request) {
 		// 审计
 		s.audit("login_success", authenticatedUser.Username)
 
-		// 超级管理员首次设置检查
+		// 超级管理员首次设置检查（已合并 wizard 功能）
 		if isSuperAdmin && s.needFirstTimeSetup() {
 			http.Redirect(w, r, s.config.AdminPrefix+"/settings/first-setup", http.StatusFound)
-			return
-		}
-
-		// 超级管理员向导检查
-		if isSuperAdmin && s.needWizard() {
-			http.Redirect(w, r, s.config.AdminPrefix+"/wizard", http.StatusFound)
 			return
 		}
 
@@ -436,6 +431,18 @@ func (s *Server) getEffectiveAdminPassword() string {
 
 func (s *Server) needFirstTimeSetup() bool {
 	// 检查是否需要首次设置（密码和邮箱）
+
+	// 首先检查是否已经有完成标记
+	setupCompleteFile := filepath.Join("./data", ".first-setup-complete")
+	if _, err := os.Stat(setupCompleteFile); err == nil {
+		// 标记文件存在，说明已经完成过首次设置
+		return false
+	}
+
+	// 检查 FirstRun 配置
+	if s.config.Admin.FirstRun {
+		return true
+	}
 
 	// 1. 检查密码文件
 	passFile := s.config.Admin.PasswordFile
@@ -576,7 +583,7 @@ func (s *Server) handleSettingsSave(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, s.config.AdminPrefix+"/settings", http.StatusFound)
 }
 
-// 首次设置页面（密码和邮箱）
+// 首次设置页面（合并了 wizard 功能）
 func (s *Server) handleFirstTimeSetup(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
 		return
@@ -584,35 +591,102 @@ func (s *Server) handleFirstTimeSetup(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == "GET" {
 		currentEmail := s.config.SSL.Email
-		fmt.Fprintf(w, `<!DOCTYPE html><html><head><meta charset="utf-8"><title>首次设置</title>
+		fmt.Fprintf(w, `<!DOCTYPE html><html><head><meta charset="utf-8"><title>首次设置向导</title>
 		<link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
 		<link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
 		</head><body class="bg-light">
-		<div class="container mt-5">
+		<div class="container mt-4">
 			<div class="row justify-content-center">
-				<div class="col-md-6">
+				<div class="col-md-8">
 					<div class="card shadow">
 						<div class="card-header bg-primary text-white">
-							<h4 class="mb-0"><i class="bi bi-gear"></i> 首次设置</h4>
+							<h4 class="mb-0"><i class="bi bi-gear"></i> 首次设置向导</h4>
 						</div>
 						<div class="card-body">
 							<p class="text-muted mb-4">欢迎使用 SSLcat！请完成以下初始设置：</p>
-							<form method="POST">
-								<div class="mb-3">
-									<label class="form-label"><i class="bi bi-lock"></i> 新密码</label>
-									<input class="form-control" type="password" name="new_password" required placeholder="请输入新的管理员密码">
+							
+							<form method="POST" id="setupForm">
+								<!-- 步骤一：管理员设置 -->
+								<div class="card mb-4">
+									<div class="card-header">
+										<h5 class="mb-0"><i class="bi bi-person-gear"></i> 步骤一：管理员设置</h5>
+									</div>
+									<div class="card-body">
+										<div class="row">
+											<div class="col-md-6">
+												<div class="mb-3">
+													<label class="form-label"><i class="bi bi-lock"></i> 新密码</label>
+													<input class="form-control" type="password" name="new_password" required placeholder="请输入新的管理员密码">
+												</div>
+											</div>
+											<div class="col-md-6">
+												<div class="mb-3">
+													<label class="form-label"><i class="bi bi-lock-fill"></i> 确认新密码</label>
+													<input class="form-control" type="password" name="confirm_password" required placeholder="请再次输入新密码">
+												</div>
+											</div>
+										</div>
+									</div>
 								</div>
-								<div class="mb-3">
-									<label class="form-label"><i class="bi bi-lock-fill"></i> 确认新密码</label>
-									<input class="form-control" type="password" name="confirm_password" required placeholder="请再次输入新密码">
+
+								<!-- 步骤二：SSL 配置 -->
+								<div class="card mb-4">
+									<div class="card-header">
+										<h5 class="mb-0"><i class="bi bi-shield-check"></i> 步骤二：SSL 配置</h5>
+									</div>
+									<div class="card-body">
+										<div class="row">
+											<div class="col-md-6">
+												<div class="mb-3">
+													<label class="form-label"><i class="bi bi-envelope"></i> 管理员邮箱</label>
+													<input class="form-control" type="email" name="admin_email" required placeholder="用于SSL证书申请和通知" value="%s">
+													<div class="form-text">此邮箱将用于 Let's Encrypt 证书申请和系统通知</div>
+												</div>
+											</div>
+											<div class="col-md-6">
+												<div class="form-check mt-4">
+													<input class="form-check-input" type="checkbox" name="auto_renew" %s id="auto_renew">
+													<label class="form-check-label" for="auto_renew">
+														<i class="bi bi-arrow-clockwise"></i> 启用自动续期
+													</label>
+												</div>
+											</div>
+										</div>
+									</div>
 								</div>
-								<div class="mb-3">
-									<label class="form-label"><i class="bi bi-envelope"></i> 管理员邮箱</label>
-									<input class="form-control" type="email" name="admin_email" required placeholder="用于SSL证书申请和通知" value="%s">
-									<div class="form-text">此邮箱将用于 Let's Encrypt 证书申请和系统通知</div>
+
+								<!-- 步骤三：代理规则（可选） -->
+								<div class="card mb-4">
+									<div class="card-header">
+										<h5 class="mb-0"><i class="bi bi-diagram-3"></i> 步骤三：添加首条代理规则（可选）</h5>
+									</div>
+									<div class="card-body">
+										<div class="row">
+											<div class="col-md-4">
+												<div class="mb-3">
+													<label class="form-label">域名</label>
+													<input class="form-control" name="domain" placeholder="example.com">
+												</div>
+											</div>
+											<div class="col-md-6">
+												<div class="mb-3">
+													<label class="form-label">目标（含协议与端口）</label>
+													<input class="form-control" name="target" placeholder="http://127.0.0.1:8080">
+												</div>
+											</div>
+											<div class="col-md-2">
+												<div class="mb-3">
+													<label class="form-label">&nbsp;</label>
+													<div class="form-text">可跳过此步骤</div>
+												</div>
+											</div>
+										</div>
+									</div>
 								</div>
+
+								<!-- 提交按钮 -->
 								<div class="d-grid gap-2">
-									<button class="btn btn-primary" type="submit">
+									<button class="btn btn-primary btn-lg" type="submit">
 										<i class="bi bi-check-circle"></i> 完成设置
 									</button>
 									<a class="btn btn-outline-secondary" href="%s/logout">
@@ -625,14 +699,43 @@ func (s *Server) handleFirstTimeSetup(w http.ResponseWriter, r *http.Request) {
 				</div>
 			</div>
 		</div>
-		</body></html>`, currentEmail, s.config.AdminPrefix)
+		</body></html>`,
+			currentEmail,
+			func() string {
+				if s.config.SSL.AutoRenew {
+					return "checked"
+				}
+				return ""
+			}(),
+			s.config.AdminPrefix)
 		return
 	}
 
 	if r.Method == "POST" {
+		// 解析表单数据
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "解析表单失败: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
 		newPassword := r.FormValue("new_password")
 		confirmPassword := r.FormValue("confirm_password")
 		adminEmail := strings.TrimSpace(r.FormValue("admin_email"))
+		autoRenew := r.FormValue("auto_renew") == "on"
+		domain := strings.TrimSpace(r.FormValue("domain"))
+		target := strings.TrimSpace(r.FormValue("target"))
+
+		// 调试日志
+		passwordStatus := "[已设置]"
+		if newPassword == "" {
+			passwordStatus = "[空]"
+		}
+		confirmStatus := "[已设置]"
+		if confirmPassword == "" {
+			confirmStatus = "[空]"
+		}
+		s.log.Infof("首次设置表单数据: new_password=%s, confirm_password=%s, admin_email=%s, auto_renew=%t, domain=%s, target=%s",
+			passwordStatus, confirmStatus, adminEmail, autoRenew, domain, target)
 
 		// 验证密码
 		if newPassword == "" || newPassword != confirmPassword {
@@ -664,8 +767,24 @@ func (s *Server) handleFirstTimeSetup(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// 更新邮箱配置
+		// 更新邮箱和自动续期配置
 		s.config.SSL.Email = adminEmail
+		s.config.SSL.AutoRenew = autoRenew
+
+		// 添加代理规则（如果提供了）
+		if domain != "" && target != "" {
+			newRule := config.ProxyRule{
+				Domain:  domain,
+				Target:  target,
+				Port:    0,
+				Enabled: true,
+				SSLOnly: true,
+			}
+			s.config.Proxy.Rules = append(s.config.Proxy.Rules, newRule)
+		}
+
+		// 设置 FirstRun 为 false
+		s.config.Admin.FirstRun = false
 
 		// 保存配置（不包含密码）
 		if err := s.config.Save(s.config.ConfigFile); err != nil {
@@ -678,8 +797,28 @@ func (s *Server) handleFirstTimeSetup(w http.ResponseWriter, r *http.Request) {
 			s.log.Warnf("Failed to enable ACME: %v", err)
 		}
 
+		// 创建首次设置完成标记文件
+		setupCompleteFile := filepath.Join("./data", ".first-setup-complete")
+		if err := os.WriteFile(setupCompleteFile, []byte(fmt.Sprintf("首次设置完成时间: %s\n管理员邮箱: %s\n自动续期: %t\n代理规则: %s",
+			time.Now().Format("2006-01-02 15:04:05"),
+			adminEmail,
+			autoRenew,
+			func() string {
+				if domain != "" && target != "" {
+					return fmt.Sprintf("%s -> %s", domain, target)
+				}
+				return "无"
+			}())), 0644); err != nil {
+			s.log.Warnf("创建首次设置完成标记失败: %v", err)
+		}
+
 		// 审计日志
-		s.audit("first_time_setup", fmt.Sprintf("password_and_email_set:%s", adminEmail))
+		s.audit("first_time_setup_complete", fmt.Sprintf("email:%s,auto_renew:%t,proxy_rule:%s", adminEmail, autoRenew, func() string {
+			if domain != "" && target != "" {
+				return fmt.Sprintf("%s->%s", domain, target)
+			}
+			return "none"
+		}()))
 
 		http.Redirect(w, r, s.config.AdminPrefix+"/dashboard", http.StatusFound)
 		return
@@ -733,109 +872,8 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 }
 
-// CDN 缓存设置页
-func (s *Server) handleCDNCache(w http.ResponseWriter, r *http.Request) {
-	if !s.checkAuth(w, r) {
-		return
-	}
-	data := map[string]interface{}{
-		"AdminPrefix": s.config.AdminPrefix,
-		"CDN":         s.config.CDNCache,
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	html := s.generateCDNCacheHTML(data)
-	w.Write([]byte(html))
-}
 
-// 保存 CDN 缓存设置
-func (s *Server) handleCDNCacheSave(w http.ResponseWriter, r *http.Request) {
-	if !s.checkAuth(w, r) {
-		return
-	}
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	enabled := r.FormValue("enabled") == "on" || r.FormValue("enabled") == "true" || r.FormValue("enabled") == "1"
-	cacheDir := strings.TrimSpace(r.FormValue("cache_dir"))
-	maxSize := strings.TrimSpace(r.FormValue("max_size_bytes"))
-	defTTL := strings.TrimSpace(r.FormValue("default_ttl_seconds"))
-	cleanInt := strings.TrimSpace(r.FormValue("clean_interval_seconds"))
-	maxObj := strings.TrimSpace(r.FormValue("max_object_bytes"))
 
-	if cacheDir != "" {
-		s.config.CDNCache.CacheDir = cacheDir
-	}
-	s.config.CDNCache.Enabled = enabled
-	if v, err := strconv.ParseInt(maxSize, 10, 64); err == nil && v >= 0 {
-		s.config.CDNCache.MaxSizeBytes = v
-	}
-	if v, err := strconv.Atoi(defTTL); err == nil && v >= 0 {
-		s.config.CDNCache.DefaultTTLSeconds = v
-	}
-	if v, err := strconv.Atoi(cleanInt); err == nil && v > 0 {
-		s.config.CDNCache.CleanIntervalSec = v
-	}
-	if v, err := strconv.ParseInt(maxObj, 10, 64); err == nil && v >= 0 {
-		s.config.CDNCache.MaxObjectBytes = v
-	}
-
-	// 规则：每行 matchType|patternOrMediaCSV|ttl
-	rulesRaw := strings.TrimSpace(r.FormValue("rules"))
-	var rules []config.CDNCacheRule
-	if rulesRaw != "" {
-		for _, line := range strings.Split(rulesRaw, "\n") {
-			line = strings.TrimSpace(line)
-			if line == "" {
-				continue
-			}
-			parts := strings.Split(line, "|")
-			if len(parts) < 3 {
-				continue
-			}
-			matchType := strings.TrimSpace(parts[0])
-			ttl, _ := strconv.Atoi(strings.TrimSpace(parts[2]))
-			if strings.EqualFold(matchType, "media") {
-				medias := []string{}
-				for _, m := range strings.Split(parts[1], ",") {
-					m = strings.TrimSpace(m)
-					if m != "" {
-						medias = append(medias, m)
-					}
-				}
-				rules = append(rules, config.CDNCacheRule{MatchType: "media", MediaTypes: medias, TTLSeconds: ttl})
-			} else {
-				rules = append(rules, config.CDNCacheRule{MatchType: matchType, Pattern: strings.TrimSpace(parts[1]), TTLSeconds: ttl})
-			}
-		}
-	}
-	s.config.CDNCache.Rules = rules
-	if s.config.CDNCache.CacheDir != "" {
-		_ = os.MkdirAll(s.config.CDNCache.CacheDir, 0755)
-	}
-	_ = s.config.Save(s.config.ConfigFile)
-	http.Redirect(w, r, s.config.AdminPrefix+"/cdn-cache", http.StatusFound)
-}
-
-// 一键清理缓存
-func (s *Server) handleCDNCacheClear(w http.ResponseWriter, r *http.Request) {
-	if !s.checkAuth(w, r) {
-		return
-	}
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	t := strings.TrimSpace(r.FormValue("type"))
-	pattern := strings.TrimSpace(r.FormValue("pattern"))
-	medias := strings.TrimSpace(r.FormValue("media_types"))
-	if pm, ok := interface{}(s.proxyManager).(interface {
-		PurgeCDN(string, string, string) error
-	}); ok {
-		_ = pm.PurgeCDN(t, pattern, medias)
-	}
-	http.Redirect(w, r, s.config.AdminPrefix+"/cdn-cache", http.StatusFound)
-}
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	// 获取当前会话

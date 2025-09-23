@@ -31,7 +31,6 @@ func (s *Server) handleAPISettings(w http.ResponseWriter, r *http.Request) {
 			"enable_ua_filter": s.config.Security.EnableUAFilter,
 			"min_form_ms":      s.config.Security.MinFormMs,
 		},
-		"cdn_cache":    s.config.CDNCache,
 		"totp_enabled": s.config.Admin.EnableTOTP,
 	}
 

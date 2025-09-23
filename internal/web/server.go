@@ -39,6 +39,7 @@ type ClusterManager interface {
 	IsMasterMode() bool
 	IsStandaloneMode() bool
 	GetNodes() map[string]interface{}
+	SetMasterMode() error
 	SetSlaveMode(masterHost string, masterPort int, authKey string) error
 	SetStandaloneMode() error
 	HandleSyncRequest(w http.ResponseWriter, r *http.Request)
@@ -409,11 +410,7 @@ func (s *Server) setupRoutes() {
 	// 紧急修复（忘记密码）
 	s.mux.HandleFunc(s.config.AdminPrefix+"/help/recover", s.handleRecoverHelp)
 
-	// 首启向导
-	s.mux.HandleFunc(s.config.AdminPrefix+"/wizard", s.handleWizard)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/wizard/step2", s.handleWizardStep2)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/wizard/step3", s.handleWizardStep3)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/wizard/finish", s.handleWizardFinish)
+	// 首次设置向导（已合并到 first-setup 中）
 
 	// 配置导出/导入/预览/应用
 	s.mux.HandleFunc(s.config.AdminPrefix+"/config/export", s.handleConfigExport)
@@ -482,9 +479,15 @@ func (s *Server) setupRoutes() {
 
 	// Git Server 管理页面路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/git-server", s.handleGitServer)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/git-server/create-app", s.handleCreateApp)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/git-server/server-config", s.handleServerConfig)
+
+	// Favicon 处理
+	s.mux.HandleFunc("/favicon.ico", s.handleFavicon)
 
 	// 集群管理路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/cluster", s.handleClusterSettings)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/cluster/set-master", s.handleClusterSetMaster)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/cluster/set-slave", s.handleClusterSetSlave)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/cluster/set-standalone", s.handleClusterSetStandalone)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/cluster/nodes", s.handleClusterNodes)
@@ -519,12 +522,23 @@ func (s *Server) registerRunnerRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/docker-runner/task/remove", dockerAPI.RemoveTask)
 
 	// Git 服务器 API 路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/repos", gitAPI.ListRepositories)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/repo", gitAPI.GetRepository)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/repo/add", gitAPI.AddRepository)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/repo/update", gitAPI.UpdateRepository)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/repo/remove", gitAPI.RemoveRepository)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/execute", gitAPI.ExecuteCommand)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/apps", gitAPI.ListApps)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app", gitAPI.GetApp)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/create", gitAPI.CreateApp)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/delete", gitAPI.DeleteApp)
+
+	// 服务器配置 API 路由
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/config", gitAPI.GetServerConfig)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/config/update", gitAPI.UpdateServerConfig)
+
+	// SSH 密钥管理 API 路由
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/ssh-keys", gitAPI.ListSSHKeys)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/ssh-key/add", gitAPI.AddSSHKey)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/ssh-key/remove", gitAPI.RemoveSSHKey)
+
+	// 日志查看 API 路由
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/logs", gitAPI.GetAppLogs)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/log-files", gitAPI.GetAppLogFiles)
 
 	// 运行时检测 API 路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/runtime-detector/detect", runtimeAPI.DetectProject)
@@ -1001,4 +1015,20 @@ func (s *Server) fetchPublicIPv4() string {
 		return ""
 	}
 	return ip
+}
+
+// handleFavicon 处理 favicon.ico 请求
+func (s *Server) handleFavicon(w http.ResponseWriter, r *http.Request) {
+	// 返回一个简单的 16x16 像素的透明 PNG favicon
+	favicon := []byte{
+		0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+		0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x10, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0xF3, 0xFF,
+		0x61, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
+		0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE,
+		0x42, 0x60, 0x82,
+	}
+
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "public, max-age=86400") // 缓存1天
+	w.Write(favicon)
 }

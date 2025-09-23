@@ -546,6 +546,18 @@ func (m *Manager) SetSlaveMode(masterHost string, masterPort int, authKey string
 	return nil
 }
 
+// SetMasterMode 设置为Master模式
+func (m *Manager) SetMasterMode() error {
+	if m.syncTicker != nil {
+		m.syncTicker.Stop()
+		m.syncTicker = nil
+	}
+
+	m.mode = "master"
+	m.logger.Info("Switched to master mode")
+	return m.startMasterMode()
+}
+
 // SetStandaloneMode 设置为独立模式
 func (m *Manager) SetStandaloneMode() error {
 	if m.syncTicker != nil {

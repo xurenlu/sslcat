@@ -2,10 +2,8 @@ package web
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
-
-	"github.com/xurenlu/sslcat/internal/config"
-	"github.com/xurenlu/sslcat/internal/ssl"
 )
 
 // HTML 生成函数
@@ -20,7 +18,6 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 	navDNS := "DNS配置"
 	navSecurity := s.translator.T("nav.security")
 	navSettings := s.translator.T("nav.settings")
-	navCDN := "类CDN缓存"
 	navRunners := "Runners管理"
 	logout := s.translator.T("menu.logout")
 	official := s.translator.T("menu.官方站点")
@@ -97,11 +94,6 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
                             <li class="nav-item">
                                 <a class="nav-link %s" href="%s/cluster">
                                     <i class="bi bi-diagram-3"></i> 集群管理
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link %s" href="%s/cdn-cache">
-                                    <i class="bi bi-hdd"></i> %s
                                 </a>
                             </li>
                             <li class="nav-item">
@@ -198,14 +190,6 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 		}(),
 		adminPrefix,
 		func() string {
-			if activePage == "cdn-cache" {
-				return "active"
-			}
-			return ""
-		}(),
-		adminPrefix,
-		navCDN,
-		func() string {
 			if activePage == "runners" {
 				return "active"
 			}
@@ -222,1592 +206,6 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 		adminPrefix,
 		adminPrefix,
 		logout)
-}
-
-func (s *Server) generateProxyManagementHTML(data map[string]interface{}) string {
-	title := s.translator.T("proxy.title")
-	addRule := s.translator.T("proxy.add_rule")
-	thDomain := s.translator.T("proxy.domain")
-	thTarget := s.translator.T("proxy.target")
-	thStatus := s.translator.T("proxy.status")
-	thActions := s.translator.T("proxy.actions")
-	return fmt.Sprintf(`
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>%s - SSLcat</title>
-    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
-</head>
-<body>
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-md-2">%s</div>
-            <main class="col-md-10">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">%s</h1>
-                    <a href="%s/proxy/add" class="btn btn-primary">
-                        <i class="bi bi-plus-circle"></i> %s
-                    </a>
-                </div>
-                
-                <div class="card">
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>%s</th>
-                                        <th>%s</th>
-                                        <th>%s</th>
-                                        <th>认证</th>
-                                        <th>%s</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    %s
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </main>
-        </div>
-    </div>
-    <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>`,
-		title,
-		s.generateSidebar(data["AdminPrefix"].(string), "proxy"),
-		title,
-		data["AdminPrefix"].(string),
-		addRule,
-		thDomain,
-		thTarget,
-		thStatus,
-		thActions,
-		s.generateProxyRulesTable(data))
-}
-
-func (s *Server) generateProxyRulesTable(data map[string]interface{}) string {
-	rules, ok := data["Rules"].([]config.ProxyRule)
-	if !ok || len(rules) == 0 {
-		return `<tr><td colspan="5" class="text-center">` + s.translator.T("proxy.no_rules") + `</td></tr>`
-	}
-
-	var rows strings.Builder
-	for i, rule := range rules {
-		statusBadge := `<span class="badge bg-secondary">` + s.translator.T("common.disabled") + `</span>`
-		if rule.Enabled {
-			statusBadge = `<span class="badge bg-success">` + s.translator.T("common.enabled") + `</span>`
-		}
-
-		// 认证状态
-		authBadge := `<span class="badge bg-secondary">未开启</span>`
-		if rule.AuthEnabled {
-			userCount := len(rule.AuthUsers)
-			authBadge = fmt.Sprintf(`<span class="badge bg-warning">已开启 (%d用户)</span>`, userCount)
-		}
-
-		rows.WriteString(fmt.Sprintf(`
-                    <tr>
-                        <td>%s</td>
-                        <td>%s</td>
-                        <td>%s</td>
-                        <td>%s</td>
-                        <td>
-                            <a href="%s/proxy/edit?index=%d" class="btn btn-sm btn-outline-primary">`+s.translator.T("proxy.edit")+`</a>
-                            <a href="%s/proxy/delete?index=%d" class="btn btn-sm btn-outline-danger" onclick="return confirm('`+s.translator.T("proxy.delete_confirm")+`')">`+s.translator.T("proxy.delete")+`</a>
-                        </td>
-                    </tr>`,
-			rule.Domain, rule.Target, statusBadge, authBadge, data["AdminPrefix"].(string), i, data["AdminPrefix"].(string), i))
-	}
-	return rows.String()
-}
-
-func (s *Server) generateSSLCertsTable(data map[string]interface{}) string {
-	certs, _ := data["Certificates"].([]ssl.CertificateInfo)
-	if len(certs) == 0 {
-		return `<tr><td colspan="6" class="text-center">` + s.translator.T("ssl.none") + `</td></tr>`
-	}
-	var b strings.Builder
-	for _, c := range certs {
-		ctype := s.translator.T("ssl.type.ca")
-		if c.SelfSigned {
-			ctype = s.translator.T("ssl.type.self_signed")
-		}
-		b.WriteString(fmt.Sprintf(`
-			<tr>
-				<td>%s</td>
-				<td>%s</td>
-				<td>%s</td>
-				<td>%s</td>
-				<td>%s</td>
-				<td>
-					<div class="btn-group" role="group">
-						<a class="btn btn-sm btn-outline-primary" href="%s/ssl/download?domain=%s&type=cert">`+s.translator.T("ssl.download_cert")+`</a>
-						<a class="btn btn-sm btn-outline-secondary" href="%s/ssl/download?domain=%s&type=key">`+s.translator.T("ssl.download_key")+`</a>
-						<button class="btn btn-sm btn-outline-warning" onclick="retrySSL('`+c.Domain+`')" title="重试申请证书">
-							<i class="bi bi-arrow-repeat"></i> 重试
-						</button>
-						<a class="btn btn-sm btn-outline-danger" href="%s/ssl/delete?domain=%s" onclick="return confirm('`+s.translator.T("ssl.delete_confirm")+`')">`+s.translator.T("proxy.delete")+`</a>
-					</div>
-				</td>
-			</tr>`,
-			c.Domain,
-			c.IssuedAt.Format("2006-01-02"),
-			c.ExpiresAt.Format("2006-01-02"),
-			c.Status,
-			ctype,
-			data["AdminPrefix"].(string), c.Domain,
-			data["AdminPrefix"].(string), c.Domain,
-			data["AdminPrefix"].(string), c.Domain,
-		))
-	}
-	return b.String()
-}
-
-func (s *Server) generateBlockedIPsTable(data map[string]interface{}) string {
-	blockedIPs, ok := data["BlockedIPs"].([]interface{})
-	if !ok || len(blockedIPs) == 0 {
-		return `<tr><td colspan="3" class="text-center text-muted">暂无封禁IP</td></tr>`
-	}
-	var rows strings.Builder
-	for _, item := range blockedIPs {
-		if blocked, ok := item.(map[string]interface{}); ok {
-			ip := blocked["ip"].(string)
-			blockTime := blocked["block_time"].(string)
-			rows.WriteString(fmt.Sprintf(`
-				<tr>
-					<td>%s</td>
-					<td>%s</td>
-					<td>
-						<form method="POST" action="%s/security/unblock" class="d-inline">
-							<input type="hidden" name="ip" value="%s">
-							<button class="btn btn-sm btn-outline-danger" type="submit">解除封禁</button>
-						</form>
-					</td>
-				</tr>`,
-				ip, blockTime, data["AdminPrefix"].(string), ip))
-		}
-	}
-	return rows.String()
-}
-
-// 辅助函数来安全地获取配置值
-func (s *Server) getConfigAdminUsername(data map[string]interface{}) string {
-	if cfg, ok := data["Config"].(*config.Config); ok {
-		return cfg.Admin.Username
-	}
-	return s.config.Admin.Username
-}
-
-func (s *Server) getConfigSSLEmail(data map[string]interface{}) string {
-	if cfg, ok := data["Config"].(*config.Config); ok {
-		return cfg.SSL.Email
-	}
-	return s.config.SSL.Email
-}
-
-func (s *Server) getConfigSSLDisableSelfSigned(data map[string]interface{}) string {
-	if cfg, ok := data["Config"].(*config.Config); ok {
-		if cfg.SSL.DisableSelfSigned {
-			return "checked"
-		}
-	} else if s.config.SSL.DisableSelfSigned {
-		return "checked"
-	}
-	return ""
-}
-
-func (s *Server) generateProxyAddHTML(data map[string]interface{}) string {
-	return fmt.Sprintf(`
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>添加代理规则 - SSLcat</title>
-    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
-</head>
-<body>
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-md-2">%s</div>
-            <main class="col-md-10">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">添加代理规则</h1>
-                    <a href="%s/proxy" class="btn btn-secondary">返回</a>
-                </div>
-                
-                <div class="card">
-                    <div class="card-body">
-                        <form method="POST">
-                            <div class="mb-3">
-                                <label for="domain" class="form-label">域名</label>
-                                <input type="text" class="form-control" id="domain" name="domain" required 
-                                       placeholder="example.com">
-                                <div class="form-text">输入要代理的域名，支持通配符 *.example.com</div>
-                            </div>
-                            <div class="mb-3">
-                                <label for="target" class="form-label">目标地址</label>
-                                <input type="text" class="form-control" id="target" name="target" required 
-                                       placeholder="http://192.168.1.100:8080" onchange="detectCloudStorage()">
-                                <div class="form-text">输入后端服务地址，包括协议和端口</div>
-                                <div id="cloud-storage-detection" class="mt-2" style="display: none;">
-                                    <div class="alert alert-info">
-                                        <i class="bi bi-cloud"></i> <strong>检测到云存储服务</strong>
-                                        <div id="cloud-storage-info"></div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="form-check form-switch mb-3">
-                                <input class="form-check-input" type="checkbox" id="enabled" name="enabled" checked>
-                                <label class="form-check-label" for="enabled">启用该规则</label>
-                            </div>
-                            <div class="form-check form-switch mb-3">
-                                <input class="form-check-input" type="checkbox" id="ssl_only" name="ssl_only">
-                                <label class="form-check-label" for="ssl_only">仅限HTTPS（HTTP访问将自动301到HTTPS）</label>
-                            </div>
-                            <div class="form-check form-switch mb-3">
-                                <input class="form-check-input" type="checkbox" id="optimize_host_header" name="optimize_host_header" onchange="checkCloudStorageWarning()">
-                                <label class="form-check-label" for="optimize_host_header">优化HTTP Host头部</label>
-                                <div class="form-text">当上游使用hostname（非IP）时，自动将Host头部设置为后端服务器地址。主要针对OSS/S3等云存储服务避免防盗链问题</div>
-                            </div>
-                            <div id="cloud-storage-warning" class="alert alert-danger mt-2" style="display: none;">
-                                <i class="bi bi-exclamation-triangle"></i>
-                                <strong>警告：</strong>检测到云存储服务，建议启用"优化HTTP Host头部"选项以避免防盗链问题！
-                            </div>
-                            <hr>
-                            <h6>类CDN缓存（针对该域名）</h6>
-                            <div class="form-check form-switch mb-2">
-                                <input class="form-check-input" type="checkbox" id="cdn_enabled" name="cdn_enabled">
-                                <label class="form-check-label" for="cdn_enabled">启用域名级CDN缓存</label>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">预设</label>
-                                    <select class="form-select" name="cdn_preset" onchange="toggleCloudStorageConfig()">
-                                        <option value="none">自定义/无预设</option>
-                                        <option value="static">静态资源（.js,.css,.png,.jpg,.ico,.woff2）</option>
-                                        <option value="images">图片（image/*）</option>
-                                        <option value="cloud_storage">云存储优化</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">默认TTL（秒，留空使用全局）</label>
-                                    <input class="form-control" name="cdn_ttl_seconds" placeholder="例如 86400">
-                                </div>
-                            </div>
-                            
-                            <!-- 云存储配置 -->
-                            <div id="cloud-storage-config" style="display: none;">
-                                <div class="card border-warning mb-3">
-                                    <div class="card-header">
-                                        <strong><i class="bi bi-cloud"></i> 云存储配置</strong>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="row mb-3">
-                                            <div class="col-md-6">
-                                                <label class="form-label">云存储类型</label>
-                                                <select class="form-select" name="cloud_storage_type" onchange="updateCloudStorageFields()">
-                                                    <option value="auto">自动检测</option>
-                                                    <option value="aliyun_oss">阿里云OSS</option>
-                                                    <option value="aws_s3">AWS S3</option>
-                                                    <option value="tencent_cos">腾讯云COS</option>
-                                                </select>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label">存储区域</label>
-                                                <input type="text" class="form-control" name="cloud_storage_region" 
-                                                       placeholder="例如: cn-hangzhou">
-                                            </div>
-                                        </div>
-                                        <div class="row mb-3">
-                                            <div class="col-md-6">
-                                                <label class="form-label">存储桶名称</label>
-                                                <input type="text" class="form-control" name="cloud_storage_bucket" 
-                                                       placeholder="例如: my-bucket">
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label">存储路径前缀</label>
-                                                <input type="text" class="form-control" name="cloud_storage_path" 
-                                                       placeholder="例如: /static/">
-                                            </div>
-                                        </div>
-                                        <div class="row mb-3">
-                                            <div class="col-md-6">
-                                                <label class="form-label">访问密钥ID</label>
-                                                <input type="text" class="form-control" name="cloud_storage_access_key" 
-                                                       placeholder="可选，用于签名URL">
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label">秘密密钥</label>
-                                                <input type="password" class="form-control" name="cloud_storage_secret_key" 
-                                                       placeholder="可选，用于签名URL">
-                                            </div>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label">自定义端点（可选）</label>
-                                            <input type="text" class="form-control" name="cloud_storage_endpoint" 
-                                                   placeholder="例如: https://custom-endpoint.com">
-                                            <div class="form-text">留空使用默认端点</div>
-                                        </div>
-                                        <div class="alert alert-warning">
-                                            <i class="bi bi-exclamation-triangle"></i>
-                                            <strong>提示：</strong>配置云存储后，系统将自动改写Host头部为后端hostname，并优化请求头部以避免防盗链检查。
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <hr>
-                            <h6>访问控制</h6>
-                            <div class="form-check form-switch mb-3">
-                                <input class="form-check-input" type="checkbox" id="auth_enabled" name="auth_enabled" 
-                                       onchange="toggleAuthSettings()">
-                                <label class="form-check-label" for="auth_enabled">启用登录验证</label>
-                            </div>
-                            
-                            <div id="auth_settings" style="display: none;">
-                                <div class="card border-primary mb-3">
-                                    <div class="card-header">
-                                        <strong>认证配置</strong>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="row mb-3">
-                                            <div class="col-md-6">
-                                                <label class="form-label">登录有效期（秒）</label>
-                                                <input type="number" class="form-control" name="auth_session_timeout" 
-                                                       value="3600" min="300" max="86400" placeholder="3600">
-                                                <div class="form-text">建议1小时(3600秒)到24小时(86400秒)</div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label">Cookie域名（留空自动设置）</label>
-                                                <input type="text" class="form-control" name="auth_cookie_domain" 
-                                                       placeholder="自动使用代理域名">
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="mb-3">
-                                            <label class="form-label">
-                                                <strong>用户账号</strong>
-                                                <button type="button" class="btn btn-sm btn-outline-primary ms-2" 
-                                                        onclick="addAuthUser()">
-                                                    <i class="bi bi-plus"></i> 添加用户
-                                                </button>
-                                            </label>
-                                            <div id="auth_users_container">
-                                                <div class="text-muted">点击"添加用户"按钮添加用户账号</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <script>
-                            function toggleAuthSettings() {
-                                const enabled = document.getElementById('auth_enabled').checked;
-                                const settings = document.getElementById('auth_settings');
-                                settings.style.display = enabled ? 'block' : 'none';
-                            }
-                            
-                            function detectCloudStorage() {
-                                const target = document.getElementById('target').value;
-                                const detection = document.getElementById('cloud-storage-detection');
-                                const info = document.getElementById('cloud-storage-info');
-                                
-                                if (!target) {
-                                    detection.style.display = 'none';
-                                    checkCloudStorageWarning();
-                                    return;
-                                }
-                                
-                                // 简单的云存储检测
-                                const targetLower = target.toLowerCase();
-                                let cloudInfo = null;
-                                
-                                if (targetLower.includes('aliyuncs.com') || targetLower.includes('oss-')) {
-                                    cloudInfo = {
-                                        type: '阿里云OSS',
-                                        icon: '🌩️',
-                                        description: '检测到阿里云OSS服务，建议启用云存储优化配置'
-                                    };
-                                } else if (targetLower.includes('amazonaws.com') || targetLower.includes('.s3.')) {
-                                    cloudInfo = {
-                                        type: 'AWS S3',
-                                        icon: '☁️',
-                                        description: '检测到AWS S3服务，建议启用云存储优化配置'
-                                    };
-                                } else if (targetLower.includes('qcloud.com') || targetLower.includes('myqcloud.com') || targetLower.includes('.cos.')) {
-                                    cloudInfo = {
-                                        type: '腾讯云COS',
-                                        icon: '🔵',
-                                        description: '检测到腾讯云COS服务，建议启用云存储优化配置'
-                                    };
-                                }
-                                
-                                if (cloudInfo) {
-                                    info.innerHTML = 
-                                        '<div class="mt-1">' +
-                                            '<strong>' + cloudInfo.icon + ' ' + cloudInfo.type + '</strong><br>' +
-                                            cloudInfo.description +
-                                        '</div>';
-                                    detection.style.display = 'block';
-                                } else {
-                                    detection.style.display = 'none';
-                                }
-                                
-                                // 检查是否需要显示警告
-                                checkCloudStorageWarning();
-                            }
-                            
-                            function checkCloudStorageWarning() {
-                                const target = document.getElementById('target').value;
-                                const optimizeHostHeader = document.getElementById('optimize_host_header');
-                                const warning = document.getElementById('cloud-storage-warning');
-                                
-                                if (!target || !optimizeHostHeader || !warning) {
-                                    return;
-                                }
-                                
-                                // 检测是否为云存储服务
-                                const targetLower = target.toLowerCase();
-                                const isCloudStorage = targetLower.includes('aliyuncs.com') || 
-                                                      targetLower.includes('oss-') ||
-                                                      targetLower.includes('amazonaws.com') || 
-                                                      targetLower.includes('.s3.') ||
-                                                      targetLower.includes('qcloud.com') || 
-                                                      targetLower.includes('myqcloud.com') || 
-                                                      targetLower.includes('.cos.');
-                                
-                                // 如果是云存储服务且未启用Host头部优化，显示警告
-                                if (isCloudStorage && !optimizeHostHeader.checked) {
-                                    warning.style.display = 'block';
-                                } else {
-                                    warning.style.display = 'none';
-                                }
-                            }
-                            
-                            function addAuthUser() {
-                                const container = document.getElementById('auth_users_container');
-                                
-                                // 如果是首次添加，清空提示文本
-                                if (container.children.length === 1 && container.firstElementChild.classList.contains('text-muted')) {
-                                    container.innerHTML = '';
-                                }
-                                
-                                const userIndex = container.children.length;
-                                const userHtml = 
-                                    '<div class="row mb-2 auth-user-row">' +
-                                        '<div class="col-md-5">' +
-                                            '<input type="text" class="form-control" name="auth_users[' + userIndex + '][username]" placeholder="用户名" required>' +
-                                        '</div>' +
-                                        '<div class="col-md-5">' +
-                                            '<input type="password" class="form-control" name="auth_users[' + userIndex + '][password]" placeholder="密码" required>' +
-                                        '</div>' +
-                                        '<div class="col-md-2">' +
-                                            '<button type="button" class="btn btn-outline-danger" onclick="removeAuthUser(this)">' +
-                                                '<i class="bi bi-trash"></i>' +
-                                            '</button>' +
-                                        '</div>' +
-                                    '</div>';
-                                container.insertAdjacentHTML('beforeend', userHtml);
-                            }
-                            
-                            function removeAuthUser(button) {
-                                const container = document.getElementById('auth_users_container');
-                                button.closest('.auth-user-row').remove();
-                                
-                                // 如果删除后没有用户了，显示提示文本
-                                if (container.children.length === 0) {
-                                    container.innerHTML = '<div class="text-muted">点击"添加用户"按钮添加用户账号</div>';
-                                }
-                            }
-                            </script>
-                            
-                            <button type="submit" class="btn btn-primary">添加规则</button>
-                            <a href="%s/proxy" class="btn btn-secondary">取消</a>
-                        </form>
-                    </div>
-                </div>
-            </main>
-        </div>
-    </div>
-</body>
-</html>`,
-		s.generateSidebar(data["AdminPrefix"].(string), "proxy"),
-		data["AdminPrefix"].(string),
-		data["AdminPrefix"].(string))
-}
-
-func (s *Server) generateProxyEditHTML(data map[string]interface{}) string {
-	rule := data["Rule"].(config.ProxyRule)
-	return fmt.Sprintf(`
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>编辑代理规则 - SSLcat</title>
-    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
-</head>
-<body>
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-md-2">%s</div>
-            <main class="col-md-10">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">编辑代理规则</h1>
-                    <a href="%s/proxy" class="btn btn-secondary">返回</a>
-                </div>
-                
-                <div class="card">
-                    <div class="card-body">
-                        <form method="POST">
-                            <div class="mb-3">
-                                <label for="domain" class="form-label">域名</label>
-                                <input type="text" class="form-control" id="domain" name="domain" required 
-                                       value="%s">
-                            </div>
-                            <div class="mb-3">
-                                <label for="target" class="form-label">目标地址</label>
-                                <input type="text" class="form-control" id="target" name="target" required 
-                                       value="%s">
-                            </div>
-                            <div class="form-check form-switch mb-3">
-                                <input class="form-check-input" type="checkbox" id="enabled" name="enabled" %s>
-                                <label class="form-check-label" for="enabled">启用该规则</label>
-                            </div>
-                            <div class="form-check form-switch mb-3">
-                                <input class="form-check-input" type="checkbox" id="ssl_only" name="ssl_only" %s>
-                                <label class="form-check-label" for="ssl_only">仅限HTTPS（HTTP访问将自动301到HTTPS）</label>
-                            </div>
-                            <div class="form-check form-switch mb-3">
-                                <input class="form-check-input" type="checkbox" id="optimize_host_header" name="optimize_host_header" %s onchange="checkCloudStorageWarning()">
-                                <label class="form-check-label" for="optimize_host_header">优化HTTP Host头部</label>
-                                <div class="form-text">当上游使用hostname（非IP）时，自动将Host头部设置为后端服务器地址。主要针对OSS/S3等云存储服务避免防盗链问题</div>
-                            </div>
-                            <div id="cloud-storage-warning" class="alert alert-danger mt-2" style="display: none;">
-                                <i class="bi bi-exclamation-triangle"></i>
-                                <strong>警告：</strong>检测到云存储服务，建议启用"优化HTTP Host头部"选项以避免防盗链问题！
-                            </div>
-                            <hr>
-                            <h6>类CDN缓存（针对该域名）</h6>
-                            <div class="form-check form-switch mb-2">
-                                <input class="form-check-input" type="checkbox" id="cdn_enabled" name="cdn_enabled" %s>
-                                <label class="form-check-label" for="cdn_enabled">启用域名级CDN缓存</label>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">预设</label>
-                                    <select class="form-select" name="cdn_preset">
-                                        <option value="none" %s>自定义/无预设</option>
-                                        <option value="static" %s>静态资源（.js,.css,.png,.jpg,.ico,.woff2）</option>
-                                        <option value="images" %s>图片（image/*）</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">默认TTL（秒，留空使用全局）</label>
-                                    <input class="form-control" name="cdn_ttl_seconds" value="%s" placeholder="例如 86400">
-                                </div>
-                            </div>
-                            
-                            <hr>
-                            <h6>访问控制</h6>
-                            <div class="form-check form-switch mb-3">
-                                <input class="form-check-input" type="checkbox" id="auth_enabled" name="auth_enabled" %s 
-                                       onchange="toggleAuthSettings()">
-                                <label class="form-check-label" for="auth_enabled">启用登录验证</label>
-                            </div>
-                            
-                            <div id="auth_settings" style="display: %s;">
-                                <div class="card border-primary mb-3">
-                                    <div class="card-header">
-                                        <strong>认证配置</strong>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="row mb-3">
-                                            <div class="col-md-6">
-                                                <label class="form-label">登录有效期（秒）</label>
-                                                <input type="number" class="form-control" name="auth_session_timeout" 
-                                                       value="%s" min="300" max="86400" placeholder="3600">
-                                                <div class="form-text">建议1小时(3600秒)到24小时(86400秒)</div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label">Cookie域名（留空自动设置）</label>
-                                                <input type="text" class="form-control" name="auth_cookie_domain" 
-                                                       value="%s" placeholder="自动使用代理域名">
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="mb-3">
-                                            <label class="form-label">
-                                                <strong>用户账号</strong>
-                                                <button type="button" class="btn btn-sm btn-outline-primary ms-2" 
-                                                        onclick="addAuthUser()">
-                                                    <i class="bi bi-plus"></i> 添加用户
-                                                </button>
-                                            </label>
-                                            <div id="auth_users_container">%s</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <script>
-                            function toggleAuthSettings() {
-                                const enabled = document.getElementById('auth_enabled').checked;
-                                const settings = document.getElementById('auth_settings');
-                                settings.style.display = enabled ? 'block' : 'none';
-                            }
-                            
-                            function detectCloudStorage() {
-                                const target = document.getElementById('target').value;
-                                const detection = document.getElementById('cloud-storage-detection');
-                                const info = document.getElementById('cloud-storage-info');
-                                
-                                if (!target) {
-                                    detection.style.display = 'none';
-                                    checkCloudStorageWarning();
-                                    return;
-                                }
-                                
-                                // 简单的云存储检测
-                                const targetLower = target.toLowerCase();
-                                let cloudInfo = null;
-                                
-                                if (targetLower.includes('aliyuncs.com') || targetLower.includes('oss-')) {
-                                    cloudInfo = {
-                                        type: '阿里云OSS',
-                                        icon: '🌩️',
-                                        description: '检测到阿里云OSS服务，建议启用云存储优化配置'
-                                    };
-                                } else if (targetLower.includes('amazonaws.com') || targetLower.includes('.s3.')) {
-                                    cloudInfo = {
-                                        type: 'AWS S3',
-                                        icon: '☁️',
-                                        description: '检测到AWS S3服务，建议启用云存储优化配置'
-                                    };
-                                } else if (targetLower.includes('qcloud.com') || targetLower.includes('myqcloud.com') || targetLower.includes('.cos.')) {
-                                    cloudInfo = {
-                                        type: '腾讯云COS',
-                                        icon: '🔵',
-                                        description: '检测到腾讯云COS服务，建议启用云存储优化配置'
-                                    };
-                                }
-                                
-                                if (cloudInfo) {
-                                    info.innerHTML = 
-                                        '<div class="mt-1">' +
-                                            '<strong>' + cloudInfo.icon + ' ' + cloudInfo.type + '</strong><br>' +
-                                            cloudInfo.description +
-                                        '</div>';
-                                    detection.style.display = 'block';
-                                } else {
-                                    detection.style.display = 'none';
-                                }
-                                
-                                // 检查是否需要显示警告
-                                checkCloudStorageWarning();
-                            }
-                            
-                            function checkCloudStorageWarning() {
-                                const target = document.getElementById('target').value;
-                                const optimizeHostHeader = document.getElementById('optimize_host_header');
-                                const warning = document.getElementById('cloud-storage-warning');
-                                
-                                if (!target || !optimizeHostHeader || !warning) {
-                                    return;
-                                }
-                                
-                                // 检测是否为云存储服务
-                                const targetLower = target.toLowerCase();
-                                const isCloudStorage = targetLower.includes('aliyuncs.com') || 
-                                                      targetLower.includes('oss-') ||
-                                                      targetLower.includes('amazonaws.com') || 
-                                                      targetLower.includes('.s3.') ||
-                                                      targetLower.includes('qcloud.com') || 
-                                                      targetLower.includes('myqcloud.com') || 
-                                                      targetLower.includes('.cos.');
-                                
-                                // 如果是云存储服务且未启用Host头部优化，显示警告
-                                if (isCloudStorage && !optimizeHostHeader.checked) {
-                                    warning.style.display = 'block';
-                                } else {
-                                    warning.style.display = 'none';
-                                }
-                            }
-                            
-                            function addAuthUser() {
-                                const container = document.getElementById('auth_users_container');
-                                const userIndex = container.children.length;
-                                const userHtml = 
-                                    '<div class="row mb-2 auth-user-row">' +
-                                        '<div class="col-md-5">' +
-                                            '<input type="text" class="form-control" name="auth_users[' + userIndex + '][username]" placeholder="用户名" required>' +
-                                        '</div>' +
-                                        '<div class="col-md-5">' +
-                                            '<input type="password" class="form-control" name="auth_users[' + userIndex + '][password]" placeholder="密码" required>' +
-                                        '</div>' +
-                                        '<div class="col-md-2">' +
-                                            '<button type="button" class="btn btn-outline-danger" onclick="removeAuthUser(this)">' +
-                                                '<i class="bi bi-trash"></i>' +
-                                            '</button>' +
-                                        '</div>' +
-                                    '</div>';
-                                container.insertAdjacentHTML('beforeend', userHtml);
-                            }
-                            
-                            function removeAuthUser(button) {
-                                button.closest('.auth-user-row').remove();
-                            }
-                            
-                            // 初始化显示状态
-                            document.addEventListener('DOMContentLoaded', function() {
-                                toggleAuthSettings();
-                            });
-                            </script>
-                            
-                            <button type="submit" class="btn btn-primary">保存更改</button>
-                            <a href="%s/proxy" class="btn btn-secondary">取消</a>
-                        </form>
-                    </div>
-                </div>
-            </main>
-        </div>
-    </div>
-</body>
-</html>`,
-		s.generateSidebar(data["AdminPrefix"].(string), "proxy"),
-		data["AdminPrefix"].(string),
-		rule.Domain,
-		rule.Target,
-		map[bool]string{true: "checked"}[rule.Enabled],
-		map[bool]string{true: "checked"}[rule.SSLOnly],
-		map[bool]string{true: "checked"}[rule.OptimizeHostHeader],
-		map[bool]string{true: "checked"}[rule.CDNEnabled],
-		map[bool]string{true: "selected"}[rule.CDNPreset == "none"],
-		map[bool]string{true: "selected"}[rule.CDNPreset == "static"],
-		map[bool]string{true: "selected"}[rule.CDNPreset == "images"],
-		func() string {
-			if rule.CDNDefaultTTLSeconds > 0 {
-				return fmt.Sprintf("%d", rule.CDNDefaultTTLSeconds)
-			}
-			return ""
-		}(),
-		// 访问控制相关字段
-		map[bool]string{true: "checked"}[rule.AuthEnabled],
-		map[bool]string{true: "block", false: "none"}[rule.AuthEnabled],
-		func() string {
-			if rule.AuthSessionTimeout > 0 {
-				return fmt.Sprintf("%d", rule.AuthSessionTimeout)
-			}
-			return "3600"
-		}(),
-		rule.AuthCookieDomain,
-		s.generateAuthUsersHTML(rule.AuthUsers),
-		data["AdminPrefix"].(string))
-}
-
-// generateAuthUsersHTML 生成认证用户的HTML
-func (s *Server) generateAuthUsersHTML(users []config.ProxyAuthUser) string {
-	if len(users) == 0 {
-		return `<div class="text-muted">暂无用户，点击"添加用户"按钮添加</div>`
-	}
-
-	var html strings.Builder
-	for i, user := range users {
-		html.WriteString(fmt.Sprintf(`
-		<div class="row mb-2 auth-user-row">
-			<div class="col-md-5">
-				<input type="text" class="form-control" name="auth_users[%d][username]" 
-					   value="%s" placeholder="用户名" required>
-			</div>
-			<div class="col-md-5">
-				<input type="password" class="form-control" name="auth_users[%d][password]" 
-					   value="%s" placeholder="密码" required>
-			</div>
-			<div class="col-md-2">
-				<button type="button" class="btn btn-outline-danger" onclick="removeAuthUser(this)">
-					<i class="bi bi-trash"></i>
-				</button>
-			</div>
-		</div>`, i, user.Username, i, user.Password))
-	}
-	return html.String()
-}
-
-// generateDNSManagementHTML 生成DNS管理页面HTML
-func (s *Server) generateDNSManagementHTML(data map[string]interface{}) string {
-	title := "DNS配置管理"
-	providers, _ := data["Providers"].([]config.DNSProvider)
-	defaultProvider, _ := data["DefaultProvider"].(string)
-	challengeMethods, _ := data["ChallengeMethods"].([]string)
-
-	return fmt.Sprintf(`
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>%s - SSLcat</title>
-    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
-</head>
-<body>
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-md-2">%s</div>
-            <main class="col-md-10">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">%s</h1>
-                    <div>
-                        <a href="%s/dns/add" class="btn btn-primary me-2">
-                            <i class="bi bi-plus-circle"></i> 添加DNS服务商
-                        </a>
-                        <a href="%s/dns/config" class="btn btn-outline-secondary">
-                            <i class="bi bi-gear"></i> 全局配置
-                        </a>
-                    </div>
-                </div>
-                
-                <div class="row mb-4">
-                    <div class="col-md-4">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="mb-0">当前配置</h5>
-                            </div>
-                            <div class="card-body">
-                                <p><strong>默认DNS服务商:</strong> %s</p>
-                                <p><strong>支持的验证方式:</strong> %s</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0">服务商状态</h5>
-                                <button class="btn btn-sm btn-outline-primary" onclick="refreshHealthStatus()">
-                                    <i class="bi bi-arrow-clockwise"></i> 刷新
-                                </button>
-                            </div>
-                            <div class="card-body" id="health-status">
-                                <div class="text-center">
-                                    <div class="spinner-border spinner-border-sm" role="status">
-                                        <span class="visually-hidden">加载中...</span>
-                                    </div>
-                                    <p class="mt-2 mb-0">检查服务商状态中...</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="mb-0">使用说明</h5>
-                            </div>
-                            <div class="card-body">
-                                <p class="mb-1">• DNS验证支持通配符证书申请</p>
-                                <p class="mb-1">• 无需开放80端口即可申请证书</p>
-                                <p class="mb-1">• 支持多个DNS服务商配置</p>
-                                <p class="mb-0">• 自动故障转移和负载均衡</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0">DNS服务商列表</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>名称</th>
-                                        <th>类型</th>
-                                        <th>状态</th>
-                                        <th>优先级</th>
-                                        <th>健康状态</th>
-                                        <th>操作</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    %s
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </main>
-        </div>
-    </div>
-    
-    <script>
-    // 页面加载时检查健康状态
-    document.addEventListener('DOMContentLoaded', function() {
-        refreshHealthStatus();
-    });
-
-    // 刷新健康状态
-    function refreshHealthStatus() {
-        const healthStatusDiv = document.getElementById('health-status');
-        healthStatusDiv.innerHTML = 
-            '<div class="text-center">' +
-                '<div class="spinner-border spinner-border-sm" role="status">' +
-                    '<span class="visually-hidden">加载中...</span>' +
-                '</div>' +
-                '<p class="mt-2 mb-0">检查服务商状态中...</p>' +
-            '</div>';
-
-        fetch('%s/api/dns/health')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    updateHealthDisplay(data.health);
-                } else {
-                    healthStatusDiv.innerHTML = 
-                        '<div class="alert alert-warning mb-0">' +
-                            '<i class="bi bi-exclamation-triangle"></i> 无法获取健康状态' +
-                        '</div>';
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                healthStatusDiv.innerHTML = 
-                    '<div class="alert alert-danger mb-0">' +
-                        '<i class="bi bi-x-circle"></i> 健康状态检查失败' +
-                    '</div>';
-            });
-    }
-
-    // 更新健康状态显示
-    function updateHealthDisplay(health) {
-        const healthStatusDiv = document.getElementById('health-status');
-        
-        if (Object.keys(health).length === 0) {
-            healthStatusDiv.innerHTML = 
-                '<div class="alert alert-info mb-0">' +
-                    '<i class="bi bi-info-circle"></i> 暂无DNS服务商' +
-                '</div>';
-            return;
-        }
-
-        let html = '<div class="row">';
-        for (const [provider, status] of Object.entries(health)) {
-            const isHealthy = status === 'healthy';
-            const badgeClass = isHealthy ? 'bg-success' : 'bg-danger';
-            const icon = isHealthy ? 'bi-check-circle' : 'bi-x-circle';
-            
-            html += 
-                '<div class="col-6 mb-2">' +
-                    '<div class="d-flex align-items-center">' +
-                        '<span class="badge ' + badgeClass + ' me-2">' +
-                            '<i class="bi ' + icon + '"></i>' +
-                        '</span>' +
-                        '<small>' + provider + '</small>' +
-                    '</div>' +
-                '</div>';
-        }
-        html += '</div>';
-        
-        healthStatusDiv.innerHTML = html;
-
-        // 更新表格中的健康状态
-        updateTableHealthStatus(health);
-    }
-
-    // 更新表格中的健康状态
-    function updateTableHealthStatus(health) {
-        for (const [provider, status] of Object.entries(health)) {
-            const elements = document.querySelectorAll('[data-provider="' + provider + '"]');
-            elements.forEach(element => {
-                const isHealthy = status === 'healthy';
-                const badgeClass = isHealthy ? 'bg-success' : 'bg-danger';
-                const text = isHealthy ? '正常' : '异常';
-                
-                element.className = 'badge ' + badgeClass;
-                element.textContent = text;
-                element.title = status;
-            });
-        }
-    }
-
-    // 测试DNS服务商
-    function testProvider(providerName) {
-        const button = event.target;
-        const originalText = button.textContent;
-        
-        button.disabled = true;
-        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 测试中...';
-
-        fetch('%s/api/dns/test', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ provider: providerName })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showAlert('success', '测试成功', 'DNS服务商连接正常');
-            } else {
-                showAlert('danger', '测试失败', data.error || '未知错误');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showAlert('danger', '测试失败', '网络错误');
-        })
-        .finally(() => {
-            button.disabled = false;
-            button.textContent = originalText;
-        });
-    }
-
-    // 显示提示信息
-    function showAlert(type, title, message) {
-        const alertDiv = document.createElement('div');
-        alertDiv.className = 'alert alert-' + type + ' alert-dismissible fade show';
-        alertDiv.innerHTML = 
-            '<strong>' + title + '</strong> ' + message +
-            '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
-        
-        // 在页面顶部显示提示
-        const container = document.querySelector('.container-fluid');
-        container.insertBefore(alertDiv, container.firstChild);
-        
-        // 5秒后自动隐藏
-        setTimeout(() => {
-            if (alertDiv.parentNode) {
-                alertDiv.remove();
-            }
-        }, 5000);
-    }
-    </script>
-    
-    <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>`,
-		title,
-		s.generateSidebar(data["AdminPrefix"].(string), "dns"),
-		title,
-		data["AdminPrefix"].(string),
-		data["AdminPrefix"].(string),
-		data["AdminPrefix"].(string),
-		data["AdminPrefix"].(string),
-		func() string {
-			if defaultProvider == "" {
-				return "未设置"
-			}
-			return defaultProvider
-		}(),
-		func() string {
-			if len(challengeMethods) == 0 {
-				return "未设置"
-			}
-			return strings.Join(challengeMethods, ", ")
-		}(),
-		s.generateDNSProvidersTable(providers, data["AdminPrefix"].(string)))
-}
-
-// generateDNSProvidersTable 生成DNS服务商表格
-func (s *Server) generateDNSProvidersTable(providers []config.DNSProvider, adminPrefix string) string {
-	if len(providers) == 0 {
-		return `<tr><td colspan="6" class="text-center">暂无DNS服务商配置</td></tr>`
-	}
-
-	var rows strings.Builder
-	for i, provider := range providers {
-		statusBadge := `<span class="badge bg-secondary">未启用</span>`
-		if provider.Enabled {
-			statusBadge = `<span class="badge bg-success">已启用</span>`
-		}
-
-		// 配置状态（暂时注释掉，因为健康状态会显示更准确的信息）
-		// configStatus := `<span class="badge bg-warning">配置不完整</span>`
-		// if provider.APIKey != "" {
-		// 	if provider.Type == "cloudflare" && provider.ZoneID != "" {
-		// 		configStatus = `<span class="badge bg-success">配置完整</span>`
-		// 	} else if provider.Type != "cloudflare" {
-		// 		configStatus = `<span class="badge bg-success">配置完整</span>`
-		// 	}
-		// }
-
-		rows.WriteString(fmt.Sprintf(`
-                    <tr>
-                        <td>%s</td>
-                        <td><span class="badge bg-info">%s</span></td>
-                        <td>%s</td>
-                        <td>%d</td>
-                        <td><span class="badge bg-light text-dark" id="health-%d" data-provider="%s">检查中...</span></td>
-                        <td>
-                            <a href="%s/dns/edit?index=%d" class="btn btn-sm btn-outline-primary">编辑</a>
-                            <button class="btn btn-sm btn-outline-info" onclick="testProvider('%s')">测试</button>
-                            <a href="%s/dns/delete?index=%d" class="btn btn-sm btn-outline-danger" onclick="return confirm('确定要删除这个DNS服务商吗？')">删除</a>
-                        </td>
-                    </tr>`,
-			provider.Name, provider.Type, statusBadge, provider.Priority, i, provider.Name, adminPrefix, i, provider.Name, adminPrefix, i))
-	}
-	return rows.String()
-}
-
-// generateDNSAddHTML 生成添加DNS服务商页面HTML
-func (s *Server) generateDNSAddHTML(data map[string]interface{}) string {
-	return fmt.Sprintf(`
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>添加DNS服务商 - SSLcat</title>
-    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
-</head>
-<body>
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-md-2">%s</div>
-            <main class="col-md-10">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">添加DNS服务商</h1>
-                    <a href="%s/dns" class="btn btn-secondary">返回</a>
-                </div>
-                
-                <div class="card">
-                    <div class="card-body">
-                        <form method="POST">
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="name" class="form-label">服务商名称</label>
-                                    <input type="text" class="form-control" id="name" name="name" required 
-                                           placeholder="例如: my-cloudflare">
-                                    <div class="form-text">用于标识这个DNS服务商配置</div>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="type" class="form-label">服务商类型</label>
-                                    <select class="form-select" id="type" name="type" required onchange="toggleProviderFields()">
-                                        <option value="">请选择服务商类型</option>
-                                        <option value="cloudflare">Cloudflare</option>
-                                        <option value="aliyun">阿里云DNS</option>
-                                        <option value="tencent">腾讯云DNS</option>
-                                        <option value="aws">AWS Route53</option>
-                                        <option value="godaddy">GoDaddy</option>
-                                        <option value="custom">自定义API</option>
-                                    </select>
-                                </div>
-                            </div>
-                            
-                            <div class="form-check form-switch mb-3">
-                                <input class="form-check-input" type="checkbox" id="enabled" name="enabled" checked>
-                                <label class="form-check-label" for="enabled">启用此服务商</label>
-                            </div>
-                            
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="priority" class="form-label">优先级</label>
-                                    <input type="number" class="form-control" id="priority" name="priority" 
-                                           value="1" min="1" max="100">
-                                    <div class="form-text">数字越小优先级越高</div>
-                                </div>
-                            </div>
-                            
-                            <hr>
-                            <h6>API配置</h6>
-                            
-                            <div id="cloudflare-fields" style="display: none;">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label for="api_key" class="form-label">API Token</label>
-                                        <input type="password" class="form-control" id="api_key" name="api_key" 
-                                               placeholder="Cloudflare API Token">
-                                        <div class="form-text">需要 Zone:Read, DNS:Edit 权限</div>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label for="zone_id" class="form-label">Zone ID</label>
-                                        <input type="text" class="form-control" id="zone_id" name="zone_id" 
-                                               placeholder="域名对应的Zone ID">
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div id="aliyun-fields" style="display: none;">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label for="api_key" class="form-label">Access Key ID</label>
-                                        <input type="text" class="form-control" id="api_key" name="api_key" 
-                                               placeholder="阿里云Access Key ID">
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label for="api_secret" class="form-label">Access Key Secret</label>
-                                        <input type="password" class="form-control" id="api_secret" name="api_secret" 
-                                               placeholder="阿里云Access Key Secret">
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div id="tencent-fields" style="display: none;">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label for="api_key" class="form-label">Secret ID</label>
-                                        <input type="text" class="form-control" id="api_key" name="api_key" 
-                                               placeholder="腾讯云Secret ID">
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label for="api_secret" class="form-label">Secret Key</label>
-                                        <input type="password" class="form-control" id="api_secret" name="api_secret" 
-                                               placeholder="腾讯云Secret Key">
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div id="custom-fields" style="display: none;">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label for="api_key" class="form-label">API Key</label>
-                                        <input type="password" class="form-control" id="api_key" name="api_key" 
-                                               placeholder="自定义API密钥">
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label for="endpoint" class="form-label">API端点</label>
-                                        <input type="url" class="form-control" id="endpoint" name="endpoint" 
-                                               placeholder="https://api.example.com">
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <button type="submit" class="btn btn-primary">添加服务商</button>
-                            <a href="%s/dns" class="btn btn-secondary">取消</a>
-                        </form>
-                    </div>
-                </div>
-            </main>
-        </div>
-    </div>
-    
-    <script>
-    function toggleProviderFields() {
-        const type = document.getElementById('type').value;
-        
-        // 隐藏所有字段组
-        document.getElementById('cloudflare-fields').style.display = 'none';
-        document.getElementById('aliyun-fields').style.display = 'none';
-        document.getElementById('tencent-fields').style.display = 'none';
-        document.getElementById('custom-fields').style.display = 'none';
-        
-        // 显示对应的字段组
-        if (type === 'cloudflare') {
-            document.getElementById('cloudflare-fields').style.display = 'block';
-        } else if (type === 'aliyun') {
-            document.getElementById('aliyun-fields').style.display = 'block';
-        } else if (type === 'tencent') {
-            document.getElementById('tencent-fields').style.display = 'block';
-        } else if (type === 'custom') {
-            document.getElementById('custom-fields').style.display = 'block';
-        }
-    }
-    </script>
-    
-    <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>`,
-		s.generateSidebar(data["AdminPrefix"].(string), "dns"),
-		data["AdminPrefix"].(string),
-		data["AdminPrefix"].(string))
-}
-
-// generateDNSEditHTML 生成编辑DNS服务商页面HTML
-func (s *Server) generateDNSEditHTML(data map[string]interface{}) string {
-	provider := data["Provider"].(config.DNSProvider)
-
-	return fmt.Sprintf(`
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>编辑DNS服务商 - SSLcat</title>
-    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
-</head>
-<body>
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-md-2">%s</div>
-            <main class="col-md-10">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">编辑DNS服务商</h1>
-                    <a href="%s/dns" class="btn btn-secondary">返回</a>
-                </div>
-                
-                <div class="card">
-                    <div class="card-body">
-                        <form method="POST">
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="name" class="form-label">服务商名称</label>
-                                    <input type="text" class="form-control" id="name" name="name" required 
-                                           value="%s">
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="type" class="form-label">服务商类型</label>
-                                    <select class="form-select" id="type" name="type" required onchange="toggleProviderFields()">
-                                        <option value="cloudflare" %s>Cloudflare</option>
-                                        <option value="aliyun" %s>阿里云DNS</option>
-                                        <option value="tencent" %s>腾讯云DNS</option>
-                                        <option value="aws" %s>AWS Route53</option>
-                                        <option value="godaddy" %s>GoDaddy</option>
-                                        <option value="custom" %s>自定义API</option>
-                                    </select>
-                                </div>
-                            </div>
-                            
-                            <div class="form-check form-switch mb-3">
-                                <input class="form-check-input" type="checkbox" id="enabled" name="enabled" %s>
-                                <label class="form-check-label" for="enabled">启用此服务商</label>
-                            </div>
-                            
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="priority" class="form-label">优先级</label>
-                                    <input type="number" class="form-control" id="priority" name="priority" 
-                                           value="%d" min="1" max="100">
-                                </div>
-                            </div>
-                            
-                            <hr>
-                            <h6>API配置</h6>
-                            
-                            <div id="cloudflare-fields" style="display: %s;">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label for="api_key" class="form-label">API Token</label>
-                                        <input type="password" class="form-control" id="api_key" name="api_key" 
-                                               value="%s" placeholder="Cloudflare API Token">
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label for="zone_id" class="form-label">Zone ID</label>
-                                        <input type="text" class="form-control" id="zone_id" name="zone_id" 
-                                               value="%s" placeholder="域名对应的Zone ID">
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div id="aliyun-fields" style="display: %s;">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label for="api_key" class="form-label">Access Key ID</label>
-                                        <input type="text" class="form-control" id="api_key" name="api_key" 
-                                               value="%s" placeholder="阿里云Access Key ID">
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label for="api_secret" class="form-label">Access Key Secret</label>
-                                        <input type="password" class="form-control" id="api_secret" name="api_secret" 
-                                               value="%s" placeholder="阿里云Access Key Secret">
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div id="tencent-fields" style="display: %s;">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label for="api_key" class="form-label">Secret ID</label>
-                                        <input type="text" class="form-control" id="api_key" name="api_key" 
-                                               value="%s" placeholder="腾讯云Secret ID">
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label for="api_secret" class="form-label">Secret Key</label>
-                                        <input type="password" class="form-control" id="api_secret" name="api_secret" 
-                                               value="%s" placeholder="腾讯云Secret Key">
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div id="custom-fields" style="display: %s;">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label for="api_key" class="form-label">API Key</label>
-                                        <input type="password" class="form-control" id="api_key" name="api_key" 
-                                               value="%s" placeholder="自定义API密钥">
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label for="endpoint" class="form-label">API端点</label>
-                                        <input type="url" class="form-control" id="endpoint" name="endpoint" 
-                                               value="%s" placeholder="https://api.example.com">
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <button type="submit" class="btn btn-primary">保存更改</button>
-                            <a href="%s/dns" class="btn btn-secondary">取消</a>
-                        </form>
-                    </div>
-                </div>
-            </main>
-        </div>
-    </div>
-    
-    <script>
-    function toggleProviderFields() {
-        const type = document.getElementById('type').value;
-        
-        // 隐藏所有字段组
-        document.getElementById('cloudflare-fields').style.display = 'none';
-        document.getElementById('aliyun-fields').style.display = 'none';
-        document.getElementById('tencent-fields').style.display = 'none';
-        document.getElementById('custom-fields').style.display = 'none';
-        
-        // 显示对应的字段组
-        if (type === 'cloudflare') {
-            document.getElementById('cloudflare-fields').style.display = 'block';
-        } else if (type === 'aliyun') {
-            document.getElementById('aliyun-fields').style.display = 'block';
-        } else if (type === 'tencent') {
-            document.getElementById('tencent-fields').style.display = 'block';
-        } else if (type === 'custom') {
-            document.getElementById('custom-fields').style.display = 'block';
-        }
-    }
-    
-    // 初始化显示状态
-    document.addEventListener('DOMContentLoaded', function() {
-        toggleProviderFields();
-    });
-    </script>
-    
-    <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>`,
-		s.generateSidebar(data["AdminPrefix"].(string), "dns"),
-		data["AdminPrefix"].(string),
-		provider.Name,
-		map[bool]string{true: "selected"}[provider.Type == "cloudflare"],
-		map[bool]string{true: "selected"}[provider.Type == "aliyun"],
-		map[bool]string{true: "selected"}[provider.Type == "tencent"],
-		map[bool]string{true: "selected"}[provider.Type == "aws"],
-		map[bool]string{true: "selected"}[provider.Type == "godaddy"],
-		map[bool]string{true: "selected"}[provider.Type == "custom"],
-		map[bool]string{true: "checked"}[provider.Enabled],
-		provider.Priority,
-		map[bool]string{true: "block", false: "none"}[provider.Type == "cloudflare"],
-		provider.APIKey,
-		provider.ZoneID,
-		map[bool]string{true: "block", false: "none"}[provider.Type == "aliyun"],
-		provider.APIKey,
-		provider.APISecret,
-		map[bool]string{true: "block", false: "none"}[provider.Type == "tencent"],
-		provider.APIKey,
-		provider.APISecret,
-		map[bool]string{true: "block", false: "none"}[provider.Type == "custom"],
-		provider.APIKey,
-		provider.Endpoint,
-		data["AdminPrefix"].(string))
-}
-
-// generateDNSConfigHTML 生成DNS全局配置页面HTML
-func (s *Server) generateDNSConfigHTML(data map[string]interface{}) string {
-	defaultProvider, _ := data["DefaultProvider"].(string)
-	challengeMethods, _ := data["ChallengeMethods"].([]string)
-	providers, _ := data["Providers"].([]config.DNSProvider)
-
-	return fmt.Sprintf(`
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DNS全局配置 - SSLcat</title>
-    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
-</head>
-<body>
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-md-2">%s</div>
-            <main class="col-md-10">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">DNS全局配置</h1>
-                    <a href="%s/dns" class="btn btn-secondary">返回</a>
-                </div>
-                
-                <div class="card">
-                    <div class="card-body">
-                        <form method="POST">
-                            <div class="mb-3">
-                                <label for="default_provider" class="form-label">默认DNS服务商</label>
-                                <select class="form-select" id="default_provider" name="default_provider">
-                                    <option value="">请选择默认服务商</option>
-                                    %s
-                                </select>
-                                <div class="form-text">用于自动申请证书时的默认DNS服务商</div>
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label class="form-label">支持的验证方式</label>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="http-01" name="challenge_methods" value="http-01" %s>
-                                    <label class="form-check-label" for="http-01">
-                                        HTTP-01 验证
-                                    </label>
-                                    <div class="form-text">需要80端口可访问，适用于单域名证书</div>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="dns-01" name="challenge_methods" value="dns-01" %s>
-                                    <label class="form-check-label" for="dns-01">
-                                        DNS-01 验证
-                                    </label>
-                                    <div class="form-text">通过DNS记录验证，支持通配符证书</div>
-                                </div>
-                            </div>
-                            
-                            <button type="submit" class="btn btn-primary">保存配置</button>
-                            <a href="%s/dns" class="btn btn-secondary">取消</a>
-                        </form>
-                    </div>
-                </div>
-            </main>
-        </div>
-    </div>
-    <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>`,
-		s.generateSidebar(data["AdminPrefix"].(string), "dns"),
-		data["AdminPrefix"].(string),
-		func() string {
-			var options strings.Builder
-			for _, provider := range providers {
-				selected := ""
-				if provider.Name == defaultProvider {
-					selected = "selected"
-				}
-				options.WriteString(fmt.Sprintf(`<option value="%s" %s>%s (%s)</option>`, provider.Name, selected, provider.Name, provider.Type))
-			}
-			return options.String()
-		}(),
-		func() string {
-			for _, method := range challengeMethods {
-				if method == "http-01" {
-					return "checked"
-				}
-			}
-			return ""
-		}(),
-		func() string {
-			for _, method := range challengeMethods {
-				if method == "dns-01" {
-					return "checked"
-				}
-			}
-			return ""
-		}(),
-		data["AdminPrefix"].(string))
 }
 
 func (s *Server) generateSSLManagementHTML(data map[string]interface{}) string {
@@ -2681,221 +1079,151 @@ func (s *Server) generateSettingsHTML(data map[string]interface{}) string {
 		data["AdminPrefix"].(string), viewLastDiff)
 }
 
-func (s *Server) generateCDNCacheHTML(data map[string]interface{}) string {
-	cdn := data["CDN"].(config.CDNCacheConfig)
 
-	// 获取实时统计
-	cdnStats := map[string]interface{}{"enabled": false}
-	if pm, ok := interface{}(s.proxyManager).(interface {
-		GetCDNCache() interface{ Stats() map[string]interface{} }
-	}); ok {
-		if cache := pm.GetCDNCache(); cache != nil {
-			cdnStats = cache.Stats()
-		}
-	}
-	return fmt.Sprintf(`
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>类CDN缓存 - SSLcat</title>
-    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
-</head>
-<body>
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-md-2">%s</div>
-            <main class="col-md-10">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">类CDN缓存</h1>
-                    <div class="btn-group">
-                        <a class="btn btn-outline-secondary" href="%s/api/cdn-cache/stats">统计JSON</a>
-                    </div>
-                </div>
+// generateGitServerManagementHTML 生成Git Server管理页面HTML (已移动到git_server_html.go)
 
-                <!-- 缓存统计 -->
-                <div class="row mb-3">
-                    <div class="col-md-3">
-                        <div class="card text-center">
-                            <div class="card-body">
-                                <h5 class="card-title">%.1f%%</h5>
-                                <p class="card-text">命中率</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card text-center">
-                            <div class="card-body">
-                                <h5 class="card-title">%d</h5>
-                                <p class="card-text">缓存对象</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card text-center">
-                            <div class="card-body">
-                                <h5 class="card-title">%.1f%%</h5>
-                                <p class="card-text">容量利用率</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card text-center">
-                            <div class="card-body">
-                                <h5 class="card-title">%d/%d</h5>
-                                <p class="card-text">命中/未命中</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card mb-3">
-                    <div class="card-body">
-                        <form method="POST" action="%s/cdn-cache/save">
-                            <div class="form-check form-switch mb-3">
-                                <input class="form-check-input" type="checkbox" id="enabled" name="enabled" %s>
-                                <label class="form-check-label" for="enabled">启用类CDN缓存</label>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">缓存目录</label>
-                                <input class="form-control" name="cache_dir" value="%s" placeholder="./data/cache/static">
-                            </div>
-                            <div class="row">
-                              <div class="col-md-4 mb-3">
-                                <label class="form-label">最大缓存体积（字节）</label>
-                                <input class="form-control" name="max_size_bytes" value="%d">
-                              </div>
-                              <div class="col-md-4 mb-3">
-                                <label class="form-label">默认TTL（秒）</label>
-                                <input class="form-control" name="default_ttl_seconds" value="%d">
-                              </div>
-                              <div class="col-md-4 mb-3">
-                                <label class="form-label">清理间隔（秒）</label>
-                                <input class="form-control" name="clean_interval_seconds" value="%d">
-                              </div>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">单对象最大体积（字节）</label>
-                                <input class="form-control" name="max_object_bytes" value="%d">
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">规则（每行：matchType|patternOrMediaCSV|ttlSeconds）</label>
-                                <textarea class="form-control" name="rules" rows="8" placeholder="prefix|/assets/|86400&#10;suffix|.js|86400&#10;media|image/,text/css|86400">%s</textarea>
-                                <div class="form-text">matchType: prefix/suffix/media。media 时第二列以逗号分隔多个类型前缀</div>
-                            </div>
-                            <button class="btn btn-primary" type="submit">保存设置</button>
-                        </form>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-body">
-                        <h5>一键清理</h5>
-                        <form class="row g-2" method="POST" action="%s/cdn-cache/clear">
-                            <div class="col-md-3">
-                                <select class="form-select" name="type">
-                                    <option value="all">全部</option>
-                                    <option value="prefix">按前缀</option>
-                                    <option value="suffix">按后缀</option>
-                                    <option value="media">按媒体类型</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <input class="form-control" name="pattern" placeholder="当选择前缀/后缀时填写">
-                            </div>
-                            <div class="col-md-4">
-                                <input class="form-control" name="media_types" placeholder="media模式：image/,text/css">
-                            </div>
-                            <div class="col-md-1">
-                                <button class="btn btn-danger w-100" type="submit">清理</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-            </main>
-        </div>
-    </div>
-</body>
-</html>`,
-		s.generateSidebar(data["AdminPrefix"].(string), "cdn-cache"),
-		data["AdminPrefix"].(string),
-		func() float64 {
-			if v, ok := cdnStats["hit_rate"].(float64); ok {
-				return v
-			}
-			return 0
-		}(),
-		func() int64 {
-			if v, ok := cdnStats["objects"].(int64); ok {
-				return v
-			}
-			return 0
-		}(),
-		func() float64 {
-			if v, ok := cdnStats["utilization"].(float64); ok {
-				return v
-			}
-			return 0
-		}(),
-		func() int64 {
-			if v, ok := cdnStats["hits"].(int64); ok {
-				return v
-			}
-			return 0
-		}(),
-		func() int64 {
-			if v, ok := cdnStats["misses"].(int64); ok {
-				return v
-			}
-			return 0
-		}(),
-		data["AdminPrefix"].(string),
-		map[bool]string{true: "checked"}[cdn.Enabled],
-		cdn.CacheDir,
-		cdn.MaxSizeBytes,
-		cdn.DefaultTTLSeconds,
-		cdn.CleanIntervalSec,
-		cdn.MaxObjectBytes,
-		s.formatCDNRules(cdn.Rules),
-		data["AdminPrefix"].(string))
-}
-
-func (s *Server) formatCDNRules(rules []config.CDNCacheRule) string {
-	if len(rules) == 0 {
-		return ""
-	}
+// generateSSLCertsTable 生成SSL证书表格HTML
+func (s *Server) generateSSLCertsTable(data map[string]interface{}) string {
 	var b strings.Builder
-	for _, r := range rules {
-		if strings.EqualFold(r.MatchType, "media") {
-			b.WriteString("media|")
-			b.WriteString(strings.Join(r.MediaTypes, ","))
-			b.WriteString("|")
-			b.WriteString(fmt.Sprintf("%d\n", r.TTLSeconds))
-		} else {
-			b.WriteString(r.MatchType)
-			b.WriteString("|")
-			b.WriteString(r.Pattern)
-			b.WriteString("|")
-			b.WriteString(fmt.Sprintf("%d\n", r.TTLSeconds))
-		}
-	}
+	b.WriteString(`<div class="table-responsive"><table class="table table-sm">
+		<thead>
+			<tr>
+				<th>域名</th>
+				<th>状态</th>
+				<th>到期时间</th>
+				<th>操作</th>
+			</tr>
+		</thead>
+		<tbody>`)
+
+	// TODO: 实现SSL证书表格生成
+	b.WriteString(`
+			<tr>
+				<td colspan="4" class="text-center text-muted">暂无SSL证书</td>
+			</tr>`)
+
+	b.WriteString(`</tbody></table></div>`)
 	return b.String()
 }
 
-// generateGitServerManagementHTML 生成Git Server管理页面HTML
-func (s *Server) generateGitServerManagementHTML(data map[string]interface{}) string {
+// generateBlockedIPsTable 生成被阻止IP表格HTML
+func (s *Server) generateBlockedIPsTable(data map[string]interface{}) string {
+	var rows strings.Builder
+	rows.WriteString(`<div class="table-responsive"><table class="table table-sm">
+		<thead>
+			<tr>
+				<th>IP地址</th>
+				<th>阻止时间</th>
+				<th>原因</th>
+				<th>操作</th>
+			</tr>
+		</thead>
+		<tbody>`)
+
+	// TODO: 实现被阻止IP表格生成
+	rows.WriteString(`
+			<tr>
+				<td colspan="4" class="text-center text-muted">暂无被阻止的IP</td>
+			</tr>`)
+
+	rows.WriteString(`</tbody></table></div>`)
+	return rows.String()
+}
+
+// 辅助函数来安全地获取配置值
+func (s *Server) getConfigAdminUsername(data map[string]interface{}) string {
+	if username, ok := data["AdminUsername"].(string); ok {
+		return username
+	}
+	return s.config.Admin.Username
+}
+
+func (s *Server) getConfigSSLEmail(data map[string]interface{}) string {
+	if email, ok := data["SSLEmail"].(string); ok {
+		return email
+	}
+	return s.config.SSL.Email
+}
+
+func (s *Server) getConfigSSLDisableSelfSigned(data map[string]interface{}) string {
+	if disable, ok := data["SSLDisableSelfSigned"].(string); ok {
+		return disable
+	}
+	return ""
+}
+
+// ==================== Git Server 页面处理 ====================
+
+// handleCreateApp 处理创建应用页面
+func (s *Server) handleCreateApp(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+
+	data := map[string]interface{}{
+		"AdminPrefix": s.config.AdminPrefix,
+		"GitEnabled":  s.config.Runners.Git.Enabled,
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	html := s.generateCreateAppHTML(data)
+	w.Write([]byte(html))
+}
+
+// handleServerConfig 处理服务器配置页面
+func (s *Server) handleServerConfig(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+
+	// 获取服务器配置
+	serverConfig := s.gitServer.GetServerConfig()
+
+	data := map[string]interface{}{
+		"AdminPrefix":     s.config.AdminPrefix,
+		"GitEnabled":      s.config.Runners.Git.Enabled,
+		"ServerConfig":    serverConfig,
+		"DomainSuffix":    serverConfig.DomainSuffix,
+		"PortRange":       serverConfig.PortRange,
+		"WelcomeMessage":  serverConfig.WelcomeMessage,
+		"AutoSSL":         serverConfig.AutoSSL,
+		"SSLEmail":        serverConfig.SSLEmail,
+		"AutoDomain":      serverConfig.AutoDomain,
+		"DefaultStrategy": serverConfig.DefaultStrategy,
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	html := s.generateServerConfigHTML(data)
+	w.Write([]byte(html))
+}
+
+// generateCreateAppHTML 生成创建应用页面 HTML
+func (s *Server) generateCreateAppHTML(data map[string]interface{}) string {
 	return fmt.Sprintf(`
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Git Server管理 - SSLcat</title>
+    <title>创建应用 - SSLcat Git Server</title>
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .form-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .form-section h5 {
+            color: #495057;
+            margin-bottom: 1rem;
+        }
+        .help-text {
+            font-size: 0.875rem;
+            color: #6c757d;
+        }
+    </style>
 </head>
 <body>
     <div class="container-fluid">
@@ -2903,117 +1231,475 @@ func (s *Server) generateGitServerManagementHTML(data map[string]interface{}) st
             <div class="col-md-2">%s</div>
             <main class="col-md-10">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Git Server管理</h1>
+                    <h1 class="h2">创建新应用</h1>
                     <div>
-                        <span class="badge %s me-2">%s</span>
-                        <button class="btn btn-primary" onclick="addGitRepo()">
-                            <i class="bi bi-plus-circle"></i> 添加仓库
-                        </button>
+                        <a href="%s/git-server" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> 返回 Git Server
+                        </a>
                     </div>
                 </div>
                 
-                <!-- 说明卡片 -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">Git Server 说明</h5>
-                    </div>
-                    <div class="card-body">
-                        <p>Git Server 是一个类似 Railway、Heroku、Dokku 的部署平台，支持：</p>
-                        <ul>
-                            <li>Git 仓库自动部署</li>
-                            <li>多语言项目支持（Node.js、Python、Go、Java等）</li>
-                            <li>自动构建和部署</li>
-                            <li>环境变量管理</li>
-                            <li>域名绑定</li>
-                            <li>SSL证书自动申请</li>
-                        </ul>
-                        <div class="alert alert-info">
-                            <strong>注意：</strong> 此功能正在开发中，敬请期待！
+                <form id="createAppForm" class="needs-validation" novalidate>
+                    <!-- 基本配置 -->
+                    <div class="form-section">
+                        <h5><i class="bi bi-info-circle"></i> 基本配置</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="appName" class="form-label">应用名称 <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="appName" placeholder="my-app" required>
+                                    <div class="help-text">应用名称将用于生成域名和 Git 仓库路径，只能包含字母、数字和连字符</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="appDisplayName" class="form-label">显示名称</label>
+                                    <input type="text" class="form-control" id="appDisplayName" placeholder="我的应用">
+                                    <div class="help-text">可选，用于显示的应用名称</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- 仓库列表 -->
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0">仓库列表</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>仓库名称</th>
-                                        <th>Git URL</th>
-                                        <th>分支</th>
-                                        <th>状态</th>
-                                        <th>最后更新</th>
-                                        <th>操作</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="git-repos-body">
-                                    <tr><td colspan="6" class="text-center text-muted">加载中...</td></tr>
-                                </tbody>
-                            </table>
+                    <!-- 部署配置 -->
+                    <div class="form-section">
+                        <h5><i class="bi bi-gear"></i> 部署配置</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="deployStrategy" class="form-label">部署策略</label>
+                                    <select class="form-select" id="deployStrategy">
+                                        <option value="auto">自动检测</option>
+                                        <option value="docker">Docker</option>
+                                        <option value="static">静态文件</option>
+                                        <option value="php">PHP</option>
+                                    </select>
+                                    <div class="help-text">选择应用的部署方式</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="buildTimeout" class="form-label">构建超时（秒）</label>
+                                    <input type="number" class="form-control" id="buildTimeout" value="300" min="60" max="3600">
+                                    <div class="help-text">构建过程的最大等待时间</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
+
+                    <!-- SSL 配置 -->
+                    <div class="form-section">
+                        <h5><i class="bi bi-shield-check"></i> SSL 配置</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="autoSSL" checked>
+                                    <label class="form-check-label" for="autoSSL">
+                                        自动申请 SSL 证书
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="autoDomain" checked>
+                                    <label class="form-check-label" for="autoDomain">
+                                        自动分配域名
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 环境变量 -->
+                    <div class="form-section">
+                        <h5><i class="bi bi-list-ul"></i> 环境变量</h5>
+                        <div id="envVarsContainer">
+                            <div class="row mb-2">
+                                <div class="col-md-5">
+                                    <input type="text" class="form-control" placeholder="变量名" name="envKey">
+                                </div>
+                                <div class="col-md-5">
+                                    <input type="text" class="form-control" placeholder="变量值" name="envValue">
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeEnvVar(this)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="addEnvVar()">
+                            <i class="bi bi-plus"></i> 添加环境变量
+                        </button>
+                    </div>
+
+                    <!-- 提交按钮 -->
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="%s/git-server" class="btn btn-secondary">取消</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-plus-circle"></i> 创建应用
+                        </button>
+                    </div>
+                </form>
             </main>
         </div>
     </div>
-    
+
     <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-    // 加载Git Server仓库
-    fetch('%s/api/git-server/repos').then(r=>r.json()).then(data=>{
-        const body = document.getElementById('git-repos-body');
-        body.innerHTML = '';
-        const repos = (data && data.data) || [];
-        if (repos.length === 0) {
-            body.innerHTML = '<tr><td colspan="6" class="text-center text-muted">暂无仓库</td></tr>';
-            return;
+        // 表单验证
+        (function() {
+            'use strict';
+            window.addEventListener('load', function() {
+                var forms = document.getElementsByClassName('needs-validation');
+                var validation = Array.prototype.filter.call(forms, function(form) {
+                    form.addEventListener('submit', function(event) {
+                        if (form.checkValidity() === false) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                        }
+                        form.classList.add('was-validated');
+                    }, false);
+                });
+            }, false);
+        })();
+
+        // 添加环境变量
+        function addEnvVar() {
+            const container = document.getElementById('envVarsContainer');
+            const newRow = document.createElement('div');
+            newRow.className = 'row mb-2';
+            newRow.innerHTML = 
+                '<div class="col-md-5">' +
+                    '<input type="text" class="form-control" placeholder="变量名" name="envKey">' +
+                '</div>' +
+                '<div class="col-md-5">' +
+                    '<input type="text" class="form-control" placeholder="变量值" name="envValue">' +
+                '</div>' +
+                '<div class="col-md-2">' +
+                    '<button type="button" class="btn btn-outline-danger btn-sm" onclick="removeEnvVar(this)">' +
+                        '<i class="bi bi-trash"></i>' +
+                    '</button>' +
+                '</div>';
+            container.appendChild(newRow);
         }
-        repos.forEach(repo=>{
-            const tr = document.createElement('tr');
-            const statusBadge = repo.status === 'active' ? 
-                '<span class="badge bg-success">活跃</span>' : 
-                '<span class="badge bg-secondary">未激活</span>';
-            tr.innerHTML = '<td>'+repo.name+'</td>'+
-                           '<td><code>'+repo.url+'</code></td>'+
-                           '<td>'+repo.branch+'</td>'+
-                           '<td>'+statusBadge+'</td>'+
-                           '<td>'+(repo.last_updated || '未知')+'</td>'+
-                           '<td>'+
-                               '<button class="btn btn-sm btn-outline-primary me-1" onclick="viewRepo(\''+repo.id+'\')">查看</button>'+
-                               '<button class="btn btn-sm btn-outline-danger" onclick="removeGitRepo(\''+repo.id+'\')">删除</button>'+
-                           '</td>';
-            body.appendChild(tr);
+
+        // 删除环境变量
+        function removeEnvVar(button) {
+            button.closest('.row').remove();
+        }
+
+        // 表单提交
+        document.getElementById('createAppForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const appData = {
+                name: document.getElementById('appName').value,
+                display_name: document.getElementById('appDisplayName').value || document.getElementById('appName').value,
+                deploy_strategy: document.getElementById('deployStrategy').value,
+                build_timeout: parseInt(document.getElementById('buildTimeout').value),
+                auto_ssl: document.getElementById('autoSSL').checked,
+                auto_domain: document.getElementById('autoDomain').checked,
+                env_vars: {}
+            };
+
+            // 收集环境变量
+            const envRows = document.querySelectorAll('#envVarsContainer .row');
+            envRows.forEach(row => {
+                const key = row.querySelector('input[name="envKey"]').value;
+                const value = row.querySelector('input[name="envValue"]').value;
+                if (key && value) {
+                    appData.env_vars[key] = value;
+                }
+            });
+
+            // 提交数据
+            fetch('%s/api/git-server/app/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(appData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('应用创建成功！');
+                    window.location.href = '%s/git-server';
+                } else {
+                    alert('创建失败: ' + (data.message || '未知错误'));
+                }
+            })
+            .catch(error => {
+                alert('创建失败: ' + error.message);
+            });
         });
-    }).catch(()=>{
-        document.getElementById('git-repos-body').innerHTML = '<tr><td colspan="6" class="text-center text-muted">加载失败</td></tr>';
-    });
-
-    function addGitRepo() {
-        alert('Git Server 功能正在开发中，敬请期待！');
-    }
-
-    function viewRepo(id) {
-        alert('查看仓库详情功能正在开发中');
-    }
-
-    function removeGitRepo(id) {
-        if (confirm('确定要删除这个仓库吗？')) {
-            fetch('%s/api/git-server/repo/remove?id='+id, {method: 'POST'})
-                .then(() => location.reload())
-                .catch(() => alert('删除失败'));
-        }
-    }
     </script>
 </body>
 </html>`,
 		s.generateSidebar(data["AdminPrefix"].(string), "git-server"),
-		map[bool]string{true: "bg-success", false: "bg-secondary"}[data["GitEnabled"].(bool)],
-		map[bool]string{true: "已启用", false: "已禁用"}[data["GitEnabled"].(bool)],
+		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string))
+}
+
+// generateServerConfigHTML 生成服务器配置页面 HTML
+func (s *Server) generateServerConfigHTML(data map[string]interface{}) string {
+	return fmt.Sprintf(`
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>服务器配置 - SSLcat Git Server</title>
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .form-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .form-section h5 {
+            color: #495057;
+            margin-bottom: 1rem;
+        }
+        .help-text {
+            font-size: 0.875rem;
+            color: #6c757d;
+        }
+        .config-preview {
+            background: #e9ecef;
+            border-radius: 4px;
+            padding: 1rem;
+            font-family: monospace;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-2">%s</div>
+            <main class="col-md-10">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">服务器配置</h1>
+                    <div>
+                        <a href="%s/git-server" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> 返回 Git Server
+                        </a>
+                    </div>
+                </div>
+                
+                <form id="serverConfigForm" class="needs-validation" novalidate>
+                    <!-- 基本配置 -->
+                    <div class="form-section">
+                        <h5><i class="bi bi-globe"></i> 基本配置</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="domainSuffix" class="form-label">主域名后缀</label>
+                                    <input type="text" class="form-control" id="domainSuffix" value="%s" placeholder="your-domain.com">
+                                    <div class="help-text">应用将分配到此域名的子域名，如 app.your-domain.com</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="welcomeMessage" class="form-label">Git 推送欢迎语</label>
+                                    <textarea class="form-control" id="welcomeMessage" rows="3" placeholder="欢迎使用 SSLcat Git 部署平台！">%s</textarea>
+                                    <div class="help-text">用户推送代码时显示的消息</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 端口配置 -->
+                    <div class="form-section">
+                        <h5><i class="bi bi-hdd-network"></i> 端口配置</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="portRangeStart" class="form-label">端口范围起始</label>
+                                    <input type="number" class="form-control" id="portRangeStart" value="%d" min="8000" max="65535">
+                                    <div class="help-text">应用端口分配的起始端口</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="portRangeEnd" class="form-label">端口范围结束</label>
+                                    <input type="number" class="form-control" id="portRangeEnd" value="%d" min="8000" max="65535">
+                                    <div class="help-text">应用端口分配的结束端口</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SSL 配置 -->
+                    <div class="form-section">
+                        <h5><i class="bi bi-shield-check"></i> SSL 配置</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="autoSSL" %s>
+                                    <label class="form-check-label" for="autoSSL">
+                                        自动申请 SSL 证书
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="autoDomain" %s>
+                                    <label class="form-check-label" for="autoDomain">
+                                        自动分配域名
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    <label for="sslEmail" class="form-label">SSL 证书邮箱</label>
+                                    <input type="email" class="form-control" id="sslEmail" value="%s" placeholder="admin@your-domain.com">
+                                    <div class="help-text">用于 Let's Encrypt 证书申请的邮箱地址</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 部署配置 -->
+                    <div class="form-section">
+                        <h5><i class="bi bi-gear"></i> 部署配置</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="defaultStrategy" class="form-label">默认部署策略</label>
+                                    <select class="form-select" id="defaultStrategy">
+                                        <option value="auto" %s>自动检测</option>
+                                        <option value="docker" %s>Docker</option>
+                                        <option value="static" %s>静态文件</option>
+                                        <option value="php" %s>PHP</option>
+                                    </select>
+                                    <div class="help-text">新应用的默认部署方式</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="buildTimeout" class="form-label">构建超时（秒）</label>
+                                    <input type="number" class="form-control" id="buildTimeout" value="300" min="60" max="3600">
+                                    <div class="help-text">构建过程的最大等待时间</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 配置预览 -->
+                    <div class="form-section">
+                        <h5><i class="bi bi-eye"></i> 配置预览</h5>
+                        <div class="config-preview" id="configPreview">
+                            配置预览将在这里显示...
+                        </div>
+                    </div>
+
+                    <!-- 提交按钮 -->
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="%s/git-server" class="btn btn-secondary">取消</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> 保存配置
+                        </button>
+                    </div>
+                </form>
+            </main>
+        </div>
+    </div>
+
+    <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 更新配置预览
+        function updateConfigPreview() {
+            const config = {
+                domain_suffix: document.getElementById('domainSuffix').value,
+                port_range: [
+                    parseInt(document.getElementById('portRangeStart').value),
+                    parseInt(document.getElementById('portRangeEnd').value)
+                ],
+                welcome_message: document.getElementById('welcomeMessage').value,
+                auto_ssl: document.getElementById('autoSSL').checked,
+                ssl_email: document.getElementById('sslEmail').value,
+                auto_domain: document.getElementById('autoDomain').checked,
+                default_strategy: document.getElementById('defaultStrategy').value,
+                build_timeout: parseInt(document.getElementById('buildTimeout').value)
+            };
+            
+            document.getElementById('configPreview').innerHTML = JSON.stringify(config, null, 2);
+        }
+
+        // 监听表单变化
+        document.querySelectorAll('#serverConfigForm input, #serverConfigForm select, #serverConfigForm textarea').forEach(element => {
+            element.addEventListener('change', updateConfigPreview);
+            element.addEventListener('input', updateConfigPreview);
+        });
+
+        // 初始化预览
+        updateConfigPreview();
+
+        // 表单提交
+        document.getElementById('serverConfigForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const config = {
+                domain_suffix: document.getElementById('domainSuffix').value,
+                port_range: [
+                    parseInt(document.getElementById('portRangeStart').value),
+                    parseInt(document.getElementById('portRangeEnd').value)
+                ],
+                welcome_message: document.getElementById('welcomeMessage').value,
+                auto_ssl: document.getElementById('autoSSL').checked,
+                ssl_email: document.getElementById('sslEmail').value,
+                auto_domain: document.getElementById('autoDomain').checked,
+                default_strategy: document.getElementById('defaultStrategy').value,
+                build_timeout: parseInt(document.getElementById('buildTimeout').value)
+            };
+
+            fetch('%s/api/git-server/config/update', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(config)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('服务器配置已保存！');
+                    window.location.href = '%s/git-server';
+                } else {
+                    alert('保存失败: ' + (data.message || '未知错误'));
+                }
+            })
+            .catch(error => {
+                alert('保存失败: ' + error.message);
+            });
+        });
+    </script>
+</body>
+</html>`,
+		s.generateSidebar(data["AdminPrefix"].(string), "git-server"),
+		data["AdminPrefix"].(string),
+		data["DomainSuffix"].(string),
+		data["WelcomeMessage"].(string),
+		data["PortRange"].([2]int)[0],
+		data["PortRange"].([2]int)[1],
+		map[bool]string{true: "checked", false: ""}[data["AutoSSL"].(bool)],
+		map[bool]string{true: "checked", false: ""}[data["AutoDomain"].(bool)],
+		data["SSLEmail"].(string),
+		map[string]string{"auto": "selected", "docker": "", "static": "", "php": ""}[data["DefaultStrategy"].(string)],
+		map[string]string{"auto": "", "docker": "selected", "static": "", "php": ""}[data["DefaultStrategy"].(string)],
+		map[string]string{"auto": "", "docker": "", "static": "selected", "php": ""}[data["DefaultStrategy"].(string)],
+		map[string]string{"auto": "", "docker": "", "static": "", "php": "selected"}[data["DefaultStrategy"].(string)],
+		data["AdminPrefix"].(string),
 		data["AdminPrefix"].(string),
 		data["AdminPrefix"].(string))
 }
