@@ -15,6 +15,10 @@ func (s *Server) handleProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 检测并设置语言
+	lang := s.detectLanguage(r)
+	s.translator.SetLanguage(lang)
+
 	// 获取所有代理规则
 	rules := s.config.Proxy.Rules
 
