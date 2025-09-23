@@ -20,6 +20,7 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 	navSettings := s.translator.T("nav.settings")
 	navRunners := s.translator.T("nav.runners")
 	navGitDeployServer := s.translator.T("nav.git_deploy_server")
+	navNotifications := s.translator.T("nav.notifications")
 	logout := s.translator.T("menu.logout")
 	official := s.translator.T("menu.官方站点")
 	if official == "menu.官方站点" {
@@ -105,6 +106,11 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
                             <li class="nav-item">
                                 <a class="nav-link %s" href="%s/git-server">
                                     <i class="bi bi-git"></i> %s
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link %s" href="%s/notifications">
+                                    <i class="bi bi-bell"></i> %s
                                 </a>
                             </li>
                         </ul>
@@ -206,6 +212,14 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 		}(),
 		adminPrefix,
 		navGitDeployServer,
+		func() string {
+			if activePage == "notifications" {
+				return "active"
+			}
+			return ""
+		}(),
+		adminPrefix,
+		navNotifications,
 		adminPrefix,
 		logout)
 }
@@ -1162,10 +1176,10 @@ func (s *Server) handleCreateApp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := map[string]interface{}{
-		"AdminPrefix": s.config.AdminPrefix,
-		"GitEnabled":  s.config.Runners.Git.Enabled,
+		"AdminPrefix":    s.config.AdminPrefix,
+		"GitEnabled":     s.config.Runners.Git.Enabled,
 		"CreateAppTitle": s.translator.T("git_deploy_server.create_app_title"),
-		"ReturnText": s.translator.T("git_deploy_server.return"),
+		"ReturnText":     s.translator.T("git_deploy_server.return"),
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -1183,18 +1197,18 @@ func (s *Server) handleServerConfig(w http.ResponseWriter, r *http.Request) {
 	serverConfig := s.gitServer.GetServerConfig()
 
 	data := map[string]interface{}{
-		"AdminPrefix":     s.config.AdminPrefix,
-		"GitEnabled":      s.config.Runners.Git.Enabled,
-		"ServerConfig":    serverConfig,
-		"DomainSuffix":    serverConfig.DomainSuffix,
+		"AdminPrefix":       s.config.AdminPrefix,
+		"GitEnabled":        s.config.Runners.Git.Enabled,
+		"ServerConfig":      serverConfig,
+		"DomainSuffix":      serverConfig.DomainSuffix,
 		"ServerConfigTitle": s.translator.T("git_deploy_server.server_config_title"),
-		"ReturnText": s.translator.T("git_deploy_server.return"),
-		"PortRange":       serverConfig.PortRange,
-		"WelcomeMessage":  serverConfig.WelcomeMessage,
-		"AutoSSL":         serverConfig.AutoSSL,
-		"SSLEmail":        serverConfig.SSLEmail,
-		"AutoDomain":      serverConfig.AutoDomain,
-		"DefaultStrategy": serverConfig.DefaultStrategy,
+		"ReturnText":        s.translator.T("git_deploy_server.return"),
+		"PortRange":         serverConfig.PortRange,
+		"WelcomeMessage":    serverConfig.WelcomeMessage,
+		"AutoSSL":           serverConfig.AutoSSL,
+		"SSLEmail":          serverConfig.SSLEmail,
+		"AutoDomain":        serverConfig.AutoDomain,
+		"DefaultStrategy":   serverConfig.DefaultStrategy,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
