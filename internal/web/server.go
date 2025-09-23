@@ -895,14 +895,24 @@ func (s *Server) getCurrentUser(r *http.Request) *User {
 		return nil
 	}
 
-	// 从数据库获取用户信息
+	// 首先尝试从数据库获取用户信息
 	user, err := s.userManager.GetUserByUsername(session.Username)
-	if err != nil {
-		s.log.Warnf("获取用户信息失败: %v", err)
-		return nil
+	if err == nil {
+		return user
 	}
 
-	return user
+	// 如果数据库中没有用户，检查是否是配置文件中的管理员
+	if session.Username == s.config.Admin.Username {
+		// 返回配置文件中的管理员用户信息
+		return &User{
+			Username: session.Username,
+			Role:     session.Role, // 使用会话中存储的角色
+			IsActive: true,
+		}
+	}
+
+	s.log.Warnf("获取用户信息失败: %v", err)
+	return nil
 }
 
 func (s *Server) getSystemStats() map[string]interface{} {
