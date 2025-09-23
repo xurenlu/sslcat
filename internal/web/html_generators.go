@@ -21,6 +21,7 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 	navRunners := s.translator.T("nav.runners")
 	navGitDeployServer := s.translator.T("nav.git_deploy_server")
 	navNotifications := s.translator.T("nav.notifications")
+	navCluster := s.translator.T("nav.cluster")
 	logout := s.translator.T("menu.logout")
 	official := s.translator.T("menu.官方站点")
 	if official == "menu.官方站点" {
@@ -89,13 +90,8 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link %s" href="%s/settings">
-                                    <i class="bi bi-gear"></i> %s
-                                </a>
-                            </li>
-                            <li class="nav-item">
                                 <a class="nav-link %s" href="%s/cluster">
-                                    <i class="bi bi-diagram-3"></i> 集群管理
+                                    <i class="bi bi-diagram-3"></i> %s
                                 </a>
                             </li>
                             <li class="nav-item">
@@ -111,6 +107,11 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
                             <li class="nav-item">
                                 <a class="nav-link %s" href="%s/notifications">
                                     <i class="bi bi-bell"></i> %s
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link %s" href="%s/settings">
+                                    <i class="bi bi-gear"></i> %s
                                 </a>
                             </li>
                         </ul>
@@ -182,20 +183,13 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 		adminPrefix,
 		navSecurity,
 		func() string {
-			if activePage == "settings" {
-				return "active"
-			}
-			return ""
-		}(),
-		adminPrefix,
-		navSettings,
-		func() string {
 			if activePage == "cluster" {
 				return "active"
 			}
 			return ""
 		}(),
 		adminPrefix,
+		navCluster,
 		func() string {
 			if activePage == "runners" {
 				return "active"
@@ -220,6 +214,14 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 		}(),
 		adminPrefix,
 		navNotifications,
+		func() string {
+			if activePage == "settings" {
+				return "active"
+			}
+			return ""
+		}(),
+		adminPrefix,
+		navSettings,
 		adminPrefix,
 		logout)
 }
