@@ -10,6 +10,10 @@
   "nav.monitoring": "Monitoring & Stats",
   "nav.logs": "Log Management",
   "nav.settings": "System Settings",
+  "nav.runners": "Runners Management",
+  "nav.git_deploy_server": "Git Deploy Server",
+  "nav.cluster": "Cluster Management",
+  "nav.dns": "DNS Configuration",
   
   "login.title": "Administrator Login",
   "login.username": "Username",
@@ -157,5 +161,14 @@
   "mobile.proxy_config": "Proxy Configuration",
   "mobile.security_protection": "Security Protection",
   "mobile.view_logs": "View Logs",
-  "mobile.real_time_monitor": "Real-time Traffic Monitoring"
+  "mobile.real_time_monitor": "Real-time Traffic Monitoring",
+  
+  "git_deploy_server.title": "Git Deploy Server Management",
+  "git_deploy_server.create_app": "Create App",
+  "git_deploy_server.server_config": "Server Configuration",
+  "git_deploy_server.function_description": "Git Deploy Server Features",
+  "git_deploy_server.description": "Git Deploy Server is a deployment platform similar to Railway, Heroku, Dokku, supporting:",
+  "git_deploy_server.return": "Back to Git Deploy Server",
+  "git_deploy_server.create_app_title": "Create App - SSLcat Git Deploy Server",
+  "git_deploy_server.server_config_title": "Server Configuration - SSLcat Git Deploy Server"
 }

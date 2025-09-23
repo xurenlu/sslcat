@@ -12,7 +12,7 @@ func (s *Server) generateGitServerManagementHTML(data map[string]interface{}) st
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Git Deploy Server管理 - SSLcat</title>
+    <title>%s - SSLcat</title>
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
     <style>
@@ -42,7 +42,7 @@ func (s *Server) generateGitServerManagementHTML(data map[string]interface{}) st
             <div class="col-md-2">%s</div>
             <main class="col-md-10">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Git Deploy Server管理</h1>
+                    <h1 class="h2">%s</h1>
                     <div>
                         <span class="badge %s me-2">%s</span>
                         <a href="%s/git-server/create-app" class="btn btn-primary">
@@ -57,10 +57,10 @@ func (s *Server) generateGitServerManagementHTML(data map[string]interface{}) st
                 <!-- 说明卡片 -->
                 <div class="card mb-4">
                     <div class="card-header">
-                        <h5 class="mb-0">Git Deploy Server 功能说明</h5>
+                        <h5 class="mb-0">%s</h5>
                     </div>
                     <div class="card-body">
-                        <p>Git Deploy Server 是一个类似 Railway、Heroku、Dokku 的部署平台，支持：</p>
+                        <p>%s</p>
                         <div class="row">
                             <div class="col-md-6">
                                 <ul>
@@ -603,9 +603,18 @@ func (s *Server) generateGitServerManagementHTML(data map[string]interface{}) st
     </script>
 </body>
 </html>`,
+		data["Title"].(string),
 		s.generateSidebar(data["AdminPrefix"].(string), "git-server"),
 		map[bool]string{true: "bg-success", false: "bg-secondary"}[data["GitEnabled"].(bool)],
 		map[bool]string{true: "已启用", false: "已禁用"}[data["GitEnabled"].(bool)],
+		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string),
+		data["FunctionDescription"].(string),
+		data["Description"].(string),
+		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string),
 		data["AdminPrefix"].(string),
 		data["AdminPrefix"].(string))
 }

@@ -15,10 +15,11 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 	navStatic := s.translator.T("nav.static_sites")
 	navPHP := s.translator.T("nav.php_sites")
 	navSSL := s.translator.T("nav.ssl")
-	navDNS := "DNS配置"
+	navDNS := s.translator.T("nav.dns")
 	navSecurity := s.translator.T("nav.security")
 	navSettings := s.translator.T("nav.settings")
-	navRunners := "Runners管理"
+	navRunners := s.translator.T("nav.runners")
+	navGitDeployServer := s.translator.T("nav.git_deploy_server")
 	logout := s.translator.T("menu.logout")
 	official := s.translator.T("menu.官方站点")
 	if official == "menu.官方站点" {
@@ -103,7 +104,7 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link %s" href="%s/git-server">
-                                    <i class="bi bi-git"></i> Git Deploy Server
+                                    <i class="bi bi-git"></i> %s
                                 </a>
                             </li>
                         </ul>
@@ -204,6 +205,7 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
 			return ""
 		}(),
 		adminPrefix,
+		navGitDeployServer,
 		adminPrefix,
 		logout)
 }
@@ -1162,6 +1164,8 @@ func (s *Server) handleCreateApp(w http.ResponseWriter, r *http.Request) {
 	data := map[string]interface{}{
 		"AdminPrefix": s.config.AdminPrefix,
 		"GitEnabled":  s.config.Runners.Git.Enabled,
+		"CreateAppTitle": s.translator.T("git_deploy_server.create_app_title"),
+		"ReturnText": s.translator.T("git_deploy_server.return"),
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -1183,6 +1187,8 @@ func (s *Server) handleServerConfig(w http.ResponseWriter, r *http.Request) {
 		"GitEnabled":      s.config.Runners.Git.Enabled,
 		"ServerConfig":    serverConfig,
 		"DomainSuffix":    serverConfig.DomainSuffix,
+		"ServerConfigTitle": s.translator.T("git_deploy_server.server_config_title"),
+		"ReturnText": s.translator.T("git_deploy_server.return"),
 		"PortRange":       serverConfig.PortRange,
 		"WelcomeMessage":  serverConfig.WelcomeMessage,
 		"AutoSSL":         serverConfig.AutoSSL,
@@ -1204,7 +1210,7 @@ func (s *Server) generateCreateAppHTML(data map[string]interface{}) string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>创建应用 - SSLcat Git Deploy Server</title>
+    <title>%s</title>
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
     <style>
@@ -1233,7 +1239,7 @@ func (s *Server) generateCreateAppHTML(data map[string]interface{}) string {
                     <h1 class="h2">创建新应用</h1>
                     <div>
                         <a href="%s/git-server" class="btn btn-outline-secondary">
-                            <i class="bi bi-arrow-left"></i> 返回 Git Deploy Server
+                            <i class="bi bi-arrow-left"></i> %s
                         </a>
                     </div>
                 </div>
@@ -1437,8 +1443,10 @@ func (s *Server) generateCreateAppHTML(data map[string]interface{}) string {
     </script>
 </body>
 </html>`,
+		data["CreateAppTitle"].(string),
 		s.generateSidebar(data["AdminPrefix"].(string), "git-server"),
 		data["AdminPrefix"].(string),
+		data["ReturnText"].(string),
 		data["AdminPrefix"].(string),
 		data["AdminPrefix"].(string),
 		data["AdminPrefix"].(string))
@@ -1452,7 +1460,7 @@ func (s *Server) generateServerConfigHTML(data map[string]interface{}) string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>服务器配置 - SSLcat Git Deploy Server</title>
+    <title>%s</title>
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
     <style>
@@ -1488,7 +1496,7 @@ func (s *Server) generateServerConfigHTML(data map[string]interface{}) string {
                     <h1 class="h2">服务器配置</h1>
                     <div>
                         <a href="%s/git-server" class="btn btn-outline-secondary">
-                            <i class="bi bi-arrow-left"></i> 返回 Git Deploy Server
+                            <i class="bi bi-arrow-left"></i> %s
                         </a>
                     </div>
                 </div>
@@ -1522,14 +1530,14 @@ func (s *Server) generateServerConfigHTML(data map[string]interface{}) string {
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label for="portRangeStart" class="form-label">端口范围起始</label>
-                                    <input type="number" class="form-control" id="portRangeStart" value="%d" min="8000" max="65535">
+                                    <input type="number" class="form-control" id="portRangeStart" value="%s" min="8000" max="65535">
                                     <div class="help-text">应用端口分配的起始端口</div>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label for="portRangeEnd" class="form-label">端口范围结束</label>
-                                    <input type="number" class="form-control" id="portRangeEnd" value="%d" min="8000" max="65535">
+                                    <input type="number" class="form-control" id="portRangeEnd" value="%s" min="8000" max="65535">
                                     <div class="help-text">应用端口分配的结束端口</div>
                                 </div>
                             </div>
@@ -1689,8 +1697,8 @@ func (s *Server) generateServerConfigHTML(data map[string]interface{}) string {
 		data["AdminPrefix"].(string),
 		data["DomainSuffix"].(string),
 		data["WelcomeMessage"].(string),
-		data["PortRange"].([2]int)[0],
-		data["PortRange"].([2]int)[1],
+		fmt.Sprintf("%d", data["PortRange"].([2]int)[0]),
+		fmt.Sprintf("%d", data["PortRange"].([2]int)[1]),
 		map[bool]string{true: "checked", false: ""}[data["AutoSSL"].(bool)],
 		map[bool]string{true: "checked", false: ""}[data["AutoDomain"].(bool)],
 		data["SSLEmail"].(string),
@@ -1698,7 +1706,9 @@ func (s *Server) generateServerConfigHTML(data map[string]interface{}) string {
 		map[string]string{"auto": "", "docker": "selected", "static": "", "php": ""}[data["DefaultStrategy"].(string)],
 		map[string]string{"auto": "", "docker": "", "static": "selected", "php": ""}[data["DefaultStrategy"].(string)],
 		map[string]string{"auto": "", "docker": "", "static": "", "php": "selected"}[data["DefaultStrategy"].(string)],
+		data["ServerConfigTitle"].(string),
+		s.generateSidebar(data["AdminPrefix"].(string), "git-server"),
 		data["AdminPrefix"].(string),
-		data["AdminPrefix"].(string),
+		data["ReturnText"].(string),
 		data["AdminPrefix"].(string))
 }
