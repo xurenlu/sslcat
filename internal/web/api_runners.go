@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/sirupsen/logrus"
 	"github.com/xurenlu/sslcat/internal/config"
@@ -339,28 +340,28 @@ func NewGitServerAPI(gs *runner.GitServer) *GitServerAPI {
 	}
 }
 
-// ListRepositories 列出所有仓库
-func (api *GitServerAPI) ListRepositories(w http.ResponseWriter, r *http.Request) {
-	repos := api.server.ListRepositories()
+// ListApps 列出所有应用
+func (api *GitServerAPI) ListApps(w http.ResponseWriter, r *http.Request) {
+	apps := api.server.ListApps()
 
 	response := map[string]interface{}{
 		"success": true,
-		"data":    repos,
-		"count":   len(repos),
+		"data":    apps,
+		"count":   len(apps),
 	}
 
 	api.writeJSON(w, response)
 }
 
-// GetRepository 获取仓库详情
-func (api *GitServerAPI) GetRepository(w http.ResponseWriter, r *http.Request) {
-	repoID := r.URL.Query().Get("id")
-	if repoID == "" {
-		api.writeError(w, "仓库ID不能为空", http.StatusBadRequest)
+// GetApp 获取应用详情
+func (api *GitServerAPI) GetApp(w http.ResponseWriter, r *http.Request) {
+	appName := r.URL.Query().Get("name")
+	if appName == "" {
+		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
 		return
 	}
 
-	repo, err := api.server.GetRepository(repoID)
+	app, err := api.server.GetApp(appName)
 	if err != nil {
 		api.writeError(w, err.Error(), http.StatusNotFound)
 		return
@@ -368,18 +369,18 @@ func (api *GitServerAPI) GetRepository(w http.ResponseWriter, r *http.Request) {
 
 	response := map[string]interface{}{
 		"success": true,
-		"data":    repo,
+		"data":    app,
 	}
 
 	api.writeJSON(w, response)
 }
 
-// AddRepository 添加仓库
-func (api *GitServerAPI) AddRepository(w http.ResponseWriter, r *http.Request) {
+// CreateApp 创建应用
+func (api *GitServerAPI) CreateApp(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Name   string `json:"name"`
-		URL    string `json:"url"`
-		Branch string `json:"branch"`
+		Name        string `json:"name"`
+		DisplayName string `json:"display_name"`
+		AutoSSL     bool   `json:"auto_ssl"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -389,78 +390,103 @@ func (api *GitServerAPI) AddRepository(w http.ResponseWriter, r *http.Request) {
 
 	// 验证必填字段
 	if req.Name == "" {
-		api.writeError(w, "仓库名称不能为空", http.StatusBadRequest)
+		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
 		return
-	}
-	if req.URL == "" {
-		api.writeError(w, "仓库URL不能为空", http.StatusBadRequest)
-		return
-	}
-	if req.Branch == "" {
-		req.Branch = "main"
 	}
 
-	if err := api.server.AddRepository(req.Name, req.URL, req.Branch); err != nil {
-		api.writeError(w, "添加仓库失败: "+err.Error(), http.StatusInternalServerError)
+	app, err := api.server.CreateApp(req.Name)
+	if err != nil {
+		api.writeError(w, "创建应用失败: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	response := map[string]interface{}{
 		"success": true,
-		"message": "仓库添加成功",
+		"message": "应用创建成功",
+		"data":    app,
 	}
 
 	api.writeJSON(w, response)
 }
 
-// UpdateRepository 更新仓库
-func (api *GitServerAPI) UpdateRepository(w http.ResponseWriter, r *http.Request) {
-	repoID := r.URL.Query().Get("id")
-	if repoID == "" {
-		api.writeError(w, "仓库ID不能为空", http.StatusBadRequest)
+// DeleteApp 删除应用
+func (api *GitServerAPI) DeleteApp(w http.ResponseWriter, r *http.Request) {
+	appName := r.URL.Query().Get("name")
+	if appName == "" {
+		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
 		return
 	}
 
-	if err := api.server.UpdateRepository(repoID); err != nil {
-		api.writeError(w, "更新仓库失败: "+err.Error(), http.StatusInternalServerError)
+	if err := api.server.DeleteApp(appName); err != nil {
+		api.writeError(w, "删除应用失败: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	response := map[string]interface{}{
 		"success": true,
-		"message": "仓库更新成功",
+		"message": "应用删除成功",
 	}
 
 	api.writeJSON(w, response)
 }
 
-// RemoveRepository 删除仓库
-func (api *GitServerAPI) RemoveRepository(w http.ResponseWriter, r *http.Request) {
-	repoID := r.URL.Query().Get("id")
-	if repoID == "" {
-		api.writeError(w, "仓库ID不能为空", http.StatusBadRequest)
+// GetServerConfig 获取服务器配置
+func (api *GitServerAPI) GetServerConfig(w http.ResponseWriter, r *http.Request) {
+	config := api.server.GetServerConfig()
+
+	response := map[string]interface{}{
+		"success": true,
+		"data":    config,
+	}
+
+	api.writeJSON(w, response)
+}
+
+// UpdateServerConfig 更新服务器配置
+func (api *GitServerAPI) UpdateServerConfig(w http.ResponseWriter, r *http.Request) {
+	var config runner.GitServerConfig
+
+	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
+		api.writeError(w, "解析请求失败: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if err := api.server.RemoveRepository(repoID); err != nil {
-		api.writeError(w, "删除仓库失败: "+err.Error(), http.StatusInternalServerError)
+	if err := api.server.UpdateServerConfig(&config); err != nil {
+		api.writeError(w, "更新服务器配置失败: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	response := map[string]interface{}{
 		"success": true,
-		"message": "仓库删除成功",
+		"message": "服务器配置已更新",
 	}
 
 	api.writeJSON(w, response)
 }
 
-// ExecuteCommand 在仓库中执行命令
-func (api *GitServerAPI) ExecuteCommand(w http.ResponseWriter, r *http.Request) {
+// ==================== SSH 密钥管理 API ====================
+
+// ListSSHKeys 列出所有 SSH 密钥
+func (api *GitServerAPI) ListSSHKeys(w http.ResponseWriter, r *http.Request) {
+	keys, err := api.server.ListSSHKeys()
+	if err != nil {
+		api.writeError(w, "获取 SSH 密钥失败: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"success": true,
+		"data":    keys,
+	}
+
+	api.writeJSON(w, response)
+}
+
+// AddSSHKey 添加 SSH 密钥
+func (api *GitServerAPI) AddSSHKey(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		RepoID  string   `json:"repo_id"`
-		Command []string `json:"command"`
-		WorkDir string   `json:"work_dir"`
+		Name      string `json:"name"`
+		PublicKey string `json:"public_key"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -468,25 +494,96 @@ func (api *GitServerAPI) ExecuteCommand(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// 验证必填字段
-	if req.RepoID == "" {
-		api.writeError(w, "仓库ID不能为空", http.StatusBadRequest)
-		return
-	}
-	if len(req.Command) == 0 {
-		api.writeError(w, "命令不能为空", http.StatusBadRequest)
+	if req.Name == "" || req.PublicKey == "" {
+		api.writeError(w, "密钥名称和公钥不能为空", http.StatusBadRequest)
 		return
 	}
 
-	result, err := api.server.ExecuteInRepository(req.RepoID, req.Command, req.WorkDir)
-	if err != nil {
-		api.writeError(w, "执行命令失败: "+err.Error(), http.StatusInternalServerError)
+	if err := api.server.AddSSHKey(req.Name, req.PublicKey); err != nil {
+		api.writeError(w, "添加 SSH 密钥失败: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	response := map[string]interface{}{
 		"success": true,
-		"data":    result,
+		"message": "SSH 密钥添加成功",
+	}
+
+	api.writeJSON(w, response)
+}
+
+// RemoveSSHKey 删除 SSH 密钥
+func (api *GitServerAPI) RemoveSSHKey(w http.ResponseWriter, r *http.Request) {
+	fingerprint := r.URL.Query().Get("fingerprint")
+	if fingerprint == "" {
+		api.writeError(w, "密钥指纹不能为空", http.StatusBadRequest)
+		return
+	}
+
+	if err := api.server.RemoveSSHKey(fingerprint); err != nil {
+		api.writeError(w, "删除 SSH 密钥失败: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"success": true,
+		"message": "SSH 密钥删除成功",
+	}
+
+	api.writeJSON(w, response)
+}
+
+// ==================== 日志查看 API ====================
+
+// GetAppLogs 获取应用日志
+func (api *GitServerAPI) GetAppLogs(w http.ResponseWriter, r *http.Request) {
+	appName := r.URL.Query().Get("app")
+	linesStr := r.URL.Query().Get("lines")
+
+	if appName == "" {
+		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+		return
+	}
+
+	lines := 100 // 默认返回最后100行
+	if linesStr != "" {
+		if l, err := strconv.Atoi(linesStr); err == nil && l > 0 {
+			lines = l
+		}
+	}
+
+	logs, err := api.server.GetAppLogs(appName, lines)
+	if err != nil {
+		api.writeError(w, "获取应用日志失败: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"success": true,
+		"data":    logs,
+	}
+
+	api.writeJSON(w, response)
+}
+
+// GetAppLogFiles 获取应用日志文件列表
+func (api *GitServerAPI) GetAppLogFiles(w http.ResponseWriter, r *http.Request) {
+	appName := r.URL.Query().Get("app")
+
+	if appName == "" {
+		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+		return
+	}
+
+	files, err := api.server.GetAppLogFiles(appName)
+	if err != nil {
+		api.writeError(w, "获取日志文件列表失败: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"success": true,
+		"data":    files,
 	}
 
 	api.writeJSON(w, response)
@@ -615,11 +712,11 @@ func (s *Server) handleGitServer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 获取Git Server的状态
-	gitRepos := s.gitServer.ListRepositories()
+	gitApps := s.gitServer.ListApps()
 
 	data := map[string]interface{}{
 		"AdminPrefix": s.config.AdminPrefix,
-		"GitRepos":    gitRepos,
+		"GitApps":     gitApps,
 		"GitEnabled":  s.config.Runners.Git.Enabled,
 	}
 

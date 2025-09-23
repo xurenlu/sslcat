@@ -55,18 +55,48 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link {% if 'static-sites' in request.url_path %}active{% endif %}" href="{{ admin_prefix }}/static-sites">
+                                <i class="bi bi-file-earmark-text"></i> 静态站点
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'php-sites' in request.url_path %}active{% endif %}" href="{{ admin_prefix }}/php-sites">
+                                <i class="bi bi-code-square"></i> PHP站点
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link {% if 'ssl' in request.url_path %}active{% endif %}" href="{{ admin_prefix }}/ssl">
                                 <i class="bi bi-shield-lock"></i> SSL证书
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link {% if 'dns' in request.url_path %}active{% endif %}" href="{{ admin_prefix }}/dns">
+                                <i class="bi bi-globe"></i> DNS配置
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link {% if 'security' in request.url_path %}active{% endif %}" href="{{ admin_prefix }}/security">
-                                <i class="bi bi-shield-exclamation"></i> 安全设置
+                                <i class="bi bi-shield-check"></i> 安全设置
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link {% if 'settings' in request.url_path %}active{% endif %}" href="{{ admin_prefix }}/settings">
                                 <i class="bi bi-gear"></i> 系统设置
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'cluster' in request.url_path %}active{% endif %}" href="{{ admin_prefix }}/cluster">
+                                <i class="bi bi-diagram-3"></i> 集群管理
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'runners' in request.url_path %}active{% endif %}" href="{{ admin_prefix }}/runners">
+                                <i class="bi bi-terminal"></i> Runners管理
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'git-server' in request.url_path %}active{% endif %}" href="{{ admin_prefix }}/git-server">
+                                <i class="bi bi-git"></i> Git Server
                             </a>
                         </li>
                     </ul>
