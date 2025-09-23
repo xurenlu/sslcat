@@ -688,6 +688,10 @@ func (s *Server) handleRunners(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 检测并设置语言
+	lang := s.detectLanguage(r)
+	s.translator.SetLanguage(lang)
+
 	// 获取各Runner的状态
 	localTasks := s.localRunner.ListTasks()
 	dockerTasks := s.dockerRunner.ListTasks()
@@ -710,6 +714,10 @@ func (s *Server) handleGitServer(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
 		return
 	}
+
+	// 检测并设置语言
+	lang := s.detectLanguage(r)
+	s.translator.SetLanguage(lang)
 
 	// 获取Git Deploy Server的状态
 	gitApps := s.gitServer.ListApps()

@@ -14,6 +14,10 @@ func (s *Server) handleDNS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 检测并设置语言
+	lang := s.detectLanguage(r)
+	s.translator.SetLanguage(lang)
+
 	data := map[string]interface{}{
 		"AdminPrefix":      s.config.AdminPrefix,
 		"Providers":        s.config.SSL.DNSProviders,
