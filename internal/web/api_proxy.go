@@ -200,3 +200,177 @@ func (s *Server) handleAPIProxyRulesDelete(w http.ResponseWriter, r *http.Reques
 		"deleted_rule": deletedRule,
 	})
 }
+
+// handleAPIProxyRule 单个代理规则的CRUD操作
+func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizeAPI(w, r, false) { // 需要写权限
+		return
+	}
+
+	domain := strings.TrimSpace(r.URL.Query().Get("domain"))
+
+	switch r.Method {
+	case "GET":
+		// 获取单个代理规则
+		if domain == "" {
+			http.Error(w, "domain parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		for _, rule := range s.config.Proxy.Rules {
+			if rule.Domain == domain {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]interface{}{
+					"success": true,
+					"data":    rule,
+				})
+				return
+			}
+		}
+
+		http.Error(w, "rule not found", http.StatusNotFound)
+		return
+
+	case "POST":
+		// 创建新的代理规则
+		var req struct {
+			Domain               string `json:"domain"`
+			Target               string `json:"target"`
+			Port                 int    `json:"port"`
+			Enabled              bool   `json:"enabled"`
+			SSLOnly              bool   `json:"ssl_only"`
+			CDNEnabled           bool   `json:"cdn_enabled"`
+			CDNPreset            string `json:"cdn_preset"`
+			CDNDefaultTTLSeconds int    `json:"cdn_ttl_seconds"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		if req.Domain == "" || req.Target == "" {
+			http.Error(w, "domain and target are required", http.StatusBadRequest)
+			return
+		}
+
+		// 检查是否已存在
+		for _, rule := range s.config.Proxy.Rules {
+			if rule.Domain == req.Domain {
+				http.Error(w, "rule already exists", http.StatusConflict)
+				return
+			}
+		}
+
+		newRule := config.ProxyRule{
+			Domain:               req.Domain,
+			Target:               req.Target,
+			Port:                 req.Port,
+			Enabled:              req.Enabled,
+			SSLOnly:              req.SSLOnly,
+			CDNEnabled:           req.CDNEnabled,
+			CDNPreset:            req.CDNPreset,
+			CDNDefaultTTLSeconds: req.CDNDefaultTTLSeconds,
+		}
+
+		s.config.Proxy.Rules = append(s.config.Proxy.Rules, newRule)
+
+		// 保存配置
+		if err := s.config.Save(s.config.ConfigFile); err != nil {
+			s.log.Errorf("Failed to save config: %v", err)
+			http.Error(w, "failed to save config", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"rule":    newRule,
+		})
+
+	case "PUT":
+		// 更新代理规则
+		var req struct {
+			Domain               string `json:"domain"`
+			Target               string `json:"target"`
+			Port                 int    `json:"port"`
+			Enabled              bool   `json:"enabled"`
+			SSLOnly              bool   `json:"ssl_only"`
+			CDNEnabled           bool   `json:"cdn_enabled"`
+			CDNPreset            string `json:"cdn_preset"`
+			CDNDefaultTTLSeconds int    `json:"cdn_ttl_seconds"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		if req.Domain == "" || req.Target == "" {
+			http.Error(w, "domain and target are required", http.StatusBadRequest)
+			return
+		}
+
+		// 查找并更新规则
+		for i, rule := range s.config.Proxy.Rules {
+			if rule.Domain == domain {
+				s.config.Proxy.Rules[i].Target = req.Target
+				s.config.Proxy.Rules[i].Port = req.Port
+				s.config.Proxy.Rules[i].Enabled = req.Enabled
+				s.config.Proxy.Rules[i].SSLOnly = req.SSLOnly
+				s.config.Proxy.Rules[i].CDNEnabled = req.CDNEnabled
+				s.config.Proxy.Rules[i].CDNPreset = req.CDNPreset
+				s.config.Proxy.Rules[i].CDNDefaultTTLSeconds = req.CDNDefaultTTLSeconds
+
+				// 保存配置
+				if err := s.config.Save(s.config.ConfigFile); err != nil {
+					s.log.Errorf("Failed to save config: %v", err)
+					http.Error(w, "failed to save config", http.StatusInternalServerError)
+					return
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]interface{}{
+					"success": true,
+					"rule":    s.config.Proxy.Rules[i],
+				})
+				return
+			}
+		}
+
+		http.Error(w, "rule not found", http.StatusNotFound)
+
+	case "DELETE":
+		// 删除代理规则
+		if domain == "" {
+			http.Error(w, "domain parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		for i, rule := range s.config.Proxy.Rules {
+			if rule.Domain == domain {
+				deletedRule := s.config.Proxy.Rules[i]
+				s.config.Proxy.Rules = append(s.config.Proxy.Rules[:i], s.config.Proxy.Rules[i+1:]...)
+
+				// 保存配置
+				if err := s.config.Save(s.config.ConfigFile); err != nil {
+					s.log.Errorf("Failed to save config: %v", err)
+					http.Error(w, "failed to save config", http.StatusInternalServerError)
+					return
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]interface{}{
+					"success":      true,
+					"deleted_rule": deletedRule,
+				})
+				return
+			}
+		}
+
+		http.Error(w, "rule not found", http.StatusNotFound)
+
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
