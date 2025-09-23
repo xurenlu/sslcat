@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+
+{% block title %}集群设置 - SSLcat{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">集群设置</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="refreshClusterStatus()">
+                <i class="bi bi-arrow-clockwise"></i> 刷新状态
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- 当前状态 -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-diagram-3"></i> 当前集群状态</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="d-flex align-items-center">
+                            <div class="me-3">
+                                {% if IsStandaloneMode %}
+                                    <i class="bi bi-laptop text-success" style="font-size: 2rem;"></i>
+                                {% elif IsMasterMode %}
+                                    <i class="bi bi-server text-primary" style="font-size: 2rem;"></i>
+                                {% elif IsSlaveMode %}
+                                    <i class="bi bi-hdd-network text-warning" style="font-size: 2rem;"></i>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <h6 class="mb-1">
+                                    {% if IsStandaloneMode %}
+                                        独立模式
+                                    {% elif IsMasterMode %}
+                                        主节点模式
+                                    {% elif IsSlaveMode %}
+                                        从节点模式
+                                    {% else %}
+                                        未知模式
+                                    {% endif %}
+                                </h6>
+                                <p class="text-muted mb-0">
+                                    {% if IsStandaloneMode %}
+                                        当前节点独立运行，不参与集群
+                                    {% elif IsMasterMode %}
+                                        作为主节点管理集群
+                                    {% elif IsSlaveMode %}
+                                        连接到主节点：{{ Config.Cluster.Master.Host }}:{{ Config.Cluster.Master.Port }}
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center">
+                            <h6 class="mb-1">节点ID</h6>
+                            <p class="text-muted mb-0">{{ Config.Cluster.NodeID or "未设置" }}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center">
+                            <h6 class="mb-1">节点名称</h6>
+                            <p class="text-muted mb-0">{{ Config.Cluster.NodeName or "未设置" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 集群节点列表 -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-list-ul"></i> 集群节点</h5>
+            </div>
+            <div class="card-body">
+                <div id="clusterNodes">
+                    <div class="text-center text-muted">
+                        <i class="bi bi-hourglass-split"></i> 加载中...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 模式切换 -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-gear"></i> 模式切换</h5>
+            </div>
+            <div class="card-body">
+                {% if IsSlaveMode %}
+                <!-- 从节点模式 - 只能切换到独立模式 -->
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>注意：</strong> 当前为从节点模式，只能切换到独立模式。
+                </div>
+                <button type="button" class="btn btn-primary" onclick="setStandaloneMode()">
+                    <i class="bi bi-laptop"></i> 切换到独立模式
+                </button>
+                {% else %}
+                <!-- 独立模式 - 可以设置为从节点 -->
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>提示：</strong> 当前为独立模式，可以设置为从节点连接到主节点。
+                </div>
+                <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#setSlaveModal">
+                    <i class="bi bi-hdd-network"></i> 设置为从节点
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 设置为从节点模态框 -->
+<div class="modal fade" id="setSlaveModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">设置为从节点</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="setSlaveForm">
+                    <div class="mb-3">
+                        <label for="masterHost" class="form-label">主节点地址</label>
+                        <input type="text" class="form-control" id="masterHost" placeholder="192.168.1.100" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="masterPort" class="form-label">主节点端口</label>
+                        <input type="number" class="form-control" id="masterPort" placeholder="8113" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="authKey" class="form-label">认证密钥</label>
+                        <input type="password" class="form-control" id="authKey" placeholder="输入认证密钥" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-warning" onclick="setSlaveMode()">设置为从节点</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function refreshClusterStatus() {
+    location.reload();
+}
+
+function setSlaveMode() {
+    const masterHost = document.getElementById('masterHost').value;
+    const masterPort = parseInt(document.getElementById('masterPort').value);
+    const authKey = document.getElementById('authKey').value;
+    
+    if (!masterHost || !masterPort || !authKey) {
+        alert('请填写所有字段');
+        return;
+    }
+    
+    fetch('{{ Config.AdminPrefix }}/cluster/set-slave', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            master_host: masterHost,
+            master_port: masterPort,
+            auth_key: authKey
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('已设置为从节点模式');
+            location.reload();
+        } else {
+            alert('设置失败: ' + (data.error || '未知错误'));
+        }
+    })
+    .catch(error => {
+        alert('设置失败: ' + error.message);
+    });
+}
+
+function setStandaloneMode() {
+    if (!confirm('确定要切换到独立模式吗？这将断开与主节点的连接。')) {
+        return;
+    }
+    
+    fetch('{{ Config.AdminPrefix }}/cluster/set-standalone', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('已设置为独立模式');
+            location.reload();
+        } else {
+            alert('设置失败: ' + (data.error || '未知错误'));
+        }
+    })
+    .catch(error => {
+        alert('设置失败: ' + error.message);
+    });
+}
+
+// 加载集群节点
+function loadClusterNodes() {
+    fetch('{{ Config.AdminPrefix }}/cluster/nodes')
+    .then(response => response.json())
+    .then(data => {
+        const container = document.getElementById('clusterNodes');
+        if (data.nodes && data.nodes.length > 0) {
+            let html = '<div class="table-responsive"><table class="table table-sm"><thead><tr><th>节点ID</th><th>状态</th><th>最后更新</th></tr></thead><tbody>';
+            for (const node of data.nodes) {
+                html += `<tr><td>${node.id || 'N/A'}</td><td><span class="badge bg-success">在线</span></td><td>${node.last_seen || 'N/A'}</td></tr>`;
+            }
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = '<div class="text-center text-muted"><i class="bi bi-info-circle"></i> 暂无集群节点信息</div>';
+        }
+    })
+    .catch(error => {
+        document.getElementById('clusterNodes').innerHTML = '<div class="text-center text-danger"><i class="bi bi-exclamation-triangle"></i> 加载失败</div>';
+    });
+}
+
+// 页面加载完成后执行
+document.addEventListener('DOMContentLoaded', function() {
+    loadClusterNodes();
+});
+</script>
+{% endblock %}

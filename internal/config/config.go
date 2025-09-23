@@ -592,7 +592,7 @@ func Load(configFile string) (*Config, error) {
 			EnableUAFilter:          false,
 			EnableWAF:               false,
 			EnableDDOS:              true,
-			EnableCaptcha:           true,
+			EnableCaptcha:           false,
 			MinFormMs:               800,
 		},
 		AdminPrefix: "/sslcat-panel",
@@ -825,8 +825,11 @@ func (c *Config) GetSSLDomains() []string {
 
 // Save 保存配置文件
 func (c *Config) Save(configFile string) error {
+	// 智能选择配置文件路径
+	actualConfigFile := c.getWritableConfigPath(configFile)
+
 	// 确保配置目录存在
-	configDir := filepath.Dir(configFile)
+	configDir := filepath.Dir(actualConfigFile)
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return fmt.Errorf("创建配置目录失败 (%s): %w", configDir, err)
 	}
@@ -848,18 +851,63 @@ func (c *Config) Save(configFile string) error {
 	}
 
 	// 创建临时文件，然后原子性重命名
-	tempFile := configFile + ".tmp"
+	tempFile := actualConfigFile + ".tmp"
 	if err := os.WriteFile(tempFile, data, 0644); err != nil {
 		return fmt.Errorf("写入临时配置文件失败 (%s): %w", tempFile, err)
 	}
 
 	// 原子性重命名
-	if err := os.Rename(tempFile, configFile); err != nil {
+	if err := os.Rename(tempFile, actualConfigFile); err != nil {
 		os.Remove(tempFile) // 清理临时文件
-		return fmt.Errorf("重命名配置文件失败 (%s -> %s): %w", tempFile, configFile, err)
+		return fmt.Errorf("重命名配置文件失败 (%s -> %s): %w", tempFile, actualConfigFile, err)
 	}
 
 	return nil
+}
+
+// getWritableConfigPath 智能选择可写的配置文件路径
+func (c *Config) getWritableConfigPath(originalPath string) string {
+	// 首先尝试原始路径
+	if c.canWriteToPath(originalPath) {
+		return originalPath
+	}
+
+	// 如果原始路径不可写，尝试运行时目录
+	runtimeDir := "./data"
+	if err := os.MkdirAll(runtimeDir, 0755); err == nil {
+		runtimePath := filepath.Join(runtimeDir, "sslcat.conf")
+		if c.canWriteToPath(runtimePath) {
+			return runtimePath
+		}
+	}
+
+	// 最后尝试当前目录
+	currentDirPath := "./sslcat.conf"
+	if c.canWriteToPath(currentDirPath) {
+		return currentDirPath
+	}
+
+	// 如果都不可写，返回原始路径（让调用者处理错误）
+	return originalPath
+}
+
+// canWriteToPath 检查是否可以写入指定路径
+func (c *Config) canWriteToPath(path string) bool {
+	// 检查目录是否存在，如果不存在则尝试创建
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return false
+	}
+
+	// 尝试创建一个临时文件来测试写入权限
+	tempFile := path + ".test"
+	if err := os.WriteFile(tempFile, []byte("test"), 0644); err != nil {
+		return false
+	}
+
+	// 清理测试文件
+	os.Remove(tempFile)
+	return true
 }
 
 // GetProxyRule 获取指定域名的代理规则

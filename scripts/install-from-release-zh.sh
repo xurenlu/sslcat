@@ -202,7 +202,7 @@ if [[ ! -f "$CONF_LINUX" ]]; then
     "enable_ua_filter": false,
     "enable_waf": false,
     "enable_ddos": true,
-    "enable_captcha": true,
+    "enable_captcha": false,
     "min_form_ms": 800
   },
   "cdn_cache": {

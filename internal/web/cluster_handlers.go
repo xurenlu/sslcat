@@ -1,6 +1,8 @@
 package web
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 )
@@ -13,6 +15,7 @@ func (s *Server) handleClusterSettings(w http.ResponseWriter, r *http.Request) {
 
 	data := map[string]interface{}{
 		"Title":            "集群设置",
+		"AdminPrefix":      s.config.AdminPrefix,
 		"Config":           s.config,
 		"ClusterMode":      s.config.Cluster.Mode,
 		"NodeID":           s.config.Cluster.NodeID,
@@ -26,7 +29,7 @@ func (s *Server) handleClusterSettings(w http.ResponseWriter, r *http.Request) {
 		data["Nodes"] = s.clusterManager.GetNodes()
 	}
 
-	s.templateRenderer.Render(w, "cluster_settings.html", data)
+	s.templateRenderer.DetectLanguageAndRender(w, r, "cluster_settings.html", data)
 }
 
 // handleClusterSetSlave 设置为Slave模式
@@ -83,17 +86,67 @@ func (s *Server) handleClusterSetSlave(w http.ResponseWriter, r *http.Request) {
 	// 启动集群管理器
 	if s.clusterManager != nil {
 		s.clusterManager.Stop()
-	}
-
-	if err := s.clusterManager.SetSlaveMode(request.MasterHost, request.MasterPort, request.AuthKey); err != nil {
-		s.log.Error("Failed to set slave mode: ", err)
-		s.sendJSONError(w, "Failed to set slave mode", http.StatusInternalServerError)
-		return
+		if err := s.clusterManager.SetSlaveMode(request.MasterHost, request.MasterPort, request.AuthKey); err != nil {
+			s.log.Error("Failed to set slave mode: ", err)
+			s.sendJSONError(w, "Failed to set slave mode", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		s.log.Warn("Cluster manager is not initialized, skipping cluster mode change")
 	}
 
 	s.sendJSONResponse(w, map[string]interface{}{
 		"success": true,
 		"message": "Successfully set to slave mode",
+	})
+}
+
+// handleClusterSetMaster 设置为Master模式
+func (s *Server) handleClusterSetMaster(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		s.sendJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 生成集群认证密钥（如果还没有）
+	if s.config.Cluster.AuthKey == "" {
+		// 生成32字节的随机密钥
+		authKey := s.generateClusterAuthKey()
+		s.config.Cluster.AuthKey = authKey
+	}
+
+	// 更新配置
+	s.config.Cluster.Mode = "master"
+	s.config.Cluster.Master.Host = ""
+	s.config.Cluster.Master.Port = 0
+	s.config.Cluster.Master.AuthKey = ""
+
+	// 保存配置
+	if err := s.config.Save(s.config.ConfigFile); err != nil {
+		s.log.Error("Failed to save config: ", err)
+		s.sendJSONError(w, "Failed to save configuration", http.StatusInternalServerError)
+		return
+	}
+
+	// 启动集群管理器
+	if s.clusterManager != nil {
+		s.clusterManager.Stop()
+		if err := s.clusterManager.SetMasterMode(); err != nil {
+			s.log.Error("Failed to set master mode: ", err)
+			s.sendJSONError(w, "Failed to set master mode", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		s.log.Warn("Cluster manager is not initialized, skipping cluster mode change")
+	}
+
+	s.sendJSONResponse(w, map[string]interface{}{
+		"success": true,
+		"message": "Successfully set to master mode",
 	})
 }
 
@@ -166,6 +219,14 @@ func (s *Server) handleClusterSync(w http.ResponseWriter, r *http.Request) {
 	s.clusterManager.HandleSyncRequest(w, r)
 }
 
+// generateClusterAuthKey 生成集群认证密钥
+func (s *Server) generateClusterAuthKey() string {
+	// 生成32字节的随机密钥
+	key := make([]byte, 32)
+	rand.Read(key)
+	return hex.EncodeToString(key)
+}
+
 // isSlaveAllowedAction 检查在Slave模式下是否允许该操作
 func (s *Server) isSlaveAllowedAction(action string) bool {
 	if !s.config.IsSlaveMode() {
@@ -209,7 +270,7 @@ func (s *Server) requireNonSlaveModeHTML(next http.HandlerFunc) http.HandlerFunc
 				"Message": "在Slave模式下不允许此操作",
 				"Config":  s.config,
 			}
-			s.templateRenderer.Render(w, "error.html", data)
+			s.templateRenderer.DetectLanguageAndRender(w, r, "error.html", data)
 			return
 		}
 		next.ServeHTTP(w, r)
