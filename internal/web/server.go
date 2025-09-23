@@ -477,7 +477,7 @@ func (s *Server) setupRoutes() {
 	// Runners 管理页面路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/runners", s.handleRunners)
 
-	// Git Server 管理页面路由
+	// Git Deploy Server 管理页面路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/git-server", s.handleGitServer)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/git-server/create-app", s.handleCreateApp)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/git-server/server-config", s.handleServerConfig)

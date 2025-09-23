@@ -103,7 +103,7 @@ func (s *Server) generateSidebar(adminPrefix, activePage string) string {
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link %s" href="%s/git-server">
-                                    <i class="bi bi-git"></i> Git Server
+                                    <i class="bi bi-git"></i> Git Deploy Server
                                 </a>
                             </li>
                         </ul>
@@ -1079,8 +1079,7 @@ func (s *Server) generateSettingsHTML(data map[string]interface{}) string {
 		data["AdminPrefix"].(string), viewLastDiff)
 }
 
-
-// generateGitServerManagementHTML 生成Git Server管理页面HTML (已移动到git_server_html.go)
+// generateGitServerManagementHTML 生成Git Deploy Server管理页面HTML (已移动到git_server_html.go)
 
 // generateSSLCertsTable 生成SSL证书表格HTML
 func (s *Server) generateSSLCertsTable(data map[string]interface{}) string {
@@ -1152,7 +1151,7 @@ func (s *Server) getConfigSSLDisableSelfSigned(data map[string]interface{}) stri
 	return ""
 }
 
-// ==================== Git Server 页面处理 ====================
+// ==================== Git Deploy Server 页面处理 ====================
 
 // handleCreateApp 处理创建应用页面
 func (s *Server) handleCreateApp(w http.ResponseWriter, r *http.Request) {
@@ -1205,7 +1204,7 @@ func (s *Server) generateCreateAppHTML(data map[string]interface{}) string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>创建应用 - SSLcat Git Server</title>
+    <title>创建应用 - SSLcat Git Deploy Server</title>
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
     <style>
@@ -1234,7 +1233,7 @@ func (s *Server) generateCreateAppHTML(data map[string]interface{}) string {
                     <h1 class="h2">创建新应用</h1>
                     <div>
                         <a href="%s/git-server" class="btn btn-outline-secondary">
-                            <i class="bi bi-arrow-left"></i> 返回 Git Server
+                            <i class="bi bi-arrow-left"></i> 返回 Git Deploy Server
                         </a>
                     </div>
                 </div>
@@ -1453,7 +1452,7 @@ func (s *Server) generateServerConfigHTML(data map[string]interface{}) string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>服务器配置 - SSLcat Git Server</title>
+    <title>服务器配置 - SSLcat Git Deploy Server</title>
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
     <style>
@@ -1489,7 +1488,7 @@ func (s *Server) generateServerConfigHTML(data map[string]interface{}) string {
                     <h1 class="h2">服务器配置</h1>
                     <div>
                         <a href="%s/git-server" class="btn btn-outline-secondary">
-                            <i class="bi bi-arrow-left"></i> 返回 Git Server
+                            <i class="bi bi-arrow-left"></i> 返回 Git Deploy Server
                         </a>
                     </div>
                 </div>
