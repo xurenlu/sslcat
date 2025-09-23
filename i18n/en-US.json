@@ -14,6 +14,7 @@
   "nav.git_deploy_server": "Git Deploy Server",
   "nav.cluster": "Cluster Management",
   "nav.dns": "DNS Configuration",
+  "nav.notifications": "Notifications",
   
   "login.title": "Administrator Login",
   "login.username": "Username",
