@@ -10,6 +10,10 @@
   "nav.monitoring": "Мониторинг и Статистика",
   "nav.logs": "Управление Логами",
   "nav.settings": "Системные Настройки",
+  "nav.runners": "Управление Runners",
+  "nav.git_deploy_server": "Git Deploy Server",
+  "nav.cluster": "Управление кластером",
+  "nav.dns": "Конфигурация DNS",
   
   "login.title": "Вход Администратора",
   "login.username": "Имя пользователя",
@@ -157,5 +161,14 @@
   "mobile.proxy_config": "Настройка Прокси",
   "mobile.security_protection": "Защита Безопасности",
   "mobile.view_logs": "Просмотр Логов",
-  "mobile.real_time_monitor": "Мониторинг Трафика в Реальном Времени"
+  "mobile.real_time_monitor": "Мониторинг Трафика в Реальном Времени",
+  
+  "git_deploy_server.title": "Управление Git Deploy Server",
+  "git_deploy_server.create_app": "Создать Приложение",
+  "git_deploy_server.server_config": "Конфигурация Сервера",
+  "git_deploy_server.function_description": "Описание Функций Git Deploy Server",
+  "git_deploy_server.description": "Git Deploy Server - это платформа развертывания, похожая на Railway, Heroku, Dokku, которая поддерживает:",
+  "git_deploy_server.return": "Вернуться к Git Deploy Server",
+  "git_deploy_server.create_app_title": "Создать Приложение - SSLcat Git Deploy Server",
+  "git_deploy_server.server_config_title": "Конфигурация Сервера - SSLcat Git Deploy Server"
 }

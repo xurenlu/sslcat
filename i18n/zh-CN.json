@@ -10,6 +10,10 @@
   "nav.monitoring": "监控统计",
   "nav.logs": "日志管理",
   "nav.settings": "系统设置",
+  "nav.runners": "Runners管理",
+  "nav.git_deploy_server": "Git Deploy Server",
+  "nav.cluster": "集群管理",
+  "nav.dns": "DNS配置",
   
   "login.title": "管理员登录",
   "login.username": "用户名",
@@ -157,5 +161,14 @@
   "mobile.proxy_config": "代理配置",
   "mobile.security_protection": "安全防护",
   "mobile.view_logs": "日志查看",
-  "mobile.real_time_monitor": "实时流量监控"
+  "mobile.real_time_monitor": "实时流量监控",
+  
+  "git_deploy_server.title": "Git Deploy Server管理",
+  "git_deploy_server.create_app": "创建应用",
+  "git_deploy_server.server_config": "服务器配置",
+  "git_deploy_server.function_description": "Git Deploy Server 功能说明",
+  "git_deploy_server.description": "Git Deploy Server 是一个类似 Railway、Heroku、Dokku 的部署平台，支持：",
+  "git_deploy_server.return": "返回 Git Deploy Server",
+  "git_deploy_server.create_app_title": "创建应用 - SSLcat Git Deploy Server",
+  "git_deploy_server.server_config_title": "服务器配置 - SSLcat Git Deploy Server"
 }
