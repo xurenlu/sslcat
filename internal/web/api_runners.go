@@ -715,12 +715,12 @@ func (s *Server) handleGitServer(w http.ResponseWriter, r *http.Request) {
 	gitApps := s.gitServer.ListApps()
 
 	data := map[string]interface{}{
-		"AdminPrefix": s.config.AdminPrefix,
-		"GitApps":     gitApps,
-		"GitEnabled":  s.config.Runners.Git.Enabled,
-		"Title": s.translator.T("git_deploy_server.title"),
+		"AdminPrefix":         s.config.AdminPrefix,
+		"GitApps":             gitApps,
+		"GitEnabled":          s.config.Runners.Git.Enabled,
+		"Title":               s.translator.T("git_deploy_server.title"),
 		"FunctionDescription": s.translator.T("git_deploy_server.function_description"),
-		"Description": s.translator.T("git_deploy_server.description"),
+		"Description":         s.translator.T("git_deploy_server.description"),
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
