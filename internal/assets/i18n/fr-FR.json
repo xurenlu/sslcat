@@ -11,6 +11,10 @@
   "nav.logs": "Gestion des Logs",
   "nav.settings": "Paramètres Système",
   "nav.dns": "Configuration DNS",
+  "nav.runners": "Gestion des Runners",
+  "nav.git_deploy_server": "Git Deploy Server",
+  "nav.cluster": "Gestion de Cluster",
+  "nav.notifications": "Notifications",
   
   "login.title": "Connexion Administrateur",
   "login.username": "Nom d'utilisateur",
