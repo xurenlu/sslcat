@@ -705,13 +705,13 @@ func (s *Server) handleRunners(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(html))
 }
 
-// handleGitServer Git Server管理页面处理器
+// handleGitServer Git Deploy Server管理页面处理器
 func (s *Server) handleGitServer(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
 		return
 	}
 
-	// 获取Git Server的状态
+	// 获取Git Deploy Server的状态
 	gitApps := s.gitServer.ListApps()
 
 	data := map[string]interface{}{
