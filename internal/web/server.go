@@ -422,7 +422,7 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/stats", s.handleAPIStats)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/proxy-rules", s.handleAPIProxyRules)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/proxy/rules", s.handleAPIProxyRules) // 兼容前端请求路径
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/proxy/rule", s.handleAPIProxyRule) // 单个代理规则操作
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/proxy/rule", s.handleAPIProxyRule)   // 单个代理规则操作
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/proxy-rules/manage", s.handleAPIProxyRulesPost)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/proxy-rules/delete", s.handleAPIProxyRulesDelete)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl-certs", s.handleAPISSLCerts)
