@@ -13,6 +13,10 @@
   "nav.static_sites": "Static Sites",
   "nav.php_sites": "PHP Sites",
   "nav.dns": "DNS Configuration",
+  "nav.runners": "Runners Management",
+  "nav.git_deploy_server": "Git Deploy Server",
+  "nav.cluster": "Cluster Management",
+  "nav.notifications": "Notifications",
   
   "login.title": "Administrator Login",
   "login.username": "Username",

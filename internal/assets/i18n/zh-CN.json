@@ -13,6 +13,10 @@
   "nav.static_sites": "静态站点",
   "nav.php_sites": "PHP 站点",
   "nav.dns": "DNS配置",
+  "nav.runners": "Runners管理",
+  "nav.git_deploy_server": "Git Deploy Server",
+  "nav.cluster": "集群管理",
+  "nav.notifications": "通知管理",
   
   "login.title": "管理员登录",
   "login.username": "用户名",

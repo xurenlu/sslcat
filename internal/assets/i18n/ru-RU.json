@@ -11,6 +11,10 @@
   "nav.logs": "Управление Логами",
   "nav.settings": "Системные Настройки",
   "nav.dns": "Конфигурация DNS",
+  "nav.runners": "Управление Runners",
+  "nav.git_deploy_server": "Git Deploy Server",
+  "nav.cluster": "Управление кластером",
+  "nav.notifications": "Уведомления",
   
   "login.title": "Вход Администратора",
   "login.username": "Имя пользователя",
