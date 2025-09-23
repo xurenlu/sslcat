@@ -11,6 +11,10 @@
   "nav.logs": "ログ管理",
   "nav.settings": "システム設定",
   "nav.dns": "DNS設定",
+  "nav.runners": "Runners管理",
+  "nav.git_deploy_server": "Git Deploy Server",
+  "nav.cluster": "クラスター管理",
+  "nav.notifications": "通知管理",
   
   "login.title": "管理者ログイン",
   "login.username": "ユーザー名",

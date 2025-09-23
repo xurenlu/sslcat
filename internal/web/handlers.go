@@ -876,9 +876,6 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 }
 
-
-
-
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	// 获取当前会话
 	session, exists := s.sessionManager.GetSessionFromRequest(r)
