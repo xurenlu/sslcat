@@ -10,6 +10,10 @@
   "nav.monitoring": "監視・統計",
   "nav.logs": "ログ管理",
   "nav.settings": "システム設定",
+  "nav.runners": "Runners管理",
+  "nav.git_deploy_server": "Git Deploy Server",
+  "nav.cluster": "クラスター管理",
+  "nav.dns": "DNS設定",
   
   "login.title": "管理者ログイン",
   "login.username": "ユーザー名",
@@ -157,5 +161,14 @@
   "mobile.proxy_config": "プロキシ設定",
   "mobile.security_protection": "セキュリティ保護",
   "mobile.view_logs": "ログ表示",
-  "mobile.real_time_monitor": "リアルタイム トラフィック監視"
+  "mobile.real_time_monitor": "リアルタイム トラフィック監視",
+  
+  "git_deploy_server.title": "Git Deploy Server管理",
+  "git_deploy_server.create_app": "アプリケーション作成",
+  "git_deploy_server.server_config": "サーバー設定",
+  "git_deploy_server.function_description": "Git Deploy Server機能説明",
+  "git_deploy_server.description": "Git Deploy Serverは、Railway、Heroku、Dokkuに似たデプロイメントプラットフォームで、以下をサポートします：",
+  "git_deploy_server.return": "Git Deploy Serverに戻る",
+  "git_deploy_server.create_app_title": "アプリケーション作成 - SSLcat Git Deploy Server",
+  "git_deploy_server.server_config_title": "サーバー設定 - SSLcat Git Deploy Server"
 }
