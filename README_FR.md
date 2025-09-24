@@ -364,7 +364,7 @@ Options :
 1. **Échec de démarrage du service**
    ```bash
    # Vérifier la syntaxe du fichier de configuration
-   sudo withssl --config /etc/sslcat/withssl.conf --log-level debug
+   sudo withssl --config /etc/sslcat/sslcat.conf --log-level debug
    
    # Vérifier l'utilisation du port
    sudo netstat -tlnp | grep :443

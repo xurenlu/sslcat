@@ -29,6 +29,7 @@ import {
   FiZap,
   FiGlobe,
 } from 'react-icons/fi'
+import { useNavigate } from 'react-router-dom'
 
 interface ProxyRule {
   id: string
@@ -40,6 +41,7 @@ interface ProxyRule {
 }
 
 const ProxyList: React.FC = () => {
+  const navigate = useNavigate()
   const [rules, setRules] = useState<ProxyRule[]>([])
   const [loading, setLoading] = useState(false)
   const toast = useToast()
@@ -156,6 +158,7 @@ const ProxyList: React.FC = () => {
           <Button
             leftIcon={<Icon as={FiPlus} />}
             colorScheme="blue"
+            onClick={() => navigate('/proxy/add')}
           >
             新增规则
           </Button>

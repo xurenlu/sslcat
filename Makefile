@@ -97,13 +97,13 @@ build-linux: deps build-frontend
 .PHONY: run
 run: build
 	@echo "启动开发服务器..."
-	@./$(BUILD_DIR)/$(BINARY_NAME) --config withssl.conf --log-level debug
+	@./$(BUILD_DIR)/$(BINARY_NAME) --config sslcat.conf --log-level debug
 
 # 运行开发服务器（直接运行，不构建）
 .PHONY: dev
 dev:
 	@echo "启动开发服务器..."
-	@go run main.go --config withssl.conf --log-level debug
+	@go run main.go --config sslcat.conf --log-level debug
 
 # 修复 Node.js 环境
 .PHONY: fix-node

@@ -364,7 +364,7 @@ Options:
 1. **Service startup failure**
    ```bash
    # Check configuration file syntax
-   sudo withssl --config /etc/sslcat/withssl.conf --log-level debug
+   sudo withssl --config /etc/sslcat/sslcat.conf --log-level debug
    
    # Check port usage
    sudo netstat -tlnp | grep :443

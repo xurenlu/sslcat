@@ -368,7 +368,7 @@ sslcat [オプション]
 1. **サービス起動失敗**
    ```bash
    # 設定ファイル構文チェック
-   sudo withssl --config /etc/sslcat/withssl.conf --log-level debug
+   sudo withssl --config /etc/sslcat/sslcat.conf --log-level debug
    
    # ポート使用状況チェック
    sudo netstat -tlnp | grep :443

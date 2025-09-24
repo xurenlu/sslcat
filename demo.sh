@@ -23,9 +23,9 @@ echo "📁 创建数据目录..."
 mkdir -p data/certs data/keys data/logs
 
 # 创建配置文件
-if [ ! -f "withssl.conf" ]; then
+if [ ! -f "sslcat.conf" ]; then
     echo "⚙️  创建配置文件..."
-    cp withssl.conf.example withssl.conf
+    cp sslcat.conf.example sslcat.conf
 fi
 
 echo ""
@@ -57,4 +57,4 @@ echo "==============================================="
 echo ""
 
 # 启动服务器
-exec ./withssl --config withssl.conf --port 8080 --log-level info
+exec ./withssl --config sslcat.conf --port 8080 --log-level info
