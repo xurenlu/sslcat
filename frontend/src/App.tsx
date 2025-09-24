@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom'
 import { Box } from '@chakra-ui/react'
+import { LanguageProvider } from './hooks/useLanguage'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import ProxyList from './pages/ProxyList'
@@ -15,24 +16,26 @@ import GitServerManagement from './pages/GitServerManagement'
 
 function App() {
   return (
-    <Box minH="100vh">
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/proxy" element={<ProxyList />} />
-          <Route path="/sites" element={<SitesManagement />} />
-          <Route path="/ssl" element={<SSLManagement />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/dns" element={<DNSManagement />} />
-          <Route path="/security" element={<Security />} />
-          <Route path="/cluster" element={<ClusterManagement />} />
-          <Route path="/runners" element={<RunnersManagement />} />
-          <Route path="/git-server" element={<GitServerManagement />} />
-          <Route path="/notifications" element={<Notifications />} />
-        </Routes>
-      </Layout>
-    </Box>
+    <LanguageProvider>
+      <Box minH="100vh">
+        <Layout>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/proxy" element={<ProxyList />} />
+            <Route path="/sites" element={<SitesManagement />} />
+            <Route path="/ssl" element={<SSLManagement />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/dns" element={<DNSManagement />} />
+            <Route path="/security" element={<Security />} />
+            <Route path="/cluster" element={<ClusterManagement />} />
+            <Route path="/runners" element={<RunnersManagement />} />
+            <Route path="/git-server" element={<GitServerManagement />} />
+            <Route path="/notifications" element={<Notifications />} />
+          </Routes>
+        </Layout>
+      </Box>
+    </LanguageProvider>
   )
 }
 
