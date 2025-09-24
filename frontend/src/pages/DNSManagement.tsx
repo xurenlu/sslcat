@@ -44,8 +44,6 @@ import {
   FiPlus,
   FiEdit,
   FiTrash2,
-  FiServer,
-  FiCheckCircle,
   FiSettings,
 } from 'react-icons/fi'
 

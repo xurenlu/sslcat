@@ -6,7 +6,6 @@ import {
   Stat,
   StatLabel,
   StatNumber,
-  StatHelpText,
   Card,
   CardBody,
   VStack,
@@ -15,7 +14,6 @@ import {
   Icon,
   Text,
   Flex,
-  Badge,
   useToast,
   Spinner,
   Alert,
@@ -28,7 +26,7 @@ import {
   FiPlus,
   FiShield,
   FiSettings,
-  FiArrowLeftRight,
+  FiZap,
   FiServer,
   FiCheckCircle,
 } from 'react-icons/fi'
@@ -171,7 +169,7 @@ const Dashboard: React.FC = () => {
                     {stats.activeRules}
                   </StatNumber>
                 </Box>
-                <Icon as={FiArrowLeftRight} boxSize={8} color="gray.300" />
+                <Icon as={FiZap} boxSize={8} color="gray.300" />
               </HStack>
             </Stat>
           </CardBody>
@@ -294,7 +292,7 @@ const Dashboard: React.FC = () => {
                   <Text>SSL证书状态良好</Text>
                 </HStack>
                 <HStack>
-                  <Icon as={FiArrowLeftRight} color="purple.500" />
+                  <Icon as={FiZap} color="purple.500" />
                   <Text>代理服务正常</Text>
                 </HStack>
               </VStack>

@@ -5,7 +5,6 @@ import {
   SimpleGrid,
   Card,
   CardBody,
-  CardHeader,
   VStack,
   HStack,
   Button,
@@ -54,11 +53,9 @@ import {
   FiTrash2,
   FiPlay,
   FiPause,
-  FiStop,
+  FiSquare,
   FiDownload,
-  FiUpload,
-  FiSettings,
-  FiContainer,
+  FiBox,
   FiServer,
 } from 'react-icons/fi'
 
@@ -389,7 +386,7 @@ const RunnersManagement: React.FC = () => {
           </Tab>
           <Tab>
             <HStack>
-              <Icon as={FiContainer} />
+              <Icon as={FiBox} />
               <Text>Docker 任务</Text>
               <Badge colorScheme="blue">{stats.dockerTasks}</Badge>
             </HStack>
@@ -478,7 +475,7 @@ const RunnersManagement: React.FC = () => {
                               ) : (
                                 <IconButton
                                   aria-label="停止"
-                                  icon={<FiStop />}
+                                  icon={<FiSquare />}
                                   size="sm"
                                   variant="ghost"
                                   colorScheme="red"
@@ -568,7 +565,7 @@ const RunnersManagement: React.FC = () => {
                           <HStack spacing={1}>
                             <IconButton
                               aria-label="操作"
-                              icon={task.status === 'running' ? <FiStop /> : <FiPlay />}
+                              icon={task.status === 'running' ? <FiSquare /> : <FiPlay />}
                               size="sm"
                               variant="ghost"
                               colorScheme={task.status === 'running' ? 'red' : 'green'}
@@ -624,7 +621,7 @@ const RunnersManagement: React.FC = () => {
                           <HStack spacing={1}>
                             <IconButton
                               aria-label="操作"
-                              icon={task.status === 'running' ? <FiStop /> : <FiPlay />}
+                              icon={task.status === 'running' ? <FiSquare /> : <FiPlay />}
                               size="sm"
                               variant="ghost"
                               colorScheme={task.status === 'running' ? 'red' : 'green'}

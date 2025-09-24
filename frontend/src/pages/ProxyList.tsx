@@ -20,14 +20,13 @@ import {
   useToast,
   Switch,
   Tooltip,
-  Spinner,
 } from '@chakra-ui/react'
 import {
   FiPlus,
   FiRefreshCw,
   FiEdit,
   FiTrash2,
-  FiArrowLeftRight,
+  FiZap,
   FiGlobe,
 } from 'react-icons/fi'
 
@@ -142,7 +141,7 @@ const ProxyList: React.FC = () => {
     <Box>
       <Flex justify="space-between" align="center" mb={6}>
         <HStack>
-          <Icon as={FiArrowLeftRight} boxSize={6} />
+          <Icon as={FiZap} boxSize={6} />
           <Heading size="lg">代理配置</Heading>
         </HStack>
         <HStack>
@@ -230,7 +229,7 @@ const ProxyList: React.FC = () => {
             </Table>
           ) : (
             <Box textAlign="center" py={8}>
-              <Icon as={FiArrowLeftRight} boxSize={12} color="gray.300" mb={4} />
+              <Icon as={FiZap} boxSize={12} color="gray.300" mb={4} />
               <Text color="gray.500" mb={4}>暂无代理规则</Text>
               <Button leftIcon={<Icon as={FiPlus} />} colorScheme="blue">
                 创建第一个规则

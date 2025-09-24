@@ -1,4 +1,3 @@
-import React from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { Box } from '@chakra-ui/react'
 import Layout from './components/Layout'
