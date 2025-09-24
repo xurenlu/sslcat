@@ -105,11 +105,23 @@ dev:
 	@echo "启动开发服务器..."
 	@go run main.go --config withssl.conf --log-level debug
 
+# 修复 Node.js 环境
+.PHONY: fix-node
+fix-node:
+	@echo "修复 Node.js 环境..."
+	@./scripts/fix-node-env.sh
+
 # 运行前端开发服务器
 .PHONY: dev-frontend
 dev-frontend:
 	@echo "启动前端开发服务器..."
 	@./scripts/dev-frontend.sh
+
+# 运行前端开发服务器（绕过 Node.js 问题）
+.PHONY: dev-frontend-simple
+dev-frontend-simple:
+	@echo "启动前端开发服务器（简单模式）..."
+	@./scripts/start-frontend-dev.sh
 
 # 安装到系统
 .PHONY: install

@@ -8,21 +8,23 @@ echo "🚀 启动前端开发服务器..."
 # 进入前端目录
 cd frontend
 
-# 检查 Node.js 和 npm
+# 检查 Node.js 和 pnpm
 if ! command -v node &> /dev/null; then
     echo "❌ Node.js 未安装，请先安装 Node.js"
     exit 1
 fi
 
-if ! command -v npm &> /dev/null; then
-    echo "❌ npm 未安装，请先安装 npm"
+if ! command -v pnpm &> /dev/null; then
+    echo "❌ pnpm 未安装，请先安装 pnpm:"
+    echo "   npm install -g pnpm"
+    echo "   或使用: curl -fsSL https://get.pnpm.io/install.sh | sh -"
     exit 1
 fi
 
 # 检查是否已安装依赖
 if [ ! -d "node_modules" ]; then
-    echo "📦 安装依赖..."
-    npm install
+    echo "📦 使用 pnpm 安装依赖..."
+    pnpm install
 fi
 
 echo "🎨 启动 Vite 开发服务器..."
@@ -35,4 +37,4 @@ echo "  - 前端修改会自动热重载"
 echo "  - 按 Ctrl+C 停止开发服务器"
 echo ""
 
-npm run dev
+pnpm run dev
