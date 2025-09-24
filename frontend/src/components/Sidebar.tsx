@@ -95,96 +95,94 @@ const SidebarContent = () => {
   ]
 
   return (
-    <Box h="full" bg="white" borderRight="1px" borderColor="gray.200">
-      <VStack spacing={0} align="stretch" h="full">
-        {/* Logo */}
-        <Box p={6} borderBottom="1px" borderColor="gray.200">
-          <VStack spacing={2}>
-            <Text fontSize="2xl" fontWeight="bold" color="brand.500">
-              SSLcat
-            </Text>
-            <Text fontSize="sm" color="gray.500" textAlign="center">
-              SSL 代理服务器
-            </Text>
-            <Button
-              as="a"
-              href="https://sslcat.com"
-              target="_blank"
-              size="sm"
-              variant="outline"
-              colorScheme="brand"
-            >
-              官方网站
-            </Button>
-          </VStack>
-        </Box>
-
-        {/* Language Selector */}
-        <Box p={4} borderBottom="1px" borderColor="gray.200">
-          <Text fontSize="sm" color="gray.600" mb={2}>
-            语言 Language
+    <Box h="full" bg="white" borderRight="1px" borderColor="gray.200" display="flex" flexDirection="column">
+      {/* Logo - 固定顶部 */}
+      <Box p={6} borderBottom="1px" borderColor="gray.200" flexShrink={0}>
+        <VStack spacing={2}>
+          <Text fontSize="2xl" fontWeight="bold" color="brand.500">
+            SSLcat
           </Text>
-          {/* TODO: 实现语言选择器 */}
-        </Box>
+          <Text fontSize="sm" color="gray.500" textAlign="center">
+            SSL 代理服务器
+          </Text>
+          <Button
+            as="a"
+            href="https://sslcat.com"
+            target="_blank"
+            size="sm"
+            variant="outline"
+            colorScheme="brand"
+          >
+            官方网站
+          </Button>
+        </VStack>
+      </Box>
 
-        {/* Main Navigation */}
-        <Box p={4} flex={1}>
-          <VStack spacing={1} align="stretch">
-            {mainMenuItems.map((item) => (
-              <NavItem
-                key={item.path}
-                icon={item.icon}
-                to={item.path}
-                isActive={location.pathname === item.path}
-              >
-                {item.name}
-              </NavItem>
-            ))}
-          </VStack>
+      {/* Language Selector - 固定 */}
+      <Box p={4} borderBottom="1px" borderColor="gray.200" flexShrink={0}>
+        <Text fontSize="sm" color="gray.600" mb={2}>
+          语言 Language
+        </Text>
+        {/* TODO: 实现语言选择器 */}
+      </Box>
 
-          <Divider my={4} />
-
-          {/* Advanced Options */}
-          <VStack spacing={1} align="stretch">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onAdvancedToggle}
-              leftIcon={<Icon as={isAdvancedOpen ? FiChevronDown : FiChevronRight} />}
-              justifyContent="flex-start"
+      {/* 可滚动的内容区域 */}
+      <Box flex={1} overflowY="auto" p={4}>
+        <VStack spacing={1} align="stretch">
+          {mainMenuItems.map((item) => (
+            <NavItem
+              key={item.path}
+              icon={item.icon}
+              to={item.path}
+              isActive={location.pathname === item.path}
             >
-              高级选项
-            </Button>
-            <Collapse in={isAdvancedOpen}>
-              <VStack spacing={1} align="stretch" mt={2}>
-                {advancedMenuItems.map((item) => (
-                  <NavItem
-                    key={item.path}
-                    icon={item.icon}
-                    to={item.path}
-                    isActive={location.pathname === item.path}
-                  >
-                    {item.name}
-                  </NavItem>
-                ))}
-              </VStack>
-            </Collapse>
-          </VStack>
-        </Box>
+              {item.name}
+            </NavItem>
+          ))}
+        </VStack>
 
-        {/* Logout */}
-        <Box p={4} borderTop="1px" borderColor="gray.200">
+        <Divider my={4} />
+
+        {/* Advanced Options */}
+        <VStack spacing={1} align="stretch">
           <Button
             variant="outline"
-            colorScheme="red"
             size="sm"
-            leftIcon={<Icon as={FiLogOut} />}
-            w="full"
+            onClick={onAdvancedToggle}
+            leftIcon={<Icon as={isAdvancedOpen ? FiChevronDown : FiChevronRight} />}
+            justifyContent="flex-start"
           >
-            退出登录
+            高级选项
           </Button>
-        </Box>
-      </VStack>
+          <Collapse in={isAdvancedOpen}>
+            <VStack spacing={1} align="stretch" mt={2}>
+              {advancedMenuItems.map((item) => (
+                <NavItem
+                  key={item.path}
+                  icon={item.icon}
+                  to={item.path}
+                  isActive={location.pathname === item.path}
+                >
+                  {item.name}
+                </NavItem>
+              ))}
+            </VStack>
+          </Collapse>
+        </VStack>
+      </Box>
+
+      {/* Logout - 固定底部 */}
+      <Box p={4} borderTop="1px" borderColor="gray.200" flexShrink={0}>
+        <Button
+          variant="outline"
+          colorScheme="red"
+          size="sm"
+          leftIcon={<Icon as={FiLogOut} />}
+          w="full"
+        >
+          退出登录
+        </Button>
+      </Box>
     </Box>
   )
 }
