@@ -4,8 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main
-      - feature/*
+      - feature/frontend-interaction-optimization
 
 permissions:
   contents: write

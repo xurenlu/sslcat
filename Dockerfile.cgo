@@ -1,0 +1,47 @@
+# Dockerfile for CGO build
+FROM golang:1.24-alpine AS builder
+
+# Install CGO dependencies
+RUN apk add --no-cache gcc musl-dev sqlite-dev
+
+# Set working directory
+WORKDIR /app
+
+# Copy go mod files
+COPY go.mod go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build with CGO enabled
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build \
+    -ldflags "-s -w -X main.version=dev -X main.build=$(date -u +%Y-%m-%d_%H:%M:%S)" \
+    -o withssl-cgo main.go
+
+# Final stage
+FROM alpine:latest
+
+# Install runtime dependencies
+RUN apk add --no-cache ca-certificates sqlite
+
+# Copy binary
+COPY --from=builder /app/withssl-cgo /usr/local/bin/withssl
+
+# Create user
+RUN addgroup -g 1000 withssl && \
+    adduser -D -s /bin/false -u 1000 -G withssl withssl
+
+# Set permissions
+RUN chmod +x /usr/local/bin/withssl
+
+# Switch to non-root user
+USER withssl
+
+# Expose ports
+EXPOSE 80 443
+
+# Default command
+CMD ["/usr/local/bin/withssl"]
