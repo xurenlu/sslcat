@@ -497,6 +497,9 @@ func (s *Server) setupRoutes() {
 
 	// Runner API 路由
 	s.registerRunnerRoutes()
+
+	// 前端 SPA 路由 - 必须放在最后，作为 fallback
+	s.setupFrontendRoutes()
 }
 
 // registerRunnerRoutes 注册 Runner API 路由
