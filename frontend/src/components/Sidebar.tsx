@@ -14,8 +14,10 @@ import {
   useDisclosure,
   Button,
   useBreakpointValue,
+  Select,
 } from '@chakra-ui/react'
 import { Link as RouterLink, useLocation } from 'react-router-dom'
+import { useLanguage } from '../hooks/useLanguage'
 import {
   FiHome,
   FiSettings,
@@ -76,6 +78,7 @@ const NavItem: React.FC<NavItemProps> = ({ icon, children, to, isActive }) => {
 const SidebarContent = () => {
   const location = useLocation()
   const { isOpen: isAdvancedOpen, onToggle: onAdvancedToggle } = useDisclosure()
+  const { currentLanguage, changeLanguage, getCurrentLanguage, supportedLanguages } = useLanguage()
 
   const mainMenuItems = [
     { name: '仪表板', icon: FiHome, path: '/dashboard' },
@@ -123,7 +126,17 @@ const SidebarContent = () => {
         <Text fontSize="sm" color="gray.600" mb={2}>
           语言 Language
         </Text>
-        {/* TODO: 实现语言选择器 */}
+        <Select
+          size="sm"
+          value={currentLanguage}
+          onChange={(e) => changeLanguage(e.target.value)}
+        >
+          {supportedLanguages.map((language) => (
+            <option key={language.code} value={language.code}>
+              {language.flag} {language.nativeName}
+            </option>
+          ))}
+        </Select>
       </Box>
 
       {/* 可滚动的内容区域 */}
