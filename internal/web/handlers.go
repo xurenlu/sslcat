@@ -760,7 +760,7 @@ func (s *Server) handleFirstTimeSetup(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// 更新内存与持久化密码文件（bcrypt）
-		s.config.Admin.Password = "" // 避免将明文写入 withssl.conf
+		s.config.Admin.Password = "" // 避免将明文写入 sslcat.conf
 		if hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost); err == nil {
 			if err := os.WriteFile(s.config.Admin.PasswordFile, append(hash, '\n'), 0600); err != nil {
 				http.Error(w, "failed to write password file: "+err.Error(), http.StatusInternalServerError)
@@ -855,7 +855,7 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// 更新内存与持久化密码文件（bcrypt）
-		s.config.Admin.Password = "" // 避免将明文写入 withssl.conf
+		s.config.Admin.Password = "" // 避免将明文写入 sslcat.conf
 		if hash, err := bcrypt.GenerateFromPassword([]byte(newp), bcrypt.DefaultCost); err == nil {
 			if err := os.WriteFile(s.config.Admin.PasswordFile, append(hash, '\n'), 0600); err != nil {
 				http.Error(w, "failed to write password file: "+err.Error(), http.StatusInternalServerError)

@@ -6,9 +6,9 @@
 mkdir -p data/certs data/keys data/logs
 
 # 复制示例配置文件
-if [ ! -f "withssl.conf" ]; then
-    cp withssl.conf.example withssl.conf
-    echo "已创建配置文件 withssl.conf"
+if [ ! -f "sslcat.conf" ]; then
+    cp sslcat.conf.example sslcat.conf
+    echo "已创建配置文件 sslcat.conf"
 fi
 
 # 启动程序
@@ -20,4 +20,4 @@ echo ""
 echo "按 Ctrl+C 停止服务器"
 echo ""
 
-./withssl --config withssl.conf --port 8080 --log-level debug
+./withssl --config sslcat.conf --port 8080 --log-level debug

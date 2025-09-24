@@ -12,7 +12,7 @@ services:
       # - WITHSSL_SYSLOG_ADDR=
       # - WITHSSL_LOKI_URL=
     volumes:
-      - ./withssl.conf:/etc/sslcat/withssl.conf:ro
+      - ./sslcat.conf:/etc/sslcat/sslcat.conf:ro
       - ./data:/var/lib/sslcat
     restart: unless-stopped
 version: '3.8'

@@ -71,7 +71,7 @@ mkdir -p "$DEPLOY_DIR"
 cp "$BINARY_NAME" "$DEPLOY_DIR/"
 
 # 复制配置文件
-cp withssl.conf.example "$DEPLOY_DIR/withssl.conf"
+cp sslcat.conf.example "$DEPLOY_DIR/sslcat.conf"
 cp withssl-advanced.conf.example "$DEPLOY_DIR/" 2>/dev/null || true
 
 # 复制脚本
@@ -99,19 +99,19 @@ cat > "$DEPLOY_DIR/README.md" << 'EOF'
 
 ```bash
 # 1. 复制配置文件
-cp withssl.conf.example withssl.conf
+cp sslcat.conf.example sslcat.conf
 
 # 2. 编辑配置
-nano withssl.conf
+nano sslcat.conf
 
 # 3. 启动服务
-./withssl --config withssl.conf
+./withssl --config sslcat.conf
 ```
 
 ## 文件说明
 
 - `withssl` / `withssl-linux`: 主程序二进制文件（包含所有嵌入资源）
-- `withssl.conf`: 配置文件示例
+- `sslcat.conf`: 配置文件示例
 - `withssl-advanced.conf.example`: 高级配置示例
 - `install.sh`: 系统安装脚本（可选）
 - `start.sh`: 快速启动脚本（可选）
@@ -168,11 +168,11 @@ echo ""
 echo "# 2. 在服务器上执行"
 echo "cd /opt/sslcat/"
 echo "chmod +x $BINARY_NAME"
-echo "cp withssl.conf.example withssl.conf"
+echo "cp sslcat.conf.example sslcat.conf"
 echo "# 编辑配置文件..."
-echo "nano withssl.conf"
+echo "nano sslcat.conf"
 echo "# 启动服务"
-echo "./$BINARY_NAME --config withssl.conf"
+echo "./$BINARY_NAME --config sslcat.conf"
 
 # 5. 清理
 echo ""

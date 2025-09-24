@@ -4,6 +4,7 @@ import { LanguageProvider } from './hooks/useLanguage'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import ProxyList from './pages/ProxyList'
+import ProxyAdd from './pages/ProxyAdd'
 import SSLManagement from './pages/SSLManagement'
 import Settings from './pages/Settings'
 import Notifications from './pages/Notifications'
@@ -23,6 +24,7 @@ function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/proxy" element={<ProxyList />} />
+            <Route path="/proxy/add" element={<ProxyAdd />} />
             <Route path="/sites" element={<SitesManagement />} />
             <Route path="/ssl" element={<SSLManagement />} />
             <Route path="/settings" element={<Settings />} />

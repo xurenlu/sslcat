@@ -31,7 +31,7 @@ echo "✅ Linux 64位二进制文件编译完成"
 echo "📦 创建部署包..."
 mkdir -p deploy
 cp withssl deploy/
-cp withssl.conf.example deploy/withssl.conf
+cp sslcat.conf.example deploy/sslcat.conf
 cp install.sh deploy/
 cp README.md deploy/
 
@@ -47,7 +47,7 @@ Type=simple
 User=withssl
 Group=withssl
 WorkingDirectory=$TARGET_DIR
-ExecStart=$TARGET_DIR/withssl --config /etc/sslcat/withssl.conf
+ExecStart=$TARGET_DIR/withssl --config /etc/sslcat/sslcat.conf
 ExecReload=/bin/kill -HUP \$MAINPID
 Restart=always
 RestartSec=5
@@ -91,10 +91,10 @@ systemctl daemon-reload
 systemctl enable withssl
 
 echo "📝 配置文件..."
-if [ ! -f /etc/sslcat/withssl.conf ]; then
-    cp withssl.conf /etc/sslcat/
-    chown withssl:withssl /etc/sslcat/withssl.conf
-    chmod 600 /etc/sslcat/withssl.conf
+if [ ! -f /etc/sslcat/sslcat.conf ]; then
+    cp sslcat.conf /etc/sslcat/
+    chown withssl:withssl /etc/sslcat/sslcat.conf
+    chmod 600 /etc/sslcat/sslcat.conf
 fi
 
 echo "🔧 配置防火墙..."
@@ -124,7 +124,7 @@ chmod +x deploy/deploy-commands.sh
 
 echo "📤 部署包创建完成，包含以下文件："
 echo "  - withssl (二进制文件)"
-echo "  - withssl.conf (配置文件)"
+echo "  - sslcat.conf (配置文件)"
 echo "  - withssl.service (systemd 服务文件)"
 echo "  - deploy-commands.sh (服务器端部署脚本)"
 echo "  - install.sh (自动安装脚本)"

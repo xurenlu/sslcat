@@ -195,7 +195,7 @@ Type=simple
 User=withssl
 Group=withssl
 WorkingDirectory=/opt/sslcat
-ExecStart=/opt/sslcat/withssl --config /etc/sslcat/withssl.conf
+ExecStart=/opt/sslcat/withssl --config /etc/sslcat/sslcat.conf
 ExecReload=/bin/kill -HUP \$MAINPID
 Restart=always
 RestartSec=5
@@ -228,7 +228,7 @@ EOF
 create_config() {
     log_info "创建默认配置文件..."
     
-    cat > /etc/sslcat/withssl.conf << EOF
+    cat > /etc/sslcat/sslcat.conf << EOF
 server:
   host: "0.0.0.0"
   port: 443
@@ -265,8 +265,8 @@ security:
 admin_prefix: "/sslcat-panel"
 EOF
     
-    chown withssl:withssl /etc/sslcat/withssl.conf
-    chmod 600 /etc/sslcat/withssl.conf
+    chown withssl:withssl /etc/sslcat/sslcat.conf
+    chmod 600 /etc/sslcat/sslcat.conf
     
     log_success "配置文件创建完成"
 }
@@ -335,7 +335,7 @@ show_install_info() {
     echo "默认用户名: admin"
     echo "默认密码: admin*9527"
     echo
-    echo "配置文件: /etc/sslcat/withssl.conf"
+    echo "配置文件: /etc/sslcat/sslcat.conf"
     echo "证书目录: /var/lib/sslcat/certs"
     echo "密钥目录: /var/lib/sslcat/keys"
     echo
