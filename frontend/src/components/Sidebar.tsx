@@ -21,7 +21,7 @@ import {
   FiSettings,
   FiShield,
   FiGlobe,
-  FiArrowLeftRight,
+  FiZap,
   FiBell,
   FiChevronDown,
   FiChevronRight,
@@ -79,7 +79,7 @@ const SidebarContent = () => {
 
   const mainMenuItems = [
     { name: '仪表板', icon: FiHome, path: '/dashboard' },
-    { name: '代理配置', icon: FiArrowLeftRight, path: '/proxy' },
+    { name: '代理配置', icon: FiZap, path: '/proxy' },
     { name: '站点管理', icon: FiGlobe, path: '/sites' },
     { name: 'SSL证书', icon: FiShield, path: '/ssl' },
     { name: '系统设置', icon: FiSettings, path: '/settings' },

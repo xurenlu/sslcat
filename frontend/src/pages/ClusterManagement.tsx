@@ -51,12 +51,8 @@ import {
   FiEdit,
   FiTrash2,
   FiServer,
-  FiCheckCircle,
-  FiXCircle,
-  FiClock,
   FiSettings,
   FiPlay,
-  FiPause,
 } from 'react-icons/fi'
 
 interface ClusterNode {

@@ -12,13 +12,11 @@ import {
   Input,
   Switch,
   Button,
-  Divider,
   Icon,
   useToast,
   SimpleGrid,
   Text,
   Select,
-  Textarea,
 } from '@chakra-ui/react'
 import {
   FiSettings,
@@ -324,7 +322,6 @@ const Settings: React.FC = () => {
                 value={settings.notificationChannels}
                 onChange={(e) => handleInputChange('notificationChannels', e.target.value)}
                 placeholder="email,webhook,slack"
-                helperText="多个渠道用逗号分隔"
               />
               <Text fontSize="sm" color="gray.500" mt={1}>
                 支持的渠道: email, webhook, slack, telegram, dingtalk
