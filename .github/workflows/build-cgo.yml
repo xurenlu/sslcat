@@ -57,7 +57,9 @@ jobs:
       - name: Package
         run: |
           VERSION="${GITHUB_REF_NAME:-dev}"
-          NAME="${BIN_NAME}_${VERSION}_${{ matrix.arch_tag }}_cgo"
+          # Clean version name to avoid special characters
+          CLEAN_VERSION=$(echo "$VERSION" | sed 's/[^a-zA-Z0-9._-]/-/g')
+          NAME="${BIN_NAME}_${CLEAN_VERSION}_${{ matrix.arch_tag }}_cgo"
           if [ "${{ matrix.archive }}" = "zip" ]; then
             (cd build && zip -9 ../artifacts/${NAME}.zip ${BIN_NAME}${{ matrix.ext }})
           else
