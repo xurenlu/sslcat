@@ -134,69 +134,24 @@ const GitServerManagement: React.FC = () => {
   const refreshData = async () => {
     setLoading(true)
     try {
-      // TODO: 实际的 API 调用
-      setTimeout(() => {
-        setApps([
-          {
-            id: '1',
-            name: 'frontend-app',
-            repository: 'https://github.com/user/frontend-app.git',
-            branch: 'main',
-            deployPath: '/var/www/frontend',
-            status: 'active',
-            lastDeploy: '2024-01-15 14:30:00',
-            commits: 156,
-            webhook: 'https://example.com/webhook/frontend-app',
-            autoSSL: true,
-            domain: 'app.example.com',
-          },
-          {
-            id: '2',
-            name: 'api-server',
-            repository: 'git@github.com:user/api-server.git',
-            branch: 'production',
-            deployPath: '/opt/api',
-            status: 'deploying',
-            lastDeploy: '2024-01-15 13:45:00',
-            commits: 89,
-            webhook: 'https://example.com/webhook/api-server',
-            autoSSL: false,
-          },
-          {
-            id: '3',
-            name: 'docs-site',
-            repository: 'https://github.com/user/docs.git',
-            branch: 'gh-pages',
-            deployPath: '/var/www/docs',
-            status: 'error',
-            lastDeploy: '2024-01-14 16:20:00',
-            commits: 23,
-            webhook: 'https://example.com/webhook/docs',
-            autoSSL: true,
-            domain: 'docs.example.com',
-          },
-        ])
-
-        setSSHKeys([
-          {
-            id: '1',
-            name: 'deploy-key-1',
-            fingerprint: 'SHA256:abc123def456ghi789jkl012mno345pqr678stu901vwx234yz567',
-            type: 'RSA 2048',
-            created: '2024-01-10',
-            lastUsed: '2024-01-15 14:30:00',
-          },
-          {
-            id: '2',
-            name: 'backup-key',
-            fingerprint: 'SHA256:def456ghi789jkl012mno345pqr678stu901vwx234yz567abc123',
-            type: 'Ed25519',
-            created: '2024-01-05',
-            lastUsed: '2024-01-12 09:15:00',
-          },
-        ])
-        setLoading(false)
-      }, 1000)
+      // 获取Git应用列表
+      const appsResponse = await fetch('/sslcat-panel/api/git-server/apps')
+      const apps = appsResponse.ok ? await appsResponse.json() : []
+      setApps(apps)
+      
+      // 获取SSH密钥列表
+      const keysResponse = await fetch('/sslcat-panel/api/git-server/ssh-keys')
+      const sshKeys = keysResponse.ok ? await keysResponse.json() : []
+      setSSHKeys(sshKeys)
+      
+      // 获取服务器配置
+      const configResponse = await fetch('/sslcat-panel/api/git-server/config')
+      if (configResponse.ok) {
+        const serverConfig = await configResponse.json()
+        setConfig(serverConfig)
+      }
+      
+      setLoading(false)
     } catch (error) {
       console.error('获取Git服务器数据失败:', error)
       setLoading(false)
@@ -205,17 +160,28 @@ const GitServerManagement: React.FC = () => {
 
   const handleCreateApp = async () => {
     try {
-      // TODO: 实际的 API 调用
-      toast({
-        title: 'Git应用创建成功',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
+      const response = await fetch('/sslcat-panel/api/git-server/apps', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newApp),
       })
       
-      onClose()
-      refreshData()
-      resetAppForm()
+      if (response.ok) {
+        toast({
+          title: 'Git应用创建成功',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        })
+        
+        onClose()
+        refreshData()
+        resetAppForm()
+      } else {
+        throw new Error('创建Git应用失败')
+      }
     } catch (error) {
       toast({
         title: '创建失败',
@@ -229,13 +195,21 @@ const GitServerManagement: React.FC = () => {
 
   const handleDeleteApp = async (id: string) => {
     try {
-      setApps(apps.filter(app => app.id !== id))
-      toast({
-        title: 'Git应用删除成功',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
+      const response = await fetch(`/sslcat-panel/api/git-server/apps/${id}`, {
+        method: 'DELETE',
       })
+      
+      if (response.ok) {
+        toast({
+          title: 'Git应用删除成功',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        })
+        refreshData()
+      } else {
+        throw new Error('删除Git应用失败')
+      }
     } catch (error) {
       toast({
         title: '删除失败',
@@ -249,14 +223,21 @@ const GitServerManagement: React.FC = () => {
 
   const handleDeployApp = async (id: string) => {
     try {
-      // TODO: 实际的 API 调用
-      toast({
-        title: '部署已启动',
-        status: 'info',
-        duration: 3000,
-        isClosable: true,
+      const response = await fetch(`/sslcat-panel/api/git-server/apps/${id}/deploy`, {
+        method: 'POST',
       })
-      refreshData()
+      
+      if (response.ok) {
+        toast({
+          title: '部署已启动',
+          status: 'info',
+          duration: 3000,
+          isClosable: true,
+        })
+        refreshData()
+      } else {
+        throw new Error('部署应用失败')
+      }
     } catch (error) {
       toast({
         title: '部署失败',
@@ -270,17 +251,28 @@ const GitServerManagement: React.FC = () => {
 
   const handleAddSSHKey = async () => {
     try {
-      // TODO: 实际的 API 调用
-      toast({
-        title: 'SSH密钥添加成功',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
+      const response = await fetch('/sslcat-panel/api/git-server/ssh-keys', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newKey),
       })
       
-      onKeyClose()
-      refreshData()
-      resetKeyForm()
+      if (response.ok) {
+        toast({
+          title: 'SSH密钥添加成功',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        })
+        
+        onKeyClose()
+        refreshData()
+        resetKeyForm()
+      } else {
+        throw new Error('添加SSH密钥失败')
+      }
     } catch (error) {
       toast({
         title: '添加失败',
@@ -294,13 +286,21 @@ const GitServerManagement: React.FC = () => {
 
   const handleDeleteSSHKey = async (id: string) => {
     try {
-      setSSHKeys(sshKeys.filter(key => key.id !== id))
-      toast({
-        title: 'SSH密钥删除成功',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
+      const response = await fetch(`/sslcat-panel/api/git-server/ssh-keys/${id}`, {
+        method: 'DELETE',
       })
+      
+      if (response.ok) {
+        toast({
+          title: 'SSH密钥删除成功',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        })
+        refreshData()
+      } else {
+        throw new Error('删除SSH密钥失败')
+      }
     } catch (error) {
       toast({
         title: '删除失败',
@@ -314,14 +314,26 @@ const GitServerManagement: React.FC = () => {
 
   const handleUpdateConfig = async () => {
     try {
-      // TODO: 实际的 API 调用
-      toast({
-        title: 'Git服务器配置更新成功',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
+      const response = await fetch('/sslcat-panel/api/git-server/config', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(config),
       })
-      onConfigClose()
+      
+      if (response.ok) {
+        toast({
+          title: 'Git服务器配置更新成功',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        })
+        onConfigClose()
+        refreshData()
+      } else {
+        throw new Error('更新配置失败')
+      }
     } catch (error) {
       toast({
         title: '更新失败',
