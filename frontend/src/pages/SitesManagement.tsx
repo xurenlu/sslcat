@@ -2,10 +2,8 @@ import React, { useState, useEffect } from 'react'
 import {
   Box,
   Heading,
-  SimpleGrid,
   Card,
   CardBody,
-  CardHeader,
   VStack,
   HStack,
   Button,
@@ -32,7 +30,6 @@ import {
   FormLabel,
   Input,
   Select,
-  Textarea,
   useDisclosure,
   Tabs,
   TabList,
@@ -48,8 +45,6 @@ import {
   FiTrash2,
   FiFolder,
   FiCode,
-  FiServer,
-  FiSettings,
 } from 'react-icons/fi'
 
 interface StaticSite {

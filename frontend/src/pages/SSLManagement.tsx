@@ -26,7 +26,6 @@ import {
   FiRefreshCw,
   FiDownload,
   FiTrash2,
-  FiClock,
   FiCheck,
   FiX,
 } from 'react-icons/fi'
