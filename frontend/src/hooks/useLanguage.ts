@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext } from 'react'
+import React, { useState, useEffect, createContext, useContext } from 'react'
 import { getTranslation, Translation } from '../i18n'
 
 export interface Language {
@@ -28,6 +28,17 @@ const LanguageContext = createContext<{
   supportedLanguages: Language[]
   t: Translation
 } | null>(null)
+
+// 语言提供者组件
+export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const languageHook = useLanguage()
+  
+  return React.createElement(
+    LanguageContext.Provider,
+    { value: languageHook },
+    children
+  )
+}
 
 export const useLanguage = () => {
   const [currentLanguage, setCurrentLanguage] = useState<string>('zh-CN')
