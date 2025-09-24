@@ -46,9 +46,9 @@ func (s *Server) generateProxyManagementHTML(data map[string]interface{}) string
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">代理管理</h1>
                     <div>
-                        <button class="btn btn-primary" onclick="showAddProxyModal()">
+                        <a href="%s/proxy/add" class="btn btn-primary">
                             <i class="bi bi-plus-circle"></i> 添加代理规则
-                        </button>
+                        </a>
                     </div>
                 </div>
                 
@@ -77,24 +77,6 @@ func (s *Server) generateProxyManagementHTML(data map[string]interface{}) string
         </div>
     </div>
 
-    <!-- 添加代理规则模态框 -->
-    <div class="modal fade" id="addProxyModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">添加代理规则</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    %s
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                    <button type="button" class="btn btn-primary" onclick="addProxyRule()">添加</button>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- 编辑代理规则模态框 -->
     <div class="modal fade" id="editProxyModal" tabindex="-1">
@@ -186,10 +168,6 @@ func (s *Server) generateProxyManagementHTML(data map[string]interface{}) string
         return div;
     }
 
-    function showAddProxyModal() {
-        const modal = new bootstrap.Modal(document.getElementById('addProxyModal'));
-        modal.show();
-    }
 
     function editProxyRule(domain) {
         currentEditingRule = domain;
@@ -216,38 +194,6 @@ func (s *Server) generateProxyManagementHTML(data map[string]interface{}) string
             });
     }
 
-    function addProxyRule() {
-        const formData = {
-            domain: document.getElementById('domain').value,
-            target: document.getElementById('target').value,
-            port: parseInt(document.getElementById('port').value),
-            ssl_only: document.getElementById('sslOnly').checked,
-            cdn_enabled: document.getElementById('cdnEnabled').checked,
-            enabled: document.getElementById('enabled').checked
-        };
-
-        fetch('%s/api/proxy/rule', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(formData)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                bootstrap.Modal.getInstance(document.getElementById('addProxyModal')).hide();
-                document.getElementById('addProxyForm').reset();
-                loadProxyRules();
-                showAlert('success', '代理规则添加成功');
-            } else {
-                showAlert('danger', '添加失败: ' + (data.message || '未知错误'));
-            }
-        })
-        .catch(error => {
-            showAlert('danger', '添加失败: ' + error.message);
-        });
-    }
 
     function updateProxyRule() {
         if (!currentEditingRule) return;
@@ -322,9 +268,8 @@ func (s *Server) generateProxyManagementHTML(data map[string]interface{}) string
 </body>
 </html>`,
 		s.generateSidebar(data["AdminPrefix"].(string), "proxy"),
-		s.generateProxyAddHTML(data),
-		s.generateProxyEditHTML(data),
 		data["AdminPrefix"].(string),
+		s.generateProxyEditHTML(data),
 		data["AdminPrefix"].(string),
 		data["AdminPrefix"].(string),
 		data["AdminPrefix"].(string),
