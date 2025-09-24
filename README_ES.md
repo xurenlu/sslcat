@@ -390,7 +390,7 @@ Opciones:
 1. **Falla al iniciar servicio**
    ```bash
    # Verificar sintaxis del archivo de configuración
-   sudo withssl --config /etc/sslcat/withssl.conf --log-level debug
+   sudo withssl --config /etc/sslcat/sslcat.conf --log-level debug
    
    # Verificar uso de puerto
    sudo netstat -tlnp | grep :443

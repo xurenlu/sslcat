@@ -18,8 +18,8 @@ if [ ! -f "./withssl" ]; then
 fi
 
 # 检查配置文件
-if [ ! -f "./withssl.conf" ]; then
-    echo "❌ 未找到配置文件 withssl.conf"
+if [ ! -f "./sslcat.conf" ]; then
+    echo "❌ 未找到配置文件 sslcat.conf"
     exit 1
 fi
 
@@ -34,12 +34,12 @@ fi
 echo ""
 echo "🔧 启动 SSLcat 服务器 (测试模式)..."
 echo "   - 监听端口: 8080 (HTTP测试)"
-echo "   - 配置文件: withssl.conf"
+echo "   - 配置文件: sslcat.conf"
 echo "   - 日志级别: debug"
 echo ""
 
 # 启动服务器 (后台运行)
-./withssl --config withssl.conf --port 8080 --log-level debug &
+./withssl --config sslcat.conf --port 8080 --log-level debug &
 SERVER_PID=$!
 
 echo "🚀 服务器已启动 (PID: $SERVER_PID)"
@@ -152,5 +152,5 @@ echo "   3. 考虑使用Let's Encrypt证书"
 echo "   4. 设置证书自动更新"
 echo ""
 echo "🚀 启动生产服务器:"
-echo "   sudo ./withssl --config withssl.conf --port 443"
+echo "   sudo ./withssl --config sslcat.conf --port 443"
 echo "=========================================="

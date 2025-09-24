@@ -364,7 +364,7 @@ sslcat [опции]
 1. **Сбой запуска сервиса**
    ```bash
    # Проверить синтаксис файла конфигурации
-   sudo withssl --config /etc/sslcat/withssl.conf --log-level debug
+   sudo withssl --config /etc/sslcat/sslcat.conf --log-level debug
    
    # Проверить использование порта
    sudo netstat -tlnp | grep :443

@@ -369,7 +369,7 @@ sslcat [选项]
 1. **服务启动失败**
    ```bash
    # 检查配置文件语法
-   sudo withssl --config /etc/sslcat/withssl.conf --log-level debug
+   sudo sslcat --config /etc/sslcat/sslcat.conf --log-level debug
    
    # 检查端口占用
    sudo netstat -tlnp | grep :443

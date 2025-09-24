@@ -40,13 +40,13 @@ ENV TZ=Asia/Shanghai
 COPY --from=builder /app/withssl /opt/sslcat/withssl
 
 # 复制配置文件模板
-COPY --from=builder /app/withssl.conf.example /etc/sslcat/withssl.conf
+COPY --from=builder /app/sslcat.conf.example /etc/sslcat/sslcat.conf
 
 # 设置权限
 RUN mkdir -p /opt/sslcat && \
     chmod +x /opt/sslcat/withssl && \
-    chown withssl:withssl /etc/sslcat/withssl.conf && \
-    chmod 600 /etc/sslcat/withssl.conf
+    chown withssl:withssl /etc/sslcat/sslcat.conf && \
+    chmod 600 /etc/sslcat/sslcat.conf
 
 # 切换到非root用户
 USER withssl
@@ -59,4 +59,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:80/health || exit 1
 
 # 启动命令
-CMD ["/opt/sslcat/withssl", "--config", "/etc/sslcat/withssl.conf"]
+CMD ["/opt/sslcat/withssl", "--config", "/etc/sslcat/sslcat.conf"]
