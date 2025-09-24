@@ -65,6 +65,7 @@
                         </ul>
                     </div>
                     
+                    <!-- 基础功能菜单 -->
                     <ul class="nav flex-column">
                         <li class="nav-item">
                             <a class="nav-link active" href="{{.AdminPrefix}}/">
@@ -77,13 +78,8 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{.AdminPrefix}}/static-sites">
-                                <i class="bi bi-file-earmark-text"></i> {{t "nav.static_sites"}}
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{.AdminPrefix}}/php-sites">
-                                <i class="bi bi-code-square"></i> {{t "nav.php_sites"}}
+                            <a class="nav-link" href="{{.AdminPrefix}}/sites">
+                                <i class="bi bi-globe2"></i> 站点管理
                             </a>
                         </li>
                         <li class="nav-item">
@@ -92,41 +88,52 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{.AdminPrefix}}/dns">
-                                <i class="bi bi-globe"></i> {{t "nav.dns"}}
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{.AdminPrefix}}/security">
-                                <i class="bi bi-shield-check"></i> {{t "nav.security"}}
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{.AdminPrefix}}/cluster">
-                                <i class="bi bi-diagram-3"></i> {{t "nav.cluster"}}
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{.AdminPrefix}}/runners">
-                                <i class="bi bi-terminal"></i> {{t "nav.runners"}}
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{.AdminPrefix}}/git-server">
-                                <i class="bi bi-git"></i> {{t "nav.git_deploy_server"}}
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{.AdminPrefix}}/notifications">
-                                <i class="bi bi-bell"></i> {{t "nav.notifications"}}
-                            </a>
-                        </li>
-                        <li class="nav-item">
                             <a class="nav-link" href="{{.AdminPrefix}}/settings">
                                 <i class="bi bi-gear"></i> {{t "nav.settings"}}
                             </a>
                         </li>
                     </ul>
+                    
+                    <!-- 高级功能折叠区域 -->
+                    <div class="mt-4">
+                        <button class="btn btn-outline-secondary btn-sm w-100" type="button" data-bs-toggle="collapse" data-bs-target="#advancedMenu" aria-expanded="false" aria-controls="advancedMenu">
+                            <i class="bi bi-chevron-down"></i> 高级选项
+                        </button>
+                        <div class="collapse mt-2" id="advancedMenu">
+                            <ul class="nav flex-column">
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{{.AdminPrefix}}/dns">
+                                        <i class="bi bi-globe"></i> {{t "nav.dns"}}
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{{.AdminPrefix}}/security">
+                                        <i class="bi bi-shield-check"></i> {{t "nav.security"}}
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{{.AdminPrefix}}/cluster">
+                                        <i class="bi bi-diagram-3"></i> {{t "nav.cluster"}}
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{{.AdminPrefix}}/runners">
+                                        <i class="bi bi-terminal"></i> {{t "nav.runners"}}
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{{.AdminPrefix}}/git-server">
+                                        <i class="bi bi-git"></i> {{t "nav.git_deploy_server"}}
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{{.AdminPrefix}}/notifications">
+                                        <i class="bi bi-bell"></i> {{t "nav.notifications"}}
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
                     
                     <hr>
                     <div class="dropdown">

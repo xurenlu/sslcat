@@ -54,9 +54,15 @@ lint:
 		echo "golangci-lint 未安装，跳过代码检查"; \
 	fi
 
+# 构建前端
+.PHONY: build-frontend
+build-frontend:
+	@echo "构建前端..."
+	@./scripts/build-frontend.sh
+
 # 构建二进制文件
 .PHONY: build
-build: deps
+build: deps build-frontend
 	@echo "构建 $(BINARY_NAME)..."
 	@mkdir -p $(BUILD_DIR)
 	@go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) main.go
@@ -64,7 +70,7 @@ build: deps
 
 # 构建多个平台的二进制文件
 .PHONY: build-all
-build-all: deps
+build-all: deps build-frontend
 	@echo "构建多平台二进制文件..."
 	@mkdir -p $(BUILD_DIR)
 	@echo "  🐧 构建 Linux AMD64..."
@@ -81,7 +87,7 @@ build-all: deps
 
 # 构建 Linux 服务器版本（最常用）
 .PHONY: build-linux
-build-linux: deps
+build-linux: deps build-frontend
 	@echo "构建 Linux 服务器版本..."
 	@mkdir -p $(BUILD_DIR)
 	@GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64 main.go
@@ -98,6 +104,12 @@ run: build
 dev:
 	@echo "启动开发服务器..."
 	@go run main.go --config withssl.conf --log-level debug
+
+# 运行前端开发服务器
+.PHONY: dev-frontend
+dev-frontend:
+	@echo "启动前端开发服务器..."
+	@./scripts/dev-frontend.sh
 
 # 安装到系统
 .PHONY: install
