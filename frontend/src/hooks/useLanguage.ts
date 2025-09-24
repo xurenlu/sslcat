@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, createContext, useContext } from 'react'
+import { getTranslation, Translation } from '../i18n'
 
 export interface Language {
   code: string
@@ -19,14 +20,25 @@ export const supportedLanguages: Language[] = [
   { code: 'ru-RU', name: 'Русский', nativeName: 'Русский', flag: '🇷🇺' },
 ]
 
+// 创建语言上下文
+const LanguageContext = createContext<{
+  currentLanguage: string
+  changeLanguage: (languageCode: string) => void
+  getCurrentLanguage: () => Language
+  supportedLanguages: Language[]
+  t: Translation
+} | null>(null)
+
 export const useLanguage = () => {
   const [currentLanguage, setCurrentLanguage] = useState<string>('zh-CN')
+  const [translation, setTranslation] = useState<Translation>(getTranslation('zh-CN'))
 
   useEffect(() => {
     // 从 localStorage 读取保存的语言设置
     const savedLanguage = localStorage.getItem('withssl-language')
     if (savedLanguage && supportedLanguages.find(lang => lang.code === savedLanguage)) {
       setCurrentLanguage(savedLanguage)
+      setTranslation(getTranslation(savedLanguage))
     } else {
       // 检测浏览器语言
       const browserLanguage = navigator.language
@@ -35,19 +47,21 @@ export const useLanguage = () => {
       )
       if (matchedLanguage) {
         setCurrentLanguage(matchedLanguage.code)
+        setTranslation(getTranslation(matchedLanguage.code))
       }
     }
   }, [])
 
   const changeLanguage = (languageCode: string) => {
     setCurrentLanguage(languageCode)
+    setTranslation(getTranslation(languageCode))
     localStorage.setItem('withssl-language', languageCode)
     
-    // TODO: 实现实际的国际化切换
     console.log('Language changed to:', languageCode)
-    
-    // 这里可以触发全局状态更新或重新加载页面
-    // window.location.reload() // 如果需要重新加载页面
+    // 触发全局重新渲染
+    window.dispatchEvent(new CustomEvent('languageChanged', { 
+      detail: { language: languageCode } 
+    }))
   }
 
   const getCurrentLanguage = () => {
@@ -59,5 +73,15 @@ export const useLanguage = () => {
     changeLanguage,
     getCurrentLanguage,
     supportedLanguages,
+    t: translation,
   }
+}
+
+// 使用翻译的 Hook
+export const useTranslation = () => {
+  const context = useContext(LanguageContext)
+  if (!context) {
+    throw new Error('useTranslation must be used within a LanguageProvider')
+  }
+  return context.t
 }
