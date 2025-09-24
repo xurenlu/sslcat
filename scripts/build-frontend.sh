@@ -8,22 +8,24 @@ echo "🚀 开始构建前端项目..."
 # 进入前端目录
 cd frontend
 
-# 检查 Node.js 和 npm
+# 检查 Node.js 和 pnpm
 if ! command -v node &> /dev/null; then
     echo "❌ Node.js 未安装，请先安装 Node.js"
     exit 1
 fi
 
-if ! command -v npm &> /dev/null; then
-    echo "❌ npm 未安装，请先安装 npm"
+if ! command -v pnpm &> /dev/null; then
+    echo "❌ pnpm 未安装，请先安装 pnpm:"
+    echo "   npm install -g pnpm"
+    echo "   或使用: curl -fsSL https://get.pnpm.io/install.sh | sh -"
     exit 1
 fi
 
-echo "📦 安装依赖..."
-npm install
+echo "📦 使用 pnpm 安装依赖..."
+pnpm install
 
 echo "🔨 构建前端项目..."
-npm run build
+pnpm run build
 
 echo "✅ 前端构建完成！"
 
