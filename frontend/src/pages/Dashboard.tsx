@@ -31,6 +31,7 @@ import {
   FiCheckCircle,
 } from 'react-icons/fi'
 import { Link as RouterLink } from 'react-router-dom'
+import { useTranslation } from '../hooks/useLanguage'
 
 interface DashboardStats {
   activeRules: number
@@ -49,6 +50,7 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const toast = useToast()
+  const t = useTranslation()
 
   const refreshStats = async () => {
     setLoading(true)
@@ -69,7 +71,7 @@ const Dashboard: React.FC = () => {
         })
         setLoading(false)
         toast({
-          title: '数据刷新成功',
+          title: t.common.success,
           description: '系统统计信息已更新',
           status: 'success',
           duration: 2000,
@@ -125,16 +127,16 @@ const Dashboard: React.FC = () => {
   return (
     <Box>
       <Flex justify="space-between" align="center" mb={6}>
-        <Heading size="lg">仪表板</Heading>
+        <Heading size="lg">{t.dashboard.title}</Heading>
         <Button
           leftIcon={<Icon as={FiRefreshCw} />}
           onClick={refreshStats}
           isLoading={loading}
-          loadingText="刷新中..."
+          loadingText={t.common.loading}
           colorScheme="blue"
           variant="outline"
         >
-          刷新
+          {t.common.refresh}
         </Button>
       </Flex>
 

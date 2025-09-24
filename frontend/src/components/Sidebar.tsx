@@ -18,6 +18,7 @@ import {
 } from '@chakra-ui/react'
 import { Link as RouterLink, useLocation } from 'react-router-dom'
 import { useLanguage } from '../hooks/useLanguage'
+import { useTranslation } from '../hooks/useLanguage'
 import {
   FiHome,
   FiSettings,
@@ -79,22 +80,23 @@ const SidebarContent = () => {
   const location = useLocation()
   const { isOpen: isAdvancedOpen, onToggle: onAdvancedToggle } = useDisclosure()
   const { currentLanguage, changeLanguage, getCurrentLanguage, supportedLanguages } = useLanguage()
+  const t = useTranslation()
 
   const mainMenuItems = [
-    { name: '仪表板', icon: FiHome, path: '/dashboard' },
-    { name: '代理配置', icon: FiZap, path: '/proxy' },
-    { name: '站点管理', icon: FiGlobe, path: '/sites' },
-    { name: 'SSL证书', icon: FiShield, path: '/ssl' },
-    { name: '系统设置', icon: FiSettings, path: '/settings' },
+    { name: t.navigation.dashboard, icon: FiHome, path: '/dashboard' },
+    { name: t.navigation.proxy, icon: FiZap, path: '/proxy' },
+    { name: t.navigation.sites, icon: FiGlobe, path: '/sites' },
+    { name: t.navigation.ssl, icon: FiShield, path: '/ssl' },
+    { name: t.navigation.settings, icon: FiSettings, path: '/settings' },
   ]
 
   const advancedMenuItems = [
-    { name: 'DNS配置', icon: FiGlobe, path: '/dns' },
-    { name: '安全设置', icon: FiShield, path: '/security' },
-    { name: '集群管理', icon: FiUsers, path: '/cluster' },
-    { name: '运行器', icon: FiTerminal, path: '/runners' },
-    { name: 'Git部署服务器', icon: FiGitBranch, path: '/git-server' },
-    { name: '通知管理', icon: FiBell, path: '/notifications' },
+    { name: t.navigation.dns, icon: FiGlobe, path: '/dns' },
+    { name: t.navigation.security, icon: FiShield, path: '/security' },
+    { name: t.navigation.cluster, icon: FiUsers, path: '/cluster' },
+    { name: t.navigation.runners, icon: FiTerminal, path: '/runners' },
+    { name: t.navigation.gitServer, icon: FiGitBranch, path: '/git-server' },
+    { name: t.navigation.notifications, icon: FiBell, path: '/notifications' },
   ]
 
   return (
@@ -158,15 +160,15 @@ const SidebarContent = () => {
 
         {/* Advanced Options */}
         <VStack spacing={1} align="stretch">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onAdvancedToggle}
-            leftIcon={<Icon as={isAdvancedOpen ? FiChevronDown : FiChevronRight} />}
-            justifyContent="flex-start"
-          >
-            高级选项
-          </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onAdvancedToggle}
+              leftIcon={<Icon as={isAdvancedOpen ? FiChevronDown : FiChevronRight} />}
+              justifyContent="flex-start"
+            >
+              {t.navigation.advanced}
+            </Button>
           <Collapse in={isAdvancedOpen}>
             <VStack spacing={1} align="stretch" mt={2}>
               {advancedMenuItems.map((item) => (
@@ -193,7 +195,7 @@ const SidebarContent = () => {
           leftIcon={<Icon as={FiLogOut} />}
           w="full"
         >
-          退出登录
+          {t.navigation.logout}
         </Button>
       </Box>
     </Box>
