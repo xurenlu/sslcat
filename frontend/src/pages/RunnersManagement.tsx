@@ -115,70 +115,25 @@ const RunnersManagement: React.FC = () => {
   const refreshData = async () => {
     setLoading(true)
     try {
-      // TODO: 实际的 API 调用
-      setTimeout(() => {
-        const mockTasks: RunnerTask[] = [
-          {
-            id: '1',
-            name: 'nginx-proxy',
-            type: 'docker',
-            status: 'running',
-            command: '',
-            workingDir: '/',
-            environment: { PORT: '80' },
-            created: '2024-01-15',
-            lastRun: '2024-01-15 14:30:00',
-            image: 'nginx:alpine',
-            container: 'nginx-proxy-container',
-          },
-          {
-            id: '2',
-            name: 'backup-script',
-            type: 'local',
-            status: 'stopped',
-            command: '/scripts/backup.sh',
-            workingDir: '/scripts',
-            environment: { BACKUP_DIR: '/backup' },
-            created: '2024-01-14',
-            lastRun: '2024-01-15 02:00:00',
-            exitCode: 0,
-          },
-          {
-            id: '3',
-            name: 'log-processor',
-            type: 'local',
-            status: 'running',
-            command: 'python log_processor.py',
-            workingDir: '/app',
-            environment: { ENV: 'production' },
-            created: '2024-01-13',
-            lastRun: '2024-01-15 14:25:00',
-            pid: 12345,
-          },
-          {
-            id: '4',
-            name: 'redis-cache',
-            type: 'docker',
-            status: 'error',
-            command: '',
-            workingDir: '/',
-            environment: {},
-            created: '2024-01-12',
-            lastRun: '2024-01-15 10:00:00',
-            image: 'redis:6-alpine',
-            exitCode: 1,
-          },
-        ]
-        
-        setTasks(mockTasks)
-        setStats({
-          totalTasks: mockTasks.length,
-          runningTasks: mockTasks.filter(t => t.status === 'running').length,
-          dockerTasks: mockTasks.filter(t => t.type === 'docker').length,
-          localTasks: mockTasks.filter(t => t.type === 'local').length,
-        })
-        setLoading(false)
-      }, 1000)
+      // 获取本地运行器任务
+      const localResponse = await fetch('/sslcat-panel/api/local-runner/tasks')
+      const localTasks = localResponse.ok ? await localResponse.json() : []
+      
+      // 获取Docker运行器任务
+      const dockerResponse = await fetch('/sslcat-panel/api/docker-runner/tasks')
+      const dockerTasks = dockerResponse.ok ? await dockerResponse.json() : []
+      
+      // 合并所有任务
+      const allTasks = [...localTasks, ...dockerTasks]
+      
+      setTasks(allTasks)
+      setStats({
+        totalTasks: allTasks.length,
+        runningTasks: allTasks.filter(t => t.status === 'running').length,
+        dockerTasks: allTasks.filter(t => t.type === 'docker').length,
+        localTasks: allTasks.filter(t => t.type === 'local').length,
+      })
+      setLoading(false)
     } catch (error) {
       console.error('获取运行器数据失败:', error)
       setLoading(false)
@@ -187,17 +142,32 @@ const RunnersManagement: React.FC = () => {
 
   const handleCreateTask = async () => {
     try {
-      // TODO: 实际的 API 调用
-      toast({
-        title: '任务创建成功',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
+      const apiEndpoint = newTask.type === 'local' 
+        ? '/sslcat-panel/api/local-runner/task/add'
+        : '/sslcat-panel/api/docker-runner/task/add'
+      
+      const response = await fetch(apiEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newTask),
       })
       
-      onClose()
-      refreshData()
-      resetForm()
+      if (response.ok) {
+        toast({
+          title: '任务创建成功',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        })
+        
+        onClose()
+        refreshData()
+        resetForm()
+      } else {
+        throw new Error('创建任务失败')
+      }
     } catch (error) {
       toast({
         title: '创建失败',
@@ -211,20 +181,34 @@ const RunnersManagement: React.FC = () => {
 
   const handleTaskAction = async (id: string, action: 'start' | 'stop' | 'restart') => {
     try {
-      // TODO: 实际的 API 调用
-      const actionText = {
-        start: '启动',
-        stop: '停止',
-        restart: '重启',
-      }[action]
+      const task = tasks.find(t => t.id === id)
+      if (!task) return
       
-      toast({
-        title: `任务${actionText}成功`,
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
+      const apiEndpoint = task.type === 'local' 
+        ? `/sslcat-panel/api/local-runner/task/${id}/${action}`
+        : `/sslcat-panel/api/docker-runner/task/${id}/${action}`
+      
+      const response = await fetch(apiEndpoint, {
+        method: 'POST',
       })
-      refreshData()
+      
+      if (response.ok) {
+        const actionText = {
+          start: '启动',
+          stop: '停止',
+          restart: '重启',
+        }[action]
+        
+        toast({
+          title: `任务${actionText}成功`,
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        })
+        refreshData()
+      } else {
+        throw new Error(`${action}任务失败`)
+      }
     } catch (error) {
       toast({
         title: '操作失败',
@@ -238,13 +222,28 @@ const RunnersManagement: React.FC = () => {
 
   const handleDeleteTask = async (id: string) => {
     try {
-      setTasks(tasks.filter(task => task.id !== id))
-      toast({
-        title: '任务删除成功',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
+      const task = tasks.find(t => t.id === id)
+      if (!task) return
+      
+      const apiEndpoint = task.type === 'local' 
+        ? `/sslcat-panel/api/local-runner/task/${id}/delete`
+        : `/sslcat-panel/api/docker-runner/task/${id}/delete`
+      
+      const response = await fetch(apiEndpoint, {
+        method: 'DELETE',
       })
+      
+      if (response.ok) {
+        toast({
+          title: '任务删除成功',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        })
+        refreshData()
+      } else {
+        throw new Error('删除任务失败')
+      }
     } catch (error) {
       toast({
         title: '删除失败',
