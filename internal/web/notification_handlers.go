@@ -190,14 +190,100 @@ func (s *Server) handleNotificationConfig(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// 返回当前通知配置
-	config := s.config.Notification
+	if r.Method == "GET" {
+		// 返回当前通知配置
+		config := s.config.Notification
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"config":  config,
-	})
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"config":  config,
+		})
+	} else if r.Method == "POST" {
+		// 更新通知配置
+		var updateConfig struct {
+			Enabled  bool                              `json:"enabled"`
+			Channels map[string]map[string]interface{} `json:"channels"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&updateConfig); err != nil {
+			http.Error(w, "无效的JSON数据", http.StatusBadRequest)
+			return
+		}
+
+		// 更新配置
+		s.config.Notification.Enabled = updateConfig.Enabled
+
+		// 更新邮件配置
+		if emailConfig, exists := updateConfig.Channels["email"]; exists {
+			if enabled, ok := emailConfig["enabled"].(bool); ok {
+				s.config.Notification.Channels.Email.Enabled = enabled
+			}
+			if host, ok := emailConfig["smtp_host"].(string); ok {
+				s.config.Notification.Channels.Email.SMTPHost = host
+			}
+			if port, ok := emailConfig["smtp_port"].(float64); ok {
+				s.config.Notification.Channels.Email.SMTPPort = int(port)
+			}
+			if username, ok := emailConfig["username"].(string); ok {
+				s.config.Notification.Channels.Email.Username = username
+			}
+			if password, ok := emailConfig["password"].(string); ok {
+				s.config.Notification.Channels.Email.Password = password
+			}
+			if from, ok := emailConfig["from"].(string); ok {
+				s.config.Notification.Channels.Email.From = from
+			}
+			if to, ok := emailConfig["to"].([]interface{}); ok {
+				var toList []string
+				for _, t := range to {
+					if str, ok := t.(string); ok {
+						toList = append(toList, str)
+					}
+				}
+				s.config.Notification.Channels.Email.To = toList
+			}
+			if useTLS, ok := emailConfig["use_tls"].(bool); ok {
+				s.config.Notification.Channels.Email.UseTLS = useTLS
+			}
+		}
+
+		// 更新Webhook配置
+		if webhookConfig, exists := updateConfig.Channels["webhook"]; exists {
+			if enabled, ok := webhookConfig["enabled"].(bool); ok {
+				s.config.Notification.Channels.Webhook.Enabled = enabled
+			}
+			if url, ok := webhookConfig["url"].(string); ok {
+				s.config.Notification.Channels.Webhook.URL = url
+			}
+			if headers, ok := webhookConfig["headers"].(map[string]interface{}); ok {
+				headerMap := make(map[string]string)
+				for k, v := range headers {
+					if str, ok := v.(string); ok {
+						headerMap[k] = str
+					}
+				}
+				s.config.Notification.Channels.Webhook.Headers = headerMap
+			}
+			if timeout, ok := webhookConfig["timeout"].(float64); ok {
+				s.config.Notification.Channels.Webhook.Timeout = int(timeout)
+			}
+		}
+
+		// 保存配置到文件
+		if err := s.config.Save(""); err != nil {
+			http.Error(w, fmt.Sprintf("保存配置失败: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"message": "通知配置已更新",
+		})
+	} else {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 // parseLevel 解析通知级别

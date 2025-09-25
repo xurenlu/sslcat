@@ -36,6 +36,7 @@ import {
   FiClock,
   FiX,
 } from 'react-icons/fi'
+import { useConfig, buildApiPath } from '../contexts/ConfigContext'
 
 interface SecurityEvent {
   id: string
@@ -71,52 +72,59 @@ const Security: React.FC = () => {
   })
   const [loading, setLoading] = useState(false)
   const toast = useToast()
+  const { adminPrefix } = useConfig()
 
   const refreshData = async () => {
     setLoading(true)
     try {
-      // TODO: 实际的 API 调用
-      setTimeout(() => {
+      // 获取安全日志（暂时使用这个API）
+      const logsResponse = await fetch(buildApiPath(adminPrefix, '/api/security-logs'), {
+        method: 'GET',
+        credentials: 'include',
+      })
+
+      if (logsResponse.ok) {
+        const logsData = await logsResponse.json()
+        // 模拟统计信息
+        const totalEvents = logsData.logs ? logsData.logs.length : 0
+        const blockedIPs = logsData.logs ? logsData.logs.filter((log: any) => !log.success).length : 0
+        const activeThreats = Math.floor(blockedIPs * 0.1) // 模拟活跃威胁数量
+        
         setStats({
-          totalEvents: 45,
-          blockedIPs: 12,
-          activeThreats: 3,
-          lastScan: '2024-01-15 14:30:00',
+          totalEvents,
+          blockedIPs,
+          activeThreats,
+          lastScan: new Date().toLocaleString('zh-CN'),
         })
         
-        setEvents([
-          {
-            id: '1',
-            type: 'ddos_attack',
-            severity: 'high',
-            source: '192.168.1.100',
-            description: 'DDoS攻击检测 - 异常高频请求',
-            timestamp: '2024-01-15 14:25:00',
-            blocked: true,
-          },
-          {
-            id: '2',
-            type: 'bruteforce',
-            severity: 'medium',
-            source: '10.0.0.50',
-            description: '暴力破解尝试 - 多次登录失败',
-            timestamp: '2024-01-15 13:45:00',
-            blocked: true,
-          },
-          {
-            id: '3',
+        // 转换日志为事件格式 - 只显示有风险、可疑的事件
+        const events = logsData.logs ? logsData.logs
+          .filter((log: any) => !log.success) // 只显示失败的访问（被阻止的）
+          .slice(0, 10)
+          .map((log: any, index: number) => ({
+            id: index.toString(),
             type: 'suspicious_ip',
-            severity: 'low',
-            source: '203.0.113.15',
-            description: '可疑IP访问 - 来自已知恶意IP段',
-            timestamp: '2024-01-15 12:30:00',
-            blocked: false,
-          },
-        ])
-        setLoading(false)
-      }, 1000)
+            severity: 'high',
+            source: log.ip,
+            description: '访问被阻止 - 可疑行为',
+            timestamp: new Date(log.timestamp).toLocaleString('zh-CN'),
+            blocked: true,
+          })) : []
+        
+        setEvents(events)
+      } else {
+        throw new Error('获取安全数据失败')
+      }
     } catch (error) {
       console.error('获取安全数据失败:', error)
+      toast({
+        title: '获取失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+    } finally {
       setLoading(false)
     }
   }

@@ -27,7 +27,8 @@ const api = axios.create({
 // 请求拦截器
 api.interceptors.request.use(
   (config) => {
-    // 这里可以添加认证 token 等
+    // 添加认证信息
+    config.withCredentials = true // 包含 cookies
     return config
   },
   (error) => {

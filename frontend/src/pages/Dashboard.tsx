@@ -32,7 +32,7 @@ import {
 } from 'react-icons/fi'
 import { Link as RouterLink } from 'react-router-dom'
 import { useTranslation } from '../hooks/useLanguage'
-import { useConfig, buildPath } from '../contexts/ConfigContext'
+import { useConfig, buildPath, buildApiPath } from '../contexts/ConfigContext'
 
 interface DashboardStats {
   activeRules: number
@@ -58,28 +58,25 @@ const Dashboard: React.FC = () => {
     setLoading(true)
     setError(null)
     try {
-      // TODO: 实际的 API 调用
-      // const response = await fetch('/api/stats')
-      // const data = await response.json()
-      // setStats(data)
-      
-      // 模拟数据
-      setTimeout(() => {
-        setStats({
-          activeRules: 15,
-          cachedProxies: 342,
-          publicIP: '192.168.1.100',
-          goVersion: 'go1.21.0',
-        })
-        setLoading(false)
-        toast({
-          title: t.common.success,
-          description: '系统统计信息已更新',
-          status: 'success',
-          duration: 2000,
-          isClosable: true,
-        })
-      }, 1000)
+      const response = await fetch(buildApiPath(adminPrefix, '/stats'), {
+        method: 'GET',
+        credentials: 'include', // 包含认证 cookies
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      setStats(data)
+      setLoading(false)
+      toast({
+        title: t.common.success,
+        description: '系统统计信息已更新',
+        status: 'success',
+        duration: 2000,
+        isClosable: true,
+      })
     } catch (error) {
       console.error('获取统计信息失败:', error)
       const errorMessage = error instanceof Error ? error.message : '未知错误'

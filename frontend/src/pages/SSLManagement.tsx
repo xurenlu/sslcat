@@ -234,7 +234,7 @@ const SSLManagement: React.FC = () => {
             申请证书
           </Button>
           <Button
-            leftIcon={<Icon as={FiRefreshCw />}
+            leftIcon={<Icon as={FiRefreshCw} />}
             colorScheme="green"
             variant="outline"
             onClick={syncACMECertificates}

@@ -1,0 +1,26 @@
+[Unit]
+Description=SSLcat SSL Proxy Server
+After=network.target
+
+[Service]
+Type=simple
+User=sslcat
+Group=sslcat
+WorkingDirectory=/opt/sslcat
+ExecStart=/opt/sslcat/sslcat --config /etc/sslcat/sslcat.conf
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sslcat
+
+# 安全设置
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/sslcat /etc/sslcat /opt/sslcat
+
+[Install]
+WantedBy=multi-user.target
