@@ -46,6 +46,7 @@ import {
   FiFolder,
   FiCode,
 } from 'react-icons/fi'
+import { useConfig, buildApiPath } from '../contexts/ConfigContext'
 
 interface StaticSite {
   id: string
@@ -65,6 +66,7 @@ interface PHPSite {
   enabled: boolean
   memoryLimit: string
   maxExecutionTime: string
+  fcgiAddr: string
   created: string
 }
 
@@ -76,6 +78,7 @@ const SitesManagement: React.FC = () => {
   const [modalType, setModalType] = useState<'static' | 'php'>('static')
   const [editingSite, setEditingSite] = useState<StaticSite | PHPSite | null>(null)
   const toast = useToast()
+  const { adminPrefix } = useConfig()
 
   const [newSite, setNewSite] = useState({
     domain: '',
@@ -85,59 +88,157 @@ const SitesManagement: React.FC = () => {
     phpVersion: '8.1',
     memoryLimit: '128M',
     maxExecutionTime: '30',
+    fcgiAddr: 'unix:/var/run/php-fpm.sock',
   })
 
   const refreshData = async () => {
     setLoading(true)
     try {
-      // TODO: 实际的 API 调用
-      setTimeout(() => {
-        setStaticSites([
-          {
-            id: '1',
-            domain: 'example.com',
-            rootPath: '/var/www/example.com',
-            enabled: true,
-            indexFile: 'index.html',
-            created: '2024-01-15',
-            size: '12.5 MB',
-          },
-          {
-            id: '2',
-            domain: 'blog.example.com',
-            rootPath: '/var/www/blog',
-            enabled: true,
-            indexFile: 'index.html',
-            created: '2024-01-10',
-            size: '8.3 MB',
-          },
-        ])
+      let hasError = false
+      
+      // 获取静态站点
+      try {
+        const staticResponse = await fetch(buildApiPath(adminPrefix, '/api/static-sites'), {
+          method: 'GET',
+          credentials: 'include',
+        })
 
-        setPHPSites([
-          {
-            id: '1',
-            domain: 'app.example.com',
-            rootPath: '/var/www/app',
-            phpVersion: '8.1',
-            enabled: true,
-            memoryLimit: '256M',
-            maxExecutionTime: '60',
-            created: '2024-01-12',
-          },
-        ])
-        setLoading(false)
-      }, 1000)
+        if (staticResponse.ok) {
+          const staticData = await staticResponse.json()
+          setStaticSites(staticData.sites || [])
+        } else {
+          console.warn('获取静态站点失败:', staticResponse.status)
+          hasError = true
+        }
+      } catch (error) {
+        console.warn('获取静态站点失败:', error)
+        hasError = true
+      }
+
+      // 获取PHP站点
+      try {
+        const phpResponse = await fetch(buildApiPath(adminPrefix, '/api/php-sites'), {
+          method: 'GET',
+          credentials: 'include',
+        })
+
+        if (phpResponse.ok) {
+          const phpData = await phpResponse.json()
+          setPHPSites(phpData.sites || [])
+        } else {
+          console.warn('获取PHP站点失败:', phpResponse.status)
+          hasError = true
+        }
+      } catch (error) {
+        console.warn('获取PHP站点失败:', error)
+        hasError = true
+      }
+
+      // 如果两个API都失败，才显示错误
+      if (hasError) {
+        toast({
+          title: '部分数据获取失败',
+          description: '某些站点数据可能无法加载，请检查网络连接',
+          status: 'warning',
+          duration: 3000,
+          isClosable: true,
+        })
+      }
     } catch (error) {
       console.error('获取站点数据失败:', error)
+      toast({
+        title: '获取失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+    } finally {
       setLoading(false)
     }
   }
 
+  const validateFCGIAddress = (addr: string): boolean => {
+    if (!addr.trim()) return false
+    
+    // 检查 Unix Socket 格式: unix:/path/to/sock
+    if (addr.startsWith('unix:')) {
+      const path = addr.substring(5)
+      return path.length > 0 && path.startsWith('/')
+    }
+    
+    // 检查 TCP 格式: host:port
+    const tcpPattern = /^[a-zA-Z0-9.-]+:\d+$/
+    return tcpPattern.test(addr)
+  }
+
   const handleCreateSite = async () => {
     try {
-      // TODO: 实际的 API 调用
+      setLoading(true)
+      
+      // 验证 PHP 站点的 FCGI 地址
+      if (modalType === 'php' && !validateFCGIAddress(newSite.fcgiAddr)) {
+        toast({
+          title: '连接地址格式错误',
+          description: '请输入有效的连接地址，如 unix:/var/run/php-fpm.sock 或 127.0.0.1:9000',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        })
+        return
+      }
+      
+      if (modalType === 'static') {
+        // 创建静态站点
+        const response = await fetch(buildApiPath(adminPrefix, '/api/static-sites'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            domain: newSite.domain,
+            root: newSite.rootPath,
+            index: newSite.indexFile,
+            enabled: newSite.enabled,
+          }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || '创建静态站点失败')
+        }
+      } else {
+        // 创建 PHP 站点
+        const response = await fetch(buildApiPath(adminPrefix, '/api/php-sites'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            domain: newSite.domain,
+            root: newSite.rootPath,
+            index: 'index.php',
+            enabled: newSite.enabled,
+            fcgi_addr: newSite.fcgiAddr,
+            vars: {
+              PHP_VERSION: newSite.phpVersion,
+              MEMORY_LIMIT: newSite.memoryLimit,
+              MAX_EXECUTION_TIME: newSite.maxExecutionTime,
+            },
+          }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || '创建 PHP 站点失败')
+        }
+      }
+
       toast({
         title: '站点创建成功',
+        description: `${modalType === 'static' ? '静态' : 'PHP'} 站点已成功创建`,
         status: 'success',
         duration: 3000,
         isClosable: true,
@@ -154,6 +255,8 @@ const SitesManagement: React.FC = () => {
         duration: 3000,
         isClosable: true,
       })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -192,6 +295,7 @@ const SitesManagement: React.FC = () => {
       phpVersion: '8.1',
       memoryLimit: '128M',
       maxExecutionTime: '30',
+      fcgiAddr: 'unix:/var/run/php-fpm.sock',
     })
     setEditingSite(null)
   }
@@ -358,6 +462,7 @@ const SitesManagement: React.FC = () => {
                           <Th>域名</Th>
                           <Th>根目录</Th>
                           <Th>PHP版本</Th>
+                          <Th>连接地址</Th>
                           <Th>状态</Th>
                           <Th>内存限制</Th>
                           <Th>执行时间</Th>
@@ -381,6 +486,11 @@ const SitesManagement: React.FC = () => {
                             </Td>
                             <Td>
                               <Badge colorScheme="purple">PHP {site.phpVersion}</Badge>
+                            </Td>
+                            <Td>
+                              <Text fontSize="sm" fontFamily="mono" color="blue.600">
+                                {site.fcgiAddr}
+                              </Text>
                             </Td>
                             <Td>
                               <Badge colorScheme={site.enabled ? 'green' : 'gray'}>
@@ -504,6 +614,18 @@ const SitesManagement: React.FC = () => {
                       value={newSite.maxExecutionTime}
                       onChange={(e) => setNewSite({ ...newSite, maxExecutionTime: e.target.value })}
                     />
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel>PHP-FPM 连接地址</FormLabel>
+                    <Input
+                      value={newSite.fcgiAddr}
+                      onChange={(e) => setNewSite({ ...newSite, fcgiAddr: e.target.value })}
+                      placeholder="unix:/var/run/php-fpm.sock 或 127.0.0.1:9000"
+                    />
+                    <Text fontSize="sm" color="gray.500" mt={1}>
+                      支持 Unix Socket (unix:/path/to/sock) 或 TCP 连接 (host:port)
+                    </Text>
                   </FormControl>
                 </>
               )}
