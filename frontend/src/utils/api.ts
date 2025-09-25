@@ -1,9 +1,23 @@
 import axios from 'axios'
 import { ApiResponse } from '../types'
 
+// 动态获取 API baseURL
+const getApiBaseURL = () => {
+  // 从当前路径推断前缀
+  const currentPath = window.location.pathname
+  const pathSegments = currentPath.split('/').filter(Boolean)
+  
+  if (pathSegments.length > 0) {
+    return `/${pathSegments[0]}/api`
+  }
+  
+  // 默认前缀
+  return '/sslcat-panel/api'
+}
+
 // 创建 axios 实例
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: getApiBaseURL(),
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',

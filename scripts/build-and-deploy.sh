@@ -1,17 +1,15 @@
 #!/bin/bash
 
-# 部署脚本：从 GitHub Release 下载并部署到服务器
-# 使用方法: ./scripts/deploy-to-server.sh [版本号] [服务器地址]
+# 本地构建并部署到服务器
+# 使用方法: ./scripts/build-and-deploy.sh
 
 set -e
 
 # 配置参数
-REPO="xurenlu/sslcat"  # 替换为您的 GitHub 仓库
 SERVER="whatq.wxside.com"
 SERVER_USER="root"
-VERSION=${1:-"latest"}
 BINARY_NAME="sslcat"
-ARCH="linux-amd64"
+VERSION="1.2.3"
 
 # 颜色输出
 RED='\033[0;31m'
@@ -37,75 +35,40 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# 检查依赖
-check_dependencies() {
-    log_info "检查依赖..."
-    
-    if ! command -v curl &> /dev/null; then
-        log_error "curl 未安装，请先安装 curl"
-        exit 1
-    fi
-    
-    if ! command -v ssh &> /dev/null; then
-        log_error "ssh 未安装，请先安装 ssh"
-        exit 1
-    fi
-    
-    log_success "依赖检查完成"
-}
-
-# 获取最新版本信息
-get_latest_version() {
-    if [ "$VERSION" = "latest" ]; then
-        log_info "获取最新版本..."
-        VERSION=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | cut -d'"' -f4)
-        if [ -z "$VERSION" ]; then
-            log_error "无法获取最新版本"
-            exit 1
-        fi
-        log_info "最新版本: $VERSION"
-    fi
-}
-
-# 下载二进制文件
-download_binary() {
-    log_info "下载二进制文件..."
-    
-    # 构建下载 URL
-    if [ "$VERSION" = "latest" ]; then
-        DOWNLOAD_URL="https://github.com/$REPO/releases/latest/download/${BINARY_NAME}_${VERSION}_${ARCH}.tar.gz"
+# 构建前端
+build_frontend() {
+    log_info "构建前端..."
+    if [ -f "scripts/build-frontend.sh" ]; then
+        ./scripts/build-frontend.sh
     else
-        DOWNLOAD_URL="https://github.com/$REPO/releases/download/${VERSION}/${BINARY_NAME}_${VERSION}_${ARCH}.tar.gz"
-    fi
-    
-    log_info "下载地址: $DOWNLOAD_URL"
-    
-    # 创建临时目录
-    TEMP_DIR=$(mktemp -d)
-    cd "$TEMP_DIR"
-    
-    # 下载文件
-    if ! curl -L -o "${BINARY_NAME}.tar.gz" "$DOWNLOAD_URL"; then
-        log_error "下载失败，请检查版本号和网络连接"
+        log_error "前端构建脚本不存在"
         exit 1
     fi
+    log_success "前端构建完成"
+}
+
+# 构建 Go 二进制文件
+build_binary() {
+    log_info "构建 Go 二进制文件..."
     
-    # 解压文件
-    tar -xzf "${BINARY_NAME}.tar.gz"
+    # 设置构建参数
+    export GOOS=linux
+    export GOARCH=amd64
+    export CGO_ENABLED=0
+    
+    # 构建
+    go build -trimpath -ldflags "-s -w -X main.version=$VERSION" -o "$BINARY_NAME" .
     
     if [ ! -f "$BINARY_NAME" ]; then
-        log_error "解压后未找到二进制文件"
+        log_error "二进制文件构建失败"
         exit 1
     fi
     
-    log_success "二进制文件下载完成"
-    echo "$TEMP_DIR/$BINARY_NAME"
+    log_success "二进制文件构建完成: $BINARY_NAME"
 }
 
 # 部署到服务器
 deploy_to_server() {
-    local binary_path="$1"
-    
     log_info "部署到服务器 $SERVER..."
     
     # 检查服务器连接
@@ -135,7 +98,7 @@ deploy_to_server() {
     
     # 上传新二进制文件
     log_info "上传新二进制文件..."
-    scp "$binary_path" "$SERVER_USER@$SERVER:/opt/sslcat/$BINARY_NAME"
+    scp "$BINARY_NAME" "$SERVER_USER@$SERVER:/opt/sslcat/$BINARY_NAME"
     
     # 设置权限
     log_info "设置权限..."
@@ -161,9 +124,6 @@ deploy_to_server() {
         ssh "$SERVER_USER@$SERVER" "systemctl status sslcat"
         exit 1
     fi
-    
-    # 清理临时文件
-    rm -rf "$(dirname "$binary_path")"
 }
 
 # 显示部署信息
@@ -173,7 +133,6 @@ show_deployment_info() {
     echo "部署信息："
     echo "  服务器: $SERVER"
     echo "  版本: $VERSION"
-    echo "  架构: $ARCH"
     echo "  二进制: /opt/sslcat/$BINARY_NAME"
     echo ""
     echo "管理命令："
@@ -186,19 +145,23 @@ show_deployment_info() {
     echo "  API 接口: https://$SERVER/api"
 }
 
+# 清理临时文件
+cleanup() {
+    log_info "清理临时文件..."
+    rm -f "$BINARY_NAME"
+    log_success "清理完成"
+}
+
 # 主函数
 main() {
-    log_info "开始部署 SSLcat 到 $SERVER"
+    log_info "开始本地构建并部署 SSLcat 到 $SERVER"
     echo ""
     
-    check_dependencies
-    get_latest_version
-    
-    local binary_path
-    binary_path=$(download_binary)
-    
-    deploy_to_server "$binary_path"
+    build_frontend
+    build_binary
+    deploy_to_server
     show_deployment_info
+    cleanup
 }
 
 # 运行主函数
