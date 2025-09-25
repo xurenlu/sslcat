@@ -29,6 +29,7 @@ import {
   FiCheck,
   FiX,
 } from 'react-icons/fi'
+import { useConfig, buildApiPath } from '../contexts/ConfigContext'
 
 interface SSLCertificate {
   id: string
@@ -43,46 +44,34 @@ interface SSLCertificate {
 const SSLManagement: React.FC = () => {
   const [certificates, setCertificates] = useState<SSLCertificate[]>([])
   const [loading, setLoading] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const toast = useToast()
+  const { adminPrefix } = useConfig()
 
   const refreshCertificates = async () => {
     setLoading(true)
     try {
-      // TODO: 实际的 API 调用
-      setTimeout(() => {
-        setCertificates([
-          {
-            id: '1',
-            domain: 'example.com',
-            issuer: "Let's Encrypt",
-            expires: '2024-04-15',
-            status: 'valid',
-            autoRenew: true,
-            created: '2024-01-15',
-          },
-          {
-            id: '2',
-            domain: 'api.example.com',
-            issuer: "Let's Encrypt",
-            expires: '2024-01-25',
-            status: 'expiring',
-            autoRenew: true,
-            created: '2024-01-14',
-          },
-          {
-            id: '3',
-            domain: 'old.example.com',
-            issuer: 'Self-signed',
-            expires: '2024-01-10',
-            status: 'expired',
-            autoRenew: false,
-            created: '2023-12-10',
-          },
-        ])
-        setLoading(false)
-      }, 1000)
+      const response = await fetch(buildApiPath(adminPrefix, '/ssl-certs'), {
+        method: 'GET',
+        credentials: 'include', // 包含认证 cookies
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      setCertificates(data || [])
     } catch (error) {
       console.error('获取SSL证书失败:', error)
+      toast({
+        title: '获取失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+    } finally {
       setLoading(false)
     }
   }
@@ -156,6 +145,42 @@ const SSLManagement: React.FC = () => {
     }
   }
 
+  const syncACMECertificates = async () => {
+    setSyncing(true)
+    try {
+      const response = await fetch(buildApiPath(adminPrefix, '/ssl/sync-acme'), {
+        method: 'POST',
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      toast({
+        title: '同步成功',
+        description: 'ACME 证书已同步到本地存储',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      })
+
+      // 同步后刷新证书列表
+      refreshCertificates()
+    } catch (error) {
+      console.error('同步 ACME 证书失败:', error)
+      toast({
+        title: '同步失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   useEffect(() => {
     refreshCertificates()
   }, [])
@@ -204,8 +229,18 @@ const SSLManagement: React.FC = () => {
           <Button
             leftIcon={<Icon as={FiShield} />}
             colorScheme="blue"
+            mr={2}
           >
             申请证书
+          </Button>
+          <Button
+            leftIcon={<Icon as={FiRefreshCw />}
+            colorScheme="green"
+            variant="outline"
+            onClick={syncACMECertificates}
+            isLoading={syncing}
+          >
+            同步 ACME 证书
           </Button>
         </HStack>
       </Flex>
