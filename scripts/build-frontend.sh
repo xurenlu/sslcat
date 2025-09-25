@@ -14,18 +14,18 @@ if ! command -v node &> /dev/null; then
     exit 1
 fi
 
-if ! command -v pnpm &> /dev/null; then
-    echo "❌ pnpm 未安装，请先安装 pnpm:"
-    echo "   npm install -g pnpm"
-    echo "   或使用: curl -fsSL https://get.pnpm.io/install.sh | sh -"
+if ! command -v yarn &> /dev/null; then
+    echo "❌ yarn 未安装，请先安装 yarn:"
+    echo "   npm install -g yarn"
+    echo "   或使用: curl -fsSL https://yarnpkg.com/install.sh | bash"
     exit 1
 fi
 
-echo "📦 使用 pnpm 安装依赖..."
-pnpm install
+echo "📦 使用 yarn 安装依赖..."
+yarn install
 
 echo "🔨 构建前端项目..."
-pnpm run build
+yarn run build
 
 echo "✅ 前端构建完成！"
 
