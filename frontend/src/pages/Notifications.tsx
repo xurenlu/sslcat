@@ -40,6 +40,7 @@ import {
   FiClock,
   FiSend,
 } from 'react-icons/fi'
+import { useConfig, buildApiPath } from '../contexts/ConfigContext'
 
 interface NotificationItem {
   id: string
@@ -70,6 +71,7 @@ const Notifications: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const { isOpen, onOpen, onClose } = useDisclosure()
   const toast = useToast()
+  const { adminPrefix } = useConfig()
 
   const [testForm, setTestForm] = useState({
     type: 'ddos_attack',
@@ -81,64 +83,55 @@ const Notifications: React.FC = () => {
   const refreshNotifications = async () => {
     setLoading(true)
     try {
-      // TODO: 实际的 API 调用
-      // const response = await fetch('/api/notifications')
-      // const data = await response.json()
+      // 使用安全日志API作为通知数据源
+      const response = await fetch(buildApiPath(adminPrefix, '/api/security-logs'), {
+        method: 'GET',
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      const logs = data.logs || []
       
-      // 模拟数据
-      setTimeout(() => {
-        setStats({
-          totalNotifications: 156,
-          channelsEnabled: 3,
-          channelsTotal: 5,
-          limit: 50,
-        })
-        
-        setNotifications([
-          {
-            id: '1',
-            level: 'info',
-            type: 'system',
-            title: '系统启动',
-            message: 'SSLcat 服务已成功启动',
-            timestamp: '2024-01-15 14:30:00',
-            source: 'system',
-            details: {
-              version: 'v1.0.0',
-              port: '8443',
-            },
+      // 转换日志为通知格式 - 只显示安全事件，过滤正常访问
+      const notifications = logs
+        .filter((log: any) => !log.success) // 只显示失败的访问（安全事件）
+        .slice(0, 20)
+        .map((log: any, index: number) => ({
+          id: index.toString(),
+          level: 'error',
+          type: 'security',
+          title: '安全事件',
+          message: `来自 ${log.ip} 的异常访问被阻止`,
+          timestamp: new Date(log.timestamp).toLocaleString('zh-CN'),
+          source: 'security',
+          details: {
+            ip: log.ip,
+            userAgent: log.userAgent,
+            path: log.path,
           },
-          {
-            id: '2',
-            level: 'warning',
-            type: 'cert_expiring',
-            title: 'SSL证书即将过期',
-            message: 'example.com 的SSL证书将在7天后过期',
-            timestamp: '2024-01-15 12:15:00',
-            source: 'ssl',
-            details: {
-              domain: 'example.com',
-              expires: '2024-01-22',
-            },
-          },
-          {
-            id: '3',
-            level: 'error',
-            type: 'ddos_attack',
-            title: 'DDoS攻击检测',
-            message: '检测到来自 192.168.1.100 的异常流量',
-            timestamp: '2024-01-15 10:45:00',
-            source: 'security',
-            details: {
-              ip: '192.168.1.100',
-              requests: '1000/min',
-            },
-          },
-        ])
-        setLoading(false)
-      }, 1000)
+        }))
+      
+      setStats({
+        totalNotifications: logs.filter((log: any) => !log.success).length, // 只计算安全事件
+        channelsEnabled: 3,
+        channelsTotal: 5,
+        limit: 50,
+      })
+      setNotifications(notifications)
     } catch (error) {
       console.error('获取通知失败:', error)
+      toast({
+        title: '获取失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+    } finally {
       setLoading(false)
     }
   }

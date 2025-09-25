@@ -30,15 +30,22 @@ import {
   FiGlobe,
 } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
-import { useConfig, buildPath } from '../contexts/ConfigContext'
+import { useConfig, buildPath, buildApiPath } from '../contexts/ConfigContext'
 
 interface ProxyRule {
-  id: string
   domain: string
   target: string
+  port: number
   enabled: boolean
-  ssl: boolean
-  created: string
+  ssl_only: boolean
+  cdn_enabled: boolean
+  cdn_preset: string
+  cdn_ttl_seconds: number
+  // 访问控制字段
+  auth_enabled: boolean
+  auth_users: Array<{username: string, password: string}>
+  auth_session_timeout: number
+  auth_cookie_domain: string
 }
 
 const ProxyList: React.FC = () => {
@@ -51,58 +58,60 @@ const ProxyList: React.FC = () => {
   const refreshRules = async () => {
     setLoading(true)
     try {
-      // TODO: 实际的 API 调用
-      setTimeout(() => {
-        setRules([
-          {
-            id: '1',
-            domain: 'example.com',
-            target: 'http://localhost:3000',
-            enabled: true,
-            ssl: true,
-            created: '2024-01-15',
-          },
-          {
-            id: '2',
-            domain: 'api.example.com',
-            target: 'http://localhost:8080',
-            enabled: true,
-            ssl: true,
-            created: '2024-01-14',
-          },
-          {
-            id: '3',
-            domain: 'test.example.com',
-            target: 'http://localhost:4000',
-            enabled: false,
-            ssl: false,
-            created: '2024-01-13',
-          },
-        ])
-        setLoading(false)
-      }, 1000)
+      const response = await fetch(buildApiPath(adminPrefix, '/proxy/rules'), {
+        method: 'GET',
+        credentials: 'include', // 包含认证 cookies
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      setRules(data || [])
     } catch (error) {
       console.error('获取代理规则失败:', error)
+      toast({
+        title: '获取失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+    } finally {
       setLoading(false)
     }
   }
 
-  const deleteRule = async (id: string) => {
+  const deleteRule = async (domain: string) => {
     // 添加确认对话框
-    if (!window.confirm('确定要删除这个代理规则吗？此操作不可撤销。')) {
+    if (!window.confirm(`确定要删除代理规则 "${domain}" 吗？此操作不可撤销。`)) {
       return
     }
 
     try {
-      // TODO: 实际的 API 调用
-      setRules(rules.filter(rule => rule.id !== id))
-      toast({
-        title: '删除成功',
-        description: '代理规则已成功删除',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
+      const response = await fetch(buildApiPath(adminPrefix, `/proxy/rule?domain=${encodeURIComponent(domain)}`), {
+        method: 'DELETE',
+        credentials: 'include',
       })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      if (data.success) {
+        setRules(rules.filter(rule => rule.domain !== domain))
+        toast({
+          title: '删除成功',
+          description: '代理规则已成功删除',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        })
+      } else {
+        throw new Error(data.error || '删除失败')
+      }
     } catch (error) {
       toast({
         title: '删除失败',
@@ -114,18 +123,39 @@ const ProxyList: React.FC = () => {
     }
   }
 
-  const toggleRule = async (id: string, enabled: boolean) => {
+  const toggleRule = async (domain: string, enabled: boolean) => {
     try {
-      setRules(rules.map(rule => 
-        rule.id === id ? { ...rule, enabled } : rule
-      ))
-      toast({
-        title: enabled ? '代理规则已启用' : '代理规则已禁用',
-        description: '规则状态更新成功',
-        status: 'success',
-        duration: 2000,
-        isClosable: true,
+      const response = await fetch(buildApiPath(adminPrefix, '/proxy/rule'), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          domain,
+          enabled,
+        }),
       })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      if (data.success) {
+        setRules(rules.map(rule => 
+          rule.domain === domain ? { ...rule, enabled } : rule
+        ))
+        toast({
+          title: enabled ? '代理规则已启用' : '代理规则已禁用',
+          description: '规则状态更新成功',
+          status: 'success',
+          duration: 2000,
+          isClosable: true,
+        })
+      } else {
+        throw new Error(data.error || '状态更新失败')
+      }
     } catch (error) {
       toast({
         title: '状态更新失败',
@@ -177,13 +207,13 @@ const ProxyList: React.FC = () => {
                   <Th>目标地址</Th>
                   <Th>状态</Th>
                   <Th>SSL</Th>
-                  <Th>创建时间</Th>
+                  <Th>功能</Th>
                   <Th>操作</Th>
                 </Tr>
               </Thead>
               <Tbody>
                 {rules.map((rule) => (
-                  <Tr key={rule.id}>
+                  <Tr key={rule.domain}>
                     <Td>
                       <HStack>
                         <Icon as={FiGlobe} />
@@ -192,24 +222,33 @@ const ProxyList: React.FC = () => {
                     </Td>
                     <Td>
                       <Text fontFamily="mono" fontSize="sm">
-                        {rule.target}
+                        {rule.target}:{rule.port}
                       </Text>
                     </Td>
-                            <Td>
-                              <Tooltip label={rule.enabled ? '点击禁用' : '点击启用'}>
-                                <Switch
-                                  isChecked={rule.enabled}
-                                  onChange={(e) => toggleRule(rule.id, e.target.checked)}
-                                  colorScheme="green"
-                                />
-                              </Tooltip>
-                            </Td>
                     <Td>
-                      <Badge colorScheme={rule.ssl ? 'blue' : 'orange'}>
-                        {rule.ssl ? 'HTTPS' : 'HTTP'}
+                      <Tooltip label={rule.enabled ? '点击禁用' : '点击启用'}>
+                        <Switch
+                          isChecked={rule.enabled}
+                          onChange={(e) => toggleRule(rule.domain, e.target.checked)}
+                          colorScheme="green"
+                        />
+                      </Tooltip>
+                    </Td>
+                    <Td>
+                      <Badge colorScheme={rule.ssl_only ? 'blue' : 'orange'}>
+                        {rule.ssl_only ? 'HTTPS' : 'HTTP'}
                       </Badge>
                     </Td>
-                    <Td>{rule.created}</Td>
+                    <Td>
+                      <HStack spacing={1}>
+                        {rule.cdn_enabled && (
+                          <Badge colorScheme="purple" size="sm">CDN</Badge>
+                        )}
+                        {rule.auth_enabled && (
+                          <Badge colorScheme="red" size="sm">认证</Badge>
+                        )}
+                      </HStack>
+                    </Td>
                     <Td>
                       <HStack spacing={2}>
                         <IconButton
@@ -217,6 +256,7 @@ const ProxyList: React.FC = () => {
                           icon={<FiEdit />}
                           size="sm"
                           variant="ghost"
+                          onClick={() => navigate(buildPath(adminPrefix, `/proxy/edit?domain=${encodeURIComponent(rule.domain)}`))}
                         />
                         <IconButton
                           aria-label="删除"
@@ -224,7 +264,7 @@ const ProxyList: React.FC = () => {
                           size="sm"
                           variant="ghost"
                           colorScheme="red"
-                          onClick={() => deleteRule(rule.id)}
+                          onClick={() => deleteRule(rule.domain)}
                         />
                       </HStack>
                     </Td>

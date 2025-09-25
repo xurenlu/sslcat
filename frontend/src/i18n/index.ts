@@ -25,8 +25,6 @@ export interface Translation {
     settings: string
     dns: string
     security: string
-    cluster: string
-    runners: string
     gitServer: string
     notifications: string
     advanced: string
@@ -101,8 +99,6 @@ export const zhCN: Translation = {
     settings: '系统设置',
     dns: 'DNS配置',
     security: '安全设置',
-    cluster: '集群管理',
-    runners: '运行器',
     gitServer: 'Git部署服务器',
     notifications: '通知管理',
     advanced: '高级选项',
@@ -169,8 +165,6 @@ export const enUS: Translation = {
     settings: 'Settings',
     dns: 'DNS',
     security: 'Security',
-    cluster: 'Cluster',
-    runners: 'Runners',
     gitServer: 'Git Server',
     notifications: 'Notifications',
     advanced: 'Advanced',

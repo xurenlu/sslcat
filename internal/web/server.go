@@ -31,20 +31,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// ClusterManager 集群管理器接口
-type ClusterManager interface {
-	Start() error
-	Stop()
-	IsSlaveMode() bool
-	IsMasterMode() bool
-	IsStandaloneMode() bool
-	GetNodes() map[string]interface{}
-	SetMasterMode() error
-	SetSlaveMode(masterHost string, masterPort int, authKey string) error
-	SetStandaloneMode() error
-	HandleSyncRequest(w http.ResponseWriter, r *http.Request)
-}
-
 // Server Web服务器
 type Server struct {
 	config           *config.Config
@@ -69,8 +55,7 @@ type Server struct {
 	// 验证码管理
 	captchaManager *CaptchaManager
 	// DDoS 防护器
-	ddosProtector  *ddos.Protector
-	clusterManager ClusterManager
+	ddosProtector *ddos.Protector
 	// 审计轮转器
 	auditRotator *logger.Rotator
 	// 访问日志记录器
@@ -84,13 +69,11 @@ type Server struct {
 	// 通知集成器
 	notificationIntegrator *notification.NotificationIntegrator
 	// Runner 模块
-	localRunner  *runner.LocalRunner
-	dockerRunner *runner.DockerRunner
-	gitServer    *runner.GitServer
+	gitServer *runner.GitServer
 }
 
 // NewServer 创建Web服务器
-func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Manager, sslMgr *ssl.Manager, localRunner *runner.LocalRunner, dockerRunner *runner.DockerRunner, gitServer *runner.GitServer, notificationIntegrator *notification.NotificationIntegrator) *Server {
+func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Manager, sslMgr *ssl.Manager, gitServer *runner.GitServer, notificationIntegrator *notification.NotificationIntegrator) *Server {
 	// 初始化翻译器（从嵌入读取）
 	translator := i18n.NewTranslator(i18n.LangZhCN, "")
 	// 通过嵌入 i18n 文件加载翻译
@@ -122,8 +105,6 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		translator:       translator,
 		mux:              http.NewServeMux(),
 		startTime:        time.Now(),
-		localRunner:      localRunner,
-		dockerRunner:     dockerRunner,
 		gitServer:        gitServer,
 		log: logrus.WithFields(logrus.Fields{
 			"component": "web_server",
@@ -421,6 +402,11 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/config/apply", s.handleConfigApply)
 
 	// API路由
+	// 认证相关 API
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/auth/login", s.handleAPIAuthLogin)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/auth/logout", s.handleAPIAuthLogout)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/auth/me", s.handleAPIAuthMe)
+
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/stats", s.handleAPIStats)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/proxy-rules", s.handleAPIProxyRules)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/proxy/rules", s.handleAPIProxyRules) // 兼容前端请求路径
@@ -489,14 +475,6 @@ func (s *Server) setupRoutes() {
 	// Favicon 处理
 	s.mux.HandleFunc("/favicon.ico", s.handleFavicon)
 
-	// 集群管理路由 - 页面路由已迁移到前端SPA
-	// s.mux.HandleFunc(s.config.AdminPrefix+"/cluster", s.handleClusterSettings) // 已迁移到前端SPA
-	s.mux.HandleFunc(s.config.AdminPrefix+"/cluster/set-master", s.handleClusterSetMaster)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/cluster/set-slave", s.handleClusterSetSlave)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/cluster/set-standalone", s.handleClusterSetStandalone)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/cluster/nodes", s.handleClusterNodes)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/cluster/sync", s.handleClusterSync)
-
 	// Runner API 路由
 	s.registerRunnerRoutes()
 
@@ -507,26 +485,8 @@ func (s *Server) setupRoutes() {
 // registerRunnerRoutes 注册 Runner API 路由
 func (s *Server) registerRunnerRoutes() {
 	// 创建 API 处理器
-	localAPI := NewLocalRunnerAPI(s.localRunner)
-	dockerAPI := NewDockerRunnerAPI(s.dockerRunner)
 	gitAPI := NewGitServerAPI(s.gitServer)
 	runtimeAPI := NewRuntimeDetectorAPI()
-
-	// Local Runner API 路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/local-runner/tasks", localAPI.ListTasks)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/local-runner/task", localAPI.GetTask)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/local-runner/task/add", localAPI.AddTask)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/local-runner/task/start", localAPI.StartTask)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/local-runner/task/stop", localAPI.StopTask)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/local-runner/task/remove", localAPI.RemoveTask)
-
-	// Docker Runner API 路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/docker-runner/tasks", dockerAPI.ListTasks)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/docker-runner/task", dockerAPI.GetTask)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/docker-runner/task/add", dockerAPI.AddTask)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/docker-runner/task/start", dockerAPI.StartTask)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/docker-runner/task/stop", dockerAPI.StopTask)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/docker-runner/task/remove", dockerAPI.RemoveTask)
 
 	// Git 服务器 API 路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/apps", gitAPI.ListApps)

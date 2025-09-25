@@ -18,7 +18,7 @@ RUN go mod download
 # 复制源代码
 COPY . .
 
-# 构建应用
+# 构建应用（纯 Go SQLite）
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o sslcat main.go
 
 # 运行阶段

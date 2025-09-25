@@ -5,8 +5,17 @@ import {
   IconButton,
   useBreakpointValue,
   Spacer,
+  HStack,
+  Text,
+  Button,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
+  Avatar,
 } from '@chakra-ui/react'
-import { FiMenu } from 'react-icons/fi'
+import { FiMenu, FiUser, FiLogOut } from 'react-icons/fi'
+import { useAuth } from '../contexts/AuthContext'
 
 interface HeaderProps {
   onMenuClick: () => void
@@ -14,6 +23,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const showMobileMenu = useBreakpointValue({ base: true, md: false })
+  const { user, logout } = useAuth()
 
   return (
     <Box
@@ -37,7 +47,33 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
           />
         )}
         <Spacer />
-        {/* 这里可以添加用户信息、通知等 */}
+        
+        {/* 用户菜单 */}
+        {user && (
+          <HStack spacing={3}>
+            <Text fontSize="sm" color="gray.600">
+              {user.username}
+            </Text>
+            <Menu>
+              <MenuButton
+                as={Button}
+                variant="ghost"
+                size="sm"
+                leftIcon={<Avatar size="xs" name={user.username} />}
+              >
+                {user.role}
+              </MenuButton>
+              <MenuList>
+                <MenuItem icon={<FiUser />}>
+                  个人设置
+                </MenuItem>
+                <MenuItem icon={<FiLogOut />} onClick={logout}>
+                  退出登录
+                </MenuItem>
+              </MenuList>
+            </Menu>
+          </HStack>
+        )}
       </Flex>
     </Box>
   )

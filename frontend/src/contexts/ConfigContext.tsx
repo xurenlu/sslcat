@@ -95,5 +95,7 @@ export const buildPath = (prefix: string, path: string): string => {
 
 // 工具函数：构建API路径
 export const buildApiPath = (prefix: string, path: string): string => {
-  return buildPath(prefix, `/api${path}`)
+  // 如果path已经以/api开头，直接使用；否则添加/api前缀
+  const apiPath = path.startsWith('/api') ? path : `/api${path}`
+  return buildPath(prefix, apiPath)
 }
