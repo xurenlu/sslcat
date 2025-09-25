@@ -433,40 +433,8 @@ type LogConfig struct {
 
 // RunnerConfig Runner 配置
 type RunnerConfig struct {
-	// Local Runner 配置
-	Local LocalRunnerConfig `json:"local"`
-	// Docker Runner 配置
-	Docker DockerRunnerConfig `json:"docker"`
 	// Git 服务器配置
 	Git GitServerConfig `json:"git"`
-}
-
-// LocalRunnerConfig Local Runner 配置
-type LocalRunnerConfig struct {
-	Enabled bool `json:"enabled"`
-	// 工作目录
-	WorkDir string `json:"work_dir"`
-	// 最大并发运行数
-	MaxConcurrent int `json:"max_concurrent"`
-	// 超时时间（秒）
-	Timeout int `json:"timeout"`
-}
-
-// DockerRunnerConfig Docker Runner 配置
-type DockerRunnerConfig struct {
-	Enabled bool `json:"enabled"`
-	// Docker 镜像前缀
-	ImagePrefix string `json:"image_prefix"`
-	// 工作目录
-	WorkDir string `json:"work_dir"`
-	// 最大并发运行数
-	MaxConcurrent int `json:"max_concurrent"`
-	// 超时时间（秒）
-	Timeout int `json:"timeout"`
-	// 自动清理容器
-	AutoCleanup bool `json:"auto_cleanup"`
-	// 清理间隔（秒）
-	CleanupInterval int `json:"cleanup_interval"`
 }
 
 // GitServerConfig Git 服务器配置
@@ -482,44 +450,6 @@ type GitServerConfig struct {
 	AutoCleanup bool `json:"auto_cleanup"`
 	// 清理间隔（秒）
 	CleanupInterval int `json:"cleanup_interval"`
-}
-
-// LocalRunnerTask Local Runner 任务
-type LocalRunnerTask struct {
-	ID            string            `json:"id"`
-	Name          string            `json:"name"`
-	Type          string            `json:"type"` // "golang" | "springboot"
-	BinaryPath    string            `json:"binary_path"`
-	Port          int               `json:"port"`
-	Env           map[string]string `json:"env"`
-	Args          []string          `json:"args"`
-	ActiveProfile string            `json:"active_profile"` // Spring Boot 专用
-	Enabled       bool              `json:"enabled"`
-	Status        string            `json:"status"` // "running" | "stopped" | "error"
-	PID           int               `json:"pid"`
-	StartTime     int64             `json:"start_time"`
-	ErrorMsg      string            `json:"error_msg"`
-}
-
-// DockerRunnerTask Docker Runner 任务
-type DockerRunnerTask struct {
-	ID          string            `json:"id"`
-	Name        string            `json:"name"`
-	GitURL      string            `json:"git_url"`
-	GitBranch   string            `json:"git_branch"`
-	Runtime     string            `json:"runtime"` // 检测到的运行时类型
-	Port        int               `json:"port"`
-	Env         map[string]string `json:"env"`
-	ContainerID string            `json:"container_id"`
-	ImageName   string            `json:"image_name"`
-	Enabled     bool              `json:"enabled"`
-	Status      string            `json:"status"` // "building" | "running" | "stopped" | "error"
-	StartTime   int64             `json:"start_time"`
-	ErrorMsg    string            `json:"error_msg"`
-	// 检测到的项目信息
-	ProjectType      string `json:"project_type"` // "golang" | "nodejs" | "nextjs" | "python" | "php" | "ruby" | "dockerfile" | "dockercompose"
-	HasDockerfile    bool   `json:"has_dockerfile"`
-	HasDockerCompose bool   `json:"has_docker_compose"`
 }
 
 // Load 加载配置文件
@@ -622,21 +552,6 @@ func Load(configFile string) (*Config, error) {
 		StaticSites: []StaticSite{},
 		PHPSites:    []PHPSite{},
 		Runners: RunnerConfig{
-			Local: LocalRunnerConfig{
-				Enabled:       false,
-				WorkDir:       "./data/runners/local",
-				MaxConcurrent: 10,
-				Timeout:       300, // 5分钟
-			},
-			Docker: DockerRunnerConfig{
-				Enabled:         false,
-				ImagePrefix:     "sslcat-runner",
-				WorkDir:         "./data/runners/docker",
-				MaxConcurrent:   5,
-				Timeout:         600, // 10分钟
-				AutoCleanup:     true,
-				CleanupInterval: 3600, // 1小时
-			},
 			Git: GitServerConfig{
 				Enabled:         false,
 				ReposDir:        "./data/runners/git",

@@ -107,6 +107,7 @@ const ProxyAdd: React.FC = () => {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // 包含认证 cookies
         body: JSON.stringify({
           domain: formData.domain,
           target: formData.target,

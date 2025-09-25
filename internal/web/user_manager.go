@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/bcrypt"
+	_ "modernc.org/sqlite"
 )
 
 // User 用户结构
@@ -58,7 +58,7 @@ func NewUserManager(log UserLogger, dataDir string) (*UserManager, error) {
 		return nil, fmt.Errorf("创建数据目录失败: %v", err)
 	}
 
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("打开数据库失败: %v", err)
 	}

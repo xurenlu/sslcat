@@ -87,8 +87,6 @@ const SidebarContent = () => {
     { name: t.navigation.settings, icon: FiSettings, path: buildPath(adminPrefix, '/settings') },
     { name: t.navigation.dns, icon: FiGlobe, path: buildPath(adminPrefix, '/dns') },
     { name: t.navigation.security, icon: FiShield, path: buildPath(adminPrefix, '/security') },
-    { name: t.navigation.cluster, icon: FiUsers, path: buildPath(adminPrefix, '/cluster') },
-    { name: t.navigation.runners, icon: FiTerminal, path: buildPath(adminPrefix, '/runners') },
     { name: t.navigation.gitServer, icon: FiGitBranch, path: buildPath(adminPrefix, '/git-server') },
     { name: t.navigation.notifications, icon: FiBell, path: buildPath(adminPrefix, '/notifications') },
   ]

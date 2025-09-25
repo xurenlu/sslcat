@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
@@ -25,7 +26,17 @@ import (
 
 func (s *Server) authorizeAPI(w http.ResponseWriter, r *http.Request, readOnly bool) bool {
 	// 1) 如果是面板登录用户（cookie session），允许访问；写接口也允许
-	if c, err := r.Cookie("sslcat_session"); err == nil && c.Value == "authenticated" {
+	session, exists := s.sessionManager.GetSessionFromRequest(r)
+	if exists {
+		// 记录用户访问日志
+		s.userManager.LogUserAction(
+			session.Username,
+			"api_access",
+			r.URL.Path,
+			fmt.Sprintf("API访问: %s %s", r.Method, r.URL.Path),
+			s.getClientIP(r),
+			r.Header.Get("User-Agent"),
+		)
 		return true
 	}
 	// 2) 检查 Authorization: Bearer <token>
@@ -57,7 +68,6 @@ func (s *Server) handleAPIStats(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(stats)
 }
-
 
 func (s *Server) handleAPIProxyRules(w http.ResponseWriter, r *http.Request) {
 	if !s.authorizeAPI(w, r, true) {

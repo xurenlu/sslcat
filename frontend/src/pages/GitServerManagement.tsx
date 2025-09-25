@@ -136,12 +136,16 @@ const GitServerManagement: React.FC = () => {
     try {
       // 获取Git应用列表
       const appsResponse = await fetch('/sslcat-panel/api/git-server/apps')
-      const apps = appsResponse.ok ? await appsResponse.json() : []
+      const appsData = appsResponse.ok ? await appsResponse.json() : []
+      // 确保apps是数组
+      const apps = Array.isArray(appsData) ? appsData : []
       setApps(apps)
       
       // 获取SSH密钥列表
       const keysResponse = await fetch('/sslcat-panel/api/git-server/ssh-keys')
-      const sshKeys = keysResponse.ok ? await keysResponse.json() : []
+      const keysData = keysResponse.ok ? await keysResponse.json() : []
+      // 确保sshKeys是数组
+      const sshKeys = Array.isArray(keysData) ? keysData : []
       setSSHKeys(sshKeys)
       
       // 获取服务器配置
@@ -154,6 +158,9 @@ const GitServerManagement: React.FC = () => {
       setLoading(false)
     } catch (error) {
       console.error('获取Git服务器数据失败:', error)
+      // 确保在错误情况下也设置空数组
+      setApps([])
+      setSSHKeys([])
       setLoading(false)
     }
   }
@@ -447,7 +454,7 @@ const GitServerManagement: React.FC = () => {
               <StatLabel>Git应用</StatLabel>
               <StatNumber>{apps.length}</StatNumber>
               <StatHelpText>
-                运行中: {apps.filter(app => app.status === 'active').length}
+                运行中: {Array.isArray(apps) ? apps.filter(app => app.status === 'active').length : 0}
               </StatHelpText>
             </Stat>
           </CardBody>
@@ -467,7 +474,7 @@ const GitServerManagement: React.FC = () => {
           <CardBody>
             <Stat>
               <StatLabel>总提交数</StatLabel>
-              <StatNumber>{apps.reduce((sum, app) => sum + app.commits, 0)}</StatNumber>
+              <StatNumber>{Array.isArray(apps) ? apps.reduce((sum, app) => sum + (app.commits || 0), 0) : 0}</StatNumber>
               <StatHelpText>所有应用的提交总数</StatHelpText>
             </Stat>
           </CardBody>
@@ -477,7 +484,7 @@ const GitServerManagement: React.FC = () => {
           <CardBody>
             <Stat>
               <StatLabel>自动SSL</StatLabel>
-              <StatNumber>{apps.filter(app => app.autoSSL).length}</StatNumber>
+              <StatNumber>{Array.isArray(apps) ? apps.filter(app => app.autoSSL).length : 0}</StatNumber>
               <StatHelpText>启用自动SSL的应用</StatHelpText>
             </Stat>
           </CardBody>
@@ -507,7 +514,7 @@ const GitServerManagement: React.FC = () => {
           <TabPanel>
             <Card>
               <CardBody>
-                {apps.length > 0 ? (
+                {Array.isArray(apps) && apps.length > 0 ? (
                   <Table variant="simple">
                     <Thead>
                       <Tr>
@@ -618,7 +625,7 @@ const GitServerManagement: React.FC = () => {
 
               <Card>
                 <CardBody>
-                  {sshKeys.length > 0 ? (
+                  {Array.isArray(sshKeys) && sshKeys.length > 0 ? (
                     <Table variant="simple">
                       <Thead>
                         <Tr>
