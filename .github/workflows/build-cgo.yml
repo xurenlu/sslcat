@@ -47,16 +47,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-
-      - name: Install pnpm
-        run: npm install -g pnpm
+          cache: 'yarn'
+          cache-dependency-path: 'frontend/yarn.lock'
 
       - name: Build frontend
         run: |
           cd frontend
-          pnpm install
-          pnpm run build
+          yarn install
+          yarn run build
           mkdir -p ../internal/assets/frontend
           cp -r dist/* ../internal/assets/frontend/
 
