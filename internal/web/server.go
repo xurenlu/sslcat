@@ -339,22 +339,24 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/", s.handleAdmin)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/login", s.handleLogin)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/logout", s.handleLogout)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/dashboard", s.handleDashboard)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/mobile", s.handleMobile)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/charts", s.handleCharts)
+	// 页面路由已迁移到前端SPA
+	// s.mux.HandleFunc(s.config.AdminPrefix+"/dashboard", s.handleDashboard) // 已迁移到前端SPA
+	// s.mux.HandleFunc(s.config.AdminPrefix+"/mobile", s.handleMobile) // 已迁移到前端SPA
+	// s.mux.HandleFunc(s.config.AdminPrefix+"/charts", s.handleCharts) // 已迁移到前端SPA
 
-	// 代理管理路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/proxy", s.handleProxy)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/proxy/add", s.handleProxyAdd)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/proxy/edit", s.handleProxyEdit)
+	// 代理管理路由 - 页面路由已迁移到前端SPA
+	// s.mux.HandleFunc(s.config.AdminPrefix+"/proxy", s.handleProxy) // 已迁移到前端SPA
+	// 注意：/proxy/add 和 /proxy/edit 现在由前端 SPA 处理，不再使用后端路由
+	// s.mux.HandleFunc(s.config.AdminPrefix+"/proxy/add", s.handleProxyAdd)
+	// s.mux.HandleFunc(s.config.AdminPrefix+"/proxy/edit", s.handleProxyEdit)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/proxy/delete", s.handleProxyDelete)
 
-	// SSL管理路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/ssl", s.handleSSL)
+	// SSL管理路由 - 页面路由已迁移到前端SPA
+	// s.mux.HandleFunc(s.config.AdminPrefix+"/ssl", s.handleSSL) // 已迁移到前端SPA
 	s.mux.HandleFunc(s.config.AdminPrefix+"/ssl/generate", s.handleSSLGenerate)
 
-	// DNS管理路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/dns", s.handleDNS)
+	// DNS管理路由 - 页面路由已迁移到前端SPA
+	// s.mux.HandleFunc(s.config.AdminPrefix+"/dns", s.handleDNS) // 已迁移到前端SPA
 	s.mux.HandleFunc(s.config.AdminPrefix+"/dns/add", s.handleDNSAdd)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/dns/edit", s.handleDNSEdit)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/dns/delete", s.handleDNSDelete)
@@ -365,28 +367,28 @@ func (s *Server) setupRoutes() {
 	// 从 acme-cache 同步证书到 certs/keys
 	s.mux.HandleFunc(s.config.AdminPrefix+"/ssl/sync-acme", s.handleSSLSyncACME)
 
-	// 安全设置路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/security", s.handleSecurity)
+	// 安全设置路由 - 页面路由已迁移到前端SPA
+	// s.mux.HandleFunc(s.config.AdminPrefix+"/security", s.handleSecurity) // 已迁移到前端SPA
 	s.mux.HandleFunc(s.config.AdminPrefix+"/security/save", s.handleSecuritySave)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/security/blocked-ips", s.handleBlockedIPs)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/security/unblock", s.handleUnblock)
 
-	// 系统设置路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/settings", s.handleSettings)
+	// 系统设置路由 - 页面路由已迁移到前端SPA
+	// s.mux.HandleFunc(s.config.AdminPrefix+"/settings", s.handleSettings) // 已迁移到前端SPA
 	s.mux.HandleFunc(s.config.AdminPrefix+"/settings/save", s.handleSettingsSave)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/settings/first-setup", s.handleFirstTimeSetup)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/settings/change-password", s.handleChangePassword)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/settings/totp", s.handleTOTPSetup)
 
-	// 用户管理路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/users", s.handleUsers)
+	// 用户管理路由 - 页面路由已迁移到前端SPA
+	// s.mux.HandleFunc(s.config.AdminPrefix+"/users", s.handleUsers) // 已迁移到前端SPA
 	s.mux.HandleFunc(s.config.AdminPrefix+"/users/add", s.handleUserAdd)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/users/edit", s.handleUserEdit)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/users/delete", s.handleUserDelete)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/users/logs", s.handleUserLogs)
 
-	// 通知管理路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/notifications", s.handleNotifications)
+	// 通知管理路由 - 页面路由已迁移到前端SPA
+	// s.mux.HandleFunc(s.config.AdminPrefix+"/notifications", s.handleNotifications) // 已迁移到前端SPA
 	s.mux.HandleFunc(s.config.AdminPrefix+"/notifications/test", s.handleNotificationTest)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/notifications/stats", s.handleNotificationStats)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/notifications/history", s.handleNotificationHistory)
@@ -395,13 +397,13 @@ func (s *Server) setupRoutes() {
 
 	// CDN 缓存设置已整合到代理配置中
 
-	// 静态站点管理
-	s.mux.HandleFunc(s.config.AdminPrefix+"/static-sites", s.handleStaticSites)
+	// 静态站点管理 - 页面路由已迁移到前端SPA
+	// s.mux.HandleFunc(s.config.AdminPrefix+"/static-sites", s.handleStaticSites) // 已迁移到前端SPA
 	s.mux.HandleFunc(s.config.AdminPrefix+"/static-sites/add", s.handleStaticSitesAdd)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/static-sites/delete", s.handleStaticSitesDelete)
 
-	// PHP 站点管理
-	s.mux.HandleFunc(s.config.AdminPrefix+"/php-sites", s.handlePHPSites)
+	// PHP 站点管理 - 页面路由已迁移到前端SPA
+	// s.mux.HandleFunc(s.config.AdminPrefix+"/php-sites", s.handlePHPSites) // 已迁移到前端SPA
 	s.mux.HandleFunc(s.config.AdminPrefix+"/php-sites/add", s.handlePHPSitesAdd)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/php-sites/delete", s.handlePHPSitesDelete)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/php-sites/security", s.handlePHPSecurity)
@@ -467,8 +469,8 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/captcha/image", s.handleAPIImageCaptcha)
 	// s.mux.HandleFunc(s.config.AdminPrefix+"/api/captcha", s.handleAPICaptcha) // 关闭验证码API
 
-	// Token 管理路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/tokens", s.handleTokensPage)
+	// Token 管理路由 - 页面路由已迁移到前端SPA
+	// s.mux.HandleFunc(s.config.AdminPrefix+"/tokens", s.handleTokensPage) // 已迁移到前端SPA
 	s.mux.HandleFunc(s.config.AdminPrefix+"/tokens/generate", s.handleTokenGeneratePage)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/tokens/delete", s.handleTokenDeleteAction)
 
@@ -476,19 +478,19 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/ssl/download-all", s.handleSSLDownloadAll)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/ssl/upload-all", s.handleSSLBulkUpload)
 
-	// Runners 管理页面路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/runners", s.handleRunners)
+	// Runners 管理页面路由 - 页面路由已迁移到前端SPA
+	// s.mux.HandleFunc(s.config.AdminPrefix+"/runners", s.handleRunners) // 已迁移到前端SPA
 
-	// Git Deploy Server 管理页面路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/git-server", s.handleGitServer)
+	// Git Deploy Server 管理页面路由 - 页面路由已迁移到前端SPA
+	// s.mux.HandleFunc(s.config.AdminPrefix+"/git-server", s.handleGitServer) // 已迁移到前端SPA
 	s.mux.HandleFunc(s.config.AdminPrefix+"/git-server/create-app", s.handleCreateApp)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/git-server/server-config", s.handleServerConfig)
 
 	// Favicon 处理
 	s.mux.HandleFunc("/favicon.ico", s.handleFavicon)
 
-	// 集群管理路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/cluster", s.handleClusterSettings)
+	// 集群管理路由 - 页面路由已迁移到前端SPA
+	// s.mux.HandleFunc(s.config.AdminPrefix+"/cluster", s.handleClusterSettings) // 已迁移到前端SPA
 	s.mux.HandleFunc(s.config.AdminPrefix+"/cluster/set-master", s.handleClusterSetMaster)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/cluster/set-slave", s.handleClusterSetSlave)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/cluster/set-standalone", s.handleClusterSetStandalone)

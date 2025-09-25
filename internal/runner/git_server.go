@@ -1186,6 +1186,11 @@ func (gs *GitServer) AddSSHKey(keyName, publicKey string) error {
 		return fmt.Errorf("密钥已存在")
 	}
 
+	// 确保SSH目录存在
+	if err := os.MkdirAll(gs.sshKeysDir, 0700); err != nil {
+		return fmt.Errorf("创建 SSH 目录失败: %w", err)
+	}
+
 	// 添加密钥到 authorized_keys
 	keyEntry := fmt.Sprintf("# %s\n%s\n", keyName, publicKey)
 
@@ -1205,6 +1210,12 @@ func (gs *GitServer) AddSSHKey(keyName, publicKey string) error {
 
 // RemoveSSHKey 删除 SSH 密钥
 func (gs *GitServer) RemoveSSHKey(fingerprint string) error {
+	// 检查文件是否存在
+	if _, err := os.Stat(gs.authorizedKeysFile); os.IsNotExist(err) {
+		gs.logger.Warn("authorized_keys 文件不存在，无需删除密钥")
+		return nil
+	}
+
 	// 读取 authorized_keys 文件
 	content, err := os.ReadFile(gs.authorizedKeysFile)
 	if err != nil {
@@ -1233,6 +1244,12 @@ func (gs *GitServer) RemoveSSHKey(fingerprint string) error {
 
 // ListSSHKeys 列出所有 SSH 密钥
 func (gs *GitServer) ListSSHKeys() ([]SSHKey, error) {
+	// 检查文件是否存在，如果不存在则返回空列表
+	if _, err := os.Stat(gs.authorizedKeysFile); os.IsNotExist(err) {
+		gs.logger.Warn("authorized_keys 文件不存在，返回空列表")
+		return []SSHKey{}, nil
+	}
+
 	content, err := os.ReadFile(gs.authorizedKeysFile)
 	if err != nil {
 		return nil, fmt.Errorf("读取 authorized_keys 文件失败: %w", err)

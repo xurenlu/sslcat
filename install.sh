@@ -131,14 +131,14 @@ install_certbot() {
 
 # 创建用户和目录
 create_user_and_dirs() {
-    log_info "创建withssl用户和目录..."
+    log_info "创建sslcat用户和目录..."
     
     # 创建用户
-    if ! id "withssl" &>/dev/null; then
-        useradd -r -s /bin/false withssl
-        log_success "创建withssl用户"
+    if ! id "sslcat" &>/dev/null; then
+        useradd -r -s /bin/false sslcat
+        log_success "创建sslcat用户"
     else
-        log_info "withssl用户已存在"
+        log_info "sslcat用户已存在"
     fi
     
     # 创建目录
@@ -147,7 +147,7 @@ create_user_and_dirs() {
     mkdir -p /opt/sslcat
     
     # 设置权限
-    chown -R withssl:withssl /var/lib/sslcat
+    chown -R sslcat:sslcat /var/lib/sslcat
     chmod 755 /etc/sslcat
     chmod 700 /var/lib/sslcat
     
@@ -155,7 +155,7 @@ create_user_and_dirs() {
 }
 
 # 编译SSLcat
-build_withssl() {
+build_sslcat() {
     log_info "编译SSLcat..."
     
     # 设置Go环境变量
@@ -172,11 +172,11 @@ build_withssl() {
     
     # 编译
     log_info "编译二进制文件..."
-    go build -o withssl main.go
+    go build -o sslcat main.go
     
     # 设置权限
-    chmod +x withssl
-    chown withssl:withssl withssl
+    chmod +x sslcat
+    chown sslcat:sslcat sslcat
     
     log_success "SSLcat编译完成"
 }
@@ -185,23 +185,23 @@ build_withssl() {
 create_systemd_service() {
     log_info "创建systemd服务..."
     
-    cat > /etc/systemd/system/withssl.service << EOF
+    cat > /etc/systemd/system/sslcat.service << EOF
 [Unit]
 Description=SSLcat SSL Proxy Server
 After=network.target
 
 [Service]
 Type=simple
-User=withssl
-Group=withssl
+User=sslcat
+Group=sslcat
 WorkingDirectory=/opt/sslcat
-ExecStart=/opt/sslcat/withssl --config /etc/sslcat/sslcat.conf
+ExecStart=/opt/sslcat/sslcat --config /etc/sslcat/sslcat.conf
 ExecReload=/bin/kill -HUP \$MAINPID
 Restart=always
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=withssl
+SyslogIdentifier=sslcat
 
 # 安全设置
 NoNewPrivileges=true
@@ -265,7 +265,7 @@ security:
 admin_prefix: "/sslcat-panel"
 EOF
     
-    chown withssl:withssl /etc/sslcat/sslcat.conf
+    chown sslcat:sslcat /etc/sslcat/sslcat.conf
     chmod 600 /etc/sslcat/sslcat.conf
     
     log_success "配置文件创建完成"
@@ -302,17 +302,17 @@ configure_firewall() {
 start_service() {
     log_info "启动SSLcat服务..."
     
-    systemctl enable withssl
-    systemctl start withssl
+    systemctl enable sslcat
+    systemctl start sslcat
     
     # 等待服务启动
     sleep 3
     
-    if systemctl is-active --quiet withssl; then
+    if systemctl is-active --quiet sslcat; then
         log_success "SSLcat服务启动成功"
     else
         log_error "SSLcat服务启动失败"
-        systemctl status withssl
+        systemctl status sslcat
         exit 1
     fi
 }
@@ -324,10 +324,10 @@ show_install_info() {
     echo "=========================================="
     echo "安装信息:"
     echo "=========================================="
-    echo "服务状态: systemctl status withssl"
-    echo "查看日志: journalctl -u withssl -f"
-    echo "重启服务: systemctl restart withssl"
-    echo "停止服务: systemctl stop withssl"
+    echo "服务状态: systemctl status sslcat"
+    echo "查看日志: journalctl -u sslcat -f"
+    echo "重启服务: systemctl restart sslcat"
+    echo "停止服务: systemctl stop sslcat"
     echo
     # 获取公网IP
     PUBLIC_IP=$(curl -s https://ip4.dev/myip | tr -d '\n' | xargs)
@@ -356,7 +356,7 @@ main() {
     install_go
     install_certbot
     create_user_and_dirs
-    build_withssl
+    build_sslcat
     create_systemd_service
     create_config
     configure_firewall

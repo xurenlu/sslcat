@@ -19,8 +19,14 @@ import {
   AlertIcon,
   Flex,
 } from '@chakra-ui/react'
-import { FiArrowLeft, FiZap, FiGlobe, FiShield } from 'react-icons/fi'
+import { FiArrowLeft, FiZap, FiGlobe, FiShield, FiPlus } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
+import { useConfig, buildPath, buildApiPath } from '../contexts/ConfigContext'
+
+interface ProxyAuthUser {
+  username: string
+  password: string
+}
 
 interface ProxyRuleForm {
   domain: string
@@ -31,12 +37,18 @@ interface ProxyRuleForm {
   cdn_enabled: boolean
   cdn_preset: string
   cdn_ttl_seconds: number
+  // 访问控制字段
+  auth_enabled: boolean
+  auth_users: ProxyAuthUser[]
+  auth_session_timeout: number
+  auth_cookie_domain: string
 }
 
 const ProxyAdd: React.FC = () => {
   const navigate = useNavigate()
   const toast = useToast()
   const [loading, setLoading] = useState(false)
+  const { adminPrefix } = useConfig()
   const [formData, setFormData] = useState<ProxyRuleForm>({
     domain: '',
     target: '',
@@ -46,6 +58,11 @@ const ProxyAdd: React.FC = () => {
     cdn_enabled: false,
     cdn_preset: '',
     cdn_ttl_seconds: 3600,
+    // 访问控制字段
+    auth_enabled: false,
+    auth_users: [{ username: '', password: '' }],
+    auth_session_timeout: 3600,
+    auth_cookie_domain: '',
   })
 
   const handleInputChange = (field: keyof ProxyRuleForm, value: string | boolean | number) => {
@@ -55,13 +72,64 @@ const ProxyAdd: React.FC = () => {
     }))
   }
 
+  const handleAuthUserChange = (index: number, field: keyof ProxyAuthUser, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      auth_users: prev.auth_users.map((user, i) => 
+        i === index ? { ...user, [field]: value } : user
+      )
+    }))
+  }
+
+  const addAuthUser = () => {
+    setFormData(prev => ({
+      ...prev,
+      auth_users: [...prev.auth_users, { username: '', password: '' }]
+    }))
+  }
+
+  const removeAuthUser = (index: number) => {
+    if (formData.auth_users.length > 1) {
+      setFormData(prev => ({
+        ...prev,
+        auth_users: prev.auth_users.filter((_, i) => i !== index)
+      }))
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
     try {
-      // TODO: 实际的 API 调用
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      const response = await fetch(buildApiPath(adminPrefix, '/proxy/rule'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          domain: formData.domain,
+          target: formData.target,
+          port: parseInt(formData.port) || 0,
+          enabled: formData.enabled,
+          ssl_only: formData.ssl_only,
+          cdn_enabled: formData.cdn_enabled,
+          cdn_preset: formData.cdn_preset,
+          cdn_ttl_seconds: formData.cdn_ttl_seconds,
+          // 访问控制字段
+          auth_enabled: formData.auth_enabled,
+          auth_users: formData.auth_users.filter(user => user.username.trim() && user.password.trim()),
+          auth_session_timeout: formData.auth_session_timeout,
+          auth_cookie_domain: formData.auth_cookie_domain || formData.domain,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || '创建失败')
+      }
+
+      const result = await response.json()
       
       toast({
         title: '代理规则创建成功',
@@ -71,7 +139,7 @@ const ProxyAdd: React.FC = () => {
         isClosable: true,
       })
       
-      navigate('/proxy')
+      navigate(buildPath(adminPrefix, '/proxy'))
     } catch (error) {
       toast({
         title: '创建失败',
@@ -86,7 +154,7 @@ const ProxyAdd: React.FC = () => {
   }
 
   const handleCancel = () => {
-    navigate('/proxy')
+    navigate(buildPath(adminPrefix, '/proxy'))
   }
 
   return (
@@ -256,6 +324,109 @@ const ProxyAdd: React.FC = () => {
                         />
                         <Text fontSize="sm" color="gray.500" mt={1}>
                           静态资源缓存时间，默认 1 小时
+                        </Text>
+                      </FormControl>
+                    </>
+                  )}
+                </VStack>
+              </Box>
+
+              <Divider />
+
+              {/* 访问控制设置 */}
+              <Box>
+                <Heading size="md" mb={4} color="gray.700">
+                  <Icon as={FiShield} mr={2} />
+                  访问控制设置
+                </Heading>
+                
+                <VStack spacing={4}>
+                  <FormControl>
+                    <HStack justify="space-between">
+                      <Box>
+                        <FormLabel mb={1}>启用访问控制</FormLabel>
+                        <Text fontSize="sm" color="gray.500">
+                          为代理域名设置用户名和密码认证
+                        </Text>
+                      </Box>
+                      <Switch
+                        isChecked={formData.auth_enabled}
+                        onChange={(e) => handleInputChange('auth_enabled', e.target.checked)}
+                        size="lg"
+                      />
+                    </HStack>
+                  </FormControl>
+
+                  {formData.auth_enabled && (
+                    <>
+                      <FormControl>
+                        <FormLabel>认证用户</FormLabel>
+                        <VStack spacing={3} align="stretch">
+                          {formData.auth_users.map((user, index) => (
+                            <HStack key={index} spacing={3}>
+                              <Input
+                                placeholder="用户名"
+                                value={user.username}
+                                onChange={(e) => handleAuthUserChange(index, 'username', e.target.value)}
+                                size="md"
+                              />
+                              <Input
+                                type="password"
+                                placeholder="密码"
+                                value={user.password}
+                                onChange={(e) => handleAuthUserChange(index, 'password', e.target.value)}
+                                size="md"
+                              />
+                              {formData.auth_users.length > 1 && (
+                                <Button
+                                  size="sm"
+                                  colorScheme="red"
+                                  variant="outline"
+                                  onClick={() => removeAuthUser(index)}
+                                >
+                                  删除
+                                </Button>
+                              )}
+                            </HStack>
+                          ))}
+                          <Button
+                            leftIcon={<Icon as={FiPlus} />}
+                            variant="outline"
+                            onClick={addAuthUser}
+                            size="sm"
+                          >
+                            添加用户
+                          </Button>
+                        </VStack>
+                        <Text fontSize="sm" color="gray.500" mt={1}>
+                          访问代理域名时需要输入用户名和密码
+                        </Text>
+                      </FormControl>
+
+                      <FormControl>
+                        <FormLabel>会话超时时间（秒）</FormLabel>
+                        <Input
+                          type="number"
+                          value={formData.auth_session_timeout}
+                          onChange={(e) => handleInputChange('auth_session_timeout', parseInt(e.target.value) || 3600)}
+                          placeholder="3600"
+                          size="lg"
+                        />
+                        <Text fontSize="sm" color="gray.500" mt={1}>
+                          用户登录后的有效时间，默认1小时
+                        </Text>
+                      </FormControl>
+
+                      <FormControl>
+                        <FormLabel>Cookie域名（可选）</FormLabel>
+                        <Input
+                          value={formData.auth_cookie_domain}
+                          onChange={(e) => handleInputChange('auth_cookie_domain', e.target.value)}
+                          placeholder={formData.domain || "example.com"}
+                          size="lg"
+                        />
+                        <Text fontSize="sm" color="gray.500" mt={1}>
+                          认证Cookie的作用域，默认为代理域名
                         </Text>
                       </FormControl>
                     </>

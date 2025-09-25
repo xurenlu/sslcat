@@ -32,6 +32,7 @@ import {
 } from 'react-icons/fi'
 import { Link as RouterLink } from 'react-router-dom'
 import { useTranslation } from '../hooks/useLanguage'
+import { useConfig, buildPath } from '../contexts/ConfigContext'
 
 interface DashboardStats {
   activeRules: number
@@ -51,6 +52,7 @@ const Dashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const toast = useToast()
   const t = useTranslation()
+  const { adminPrefix } = useConfig()
 
   const refreshStats = async () => {
     setLoading(true)
@@ -101,25 +103,25 @@ const Dashboard: React.FC = () => {
     {
       title: '新增代理规则',
       icon: FiPlus,
-      path: '/proxy/new',
+      path: buildPath(adminPrefix, '/proxy/add'),
       colorScheme: 'blue',
     },
     {
       title: '管理SSL证书',
       icon: FiShield,
-      path: '/ssl',
+      path: buildPath(adminPrefix, '/ssl'),
       colorScheme: 'green',
     },
     {
       title: '安全设置',
       icon: FiShield,
-      path: '/security',
+      path: buildPath(adminPrefix, '/security'),
       colorScheme: 'orange',
     },
     {
       title: '系统设置',
       icon: FiSettings,
-      path: '/settings',
+      path: buildPath(adminPrefix, '/settings'),
       colorScheme: 'purple',
     },
   ]
