@@ -19,7 +19,7 @@ RUN go mod download
 COPY . .
 
 # 构建应用
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o withssl main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o sslcat main.go
 
 # 运行阶段
 FROM alpine:latest
@@ -28,28 +28,28 @@ FROM alpine:latest
 RUN apk --no-cache add ca-certificates tzdata certbot
 
 # 创建用户和目录
-RUN addgroup -g 1000 withssl && \
-    adduser -D -s /bin/false -u 1000 -G withssl withssl && \
+RUN addgroup -g 1000 sslcat && \
+    adduser -D -s /bin/false -u 1000 -G sslcat sslcat && \
     mkdir -p /etc/sslcat /var/lib/sslcat/{certs,keys,logs} && \
-    chown -R withssl:withssl /var/lib/sslcat
+    chown -R sslcat:sslcat /var/lib/sslcat
 
 # 设置时区
 ENV TZ=Asia/Shanghai
 
 # 从构建阶段复制二进制文件
-COPY --from=builder /app/withssl /opt/sslcat/withssl
+COPY --from=builder /app/sslcat /opt/sslcat/sslcat
 
 # 复制配置文件模板
 COPY --from=builder /app/sslcat.conf.example /etc/sslcat/sslcat.conf
 
 # 设置权限
 RUN mkdir -p /opt/sslcat && \
-    chmod +x /opt/sslcat/withssl && \
-    chown withssl:withssl /etc/sslcat/sslcat.conf && \
+    chmod +x /opt/sslcat/sslcat && \
+    chown sslcat:sslcat /etc/sslcat/sslcat.conf && \
     chmod 600 /etc/sslcat/sslcat.conf
 
 # 切换到非root用户
-USER withssl
+USER sslcat
 
 # 暴露端口
 EXPOSE 80 443
@@ -59,4 +59,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:80/health || exit 1
 
 # 启动命令
-CMD ["/opt/sslcat/withssl", "--config", "/etc/sslcat/sslcat.conf"]
+CMD ["/opt/sslcat/sslcat", "--config", "/etc/sslcat/sslcat.conf"]

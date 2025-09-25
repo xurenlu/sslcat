@@ -6,7 +6,7 @@
 set -e
 
 # 配置参数
-REPO="xurenlu/withssl"  # 替换为您的 GitHub 仓库
+REPO="xurenlu/sslcat"  # 替换为您的 GitHub 仓库
 SERVER="whatq.wxside.com"
 SERVER_USER="root"
 VERSION=${1:-"latest"}
@@ -75,7 +75,7 @@ download_binary() {
     if [ "$VERSION" = "latest" ]; then
         DOWNLOAD_URL="https://github.com/$REPO/releases/latest/download/${BINARY_NAME}_${VERSION}_${ARCH}.tar.gz"
     else
-        DOWNLOAD_URL="https://github.com/$REPO/releases/download/v${VERSION}/${BINARY_NAME}_v${VERSION}_${ARCH}.tar.gz"
+        DOWNLOAD_URL="https://github.com/$REPO/releases/download/${VERSION}/${BINARY_NAME}_${VERSION}_${ARCH}.tar.gz"
     fi
     
     log_info "下载地址: $DOWNLOAD_URL"

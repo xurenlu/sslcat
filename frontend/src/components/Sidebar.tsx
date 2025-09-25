@@ -10,8 +10,6 @@ import {
   Icon,
   Link,
   Divider,
-  Collapse,
-  useDisclosure,
   Button,
   useBreakpointValue,
   Select,
@@ -19,6 +17,7 @@ import {
 import { Link as RouterLink, useLocation } from 'react-router-dom'
 import { useLanguage } from '../hooks/useLanguage'
 import { useTranslation } from '../hooks/useLanguage'
+import { useConfig, buildPath } from '../contexts/ConfigContext'
 import {
   FiHome,
   FiSettings,
@@ -26,8 +25,6 @@ import {
   FiGlobe,
   FiZap,
   FiBell,
-  FiChevronDown,
-  FiChevronRight,
   FiTerminal,
   FiGitBranch,
   FiUsers,
@@ -78,25 +75,22 @@ const NavItem: React.FC<NavItemProps> = ({ icon, children, to, isActive }) => {
 
 const SidebarContent = () => {
   const location = useLocation()
-  const { isOpen: isAdvancedOpen, onToggle: onAdvancedToggle } = useDisclosure()
   const { currentLanguage, changeLanguage, getCurrentLanguage, supportedLanguages } = useLanguage()
   const t = useTranslation()
+  const { adminPrefix } = useConfig()
 
-  const mainMenuItems = [
-    { name: t.navigation.dashboard, icon: FiHome, path: '/dashboard' },
-    { name: t.navigation.proxy, icon: FiZap, path: '/proxy' },
-    { name: t.navigation.sites, icon: FiGlobe, path: '/sites' },
-    { name: t.navigation.ssl, icon: FiShield, path: '/ssl' },
-    { name: t.navigation.settings, icon: FiSettings, path: '/settings' },
-  ]
-
-  const advancedMenuItems = [
-    { name: t.navigation.dns, icon: FiGlobe, path: '/dns' },
-    { name: t.navigation.security, icon: FiShield, path: '/security' },
-    { name: t.navigation.cluster, icon: FiUsers, path: '/cluster' },
-    { name: t.navigation.runners, icon: FiTerminal, path: '/runners' },
-    { name: t.navigation.gitServer, icon: FiGitBranch, path: '/git-server' },
-    { name: t.navigation.notifications, icon: FiBell, path: '/notifications' },
+  const menuItems = [
+    { name: t.navigation.dashboard, icon: FiHome, path: buildPath(adminPrefix, '/dashboard') },
+    { name: t.navigation.proxy, icon: FiZap, path: buildPath(adminPrefix, '/proxy') },
+    { name: t.navigation.sites, icon: FiGlobe, path: buildPath(adminPrefix, '/sites') },
+    { name: t.navigation.ssl, icon: FiShield, path: buildPath(adminPrefix, '/ssl') },
+    { name: t.navigation.settings, icon: FiSettings, path: buildPath(adminPrefix, '/settings') },
+    { name: t.navigation.dns, icon: FiGlobe, path: buildPath(adminPrefix, '/dns') },
+    { name: t.navigation.security, icon: FiShield, path: buildPath(adminPrefix, '/security') },
+    { name: t.navigation.cluster, icon: FiUsers, path: buildPath(adminPrefix, '/cluster') },
+    { name: t.navigation.runners, icon: FiTerminal, path: buildPath(adminPrefix, '/runners') },
+    { name: t.navigation.gitServer, icon: FiGitBranch, path: buildPath(adminPrefix, '/git-server') },
+    { name: t.navigation.notifications, icon: FiBell, path: buildPath(adminPrefix, '/notifications') },
   ]
 
   return (
@@ -144,7 +138,7 @@ const SidebarContent = () => {
       {/* 可滚动的内容区域 */}
       <Box flex={1} overflowY="auto" p={4}>
         <VStack spacing={1} align="stretch">
-          {mainMenuItems.map((item) => (
+          {menuItems.map((item) => (
             <NavItem
               key={item.path}
               icon={item.icon}
@@ -154,35 +148,6 @@ const SidebarContent = () => {
               {item.name}
             </NavItem>
           ))}
-        </VStack>
-
-        <Divider my={4} />
-
-        {/* Advanced Options */}
-        <VStack spacing={1} align="stretch">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onAdvancedToggle}
-              leftIcon={<Icon as={isAdvancedOpen ? FiChevronDown : FiChevronRight} />}
-              justifyContent="flex-start"
-            >
-              {t.navigation.advanced}
-            </Button>
-          <Collapse in={isAdvancedOpen}>
-            <VStack spacing={1} align="stretch" mt={2}>
-              {advancedMenuItems.map((item) => (
-                <NavItem
-                  key={item.path}
-                  icon={item.icon}
-                  to={item.path}
-                  isActive={location.pathname === item.path}
-                >
-                  {item.name}
-                </NavItem>
-              ))}
-            </VStack>
-          </Collapse>
         </VStack>
       </Box>
 

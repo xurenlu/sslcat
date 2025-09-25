@@ -1,7 +1,7 @@
 # SSLcat Makefile
 
 # 变量定义
-BINARY_NAME=withssl
+BINARY_NAME=sslcat
 BUILD_DIR=build
 VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 BUILD_TIME=$(shell date -u '+%Y-%m-%d_%H:%M:%S')
@@ -168,8 +168,8 @@ api-docs:
 .PHONY: docker
 docker:
 	@echo "创建Docker镜像..."
-	@docker build -t withssl:$(VERSION) .
-	@docker tag withssl:$(VERSION) withssl:latest
+	@docker build -t sslcat:$(VERSION) .
+	@docker tag sslcat:$(VERSION) sslcat:latest
 	@echo "Docker镜像创建完成"
 
 # 运行Docker容器
@@ -177,19 +177,19 @@ docker:
 docker-run:
 	@echo "运行Docker容器..."
 	@docker run -d \
-		--name withssl \
+		--name sslcat \
 		-p 80:80 \
 		-p 443:443 \
 		-v /etc/sslcat:/etc/sslcat \
 		-v /var/lib/sslcat:/var/lib/sslcat \
-		withssl:latest
+		sslcat:latest
 
 # 停止Docker容器
 .PHONY: docker-stop
 docker-stop:
 	@echo "停止Docker容器..."
-	@docker stop withssl || true
-	@docker rm withssl || true
+	@docker stop sslcat || true
+	@docker rm sslcat || true
 
 # 检查代码质量
 .PHONY: check

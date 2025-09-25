@@ -20,4 +20,4 @@ echo ""
 echo "按 Ctrl+C 停止服务器"
 echo ""
 
-./withssl --config sslcat.conf --port 8080 --log-level debug
+./sslcat --config sslcat.conf --port 8080 --log-level debug

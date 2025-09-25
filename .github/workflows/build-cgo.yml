@@ -43,6 +43,23 @@ jobs:
       - name: Print Go version
         run: go version
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          pnpm install
+          pnpm run build
+          mkdir -p ../internal/assets/frontend
+          cp -r dist/* ../internal/assets/frontend/
+
       - name: Build with CGO (${{ matrix.goos }}/${{ matrix.goarch }})
         env:
           GOOS: ${{ matrix.goos }}
