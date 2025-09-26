@@ -1,5 +1,7 @@
 package main
 
+// This is a standalone tool for listing users
+
 import (
 	"database/sql"
 	"fmt"
