@@ -1,0 +1,23 @@
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 9933,
+    "debug": false
+  },
+  "session": {
+    "storage_type": "file",
+    "data_dir": "./data",
+    "session_timeout": 28800,
+    "cleanup_interval": 600
+  },
+  "admin": {
+    "username": "admin",
+    "password_file": "./data/admin.pass",
+    "enable_totp": false
+  },
+  "security": {
+    "enable_captcha": false,
+    "max_attempts": 900,
+    "block_duration": "5s"
+  }
+}

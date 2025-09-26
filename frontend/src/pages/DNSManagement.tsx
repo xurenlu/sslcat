@@ -44,7 +44,7 @@ import { useConfig, buildApiPath } from '../contexts/ConfigContext'
 interface DNSProvider {
   id: string
   name: string
-  type: 'cloudflare' | 'aliyun' | 'dnspod' | 'godaddy'
+  type: 'cloudflare' | 'aliyun' | 'tencent' | 'aws' | 'godaddy' | 'custom'
   status: 'connected' | 'error' | 'disabled'
   domains: number
   lastSync: string
@@ -53,10 +53,16 @@ interface DNSProvider {
 const DNSManagement: React.FC = () => {
   const [providers, setProviders] = useState<DNSProvider[]>([])
   const [loading, setLoading] = useState(false)
+  const [editingProvider, setEditingProvider] = useState<DNSProvider | null>(null)
   const {
     isOpen: isProviderOpen,
     onOpen: onProviderOpen,
     onClose: onProviderClose,
+  } = useDisclosure()
+  const {
+    isOpen: isEditOpen,
+    onOpen: onEditOpen,
+    onClose: onEditClose,
   } = useDisclosure()
   const toast = useToast()
   const { adminPrefix } = useConfig()
@@ -67,6 +73,8 @@ const DNSManagement: React.FC = () => {
     apiKey: '',
     apiSecret: '',
     email: '',
+    zoneId: '',
+    endpoint: '',
   })
 
   const refreshData = async () => {
@@ -115,9 +123,36 @@ const DNSManagement: React.FC = () => {
 
   const handleConnectProvider = async () => {
     try {
-      // TODO: 实际的 API 调用
+      setLoading(true)
+      
+      const response = await fetch(buildApiPath(adminPrefix, '/api/dns/provider'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: newProvider.name,
+          type: newProvider.type,
+          api_key: newProvider.apiKey,
+          api_secret: newProvider.apiSecret,
+          zone_id: newProvider.zoneId,
+          endpoint: newProvider.endpoint,
+          priority: 1, // 默认优先级
+          enabled: true, // 默认启用
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || '添加DNS提供商失败')
+      }
+
+      const result = await response.json()
+      
       toast({
-        title: 'DNS提供商连接成功',
+        title: 'DNS提供商添加成功',
+        description: '新的DNS提供商已成功添加到系统中',
         status: 'success',
         duration: 3000,
         isClosable: true,
@@ -128,12 +163,14 @@ const DNSManagement: React.FC = () => {
       resetProviderForm()
     } catch (error) {
       toast({
-        title: '连接失败',
+        title: '添加失败',
         description: error instanceof Error ? error.message : '未知错误',
         status: 'error',
         duration: 3000,
         isClosable: true,
       })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -145,7 +182,117 @@ const DNSManagement: React.FC = () => {
       apiKey: '',
       apiSecret: '',
       email: '',
+      zoneId: '',
+      endpoint: '',
     })
+  }
+
+  const handleEditProvider = (provider: DNSProvider) => {
+    setEditingProvider(provider)
+    setNewProvider({
+      name: provider.name,
+      type: provider.type,
+      apiKey: '', // 不显示敏感信息
+      apiSecret: '',
+      email: '',
+      zoneId: '',
+      endpoint: '',
+    })
+    onEditOpen()
+  }
+
+  const handleUpdateProvider = async () => {
+    if (!editingProvider) return
+
+    try {
+      setLoading(true)
+      
+      const response = await fetch(buildApiPath(adminPrefix, '/api/dns/provider'), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: newProvider.name,
+          type: newProvider.type,
+          api_key: newProvider.apiKey,
+          api_secret: newProvider.apiSecret,
+          zone_id: newProvider.zoneId,
+          endpoint: newProvider.endpoint,
+          priority: 1,
+          enabled: true,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || '更新DNS提供商失败')
+      }
+
+      toast({
+        title: 'DNS提供商更新成功',
+        description: 'DNS提供商信息已成功更新',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      })
+      
+      onEditClose()
+      refreshData()
+      resetProviderForm()
+      setEditingProvider(null)
+    } catch (error) {
+      toast({
+        title: '更新失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeleteProvider = async (provider: DNSProvider) => {
+    if (!confirm(`确定要删除DNS提供商 "${provider.name}" 吗？此操作不可撤销。`)) {
+      return
+    }
+
+    try {
+      setLoading(true)
+      
+      const response = await fetch(buildApiPath(adminPrefix, `/api/dns/provider?name=${encodeURIComponent(provider.name)}`), {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || '删除DNS提供商失败')
+      }
+
+      toast({
+        title: 'DNS提供商删除成功',
+        description: `DNS提供商 "${provider.name}" 已成功删除`,
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      })
+      
+      refreshData()
+    } catch (error) {
+      toast({
+        title: '删除失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
 
@@ -229,6 +376,7 @@ const DNSManagement: React.FC = () => {
                         icon={<FiSettings />}
                         size="sm"
                         variant="ghost"
+                        onClick={() => handleEditProvider(provider)}
                       />
                       <IconButton
                         aria-label="删除"
@@ -236,6 +384,7 @@ const DNSManagement: React.FC = () => {
                         size="sm"
                         variant="ghost"
                         colorScheme="red"
+                        onClick={() => handleDeleteProvider(provider)}
                       />
                     </HStack>
                   </Flex>
@@ -299,8 +448,10 @@ const DNSManagement: React.FC = () => {
                 >
                   <option value="cloudflare">Cloudflare</option>
                   <option value="aliyun">阿里云 DNS</option>
-                  <option value="dnspod">DNSPod</option>
+                  <option value="tencent">腾讯云 DNS</option>
+                  <option value="aws">AWS Route53</option>
                   <option value="godaddy">GoDaddy</option>
+                  <option value="custom">自定义 API</option>
                 </Select>
               </FormControl>
 
@@ -337,6 +488,28 @@ const DNSManagement: React.FC = () => {
                   />
                 </FormControl>
               )}
+
+              {(newProvider.type === 'cloudflare' || newProvider.type === 'aliyun') && (
+                <FormControl>
+                  <FormLabel>Zone ID</FormLabel>
+                  <Input
+                    value={newProvider.zoneId}
+                    onChange={(e) => setNewProvider({ ...newProvider, zoneId: e.target.value })}
+                    placeholder="Zone ID (Cloudflare等需要)"
+                  />
+                </FormControl>
+              )}
+
+              {newProvider.type === 'custom' && (
+                <FormControl>
+                  <FormLabel>API 端点</FormLabel>
+                  <Input
+                    value={newProvider.endpoint}
+                    onChange={(e) => setNewProvider({ ...newProvider, endpoint: e.target.value })}
+                    placeholder="https://api.example.com"
+                  />
+                </FormControl>
+              )}
             </VStack>
           </ModalBody>
 
@@ -346,6 +519,107 @@ const DNSManagement: React.FC = () => {
             </Button>
             <Button colorScheme="blue" onClick={handleConnectProvider}>
               连接提供商
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* 编辑 DNS 提供商模态框 */}
+      <Modal isOpen={isEditOpen} onClose={onEditClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>编辑 DNS 提供商</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={4}>
+              <FormControl>
+                <FormLabel>提供商名称</FormLabel>
+                <Input
+                  value={newProvider.name}
+                  onChange={(e) => setNewProvider({ ...newProvider, name: e.target.value })}
+                  placeholder="我的 Cloudflare"
+                />
+              </FormControl>
+
+              <FormControl>
+                <FormLabel>提供商类型</FormLabel>
+                <Select
+                  value={newProvider.type}
+                  onChange={(e) => setNewProvider({ ...newProvider, type: e.target.value as DNSProvider['type'] })}
+                >
+                  <option value="cloudflare">Cloudflare</option>
+                  <option value="aliyun">阿里云 DNS</option>
+                  <option value="tencent">腾讯云 DNS</option>
+                  <option value="aws">AWS Route53</option>
+                  <option value="godaddy">GoDaddy</option>
+                  <option value="custom">自定义 API</option>
+                </Select>
+              </FormControl>
+
+              <FormControl>
+                <FormLabel>API Key</FormLabel>
+                <Input
+                  type="password"
+                  value={newProvider.apiKey}
+                  onChange={(e) => setNewProvider({ ...newProvider, apiKey: e.target.value })}
+                  placeholder="API 密钥（留空则不更新）"
+                />
+              </FormControl>
+
+              {newProvider.type === 'cloudflare' && (
+                <FormControl>
+                  <FormLabel>邮箱地址</FormLabel>
+                  <Input
+                    type="email"
+                    value={newProvider.email}
+                    onChange={(e) => setNewProvider({ ...newProvider, email: e.target.value })}
+                    placeholder="user@example.com"
+                  />
+                </FormControl>
+              )}
+
+              {newProvider.type !== 'cloudflare' && (
+                <FormControl>
+                  <FormLabel>API Secret</FormLabel>
+                  <Input
+                    type="password"
+                    value={newProvider.apiSecret}
+                    onChange={(e) => setNewProvider({ ...newProvider, apiSecret: e.target.value })}
+                    placeholder="API 密钥（留空则不更新）"
+                  />
+                </FormControl>
+              )}
+
+              {(newProvider.type === 'cloudflare' || newProvider.type === 'aliyun') && (
+                <FormControl>
+                  <FormLabel>Zone ID</FormLabel>
+                  <Input
+                    value={newProvider.zoneId}
+                    onChange={(e) => setNewProvider({ ...newProvider, zoneId: e.target.value })}
+                    placeholder="Zone ID (Cloudflare等需要)"
+                  />
+                </FormControl>
+              )}
+
+              {newProvider.type === 'custom' && (
+                <FormControl>
+                  <FormLabel>API 端点</FormLabel>
+                  <Input
+                    value={newProvider.endpoint}
+                    onChange={(e) => setNewProvider({ ...newProvider, endpoint: e.target.value })}
+                    placeholder="https://api.example.com"
+                  />
+                </FormControl>
+              )}
+            </VStack>
+          </ModalBody>
+
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onEditClose}>
+              取消
+            </Button>
+            <Button colorScheme="blue" onClick={handleUpdateProvider}>
+              保存更改
             </Button>
           </ModalFooter>
         </ModalContent>

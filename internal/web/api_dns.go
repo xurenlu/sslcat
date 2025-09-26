@@ -53,7 +53,7 @@ func (s *Server) handleAPIDNSProvidersPost(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if r.Method != "POST" {
+	if r.Method != "POST" && r.Method != "PUT" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
