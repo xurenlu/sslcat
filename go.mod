@@ -10,7 +10,6 @@ require (
 	github.com/pquerna/otp v1.5.0
 	golang.org/x/crypto v0.23.0
 	golang.org/x/image v0.31.0
-	modernc.org/sqlite v1.29.6
 )
 
 require (
@@ -19,6 +18,7 @@ require (
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/mattn/go-isatty v0.0.16 // indirect
+	github.com/mattn/go-sqlite3 v1.14.32 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	modernc.org/gc/v3 v3.0.0-20240107210532-573471604cb6 // indirect

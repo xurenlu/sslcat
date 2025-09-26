@@ -79,16 +79,21 @@ jobs:
           mkdir -p ../internal/assets/frontend
           cp -r dist/* ../internal/assets/frontend/
 
+      - name: Install CGO dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc libc6-dev
+
       - name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: 0
+          CGO_ENABLED: 1
         run: |
           mkdir -p build artifacts
           VERSION="${GITHUB_REF_NAME}"
           if [ -z "$VERSION" ]; then VERSION="dev"; fi
-          echo "Building $BIN_NAME for $GOOS/$GOARCH (version=$VERSION) with pure Go SQLite"
+          echo "Building $BIN_NAME for $GOOS/$GOARCH (version=$VERSION) with CGO SQLite"
           go build -trimpath -ldflags "-s -w -X main.version=$VERSION -X main.build=$GITHUB_RUN_ID" -o build/${BIN_NAME}${{ matrix.ext }} .
 
       - name: Package
