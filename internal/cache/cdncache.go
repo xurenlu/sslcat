@@ -28,6 +28,8 @@ type CDNCache struct {
 	// 统计计数器
 	hits   int64
 	misses int64
+	// 正在处理的请求，避免相同URL并发穿透
+	processing sync.Map // key: request_key, value: chan struct{}
 }
 
 type objectMeta struct {
@@ -52,11 +54,26 @@ func NewCDNCache(cfg *config.Config) *CDNCache {
 
 // ServeIfFresh 若命中缓存且未过期，直接回源本地文件
 func (c *CDNCache) ServeIfFresh(w http.ResponseWriter, r *http.Request) bool {
-	if c == nil || !c.isEnabled() {
+	return c.ServeIfFreshWithConfig(w, r, false)
+}
+
+// ServeIfFreshWithConfig 带自定义启用状态的缓存服务
+func (c *CDNCache) ServeIfFreshWithConfig(w http.ResponseWriter, r *http.Request, forceEnabled bool) bool {
+	c.log.Infof("CDN缓存查询: url=%s, isEnabled=%v, forceEnabled=%v", r.URL.Path, c.isEnabled(), forceEnabled)
+
+	if c == nil || (!c.isEnabled() && !forceEnabled) {
 		// 统计未命中（未启用）
 		if c != nil {
 			c.misses++
+			c.log.Infof("CDN缓存未启用: url=%s", r.URL.Path)
 		}
+		return false
+	}
+
+	// 如果强制启用，但基本配置不可用，仍然返回false
+	if forceEnabled && (c.cfg == nil || c.cfg.CDNCache.CacheDir == "") {
+		c.misses++
+		c.log.Infof("CDN缓存配置不可用: url=%s", r.URL.Path)
 		return false
 	}
 	// 仅缓存 GET/HEAD
@@ -65,10 +82,54 @@ func (c *CDNCache) ServeIfFresh(w http.ResponseWriter, r *http.Request) bool {
 	}
 
 	filePath, metaPath := c.cachePaths(r)
+	c.log.Infof("CDN缓存路径: filePath=%s, metaPath=%s", filePath, metaPath)
+
 	meta, err := c.readMeta(metaPath)
 	if err != nil || meta == nil {
 		// 统计未命中（无元数据）
 		c.misses++
+		c.log.Infof("CDN缓存未命中(无元数据): url=%s, err=%v", r.URL.Path, err)
+
+		// 检查是否有相同请求正在处理，避免并发穿透
+		requestKey := c.getRequestKey(r)
+		if ch, loaded := c.processing.LoadOrStore(requestKey, make(chan struct{})); loaded {
+			// 有相同请求正在处理，等待其完成
+			c.log.Infof("CDN缓存等待相同请求完成: url=%s", r.URL.Path)
+			<-ch.(chan struct{})
+			// 重新尝试读取缓存
+			if meta, err := c.readMeta(metaPath); err == nil && meta != nil {
+				c.log.Infof("CDN缓存等待后命中: url=%s", r.URL.Path)
+				// 检查过期
+				if meta.ExpiresAtUnix > 0 && time.Now().Unix() >= meta.ExpiresAtUnix {
+					_ = os.Remove(filePath)
+					_ = os.Remove(metaPath)
+					return false
+				}
+				// 回写头并返回内容
+				if meta.ContentType != "" {
+					w.Header().Set("Content-Type", meta.ContentType)
+				}
+				if meta.Encoding != "" {
+					w.Header().Set("Content-Encoding", meta.Encoding)
+				}
+				if meta.ETag != "" {
+					w.Header().Set("ETag", meta.ETag)
+				}
+				if r.Method == http.MethodHead {
+					w.WriteHeader(http.StatusOK)
+					c.touch(metaPath, meta)
+					return true
+				}
+				if f, err := os.Open(filePath); err == nil {
+					defer f.Close()
+					w.WriteHeader(http.StatusOK)
+					_, _ = io.Copy(w, f)
+					c.touch(metaPath, meta)
+					c.hits++
+					return true
+				}
+			}
+		}
 		return false
 	}
 	// 过期检查
@@ -117,19 +178,47 @@ func (c *CDNCache) ServeIfFresh(w http.ResponseWriter, r *http.Request) bool {
 // MaybeStore 按规则存储响应
 // 注意：该函数会读取 resp.Body 并重置
 func (c *CDNCache) MaybeStore(resp *http.Response) {
-	if c == nil || !c.isEnabled() || resp == nil || resp.Request == nil {
+	c.MaybeStoreWithConfig(resp, false)
+}
+
+// MaybeStoreWithConfig 带自定义启用状态的缓存存储
+func (c *CDNCache) MaybeStoreWithConfig(resp *http.Response, forceEnabled bool) {
+	if resp != nil && resp.Request != nil {
+		c.log.Infof("CDN缓存存储: url=%s, isEnabled=%v, forceEnabled=%v", resp.Request.URL.Path, c.isEnabled(), forceEnabled)
+	}
+
+	if c == nil || (!c.isEnabled() && !forceEnabled) || resp == nil || resp.Request == nil {
+		if resp != nil && resp.Request != nil {
+			c.log.Infof("CDN缓存存储跳过: url=%s", resp.Request.URL.Path)
+			c.cleanupProcessing(resp.Request)
+		}
+		return
+	}
+
+	// 如果强制启用，但基本配置不可用，仍然返回
+	if forceEnabled && (c.cfg == nil || c.cfg.CDNCache.CacheDir == "") {
+		c.log.Infof("CDN缓存配置不可用，无法存储: url=%s", resp.Request.URL.Path)
+		c.cleanupProcessing(resp.Request)
 		return
 	}
 	req := resp.Request
 	if req.Method != http.MethodGet && req.Method != http.MethodHead {
+		c.cleanupProcessing(req)
 		return
 	}
+	// 只缓存 200 OK 和 206 Partial Content 响应
+	// 304 Not Modified 等其他状态码不缓存
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
+		if resp.StatusCode == http.StatusNotModified {
+			c.log.Infof("CDN缓存跳过存储(304响应): url=%s", req.URL.Path)
+		}
+		c.cleanupProcessing(req)
 		return
 	}
 	// 遵循上游缓存控制
 	cc := parseCacheControl(resp.Header.Get("Cache-Control"))
 	if cc.noStore || cc.noCache || cc.private {
+		c.cleanupProcessing(req)
 		return
 	}
 
@@ -143,6 +232,7 @@ func (c *CDNCache) MaybeStore(resp *http.Response) {
 		}
 	}
 	if ttl <= 0 {
+		c.cleanupProcessing(req)
 		return
 	}
 	if cc.maxAge >= 0 {
@@ -162,12 +252,14 @@ func (c *CDNCache) MaybeStore(resp *http.Response) {
 	if err != nil {
 		c.log.Debugf("read response body failed: %v", err)
 		resp.Body = io.NopCloser(bytes.NewReader(nil))
+		c.cleanupProcessing(req)
 		return
 	}
 	// 重置响应体给下游继续写
 	resp.Body = io.NopCloser(bytes.NewReader(data))
 
 	if int64(len(data)) > maxObj {
+		c.cleanupProcessing(req)
 		return
 	}
 
@@ -176,8 +268,11 @@ func (c *CDNCache) MaybeStore(resp *http.Response) {
 
 	if err := os.WriteFile(filePath, data, 0644); err != nil {
 		c.log.Debugf("write cache failed: %v", err)
+		c.cleanupProcessing(req)
 		return
 	}
+
+	c.log.Infof("CDN缓存写入成功: url=%s, filePath=%s, size=%d bytes", req.URL.Path, filePath, len(data))
 
 	encoding := resp.Header.Get("Content-Encoding")
 	meta := &objectMeta{
@@ -193,6 +288,9 @@ func (c *CDNCache) MaybeStore(resp *http.Response) {
 		SizeBytes:     int64(len(data)),
 	}
 	_ = c.writeMeta(metaPath, meta)
+
+	// 通知等待的相同请求
+	c.cleanupProcessing(req)
 
 	// 触发一次清理（非阻塞）
 	go c.CleanOnce()
@@ -333,12 +431,12 @@ func (c *CDNCache) Stats() map[string]any {
 		objectCount++
 		return nil
 	})
-	
+
 	hitRate := float64(0)
 	if c.hits+c.misses > 0 {
 		hitRate = float64(c.hits) / float64(c.hits+c.misses) * 100
 	}
-	
+
 	return map[string]any{
 		"enabled":     true,
 		"objects":     objectCount,
@@ -470,6 +568,27 @@ func parseCacheControl(v string) cacheControl {
 		}
 	}
 	return cc
+}
+
+// getRequestKey 生成请求的唯一标识用于并发控制
+func (c *CDNCache) getRequestKey(r *http.Request) string {
+	host := hostOnly(r.Host)
+	key := host + ":" + r.URL.Path
+	if r.URL.RawQuery != "" {
+		h := sha1.Sum([]byte(r.URL.RawQuery))
+		key += "__q_" + hex.EncodeToString(h[:8])
+	}
+	return key
+}
+
+// cleanupProcessing 清理processing标记，通知等待的请求
+func (c *CDNCache) cleanupProcessing(req *http.Request) {
+	if req != nil {
+		requestKey := c.getRequestKey(req)
+		if ch, loaded := c.processing.LoadAndDelete(requestKey); loaded {
+			close(ch.(chan struct{}))
+		}
+	}
 }
 
 func (c *CDNCache) matchRule(matchType, pattern string, medias []string, relPath string, meta *objectMeta) bool {

@@ -90,8 +90,18 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 	m.logRequestDetails(r, "INCOMING_REQUEST", rule)
 
 	// CDN 缓存直出（仅 GET/HEAD，且全局或域名启用）
-	if m.cdnCache != nil && (m.config.CDNCache.Enabled || (rule != nil && rule.CDNEnabled)) {
-		if m.cdnCache.ServeIfFresh(w, r) {
+	cdnEnabled := m.config.CDNCache.Enabled || (rule != nil && rule.CDNEnabled)
+	if m.cdnCache != nil && cdnEnabled {
+		// 临时修改请求Host为后端域名，确保缓存路径一致性
+		originalHost := r.Host
+		if rule != nil {
+			backendHost := m.extractHostFromTarget(rule.Target, rule.Port)
+			r.Host = backendHost
+		}
+		served := m.cdnCache.ServeIfFreshWithConfig(w, r, cdnEnabled)
+		// 恢复原始Host
+		r.Host = originalHost
+		if served {
 			m.log.Debugf("Served from CDN cache for %s %s", r.Method, r.URL.Path)
 			return
 		}
@@ -109,7 +119,7 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 	}
 
 	// 检查是否启用了CDN缓存（全局或域名级别）
-	cdnEnabled := m.config.CDNCache.Enabled || (rule != nil && rule.CDNEnabled)
+	// cdnEnabled 已在上面定义
 	isCloudStorage := m.isCloudStorageService(rule.Target)
 
 	// 在CDN模式或云存储模式下，预先清理可能存在的代理头部
@@ -192,11 +202,20 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 		// 添加代理标识
 		resp.Header.Set("X-Proxy-By", "SSLcat")
 		// CDN 缓存落盘（全局或域名启用）
-		if m.cdnCache != nil && (m.config.CDNCache.Enabled || (rule != nil && rule.CDNEnabled)) {
+		// 使用之前定义的cdnEnabled变量
+		if m.cdnCache != nil && cdnEnabled {
 			if rule != nil && rule.CDNDefaultTTLSeconds > 0 {
 				resp.Header.Set("X-SSLcat-CDN-Default-TTL", strconv.Itoa(rule.CDNDefaultTTLSeconds))
 			}
-			m.cdnCache.MaybeStore(resp)
+			// 临时修改请求Host为后端域名，确保缓存路径一致性
+			originalHost := resp.Request.Host
+			if rule != nil {
+				backendHost := m.extractHostFromTarget(rule.Target, rule.Port)
+				resp.Request.Host = backendHost
+			}
+			m.cdnCache.MaybeStoreWithConfig(resp, cdnEnabled)
+			// 恢复原始Host
+			resp.Request.Host = originalHost
 			if rule != nil {
 				resp.Header.Del("X-SSLcat-CDN-Default-TTL")
 			}
@@ -280,15 +299,20 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 			// 后端是域名，根据配置决定Host头部处理方式
 			if rule.OptimizeHostHeader {
 				// 启用Host头部优化：使用后端配置的域名作为Host
+				m.log.Infof("开始Host头部优化: target=%s, port=%d", rule.Target, rule.Port)
 				backendHost := m.extractHostFromTarget(rule.Target, rule.Port)
+				m.log.Infof("extractHostFromTarget返回: %s", backendHost)
 
 				// 如果是云存储服务，根据配置决定Host头部
 				if m.isCloudStorageService(rule.Target) {
+					m.log.Infof("检测到云存储服务: %s", rule.Target)
 					// 对于云存储，优先使用配置的端点，否则使用检测到的端点
 					if rule.CloudStorageEndpoint != "" {
 						backendHost = rule.CloudStorageEndpoint
+						m.log.Infof("使用配置的云存储端点: %s", backendHost)
 					} else if cloudInfo := m.detectCloudStorageInfo(rule.Target); cloudInfo != nil {
 						backendHost = cloudInfo.Endpoint
+						m.log.Infof("使用检测到的云存储端点: %s", backendHost)
 					}
 					m.log.Infof("云存储模式: 使用端点 %s (配置: %s)", backendHost, rule.CloudStorageEndpoint)
 				}
@@ -791,16 +815,21 @@ func (m *Manager) buildTargetInfo(rule *config.ProxyRule) string {
 
 // extractHostFromTarget 从目标配置中提取Host头信息
 func (m *Manager) extractHostFromTarget(target string, port int) string {
+	m.log.Infof("extractHostFromTarget调用: target=%s, port=%d", target, port)
+
 	// 如果target包含完整URL，解析出域名和端口
 	if strings.HasPrefix(strings.ToLower(target), "http://") || strings.HasPrefix(strings.ToLower(target), "https://") {
+		m.log.Infof("target包含协议，开始解析URL")
 		parsedURL, err := url.Parse(target)
 		if err == nil {
 			// 检查是否为OSS或其他云服务，对于这些服务，Host头部不应包含标准端口号
 			hostname := parsedURL.Hostname()
+			m.log.Infof("解析URL成功: hostname=%s, port=%s", hostname, parsedURL.Port())
 			isCloudService := strings.Contains(strings.ToLower(hostname), "aliyuncs.com") ||
 				strings.Contains(strings.ToLower(hostname), "amazonaws.com") ||
 				strings.Contains(strings.ToLower(hostname), "qcloud.com") ||
 				strings.Contains(strings.ToLower(hostname), "myqcloud.com")
+			m.log.Infof("云服务检测结果: %v", isCloudService)
 
 			// 如果URL中已经有端口
 			if parsedURL.Port() != "" {
@@ -808,10 +837,18 @@ func (m *Manager) extractHostFromTarget(target string, port int) string {
 
 				// 对于云服务，如果是标准端口（80/443），则不包含端口号
 				if isCloudService && (urlPort == 80 || urlPort == 443) {
+					m.log.Infof("云服务标准端口，返回hostname: %s", hostname)
 					return hostname
 				}
 
-				// 对于非云服务，或者非标准端口，保留端口号
+				// 对于云服务，即使是非标准端口，也不包含端口号（云服务通常只支持标准端口）
+				if isCloudService {
+					m.log.Infof("云服务非标准端口，仍返回hostname: %s", hostname)
+					return hostname
+				}
+
+				// 对于非云服务，保留端口号
+				m.log.Infof("非云服务，返回完整Host: %s", parsedURL.Host)
 				return parsedURL.Host
 			}
 
@@ -819,10 +856,14 @@ func (m *Manager) extractHostFromTarget(target string, port int) string {
 			if port > 0 && port != 80 && port != 443 {
 				// 对于云服务，即使配置了非标准端口，也不包含端口号（云服务通常只支持标准端口）
 				if isCloudService {
+					m.log.Infof("云服务，配置了非标准端口，仍返回hostname: %s", hostname)
 					return hostname
 				}
-				return net.JoinHostPort(hostname, strconv.Itoa(port))
+				result := net.JoinHostPort(hostname, strconv.Itoa(port))
+				m.log.Infof("非云服务，添加配置端口，返回: %s", result)
+				return result
 			}
+			m.log.Infof("无需添加端口，返回hostname: %s", hostname)
 			return hostname
 		}
 	}
@@ -986,63 +1027,76 @@ func (m *Manager) isCloudStorageService(target string) bool {
 func (m *Manager) detectCloudStorageInfo(target string) *CloudStorageInfo {
 	targetLower := strings.ToLower(target)
 
+	// 提取hostname（去除协议）
+	extractHostname := func(target string) string {
+		if strings.HasPrefix(strings.ToLower(target), "http://") || strings.HasPrefix(strings.ToLower(target), "https://") {
+			if parsedURL, err := url.Parse(target); err == nil {
+				return parsedURL.Hostname()
+			}
+		}
+		return target
+	}
+
 	// 阿里云OSS检测
 	if strings.Contains(targetLower, "aliyuncs.com") || strings.Contains(targetLower, "oss-") {
+		hostname := extractHostname(target)
 		// 解析bucket.oss-region.aliyuncs.com格式
-		parts := strings.Split(target, ".")
+		parts := strings.Split(hostname, ".")
 		if len(parts) >= 3 {
 			return &CloudStorageInfo{
 				Type:     "aliyun_oss",
 				Name:     "阿里云OSS",
 				Bucket:   parts[0],
 				Region:   extractRegionFromOSS(parts),
-				Endpoint: target,
+				Endpoint: hostname,
 			}
 		}
 		return &CloudStorageInfo{
 			Type:     "aliyun_oss",
 			Name:     "阿里云OSS",
-			Endpoint: target,
+			Endpoint: hostname,
 		}
 	}
 
 	// AWS S3检测
 	if strings.Contains(targetLower, "amazonaws.com") || strings.Contains(targetLower, ".s3.") {
+		hostname := extractHostname(target)
 		// 解析bucket.s3-region.amazonaws.com格式
-		parts := strings.Split(target, ".")
+		parts := strings.Split(hostname, ".")
 		if len(parts) >= 3 {
 			return &CloudStorageInfo{
 				Type:     "aws_s3",
 				Name:     "AWS S3",
 				Bucket:   parts[0],
 				Region:   extractRegionFromS3(parts),
-				Endpoint: target,
+				Endpoint: hostname,
 			}
 		}
 		return &CloudStorageInfo{
 			Type:     "aws_s3",
 			Name:     "AWS S3",
-			Endpoint: target,
+			Endpoint: hostname,
 		}
 	}
 
 	// 腾讯云COS检测
 	if strings.Contains(targetLower, "qcloud.com") || strings.Contains(targetLower, "myqcloud.com") || strings.Contains(targetLower, ".cos.") {
+		hostname := extractHostname(target)
 		// 解析bucket.cos-region.myqcloud.com格式
-		parts := strings.Split(target, ".")
+		parts := strings.Split(hostname, ".")
 		if len(parts) >= 3 {
 			return &CloudStorageInfo{
 				Type:     "tencent_cos",
 				Name:     "腾讯云COS",
 				Bucket:   parts[0],
 				Region:   extractRegionFromCOS(parts),
-				Endpoint: target,
+				Endpoint: hostname,
 			}
 		}
 		return &CloudStorageInfo{
 			Type:     "tencent_cos",
 			Name:     "腾讯云COS",
-			Endpoint: target,
+			Endpoint: hostname,
 		}
 	}
 
