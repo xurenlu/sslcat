@@ -8,27 +8,24 @@
 
 这是因为项目使用了 `github.com/mattn/go-sqlite3` 依赖，该依赖需要 CGO 支持，但构建配置中禁用了 CGO。
 
-## 解决方案
-**采用纯 Go 实现的 SQLite 驱动 `modernc.org/sqlite`，完全避免 CGO 依赖！**
+## 解决方案变更
+**最初采用纯 Go 实现的 SQLite 驱动 `modernc.org/sqlite`，但发现性能问题，现已恢复使用 `github.com/mattn/go-sqlite3` 并启用 CGO 支持！**
 
 ## 修改的文件
 
-### 1. 依赖替换
+### 1. 依赖恢复
 - **`go.mod`**：
-  - 移除 `github.com/mattn/go-sqlite3 v1.14.32`
-  - 添加 `modernc.org/sqlite v1.29.6`
+  - 移除 `modernc.org/sqlite v1.29.6`
+  - 恢复 `github.com/mattn/go-sqlite3 v1.14.32`
 
 - **`internal/web/user_manager.go`**：
-  - 将导入从 `_ "github.com/mattn/go-sqlite3"` 改为 `_ "modernc.org/sqlite"`
+  - 将导入从 `_ "modernc.org/sqlite"` 改回 `_ "github.com/mattn/go-sqlite3"`
 
 ### 2. GitHub Actions 工作流
 - **`.github/workflows/release.yml`**：
-  - 移除 CGO 依赖安装步骤
-  - 保持 `CGO_ENABLED: 0`
-  - 更新构建日志信息为 "with pure Go SQLite"
-
-- **删除** `.github/workflows/build-cgo.yml`：
-  - 不再需要单独的 CGO 构建工作流
+  - 添加 CGO 依赖安装步骤 (`gcc libc6-dev`)
+  - 启用 `CGO_ENABLED: 1`
+  - 更新构建日志信息为 "with CGO SQLite"
 
 ### 3. Makefile
 - **`Makefile`**：
