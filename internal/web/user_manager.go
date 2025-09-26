@@ -60,7 +60,7 @@ func NewUserManager(log UserLogger, dataDir string) (*UserManager, error) {
 
 	// 配置SQLite连接参数，启用WAL模式提高并发性能
 	dsn := fmt.Sprintf("%s?_journal_mode=WAL&_synchronous=NORMAL&_cache_size=10000&_timeout=30000&_busy_timeout=30000", dbPath)
-	db, err := sql.Open("sqlite", dsn)
+	db, err := sql.Open("sqlite3", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("打开数据库失败: %v", err)
 	}
