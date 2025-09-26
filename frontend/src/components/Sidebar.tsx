@@ -29,6 +29,7 @@ import {
   FiGitBranch,
   FiUsers,
   FiLogOut,
+  FiHardDrive,
 } from 'react-icons/fi'
 
 interface SidebarProps {
@@ -84,11 +85,13 @@ const SidebarContent = () => {
     { name: t.navigation.proxy, icon: FiZap, path: buildPath(adminPrefix, '/proxy') },
     { name: t.navigation.sites, icon: FiGlobe, path: buildPath(adminPrefix, '/sites') },
     { name: t.navigation.ssl, icon: FiShield, path: buildPath(adminPrefix, '/ssl') },
+    { name: '类CDN缓存', icon: FiHardDrive, path: buildPath(adminPrefix, '/cdn') },
     { name: t.navigation.settings, icon: FiSettings, path: buildPath(adminPrefix, '/settings') },
     { name: t.navigation.dns, icon: FiGlobe, path: buildPath(adminPrefix, '/dns') },
     { name: t.navigation.security, icon: FiShield, path: buildPath(adminPrefix, '/security') },
     { name: t.navigation.gitServer, icon: FiGitBranch, path: buildPath(adminPrefix, '/git-server') },
     { name: t.navigation.notifications, icon: FiBell, path: buildPath(adminPrefix, '/notifications') },
+    { name: '用户管理', icon: FiUsers, path: buildPath(adminPrefix, '/users') },
   ]
 
   return (

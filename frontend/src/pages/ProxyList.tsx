@@ -55,6 +55,23 @@ const ProxyList: React.FC = () => {
   const toast = useToast()
   const { adminPrefix } = useConfig()
 
+  // 格式化目标地址和端口显示
+  const formatTargetWithPort = (target: string, port: number): string => {
+    // 如果端口为0或未设置，直接返回target
+    if (!port || port === 0) {
+      return target
+    }
+    
+    // 首先检查target是否已经包含端口号（使用正则表达式）
+    const hasPortPattern = /^https?:\/\/[^:]+:\d+(\/.*)?$/
+    if (hasPortPattern.test(target)) {
+      return target
+    }
+    
+    // 如果target不包含端口号，添加端口号
+    return `${target}:${port}`
+  }
+
   const refreshRules = async () => {
     setLoading(true)
     try {
@@ -222,7 +239,7 @@ const ProxyList: React.FC = () => {
                     </Td>
                     <Td>
                       <Text fontFamily="mono" fontSize="sm">
-                        {rule.target}:{rule.port}
+                        {formatTargetWithPort(rule.target, rule.port)}
                       </Text>
                     </Td>
                     <Td>

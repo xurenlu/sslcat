@@ -31,12 +31,15 @@ interface ProxyAuthUser {
 interface ProxyRuleForm {
   domain: string
   target: string
-  port: string
   enabled: boolean
   ssl_only: boolean
+  // 类CDN设置
+  cdn_mode_enabled: boolean
   cdn_enabled: boolean
   cdn_preset: string
   cdn_ttl_seconds: number
+  // HTTP Host头部优化
+  optimize_host_header: boolean
   // 访问控制字段
   auth_enabled: boolean
   auth_users: ProxyAuthUser[]
@@ -57,12 +60,15 @@ const ProxyEdit: React.FC = () => {
   const [formData, setFormData] = useState<ProxyRuleForm>({
     domain: '',
     target: '',
-    port: '',
     enabled: true,
     ssl_only: true,
+    // 类CDN设置
+    cdn_mode_enabled: false,
     cdn_enabled: false,
     cdn_preset: '',
-    cdn_ttl_seconds: 3600,
+    cdn_ttl_seconds: 259200, // 默认72小时
+    // HTTP Host头部优化
+    optimize_host_header: false,
     // 访问控制字段
     auth_enabled: false,
     auth_users: [{ username: '', password: '' }],
@@ -96,20 +102,24 @@ const ProxyEdit: React.FC = () => {
         }
 
         const data = await response.json()
-        if (data && data.domain) {
+        if (data && data.success && data.data) {
+          const rule = data.data
           setFormData({
-            domain: data.domain || '',
-            target: data.target || '',
-            port: data.port?.toString() || '',
-            enabled: data.enabled ?? true,
-            ssl_only: data.ssl_only ?? true,
-            cdn_enabled: data.cdn_enabled ?? false,
-            cdn_preset: data.cdn_preset || '',
-            cdn_ttl_seconds: data.cdn_ttl_seconds || 3600,
-            auth_enabled: data.auth_enabled ?? false,
-            auth_users: data.auth_users || [{ username: '', password: '' }],
-            auth_session_timeout: data.auth_session_timeout || 3600,
-            auth_cookie_domain: data.auth_cookie_domain || '',
+            domain: rule.domain || '',
+            target: rule.target || '',
+            enabled: rule.enabled ?? true,
+            ssl_only: rule.ssl_only ?? true,
+            // 类CDN设置 - 如果CDN缓存或Host头部优化任一启用，则认为类CDN模式启用
+            cdn_mode_enabled: (rule.cdn_enabled ?? false) || (rule.optimize_host_header ?? false),
+            cdn_enabled: rule.cdn_enabled ?? false,
+            cdn_preset: rule.cdn_preset || '',
+            cdn_ttl_seconds: rule.cdn_ttl_seconds || 259200,
+            // HTTP Host头部优化
+            optimize_host_header: rule.optimize_host_header ?? false,
+            auth_enabled: rule.auth_enabled ?? false,
+            auth_users: rule.auth_users || [{ username: '', password: '' }],
+            auth_session_timeout: rule.auth_session_timeout || 3600,
+            auth_cookie_domain: rule.auth_cookie_domain || '',
           })
         }
       } catch (error) {
@@ -167,15 +177,29 @@ const ProxyEdit: React.FC = () => {
     setLoading(true)
 
     try {
-      const response = await fetch(buildApiPath(adminPrefix, '/proxy/rule'), {
+      const response = await fetch(buildApiPath(adminPrefix, `/proxy/rule?domain=${encodeURIComponent(domain)}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
         body: JSON.stringify({
-          ...formData,
-          port: parseInt(formData.port),
+          domain: formData.domain,
+          target: formData.target,
+          enabled: formData.enabled,
+          ssl_only: formData.ssl_only,
+          // 类CDN设置
+          cdn_mode_enabled: formData.cdn_mode_enabled,
+          cdn_enabled: formData.cdn_enabled,
+          cdn_preset: formData.cdn_preset,
+          cdn_ttl_seconds: formData.cdn_ttl_seconds,
+          // HTTP Host头部优化
+          optimize_host_header: formData.optimize_host_header,
+          // 访问控制字段
+          auth_enabled: formData.auth_enabled,
+          auth_users: formData.auth_users.filter(user => user.username.trim() && user.password.trim()),
+          auth_session_timeout: formData.auth_session_timeout,
+          auth_cookie_domain: formData.auth_cookie_domain || formData.domain,
         }),
       })
 
@@ -254,7 +278,7 @@ const ProxyEdit: React.FC = () => {
                       <Input
                         value={formData.domain}
                         onChange={(e) => handleInputChange('domain', e.target.value)}
-                        placeholder="example.com"
+                        placeholder={domain || "example.com"}
                         isDisabled
                       />
                       <Text fontSize="sm" color="gray.500" mt={1}>
@@ -262,27 +286,17 @@ const ProxyEdit: React.FC = () => {
                       </Text>
                     </FormControl>
 
-                    <HStack spacing={4}>
-                      <FormControl isRequired>
-                        <FormLabel>目标地址</FormLabel>
-                        <Input
-                          value={formData.target}
-                          onChange={(e) => handleInputChange('target', e.target.value)}
-                          placeholder="127.0.0.1"
-                        />
-                      </FormControl>
-                      <FormControl isRequired>
-                        <FormLabel>端口</FormLabel>
-                        <Input
-                          type="number"
-                          value={formData.port}
-                          onChange={(e) => handleInputChange('port', e.target.value)}
-                          placeholder="8080"
-                          min="1"
-                          max="65535"
-                        />
-                      </FormControl>
-                    </HStack>
+                    <FormControl isRequired>
+                      <FormLabel>目标地址</FormLabel>
+                      <Input
+                        value={formData.target}
+                        onChange={(e) => handleInputChange('target', e.target.value)}
+                        placeholder="http://127.0.0.1:8080"
+                      />
+                      <Text fontSize="sm" color="gray.500" mt={1}>
+                        完整的代理目标地址，包含协议、主机和端口
+                      </Text>
+                    </FormControl>
                   </VStack>
                 </Box>
 
@@ -294,6 +308,19 @@ const ProxyEdit: React.FC = () => {
                     <Icon as={FiShield} mr={2} />
                     安全配置
                   </Heading>
+                  
+                  <Alert status="info" mb={4}>
+                    <AlertIcon />
+                    <Box>
+                      <Text fontWeight="bold" mb={1}>配置说明：</Text>
+                      <Text fontSize="sm">
+                        • <strong>启用规则</strong>：控制代理规则是否生效<br/>
+                        • <strong>仅HTTPS</strong>：只允许HTTPS请求通过<br/>
+                        • <strong>启用CDN缓存</strong>：开启缓存加速功能<br/>
+                        • <strong>优化HTTP Host头部</strong>：使用目标地址域名作为Host头部，避免防盗链问题
+                      </Text>
+                    </Box>
+                  </Alert>
                   <VStack spacing={4} align="stretch">
                     <HStack justify="space-between">
                       <FormLabel mb={0}>启用规则</FormLabel>
@@ -312,32 +339,92 @@ const ProxyEdit: React.FC = () => {
                     </HStack>
 
                     <HStack justify="space-between">
-                      <FormLabel mb={0}>启用CDN缓存</FormLabel>
+                      <Box>
+                        <FormLabel mb={1}>启用类CDN功能</FormLabel>
+                        <Text fontSize="sm" color="gray.500">
+                          启用CDN缓存和Host头部优化功能
+                        </Text>
+                      </Box>
                       <Switch
-                        isChecked={formData.cdn_enabled}
-                        onChange={(e) => handleInputChange('cdn_enabled', e.target.checked)}
+                        isChecked={formData.cdn_mode_enabled}
+                        onChange={(e) => handleInputChange('cdn_mode_enabled', e.target.checked)}
                       />
                     </HStack>
 
-                    {formData.cdn_enabled && (
+                    {formData.cdn_mode_enabled && (
                       <VStack spacing={4} align="stretch">
-                        <FormControl>
-                          <FormLabel>CDN预设</FormLabel>
-                          <Input
-                            value={formData.cdn_preset}
-                            onChange={(e) => handleInputChange('cdn_preset', e.target.value)}
-                            placeholder="default"
+                        <HStack justify="space-between">
+                          <FormLabel mb={0}>启用CDN缓存</FormLabel>
+                          <Switch
+                            isChecked={formData.cdn_enabled}
+                            onChange={(e) => handleInputChange('cdn_enabled', e.target.checked)}
                           />
-                        </FormControl>
-                        <FormControl>
-                          <FormLabel>CDN TTL (秒)</FormLabel>
-                          <Input
-                            type="number"
-                            value={formData.cdn_ttl_seconds}
-                            onChange={(e) => handleInputChange('cdn_ttl_seconds', parseInt(e.target.value))}
-                            min="0"
+                        </HStack>
+
+                        {formData.cdn_enabled && (
+                          <VStack spacing={4} align="stretch">
+                            <Alert status="success" variant="subtle">
+                              <AlertIcon />
+                              <Box>
+                                <Text fontWeight="bold" mb={1}>CDN缓存已启用</Text>
+                                <Text fontSize="sm">
+                                  系统将缓存静态资源，提升访问速度。建议配置合适的TTL时间。
+                                </Text>
+                              </Box>
+                            </Alert>
+                            
+                            <FormControl>
+                              <FormLabel>CDN预设</FormLabel>
+                              <Input
+                                value={formData.cdn_preset}
+                                onChange={(e) => handleInputChange('cdn_preset', e.target.value)}
+                                placeholder="default"
+                              />
+                              <Text fontSize="sm" color="gray.500" mt={1}>
+                                缓存策略预设，可选：default, static, images
+                              </Text>
+                            </FormControl>
+                            
+                            <FormControl>
+                              <FormLabel>CDN TTL (秒)</FormLabel>
+                              <Input
+                                type="number"
+                                value={formData.cdn_ttl_seconds}
+                                onChange={(e) => handleInputChange('cdn_ttl_seconds', parseInt(e.target.value))}
+                                min="0"
+                              />
+                              <Text fontSize="sm" color="gray.500" mt={1}>
+                                缓存时间，0表示使用全局设置
+                              </Text>
+                            </FormControl>
+                          </VStack>
+                        )}
+
+                        <HStack justify="space-between">
+                          <Box>
+                            <FormLabel mb={0}>优化HTTP Host头部</FormLabel>
+                            <Text fontSize="sm" color="gray.600">
+                              解决防盗链问题
+                            </Text>
+                          </Box>
+                          <Switch
+                            isChecked={formData.optimize_host_header}
+                            onChange={(e) => handleInputChange('optimize_host_header', e.target.checked)}
                           />
-                        </FormControl>
+                        </HStack>
+                        
+                        {formData.optimize_host_header && (
+                          <Alert status="warning">
+                            <AlertIcon />
+                            <Box>
+                              <Text fontWeight="bold" mb={1}>Host头部优化已启用</Text>
+                              <Text fontSize="sm">
+                                系统将使用目标地址的域名作为HTTP Host头部，而不是浏览器发送的域名。
+                                这有助于绕过某些防盗链检查，但可能影响某些依赖原始Host头部的应用。
+                              </Text>
+                            </Box>
+                          </Alert>
+                        )}
                       </VStack>
                     )}
                   </VStack>

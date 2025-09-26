@@ -5,6 +5,7 @@ import { useConfig } from './ConfigContext'
 interface User {
   username: string
   role: string
+  is_active?: boolean
 }
 
 interface AuthContextType {
@@ -31,15 +32,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // 检查认证状态
   const checkAuth = async (): Promise<boolean> => {
     try {
+      console.log('检查认证状态，adminPrefix:', adminPrefix)
       const response = await fetch(`${adminPrefix}/api/auth/me`, {
         credentials: 'include', // 包含 cookies
       })
       
+      console.log('认证检查响应状态:', response.status)
+      
       if (response.ok) {
         const userData = await response.json()
+        console.log('认证成功，用户数据:', userData)
         setUser(userData)
         return true
       } else {
+        const errorText = await response.text()
+        console.warn('认证失败:', response.status, errorText)
         setUser(null)
         return false
       }

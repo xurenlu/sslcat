@@ -4,11 +4,39 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/xurenlu/sslcat/internal/config"
 )
+
+// parsePortFromTarget 从目标地址中解析端口号
+func parsePortFromTarget(target string) int {
+	// 解析URL
+	parsedURL, err := url.Parse(target)
+	if err != nil {
+		// 如果解析失败，返回0
+		return 0
+	}
+
+	// 如果URL中有端口号，使用它
+	if parsedURL.Port() != "" {
+		if port, err := strconv.Atoi(parsedURL.Port()); err == nil {
+			return port
+		}
+	}
+
+	// 根据协议设置默认端口
+	switch parsedURL.Scheme {
+	case "http":
+		return 80
+	case "https":
+		return 443
+	default:
+		return 0
+	}
+}
 
 // handleAPIProxyRulesPost 添加或更新代理规则
 func (s *Server) handleAPIProxyRulesPost(w http.ResponseWriter, r *http.Request) {
@@ -22,14 +50,18 @@ func (s *Server) handleAPIProxyRulesPost(w http.ResponseWriter, r *http.Request)
 	}
 
 	var req struct {
-		Domain               string `json:"domain"`
-		Target               string `json:"target"`
-		Port                 int    `json:"port"`
-		Enabled              bool   `json:"enabled"`
-		SSLOnly              bool   `json:"ssl_only"`
+		Domain  string `json:"domain"`
+		Target  string `json:"target"`
+		Port    int    `json:"port"`
+		Enabled bool   `json:"enabled"`
+		SSLOnly bool   `json:"ssl_only"`
+		// 类CDN设置
+		CDNModeEnabled       bool   `json:"cdn_mode_enabled"`
 		CDNEnabled           bool   `json:"cdn_enabled"`
 		CDNPreset            string `json:"cdn_preset"`
 		CDNDefaultTTLSeconds int    `json:"cdn_ttl_seconds"`
+		// HTTP Host头部优化
+		OptimizeHostHeader bool `json:"optimize_host_header"`
 
 		// 访问控制字段
 		AuthEnabled        bool                   `json:"auth_enabled"`
@@ -92,15 +124,23 @@ func (s *Server) handleAPIProxyRulesPost(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
+	// 自动解析端口号
+	port := req.Port
+	if port == 0 {
+		port = parsePortFromTarget(req.Target)
+	}
+
 	newRule := config.ProxyRule{
 		Domain:               req.Domain,
 		Target:               req.Target,
-		Port:                 req.Port,
+		Port:                 port,
 		Enabled:              req.Enabled,
 		SSLOnly:              req.SSLOnly,
 		CDNEnabled:           req.CDNEnabled,
 		CDNPreset:            req.CDNPreset,
 		CDNDefaultTTLSeconds: req.CDNDefaultTTLSeconds,
+		// HTTP Host头部优化
+		OptimizeHostHeader: req.OptimizeHostHeader,
 
 		// 访问控制字段
 		AuthEnabled:        req.AuthEnabled,
@@ -234,14 +274,18 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 	case "POST":
 		// 创建新的代理规则
 		var req struct {
-			Domain               string `json:"domain"`
-			Target               string `json:"target"`
-			Port                 int    `json:"port"`
-			Enabled              bool   `json:"enabled"`
-			SSLOnly              bool   `json:"ssl_only"`
+			Domain  string `json:"domain"`
+			Target  string `json:"target"`
+			Port    int    `json:"port"`
+			Enabled bool   `json:"enabled"`
+			SSLOnly bool   `json:"ssl_only"`
+			// 类CDN设置
+			CDNModeEnabled       bool   `json:"cdn_mode_enabled"`
 			CDNEnabled           bool   `json:"cdn_enabled"`
 			CDNPreset            string `json:"cdn_preset"`
 			CDNDefaultTTLSeconds int    `json:"cdn_ttl_seconds"`
+			// HTTP Host头部优化
+			OptimizeHostHeader bool `json:"optimize_host_header"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -262,15 +306,23 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		// 自动解析端口号
+		port := req.Port
+		if port == 0 {
+			port = parsePortFromTarget(req.Target)
+		}
+
 		newRule := config.ProxyRule{
 			Domain:               req.Domain,
 			Target:               req.Target,
-			Port:                 req.Port,
+			Port:                 port,
 			Enabled:              req.Enabled,
 			SSLOnly:              req.SSLOnly,
 			CDNEnabled:           req.CDNEnabled,
 			CDNPreset:            req.CDNPreset,
 			CDNDefaultTTLSeconds: req.CDNDefaultTTLSeconds,
+			// HTTP Host头部优化
+			OptimizeHostHeader: req.OptimizeHostHeader,
 		}
 
 		s.config.Proxy.Rules = append(s.config.Proxy.Rules, newRule)
@@ -291,14 +343,24 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 	case "PUT":
 		// 更新代理规则
 		var req struct {
-			Domain               string `json:"domain"`
-			Target               string `json:"target"`
-			Port                 int    `json:"port"`
-			Enabled              bool   `json:"enabled"`
-			SSLOnly              bool   `json:"ssl_only"`
+			Domain  string `json:"domain"`
+			Target  string `json:"target"`
+			Port    int    `json:"port"`
+			Enabled bool   `json:"enabled"`
+			SSLOnly bool   `json:"ssl_only"`
+			// 类CDN设置
+			CDNModeEnabled       bool   `json:"cdn_mode_enabled"`
 			CDNEnabled           bool   `json:"cdn_enabled"`
 			CDNPreset            string `json:"cdn_preset"`
 			CDNDefaultTTLSeconds int    `json:"cdn_ttl_seconds"`
+			// HTTP Host头部优化
+			OptimizeHostHeader bool `json:"optimize_host_header"`
+
+			// 访问控制字段
+			AuthEnabled        bool                   `json:"auth_enabled"`
+			AuthUsers          []config.ProxyAuthUser `json:"auth_users"`
+			AuthSessionTimeout int                    `json:"auth_session_timeout"`
+			AuthCookieDomain   string                 `json:"auth_cookie_domain"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -314,13 +376,27 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 		// 查找并更新规则
 		for i, rule := range s.config.Proxy.Rules {
 			if rule.Domain == domain {
+				// 自动解析端口号
+				port := req.Port
+				if port == 0 {
+					port = parsePortFromTarget(req.Target)
+				}
+
 				s.config.Proxy.Rules[i].Target = req.Target
-				s.config.Proxy.Rules[i].Port = req.Port
+				s.config.Proxy.Rules[i].Port = port
 				s.config.Proxy.Rules[i].Enabled = req.Enabled
 				s.config.Proxy.Rules[i].SSLOnly = req.SSLOnly
 				s.config.Proxy.Rules[i].CDNEnabled = req.CDNEnabled
 				s.config.Proxy.Rules[i].CDNPreset = req.CDNPreset
 				s.config.Proxy.Rules[i].CDNDefaultTTLSeconds = req.CDNDefaultTTLSeconds
+				// HTTP Host头部优化
+				s.config.Proxy.Rules[i].OptimizeHostHeader = req.OptimizeHostHeader
+
+				// 访问控制字段
+				s.config.Proxy.Rules[i].AuthEnabled = req.AuthEnabled
+				s.config.Proxy.Rules[i].AuthUsers = req.AuthUsers
+				s.config.Proxy.Rules[i].AuthSessionTimeout = req.AuthSessionTimeout
+				s.config.Proxy.Rules[i].AuthCookieDomain = req.AuthCookieDomain
 
 				// 保存配置
 				if err := s.config.Save(s.config.ConfigFile); err != nil {

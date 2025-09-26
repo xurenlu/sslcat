@@ -406,6 +406,11 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/auth/login", s.handleAPIAuthLogin)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/auth/logout", s.handleAPIAuthLogout)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/auth/me", s.handleAPIAuthMe)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/auth/change-password", s.handleAPIChangePassword)
+
+	// 用户管理 API
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/users", s.handleAPIUsers)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/users/", s.handleAPIUser)
 
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/stats", s.handleAPIStats)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/proxy-rules", s.handleAPIProxyRules)
@@ -449,6 +454,13 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/tls-fingerprints", s.handleAPITLSFingerprints)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/attacks", s.handleAPISecurityAttacks)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/cloud-storage/detect", s.handleAPICloudStorageDetect)
+
+	// CDN缓存API
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/cdn/stats", s.handleAPICDNStats)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/cdn/objects", s.handleAPICDNObjects)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/cdn/purge", s.handleAPICDNPurge)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/cdn/rules", s.handleAPICDNRules)
+
 	// Prometheus 指标
 	s.mux.HandleFunc("/metrics", s.handleMetrics)
 	// 图形验证码
