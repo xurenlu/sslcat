@@ -28,7 +28,7 @@ func main() {
 	dbPath := filepath.Join(dataDir, "users.db")
 
 	// 打开数据库
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		fmt.Printf("打开数据库失败: %v\n", err)
 		os.Exit(1)
