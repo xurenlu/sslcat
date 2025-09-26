@@ -58,10 +58,17 @@ func NewUserManager(log UserLogger, dataDir string) (*UserManager, error) {
 		return nil, fmt.Errorf("创建数据目录失败: %v", err)
 	}
 
-	db, err := sql.Open("sqlite", dbPath)
+	// 配置SQLite连接参数，启用WAL模式提高并发性能
+	dsn := fmt.Sprintf("%s?_journal_mode=WAL&_synchronous=NORMAL&_cache_size=10000&_timeout=30000&_busy_timeout=30000", dbPath)
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("打开数据库失败: %v", err)
 	}
+
+	// 配置连接池参数
+	db.SetMaxOpenConns(10)                 // 最大打开连接数
+	db.SetMaxIdleConns(5)                  // 最大空闲连接数
+	db.SetConnMaxLifetime(5 * time.Minute) // 连接最大生存时间
 
 	manager := &UserManager{
 		db:     db,
@@ -359,10 +366,31 @@ func (um *UserManager) LogUserAction(username, action, resource, details, ipAddr
 	VALUES (?, ?, ?, ?, ?, ?)
 	`
 
-	_, err := um.db.Exec(insertSQL, username, action, resource, details, ipAddress, userAgent)
-	if err != nil {
+	// 使用重试机制处理数据库锁定问题
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		_, err := um.db.Exec(insertSQL, username, action, resource, details, ipAddress, userAgent)
+		if err == nil {
+			return // 成功，退出重试循环
+		}
+
+		// 检查是否是SQLite_BUSY错误
+		if err.Error() == "database is locked" ||
+			err.Error() == "database is locked (5)" ||
+			err.Error() == "SQLITE_BUSY" {
+			um.log.Debugf("数据库锁定，重试 %d/%d: %v", i+1, maxRetries, err)
+			// 指数退避重试
+			time.Sleep(time.Duration(i+1) * 100 * time.Millisecond)
+			continue
+		}
+
+		// 其他错误直接记录并退出
 		um.log.Warnf("记录用户操作日志失败: %v", err)
+		return
 	}
+
+	// 所有重试都失败了
+	um.log.Warnf("记录用户操作日志失败，已重试 %d 次", maxRetries)
 }
 
 // GetUserAuditLogs 获取用户操作日志
@@ -451,6 +479,32 @@ func (um *UserManager) generateSessionID() string {
 	bytes := make([]byte, 16)
 	rand.Read(bytes)
 	return hex.EncodeToString(bytes)
+}
+
+// CheckDatabaseHealth 检查数据库健康状态
+func (um *UserManager) CheckDatabaseHealth() error {
+	// 执行简单的查询来检查数据库连接
+	_, err := um.db.Exec("SELECT 1")
+	if err != nil {
+		um.log.Errorf("数据库健康检查失败: %v", err)
+		return err
+	}
+	return nil
+}
+
+// GetDatabaseStats 获取数据库统计信息
+func (um *UserManager) GetDatabaseStats() map[string]interface{} {
+	stats := um.db.Stats()
+	return map[string]interface{}{
+		"open_connections":     stats.OpenConnections,
+		"in_use":               stats.InUse,
+		"idle":                 stats.Idle,
+		"wait_count":           stats.WaitCount,
+		"wait_duration":        stats.WaitDuration.String(),
+		"max_idle_closed":      stats.MaxIdleClosed,
+		"max_idle_time_closed": stats.MaxIdleTimeClosed,
+		"max_lifetime_closed":  stats.MaxLifetimeClosed,
+	}
 }
 
 // Close 关闭数据库连接

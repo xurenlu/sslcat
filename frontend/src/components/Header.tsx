@@ -14,8 +14,10 @@ import {
   MenuItem,
   Avatar,
 } from '@chakra-ui/react'
-import { FiMenu, FiUser, FiLogOut } from 'react-icons/fi'
+import { FiMenu, FiUser, FiLogOut, FiLock } from 'react-icons/fi'
 import { useAuth } from '../contexts/AuthContext'
+import { useConfig, buildPath } from '../contexts/ConfigContext'
+import { Link as RouterLink } from 'react-router-dom'
 
 interface HeaderProps {
   onMenuClick: () => void
@@ -24,6 +26,7 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const showMobileMenu = useBreakpointValue({ base: true, md: false })
   const { user, logout } = useAuth()
+  const { adminPrefix } = useConfig()
 
   return (
     <Box
@@ -64,8 +67,12 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                 {user.role}
               </MenuButton>
               <MenuList>
-                <MenuItem icon={<FiUser />}>
-                  个人设置
+                <MenuItem 
+                  icon={<FiLock />}
+                  as={RouterLink}
+                  to={buildPath(adminPrefix, '/change-password')}
+                >
+                  修改密码
                 </MenuItem>
                 <MenuItem icon={<FiLogOut />} onClick={logout}>
                   退出登录

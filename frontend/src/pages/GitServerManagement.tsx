@@ -848,7 +848,11 @@ const GitServerManagement: React.FC = () => {
                 <Input
                   value={config.defaultBranch}
                   onChange={(e) => setConfig({ ...config, defaultBranch: e.target.value })}
+                  placeholder="main"
                 />
+                <Text fontSize="sm" color="gray.500" mt={1}>
+                  新Git应用创建时的默认分支名称
+                </Text>
               </FormControl>
 
               <FormControl display="flex" alignItems="center">

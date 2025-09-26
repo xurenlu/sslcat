@@ -17,6 +17,9 @@ import Security from './pages/Security'
 import SitesManagement from './pages/SitesManagement'
 import DNSManagement from './pages/DNSManagement'
 import GitServerManagement from './pages/GitServerManagement'
+import UserManagement from './pages/UserManagement'
+import ChangePassword from './pages/ChangePassword'
+import CDNManagement from './pages/CDNManagement'
 
 const AppRoutes: React.FC = () => {
   const { adminPrefix, isLoading, error } = useConfig()
@@ -101,6 +104,21 @@ const AppRoutes: React.FC = () => {
       <Route path={`${adminPrefix}/notifications`} element={
         <AuthGuard>
           <Notifications />
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/users`} element={
+        <AuthGuard>
+          <UserManagement />
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/change-password`} element={
+        <AuthGuard>
+          <ChangePassword />
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/cdn`} element={
+        <AuthGuard>
+          <CDNManagement />
         </AuthGuard>
       } />
     </Routes>

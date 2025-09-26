@@ -31,12 +31,15 @@ interface ProxyAuthUser {
 interface ProxyRuleForm {
   domain: string
   target: string
-  port: string
   enabled: boolean
   ssl_only: boolean
+  // 类CDN设置
+  cdn_mode_enabled: boolean
   cdn_enabled: boolean
   cdn_preset: string
   cdn_ttl_seconds: number
+  // HTTP Host头部优化
+  optimize_host_header: boolean
   // 访问控制字段
   auth_enabled: boolean
   auth_users: ProxyAuthUser[]
@@ -52,12 +55,15 @@ const ProxyAdd: React.FC = () => {
   const [formData, setFormData] = useState<ProxyRuleForm>({
     domain: '',
     target: '',
-    port: '',
     enabled: true,
     ssl_only: true,
+    // 类CDN设置
+    cdn_mode_enabled: false,
     cdn_enabled: false,
     cdn_preset: '',
-    cdn_ttl_seconds: 3600,
+    cdn_ttl_seconds: 259200, // 默认72小时
+    // HTTP Host头部优化
+    optimize_host_header: false,
     // 访问控制字段
     auth_enabled: false,
     auth_users: [{ username: '', password: '' }],
@@ -111,12 +117,15 @@ const ProxyAdd: React.FC = () => {
         body: JSON.stringify({
           domain: formData.domain,
           target: formData.target,
-          port: parseInt(formData.port) || 0,
           enabled: formData.enabled,
           ssl_only: formData.ssl_only,
+          // 类CDN设置
+          cdn_mode_enabled: formData.cdn_mode_enabled,
           cdn_enabled: formData.cdn_enabled,
           cdn_preset: formData.cdn_preset,
           cdn_ttl_seconds: formData.cdn_ttl_seconds,
+          // HTTP Host头部优化
+          optimize_host_header: formData.optimize_host_header,
           // 访问控制字段
           auth_enabled: formData.auth_enabled,
           auth_users: formData.auth_users.filter(user => user.username.trim() && user.password.trim()),
@@ -211,20 +220,7 @@ const ProxyAdd: React.FC = () => {
                       size="lg"
                     />
                     <Text fontSize="sm" color="gray.500" mt={1}>
-                      代理转发的目标地址，支持 HTTP/HTTPS 协议
-                    </Text>
-                  </FormControl>
-
-                  <FormControl>
-                    <FormLabel>端口（可选）</FormLabel>
-                    <Input
-                      value={formData.port}
-                      onChange={(e) => handleInputChange('port', e.target.value)}
-                      placeholder="8080"
-                      size="lg"
-                    />
-                    <Text fontSize="sm" color="gray.500" mt={1}>
-                      如果目标地址已包含端口，此字段可留空
+                      代理转发的完整目标地址，包含协议、主机和端口
                     </Text>
                   </FormControl>
                 </VStack>
@@ -276,56 +272,92 @@ const ProxyAdd: React.FC = () => {
 
               <Divider />
 
-              {/* CDN 设置 */}
+              {/* 类CDN设置 */}
               <Box>
                 <Heading size="md" mb={4} color="gray.700">
-                  CDN 缓存设置
+                  类CDN设置
                 </Heading>
                 
                 <VStack spacing={4}>
                   <FormControl>
                     <HStack justify="space-between">
                       <Box>
-                        <FormLabel mb={1}>启用 CDN 缓存</FormLabel>
+                        <FormLabel mb={1}>启用类CDN功能</FormLabel>
                         <Text fontSize="sm" color="gray.500">
-                          启用静态资源缓存以提升性能
+                          启用CDN缓存和Host头部优化功能
                         </Text>
                       </Box>
                       <Switch
-                        isChecked={formData.cdn_enabled}
-                        onChange={(e) => handleInputChange('cdn_enabled', e.target.checked)}
+                        isChecked={formData.cdn_mode_enabled}
+                        onChange={(e) => handleInputChange('cdn_mode_enabled', e.target.checked)}
                         size="lg"
                       />
                     </HStack>
                   </FormControl>
 
-                  {formData.cdn_enabled && (
+                  {formData.cdn_mode_enabled && (
                     <>
                       <FormControl>
-                        <FormLabel>缓存预设</FormLabel>
-                        <Input
-                          value={formData.cdn_preset}
-                          onChange={(e) => handleInputChange('cdn_preset', e.target.value)}
-                          placeholder="default"
-                          size="lg"
-                        />
-                        <Text fontSize="sm" color="gray.500" mt={1}>
-                          缓存策略预设名称
-                        </Text>
+                        <HStack justify="space-between">
+                          <Box>
+                            <FormLabel mb={1}>启用 CDN 缓存</FormLabel>
+                            <Text fontSize="sm" color="gray.500">
+                              启用静态资源缓存以提升性能
+                            </Text>
+                          </Box>
+                          <Switch
+                            isChecked={formData.cdn_enabled}
+                            onChange={(e) => handleInputChange('cdn_enabled', e.target.checked)}
+                            size="lg"
+                          />
+                        </HStack>
                       </FormControl>
 
+                      {formData.cdn_enabled && (
+                        <>
+                          <FormControl>
+                            <FormLabel>缓存预设</FormLabel>
+                            <Input
+                              value={formData.cdn_preset}
+                              onChange={(e) => handleInputChange('cdn_preset', e.target.value)}
+                              placeholder="default"
+                              size="lg"
+                            />
+                            <Text fontSize="sm" color="gray.500" mt={1}>
+                              缓存策略预设名称
+                            </Text>
+                          </FormControl>
+
+                          <FormControl>
+                            <FormLabel>缓存时间（秒）</FormLabel>
+                            <Input
+                              type="number"
+                              value={formData.cdn_ttl_seconds}
+                              onChange={(e) => handleInputChange('cdn_ttl_seconds', parseInt(e.target.value) || 259200)}
+                              placeholder="259200"
+                              size="lg"
+                            />
+                            <Text fontSize="sm" color="gray.500" mt={1}>
+                              静态资源缓存时间，默认 72 小时
+                            </Text>
+                          </FormControl>
+                        </>
+                      )}
+
                       <FormControl>
-                        <FormLabel>缓存时间（秒）</FormLabel>
-                        <Input
-                          type="number"
-                          value={formData.cdn_ttl_seconds}
-                          onChange={(e) => handleInputChange('cdn_ttl_seconds', parseInt(e.target.value) || 0)}
-                          placeholder="3600"
-                          size="lg"
-                        />
-                        <Text fontSize="sm" color="gray.500" mt={1}>
-                          静态资源缓存时间，默认 1 小时
-                        </Text>
+                        <HStack justify="space-between">
+                          <Box>
+                            <FormLabel mb={1}>优化HTTP Host头部</FormLabel>
+                            <Text fontSize="sm" color="gray.500">
+                              使用目标地址域名作为Host头部，解决防盗链问题
+                            </Text>
+                          </Box>
+                          <Switch
+                            isChecked={formData.optimize_host_header}
+                            onChange={(e) => handleInputChange('optimize_host_header', e.target.checked)}
+                            size="lg"
+                          />
+                        </HStack>
                       </FormControl>
                     </>
                   )}
