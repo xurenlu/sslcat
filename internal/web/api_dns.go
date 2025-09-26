@@ -21,11 +21,19 @@ func (s *Server) handleAPIDNSProviders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 获取可用的DNS服务商
-	availableProviders := []string{"cloudflare", "aliyun", "tencent", "aws", "godaddy", "custom"}
+	availableProviders := []string{"cloudflare", "aliyun", "tencent", "godaddy", "namecheap", "aws", "custom"}
 
 	// 获取已配置的服务商
 	configuredProviders := make([]map[string]interface{}, 0, len(s.config.SSL.DNSProviders))
 	for _, provider := range s.config.SSL.DNSProviders {
+		// 获取域名数量
+		domainCount := 0
+		if provider.Enabled {
+			if domains, err := s.sslManager.GetDNSProviderDomains(provider.Name); err == nil {
+				domainCount = len(domains)
+			}
+		}
+
 		configuredProviders = append(configuredProviders, map[string]interface{}{
 			"name":       provider.Name,
 			"type":       provider.Type,
@@ -35,6 +43,7 @@ func (s *Server) handleAPIDNSProviders(w http.ResponseWriter, r *http.Request) {
 			"has_secret": provider.APISecret != "",
 			"zone_id":    provider.ZoneID,
 			"endpoint":   provider.Endpoint,
+			"domains":    domainCount,
 		})
 	}
 
@@ -82,7 +91,7 @@ func (s *Server) handleAPIDNSProvidersPost(w http.ResponseWriter, r *http.Reques
 	}
 
 	// 验证服务商类型
-	validTypes := []string{"cloudflare", "aliyun", "tencent", "aws", "godaddy", "custom"}
+	validTypes := []string{"cloudflare", "aliyun", "tencent", "godaddy", "namecheap", "aws", "custom"}
 	validType := false
 	for _, t := range validTypes {
 		if req.Type == t {

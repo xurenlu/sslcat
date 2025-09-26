@@ -97,7 +97,7 @@ const DNSManagement: React.FC = () => {
           name: provider.name,
           type: provider.type,
           status: provider.enabled ? 'connected' : 'disabled',
-          domains: 0, // 暂时设为0，因为后端没有提供这个信息
+          domains: provider.domains || 0, // 使用后端提供的域名数量
           lastSync: new Date().toLocaleDateString('zh-CN')
         }))
         

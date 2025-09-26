@@ -1236,10 +1236,12 @@ func (m *Manager) initializeDNSProviders() {
 			dnsProvider = NewAliyunProvider(provider.APIKey, provider.APISecret, m.log)
 		case "tencent":
 			dnsProvider = NewTencentProvider(provider.APIKey, provider.APISecret, m.log)
-		case "aws":
-			dnsProvider = NewAWSRoute53Provider(provider.APIKey, provider.APISecret, "us-east-1", m.log)
 		case "godaddy":
 			dnsProvider = NewGoDaddyProvider(provider.APIKey, provider.APISecret, m.log)
+		case "namecheap":
+			dnsProvider = NewNamecheapProvider(provider.APIKey, provider.APISecret, provider.ZoneID, m.log)
+		case "aws":
+			dnsProvider = NewAWSRoute53Provider(provider.APIKey, provider.APISecret, "us-east-1", m.log)
 		case "custom":
 			dnsProvider = NewCustomProvider(provider.Endpoint, provider.APIKey, m.log)
 		default:
@@ -1483,26 +1485,42 @@ func (m *Manager) ValidateDNSProvider(providerName string) error {
 func (m *Manager) GetDNSProviderHealth() map[string]string {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	return m.dnsManager.GetProviderHealth(ctx)
+	return m.dnsManager.GetDNSProviderHealth(ctx)
 }
 
 // TestDNSProvider 测试DNS提供程序连接
 func (m *Manager) TestDNSProvider(name string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	return m.dnsManager.TestProvider(ctx, name)
+	return m.dnsManager.TestProvider(name)
 }
 
 // CreateDNSChallenge 创建DNS挑战记录
 func (m *Manager) CreateDNSChallenge(domain, recordName, recordValue, providerName string) (*DNSChallengeInfo, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	return m.dnsManager.CreateDNSChallenge(ctx, providerName, domain, recordName, recordValue)
+	return m.dnsManager.CreateDNSChallenge(ctx, domain, recordName, recordValue, providerName)
 }
 
 // CreateDNSChallengeWithFailover 使用故障转移创建DNS挑战记录
-func (m *Manager) CreateDNSChallengeWithFailover(domain, recordName, recordValue string) (*DNSChallengeInfo, error) {
+func (m *Manager) CreateDNSChallengeWithFailover(domain, recordName, recordValue string) (interface{}, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	return m.dnsManager.CreateDNSChallengeWithFailover(ctx, domain, recordName, recordValue)
+}
+
+// GetDNSProviderDomains 获取DNS提供商的域名列表
+func (m *Manager) GetDNSProviderDomains(providerName string) ([]DomainInfo, error) {
+	provider, err := m.dnsManager.GetProvider(providerName)
+	if err != nil {
+		return nil, fmt.Errorf("DNS provider not found: %s", providerName)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	domains, err := provider.ListDomains(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get domains from provider %s: %w", providerName, err)
+	}
+
+	return domains, nil
 }
