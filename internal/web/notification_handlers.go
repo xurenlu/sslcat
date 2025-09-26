@@ -179,14 +179,7 @@ func (s *Server) handleNotificationTestChannels(w http.ResponseWriter, r *http.R
 
 // handleNotificationConfig 获取通知配置
 func (s *Server) handleNotificationConfig(w http.ResponseWriter, r *http.Request) {
-	if !s.checkAuth(w, r) {
-		return
-	}
-
-	// 检查权限
-	currentUser := s.getCurrentUser(r)
-	if currentUser == nil || (currentUser.Role != RoleSuperAdmin && currentUser.Role != RoleAdmin) {
-		http.Error(w, "权限不足", http.StatusForbidden)
+	if !s.authorizeAPI(w, r, false) { // 需要写权限
 		return
 	}
 
@@ -271,7 +264,7 @@ func (s *Server) handleNotificationConfig(w http.ResponseWriter, r *http.Request
 		}
 
 		// 保存配置到文件
-		if err := s.config.Save(""); err != nil {
+		if err := s.config.Save(s.config.ConfigFile); err != nil {
 			http.Error(w, fmt.Sprintf("保存配置失败: %v", err), http.StatusInternalServerError)
 			return
 		}

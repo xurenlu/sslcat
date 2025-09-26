@@ -425,6 +425,7 @@ func (s *Server) setupRoutes() {
 
 	// DNS API路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/providers", s.handleAPIDNSProviders)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/provider", s.handleAPIDNSProvidersPost)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/providers/manage", s.handleAPIDNSProvidersPost)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/providers/delete", s.handleAPIDNSProvidersDelete)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/validate", s.handleAPIDNSValidate)

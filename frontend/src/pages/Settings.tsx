@@ -76,6 +76,42 @@ const Settings: React.FC = () => {
     }))
   }, [adminPrefix])
 
+  // 加载通知配置
+  useEffect(() => {
+    const loadNotificationConfig = async () => {
+      try {
+        const response = await fetch(`${adminPrefix}/api/notifications/config`, {
+          method: 'GET',
+          credentials: 'include',
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && data.config) {
+            const config = data.config
+            setSettings(prev => ({
+              ...prev,
+              enableNotifications: config.enabled || false,
+              smtpHost: config.channels?.email?.smtp_host || '',
+              smtpPort: config.channels?.email?.smtp_port?.toString() || '587',
+              smtpUsername: config.channels?.email?.username || '',
+              smtpPassword: config.channels?.email?.password || '',
+              smtpFrom: config.channels?.email?.from || '',
+              smtpTo: config.channels?.email?.to?.join(',') || '',
+              smtpUseTLS: config.channels?.email?.use_tls || true,
+              slackWebhook: config.channels?.webhook?.url || '',
+              webhookUrl: config.channels?.webhook?.url || '',
+            }))
+          }
+        }
+      } catch (error) {
+        console.error('加载通知配置失败:', error)
+      }
+    }
+
+    loadNotificationConfig()
+  }, [adminPrefix])
+
   const handleInputChange = (field: string, value: string | boolean) => {
     setSettings(prev => ({
       ...prev,
