@@ -134,6 +134,8 @@ sslcat-linux-amd64
 withssl-source.tar.gz
 sslcat_*.tar.gz
 *.tar.gz
+sslcat-linux-amd64
+sslcat-test
 
 # Image files
 *.png
