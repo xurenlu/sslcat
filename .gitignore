@@ -125,3 +125,23 @@ test.conf
 sslcat
 /build/
 /dist/
+
+# Compiled binaries (should never be committed)
+withssl-linux-amd64
+withssl-test
+sslcat-test
+sslcat-linux-amd64
+withssl-source.tar.gz
+sslcat_*.tar.gz
+*.tar.gz
+
+# Image files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ico
+
+# Binary files
+*.bin
+*.exe
