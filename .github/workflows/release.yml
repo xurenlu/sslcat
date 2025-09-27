@@ -25,11 +25,6 @@ jobs:
             arch_tag: linux-amd64
             archive: tar.gz
             ext: ""
-          - goos: linux
-            goarch: arm64
-            arch_tag: linux-arm64
-            archive: tar.gz
-            ext: ""
           - goos: darwin
             goarch: amd64
             arch_tag: darwin-amd64
@@ -84,9 +79,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc libc6-dev
           # 为不同平台安装交叉编译工具链
-          if [ "${{ matrix.goos }}" = "linux" ] && [ "${{ matrix.goarch }}" = "arm64" ]; then
-            sudo apt-get install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross
-          elif [ "${{ matrix.goos }}" = "darwin" ]; then
+          if [ "${{ matrix.goos }}" = "darwin" ]; then
             # macOS 交叉编译需要 osxcross
             sudo apt-get install -y clang llvm-dev libxml2-dev uuid-dev libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev libncurses5-dev libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev
             # 安装 osxcross
@@ -105,9 +98,6 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           # 根据平台设置 CGO 和编译器
           CGO_ENABLED: ${{ matrix.goos == 'linux' && '1' || '0' }}
-          # Linux ARM64 交叉编译环境
-          CC_aarch64: aarch64-linux-gnu-gcc
-          CXX_aarch64: aarch64-linux-gnu-g++
           # Windows 交叉编译环境
           CC_windows: x86_64-w64-mingw32-gcc
           CXX_windows: x86_64-w64-mingw32-g++
