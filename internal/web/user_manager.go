@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/xurenlu/sslcat/internal/database"
 	"golang.org/x/crypto/bcrypt"
 )
 
