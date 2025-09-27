@@ -83,12 +83,19 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc libc6-dev
+          # 为 ARM64 交叉编译安装额外的工具链
+          if [ "${{ matrix.goarch }}" = "arm64" ]; then
+            sudo apt-get install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross
+          fi
 
       - name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 1
+          # 为 ARM64 设置交叉编译环境
+          CC_aarch64: aarch64-linux-gnu-gcc
+          CXX_aarch64: aarch64-linux-gnu-g++
         run: |
           mkdir -p build artifacts
           VERSION="${GITHUB_REF_NAME}"
