@@ -149,7 +149,7 @@ func main() {
 	securityManager := security.NewManager(cfg)
 	cdnCache := cache.NewCDNCache(cfg)
 	cdnCache.StartCleaner()
-	proxyManager := proxy.NewManager(cfg, sslManager, securityManager, cdnCache)
+	proxyManager := proxy.NewManager(cfg, sslManager, securityManager, cdnCache, version)
 
 	// 初始化 Runner 模块
 	gitServer := runner.NewGitServer(cfg)

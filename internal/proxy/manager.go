@@ -36,16 +36,18 @@ type Manager struct {
 	cacheMutex      sync.RWMutex
 	cdnCache        *cache.CDNCache
 	log             *logrus.Entry
+	version         string
 }
 
 // NewManager 创建代理管理器
-func NewManager(cfg *config.Config, sslMgr *ssl.Manager, secMgr *security.Manager, cdn *cache.CDNCache) *Manager {
+func NewManager(cfg *config.Config, sslMgr *ssl.Manager, secMgr *security.Manager, cdn *cache.CDNCache, version string) *Manager {
 	return &Manager{
 		config:          cfg,
 		sslManager:      sslMgr,
 		securityManager: secMgr,
 		proxyCache:      make(map[string]*httputil.ReverseProxy),
 		cdnCache:        cdn,
+		version:         version,
 		log: logrus.WithFields(logrus.Fields{
 			"component": "proxy_manager",
 		}),
@@ -200,7 +202,7 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 		resp.Header.Del("X-Frame-Options")
 		resp.Header.Del("X-Content-Type-Options")
 		// 添加代理标识
-		resp.Header.Set("X-Proxy-By", "SSLcat")
+		resp.Header.Set("X-Proxy-By", "SSLcat/"+m.version)
 		// CDN 缓存落盘（全局或域名启用）
 		// 使用之前定义的cdnEnabled变量
 		if m.cdnCache != nil && cdnEnabled {
