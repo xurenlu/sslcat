@@ -54,7 +54,7 @@ build_binary() {
     # 设置构建参数
     export GOOS=linux
     export GOARCH=amd64
-    export CGO_ENABLED=0
+    export CGO_ENABLED=1
     
     # 构建
     go build -trimpath -ldflags "-s -w -X main.version=$VERSION" -o "$BINARY_NAME" .
