@@ -23,8 +23,8 @@ import (
 	"github.com/xurenlu/sslcat/internal/ssl"
 	"github.com/xurenlu/sslcat/internal/web"
 
-	_ "github.com/xurenlu/sslcat/internal/database"
 	"github.com/sirupsen/logrus"
+	_ "github.com/xurenlu/sslcat/internal/database"
 )
 
 var (
