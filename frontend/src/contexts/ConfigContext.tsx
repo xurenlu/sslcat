@@ -23,31 +23,41 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
       setIsLoading(true)
       setError(null)
       
-      // 尝试从当前路径推断前缀
+      // 首先尝试从当前路径推断前缀
       const currentPath = window.location.pathname
       const pathSegments = currentPath.split('/').filter(Boolean)
+      let detectedPrefix = '/sslcat-panel' // 默认值
       
       if (pathSegments.length > 0) {
         // 如果当前路径包含前缀，使用它
-        const detectedPrefix = '/' + pathSegments[0]
+        detectedPrefix = '/' + pathSegments[0]
         setAdminPrefix(detectedPrefix)
-      } else {
-        // 否则尝试从API获取配置
-        try {
-          const response = await fetch('/api/config/prefix')
-          if (response.ok) {
-            const data = await response.json()
-            setAdminPrefix(data.adminPrefix || '/sslcat-panel')
+      }
+      
+      // 然后尝试从API获取最新配置进行验证/更新
+      try {
+        const response = await fetch(`${detectedPrefix}/api/settings`)
+        if (response.ok) {
+          const data = await response.json()
+          const serverPrefix = data.admin_prefix || detectedPrefix
+          // 如果服务器返回的前缀与检测到的不同，更新它
+          if (serverPrefix !== detectedPrefix) {
+            console.log('Server prefix differs from detected:', { detected: detectedPrefix, server: serverPrefix })
+            setAdminPrefix(serverPrefix)
           }
-        } catch (apiError) {
-          // API调用失败，使用默认值
-          console.warn('Failed to fetch config from API, using default prefix')
-          setAdminPrefix('/sslcat-panel')
+        } else {
+          // 如果API调用失败，但路径检测成功，继续使用检测到的前缀
+          console.warn('Failed to fetch config from API, using detected prefix:', detectedPrefix)
         }
+      } catch (apiError) {
+        // API调用失败，使用检测到的前缀或默认值
+        console.warn('Failed to fetch config from API, using fallback prefix:', detectedPrefix)
+        setAdminPrefix(detectedPrefix)
       }
     } catch (err) {
       console.error('Failed to fetch config:', err)
       setError(err instanceof Error ? err.message : 'Unknown error')
+      setAdminPrefix('/sslcat-panel') // 发生错误时使用默认值
     } finally {
       setIsLoading(false)
     }

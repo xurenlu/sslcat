@@ -27,7 +27,7 @@ import { useConfig } from '../contexts/ConfigContext'
 import { useTranslation } from '../hooks/useLanguage'
 
 const Settings: React.FC = () => {
-  const { adminPrefix } = useConfig()
+  const { adminPrefix, refreshConfig } = useConfig()
   const t = useTranslation()
   const [settings, setSettings] = useState({
     // 基础设置
@@ -152,10 +152,15 @@ const Settings: React.FC = () => {
           isClosable: true,
         })
         
-        // 如果adminPrefix发生变化，刷新页面以使用新的前缀
+        // 如果adminPrefix发生变化，刷新配置并重定向到新的前缀
         if (settings.adminPrefix !== adminPrefix) {
+          // 先刷新配置
+          await refreshConfig()
+          // 然后重定向到新的URL
           setTimeout(() => {
-            window.location.href = settings.adminPrefix + '/settings'
+            const newUrl = `${settings.adminPrefix}/settings`
+            console.log('Redirecting to new admin prefix:', newUrl)
+            window.location.href = newUrl
           }, 1000)
         }
       } else {
