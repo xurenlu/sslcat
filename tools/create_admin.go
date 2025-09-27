@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"golang.org/x/crypto/bcrypt"
 	_ "github.com/mattn/go-sqlite3"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func main() {

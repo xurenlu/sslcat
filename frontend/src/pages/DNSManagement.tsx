@@ -80,7 +80,17 @@ const DNSManagement: React.FC = () => {
   const refreshData = async () => {
     setLoading(true)
     try {
-      // 获取DNS提供商（DNS记录API暂时不存在，使用提供商API）
+      // 首先触发缓存刷新
+      const refreshResponse = await fetch(buildApiPath(adminPrefix, '/api/dns/refresh'), {
+        method: 'POST',
+        credentials: 'include',
+      })
+
+      if (!refreshResponse.ok) {
+        console.warn('缓存刷新失败，继续使用现有缓存数据')
+      }
+
+      // 然后获取DNS提供商数据（从缓存读取）
       const providersResponse = await fetch(buildApiPath(adminPrefix, '/api/dns/providers'), {
         method: 'GET',
         credentials: 'include',
@@ -102,6 +112,15 @@ const DNSManagement: React.FC = () => {
         }))
         
         setProviders(formattedProviders)
+        
+        // 显示刷新成功提示
+        toast({
+          title: '刷新成功',
+          description: 'DNS 提供商数据已更新',
+          status: 'success',
+          duration: 2000,
+          isClosable: true,
+        })
         
       } else {
         throw new Error('获取DNS数据失败')

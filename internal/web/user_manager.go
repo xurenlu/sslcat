@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"golang.org/x/crypto/bcrypt"
 	_ "github.com/mattn/go-sqlite3"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // User 用户结构
@@ -250,13 +250,22 @@ func (um *UserManager) GetAllUsers() ([]*User, error) {
 	var users []*User
 	for rows.Next() {
 		user := &User{}
+		var lastLoginAt sql.NullTime
 		err := rows.Scan(
 			&user.ID, &user.Username, &user.Role, &user.Email,
-			&user.IsActive, &user.CreatedAt, &user.LastLoginAt, &user.CreatedBy,
+			&user.IsActive, &user.CreatedAt, &lastLoginAt, &user.CreatedBy,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("扫描用户数据失败: %v", err)
 		}
+
+		// 处理可能为 NULL 的 last_login_at 字段
+		if lastLoginAt.Valid {
+			user.LastLoginAt = lastLoginAt.Time
+		} else {
+			user.LastLoginAt = time.Time{} // 零值时间
+		}
+
 		users = append(users, user)
 	}
 

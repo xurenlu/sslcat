@@ -26,12 +26,11 @@ func (s *Server) handleAPIDNSProviders(w http.ResponseWriter, r *http.Request) {
 	// 获取已配置的服务商
 	configuredProviders := make([]map[string]interface{}, 0, len(s.config.SSL.DNSProviders))
 	for _, provider := range s.config.SSL.DNSProviders {
-		// 获取域名数量
+		// 从缓存获取域名数量
 		domainCount := 0
 		if provider.Enabled {
-			if domains, err := s.sslManager.GetDNSProviderDomains(provider.Name); err == nil {
-				domainCount = len(domains)
-			}
+			cache := s.dnsCache.GetProviderCache(provider.Name)
+			domainCount = cache.DomainCount
 		}
 
 		configuredProviders = append(configuredProviders, map[string]interface{}{
@@ -138,6 +137,11 @@ func (s *Server) handleAPIDNSProvidersPost(w http.ResponseWriter, r *http.Reques
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "failed to save config"})
 		return
+	}
+
+	// 如果提供商已启用，触发缓存更新
+	if newProvider.Enabled {
+		s.dnsCache.UpdateProviderCache(newProvider.Name)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -474,4 +478,34 @@ func (s *Server) handleAPIDNSChallenge(w http.ResponseWriter, r *http.Request) {
 			"challenge": challenge,
 		})
 	}
+}
+
+// handleAPIDNSRefresh 刷新DNS缓存
+func (s *Server) handleAPIDNSRefresh(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizeAPI(w, r, true) {
+		return
+	}
+
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 获取所有启用的提供商名称
+	var enabledProviders []string
+	for _, provider := range s.config.SSL.DNSProviders {
+		if provider.Enabled {
+			enabledProviders = append(enabledProviders, provider.Name)
+		}
+	}
+
+	// 触发所有启用提供商的缓存更新
+	s.dnsCache.UpdateAllProvidersCache(enabledProviders)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":   true,
+		"message":   "DNS cache refresh initiated",
+		"providers": enabledProviders,
+	})
 }

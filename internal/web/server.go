@@ -52,6 +52,8 @@ type Server struct {
 	pendingDiff       *config.ConfigDiff
 	// Token 管理
 	tokenStore *security.TokenStore
+	// DNS 缓存管理
+	dnsCache *DNSCache
 	// 验证码管理
 	captchaManager *CaptchaManager
 	// DDoS 防护器
@@ -114,6 +116,9 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	// 初始化 TokenStore
 	server.tokenStore = security.NewTokenStore("./data/tokens.json")
 
+	// 初始化 DNS 缓存管理器
+	server.dnsCache = NewDNSCache(sslMgr)
+
 	// 初始化验证码管理器
 	server.captchaManager = NewCaptchaManager()
 	// 初始化 DDoS 防护器
@@ -169,7 +174,30 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 
 	// 启动定时检查有效LE证书对应域名是否解析到本机公网IP
 	go server.refreshLEPreferredHostLoop()
+
+	// 初始化 DNS 缓存并启动定期更新
+	server.initDNSCache()
+
 	return server
+}
+
+// initDNSCache 初始化DNS缓存并启动定期更新
+func (s *Server) initDNSCache() {
+	// 获取所有启用的DNS提供商
+	var enabledProviders []string
+	for _, provider := range s.config.SSL.DNSProviders {
+		if provider.Enabled {
+			enabledProviders = append(enabledProviders, provider.Name)
+		}
+	}
+
+	// 立即更新一次缓存
+	s.dnsCache.UpdateAllProvidersCache(enabledProviders)
+
+	// 启动定期更新（每5分钟更新一次）
+	s.dnsCache.StartPeriodicUpdate(enabledProviders, 5*time.Minute)
+
+	s.log.Infof("DNS cache initialized for %d providers: %v", len(enabledProviders), enabledProviders)
 }
 
 // initConfigWatch 计算初始哈希并启动后台监听
@@ -431,6 +459,7 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/validate", s.handleAPIDNSValidate)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/request-cert", s.handleAPIDNSRequestCert)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/config", s.handleAPIDNSConfig)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/refresh", s.handleAPIDNSRefresh)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl/upload", s.handleAPISSLUpload)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl/delete", s.handleAPISSLDelete)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/settings", s.handleAPISettings)

@@ -181,9 +181,40 @@ const UserManagement: React.FC = () => {
 
   // 添加用户
   const handleAddUser = async () => {
+    // 前端验证
+    if (!addForm.username || addForm.username.trim().length < 3) {
+      toast({
+        title: '用户名长度至少3个字符',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+      return
+    }
+
+    if (!addForm.password || addForm.password.length < 6) {
+      toast({
+        title: '密码长度至少6个字符',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+      return
+    }
+
     if (addForm.password !== addForm.confirmPassword) {
       toast({
         title: '密码确认不匹配',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+      return
+    }
+
+    if (!addForm.role) {
+      toast({
+        title: '请选择用户角色',
         status: 'error',
         duration: 3000,
         isClosable: true,
@@ -248,9 +279,30 @@ const UserManagement: React.FC = () => {
 
   // 编辑用户
   const handleEditUser = async () => {
+    // 前端验证
+    if (editForm.password && editForm.password.length < 6) {
+      toast({
+        title: '密码长度至少6个字符',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+      return
+    }
+
     if (editForm.password && editForm.password !== editForm.confirmPassword) {
       toast({
         title: '密码确认不匹配',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+      return
+    }
+
+    if (!editForm.role) {
+      toast({
+        title: '请选择用户角色',
         status: 'error',
         duration: 3000,
         isClosable: true,
@@ -513,7 +565,7 @@ const UserManagement: React.FC = () => {
                   <Input
                     value={addForm.username}
                     onChange={(e) => setAddForm({ ...addForm, username: e.target.value })}
-                    placeholder="输入用户名"
+                    placeholder="输入用户名（至少3个字符）"
                   />
                 </FormControl>
                 <FormControl isRequired>
@@ -522,7 +574,7 @@ const UserManagement: React.FC = () => {
                     type="password"
                     value={addForm.password}
                     onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
-                    placeholder="输入密码"
+                    placeholder="输入密码（至少6个字符）"
                   />
                 </FormControl>
                 <FormControl isRequired>
@@ -592,7 +644,7 @@ const UserManagement: React.FC = () => {
                     type="password"
                     value={editForm.password}
                     onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
-                    placeholder="输入新密码"
+                    placeholder="输入新密码（至少6个字符）"
                   />
                 </FormControl>
                 {editForm.password && (

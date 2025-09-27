@@ -34,13 +34,26 @@ func (p *CloudflareProvider) Validate() error {
 	if p.APIKey == "" {
 		return fmt.Errorf("Cloudflare API key is required")
 	}
-	if p.ZoneID == "" {
-		return fmt.Errorf("Cloudflare Zone ID is required")
-	}
+	// Zone ID可以为空，这样会获取所有Zone
 	return nil
 }
 
 func (p *CloudflareProvider) SetTXTRecord(ctx context.Context, domain, name, value string, ttl int) error {
+	// 如果Zone ID为空，根据域名自动查找Zone ID
+	zoneID := p.ZoneID
+	if zoneID == "" || zoneID == "YOUR_CLOUDFLARE_ZONE_ID" {
+		var err error
+		zoneID, err = p.findZoneIDByDomain(ctx, domain)
+		if err != nil {
+			return fmt.Errorf("failed to find zone ID for domain %s: %w", domain, err)
+		}
+	}
+
+	// 临时设置Zone ID
+	originalZoneID := p.ZoneID
+	p.ZoneID = zoneID
+	defer func() { p.ZoneID = originalZoneID }()
+
 	// 检查记录是否已存在
 	existingID, err := p.getRecordID(ctx, name)
 	if err != nil && err.Error() != "record not found" {
@@ -57,6 +70,21 @@ func (p *CloudflareProvider) SetTXTRecord(ctx context.Context, domain, name, val
 }
 
 func (p *CloudflareProvider) DeleteTXTRecord(ctx context.Context, domain, name string) error {
+	// 如果Zone ID为空，根据域名自动查找Zone ID
+	zoneID := p.ZoneID
+	if zoneID == "" || zoneID == "YOUR_CLOUDFLARE_ZONE_ID" {
+		var err error
+		zoneID, err = p.findZoneIDByDomain(ctx, domain)
+		if err != nil {
+			return fmt.Errorf("failed to find zone ID for domain %s: %w", domain, err)
+		}
+	}
+
+	// 临时设置Zone ID
+	originalZoneID := p.ZoneID
+	p.ZoneID = zoneID
+	defer func() { p.ZoneID = originalZoneID }()
+
 	recordID, err := p.getRecordID(ctx, name)
 	if err != nil {
 		if err.Error() == "record not found" {
@@ -96,6 +124,17 @@ func (p *CloudflareProvider) WaitForPropagation(ctx context.Context, domain, nam
 }
 
 func (p *CloudflareProvider) ListDomains(ctx context.Context) ([]DomainInfo, error) {
+	// 如果指定了Zone ID，只获取该Zone的信息
+	if p.ZoneID != "" && p.ZoneID != "YOUR_CLOUDFLARE_ZONE_ID" {
+		return p.listSingleZone(ctx)
+	}
+
+	// 否则获取所有Zone
+	return p.listAllZones(ctx)
+}
+
+// listSingleZone 获取单个Zone的信息
+func (p *CloudflareProvider) listSingleZone(ctx context.Context) ([]DomainInfo, error) {
 	// 获取区域信息
 	zoneInfo, err := p.getZoneInfo(ctx)
 	if err != nil {
@@ -141,6 +180,32 @@ func (p *CloudflareProvider) ListDomains(ctx context.Context) ([]DomainInfo, err
 			UpdatedAt: record.UpdatedAt,
 			TTL:       record.TTL,
 			Value:     record.Content,
+		})
+	}
+
+	return allDomains, nil
+}
+
+// listAllZones 获取所有Zone的信息
+func (p *CloudflareProvider) listAllZones(ctx context.Context) ([]DomainInfo, error) {
+	// 获取所有Zone
+	zones, err := p.getAllZones(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all zones: %w", err)
+	}
+
+	var allDomains []DomainInfo
+
+	// 为每个Zone添加域名信息
+	for _, zone := range zones {
+		allDomains = append(allDomains, DomainInfo{
+			Name:      zone.Name,
+			Type:      "domain",
+			Status:    zone.Status,
+			CreatedAt: zone.CreatedAt,
+			UpdatedAt: zone.UpdatedAt,
+			TTL:       600,
+			Value:     zone.ID, // Zone ID作为Value
 		})
 	}
 
@@ -523,4 +588,67 @@ func (p *CloudflareProvider) deleteRecord(ctx context.Context, recordID string) 
 	}
 
 	return nil
+}
+
+// getAllZones 获取所有Zone
+func (p *CloudflareProvider) getAllZones(ctx context.Context) ([]CloudflareZone, error) {
+	url := "https://api.cloudflare.com/client/v4/zones"
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+p.APIKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var result struct {
+		Success bool             `json:"success"`
+		Result  []CloudflareZone `json:"result"`
+		Errors  []struct {
+			Code    int    `json:"code"`
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, err
+	}
+
+	if !result.Success {
+		if len(result.Errors) > 0 {
+			return nil, fmt.Errorf("Cloudflare API error: %s", result.Errors[0].Message)
+		}
+		return nil, fmt.Errorf("Cloudflare API returned success=false")
+	}
+
+	return result.Result, nil
+}
+
+// findZoneIDByDomain 根据域名查找Zone ID
+func (p *CloudflareProvider) findZoneIDByDomain(ctx context.Context, domain string) (string, error) {
+	zones, err := p.getAllZones(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	// 查找匹配的域名
+	for _, zone := range zones {
+		if zone.Name == domain {
+			return zone.ID, nil
+		}
+	}
+
+	return "", fmt.Errorf("zone not found for domain: %s", domain)
 }
