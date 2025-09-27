@@ -98,25 +98,25 @@ const Dashboard: React.FC = () => {
 
   const quickActions = [
     {
-      title: '新增代理规则',
+      title: t.quickActions.newProxyRule,
       icon: FiPlus,
       path: buildPath(adminPrefix, '/proxy/add'),
       colorScheme: 'blue',
     },
     {
-      title: '管理SSL证书',
+      title: t.quickActions.manageSSL,
       icon: FiShield,
       path: buildPath(adminPrefix, '/ssl'),
       colorScheme: 'green',
     },
     {
-      title: '安全设置',
+      title: t.quickActions.securitySettings,
       icon: FiShield,
       path: buildPath(adminPrefix, '/security'),
       colorScheme: 'orange',
     },
     {
-      title: '系统设置',
+      title: t.quickActions.systemSettings,
       icon: FiSettings,
       path: buildPath(adminPrefix, '/settings'),
       colorScheme: 'purple',
@@ -143,7 +143,7 @@ const Dashboard: React.FC = () => {
       {error && (
         <Alert status="error" mb={6}>
           <AlertIcon />
-          <AlertTitle>数据加载失败！</AlertTitle>
+          <AlertTitle>{t.dialog.dataLoadFailed}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
@@ -152,7 +152,7 @@ const Dashboard: React.FC = () => {
       {loading && (
         <Flex justify="center" align="center" py={8} mb={6}>
           <Spinner size="lg" color="blue.500" />
-          <Text ml={4} color="gray.600">正在加载系统数据...</Text>
+          <Text ml={4} color="gray.600">{t.dialog.loadingSystemData}</Text>
         </Flex>
       )}
 

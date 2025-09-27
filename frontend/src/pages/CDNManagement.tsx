@@ -53,6 +53,7 @@ import {
   FiActivity,
 } from 'react-icons/fi'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
+import { useTranslation } from '../hooks/useLanguage'
 
 interface CacheStats {
   enabled: boolean
@@ -86,6 +87,7 @@ interface CacheObject {
 
 const CDNManagement: React.FC = () => {
   const { adminPrefix } = useConfig()
+  const t = useTranslation()
   const toast = useToast()
   const { isOpen: isAddRuleOpen, onOpen: onAddRuleOpen, onClose: onAddRuleClose } = useDisclosure()
   
@@ -294,7 +296,7 @@ const CDNManagement: React.FC = () => {
         <HStack justify="space-between">
           <Heading size="lg" display="flex" alignItems="center" gap={2}>
             <Icon as={FiHardDrive} />
-            类CDN缓存管理
+            {t.cdn.title}
           </Heading>
           <HStack spacing={3}>
             <Button
@@ -302,7 +304,7 @@ const CDNManagement: React.FC = () => {
               colorScheme="blue"
               onClick={onAddRuleOpen}
             >
-              添加规则
+{t.cdn.addRule}
             </Button>
             <Button
               leftIcon={<Icon as={FiRefreshCw} />}
@@ -311,7 +313,7 @@ const CDNManagement: React.FC = () => {
                 fetchObjects()
               }}
             >
-              刷新
+{t.cdn.refresh}
             </Button>
             <Button
               leftIcon={<Icon as={FiTrash2} />}
@@ -320,7 +322,7 @@ const CDNManagement: React.FC = () => {
               onClick={() => clearCache()}
               isLoading={actionLoading}
             >
-              清理全部缓存
+{t.cdn.clearAllCache}
             </Button>
           </HStack>
         </HStack>

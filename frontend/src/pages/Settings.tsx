@@ -24,9 +24,11 @@ import {
   FiRefreshCw,
 } from 'react-icons/fi'
 import { useConfig } from '../contexts/ConfigContext'
+import { useTranslation } from '../hooks/useLanguage'
 
 const Settings: React.FC = () => {
   const { adminPrefix } = useConfig()
+  const t = useTranslation()
   const [settings, setSettings] = useState({
     // 基础设置
     adminPrefix: adminPrefix,
@@ -122,22 +124,44 @@ const Settings: React.FC = () => {
   const saveSettings = async () => {
     setLoading(true)
     try {
-      // TODO: 实际的 API 调用
-      // const response = await fetch('/api/settings', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(settings),
-      // })
-      
-      setTimeout(() => {
+      const response = await fetch(`${adminPrefix}/api/settings/basic`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          adminPrefix: settings.adminPrefix,
+          httpPort: settings.httpPort,
+          httpsPort: settings.httpsPort,
+          autoSSL: settings.autoSSL,
+          letsEncryptEmail: settings.letsEncryptEmail,
+          sslProvider: settings.sslProvider,
+          enableDDoSProtection: settings.enableDDoSProtection,
+          maxRequestsPerMinute: settings.maxRequestsPerMinute,
+          enableRateLimit: settings.enableRateLimit,
+          enableAccessLog: settings.enableAccessLog,
+          enableErrorLog: settings.enableErrorLog,
+          logLevel: settings.logLevel,
+        }),
+      })
+
+      if (response.ok) {
         toast({
-          title: '设置保存成功',
+          title: t.settings.settingsSaved,
           status: 'success',
           duration: 3000,
           isClosable: true,
         })
-        setLoading(false)
-      }, 1000)
+        
+        // 如果adminPrefix发生变化，刷新页面以使用新的前缀
+        if (settings.adminPrefix !== adminPrefix) {
+          setTimeout(() => {
+            window.location.href = settings.adminPrefix + '/settings'
+          }, 1000)
+        }
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.message || '保存失败')
+      }
     } catch (error) {
       toast({
         title: '保存失败',
@@ -146,6 +170,7 @@ const Settings: React.FC = () => {
         duration: 3000,
         isClosable: true,
       })
+    } finally {
       setLoading(false)
     }
   }
@@ -249,7 +274,7 @@ const Settings: React.FC = () => {
       <HStack justify="space-between" align="center" mb={6}>
         <HStack>
           <Icon as={FiSettings} boxSize={6} />
-          <Heading size="lg">系统设置</Heading>
+          <Heading size="lg">{t.settings.title}</Heading>
         </HStack>
         <HStack>
           <Button
@@ -257,7 +282,7 @@ const Settings: React.FC = () => {
             onClick={resetSettings}
             variant="outline"
           >
-            重置
+            {t.settings.resetSettings}
           </Button>
           <Button
             leftIcon={<Icon as={FiSave} />}
@@ -265,7 +290,7 @@ const Settings: React.FC = () => {
             isLoading={loading}
             colorScheme="blue"
           >
-            保存设置
+            {t.settings.saveSettings}
           </Button>
         </HStack>
       </HStack>
@@ -274,12 +299,12 @@ const Settings: React.FC = () => {
         {/* 基础设置 */}
         <Card>
           <CardHeader>
-            <Heading size="md">基础设置</Heading>
+            <Heading size="md">{t.settings.basicSettings}</Heading>
           </CardHeader>
           <CardBody>
             <VStack spacing={4} align="stretch">
               <FormControl>
-                <FormLabel>管理界面前缀</FormLabel>
+                <FormLabel>{t.settings.adminPrefix}</FormLabel>
                 <Input
                   value={settings.adminPrefix}
                   onChange={(e) => handleInputChange('adminPrefix', e.target.value)}
@@ -288,7 +313,7 @@ const Settings: React.FC = () => {
               </FormControl>
               
               <FormControl>
-                <FormLabel>HTTP端口</FormLabel>
+                <FormLabel>{t.settings.httpPort}</FormLabel>
                 <Input
                   value={settings.httpPort}
                   onChange={(e) => handleInputChange('httpPort', e.target.value)}
@@ -298,7 +323,7 @@ const Settings: React.FC = () => {
               </FormControl>
               
               <FormControl>
-                <FormLabel>HTTPS端口</FormLabel>
+                <FormLabel>{t.settings.httpsPort}</FormLabel>
                 <Input
                   value={settings.httpsPort}
                   onChange={(e) => handleInputChange('httpsPort', e.target.value)}
@@ -313,12 +338,12 @@ const Settings: React.FC = () => {
         {/* SSL设置 */}
         <Card>
           <CardHeader>
-            <Heading size="md">SSL设置</Heading>
+            <Heading size="md">{t.settings.sslSettings}</Heading>
           </CardHeader>
           <CardBody>
             <VStack spacing={4} align="stretch">
               <FormControl display="flex" alignItems="center">
-                <FormLabel mb="0">自动SSL证书</FormLabel>
+                <FormLabel mb="0">{t.settings.autoSSL}</FormLabel>
                 <Switch
                   isChecked={settings.autoSSL}
                   onChange={(e) => handleInputChange('autoSSL', e.target.checked)}
@@ -326,7 +351,7 @@ const Settings: React.FC = () => {
               </FormControl>
               
               <FormControl>
-                <FormLabel>Let's Encrypt 邮箱</FormLabel>
+                <FormLabel>{t.settings.letsEncryptEmail}</FormLabel>
                 <Input
                   value={settings.letsEncryptEmail}
                   onChange={(e) => handleInputChange('letsEncryptEmail', e.target.value)}
@@ -342,12 +367,12 @@ const Settings: React.FC = () => {
         {/* 安全设置 */}
         <Card>
           <CardHeader>
-            <Heading size="md">安全设置</Heading>
+            <Heading size="md">{t.settings.securitySettings}</Heading>
           </CardHeader>
           <CardBody>
             <VStack spacing={4} align="stretch">
               <FormControl display="flex" alignItems="center">
-                <FormLabel mb="0">启用DDoS防护</FormLabel>
+                <FormLabel mb="0">{t.settings.enableDDoSProtection}</FormLabel>
                 <Switch
                   isChecked={settings.enableDDoSProtection}
                   onChange={(e) => handleInputChange('enableDDoSProtection', e.target.checked)}
@@ -355,7 +380,7 @@ const Settings: React.FC = () => {
               </FormControl>
               
               <FormControl display="flex" alignItems="center">
-                <FormLabel mb="0">启用访问限制</FormLabel>
+                <FormLabel mb="0">{t.settings.enableRateLimit}</FormLabel>
                 <Switch
                   isChecked={settings.enableRateLimit}
                   onChange={(e) => handleInputChange('enableRateLimit', e.target.checked)}
@@ -363,7 +388,7 @@ const Settings: React.FC = () => {
               </FormControl>
               
               <FormControl>
-                <FormLabel>每分钟最大请求数</FormLabel>
+                <FormLabel>{t.settings.maxRequestsPerMinute}</FormLabel>
                 <Input
                   value={settings.maxRequestsPerMinute}
                   onChange={(e) => handleInputChange('maxRequestsPerMinute', e.target.value)}
@@ -378,12 +403,12 @@ const Settings: React.FC = () => {
         {/* 日志设置 */}
         <Card>
           <CardHeader>
-            <Heading size="md">日志设置</Heading>
+            <Heading size="md">{t.settings.logSettings}</Heading>
           </CardHeader>
           <CardBody>
             <VStack spacing={4} align="stretch">
               <FormControl display="flex" alignItems="center">
-                <FormLabel mb="0">启用访问日志</FormLabel>
+                <FormLabel mb="0">{t.settings.enableAccessLog}</FormLabel>
                 <Switch
                   isChecked={settings.enableAccessLog}
                   onChange={(e) => handleInputChange('enableAccessLog', e.target.checked)}
@@ -391,7 +416,7 @@ const Settings: React.FC = () => {
               </FormControl>
               
               <FormControl display="flex" alignItems="center">
-                <FormLabel mb="0">启用错误日志</FormLabel>
+                <FormLabel mb="0">{t.settings.enableErrorLog}</FormLabel>
                 <Switch
                   isChecked={settings.enableErrorLog}
                   onChange={(e) => handleInputChange('enableErrorLog', e.target.checked)}
@@ -399,15 +424,15 @@ const Settings: React.FC = () => {
               </FormControl>
               
               <FormControl>
-                <FormLabel>日志级别</FormLabel>
+                <FormLabel>{t.settings.logLevel}</FormLabel>
                 <Select
                   value={settings.logLevel}
                   onChange={(e) => handleInputChange('logLevel', e.target.value)}
                 >
-                  <option value="debug">调试 (Debug)</option>
-                  <option value="info">信息 (Info)</option>
-                  <option value="warn">警告 (Warning)</option>
-                  <option value="error">错误 (Error)</option>
+                  <option value="debug">{t.settings.debug}</option>
+                  <option value="info">{t.settings.info}</option>
+                  <option value="warn">{t.settings.warn}</option>
+                  <option value="error">{t.settings.error}</option>
                 </Select>
               </FormControl>
             </VStack>
@@ -418,12 +443,12 @@ const Settings: React.FC = () => {
       {/* 通知设置 */}
       <Card mt={6}>
         <CardHeader>
-          <Heading size="md">通知设置</Heading>
+          <Heading size="md">{t.settings.notificationSettings}</Heading>
         </CardHeader>
         <CardBody>
           <VStack spacing={6} align="stretch">
             <FormControl display="flex" alignItems="center">
-              <FormLabel mb="0">启用通知</FormLabel>
+              <FormLabel mb="0">{t.settings.enableNotifications}</FormLabel>
               <Switch
                 isChecked={settings.enableNotifications}
                 onChange={(e) => handleInputChange('enableNotifications', e.target.checked)}
@@ -432,10 +457,10 @@ const Settings: React.FC = () => {
             
             {/* 邮件通知配置 */}
             <Box border="1px" borderColor="gray.200" borderRadius="md" p={4}>
-              <Heading size="sm" mb={4}>邮件通知 (SMTP)</Heading>
+              <Heading size="sm" mb={4}>{t.settings.emailNotification}</Heading>
               <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
                 <FormControl>
-                  <FormLabel>SMTP服务器</FormLabel>
+                  <FormLabel>{t.settings.smtpServer}</FormLabel>
                   <Input
                     value={settings.smtpHost || ''}
                     onChange={(e) => handleInputChange('smtpHost', e.target.value)}
@@ -443,7 +468,7 @@ const Settings: React.FC = () => {
                   />
                 </FormControl>
                 <FormControl>
-                  <FormLabel>端口</FormLabel>
+                  <FormLabel>{t.settings.port}</FormLabel>
                   <Input
                     value={settings.smtpPort || ''}
                     onChange={(e) => handleInputChange('smtpPort', e.target.value)}
@@ -452,7 +477,7 @@ const Settings: React.FC = () => {
                   />
                 </FormControl>
                 <FormControl>
-                  <FormLabel>用户名</FormLabel>
+                  <FormLabel>{t.settings.username}</FormLabel>
                   <Input
                     value={settings.smtpUsername || ''}
                     onChange={(e) => handleInputChange('smtpUsername', e.target.value)}
@@ -460,7 +485,7 @@ const Settings: React.FC = () => {
                   />
                 </FormControl>
                 <FormControl>
-                  <FormLabel>密码</FormLabel>
+                  <FormLabel>{t.settings.password}</FormLabel>
                   <Input
                     value={settings.smtpPassword || ''}
                     onChange={(e) => handleInputChange('smtpPassword', e.target.value)}
@@ -469,7 +494,7 @@ const Settings: React.FC = () => {
                   />
                 </FormControl>
                 <FormControl>
-                  <FormLabel>发件人</FormLabel>
+                  <FormLabel>{t.settings.sender}</FormLabel>
                   <Input
                     value={settings.smtpFrom || ''}
                     onChange={(e) => handleInputChange('smtpFrom', e.target.value)}
@@ -477,7 +502,7 @@ const Settings: React.FC = () => {
                   />
                 </FormControl>
                 <FormControl>
-                  <FormLabel>收件人</FormLabel>
+                  <FormLabel>{t.settings.recipient}</FormLabel>
                   <Input
                     value={settings.smtpTo || ''}
                     onChange={(e) => handleInputChange('smtpTo', e.target.value)}
@@ -486,7 +511,7 @@ const Settings: React.FC = () => {
                 </FormControl>
               </SimpleGrid>
               <FormControl display="flex" alignItems="center" mt={4}>
-                <FormLabel mb="0">启用TLS</FormLabel>
+                <FormLabel mb="0">{t.settings.enableTLS}</FormLabel>
                 <Switch
                   isChecked={settings.smtpUseTLS || false}
                   onChange={(e) => handleInputChange('smtpUseTLS', e.target.checked)}
@@ -496,32 +521,32 @@ const Settings: React.FC = () => {
 
             {/* Slack通知配置 */}
             <Box border="1px" borderColor="gray.200" borderRadius="md" p={4}>
-              <Heading size="sm" mb={4}>Slack通知</Heading>
+              <Heading size="sm" mb={4}>{t.settings.slackNotification}</Heading>
               <FormControl>
-                <FormLabel>Webhook URL</FormLabel>
+                <FormLabel>{t.settings.webhookUrl}</FormLabel>
                 <Input
                   value={settings.slackWebhook || ''}
                   onChange={(e) => handleInputChange('slackWebhook', e.target.value)}
                   placeholder="https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
                 />
                 <Text fontSize="sm" color="gray.500" mt={1}>
-                  在Slack中创建Incoming Webhook获取URL
+                  {t.settings.createSlackWebhook}
                 </Text>
               </FormControl>
             </Box>
 
             {/* 其他通知渠道 */}
             <Box border="1px" borderColor="gray.200" borderRadius="md" p={4}>
-              <Heading size="sm" mb={4}>其他通知渠道</Heading>
+              <Heading size="sm" mb={4}>{t.settings.otherNotification}</Heading>
               <FormControl>
-                <FormLabel>通用Webhook URL</FormLabel>
+                <FormLabel>{t.settings.webhookUrl}</FormLabel>
                 <Input
                   value={settings.webhookUrl || ''}
                   onChange={(e) => handleInputChange('webhookUrl', e.target.value)}
                   placeholder="https://your-webhook-endpoint.com/notify"
                 />
                 <Text fontSize="sm" color="gray.500" mt={1}>
-                  支持钉钉、企业微信等Webhook通知
+                  {t.settings.supportDingtalk}
                 </Text>
               </FormControl>
             </Box>
@@ -531,9 +556,9 @@ const Settings: React.FC = () => {
               colorScheme="blue" 
               onClick={saveNotificationSettings}
               isLoading={loading}
-              loadingText="保存中..."
+              loadingText={t.settings.saving}
             >
-              保存通知设置
+              {t.settings.saveNotificationSettings}
             </Button>
           </VStack>
         </CardBody>

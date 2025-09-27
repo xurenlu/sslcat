@@ -6,6 +6,7 @@ import {
   Box,
   VStack,
 } from '@chakra-ui/react'
+import { useTranslation } from '../hooks/useLanguage'
 
 interface LoadingOverlayProps {
   isLoading: boolean
@@ -16,10 +17,12 @@ interface LoadingOverlayProps {
 
 const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
   isLoading,
-  message = '加载中...',
+  message,
   children,
   overlay = false,
 }) => {
+  const t = useTranslation()
+  const defaultMessage = message || t.common.loading
   if (!isLoading) {
     return <>{children}</>
   }
@@ -43,7 +46,7 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
           <VStack spacing={3}>
             <Spinner size="lg" color="blue.500" thickness="3px" />
             <Text color="gray.600" fontSize="sm" fontWeight="medium">
-              {message}
+              {defaultMessage}
             </Text>
           </VStack>
         </Flex>
@@ -56,7 +59,7 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
       <VStack spacing={4}>
         <Spinner size="xl" color="blue.500" thickness="4px" />
         <Text color="gray.600" fontSize="lg" fontWeight="medium">
-          {message}
+          {defaultMessage}
         </Text>
       </VStack>
     </Flex>

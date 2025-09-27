@@ -9,6 +9,7 @@ import {
   Button,
   useDisclosure,
 } from '@chakra-ui/react'
+import { useTranslation } from '../hooks/useLanguage'
 
 interface ConfirmDialogProps {
   isOpen: boolean
@@ -28,11 +29,12 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onConfirm,
   title,
   message,
-  confirmButtonText = '确认',
-  cancelButtonText = '取消',
+  confirmButtonText,
+  cancelButtonText,
   confirmButtonColor = 'red',
   isLoading = false,
 }) => {
+  const t = useTranslation()
   const cancelRef = React.useRef<HTMLButtonElement>(null)
 
   const handleConfirm = () => {
@@ -58,16 +60,16 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
           <AlertDialogFooter>
             <Button ref={cancelRef} onClick={onClose} disabled={isLoading}>
-              {cancelButtonText}
+              {cancelButtonText || t.common.cancel}
             </Button>
             <Button
               colorScheme={confirmButtonColor}
               onClick={handleConfirm}
               ml={3}
               isLoading={isLoading}
-              loadingText="处理中..."
+              loadingText={t.dialog.processing}
             >
-              {confirmButtonText}
+              {confirmButtonText || t.common.confirm}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

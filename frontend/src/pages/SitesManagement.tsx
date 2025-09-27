@@ -47,6 +47,7 @@ import {
   FiCode,
 } from 'react-icons/fi'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
+import { useTranslation } from '../hooks/useLanguage'
 
 interface StaticSite {
   id: string
@@ -74,6 +75,7 @@ const SitesManagement: React.FC = () => {
   const [staticSites, setStaticSites] = useState<StaticSite[]>([])
   const [phpSites, setPHPSites] = useState<PHPSite[]>([])
   const [loading, setLoading] = useState(false)
+  const t = useTranslation()
   const { isOpen, onOpen, onClose } = useDisclosure()
   const [modalType, setModalType] = useState<'static' | 'php'>('static')
   const [editingSite, setEditingSite] = useState<StaticSite | PHPSite | null>(null)
@@ -315,7 +317,7 @@ const SitesManagement: React.FC = () => {
       <Flex justify="space-between" align="center" mb={6}>
         <HStack>
           <Icon as={FiGlobe} boxSize={6} />
-          <Heading size="lg">站点管理</Heading>
+          <Heading size="lg">{t.sites.title}</Heading>
         </HStack>
         <HStack>
           <Button
@@ -324,7 +326,7 @@ const SitesManagement: React.FC = () => {
             isLoading={loading}
             variant="outline"
           >
-            刷新
+{t.sites.refresh}
           </Button>
         </HStack>
       </Flex>
@@ -334,14 +336,14 @@ const SitesManagement: React.FC = () => {
           <Tab>
             <HStack>
               <Icon as={FiFolder} />
-              <Text>静态站点</Text>
+              <Text>{t.sites.staticSites}</Text>
               <Badge colorScheme="blue">{staticSites.length}</Badge>
             </HStack>
           </Tab>
           <Tab>
             <HStack>
               <Icon as={FiCode} />
-              <Text>PHP 站点</Text>
+              <Text>{t.sites.phpSites}</Text>
               <Badge colorScheme="green">{phpSites.length}</Badge>
             </HStack>
           </Tab>

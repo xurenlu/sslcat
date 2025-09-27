@@ -28,10 +28,12 @@ import {
   FiSave,
 } from 'react-icons/fi'
 import { useConfig } from '../contexts/ConfigContext'
+import { useTranslation } from '../hooks/useLanguage'
 import { useAuth } from '../contexts/AuthContext'
 
 const ChangePassword: React.FC = () => {
   const { adminPrefix } = useConfig()
+  const t = useTranslation()
   const { user, logout } = useAuth()
   const toast = useToast()
 
@@ -184,10 +186,10 @@ const ChangePassword: React.FC = () => {
         <Box textAlign="center">
           <Heading size="lg" display="flex" alignItems="center" justifyContent="center" gap={2} mb={2}>
             <Icon as={FiLock} />
-            修改密码
+            {t.users.changePassword}
           </Heading>
           <Text color="gray.600">
-            为了您的账户安全，请定期更新密码
+            {t.users.securityNotice}
           </Text>
         </Box>
 
@@ -196,19 +198,19 @@ const ChangePassword: React.FC = () => {
           <CardHeader>
             <HStack>
               <Icon as={FiUser} />
-              <Text fontWeight="medium">当前用户信息</Text>
+              <Text fontWeight="medium">{t.users.currentUserInfo}</Text>
             </HStack>
           </CardHeader>
           <CardBody>
             <VStack spacing={3} align="stretch">
               <HStack justify="space-between">
-                <Text>用户名:</Text>
+                <Text>{t.users.username}:</Text>
                 <Badge colorScheme="blue" fontSize="sm">
                   {user?.username}
                 </Badge>
               </HStack>
               <HStack justify="space-between">
-                <Text>角色:</Text>
+                <Text>{t.users.role}:</Text>
                 <Badge 
                   colorScheme={
                     user?.role === 'super_admin' ? 'red' :
@@ -217,15 +219,15 @@ const ChangePassword: React.FC = () => {
                   }
                   fontSize="sm"
                 >
-                  {user?.role === 'super_admin' ? '超级管理员' :
-                   user?.role === 'admin' ? '管理员' :
-                   user?.role === 'operator' ? '操作员' : '只读用户'}
+                  {user?.role === 'super_admin' ? t.users.superAdmin :
+                   user?.role === 'admin' ? t.users.admin :
+                   user?.role === 'operator' ? t.users.operator : t.users.readOnly}
                 </Badge>
               </HStack>
               <HStack justify="space-between">
-                <Text>状态:</Text>
+                <Text>{t.users.status}:</Text>
                 <Badge colorScheme={user?.is_active ? 'green' : 'red'} fontSize="sm">
-                  {user?.is_active ? '活跃' : '禁用'}
+                  {user?.is_active ? t.users.active : t.users.disabled}
                 </Badge>
               </HStack>
             </VStack>

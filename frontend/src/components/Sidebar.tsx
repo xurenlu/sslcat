@@ -30,6 +30,7 @@ import {
   FiUsers,
   FiLogOut,
   FiHardDrive,
+  FiKey,
 } from 'react-icons/fi'
 
 interface SidebarProps {
@@ -85,13 +86,14 @@ const SidebarContent = () => {
     { name: t.navigation.proxy, icon: FiZap, path: buildPath(adminPrefix, '/proxy') },
     { name: t.navigation.sites, icon: FiGlobe, path: buildPath(adminPrefix, '/sites') },
     { name: t.navigation.ssl, icon: FiShield, path: buildPath(adminPrefix, '/ssl') },
-    { name: '类CDN缓存', icon: FiHardDrive, path: buildPath(adminPrefix, '/cdn') },
+    { name: t.navigation.cdnCache, icon: FiHardDrive, path: buildPath(adminPrefix, '/cdn') },
     { name: t.navigation.settings, icon: FiSettings, path: buildPath(adminPrefix, '/settings') },
     { name: t.navigation.dns, icon: FiGlobe, path: buildPath(adminPrefix, '/dns') },
     { name: t.navigation.security, icon: FiShield, path: buildPath(adminPrefix, '/security') },
     { name: t.navigation.gitServer, icon: FiGitBranch, path: buildPath(adminPrefix, '/git-server') },
     { name: t.navigation.notifications, icon: FiBell, path: buildPath(adminPrefix, '/notifications') },
-    { name: '用户管理', icon: FiUsers, path: buildPath(adminPrefix, '/users') },
+    { name: t.navigation.userManagement, icon: FiUsers, path: buildPath(adminPrefix, '/users') },
+    { name: t.navigation.changePassword, icon: FiKey, path: buildPath(adminPrefix, '/change-password') },
   ]
 
   return (
@@ -103,7 +105,7 @@ const SidebarContent = () => {
             SSLcat
           </Text>
           <Text fontSize="sm" color="gray.500" textAlign="center">
-            SSL 代理服务器
+            {t.sidebar.sslProxyServer}
           </Text>
           <Button
             as="a"
@@ -113,7 +115,7 @@ const SidebarContent = () => {
             variant="outline"
             colorScheme="brand"
           >
-            官方网站
+            {t.sidebar.officialWebsite}
           </Button>
         </VStack>
       </Box>
@@ -121,7 +123,7 @@ const SidebarContent = () => {
       {/* Language Selector - 固定 */}
       <Box p={4} borderBottom="1px" borderColor="gray.200" flexShrink={0}>
         <Text fontSize="sm" color="gray.600" mb={2}>
-          语言 Language
+          {t.sidebar.language}
         </Text>
         <Select
           size="sm"
