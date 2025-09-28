@@ -47,6 +47,7 @@ import {
   FiX,
 } from 'react-icons/fi'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
+import { useTranslation } from '../hooks/useLanguage'
 import GeoIPSetupGuide from './GeoIPSetupGuide'
 
 interface GeoIPConfig {
@@ -77,30 +78,30 @@ interface CountryOption {
   flag: string
 }
 
-// 常用国家列表
-const COMMON_COUNTRIES: CountryOption[] = [
-  { code: 'CN', name: '中国', flag: '🇨🇳' },
-  { code: 'US', name: '美国', flag: '🇺🇸' },
-  { code: 'JP', name: '日本', flag: '🇯🇵' },
-  { code: 'KR', name: '韩国', flag: '🇰🇷' },
-  { code: 'SG', name: '新加坡', flag: '🇸🇬' },
-  { code: 'GB', name: '英国', flag: '🇬🇧' },
-  { code: 'DE', name: '德国', flag: '🇩🇪' },
-  { code: 'FR', name: '法国', flag: '🇫🇷' },
-  { code: 'CA', name: '加拿大', flag: '🇨🇦' },
-  { code: 'AU', name: '澳大利亚', flag: '🇦🇺' },
-  { code: 'IN', name: '印度', flag: '🇮🇳' },
-  { code: 'BR', name: '巴西', flag: '🇧🇷' },
-  { code: 'RU', name: '俄罗斯', flag: '🇷🇺' },
-  { code: 'IT', name: '意大利', flag: '🇮🇹' },
-  { code: 'ES', name: '西班牙', flag: '🇪🇸' },
-  { code: 'NL', name: '荷兰', flag: '🇳🇱' },
-  { code: 'SE', name: '瑞典', flag: '🇸🇪' },
-  { code: 'NO', name: '挪威', flag: '🇳🇴' },
-  { code: 'CH', name: '瑞士', flag: '🇨🇭' },
-  { code: 'HK', name: '香港', flag: '🇭🇰' },
-  { code: 'TW', name: '台湾', flag: '🇹🇼' },
-  { code: 'MO', name: '澳门', flag: '🇲🇴' },
+// 常用国家列表 - 将在组件内部使用翻译
+const getCommonCountries = (t: any): CountryOption[] => [
+  { code: 'CN', name: t.geoIP.commonCountries.china, flag: '🇨🇳' },
+  { code: 'US', name: t.geoIP.commonCountries.usa, flag: '🇺🇸' },
+  { code: 'JP', name: t.geoIP.commonCountries.japan, flag: '🇯🇵' },
+  { code: 'KR', name: t.geoIP.commonCountries.southKorea, flag: '🇰🇷' },
+  { code: 'SG', name: t.geoIP.commonCountries.singapore, flag: '🇸🇬' },
+  { code: 'GB', name: t.geoIP.commonCountries.uk, flag: '🇬🇧' },
+  { code: 'DE', name: t.geoIP.commonCountries.germany, flag: '🇩🇪' },
+  { code: 'FR', name: t.geoIP.commonCountries.france, flag: '🇫🇷' },
+  { code: 'CA', name: t.geoIP.commonCountries.canada, flag: '🇨🇦' },
+  { code: 'AU', name: t.geoIP.commonCountries.australia, flag: '🇦🇺' },
+  { code: 'IN', name: t.geoIP.commonCountries.india, flag: '🇮🇳' },
+  { code: 'BR', name: t.geoIP.commonCountries.brazil, flag: '🇧🇷' },
+  { code: 'RU', name: t.geoIP.commonCountries.russia, flag: '🇷🇺' },
+  { code: 'IT', name: t.geoIP.commonCountries.italy, flag: '🇮🇹' },
+  { code: 'ES', name: t.geoIP.commonCountries.spain, flag: '🇪🇸' },
+  { code: 'NL', name: t.geoIP.commonCountries.netherlands, flag: '🇳🇱' },
+  { code: 'SE', name: t.geoIP.commonCountries.sweden, flag: '🇸🇪' },
+  { code: 'NO', name: t.geoIP.commonCountries.norway, flag: '🇳🇴' },
+  { code: 'CH', name: t.geoIP.commonCountries.switzerland, flag: '🇨🇭' },
+  { code: 'HK', name: t.geoIP.commonCountries.hongKong, flag: '🇭🇰' },
+  { code: 'TW', name: t.geoIP.commonCountries.taiwan, flag: '🇹🇼' },
+  { code: 'MO', name: t.geoIP.commonCountries.macau, flag: '🇲🇴' },
 ]
 
 const GeoIPConfig: React.FC = () => {
@@ -121,6 +122,7 @@ const GeoIPConfig: React.FC = () => {
   
   const toast = useToast()
   const { adminPrefix } = useConfig()
+  const t = useTranslation()
 
   // 加载配置和状态
   const loadConfig = async () => {
@@ -240,7 +242,8 @@ const GeoIPConfig: React.FC = () => {
 
   // 获取国家名称
   const getCountryName = (code: string) => {
-    const country = COMMON_COUNTRIES.find(c => c.code === code)
+    const countries = getCommonCountries(t)
+    const country = countries.find(c => c.code === code)
     return country ? `${country.flag} ${country.name}` : code
   }
 
@@ -290,14 +293,14 @@ const GeoIPConfig: React.FC = () => {
     return (
       <VStack spacing={6} align="stretch">
         <HStack>
-          <Button
-            leftIcon={<FiX />}
-            variant="outline"
-            onClick={() => setShowSetupGuide(false)}
-          >
-            返回配置
-          </Button>
-          <Text fontSize="lg" fontWeight="bold">GeoIP数据库设置指南</Text>
+            <Button
+              leftIcon={<FiX />}
+              variant="outline"
+              onClick={() => setShowSetupGuide(false)}
+            >
+              {t.geoIP.backToConfig}
+            </Button>
+            <Text fontSize="lg" fontWeight="bold">{t.geoIP.setupGuideTitle}</Text>
         </HStack>
         <GeoIPSetupGuide />
       </VStack>
@@ -311,7 +314,7 @@ const GeoIPConfig: React.FC = () => {
         <CardHeader>
           <HStack>
             <Icon as={FiGlobe} color="blue.500" />
-            <Heading size="md">地理位置过滤状态</Heading>
+            <Heading size="md">{t.geoIP.title}</Heading>
             <Button
               size="sm"
               variant="outline"
@@ -319,7 +322,7 @@ const GeoIPConfig: React.FC = () => {
               onClick={loadConfig}
               isLoading={loading}
             >
-              刷新
+              {t.geoIP.loading}
             </Button>
           </HStack>
         </CardHeader>
@@ -327,20 +330,20 @@ const GeoIPConfig: React.FC = () => {
           {stats ? (
             <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4}>
               <Stat>
-                <StatLabel>功能状态</StatLabel>
+                <StatLabel>{t.geoIP.status}</StatLabel>
                 <StatNumber>
                   <Badge colorScheme={stats.enabled ? 'green' : 'gray'}>
-                    {stats.enabled ? '已启用' : '已禁用'}
+                    {stats.enabled ? t.geoIP.enabled : t.geoIP.disabled}
                   </Badge>
                 </StatNumber>
-                <StatHelpText>地理位置过滤</StatHelpText>
+                <StatHelpText>{t.geoIP.enableGeoFiltering}</StatHelpText>
               </Stat>
               
               <Stat>
-                <StatLabel>城市数据库</StatLabel>
+                <StatLabel>{t.geoIP.cityDatabase}</StatLabel>
                 <StatNumber>
                   <Badge colorScheme={stats.city_db_loaded ? 'green' : 'red'}>
-                    {stats.city_db_loaded ? '已加载' : '未加载'}
+                    {stats.city_db_loaded ? t.geoIP.loaded : t.geoIP.notLoaded}
                   </Badge>
                 </StatNumber>
                 <StatHelpText>GeoLite2-City.mmdb</StatHelpText>

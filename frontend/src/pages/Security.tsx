@@ -43,6 +43,7 @@ import {
   FiGlobe,
 } from 'react-icons/fi'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
+import { useTranslation } from '../hooks/useLanguage'
 import GeoIPConfig from '../components/GeoIPConfig'
 
 interface SecurityEvent {
@@ -80,6 +81,7 @@ const Security: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const toast = useToast()
   const { adminPrefix } = useConfig()
+  const t = useTranslation()
 
   const refreshData = async () => {
     setLoading(true)
@@ -193,20 +195,20 @@ const Security: React.FC = () => {
 
   const getSeverityText = (severity: string) => {
     switch (severity) {
-      case 'low': return '低'
-      case 'medium': return '中'
-      case 'high': return '高'
-      case 'critical': return '严重'
+      case 'low': return t.security.low
+      case 'medium': return t.security.medium
+      case 'high': return t.security.high
+      case 'critical': return t.security.critical
       default: return severity
     }
   }
 
   const getTypeText = (type: string) => {
     switch (type) {
-      case 'ddos_attack': return 'DDoS攻击'
-      case 'bruteforce': return '暴力破解'
-      case 'suspicious_ip': return '可疑IP'
-      case 'malware': return '恶意软件'
+      case 'ddos_attack': return t.security.ddosAttack
+      case 'bruteforce': return t.security.bruteforce
+      case 'suspicious_ip': return t.security.suspiciousIP
+      case 'malware': return t.security.malware
       default: return type
     }
   }
@@ -216,7 +218,7 @@ const Security: React.FC = () => {
       <Flex justify="space-between" align="center" mb={6}>
         <HStack>
           <Icon as={FiShield} boxSize={6} />
-          <Heading size="lg">安全中心</Heading>
+          <Heading size="lg">{t.security.title}</Heading>
         </HStack>
         <Button
           leftIcon={<Icon as={FiRefreshCw} />}
@@ -224,7 +226,7 @@ const Security: React.FC = () => {
           isLoading={loading}
           variant="outline"
         >
-          刷新
+          {t.security.refresh}
         </Button>
       </Flex>
 
@@ -232,11 +234,11 @@ const Security: React.FC = () => {
         <TabList>
           <Tab>
             <Icon as={FiShield} mr={2} />
-            安全概览
+            {t.security.overview}
           </Tab>
           <Tab>
             <Icon as={FiGlobe} mr={2} />
-            地理位置过滤
+            {t.security.geoFiltering}
           </Tab>
         </TabList>
 
@@ -251,7 +253,7 @@ const Security: React.FC = () => {
             <Stat>
               <HStack justify="space-between">
                 <Box>
-                  <StatLabel color="red.100">安全事件</StatLabel>
+                  <StatLabel color="red.100">{t.security.securityEvents}</StatLabel>
                   <StatNumber>{stats.totalEvents}</StatNumber>
                 </Box>
                 <Icon as={FiAlertTriangle} boxSize={8} color="red.200" />
@@ -265,7 +267,7 @@ const Security: React.FC = () => {
             <Stat>
               <HStack justify="space-between">
                 <Box>
-                  <StatLabel color="orange.100">被封IP</StatLabel>
+                  <StatLabel color="orange.100">{t.security.blockedIPs}</StatLabel>
                   <StatNumber>{stats.blockedIPs}</StatNumber>
                 </Box>
                 <Icon as={FiX} boxSize={8} color="orange.200" />
@@ -279,7 +281,7 @@ const Security: React.FC = () => {
             <Stat>
               <HStack justify="space-between">
                 <Box>
-                  <StatLabel color="purple.100">活跃威胁</StatLabel>
+                  <StatLabel color="purple.100">{t.security.activeThreats}</StatLabel>
                   <StatNumber>{stats.activeThreats}</StatNumber>
                 </Box>
                 <Icon as={FiShield} boxSize={8} color="purple.200" />
@@ -293,7 +295,7 @@ const Security: React.FC = () => {
             <Stat>
               <HStack justify="space-between">
                 <Box>
-                  <StatLabel color="green.100">最后扫描</StatLabel>
+                  <StatLabel color="green.100">{t.security.lastScan}</StatLabel>
                   <Text fontSize="sm">{stats.lastScan}</Text>
                 </Box>
                 <Icon as={FiClock} boxSize={8} color="green.200" />
@@ -307,12 +309,12 @@ const Security: React.FC = () => {
         {/* 安全设置 */}
         <Card>
           <CardHeader>
-            <Heading size="md">安全设置</Heading>
+            <Heading size="md">{t.security.securitySettings}</Heading>
           </CardHeader>
           <CardBody>
             <VStack spacing={4} align="stretch">
               <FormControl display="flex" alignItems="center">
-                <FormLabel mb="0" flex="1">Web应用防火墙 (WAF)</FormLabel>
+                <FormLabel mb="0" flex="1">{t.security.wafProtection}</FormLabel>
                 <Switch
                   isChecked={settings.enableWAF}
                   onChange={(e) => setSettings(prev => ({ ...prev, enableWAF: e.target.checked }))}
@@ -320,7 +322,7 @@ const Security: React.FC = () => {
               </FormControl>
               
               <FormControl display="flex" alignItems="center">
-                <FormLabel mb="0" flex="1">DDoS防护</FormLabel>
+                <FormLabel mb="0" flex="1">{t.security.ddosProtection}</FormLabel>
                 <Switch
                   isChecked={settings.enableDDoSProtection}
                   onChange={(e) => setSettings(prev => ({ ...prev, enableDDoSProtection: e.target.checked }))}
@@ -328,7 +330,7 @@ const Security: React.FC = () => {
               </FormControl>
               
               <FormControl display="flex" alignItems="center">
-                <FormLabel mb="0" flex="1">威胁情报</FormLabel>
+                <FormLabel mb="0" flex="1">{t.security.threatIntelligence}</FormLabel>
                 <Switch
                   isChecked={settings.enableThreatIntel}
                   onChange={(e) => setSettings(prev => ({ ...prev, enableThreatIntel: e.target.checked }))}
@@ -336,7 +338,7 @@ const Security: React.FC = () => {
               </FormControl>
               
               <FormControl display="flex" alignItems="center">
-                <FormLabel mb="0" flex="1">自动封锁可疑IP</FormLabel>
+                <FormLabel mb="0" flex="1">{t.security.autoBlockSuspiciousIPs}</FormLabel>
                 <Switch
                   isChecked={settings.blockSuspiciousIPs}
                   onChange={(e) => setSettings(prev => ({ ...prev, blockSuspiciousIPs: e.target.checked }))}
@@ -344,7 +346,7 @@ const Security: React.FC = () => {
               </FormControl>
               
               <FormControl>
-                <FormLabel>每分钟最大请求数</FormLabel>
+                <FormLabel>{t.security.maxRequestsPerMinute}</FormLabel>
                 <Input
                   value={settings.maxRequestsPerMinute}
                   onChange={(e) => setSettings(prev => ({ ...prev, maxRequestsPerMinute: e.target.value }))}
@@ -353,7 +355,7 @@ const Security: React.FC = () => {
               </FormControl>
               
               <Button colorScheme="blue" onClick={saveSecuritySettings}>
-                保存设置
+                {t.security.saveSettings}
               </Button>
             </VStack>
           </CardBody>
@@ -362,40 +364,40 @@ const Security: React.FC = () => {
         {/* 威胁概览 */}
         <Card>
           <CardHeader>
-            <Heading size="md">威胁概览</Heading>
+            <Heading size="md">{t.security.threatOverview}</Heading>
           </CardHeader>
           <CardBody>
             <VStack spacing={4} align="stretch">
               <HStack justify="space-between">
                 <HStack>
                   <Icon as={FiCheckCircle} color="green.500" />
-                  <Text>WAF防护</Text>
+                  <Text>{t.security.wafEnabled}</Text>
                 </HStack>
-                <Badge colorScheme="green">已启用</Badge>
+                <Badge colorScheme="green">{t.common.enable}</Badge>
               </HStack>
               
               <HStack justify="space-between">
                 <HStack>
                   <Icon as={FiCheckCircle} color="green.500" />
-                  <Text>DDoS防护</Text>
+                  <Text>{t.security.ddosEnabled}</Text>
                 </HStack>
-                <Badge colorScheme="green">已启用</Badge>
+                <Badge colorScheme="green">{t.common.enable}</Badge>
               </HStack>
               
               <HStack justify="space-between">
                 <HStack>
                   <Icon as={FiCheckCircle} color="green.500" />
-                  <Text>威胁情报</Text>
+                  <Text>{t.security.threatIntelEnabled}</Text>
                 </HStack>
-                <Badge colorScheme="green">已启用</Badge>
+                <Badge colorScheme="green">{t.common.enable}</Badge>
               </HStack>
               
               <HStack justify="space-between">
                 <HStack>
                   <Icon as={FiAlertTriangle} color="orange.500" />
-                  <Text>IP封锁</Text>
+                  <Text>{t.security.ipBlocked}</Text>
                 </HStack>
-                <Badge colorScheme="orange">{stats.blockedIPs} 个IP</Badge>
+                <Badge colorScheme="orange">{stats.blockedIPs} {t.security.blockedIPs}</Badge>
               </HStack>
             </VStack>
           </CardBody>
@@ -405,20 +407,20 @@ const Security: React.FC = () => {
       {/* 安全事件 */}
       <Card>
         <CardHeader>
-          <Heading size="md">最近安全事件</Heading>
+          <Heading size="md">{t.security.recentEvents}</Heading>
         </CardHeader>
         <CardBody>
           {events.length > 0 ? (
             <Table variant="simple">
               <Thead>
                 <Tr>
-                  <Th>类型</Th>
-                  <Th>严重程度</Th>
-                  <Th>来源IP</Th>
-                  <Th>描述</Th>
-                  <Th>时间</Th>
-                  <Th>状态</Th>
-                  <Th>操作</Th>
+                  <Th>{t.security.type}</Th>
+                  <Th>{t.security.severity}</Th>
+                  <Th>{t.security.sourceIP}</Th>
+                  <Th>{t.security.description}</Th>
+                  <Th>{t.security.time}</Th>
+                  <Th>{t.security.status}</Th>
+                  <Th>{t.security.action}</Th>
                 </Tr>
               </Thead>
               <Tbody>
@@ -439,7 +441,7 @@ const Security: React.FC = () => {
                     <Td>{event.timestamp}</Td>
                     <Td>
                       <Badge colorScheme={event.blocked ? 'red' : 'green'}>
-                        {event.blocked ? '已封锁' : '已允许'}
+                        {event.blocked ? t.security.blocked : t.security.allowed}
                       </Badge>
                     </Td>
                     <Td>
@@ -450,7 +452,7 @@ const Security: React.FC = () => {
                           variant="outline"
                           onClick={() => blockIP(event.source)}
                         >
-                          封锁IP
+                          {t.security.blockIP}
                         </Button>
                       )}
                     </Td>
@@ -461,7 +463,7 @@ const Security: React.FC = () => {
           ) : (
             <Box textAlign="center" py={8}>
               <Icon as={FiShield} boxSize={12} color="gray.300" mb={4} />
-              <Text color="gray.500">暂无安全事件</Text>
+              <Text color="gray.500">{t.security.noSecurityEvents}</Text>
             </Box>
           )}
         </CardBody>
