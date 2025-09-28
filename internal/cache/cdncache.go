@@ -2,6 +2,7 @@ package cache
 
 import (
 	"bytes"
+	"compress/gzip"
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
@@ -174,9 +175,14 @@ func (c *CDNCache) ServeIfFreshWithConfig(w http.ResponseWriter, r *http.Request
 	}
 	defer f.Close()
 
-	// 简单写回
-	w.WriteHeader(http.StatusOK)
-	_, _ = io.Copy(w, f)
+	// 智能压缩处理
+	if c.shouldCompressFile(meta.Path, meta.SizeBytes) {
+		c.serveWithCompression(w, r, f, meta)
+	} else {
+		// 简单写回
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.Copy(w, f)
+	}
 
 	// 更新访问时间
 	c.touch(metaPath, meta)
@@ -690,4 +696,107 @@ func (c *CDNCache) checkConditionalRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	return false
+}
+
+// shouldCompressFile 判断是否应该压缩文件
+func (c *CDNCache) shouldCompressFile(filePath string, fileSize int64) bool {
+	// 文件太小不压缩（小于1KB）
+	if fileSize < 1024 {
+		return false
+	}
+
+	// 检查文件类型
+	ext := strings.ToLower(filepath.Ext(filePath))
+
+	// 需要压缩的文件类型
+	compressibleTypes := map[string]bool{
+		".js":   true,
+		".css":  true,
+		".html": true,
+		".htm":  true,
+		".xml":  true,
+		".json": true,
+		".txt":  true,
+		".svg":  true,
+	}
+
+	// 已经压缩的文件类型不再次压缩
+	alreadyCompressed := map[string]bool{
+		".gz":    true,
+		".br":    true,
+		".zip":   true,
+		".rar":   true,
+		".7z":    true,
+		".jpg":   true,
+		".jpeg":  true,
+		".png":   true,
+		".gif":   true,
+		".webp":  true,
+		".ico":   true,
+		".woff":  true,
+		".woff2": true,
+		".ttf":   true,
+		".eot":   true,
+	}
+
+	// 如果已经压缩，不再次压缩
+	if alreadyCompressed[ext] {
+		return false
+	}
+
+	// 如果是可压缩类型，且文件大小大于1KB，则压缩
+	return compressibleTypes[ext] && fileSize >= 1024
+}
+
+// serveWithCompression 使用压缩方式服务文件
+func (c *CDNCache) serveWithCompression(w http.ResponseWriter, r *http.Request, file io.Reader, meta *objectMeta) {
+	// 检查客户端是否支持gzip
+	acceptEncoding := r.Header.Get("Accept-Encoding")
+	if !strings.Contains(acceptEncoding, "gzip") {
+		// 客户端不支持gzip，直接返回原文件
+		w.WriteHeader(http.StatusOK)
+		io.Copy(w, file)
+		return
+	}
+
+	// 读取文件内容
+	content, err := io.ReadAll(file)
+	if err != nil {
+		c.log.Errorf("Failed to read cached file: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	// 压缩内容
+	var buf bytes.Buffer
+	gzWriter := gzip.NewWriter(&buf)
+	if _, err := gzWriter.Write(content); err != nil {
+		c.log.Errorf("Failed to compress content: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	if err := gzWriter.Close(); err != nil {
+		c.log.Errorf("Failed to close gzip writer: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	// 检查压缩效果，如果压缩后反而更大，则不使用压缩
+	compressedSize := buf.Len()
+	originalSize := len(content)
+
+	if compressedSize >= originalSize {
+		// 压缩效果不好，直接返回原内容
+		w.WriteHeader(http.StatusOK)
+		w.Write(content)
+		return
+	}
+
+	// 设置压缩相关头部
+	w.Header().Set("Content-Encoding", "gzip")
+	w.Header().Set("Vary", "Accept-Encoding")
+
+	// 写入压缩后的内容
+	w.WriteHeader(http.StatusOK)
+	w.Write(buf.Bytes())
 }
