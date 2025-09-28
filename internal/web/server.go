@@ -43,6 +43,7 @@ type Server struct {
 	mux              *http.ServeMux
 	log              *logrus.Entry
 	startTime        time.Time
+	version          string
 	leRedirectHost   string
 	lastLECheck      time.Time
 	lastConfigHash   string
@@ -75,7 +76,7 @@ type Server struct {
 }
 
 // NewServer 创建Web服务器
-func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Manager, sslMgr *ssl.Manager, gitServer *runner.GitServer, notificationIntegrator *notification.NotificationIntegrator) *Server {
+func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Manager, sslMgr *ssl.Manager, gitServer *runner.GitServer, notificationIntegrator *notification.NotificationIntegrator, version string) *Server {
 	// 初始化翻译器（从嵌入读取）
 	translator := i18n.NewTranslator(i18n.LangZhCN, "")
 	// 通过嵌入 i18n 文件加载翻译
@@ -107,6 +108,7 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		translator:       translator,
 		mux:              http.NewServeMux(),
 		startTime:        time.Now(),
+		version:          version,
 		gitServer:        gitServer,
 		log: logrus.WithFields(logrus.Fields{
 			"component": "web_server",
@@ -464,6 +466,7 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl/delete", s.handleAPISSLDelete)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/settings", s.handleAPISettings)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/settings/update", s.handleAPISettingsUpdate)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/settings/basic", s.handleAPISettingsBasic)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/unblock", s.handleAPISecurityUnblock)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/static-sites", s.handleAPIStaticSites)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/static-sites/delete", s.handleAPIStaticSitesDelete)
@@ -815,7 +818,7 @@ func (s *Server) proxyMiddleware(w http.ResponseWriter, r *http.Request) bool {
 		s.log.Warnf("Unmatched proxy for host=%s path=%s, returning 502", host, r.URL.Path)
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusBadGateway)
-		w.Write([]byte("502 Bad Gateway\n"))
+		w.Write([]byte("502 Bad Gateway\n\nPowered by sslcat-" + s.version + "\n"))
 	}
 	return true
 }

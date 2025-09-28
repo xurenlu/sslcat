@@ -39,6 +39,7 @@ type objectMeta struct {
 	ContentType   string    `json:"content_type"`
 	Encoding      string    `json:"encoding"`
 	ETag          string    `json:"etag"`
+	LastModified  time.Time `json:"last_modified"`
 	TTLSeconds    int       `json:"ttl_seconds"`
 	ExpiresAtUnix int64     `json:"expires_at_unix"`
 	LastAccess    time.Time `json:"last_access"`
@@ -140,6 +141,12 @@ func (c *CDNCache) ServeIfFreshWithConfig(w http.ResponseWriter, r *http.Request
 		c.misses++
 		return false
 	}
+	// 检查HTTP条件请求
+	if c.checkConditionalRequest(w, r, meta) {
+		// 返回304 Not Modified，不需要发送内容
+		return true
+	}
+
 	// 回写头
 	if meta.ContentType != "" {
 		w.Header().Set("Content-Type", meta.ContentType)
@@ -149,6 +156,9 @@ func (c *CDNCache) ServeIfFreshWithConfig(w http.ResponseWriter, r *http.Request
 	}
 	if meta.ETag != "" {
 		w.Header().Set("ETag", meta.ETag)
+	}
+	if !meta.LastModified.IsZero() {
+		w.Header().Set("Last-Modified", meta.LastModified.UTC().Format(http.TimeFormat))
 	}
 
 	// HEAD 不需要写 body
@@ -275,6 +285,19 @@ func (c *CDNCache) MaybeStoreWithConfig(resp *http.Response, forceEnabled bool) 
 	c.log.Infof("CDN缓存写入成功: url=%s, filePath=%s, size=%d bytes", req.URL.Path, filePath, len(data))
 
 	encoding := resp.Header.Get("Content-Encoding")
+
+	// 解析Last-Modified头部
+	var lastModified time.Time
+	if lastModifiedStr := resp.Header.Get("Last-Modified"); lastModifiedStr != "" {
+		if parsedTime, err := http.ParseTime(lastModifiedStr); err == nil {
+			lastModified = parsedTime
+		}
+	}
+	// 如果没有Last-Modified头部，使用当前时间
+	if lastModified.IsZero() {
+		lastModified = time.Now()
+	}
+
 	meta := &objectMeta{
 		Host:          hostOnly(req.Host),
 		URL:           req.URL.String(),
@@ -282,6 +305,7 @@ func (c *CDNCache) MaybeStoreWithConfig(resp *http.Response, forceEnabled bool) 
 		ContentType:   contentType,
 		Encoding:      encoding,
 		ETag:          resp.Header.Get("ETag"),
+		LastModified:  lastModified,
 		TTLSeconds:    ttl,
 		ExpiresAtUnix: time.Now().Add(time.Duration(ttl) * time.Second).Unix(),
 		LastAccess:    time.Now(),
@@ -622,4 +646,48 @@ func hostOnly(h string) string {
 // URL escape helper (not used but kept for future safety)
 func safeSegment(s string) string {
 	return url.PathEscape(s)
+}
+
+// checkConditionalRequest 检查HTTP条件请求，如果满足条件返回304
+func (c *CDNCache) checkConditionalRequest(w http.ResponseWriter, r *http.Request, meta *objectMeta) bool {
+	// 检查 If-None-Match (ETag验证)
+	if ifNoneMatch := r.Header.Get("If-None-Match"); ifNoneMatch != "" {
+		if meta.ETag != "" {
+			// 支持弱ETag比较 (W/"etag")
+			clientETag := strings.TrimSpace(ifNoneMatch)
+			serverETag := strings.TrimSpace(meta.ETag)
+
+			// 移除弱ETag标记进行比较
+			if strings.HasPrefix(clientETag, "W/\"") && strings.HasSuffix(clientETag, "\"") {
+				clientETag = clientETag[3 : len(clientETag)-1]
+			}
+			if strings.HasPrefix(serverETag, "W/\"") && strings.HasSuffix(serverETag, "\"") {
+				serverETag = serverETag[3 : len(serverETag)-1]
+			}
+
+			if clientETag == serverETag {
+				c.log.Debugf("ETag匹配，返回304: %s", r.URL.Path)
+				w.WriteHeader(http.StatusNotModified)
+				return true
+			}
+		}
+	}
+
+	// 检查 If-Modified-Since (时间验证)
+	if ifModifiedSince := r.Header.Get("If-Modified-Since"); ifModifiedSince != "" {
+		if !meta.LastModified.IsZero() {
+			// 解析客户端发送的时间
+			clientTime, err := http.ParseTime(ifModifiedSince)
+			if err == nil {
+				// 比较时间，如果客户端缓存的时间 >= 服务器最后修改时间，返回304
+				if !clientTime.Before(meta.LastModified) {
+					c.log.Debugf("Last-Modified匹配，返回304: %s", r.URL.Path)
+					w.WriteHeader(http.StatusNotModified)
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }

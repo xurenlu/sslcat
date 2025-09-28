@@ -28,7 +28,7 @@ import (
 )
 
 var (
-	version = "1.2.2"
+	version = "1.3.0"
 	build   = "dev"
 )
 
@@ -154,7 +154,7 @@ func main() {
 	// 初始化 Runner 模块
 	gitServer := runner.NewGitServer(cfg)
 
-	webServer := web.NewServer(cfg, proxyManager, securityManager, sslManager, gitServer, notificationIntegrator)
+	webServer := web.NewServer(cfg, proxyManager, securityManager, sslManager, gitServer, notificationIntegrator, version)
 
 	// 日志级别
 	if cfg.Server.Debug {

@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 )
 
 // handleAPISettings 获取系统设置
@@ -129,6 +130,101 @@ func (s *Server) handleAPISettingsUpdate(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": "settings updated",
+	})
+}
+
+// handleAPISettingsBasic 处理前端基础设置保存
+func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizeAPI(w, r, false) { // 需要写权限
+		return
+	}
+
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		AdminPrefix           string `json:"adminPrefix,omitempty"`
+		HTTPPort              string `json:"httpPort,omitempty"`
+		HTTPSPort             string `json:"httpsPort,omitempty"`
+		AutoSSL               *bool  `json:"autoSSL,omitempty"`
+		LetsEncryptEmail      string `json:"letsEncryptEmail,omitempty"`
+		SSLProvider           string `json:"sslProvider,omitempty"`
+		EnableDDoSProtection  *bool  `json:"enableDDoSProtection,omitempty"`
+		MaxRequestsPerMinute  string `json:"maxRequestsPerMinute,omitempty"`
+		EnableRateLimit       *bool  `json:"enableRateLimit,omitempty"`
+		EnableAccessLog       *bool  `json:"enableAccessLog,omitempty"`
+		EnableErrorLog        *bool  `json:"enableErrorLog,omitempty"`
+		LogLevel              string `json:"logLevel,omitempty"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON", "message": err.Error()})
+		return
+	}
+
+	// 记录旧前缀用于路由重建
+	oldPrefix := s.config.AdminPrefix
+
+	// 更新配置（只更新提供的字段）
+	if req.AdminPrefix != "" && req.AdminPrefix != oldPrefix {
+		s.config.AdminPrefix = req.AdminPrefix
+	}
+	
+	if req.HTTPSPort != "" {
+		if port, err := strconv.Atoi(req.HTTPSPort); err == nil && port > 0 && port <= 65535 {
+			s.config.Server.Port = port
+		}
+	}
+	
+	if req.LetsEncryptEmail != "" {
+		s.config.SSL.Email = req.LetsEncryptEmail
+	}
+	
+	if req.EnableDDoSProtection != nil {
+		s.config.Security.EnableDDOS = *req.EnableDDoSProtection
+	}
+	
+	if req.MaxRequestsPerMinute != "" {
+		if maxReq, err := strconv.Atoi(req.MaxRequestsPerMinute); err == nil && maxReq > 0 {
+			s.config.Security.MaxAttempts5Min = maxReq
+		}
+	}
+	
+	if req.EnableRateLimit != nil {
+		s.config.Security.EnableUAFilter = *req.EnableRateLimit
+	}
+	
+	if req.EnableAccessLog != nil {
+		s.config.Server.AccessLogEnabled = *req.EnableAccessLog
+	}
+
+	// 保存配置
+	if err := s.config.Save(s.config.ConfigFile); err != nil {
+		s.log.Errorf("保存配置失败: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "failed to save config", "message": err.Error()})
+		return
+	}
+
+	// 如果管理前缀变化，重建路由
+	if oldPrefix != s.config.AdminPrefix {
+		s.mux = http.NewServeMux()
+		s.setupRoutes()
+		s.templateRenderer.ClearCache()
+		s.log.Infof("管理前缀已从 %s 更改为 %s，路由已重建", oldPrefix, s.config.AdminPrefix)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "基础设置保存成功",
+		"data": map[string]interface{}{
+			"adminPrefix": s.config.AdminPrefix,
+			"httpsPort":   s.config.Server.Port,
+		},
 	})
 }
 

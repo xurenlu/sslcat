@@ -1,10 +1,13 @@
 package web
 
 import (
+	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/xurenlu/sslcat/internal/assets"
 )
@@ -108,6 +111,24 @@ func (s *Server) handleFrontendAssets(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
+	// 获取文件信息用于ETag生成
+	fileInfo, err := file.Stat()
+	if err != nil {
+		s.log.Debugf("Failed to get file info: %s", filePath)
+		http.NotFound(w, r)
+		return
+	}
+
+	// 生成ETag（基于文件修改时间和大小）
+	etag := generateETag(fileInfo)
+	w.Header().Set("ETag", etag)
+	w.Header().Set("Last-Modified", fileInfo.ModTime().UTC().Format(http.TimeFormat))
+
+	// 检查条件请求
+	if checkConditionalRequest(w, r, etag, fileInfo.ModTime()) {
+		return
+	}
+
 	// 复制文件内容
 	io.Copy(w, file)
 }
@@ -158,4 +179,51 @@ func (s *Server) handleSPA(w http.ResponseWriter, r *http.Request) {
 
 	// 写入修改后的HTML内容
 	w.Write([]byte(htmlStr))
+}
+
+// generateETag 生成基于文件信息的ETag
+func generateETag(fileInfo os.FileInfo) string {
+	// 使用文件修改时间和大小生成ETag
+	// 格式: "W/\"size-mtime\"" (弱ETag)
+	size := fileInfo.Size()
+	mtime := fileInfo.ModTime().Unix()
+	return fmt.Sprintf("W/\"%d-%d\"", size, mtime)
+}
+
+// checkConditionalRequest 检查HTTP条件请求
+func checkConditionalRequest(w http.ResponseWriter, r *http.Request, etag string, lastModified time.Time) bool {
+	// 检查 If-None-Match (ETag验证)
+	if ifNoneMatch := r.Header.Get("If-None-Match"); ifNoneMatch != "" {
+		// 支持弱ETag比较
+		clientETag := strings.TrimSpace(ifNoneMatch)
+		serverETag := strings.TrimSpace(etag)
+
+		// 移除弱ETag标记进行比较
+		if strings.HasPrefix(clientETag, "W/\"") && strings.HasSuffix(clientETag, "\"") {
+			clientETag = clientETag[3 : len(clientETag)-1]
+		}
+		if strings.HasPrefix(serverETag, "W/\"") && strings.HasSuffix(serverETag, "\"") {
+			serverETag = serverETag[3 : len(serverETag)-1]
+		}
+
+		if clientETag == serverETag {
+			w.WriteHeader(http.StatusNotModified)
+			return true
+		}
+	}
+
+	// 检查 If-Modified-Since (时间验证)
+	if ifModifiedSince := r.Header.Get("If-Modified-Since"); ifModifiedSince != "" {
+		// 解析客户端发送的时间
+		clientTime, err := http.ParseTime(ifModifiedSince)
+		if err == nil {
+			// 比较时间，如果客户端缓存的时间 >= 服务器最后修改时间，返回304
+			if !clientTime.Before(lastModified) {
+				w.WriteHeader(http.StatusNotModified)
+				return true
+			}
+		}
+	}
+
+	return false
 }

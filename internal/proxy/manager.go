@@ -431,9 +431,11 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 			<h1>502 Bad Gateway</h1>
 			<p>Unable to connect to upstream: %s</p>
 			<p>Error: %v</p>
+			<hr>
+			<p><small>Powered by sslcat-%s</small></p>
 		</body>
 		</html>
-		`, targetURL, err)
+		`, targetURL, err, m.version)
 	}
 
 	// 修改响应
