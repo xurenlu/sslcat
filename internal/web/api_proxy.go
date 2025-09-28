@@ -68,6 +68,14 @@ func (s *Server) handleAPIProxyRulesPost(w http.ResponseWriter, r *http.Request)
 		AuthUsers          []config.ProxyAuthUser `json:"auth_users"`
 		AuthSessionTimeout int                    `json:"auth_session_timeout"`
 		AuthCookieDomain   string                 `json:"auth_cookie_domain"`
+
+		// 代理超时配置
+		ConnectTimeoutSec        int `json:"connect_timeout_sec"`
+		KeepAliveTimeoutSec      int `json:"keep_alive_timeout_sec"`
+		IdleTimeoutSec           int `json:"idle_timeout_sec"`
+		TLSHandshakeTimeoutSec   int `json:"tls_handshake_timeout_sec"`
+		ExpectContinueTimeoutSec int `json:"expect_continue_timeout_sec"`
+		HealthCheckTimeoutSec    int `json:"health_check_timeout_sec"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -147,6 +155,14 @@ func (s *Server) handleAPIProxyRulesPost(w http.ResponseWriter, r *http.Request)
 		AuthUsers:          req.AuthUsers,
 		AuthSessionTimeout: req.AuthSessionTimeout,
 		AuthCookieDomain:   req.AuthCookieDomain,
+
+		// 代理超时配置
+		ConnectTimeoutSec:        req.ConnectTimeoutSec,
+		KeepAliveTimeoutSec:      req.KeepAliveTimeoutSec,
+		IdleTimeoutSec:           req.IdleTimeoutSec,
+		TLSHandshakeTimeoutSec:   req.TLSHandshakeTimeoutSec,
+		ExpectContinueTimeoutSec: req.ExpectContinueTimeoutSec,
+		HealthCheckTimeoutSec:    req.HealthCheckTimeoutSec,
 	}
 
 	if existingIndex >= 0 {
@@ -286,6 +302,13 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 			CDNDefaultTTLSeconds int    `json:"cdn_ttl_seconds"`
 			// HTTP Host头部优化
 			OptimizeHostHeader bool `json:"optimize_host_header"`
+			// 代理超时配置
+			ConnectTimeoutSec        int `json:"connect_timeout_sec"`
+			KeepAliveTimeoutSec      int `json:"keep_alive_timeout_sec"`
+			IdleTimeoutSec           int `json:"idle_timeout_sec"`
+			TLSHandshakeTimeoutSec   int `json:"tls_handshake_timeout_sec"`
+			ExpectContinueTimeoutSec int `json:"expect_continue_timeout_sec"`
+			HealthCheckTimeoutSec    int `json:"health_check_timeout_sec"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -323,6 +346,13 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 			CDNDefaultTTLSeconds: req.CDNDefaultTTLSeconds,
 			// HTTP Host头部优化
 			OptimizeHostHeader: req.OptimizeHostHeader,
+			// 代理超时配置
+			ConnectTimeoutSec:        req.ConnectTimeoutSec,
+			KeepAliveTimeoutSec:      req.KeepAliveTimeoutSec,
+			IdleTimeoutSec:           req.IdleTimeoutSec,
+			TLSHandshakeTimeoutSec:   req.TLSHandshakeTimeoutSec,
+			ExpectContinueTimeoutSec: req.ExpectContinueTimeoutSec,
+			HealthCheckTimeoutSec:    req.HealthCheckTimeoutSec,
 		}
 
 		s.config.Proxy.Rules = append(s.config.Proxy.Rules, newRule)

@@ -24,16 +24,18 @@ type ProxyRuleChange struct {
 
 // ConfigDiff 总体差异
 type ConfigDiff struct {
-	ServerChanges      []KeyChange       `json:"server_changes"`
-	SSLChanges         []KeyChange       `json:"ssl_changes"`
-	AdminChanges       []KeyChange       `json:"admin_changes"`
-	SecurityChanges    []KeyChange       `json:"security_changes"`
-	NotificationChanges []KeyChange      `json:"notification_changes"`
-	AdminPrefix        *KeyChange        `json:"admin_prefix,omitempty"`
-	ProxyAdded         []ProxyRule       `json:"proxy_added"`
-	ProxyRemoved       []ProxyRule       `json:"proxy_removed"`
-	ProxyModified      []ProxyRuleChange `json:"proxy_modified"`
-	HasChanges         bool              `json:"has_changes"`
+	ServerChanges       []KeyChange       `json:"server_changes"`
+	SSLChanges          []KeyChange       `json:"ssl_changes"`
+	AdminChanges        []KeyChange       `json:"admin_changes"`
+	SecurityChanges     []KeyChange       `json:"security_changes"`
+	CompressionChanges  []KeyChange       `json:"compression_changes"`
+	CDNCacheChanges     []KeyChange       `json:"cdn_cache_changes"`
+	NotificationChanges []KeyChange       `json:"notification_changes"`
+	AdminPrefix         *KeyChange        `json:"admin_prefix,omitempty"`
+	ProxyAdded          []ProxyRule       `json:"proxy_added"`
+	ProxyRemoved        []ProxyRule       `json:"proxy_removed"`
+	ProxyModified       []ProxyRuleChange `json:"proxy_modified"`
+	HasChanges          bool              `json:"has_changes"`
 }
 
 func stringOf[T any](v T) string { return fmt.Sprintf("%v", v) }
@@ -109,6 +111,12 @@ func CompareConfigs(cur, prop *Config) ConfigDiff {
 	diff.SecurityChanges = append(diff.SecurityChanges, simpleDiff("security.tls_fp_max_per_min", cur.Security.TLSFingerprintMaxPerMin, prop.Security.TLSFingerprintMaxPerMin)...)
 	diff.SecurityChanges = append(diff.SecurityChanges, simpleDiff("security.tls_fp_top_n", cur.Security.TLSFingerprintTopN, prop.Security.TLSFingerprintTopN)...)
 
+	// Compression 配置比较
+	diff.CompressionChanges = compareCompressionConfigs(cur.Compression, prop.Compression)
+
+	// CDN Cache 配置比较
+	diff.CDNCacheChanges = compareCDNCacheConfigs(cur.CDNCache, prop.CDNCache)
+
 	// Notification 配置比较
 	diff.NotificationChanges = compareNotificationConfigs(cur.Notification, prop.Notification)
 
@@ -146,7 +154,48 @@ func CompareConfigs(cur, prop *Config) ConfigDiff {
 				if or.SSLOnly != nr.SSLOnly {
 					fcs = append(fcs, KeyChange{Key: "ssl_only", Old: stringOf(or.SSLOnly), New: stringOf(nr.SSLOnly)})
 				}
-				diff.ProxyModified = append(diff.ProxyModified, ProxyRuleChange{Domain: dom, FieldChanges: fcs, Old: or, New: nr})
+
+				// 负载均衡配置比较
+				if or.LoadBalancerEnabled != nr.LoadBalancerEnabled {
+					fcs = append(fcs, KeyChange{Key: "load_balancer_enabled", Old: stringOf(or.LoadBalancerEnabled), New: stringOf(nr.LoadBalancerEnabled)})
+				}
+				if or.LoadBalancerAlgorithm != nr.LoadBalancerAlgorithm {
+					fcs = append(fcs, KeyChange{Key: "load_balancer_algorithm", Old: or.LoadBalancerAlgorithm, New: nr.LoadBalancerAlgorithm})
+				}
+				if !reflect.DeepEqual(or.LoadBalancerBackends, nr.LoadBalancerBackends) {
+					fcs = append(fcs, KeyChange{Key: "load_balancer_backends", Old: fmt.Sprintf("%d backends", len(or.LoadBalancerBackends)), New: fmt.Sprintf("%d backends", len(nr.LoadBalancerBackends))})
+				}
+
+				// 会话保持配置比较
+				if or.SessionAffinityEnabled != nr.SessionAffinityEnabled {
+					fcs = append(fcs, KeyChange{Key: "session_affinity_enabled", Old: stringOf(or.SessionAffinityEnabled), New: stringOf(nr.SessionAffinityEnabled)})
+				}
+				if or.SessionAffinityMethod != nr.SessionAffinityMethod {
+					fcs = append(fcs, KeyChange{Key: "session_affinity_method", Old: or.SessionAffinityMethod, New: nr.SessionAffinityMethod})
+				}
+
+				// 健康检查配置比较
+				if or.HealthCheckEnabled != nr.HealthCheckEnabled {
+					fcs = append(fcs, KeyChange{Key: "health_check_enabled", Old: stringOf(or.HealthCheckEnabled), New: stringOf(nr.HealthCheckEnabled)})
+				}
+				if or.HealthCheckPath != nr.HealthCheckPath {
+					fcs = append(fcs, KeyChange{Key: "health_check_path", Old: or.HealthCheckPath, New: nr.HealthCheckPath})
+				}
+				if or.HealthCheckInterval != nr.HealthCheckInterval {
+					fcs = append(fcs, KeyChange{Key: "health_check_interval", Old: stringOf(or.HealthCheckInterval), New: stringOf(nr.HealthCheckInterval)})
+				}
+
+				// CDN配置比较
+				if or.CDNEnabled != nr.CDNEnabled {
+					fcs = append(fcs, KeyChange{Key: "cdn_enabled", Old: stringOf(or.CDNEnabled), New: stringOf(nr.CDNEnabled)})
+				}
+				if or.CDNPreset != nr.CDNPreset {
+					fcs = append(fcs, KeyChange{Key: "cdn_preset", Old: or.CDNPreset, New: nr.CDNPreset})
+				}
+
+				if len(fcs) > 0 {
+					diff.ProxyModified = append(diff.ProxyModified, ProxyRuleChange{Domain: dom, FieldChanges: fcs, Old: or, New: nr})
+				}
 			}
 		}
 	}
@@ -159,7 +208,9 @@ func CompareConfigs(cur, prop *Config) ConfigDiff {
 	}
 
 	// 标记是否有变更
-	total := len(diff.ServerChanges) + len(diff.SSLChanges) + len(diff.AdminChanges) + len(diff.SecurityChanges) + len(diff.NotificationChanges) + len(diff.ProxyAdded) + len(diff.ProxyRemoved) + len(diff.ProxyModified)
+	total := len(diff.ServerChanges) + len(diff.SSLChanges) + len(diff.AdminChanges) + len(diff.SecurityChanges) +
+		len(diff.CompressionChanges) + len(diff.CDNCacheChanges) + len(diff.NotificationChanges) +
+		len(diff.ProxyAdded) + len(diff.ProxyRemoved) + len(diff.ProxyModified)
 	if diff.AdminPrefix != nil {
 		total++
 	}
@@ -182,26 +233,26 @@ func simpleDiff[T comparable](key string, a, b T) []KeyChange {
 // compareNotificationConfigs 比较通知配置
 func compareNotificationConfigs(cur, prop NotificationConfig) []KeyChange {
 	var changes []KeyChange
-	
+
 	// 基本配置
 	changes = append(changes, simpleDiff("notification.enabled", cur.Enabled, prop.Enabled)...)
-	
+
 	// 邮件配置
 	emailChanges := compareEmailChannelConfigs(cur.Channels.Email, prop.Channels.Email)
 	changes = append(changes, emailChanges...)
-	
+
 	// Webhook配置
 	webhookChanges := compareWebhookChannelConfigs(cur.Channels.Webhook, prop.Channels.Webhook)
 	changes = append(changes, webhookChanges...)
-	
+
 	// 系统日志配置
 	syslogChanges := compareSyslogChannelConfigs(cur.Channels.Syslog, prop.Channels.Syslog)
 	changes = append(changes, syslogChanges...)
-	
+
 	// 控制台配置
 	consoleChanges := compareConsoleChannelConfigs(cur.Channels.Console, prop.Channels.Console)
 	changes = append(changes, consoleChanges...)
-	
+
 	return changes
 }
 
@@ -209,12 +260,12 @@ func compareNotificationConfigs(cur, prop NotificationConfig) []KeyChange {
 func compareEmailChannelConfigs(cur, prop EmailChannelConfig) []KeyChange {
 	var changes []KeyChange
 	prefix := "notification.channels.email."
-	
+
 	changes = append(changes, simpleDiff(prefix+"enabled", cur.Enabled, prop.Enabled)...)
 	changes = append(changes, simpleDiff(prefix+"smtp_host", cur.SMTPHost, prop.SMTPHost)...)
 	changes = append(changes, simpleDiff(prefix+"smtp_port", cur.SMTPPort, prop.SMTPPort)...)
 	changes = append(changes, simpleDiff(prefix+"username", cur.Username, prop.Username)...)
-	
+
 	// 密码需要特殊处理，不显示明文
 	if cur.Password != prop.Password {
 		changes = append(changes, KeyChange{
@@ -223,9 +274,9 @@ func compareEmailChannelConfigs(cur, prop EmailChannelConfig) []KeyChange {
 			New: "(已修改)",
 		})
 	}
-	
+
 	changes = append(changes, simpleDiff(prefix+"from", cur.From, prop.From)...)
-	
+
 	// To字段需要特殊处理数组
 	if !reflect.DeepEqual(cur.To, prop.To) {
 		changes = append(changes, KeyChange{
@@ -234,9 +285,9 @@ func compareEmailChannelConfigs(cur, prop EmailChannelConfig) []KeyChange {
 			New: fmt.Sprintf("[%s]", strings.Join(prop.To, ", ")),
 		})
 	}
-	
+
 	changes = append(changes, simpleDiff(prefix+"use_tls", cur.UseTLS, prop.UseTLS)...)
-	
+
 	return changes
 }
 
@@ -244,11 +295,11 @@ func compareEmailChannelConfigs(cur, prop EmailChannelConfig) []KeyChange {
 func compareWebhookChannelConfigs(cur, prop WebhookChannelConfig) []KeyChange {
 	var changes []KeyChange
 	prefix := "notification.channels.webhook."
-	
+
 	changes = append(changes, simpleDiff(prefix+"enabled", cur.Enabled, prop.Enabled)...)
 	changes = append(changes, simpleDiff(prefix+"url", cur.URL, prop.URL)...)
 	changes = append(changes, simpleDiff(prefix+"timeout", cur.Timeout, prop.Timeout)...)
-	
+
 	// Headers需要特殊处理
 	if !reflect.DeepEqual(cur.Headers, prop.Headers) {
 		changes = append(changes, KeyChange{
@@ -257,7 +308,7 @@ func compareWebhookChannelConfigs(cur, prop WebhookChannelConfig) []KeyChange {
 			New: stringOf(prop.Headers),
 		})
 	}
-	
+
 	return changes
 }
 
@@ -265,11 +316,11 @@ func compareWebhookChannelConfigs(cur, prop WebhookChannelConfig) []KeyChange {
 func compareSyslogChannelConfigs(cur, prop SyslogChannelConfig) []KeyChange {
 	var changes []KeyChange
 	prefix := "notification.channels.syslog."
-	
+
 	changes = append(changes, simpleDiff(prefix+"enabled", cur.Enabled, prop.Enabled)...)
 	changes = append(changes, simpleDiff(prefix+"address", cur.Address, prop.Address)...)
 	changes = append(changes, simpleDiff(prefix+"network", cur.Network, prop.Network)...)
-	
+
 	return changes
 }
 
@@ -277,8 +328,72 @@ func compareSyslogChannelConfigs(cur, prop SyslogChannelConfig) []KeyChange {
 func compareConsoleChannelConfigs(cur, prop ConsoleChannelConfig) []KeyChange {
 	var changes []KeyChange
 	prefix := "notification.channels.console."
-	
+
 	changes = append(changes, simpleDiff(prefix+"enabled", cur.Enabled, prop.Enabled)...)
-	
+
+	return changes
+}
+
+// compareCompressionConfigs 比较压缩配置
+func compareCompressionConfigs(cur, prop CompressionConfig) []KeyChange {
+	var changes []KeyChange
+	prefix := "compression."
+
+	changes = append(changes, simpleDiff(prefix+"enabled", cur.Enabled, prop.Enabled)...)
+	changes = append(changes, simpleDiff(prefix+"min_size", cur.MinSize, prop.MinSize)...)
+	changes = append(changes, simpleDiff(prefix+"level.gzip", cur.Level.Gzip, prop.Level.Gzip)...)
+	changes = append(changes, simpleDiff(prefix+"level.brotli", cur.Level.Brotli, prop.Level.Brotli)...)
+
+	// 算法数组比较
+	if !reflect.DeepEqual(cur.Algorithms, prop.Algorithms) {
+		changes = append(changes, KeyChange{
+			Key: prefix + "algorithms",
+			Old: fmt.Sprintf("[%s]", strings.Join(cur.Algorithms, ", ")),
+			New: fmt.Sprintf("[%s]", strings.Join(prop.Algorithms, ", ")),
+		})
+	}
+
+	// 文件类型数组比较
+	if !reflect.DeepEqual(cur.Types, prop.Types) {
+		changes = append(changes, KeyChange{
+			Key: prefix + "types",
+			Old: fmt.Sprintf("%d types", len(cur.Types)),
+			New: fmt.Sprintf("%d types", len(prop.Types)),
+		})
+	}
+
+	// 排除类型数组比较
+	if !reflect.DeepEqual(cur.ExcludedTypes, prop.ExcludedTypes) {
+		changes = append(changes, KeyChange{
+			Key: prefix + "excluded_types",
+			Old: fmt.Sprintf("%d types", len(cur.ExcludedTypes)),
+			New: fmt.Sprintf("%d types", len(prop.ExcludedTypes)),
+		})
+	}
+
+	return changes
+}
+
+// compareCDNCacheConfigs 比较CDN缓存配置
+func compareCDNCacheConfigs(cur, prop CDNCacheConfig) []KeyChange {
+	var changes []KeyChange
+	prefix := "cdn_cache."
+
+	changes = append(changes, simpleDiff(prefix+"enabled", cur.Enabled, prop.Enabled)...)
+	changes = append(changes, simpleDiff(prefix+"cache_dir", cur.CacheDir, prop.CacheDir)...)
+	changes = append(changes, simpleDiff(prefix+"max_size_bytes", cur.MaxSizeBytes, prop.MaxSizeBytes)...)
+	changes = append(changes, simpleDiff(prefix+"default_ttl_seconds", cur.DefaultTTLSeconds, prop.DefaultTTLSeconds)...)
+	changes = append(changes, simpleDiff(prefix+"clean_interval_seconds", cur.CleanIntervalSec, prop.CleanIntervalSec)...)
+	changes = append(changes, simpleDiff(prefix+"max_object_bytes", cur.MaxObjectBytes, prop.MaxObjectBytes)...)
+
+	// 缓存规则比较
+	if !reflect.DeepEqual(cur.Rules, prop.Rules) {
+		changes = append(changes, KeyChange{
+			Key: prefix + "rules",
+			Old: fmt.Sprintf("%d rules", len(cur.Rules)),
+			New: fmt.Sprintf("%d rules", len(prop.Rules)),
+		})
+	}
+
 	return changes
 }

@@ -2,10 +2,10 @@ package cache
 
 import (
 	"bytes"
-	"compress/gzip"
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -18,14 +18,16 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/xurenlu/sslcat/internal/compression"
 	"github.com/xurenlu/sslcat/internal/config"
 )
 
 // CDNCache 本地静态文件缓存管理器
 type CDNCache struct {
-	cfg   *config.Config
-	log   *logrus.Entry
-	mutex sync.Mutex
+	cfg        *config.Config
+	log        *logrus.Entry
+	compressor *compression.Compressor
+	mutex      sync.Mutex
 	// 统计计数器
 	hits   int64
 	misses int64
@@ -48,9 +50,13 @@ type objectMeta struct {
 }
 
 func NewCDNCache(cfg *config.Config) *CDNCache {
+	// 创建压缩器
+	compressor := compression.NewCompressor(compression.FromConfig(cfg))
+
 	return &CDNCache{
-		cfg: cfg,
-		log: logrus.WithFields(logrus.Fields{"component": "cdn_cache"}),
+		cfg:        cfg,
+		log:        logrus.WithFields(logrus.Fields{"component": "cdn_cache"}),
+		compressor: compressor,
 	}
 }
 
@@ -176,8 +182,8 @@ func (c *CDNCache) ServeIfFreshWithConfig(w http.ResponseWriter, r *http.Request
 	defer f.Close()
 
 	// 智能压缩处理
-	if c.shouldCompressFile(meta.Path, meta.SizeBytes) {
-		c.serveWithCompression(w, r, f, meta)
+	if c.compressor != nil && c.compressor.ShouldCompress(meta.Path, meta.SizeBytes, meta.ContentType) {
+		c.serveWithAdvancedCompression(w, r, f, meta)
 	} else {
 		// 简单写回
 		w.WriteHeader(http.StatusOK)
@@ -748,17 +754,8 @@ func (c *CDNCache) shouldCompressFile(filePath string, fileSize int64) bool {
 	return compressibleTypes[ext] && fileSize >= 1024
 }
 
-// serveWithCompression 使用压缩方式服务文件
-func (c *CDNCache) serveWithCompression(w http.ResponseWriter, r *http.Request, file io.Reader, meta *objectMeta) {
-	// 检查客户端是否支持gzip
-	acceptEncoding := r.Header.Get("Accept-Encoding")
-	if !strings.Contains(acceptEncoding, "gzip") {
-		// 客户端不支持gzip，直接返回原文件
-		w.WriteHeader(http.StatusOK)
-		io.Copy(w, file)
-		return
-	}
-
+// serveWithAdvancedCompression 使用高级压缩方式服务文件
+func (c *CDNCache) serveWithAdvancedCompression(w http.ResponseWriter, r *http.Request, file io.Reader, meta *objectMeta) {
 	// 读取文件内容
 	content, err := io.ReadAll(file)
 	if err != nil {
@@ -767,36 +764,40 @@ func (c *CDNCache) serveWithCompression(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	// 压缩内容
-	var buf bytes.Buffer
-	gzWriter := gzip.NewWriter(&buf)
-	if _, err := gzWriter.Write(content); err != nil {
+	// 使用压缩器压缩内容
+	result, err := c.compressor.Compress(content, r.Header.Get("Accept-Encoding"))
+	if err != nil {
 		c.log.Errorf("Failed to compress content: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-	if err := gzWriter.Close(); err != nil {
-		c.log.Errorf("Failed to close gzip writer: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	// 检查压缩效果，如果压缩后反而更大，则不使用压缩
-	compressedSize := buf.Len()
-	originalSize := len(content)
-
-	if compressedSize >= originalSize {
-		// 压缩效果不好，直接返回原内容
+		// 压缩失败，直接返回原内容
 		w.WriteHeader(http.StatusOK)
 		w.Write(content)
 		return
 	}
 
 	// 设置压缩相关头部
-	w.Header().Set("Content-Encoding", "gzip")
-	w.Header().Set("Vary", "Accept-Encoding")
+	if result.Algorithm != compression.None {
+		w.Header().Set("Content-Encoding", string(result.Algorithm))
+		w.Header().Set("Vary", "Accept-Encoding")
+
+		// 添加压缩统计信息（调试用）
+		if c.log.Logger.IsLevelEnabled(logrus.DebugLevel) {
+			w.Header().Set("X-CDN-Compression-Algorithm", string(result.Algorithm))
+			w.Header().Set("X-CDN-Compression-Ratio", fmt.Sprintf("%.2f", result.Ratio))
+			w.Header().Set("X-CDN-Original-Size", fmt.Sprintf("%d", result.OriginalSize))
+			w.Header().Set("X-CDN-Compressed-Size", fmt.Sprintf("%d", result.CompressedSize))
+		}
+
+		c.log.Debugf("CDN compressed %s: %d -> %d bytes (%.1f%% reduction)",
+			result.Algorithm, result.OriginalSize, result.CompressedSize, result.Ratio*100)
+	}
 
 	// 写入压缩后的内容
 	w.WriteHeader(http.StatusOK)
-	w.Write(buf.Bytes())
+	w.Write(result.Data)
+}
+
+// serveWithCompression 使用压缩方式服务文件（保留用于向后兼容）
+func (c *CDNCache) serveWithCompression(w http.ResponseWriter, r *http.Request, file io.Reader, meta *objectMeta) {
+	// 使用新的高级压缩方法
+	c.serveWithAdvancedCompression(w, r, file, meta)
 }

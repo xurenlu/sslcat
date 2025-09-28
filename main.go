@@ -28,7 +28,7 @@ import (
 )
 
 var (
-	version = "1.3.1"
+	version = "1.3.2"
 	build   = "dev"
 )
 
@@ -56,12 +56,52 @@ func main() {
 		host        = flag.String("host", "0.0.0.0", "监听地址")
 		logLevel    = flag.String("log-level", "info", "日志级别")
 		showVersion = flag.Bool("version", false, "显示版本信息")
+		testConfig  = flag.Bool("test", false, "测试配置文件语法和完整性")
+		checkConfig = flag.Bool("check", false, "检查配置文件并显示详细信息")
 	)
 	flag.Parse()
 
 	if *showVersion {
 		fmt.Printf("SSLcat v%s (build: %s)\n", version, build)
 		return
+	}
+
+	// 配置文件测试模式
+	if *testConfig {
+		fmt.Printf("🧪 测试配置文件: %s\n", *configFile)
+		result, err := config.ValidateConfigFile(*configFile)
+		if err != nil {
+			fmt.Printf("❌ 验证过程出错: %v\n", err)
+			os.Exit(1)
+		}
+
+		if result.Valid {
+			fmt.Println("✅ 配置文件语法正确，所有必要设置已配置")
+			os.Exit(0)
+		} else {
+			fmt.Printf("❌ 配置文件有 %d 个错误\n", len(result.Errors))
+			for _, err := range result.Errors {
+				fmt.Printf("   %s: %s\n", err.Field, err.Message)
+			}
+			os.Exit(1)
+		}
+	}
+
+	// 配置文件检查模式
+	if *checkConfig {
+		result, err := config.ValidateConfigFile(*configFile)
+		if err != nil {
+			fmt.Printf("❌ 验证过程出错: %v\n", err)
+			os.Exit(1)
+		}
+
+		config.PrintValidationResult(result, *configFile)
+
+		if result.Valid {
+			os.Exit(0)
+		} else {
+			os.Exit(1)
+		}
 	}
 
 	// 初始化日志
@@ -77,6 +117,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
 	}
+
+	// 创建配置监听器
+	configWatcher, err := config.NewConfigWatcher(*configFile, cfg)
+	if err != nil {
+		log.Fatalf("failed to create config watcher: %v", err)
+	}
+
+	// 创建重载管理器
+	reloadManager := config.NewReloadManager()
 
 	// 覆盖配置
 	if *adminPrefix != "/sslcat-panel" {
@@ -155,6 +204,41 @@ func main() {
 	gitServer := runner.NewGitServer(cfg)
 
 	webServer := web.NewServer(cfg, proxyManager, securityManager, sslManager, gitServer, notificationIntegrator, version)
+
+	// 注册可重载组件
+	reloadManager.RegisterComponent(proxyManager)
+	// 注意：其他组件（如sslManager, securityManager）也需要实现ReloadableComponent接口才能注册
+
+	// 设置配置变化回调
+	configWatcher.OnConfigChange(func(oldConfig, newConfig *config.Config) error {
+		log.Info("Configuration changed, starting hot reload...")
+		return reloadManager.ReloadAll(oldConfig, newConfig)
+	})
+
+	configWatcher.OnReloadStart(func() {
+		log.Info("Configuration reload started")
+	})
+
+	configWatcher.OnReloadSuccess(func(newConfig *config.Config) {
+		log.Info("Configuration reload completed successfully")
+		// 更新全局配置引用
+		cfg = newConfig
+		// 更新Web服务器的配置引用
+		webServer.UpdateConfig(newConfig)
+	})
+
+	configWatcher.OnReloadError(func(err error) {
+		log.Errorf("Configuration reload failed: %v", err)
+	})
+
+	// 设置Web服务器的配置重载功能
+	webServer.SetupConfigReload(configWatcher, reloadManager)
+
+	// 启动配置监听
+	if err := configWatcher.Start(); err != nil {
+		log.Fatalf("failed to start config watcher: %v", err)
+	}
+	defer configWatcher.Stop()
 
 	// 日志级别
 	if cfg.Server.Debug {

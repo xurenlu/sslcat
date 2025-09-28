@@ -13,19 +13,36 @@ import {
   VStack,
   Icon,
   useToast,
+  SimpleGrid,
   Text,
   Divider,
   Alert,
   AlertIcon,
   Flex,
 } from '@chakra-ui/react'
-import { FiArrowLeft, FiZap, FiGlobe, FiShield, FiPlus } from 'react-icons/fi'
+import { FiArrowLeft, FiZap, FiGlobe, FiShield, FiPlus, FiClock } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
 import { useConfig, buildPath, buildApiPath } from '../contexts/ConfigContext'
+import LoadBalancerConfig from '../components/LoadBalancerConfig'
 
 interface ProxyAuthUser {
   username: string
   password: string
+}
+
+interface ProxyBackend {
+  id: string
+  host: string
+  port: number
+  weight: number
+  enabled: boolean
+  health_check_enabled: boolean
+  health_check_path: string
+  health_check_method: string
+  expected_status_code: number
+  max_connections: number
+  tls_enabled: boolean
+  tls_insecure: boolean
 }
 
 interface ProxyRuleForm {
@@ -33,6 +50,34 @@ interface ProxyRuleForm {
   target: string
   enabled: boolean
   ssl_only: boolean
+  
+  // 负载均衡配置
+  load_balancer_enabled: boolean
+  load_balancer_algorithm: string
+  load_balancer_backends: ProxyBackend[]
+  
+  // 会话保持配置
+  session_affinity_enabled: boolean
+  session_affinity_method: string
+  session_affinity_cookie: string
+  session_affinity_header: string
+  session_affinity_ttl: number
+  
+  // 健康检查配置
+  health_check_enabled: boolean
+  health_check_path: string
+  health_check_interval: number
+  health_check_timeout: number
+  health_check_method: string
+  expected_status_code: number
+  
+  // 故障转移配置
+  failover_enabled: boolean
+  max_retries: number
+  retry_interval: number
+  failure_threshold: number
+  recovery_threshold: number
+  
   // 类CDN设置
   cdn_mode_enabled: boolean
   cdn_enabled: boolean
@@ -45,6 +90,13 @@ interface ProxyRuleForm {
   auth_users: ProxyAuthUser[]
   auth_session_timeout: number
   auth_cookie_domain: string
+  // 代理超时配置
+  connect_timeout_sec: number
+  keep_alive_timeout_sec: number
+  idle_timeout_sec: number
+  tls_handshake_timeout_sec: number
+  expect_continue_timeout_sec: number
+  health_check_timeout_sec: number
 }
 
 const ProxyAdd: React.FC = () => {
@@ -57,6 +109,34 @@ const ProxyAdd: React.FC = () => {
     target: '',
     enabled: true,
     ssl_only: true,
+    
+    // 负载均衡配置
+    load_balancer_enabled: false,
+    load_balancer_algorithm: 'round_robin',
+    load_balancer_backends: [],
+    
+    // 会话保持配置
+    session_affinity_enabled: false,
+    session_affinity_method: 'ip',
+    session_affinity_cookie: '',
+    session_affinity_header: '',
+    session_affinity_ttl: 3600,
+    
+    // 健康检查配置
+    health_check_enabled: false,
+    health_check_path: '/health',
+    health_check_interval: 30,
+    health_check_timeout: 5,
+    health_check_method: 'GET',
+    expected_status_code: 200,
+    
+    // 故障转移配置
+    failover_enabled: true,
+    max_retries: 3,
+    retry_interval: 1,
+    failure_threshold: 3,
+    recovery_threshold: 2,
+    
     // 类CDN设置
     cdn_mode_enabled: false,
     cdn_enabled: false,
@@ -69,6 +149,13 @@ const ProxyAdd: React.FC = () => {
     auth_users: [{ username: '', password: '' }],
     auth_session_timeout: 3600,
     auth_cookie_domain: '',
+    // 代理超时配置
+    connect_timeout_sec: 30,
+    keep_alive_timeout_sec: 30,
+    idle_timeout_sec: 90,
+    tls_handshake_timeout_sec: 10,
+    expect_continue_timeout_sec: 1,
+    health_check_timeout_sec: 5,
   })
 
   const handleInputChange = (field: keyof ProxyRuleForm, value: string | boolean | number) => {
@@ -99,6 +186,46 @@ const ProxyAdd: React.FC = () => {
       setFormData(prev => ({
         ...prev,
         auth_users: prev.auth_users.filter((_, i) => i !== index)
+      }))
+    }
+  }
+
+  // 后端服务器管理函数
+  const handleBackendChange = (index: number, field: keyof ProxyBackend, value: string | number | boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      load_balancer_backends: prev.load_balancer_backends.map((backend, i) => 
+        i === index ? { ...backend, [field]: value } : backend
+      )
+    }))
+  }
+
+  const addBackend = () => {
+    const newBackend: ProxyBackend = {
+      id: `backend_${Date.now()}`,
+      host: '',
+      port: 8080,
+      weight: 1,
+      enabled: true,
+      health_check_enabled: true,
+      health_check_path: '/health',
+      health_check_method: 'GET',
+      expected_status_code: 200,
+      max_connections: 100,
+      tls_enabled: false,
+      tls_insecure: false
+    }
+    setFormData(prev => ({
+      ...prev,
+      load_balancer_backends: [...prev.load_balancer_backends, newBackend]
+    }))
+  }
+
+  const removeBackend = (index: number) => {
+    if (formData.load_balancer_backends.length > 1) {
+      setFormData(prev => ({
+        ...prev,
+        load_balancer_backends: prev.load_balancer_backends.filter((_, i) => i !== index)
       }))
     }
   }
@@ -225,6 +352,35 @@ const ProxyAdd: React.FC = () => {
                   </FormControl>
                 </VStack>
               </Box>
+
+              <Divider />
+
+              {/* 负载均衡配置 */}
+              <LoadBalancerConfig
+                load_balancer_enabled={formData.load_balancer_enabled}
+                load_balancer_algorithm={formData.load_balancer_algorithm}
+                load_balancer_backends={formData.load_balancer_backends}
+                session_affinity_enabled={formData.session_affinity_enabled}
+                session_affinity_method={formData.session_affinity_method}
+                session_affinity_cookie={formData.session_affinity_cookie}
+                session_affinity_header={formData.session_affinity_header}
+                session_affinity_ttl={formData.session_affinity_ttl}
+                health_check_enabled={formData.health_check_enabled}
+                health_check_path={formData.health_check_path}
+                health_check_interval={formData.health_check_interval}
+                health_check_timeout={formData.health_check_timeout}
+                health_check_method={formData.health_check_method}
+                expected_status_code={formData.expected_status_code}
+                failover_enabled={formData.failover_enabled}
+                max_retries={formData.max_retries}
+                retry_interval={formData.retry_interval}
+                failure_threshold={formData.failure_threshold}
+                recovery_threshold={formData.recovery_threshold}
+                onFieldChange={handleInputChange}
+                onBackendChange={handleBackendChange}
+                onAddBackend={addBackend}
+                onRemoveBackend={removeBackend}
+              />
 
               <Divider />
 
@@ -464,6 +620,101 @@ const ProxyAdd: React.FC = () => {
                       </FormControl>
                     </>
                   )}
+                </VStack>
+              </Box>
+
+              {/* 代理超时配置 */}
+              <Box>
+                <Heading size="md" mb={4}>
+                  <Icon as={FiClock} mr={2} />
+                  代理超时配置
+                </Heading>
+                <VStack spacing={4}>
+                  <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} w="full">
+                    <FormControl>
+                      <FormLabel>连接超时（秒）</FormLabel>
+                      <Input
+                        type="number"
+                        value={formData.connect_timeout_sec}
+                        onChange={(e) => handleInputChange('connect_timeout_sec', parseInt(e.target.value) || 30)}
+                        placeholder="30"
+                        size="lg"
+                      />
+                      <Text fontSize="sm" color="gray.500" mt={1}>
+                        建立连接到上游服务器的超时时间
+                      </Text>
+                    </FormControl>
+
+                    <FormControl>
+                      <FormLabel>连接保持超时（秒）</FormLabel>
+                      <Input
+                        type="number"
+                        value={formData.keep_alive_timeout_sec}
+                        onChange={(e) => handleInputChange('keep_alive_timeout_sec', parseInt(e.target.value) || 30)}
+                        placeholder="30"
+                        size="lg"
+                      />
+                      <Text fontSize="sm" color="gray.500" mt={1}>
+                        TCP连接保持活跃的超时时间
+                      </Text>
+                    </FormControl>
+
+                    <FormControl>
+                      <FormLabel>空闲连接超时（秒）</FormLabel>
+                      <Input
+                        type="number"
+                        value={formData.idle_timeout_sec}
+                        onChange={(e) => handleInputChange('idle_timeout_sec', parseInt(e.target.value) || 90)}
+                        placeholder="90"
+                        size="lg"
+                      />
+                      <Text fontSize="sm" color="gray.500" mt={1}>
+                        空闲连接在连接池中的超时时间
+                      </Text>
+                    </FormControl>
+
+                    <FormControl>
+                      <FormLabel>TLS握手超时（秒）</FormLabel>
+                      <Input
+                        type="number"
+                        value={formData.tls_handshake_timeout_sec}
+                        onChange={(e) => handleInputChange('tls_handshake_timeout_sec', parseInt(e.target.value) || 10)}
+                        placeholder="10"
+                        size="lg"
+                      />
+                      <Text fontSize="sm" color="gray.500" mt={1}>
+                        TLS/SSL握手过程的超时时间
+                      </Text>
+                    </FormControl>
+
+                    <FormControl>
+                      <FormLabel>Expect-Continue超时（秒）</FormLabel>
+                      <Input
+                        type="number"
+                        value={formData.expect_continue_timeout_sec}
+                        onChange={(e) => handleInputChange('expect_continue_timeout_sec', parseInt(e.target.value) || 1)}
+                        placeholder="1"
+                        size="lg"
+                      />
+                      <Text fontSize="sm" color="gray.500" mt={1}>
+                        等待100-Continue响应的超时时间
+                      </Text>
+                    </FormControl>
+
+                    <FormControl>
+                      <FormLabel>健康检查超时（秒）</FormLabel>
+                      <Input
+                        type="number"
+                        value={formData.health_check_timeout_sec}
+                        onChange={(e) => handleInputChange('health_check_timeout_sec', parseInt(e.target.value) || 5)}
+                        placeholder="5"
+                        size="lg"
+                      />
+                      <Text fontSize="sm" color="gray.500" mt={1}>
+                        测试上游服务器连接的超时时间
+                      </Text>
+                    </FormControl>
+                  </SimpleGrid>
                 </VStack>
               </Box>
 

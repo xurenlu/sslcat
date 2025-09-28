@@ -23,6 +23,8 @@ type Config struct {
 	AdminPrefix string         `json:"admin_prefix"`
 	ConfigFile  string         `json:"-"` // 配置文件路径，不序列化
 
+	// 压缩配置
+	Compression CompressionConfig `json:"compression"`
 	// 集群配置
 	Cluster ClusterConfig `json:"cluster"`
 	// 静态站点
@@ -113,6 +115,33 @@ type ProxyRule struct {
 	Port    int    `json:"port"`
 	Enabled bool   `json:"enabled"`
 	SSLOnly bool   `json:"ssl_only"`
+
+	// 负载均衡配置
+	LoadBalancerEnabled   bool           `json:"load_balancer_enabled"`   // 是否启用负载均衡
+	LoadBalancerAlgorithm string         `json:"load_balancer_algorithm"` // 负载均衡算法: round_robin, least_conn, ip_hash, random, weighted_round_robin
+	LoadBalancerBackends  []ProxyBackend `json:"load_balancer_backends"`  // 后端服务器列表
+
+	// 会话保持配置
+	SessionAffinityEnabled bool   `json:"session_affinity_enabled"` // 是否启用会话保持
+	SessionAffinityMethod  string `json:"session_affinity_method"`  // 会话保持方法: cookie, header, ip
+	SessionAffinityCookie  string `json:"session_affinity_cookie"`  // Cookie名称
+	SessionAffinityHeader  string `json:"session_affinity_header"`  // Header名称
+	SessionAffinityTTL     int    `json:"session_affinity_ttl"`     // 会话保持时间（秒）
+
+	// 健康检查配置
+	HealthCheckEnabled  bool   `json:"health_check_enabled"`  // 是否启用健康检查
+	HealthCheckPath     string `json:"health_check_path"`     // 健康检查路径
+	HealthCheckInterval int    `json:"health_check_interval"` // 健康检查间隔（秒）
+	HealthCheckTimeout  int    `json:"health_check_timeout"`  // 健康检查超时（秒）
+	HealthCheckMethod   string `json:"health_check_method"`   // 健康检查HTTP方法
+	ExpectedStatusCode  int    `json:"expected_status_code"`  // 期望的状态码
+
+	// 故障转移配置
+	FailoverEnabled   bool `json:"failover_enabled"`   // 是否启用故障转移
+	MaxRetries        int  `json:"max_retries"`        // 最大重试次数
+	RetryInterval     int  `json:"retry_interval"`     // 重试间隔（秒）
+	FailureThreshold  int  `json:"failure_threshold"`  // 故障阈值
+	RecoveryThreshold int  `json:"recovery_threshold"` // 恢复阈值
 	// HTTP Host头部优化设置
 	OptimizeHostHeader bool `json:"optimize_host_header"`
 	// 每域名的类CDN设置
@@ -134,6 +163,60 @@ type ProxyRule struct {
 	AuthUsers          []ProxyAuthUser `json:"auth_users,omitempty"` // 用户密码列表
 	AuthSessionTimeout int             `json:"auth_session_timeout"` // 登录有效期（秒），默认3600
 	AuthCookieDomain   string          `json:"auth_cookie_domain"`   // Cookie作用域，默认为代理域名
+
+	// 代理超时配置
+	ConnectTimeoutSec        int `json:"connect_timeout_sec"`         // 连接超时（秒），默认30
+	KeepAliveTimeoutSec      int `json:"keep_alive_timeout_sec"`      // 连接保持超时（秒），默认30
+	IdleTimeoutSec           int `json:"idle_timeout_sec"`            // 空闲连接超时（秒），默认90
+	TLSHandshakeTimeoutSec   int `json:"tls_handshake_timeout_sec"`   // TLS握手超时（秒），默认10
+	ExpectContinueTimeoutSec int `json:"expect_continue_timeout_sec"` // Expect-Continue超时（秒），默认1
+	HealthCheckTimeoutSec    int `json:"health_check_timeout_sec"`    // 健康检查超时（秒），默认5
+
+	// WebSocket代理优化配置
+	WebSocketOptimized    bool `json:"websocket_optimized"`     // 是否启用WebSocket优化，默认true
+	WebSocketBufferSize   int  `json:"websocket_buffer_size"`   // WebSocket缓冲区大小，默认100
+	WebSocketReadTimeout  int  `json:"websocket_read_timeout"`  // WebSocket读取超时（秒），默认30
+	WebSocketWriteTimeout int  `json:"websocket_write_timeout"` // WebSocket写入超时（秒），默认10
+	WebSocketPingInterval int  `json:"websocket_ping_interval"` // WebSocket心跳间隔（秒），默认30
+}
+
+// ProxyBackend 代理后端服务器
+type ProxyBackend struct {
+	ID       string `json:"id"`       // 后端唯一标识
+	Host     string `json:"host"`     // 主机地址
+	Port     int    `json:"port"`     // 端口
+	Weight   int    `json:"weight"`   // 权重，默认为1
+	Priority int    `json:"priority"` // 优先级，数字越小优先级越高
+	Enabled  bool   `json:"enabled"`  // 是否启用
+
+	// 健康检查配置（可选，覆盖全局配置）
+	HealthCheckEnabled  bool   `json:"health_check_enabled,omitempty"`  // 是否启用健康检查
+	HealthCheckPath     string `json:"health_check_path,omitempty"`     // 健康检查路径
+	HealthCheckInterval int    `json:"health_check_interval,omitempty"` // 检查间隔（秒）
+	HealthCheckTimeout  int    `json:"health_check_timeout,omitempty"`  // 检查超时（秒）
+	HealthCheckMethod   string `json:"health_check_method,omitempty"`   // 检查方法
+	ExpectedStatusCode  int    `json:"expected_status_code,omitempty"`  // 期望的状态码
+
+	// 连接配置
+	MaxConnections   int `json:"max_connections,omitempty"`    // 最大连接数
+	ConnectTimeout   int `json:"connect_timeout,omitempty"`    // 连接超时（秒）
+	ReadTimeout      int `json:"read_timeout,omitempty"`       // 读取超时（秒）
+	WriteTimeout     int `json:"write_timeout,omitempty"`      // 写入超时（秒）
+	KeepAliveTimeout int `json:"keep_alive_timeout,omitempty"` // 长连接超时（秒）
+
+	// SSL/TLS配置
+	TLSEnabled    bool   `json:"tls_enabled,omitempty"`     // 是否启用TLS
+	TLSInsecure   bool   `json:"tls_insecure,omitempty"`    // 是否跳过TLS验证
+	TLSServerName string `json:"tls_server_name,omitempty"` // TLS服务器名称
+
+	// 故障转移配置
+	MaxRetries        int `json:"max_retries,omitempty"`        // 最大重试次数
+	RetryInterval     int `json:"retry_interval,omitempty"`     // 重试间隔（秒）
+	FailureThreshold  int `json:"failure_threshold,omitempty"`  // 故障阈值
+	RecoveryThreshold int `json:"recovery_threshold,omitempty"` // 恢复阈值
+
+	// 元数据
+	Metadata map[string]string `json:"metadata,omitempty"` // 元数据，用于存储自定义信息
 }
 
 // ProxyAuthUser 代理访问控制用户
@@ -149,6 +232,16 @@ type SecurityConfig struct {
 	MaxAttempts5Min   int      `json:"max_attempts_5min"`
 	BlockFile         string   `json:"block_file"`
 	AllowedUserAgents []string `json:"allowed_user_agents"`
+
+	// IP访问控制
+	IPWhitelist []string `json:"ip_whitelist"`
+	IPBlacklist []string `json:"ip_blacklist"`
+
+	// 地理位置过滤
+	GeoBlocking GeoBlockingConfig `json:"geo_blocking"`
+
+	// CORS配置
+	CORS CORSConfig `json:"cors"`
 	// 可疑 UA 计数阈值（达到后封禁）
 	UAInvalidMax1Min int `json:"ua_invalid_max_1min"`
 	UAInvalidMax5Min int `json:"ua_invalid_max_5min"`
@@ -168,6 +261,100 @@ type SecurityConfig struct {
 
 	// 解析后的时间字段
 	BlockDuration time.Duration `json:"-"`
+}
+
+// GeoBlockingConfig 地理位置过滤配置
+type GeoBlockingConfig struct {
+	// 是否启用地理位置过滤
+	Enabled bool `json:"enabled"`
+
+	// 允许的国家代码列表
+	AllowedCountries []string `json:"allowed_countries"`
+
+	// 阻止的国家代码列表
+	BlockedCountries []string `json:"blocked_countries"`
+
+	// GeoIP数据库路径
+	DatabasePath string `json:"database_path"`
+
+	// 数据库更新间隔（小时）
+	UpdateInterval int `json:"update_interval"`
+
+	// 是否允许未知国家
+	AllowUnknown bool `json:"allow_unknown"`
+}
+
+// CORSConfig CORS配置
+type CORSConfig struct {
+	// 是否启用CORS
+	Enabled bool `json:"enabled"`
+
+	// 允许的源
+	AllowedOrigins []string `json:"allowed_origins"`
+
+	// 允许的方法
+	AllowedMethods []string `json:"allowed_methods"`
+
+	// 允许的头部
+	AllowedHeaders []string `json:"allowed_headers"`
+
+	// 暴露的头部
+	ExposedHeaders []string `json:"exposed_headers"`
+
+	// 是否允许凭证
+	AllowCredentials bool `json:"allow_credentials"`
+
+	// 预检请求缓存时间
+	MaxAge int `json:"max_age"`
+
+	// 是否允许私有网络
+	AllowPrivateNetwork bool `json:"allow_private_network"`
+}
+
+// RateLimitConfig 限流配置
+type RateLimitConfig struct {
+	// IP限流
+	IPRateLimit IPRateLimitConfig `json:"ip_rate_limit"`
+
+	// 用户限流
+	UserRateLimit UserRateLimitConfig `json:"user_rate_limit"`
+
+	// 路径限流
+	PathRateLimit []PathRateLimitRule `json:"path_rate_limit"`
+
+	// 方法限流
+	MethodRateLimit map[string]int `json:"method_rate_limit"`
+
+	// 全局限流
+	GlobalRateLimit GlobalRateLimitConfig `json:"global_rate_limit"`
+}
+
+// IPRateLimitConfig IP限流配置
+type IPRateLimitConfig struct {
+	RequestsPerSecond int `json:"requests_per_second"`
+	RequestsPerMinute int `json:"requests_per_minute"`
+	RequestsPerHour   int `json:"requests_per_hour"`
+	BurstSize         int `json:"burst_size"`
+}
+
+// UserRateLimitConfig 用户限流配置
+type UserRateLimitConfig struct {
+	RequestsPerMinute int `json:"requests_per_minute"`
+	RequestsPerHour   int `json:"requests_per_hour"`
+}
+
+// PathRateLimitRule 路径限流规则
+type PathRateLimitRule struct {
+	Path              string `json:"path"`
+	Pattern           string `json:"pattern"`
+	RequestsPerMinute int    `json:"requests_per_minute"`
+	BurstSize         int    `json:"burst_size"`
+}
+
+// GlobalRateLimitConfig 全局限流配置
+type GlobalRateLimitConfig struct {
+	RequestsPerSecond int `json:"requests_per_second"`
+	RequestsPerMinute int `json:"requests_per_minute"`
 }
 
 // CDNCacheRule CDN 类缓存规则
@@ -191,6 +378,39 @@ type CDNCacheConfig struct {
 	CleanIntervalSec  int            `json:"clean_interval_seconds"`
 	MaxObjectBytes    int64          `json:"max_object_bytes"`
 	Rules             []CDNCacheRule `json:"rules"`
+}
+
+// CompressionConfig 压缩配置
+type CompressionConfig struct {
+	// 是否启用压缩
+	Enabled bool `json:"enabled"`
+
+	// 支持的压缩算法，按优先级排序
+	Algorithms []string `json:"algorithms"`
+
+	// 最小压缩文件大小（字节）
+	MinSize int64 `json:"min_size"`
+
+	// 压缩级别配置
+	Level CompressionLevelConfig `json:"level"`
+
+	// 可压缩的文件类型
+	Types []string `json:"types"`
+
+	// 不压缩的文件类型
+	ExcludedTypes []string `json:"excluded_types"`
+
+	// 可压缩的Content-Type
+	ContentTypes []string `json:"content_types"`
+}
+
+// CompressionLevelConfig 压缩级别配置
+type CompressionLevelConfig struct {
+	// Gzip压缩级别 (1-9, -1=默认, -2=最快, -3=最佳)
+	Gzip int `json:"gzip"`
+
+	// Brotli压缩级别 (0-11)
+	Brotli int `json:"brotli"`
 }
 
 // ClusterConfig 集群配置

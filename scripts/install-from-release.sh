@@ -3,7 +3,7 @@ set -euo pipefail
 
 # sslcat 一键安装脚本（Linux/macOS）
 # 用法（推荐传版本）：
-#   curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/scripts/install-from-release.sh | sudo bash -s -- -v 1.0.4
+#   curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/scripts/install-from-release.sh | sudo bash -s -- -v 1.3.2
 
 VER=""
 DEST_LINUX="/opt/sslcat"
@@ -106,7 +106,7 @@ done
 set_lang "$USER_LANG"
 
 if [[ -z "$VER" ]]; then
-  VER="1.0.13"
+  VER="1.3.2"
   msg missing_version "$VER"
 fi
 
@@ -213,6 +213,18 @@ if [[ ! -f "$CONF_LINUX" ]]; then
     "clean_interval_seconds": 60,
     "max_object_bytes": 20971520,
     "rules": []
+  },
+  "compression": {
+    "enabled": true,
+    "algorithms": ["br", "gzip"],
+    "min_size": 1024,
+    "level": {
+      "gzip": 6,
+      "brotli": 6
+    },
+    "types": [".js", ".css", ".html", ".htm", ".xml", ".json", ".txt", ".svg"],
+    "excluded_types": [".gz", ".br", ".zip", ".rar", ".7z", ".jpg", ".jpeg", ".png", ".gif", ".webp", ".ico", ".woff", ".woff2", ".ttf", ".eot", ".mp3", ".mp4", ".pdf"],
+    "content_types": ["text/css", "text/plain", "application/javascript", "application/json", "application/xml", "image/svg+xml"]
   },
   "admin_prefix": "/sslcat-panel",
   "cluster": {

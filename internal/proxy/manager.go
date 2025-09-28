@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"bufio"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -11,10 +12,12 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/xurenlu/sslcat/internal/cache"
 	"github.com/xurenlu/sslcat/internal/config"
+	"github.com/xurenlu/sslcat/internal/loadbalancer"
 	"github.com/xurenlu/sslcat/internal/security"
 	"github.com/xurenlu/sslcat/internal/ssl"
 
@@ -35,34 +38,478 @@ type Manager struct {
 	proxyCache      map[string]*httputil.ReverseProxy
 	cacheMutex      sync.RWMutex
 	cdnCache        *cache.CDNCache
+	upstreamCache   *cache.UpstreamCache
 	log             *logrus.Entry
 	version         string
+
+	// 负载均衡器
+	loadBalancers map[string]loadbalancer.BalancerInterface // domain -> load balancer
+	lbMutex       sync.RWMutex
+	lbFactory     *loadbalancer.BalancerFactory
 }
 
 // NewManager 创建代理管理器
 func NewManager(cfg *config.Config, sslMgr *ssl.Manager, secMgr *security.Manager, cdn *cache.CDNCache, version string) *Manager {
-	return &Manager{
+	manager := &Manager{
 		config:          cfg,
 		sslManager:      sslMgr,
 		securityManager: secMgr,
 		proxyCache:      make(map[string]*httputil.ReverseProxy),
 		cdnCache:        cdn,
+		upstreamCache:   cache.NewUpstreamCache(cfg),
 		version:         version,
+		loadBalancers:   make(map[string]loadbalancer.BalancerInterface),
+		lbFactory:       loadbalancer.NewBalancerFactory(),
 		log: logrus.WithFields(logrus.Fields{
 			"component": "proxy_manager",
 		}),
 	}
+
+	// 初始化负载均衡器
+	manager.initializeLoadBalancers()
+
+	return manager
 }
 
 // Start 启动代理管理器
 func (m *Manager) Start() error {
 	m.log.Info("Starting proxy manager")
+
+	// 启动上游缓存清理器
+	if m.upstreamCache != nil {
+		m.upstreamCache.StartCleaner()
+		m.log.Info("Started upstream cache cleaner")
+	}
+
 	return nil
 }
 
 // Stop 停止代理管理器
 func (m *Manager) Stop() {
 	m.log.Info("Stopping proxy manager")
+
+	// 停止所有负载均衡器的健康检查
+	m.lbMutex.RLock()
+	for _, lb := range m.loadBalancers {
+		lb.StopHealthCheck()
+	}
+	m.lbMutex.RUnlock()
+}
+
+// initializeLoadBalancers 初始化负载均衡器
+func (m *Manager) initializeLoadBalancers() {
+	for _, rule := range m.config.Proxy.Rules {
+		if rule.LoadBalancerEnabled && len(rule.LoadBalancerBackends) > 0 {
+			if err := m.createLoadBalancer(&rule); err != nil {
+				m.log.Errorf("Failed to create load balancer for domain %s: %v", rule.Domain, err)
+			}
+		}
+	}
+}
+
+// createLoadBalancer 为指定域名创建负载均衡器
+func (m *Manager) createLoadBalancer(rule *config.ProxyRule) error {
+	// 转换配置格式
+	var backends []loadbalancer.Backend
+	for i, proxyBackend := range rule.LoadBalancerBackends {
+		if !proxyBackend.Enabled {
+			continue
+		}
+
+		backend := loadbalancer.Backend{
+			ID:       proxyBackend.ID,
+			Host:     proxyBackend.Host,
+			Port:     proxyBackend.Port,
+			Weight:   proxyBackend.Weight,
+			Priority: proxyBackend.Priority,
+
+			// 健康检查配置
+			HealthCheckEnabled:  rule.HealthCheckEnabled || proxyBackend.HealthCheckEnabled,
+			HealthCheckPath:     m.getHealthCheckPath(rule, &proxyBackend),
+			HealthCheckInterval: m.getDuration(rule.HealthCheckInterval, proxyBackend.HealthCheckInterval, 30),
+			HealthCheckTimeout:  m.getDuration(rule.HealthCheckTimeout, proxyBackend.HealthCheckTimeout, 5),
+			HealthCheckMethod:   m.getHealthCheckMethod(rule, &proxyBackend),
+			ExpectedStatusCode:  m.getExpectedStatusCode(rule, &proxyBackend),
+
+			// 连接配置
+			MaxConnections:      proxyBackend.MaxConnections,
+			ConnectTimeout:      m.getDuration(0, proxyBackend.ConnectTimeout, 30),
+			ReadTimeout:         m.getDuration(0, proxyBackend.ReadTimeout, 30),
+			WriteTimeout:        m.getDuration(0, proxyBackend.WriteTimeout, 30),
+			KeepAliveTimeout:    m.getDuration(0, proxyBackend.KeepAliveTimeout, 30),
+			TLSHandshakeTimeout: time.Duration(10) * time.Second,
+
+			// SSL/TLS配置
+			TLSEnabled:    proxyBackend.TLSEnabled,
+			TLSInsecure:   proxyBackend.TLSInsecure,
+			TLSServerName: proxyBackend.TLSServerName,
+
+			// 故障转移配置
+			MaxRetries:        m.getInt(rule.MaxRetries, proxyBackend.MaxRetries, 3),
+			RetryInterval:     m.getDuration(rule.RetryInterval, proxyBackend.RetryInterval, 1),
+			FailureThreshold:  m.getInt(rule.FailureThreshold, proxyBackend.FailureThreshold, 3),
+			RecoveryThreshold: m.getInt(rule.RecoveryThreshold, proxyBackend.RecoveryThreshold, 2),
+
+			// 元数据
+			Metadata: proxyBackend.Metadata,
+		}
+
+		// 设置默认ID
+		if backend.ID == "" {
+			backend.ID = fmt.Sprintf("%s_backend_%d", rule.Domain, i)
+		}
+
+		// 设置默认权重
+		if backend.Weight <= 0 {
+			backend.Weight = 1
+		}
+
+		backends = append(backends, backend)
+	}
+
+	if len(backends) == 0 {
+		return fmt.Errorf("no enabled backends found for domain %s", rule.Domain)
+	}
+
+	// 创建负载均衡器配置
+	algorithm := loadbalancer.Algorithm(rule.LoadBalancerAlgorithm)
+	if algorithm == "" {
+		algorithm = loadbalancer.RoundRobin
+	}
+
+	lbConfig := loadbalancer.LoadBalancerConfig{
+		Algorithm:           algorithm,
+		Backends:            backends,
+		HealthCheckEnabled:  rule.HealthCheckEnabled,
+		HealthCheckInterval: time.Duration(rule.HealthCheckInterval) * time.Second,
+		HealthCheckTimeout:  time.Duration(rule.HealthCheckTimeout) * time.Second,
+
+		// 会话保持配置
+		SessionAffinityEnabled: rule.SessionAffinityEnabled,
+		SessionAffinityMethod:  rule.SessionAffinityMethod,
+		SessionAffinityCookie:  rule.SessionAffinityCookie,
+		SessionAffinityHeader:  rule.SessionAffinityHeader,
+		SessionAffinityTTL:     rule.SessionAffinityTTL,
+
+		// 故障转移配置
+		FailoverEnabled: rule.FailoverEnabled,
+		MaxRetries:      rule.MaxRetries,
+		RetryInterval:   time.Duration(rule.RetryInterval) * time.Second,
+	}
+
+	// 创建负载均衡器
+	lb, err := m.lbFactory.CreateBalancer(lbConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create load balancer: %w", err)
+	}
+
+	// 设置事件回调
+	lb.OnBackendHealthChange(func(backend *loadbalancer.Backend, isHealthy bool) {
+		status := "unhealthy"
+		if isHealthy {
+			status = "healthy"
+		}
+		m.log.Infof("Backend %s (%s:%d) for domain %s is now %s",
+			backend.ID, backend.Host, backend.Port, rule.Domain, status)
+	})
+
+	// 存储负载均衡器
+	m.lbMutex.Lock()
+	m.loadBalancers[rule.Domain] = lb
+	m.lbMutex.Unlock()
+
+	m.log.Infof("Created load balancer for domain %s with %d backends using %s algorithm",
+		rule.Domain, len(backends), algorithm)
+
+	return nil
+}
+
+// 辅助方法
+func (m *Manager) getHealthCheckPath(rule *config.ProxyRule, backend *config.ProxyBackend) string {
+	if backend.HealthCheckPath != "" {
+		return backend.HealthCheckPath
+	}
+	if rule.HealthCheckPath != "" {
+		return rule.HealthCheckPath
+	}
+	return "/"
+}
+
+func (m *Manager) getHealthCheckMethod(rule *config.ProxyRule, backend *config.ProxyBackend) string {
+	if backend.HealthCheckMethod != "" {
+		return backend.HealthCheckMethod
+	}
+	if rule.HealthCheckMethod != "" {
+		return rule.HealthCheckMethod
+	}
+	return "GET"
+}
+
+func (m *Manager) getExpectedStatusCode(rule *config.ProxyRule, backend *config.ProxyBackend) int {
+	if backend.ExpectedStatusCode > 0 {
+		return backend.ExpectedStatusCode
+	}
+	if rule.ExpectedStatusCode > 0 {
+		return rule.ExpectedStatusCode
+	}
+	return 200
+}
+
+func (m *Manager) getDuration(ruleValue, backendValue, defaultValue int) time.Duration {
+	if backendValue > 0 {
+		return time.Duration(backendValue) * time.Second
+	}
+	if ruleValue > 0 {
+		return time.Duration(ruleValue) * time.Second
+	}
+	return time.Duration(defaultValue) * time.Second
+}
+
+func (m *Manager) getInt(ruleValue, backendValue, defaultValue int) int {
+	if backendValue > 0 {
+		return backendValue
+	}
+	if ruleValue > 0 {
+		return ruleValue
+	}
+	return defaultValue
+}
+
+// handleLoadBalancedRequest 处理负载均衡请求
+func (m *Manager) handleLoadBalancedRequest(w http.ResponseWriter, r *http.Request, rule *config.ProxyRule) {
+	// 获取负载均衡器
+	m.lbMutex.RLock()
+	lb, exists := m.loadBalancers[rule.Domain]
+	m.lbMutex.RUnlock()
+
+	if !exists {
+		m.log.Errorf("Load balancer not found for domain: %s", rule.Domain)
+		http.Error(w, "Service Unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
+	// 选择后端服务器
+	backend, err := lb.SelectBackend(r)
+	if err != nil {
+		m.log.Errorf("Failed to select backend for domain %s: %v", rule.Domain, err)
+		http.Error(w, "Service Unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
+	m.log.Infof("Selected backend %s (%s:%d) for request to %s",
+		backend.ID, backend.Host, backend.Port, rule.Domain)
+
+	// 创建临时的ProxyRule用于传统代理逻辑
+	tempRule := *rule
+	tempRule.Target = backend.Host
+	tempRule.Port = backend.Port
+	tempRule.LoadBalancerEnabled = false // 避免递归
+
+	// 记录后端选择
+	r.Header.Set("X-Selected-Backend", backend.ID)
+	r.Header.Set("X-Backend-Address", backend.GetAddress())
+
+	// 使用传统的代理逻辑处理请求
+	m.proxyToBackend(w, r, &tempRule, backend)
+}
+
+// proxyToBackend 代理请求到指定后端
+func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *config.ProxyRule, backend *loadbalancer.Backend) {
+	startTime := time.Now()
+
+	// 上游缓存检查（仅对GET/HEAD请求）
+	if m.upstreamCache != nil && (r.Method == "GET" || r.Method == "HEAD") {
+		if m.upstreamCache.Serve(w, r) {
+			m.log.Debugf("Served from upstream cache for %s %s", r.Method, r.URL.Path)
+			return
+		}
+	}
+
+	// CDN 缓存直出（仅 GET/HEAD，且全局或域名启用）
+	cdnEnabled := m.config.CDNCache.Enabled || (rule != nil && rule.CDNEnabled)
+	if m.cdnCache != nil && cdnEnabled {
+		// 临时修改请求Host为后端域名，确保缓存路径一致性
+		originalHost := r.Host
+		if rule != nil {
+			backendHost := m.extractHostFromTarget(rule.Target, rule.Port)
+			r.Host = backendHost
+		}
+		served := m.cdnCache.ServeIfFreshWithConfig(w, r, cdnEnabled)
+		// 恢复原始Host
+		r.Host = originalHost
+		if served {
+			m.log.Debugf("Served from CDN cache for %s %s", r.Method, r.URL.Path)
+			return
+		}
+	}
+
+	// 获取或创建反向代理
+	proxy := m.getOrCreateProxy(rule)
+	if proxy == nil {
+		backend.IncrementFailures()
+		http.Error(w, "Failed to create proxy", http.StatusInternalServerError)
+		return
+	}
+
+	// 获取真实客户端IP
+	clientIP := m.getClientIP(r)
+
+	// 透明代理 - 正确设置所有必要的头部
+	scheme := "https"
+	if r.TLS == nil {
+		scheme = "http"
+	}
+
+	// 检查是否启用了CDN缓存（全局或域名级别）
+	isCloudStorage := m.isCloudStorageService(rule.Target)
+
+	// 在CDN模式或云存储模式下，预先清理可能存在的代理头部
+	if cdnEnabled || isCloudStorage {
+		r.Header.Del("X-Forwarded-For")
+		r.Header.Del("X-Forwarded-Host")
+		r.Header.Del("X-Forwarded-Proto")
+		r.Header.Del("X-Forwarded-Port")
+		r.Header.Del("X-Real-IP")
+		r.Header.Del("X-Forwarded-Server")
+		r.Header.Del("X-Original-URI")
+		r.Header.Del("X-Original-Method")
+
+		// 对于云服务，进行更彻底的头部清理
+		if isCloudStorage {
+			r.Header.Del("X-Forwarded")
+			r.Header.Del("X-Client-IP")
+			r.Header.Del("X-Cluster-Client-IP")
+			r.Header.Del("Forwarded-For")
+			r.Header.Del("Forwarded")
+			r.Header.Del("CF-Connecting-IP")
+
+			// 处理可能导致防盗链问题的Referer
+			if referer := r.Header.Get("Referer"); referer != "" && strings.Contains(referer, "local.") {
+				r.Header.Del("Referer")
+				m.log.Debugf("Pre-removed local Referer for cloud service: %s", referer)
+			}
+		}
+
+		m.log.Debugf("Pre-cleaned proxy headers for %s (CDN: %v, 云服务: %v)", r.Host, cdnEnabled, isCloudStorage)
+	}
+
+	if !cdnEnabled && !isCloudStorage {
+		// 非CDN且非云服务模式：设置标准的代理头部
+		r.Header.Set("X-Forwarded-Proto", scheme)
+		r.Header.Set("X-Forwarded-Host", r.Host)
+		r.Header.Set("X-Forwarded-Port", m.getPort(r))
+		r.Header.Set("X-Real-IP", clientIP)
+
+		// 正确处理 X-Forwarded-For 链
+		if existing := r.Header.Get("X-Forwarded-For"); existing != "" {
+			r.Header.Set("X-Forwarded-For", existing+", "+clientIP)
+		} else {
+			r.Header.Set("X-Forwarded-For", clientIP)
+		}
+
+		// 设置原始请求信息
+		r.Header.Set("X-Forwarded-Server", "sslcat")
+		r.Header.Set("X-Original-URI", r.RequestURI)
+		r.Header.Set("X-Original-Method", r.Method)
+
+		m.log.Debugf("Added proxy headers (non-CDN, non-cloud mode) for %s", r.Host)
+	}
+
+	// 执行代理
+	// 在 ModifyResponse 中做缓存落盘（全局或域名启用）
+	originalModify := proxy.ModifyResponse
+	proxy.ModifyResponse = func(resp *http.Response) error {
+		// 计算响应时间
+		responseTime := time.Since(startTime)
+		backend.UpdateResponseTime(responseTime)
+
+		// 记录响应详情
+		m.logResponseDetails(resp, rule)
+
+		if originalModify != nil {
+			if err := originalModify(resp); err != nil {
+				backend.IncrementFailures()
+				return err
+			}
+		}
+
+		// 移除可能的安全头，让目标服务器自己设置
+		resp.Header.Del("Strict-Transport-Security")
+		resp.Header.Del("X-Frame-Options")
+		resp.Header.Del("X-Content-Type-Options")
+
+		// 添加代理标识和后端信息
+		resp.Header.Set("X-Proxy-By", "SSLcat/"+m.version)
+		resp.Header.Set("X-Backend-ID", backend.ID)
+		resp.Header.Set("X-Backend-Address", backend.GetAddress())
+		resp.Header.Set("X-Response-Time", responseTime.String())
+
+		// 上游缓存存储（仅对GET/HEAD请求的静态资源）
+		if m.upstreamCache != nil && (resp.Request.Method == "GET" || resp.Request.Method == "HEAD") {
+			// 异步存储到上游缓存，避免影响响应性能
+			go func() {
+				if err := m.upstreamCache.Store(resp.Request, resp); err != nil {
+					m.log.Debugf("Failed to store upstream cache for %s: %v", resp.Request.URL.String(), err)
+				}
+			}()
+		}
+
+		// CDN 缓存落盘（全局或域名启用）
+		if m.cdnCache != nil && cdnEnabled {
+			if rule != nil && rule.CDNDefaultTTLSeconds > 0 {
+				resp.Header.Set("X-SSLcat-CDN-Default-TTL", strconv.Itoa(rule.CDNDefaultTTLSeconds))
+			}
+			// 临时修改请求Host为后端域名，确保缓存路径一致性
+			originalHost := resp.Request.Host
+			if rule != nil {
+				backendHost := m.extractHostFromTarget(rule.Target, rule.Port)
+				resp.Request.Host = backendHost
+			}
+			m.cdnCache.MaybeStoreWithConfig(resp, cdnEnabled)
+			// 恢复原始Host
+			resp.Request.Host = originalHost
+			if rule != nil {
+				resp.Header.Del("X-SSLcat-CDN-Default-TTL")
+			}
+		}
+
+		return nil
+	}
+
+	// 设置错误处理
+	originalErrorHandler := proxy.ErrorHandler
+	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+		backend.IncrementFailures()
+		backend.DecrementConnections() // 确保连接计数正确
+
+		m.log.Errorf("Proxy error to backend %s (%s): %v", backend.ID, backend.GetAddress(), err)
+
+		if originalErrorHandler != nil {
+			originalErrorHandler(w, r, err)
+		} else {
+			// 默认错误处理
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.WriteHeader(http.StatusBadGateway)
+			fmt.Fprintf(w, `
+			<html>
+			<head><title>Proxy Error</title></head>
+			<body>
+				<h1>502 Bad Gateway</h1>
+				<p>Unable to connect to backend %s (%s)</p>
+				<p>Error: %v</p>
+				<hr>
+				<p><small>Powered by sslcat-%s</small></p>
+			</body>
+			</html>
+			`, backend.ID, backend.GetAddress(), err, m.version)
+		}
+	}
+
+	// 执行代理请求
+	proxy.ServeHTTP(w, r)
+
+	// 请求完成后减少连接计数
+	backend.DecrementConnections()
 }
 
 // PurgeCDN 清理 CDN 缓存
@@ -74,6 +521,30 @@ func (m *Manager) PurgeCDN(matchType, pattern, mediaCSV string) error {
 		return m.cdnCache.PurgeAll()
 	}
 	return m.cdnCache.PurgeByCondition(matchType, pattern, mediaCSV)
+}
+
+// PurgeUpstreamCache 清理上游缓存
+func (m *Manager) PurgeUpstreamCache(pattern string) error {
+	if m.upstreamCache == nil {
+		return fmt.Errorf("upstream cache not enabled")
+	}
+
+	if pattern == "" || pattern == "all" {
+		return m.upstreamCache.PurgeAll()
+	}
+
+	return m.upstreamCache.PurgeByPattern(pattern)
+}
+
+// GetUpstreamCacheStats 获取上游缓存统计信息
+func (m *Manager) GetUpstreamCacheStats() map[string]interface{} {
+	if m.upstreamCache == nil {
+		return map[string]interface{}{
+			"enabled": false,
+		}
+	}
+
+	return m.upstreamCache.GetStats()
 }
 
 // GetProxyConfig 获取指定域名的代理配置
@@ -88,8 +559,21 @@ func (m *Manager) GetCDNCache() interface{ Stats() map[string]any } {
 
 // ProxyRequest 代理请求
 func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *config.ProxyRule) {
+	// 检查是否为WebSocket升级请求
+	if m.isWebSocketUpgrade(r) {
+		m.log.Infof("Detected WebSocket upgrade request for %s", r.Host)
+		m.HandleWebSocketOptimized(w, r, rule)
+		return
+	}
+
 	// 记录原始请求信息
 	m.logRequestDetails(r, "INCOMING_REQUEST", rule)
+
+	// 检查是否启用负载均衡
+	if rule.LoadBalancerEnabled {
+		m.handleLoadBalancedRequest(w, r, rule)
+		return
+	}
 
 	// CDN 缓存直出（仅 GET/HEAD，且全局或域名启用）
 	cdnEnabled := m.config.CDNCache.Enabled || (rule != nil && rule.CDNEnabled)
@@ -395,18 +879,40 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 		m.logRequestDetails(req, "OUTGOING_REQUEST", rule)
 	}
 
+	// 获取超时配置，如果为0则使用默认值
+	connectTimeout := rule.ConnectTimeoutSec
+	if connectTimeout <= 0 {
+		connectTimeout = 30 // 默认30秒
+	}
+	keepAliveTimeout := rule.KeepAliveTimeoutSec
+	if keepAliveTimeout <= 0 {
+		keepAliveTimeout = 30 // 默认30秒
+	}
+	idleTimeout := rule.IdleTimeoutSec
+	if idleTimeout <= 0 {
+		idleTimeout = 90 // 默认90秒
+	}
+	tlsHandshakeTimeout := rule.TLSHandshakeTimeoutSec
+	if tlsHandshakeTimeout <= 0 {
+		tlsHandshakeTimeout = 10 // 默认10秒
+	}
+	expectContinueTimeout := rule.ExpectContinueTimeoutSec
+	if expectContinueTimeout <= 0 {
+		expectContinueTimeout = 1 // 默认1秒
+	}
+
 	// 自定义传输配置
 	baseTransport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
+			Timeout:   time.Duration(connectTimeout) * time.Second,
+			KeepAlive: time.Duration(keepAliveTimeout) * time.Second,
 		}).DialContext,
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
+		IdleConnTimeout:       time.Duration(idleTimeout) * time.Second,
+		TLSHandshakeTimeout:   time.Duration(tlsHandshakeTimeout) * time.Second,
+		ExpectContinueTimeout: time.Duration(expectContinueTimeout) * time.Second,
 		// 不验证后端证书，允许自签名证书
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
@@ -611,7 +1117,256 @@ func (m *Manager) HandleWebSocket(w http.ResponseWriter, r *http.Request, rule *
 	m.copyData(conn, clientConn)
 }
 
-// copyData 复制数据
+// isWebSocketUpgrade 检查是否为WebSocket升级请求
+func (m *Manager) isWebSocketUpgrade(r *http.Request) bool {
+	return strings.ToLower(r.Header.Get("Connection")) == "upgrade" &&
+		strings.ToLower(r.Header.Get("Upgrade")) == "websocket"
+}
+
+// HandleWebSocketOptimized 优化的WebSocket代理处理
+func (m *Manager) HandleWebSocketOptimized(w http.ResponseWriter, r *http.Request, rule *config.ProxyRule) {
+	// 检查是否启用WebSocket优化
+	if !rule.WebSocketOptimized {
+		// 使用原有的简单WebSocket代理
+		m.HandleWebSocket(w, r, rule)
+		return
+	}
+
+	// 获取连接超时配置
+	connectTimeout := rule.ConnectTimeoutSec
+	if connectTimeout <= 0 {
+		connectTimeout = 30 // 默认30秒
+	}
+
+	// 建立到上游服务器的连接
+	upstreamConn, err := net.DialTimeout("tcp", net.JoinHostPort(rule.Target, strconv.Itoa(rule.Port)), time.Duration(connectTimeout)*time.Second)
+	if err != nil {
+		m.log.Errorf("Failed to connect to upstream WebSocket server: %v", err)
+		http.Error(w, "无法连接到目标服务器", http.StatusBadGateway)
+		return
+	}
+
+	// 劫持客户端连接
+	hj, ok := w.(http.Hijacker)
+	if !ok {
+		upstreamConn.Close()
+		http.Error(w, "无法劫持连接", http.StatusInternalServerError)
+		return
+	}
+
+	clientConn, _, err := hj.Hijack()
+	if err != nil {
+		upstreamConn.Close()
+		http.Error(w, "无法劫持连接", http.StatusInternalServerError)
+		return
+	}
+
+	// 转发WebSocket握手请求到上游服务器
+	err = r.Write(upstreamConn)
+	if err != nil {
+		m.log.Errorf("Failed to forward WebSocket handshake: %v", err)
+		clientConn.Close()
+		upstreamConn.Close()
+		return
+	}
+
+	// 读取上游服务器的握手响应
+	upstreamReader := bufio.NewReader(upstreamConn)
+	resp, err := http.ReadResponse(upstreamReader, r)
+	if err != nil {
+		m.log.Errorf("Failed to read WebSocket handshake response: %v", err)
+		clientConn.Close()
+		upstreamConn.Close()
+		return
+	}
+
+	// 转发握手响应到客户端
+	err = resp.Write(clientConn)
+	if err != nil {
+		m.log.Errorf("Failed to forward WebSocket handshake response: %v", err)
+		clientConn.Close()
+		upstreamConn.Close()
+		return
+	}
+
+	// 检查握手是否成功
+	if resp.StatusCode != 101 {
+		m.log.Errorf("WebSocket handshake failed with status: %d", resp.StatusCode)
+		clientConn.Close()
+		upstreamConn.Close()
+		return
+	}
+
+	m.log.Infof("WebSocket handshake successful for %s", r.Host)
+
+	// 开始优化的双向数据转发
+	m.startOptimizedWebSocketProxy(clientConn, upstreamConn, rule)
+}
+
+// startOptimizedWebSocketProxy 启动优化的WebSocket代理
+func (m *Manager) startOptimizedWebSocketProxy(clientConn, upstreamConn net.Conn, rule *config.ProxyRule) {
+	// 获取缓冲区大小配置
+	bufferSize := rule.WebSocketBufferSize
+	if bufferSize <= 0 {
+		bufferSize = 100 // 默认100
+	}
+
+	// 创建带缓冲的通道用于数据传输
+	clientToUpstream := make(chan []byte, bufferSize)
+	upstreamToClient := make(chan []byte, bufferSize)
+
+	// 错误通道
+	errChan := make(chan error, 4)
+
+	// 连接状态
+	var clientClosed, upstreamClosed int32
+
+	// 启动数据读取goroutine
+	go m.readWebSocketData(clientConn, clientToUpstream, errChan, &clientClosed, "client", rule)
+	go m.readWebSocketData(upstreamConn, upstreamToClient, errChan, &upstreamClosed, "upstream", rule)
+
+	// 启动数据写入goroutine
+	go m.writeWebSocketData(upstreamConn, clientToUpstream, errChan, &upstreamClosed, "upstream", rule)
+	go m.writeWebSocketData(clientConn, upstreamToClient, errChan, &clientClosed, "client", rule)
+
+	// 监控连接状态和错误
+	go m.monitorWebSocketConnections(clientConn, upstreamConn, errChan, &clientClosed, &upstreamClosed, rule)
+
+	// 等待连接关闭
+	<-errChan
+
+	// 清理资源
+	atomic.StoreInt32(&clientClosed, 1)
+	atomic.StoreInt32(&upstreamClosed, 1)
+
+	// 给缓冲的数据一些时间完成传输
+	time.Sleep(100 * time.Millisecond)
+
+	close(clientToUpstream)
+	close(upstreamToClient)
+
+	clientConn.Close()
+	upstreamConn.Close()
+
+	m.log.Infof("WebSocket proxy connection closed for %s", rule.Target)
+}
+
+// readWebSocketData 读取WebSocket数据
+func (m *Manager) readWebSocketData(conn net.Conn, dataChan chan<- []byte, errChan chan<- error, closed *int32, connType string, rule *config.ProxyRule) {
+	defer func() {
+		if r := recover(); r != nil {
+			m.log.Errorf("Panic in readWebSocketData (%s): %v", connType, r)
+		}
+	}()
+
+	// 获取读取超时配置
+	readTimeout := rule.WebSocketReadTimeout
+	if readTimeout <= 0 {
+		readTimeout = 30 // 默认30秒
+	}
+
+	buffer := make([]byte, 32*1024)
+	for atomic.LoadInt32(closed) == 0 {
+		// 设置读取超时
+		conn.SetReadDeadline(time.Now().Add(time.Duration(readTimeout) * time.Second))
+
+		n, err := conn.Read(buffer)
+		if err != nil {
+			if atomic.LoadInt32(closed) == 0 {
+				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+					// 超时不是错误，继续读取
+					continue
+				}
+				m.log.Debugf("WebSocket read error (%s): %v", connType, err)
+				errChan <- err
+			}
+			return
+		}
+
+		if n > 0 {
+			// 复制数据避免竞态条件
+			data := make([]byte, n)
+			copy(data, buffer[:n])
+
+			select {
+			case dataChan <- data:
+				// 数据发送成功
+			case <-time.After(5 * time.Second):
+				// 发送超时，可能对端已关闭
+				m.log.Warnf("WebSocket data send timeout (%s)", connType)
+				errChan <- fmt.Errorf("data send timeout")
+				return
+			}
+		}
+	}
+}
+
+// writeWebSocketData 写入WebSocket数据
+func (m *Manager) writeWebSocketData(conn net.Conn, dataChan <-chan []byte, errChan chan<- error, closed *int32, connType string, rule *config.ProxyRule) {
+	defer func() {
+		if r := recover(); r != nil {
+			m.log.Errorf("Panic in writeWebSocketData (%s): %v", connType, r)
+		}
+	}()
+
+	// 获取写入超时配置
+	writeTimeout := rule.WebSocketWriteTimeout
+	if writeTimeout <= 0 {
+		writeTimeout = 10 // 默认10秒
+	}
+
+	for atomic.LoadInt32(closed) == 0 {
+		select {
+		case data, ok := <-dataChan:
+			if !ok {
+				// 通道已关闭
+				return
+			}
+
+			// 设置写入超时
+			conn.SetWriteDeadline(time.Now().Add(time.Duration(writeTimeout) * time.Second))
+
+			_, err := conn.Write(data)
+			if err != nil {
+				if atomic.LoadInt32(closed) == 0 {
+					m.log.Debugf("WebSocket write error (%s): %v", connType, err)
+					errChan <- err
+				}
+				return
+			}
+		case <-time.After(30 * time.Second):
+			// 写入超时检查
+			if atomic.LoadInt32(closed) != 0 {
+				return
+			}
+		}
+	}
+}
+
+// monitorWebSocketConnections 监控WebSocket连接状态
+func (m *Manager) monitorWebSocketConnections(clientConn, upstreamConn net.Conn, errChan chan<- error, clientClosed, upstreamClosed *int32, rule *config.ProxyRule) {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			// 定期检查连接状态
+			if atomic.LoadInt32(clientClosed) != 0 || atomic.LoadInt32(upstreamClosed) != 0 {
+				errChan <- fmt.Errorf("connection closed")
+				return
+			}
+
+			// 可以在这里添加心跳检测逻辑
+
+		case <-time.After(5 * time.Minute):
+			// 连接超时检查
+			m.log.Debugf("WebSocket connection timeout check for %s", rule.Target)
+		}
+	}
+}
+
+// copyData 复制数据（保留原有方法作为备用）
 func (m *Manager) copyData(dst, src net.Conn) {
 	defer dst.Close()
 	defer src.Close()
@@ -638,7 +1393,13 @@ func (m *Manager) copyData(dst, src net.Conn) {
 
 // TestConnection 测试到目标服务器的连接
 func (m *Manager) TestConnection(rule *config.ProxyRule) error {
-	conn, err := net.DialTimeout("tcp", net.JoinHostPort(rule.Target, strconv.Itoa(rule.Port)), 5*time.Second)
+	// 获取健康检查超时配置，如果为0则使用默认值
+	healthCheckTimeout := rule.HealthCheckTimeoutSec
+	if healthCheckTimeout <= 0 {
+		healthCheckTimeout = 5 // 默认5秒
+	}
+
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort(rule.Target, strconv.Itoa(rule.Port)), time.Duration(healthCheckTimeout)*time.Second)
 	if err != nil {
 		return fmt.Errorf("failed to connect to %s:%d: %w", rule.Target, rule.Port, err)
 	}
@@ -657,7 +1418,120 @@ func (m *Manager) GetProxyStats() map[string]interface{} {
 		"active_rules":   len(m.config.Proxy.Rules),
 	}
 
+	// 添加负载均衡器统计
+	m.lbMutex.RLock()
+	stats["load_balancers"] = len(m.loadBalancers)
+	m.lbMutex.RUnlock()
+
+	// 添加上游缓存统计
+	if m.upstreamCache != nil {
+		stats["upstream_cache"] = m.upstreamCache.GetStats()
+	}
+
 	return stats
+}
+
+// 实现 ReloadableComponent 接口
+
+// GetName 获取组件名称
+func (m *Manager) GetName() string {
+	return "proxy_manager"
+}
+
+// Reload 重载代理配置
+func (m *Manager) Reload(newConfig *config.Config) error {
+	m.log.Info("Reloading proxy manager configuration")
+
+	// 更新配置
+	oldConfig := m.config
+	m.config = newConfig
+
+	// 重新初始化负载均衡器
+	m.lbMutex.Lock()
+	// 停止旧的负载均衡器
+	for _, lb := range m.loadBalancers {
+		lb.StopHealthCheck()
+	}
+	// 清空负载均衡器
+	m.loadBalancers = make(map[string]loadbalancer.BalancerInterface)
+	m.lbMutex.Unlock()
+
+	// 初始化新的负载均衡器
+	m.initializeLoadBalancers()
+
+	// 清理不再需要的代理缓存
+	m.cacheMutex.Lock()
+	newDomains := make(map[string]bool)
+	for _, rule := range newConfig.Proxy.Rules {
+		newDomains[rule.Domain] = true
+	}
+
+	// 清理不再使用的代理缓存
+	for key := range m.proxyCache {
+		found := false
+		for _, rule := range newConfig.Proxy.Rules {
+			if !rule.LoadBalancerEnabled {
+				expectedKey := fmt.Sprintf("%s:%d", rule.Target, rule.Port)
+				if key == expectedKey {
+					found = true
+					break
+				}
+			}
+		}
+		if !found {
+			delete(m.proxyCache, key)
+		}
+	}
+	m.cacheMutex.Unlock()
+
+	m.log.Infof("Proxy manager reloaded: %d rules -> %d rules, %d load balancers",
+		len(oldConfig.Proxy.Rules), len(newConfig.Proxy.Rules), len(m.loadBalancers))
+
+	return nil
+}
+
+// Validate 验证代理配置
+func (m *Manager) Validate(newConfig *config.Config) error {
+	// 验证代理规则
+	for i, rule := range newConfig.Proxy.Rules {
+		if rule.Domain == "" {
+			return fmt.Errorf("proxy rule %d: domain is required", i)
+		}
+
+		if !rule.LoadBalancerEnabled {
+			// 单后端模式验证
+			if rule.Target == "" {
+				return fmt.Errorf("proxy rule %d: target is required", i)
+			}
+			if rule.Port <= 0 {
+				return fmt.Errorf("proxy rule %d: invalid port: %d", i, rule.Port)
+			}
+		} else {
+			// 负载均衡模式验证
+			if len(rule.LoadBalancerBackends) == 0 {
+				return fmt.Errorf("proxy rule %d: load balancer backends are required", i)
+			}
+
+			enabledBackends := 0
+			for j, backend := range rule.LoadBalancerBackends {
+				if backend.Host == "" {
+					return fmt.Errorf("proxy rule %d, backend %d: host is required", i, j)
+				}
+				if backend.Port <= 0 {
+					return fmt.Errorf("proxy rule %d, backend %d: invalid port: %d", i, j, backend.Port)
+				}
+				if backend.Enabled {
+					enabledBackends++
+				}
+			}
+
+			if enabledBackends == 0 {
+				return fmt.Errorf("proxy rule %d: at least one backend must be enabled", i)
+			}
+		}
+	}
+
+	return nil
 }
 
 // logRequestDetails 记录请求详情

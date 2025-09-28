@@ -1,8 +1,6 @@
 package web
 
 import (
-	"bytes"
-	"compress/gzip"
 	"fmt"
 	"io"
 	"net/http"
@@ -133,7 +131,7 @@ func (s *Server) handleFrontendAssets(w http.ResponseWriter, r *http.Request) {
 
 	// 智能压缩处理
 	if shouldCompress(filePath, fileInfo.Size()) {
-		serveWithCompression(w, r, file, fileInfo)
+		s.serveWithCompression(w, r, file, fileInfo)
 	} else {
 		// 直接复制文件内容
 		io.Copy(w, file)
@@ -286,15 +284,7 @@ func shouldCompress(filePath string, fileSize int64) bool {
 }
 
 // serveWithCompression 使用压缩方式服务文件
-func serveWithCompression(w http.ResponseWriter, r *http.Request, file io.Reader, fileInfo os.FileInfo) {
-	// 检查客户端是否支持gzip
-	acceptEncoding := r.Header.Get("Accept-Encoding")
-	if !strings.Contains(acceptEncoding, "gzip") {
-		// 客户端不支持gzip，直接返回原文件
-		io.Copy(w, file)
-		return
-	}
-
+func (s *Server) serveWithCompression(w http.ResponseWriter, r *http.Request, file io.Reader, fileInfo os.FileInfo) {
 	// 读取文件内容
 	content, err := io.ReadAll(file)
 	if err != nil {
@@ -302,32 +292,36 @@ func serveWithCompression(w http.ResponseWriter, r *http.Request, file io.Reader
 		return
 	}
 
-	// 压缩内容
-	var buf bytes.Buffer
-	gzWriter := gzip.NewWriter(&buf)
-	if _, err := gzWriter.Write(content); err != nil {
-		http.Error(w, "Failed to compress content", http.StatusInternalServerError)
-		return
-	}
-	if err := gzWriter.Close(); err != nil {
-		http.Error(w, "Failed to close gzip writer", http.StatusInternalServerError)
-		return
-	}
-
-	// 检查压缩效果，如果压缩后反而更大，则不使用压缩
-	compressedSize := buf.Len()
-	originalSize := len(content)
-
-	if compressedSize >= originalSize {
-		// 压缩效果不好，直接返回原内容
+	// 使用压缩器压缩内容
+	if s.compressor != nil {
+		// 根据文件扩展名确定Content-Type
+		contentType := getContentType(fileInfo.Name())
+		s.compressor.CompressResponse(w, r, content, contentType)
+	} else {
+		// 如果压缩器未初始化，直接返回原内容
 		w.Write(content)
-		return
 	}
+}
 
-	// 设置压缩相关头部
-	w.Header().Set("Content-Encoding", "gzip")
-	w.Header().Set("Vary", "Accept-Encoding")
-
-	// 写入压缩后的内容
-	w.Write(buf.Bytes())
+// getContentType 根据文件名获取Content-Type
+func getContentType(filename string) string {
+	ext := strings.ToLower(filepath.Ext(filename))
+	switch ext {
+	case ".js":
+		return "application/javascript"
+	case ".css":
+		return "text/css"
+	case ".html", ".htm":
+		return "text/html"
+	case ".json":
+		return "application/json"
+	case ".xml":
+		return "application/xml"
+	case ".svg":
+		return "image/svg+xml"
+	case ".txt":
+		return "text/plain"
+	default:
+		return "application/octet-stream"
+	}
 }

@@ -14,10 +14,12 @@ import (
 	"time"
 
 	"github.com/xurenlu/sslcat/internal/assets"
+	"github.com/xurenlu/sslcat/internal/compression"
 	"github.com/xurenlu/sslcat/internal/config"
 	"github.com/xurenlu/sslcat/internal/ddos"
 	"github.com/xurenlu/sslcat/internal/i18n"
 	"github.com/xurenlu/sslcat/internal/logger"
+	"github.com/xurenlu/sslcat/internal/metrics"
 	"github.com/xurenlu/sslcat/internal/notification"
 	"github.com/xurenlu/sslcat/internal/notify"
 	"github.com/xurenlu/sslcat/internal/proxy"
@@ -47,6 +49,15 @@ type Server struct {
 	leRedirectHost   string
 	lastLECheck      time.Time
 	lastConfigHash   string
+	compressor       *compression.Compressor
+
+	// 配置热重载
+	configWatcher   *config.ConfigWatcher
+	reloadManager   *config.ReloadManager
+	configReloadAPI *ConfigReloadAPI
+
+	// Prometheus指标
+	prometheusMetrics *metrics.PrometheusMetrics
 	// 导入配置暂存
 	pendingImportJSON string
 	pendingImport     *config.Config
@@ -77,6 +88,12 @@ type Server struct {
 
 // NewServer 创建Web服务器
 func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Manager, sslMgr *ssl.Manager, gitServer *runner.GitServer, notificationIntegrator *notification.NotificationIntegrator, version string) *Server {
+	// 初始化压缩器
+	compressor := compression.NewCompressor(compression.FromConfig(cfg))
+
+	// 初始化Prometheus指标
+	prometheusMetrics := metrics.NewPrometheusMetrics()
+
 	// 初始化翻译器（从嵌入读取）
 	translator := i18n.NewTranslator(i18n.LangZhCN, "")
 	// 通过嵌入 i18n 文件加载翻译
@@ -99,17 +116,19 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	templateRenderer := NewTemplateRenderer(translator)
 
 	server := &Server{
-		config:           cfg,
-		proxyManager:     proxyMgr,
-		securityManager:  secMgr,
-		sslManager:       sslMgr,
-		notifier:         notify.NewFromEnv(),
-		templateRenderer: templateRenderer,
-		translator:       translator,
-		mux:              http.NewServeMux(),
-		startTime:        time.Now(),
-		version:          version,
-		gitServer:        gitServer,
+		config:            cfg,
+		proxyManager:      proxyMgr,
+		securityManager:   secMgr,
+		sslManager:        sslMgr,
+		notifier:          notify.NewFromEnv(),
+		templateRenderer:  templateRenderer,
+		translator:        translator,
+		mux:               http.NewServeMux(),
+		startTime:         time.Now(),
+		version:           version,
+		gitServer:         gitServer,
+		compressor:        compressor,
+		prometheusMetrics: prometheusMetrics,
 		log: logrus.WithFields(logrus.Fields{
 			"component": "web_server",
 		}),
@@ -181,6 +200,41 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	server.initDNSCache()
 
 	return server
+}
+
+// SetupConfigReload 设置配置热重载功能
+func (s *Server) SetupConfigReload(configWatcher *config.ConfigWatcher, reloadManager *config.ReloadManager) {
+	s.configWatcher = configWatcher
+	s.reloadManager = reloadManager
+	s.configReloadAPI = NewConfigReloadAPI(s, configWatcher, reloadManager)
+
+	// 设置API路由
+	s.configReloadAPI.SetupRoutes()
+
+	s.log.Info("Config hot reload functionality enabled")
+}
+
+// UpdateConfig 更新服务器配置（热重载时调用）
+func (s *Server) UpdateConfig(newConfig *config.Config) {
+	s.log.Info("Updating server configuration")
+
+	oldConfig := s.config
+	s.config = newConfig
+
+	// 更新压缩器配置
+	if s.compressor != nil {
+		s.compressor = compression.NewCompressor(compression.FromConfig(newConfig))
+		s.log.Info("Updated compressor configuration")
+	}
+
+	// 如果管理面板前缀发生变化，需要重新设置路由
+	if oldConfig.AdminPrefix != newConfig.AdminPrefix {
+		s.log.Infof("Admin prefix changed: %s -> %s", oldConfig.AdminPrefix, newConfig.AdminPrefix)
+		// 注意：这里可能需要重新初始化路由，但这会比较复杂
+		// 建议在文档中说明管理面板前缀变化需要重启服务
+	}
+
+	s.log.Info("Server configuration updated successfully")
 }
 
 // initDNSCache 初始化DNS缓存并启动定期更新
@@ -331,14 +385,6 @@ func (s *Server) applyConfigInPlace(newCfg *config.Config) {
 	s.config.StaticSites = newCfg.StaticSites
 	s.config.PHPSites = newCfg.PHPSites
 	s.config.CDNCache = newCfg.CDNCache
-}
-
-// UpdateConfig 更新配置并重新设置路由
-func (s *Server) UpdateConfig(cfg *config.Config) {
-	s.config = cfg
-	// 重新创建路由器
-	s.mux = http.NewServeMux()
-	s.setupRoutes()
 }
 
 // setupRoutes 设置路由
@@ -495,7 +541,7 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/cdn/rules", s.handleAPICDNRules)
 
 	// Prometheus 指标
-	s.mux.HandleFunc("/metrics", s.handleMetrics)
+	s.mux.Handle("/metrics", s.prometheusMetrics.Handler())
 	// 图形验证码
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/captcha/image", s.handleAPIImageCaptcha)
 	// s.mux.HandleFunc(s.config.AdminPrefix+"/api/captcha", s.handleAPICaptcha) // 关闭验证码API
@@ -525,6 +571,9 @@ func (s *Server) setupRoutes() {
 
 	// 前端 SPA 路由 - 必须放在最后，作为 fallback
 	s.setupFrontendRoutes()
+
+	// 设置上游缓存路由
+	s.setupUpstreamCacheRoutes()
 }
 
 // registerRunnerRoutes 注册 Runner API 路由
@@ -551,6 +600,14 @@ func (s *Server) registerRunnerRoutes() {
 	// 日志查看 API 路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/logs", gitAPI.GetAppLogs)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/log-files", gitAPI.GetAppLogFiles)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/logs/stream", gitAPI.GetAppLogsStream)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/logs/history", gitAPI.GetAppLogsHistory)
+
+	// Docker Registry API 路由
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/docker/images", gitAPI.GetDockerImages)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/docker/config", gitAPI.GetDockerConfig)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/docker/config/update", gitAPI.UpdateDockerConfig)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/docker/test", gitAPI.TestDockerConnection)
 
 	// 运行时检测 API 路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/runtime-detector/detect", runtimeAPI.DetectProject)

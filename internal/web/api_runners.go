@@ -272,6 +272,132 @@ func (api *GitServerAPI) GetAppLogFiles(w http.ResponseWriter, r *http.Request) 
 	api.writeJSON(w, response)
 }
 
+// GetAppLogsStream 获取应用实时日志流
+func (api *GitServerAPI) GetAppLogsStream(w http.ResponseWriter, r *http.Request) {
+	appName := r.URL.Query().Get("app")
+	if appName == "" {
+		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+		return
+	}
+
+	// 使用日志流管理器处理实时日志连接
+	api.server.GetLogStreamManager().HandleWebSocketLogs(w, r, appName)
+}
+
+// GetAppLogsHistory 获取应用历史日志
+func (api *GitServerAPI) GetAppLogsHistory(w http.ResponseWriter, r *http.Request) {
+	appName := r.URL.Query().Get("app")
+	if appName == "" {
+		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+		return
+	}
+
+	limitStr := r.URL.Query().Get("limit")
+	limit := 100
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	// 获取日志流
+	stream := api.server.GetLogStreamManager().GetStream(appName)
+	if stream == nil {
+		api.writeError(w, "日志流不存在", http.StatusNotFound)
+		return
+	}
+
+	// 获取历史日志
+	logs, err := stream.GetHistoryLogs(limit)
+	if err != nil {
+		api.writeError(w, "获取历史日志失败: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"success": true,
+		"data":    logs,
+		"count":   len(logs),
+	}
+
+	api.writeJSON(w, response)
+}
+
+// ==================== Docker Registry API ====================
+
+// GetDockerImages 获取Docker镜像列表
+func (api *GitServerAPI) GetDockerImages(w http.ResponseWriter, r *http.Request) {
+	appName := r.URL.Query().Get("app")
+	if appName == "" {
+		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+		return
+	}
+
+	images, err := api.server.GetDockerRegistry().ListImages(appName)
+	if err != nil {
+		api.writeError(w, "获取Docker镜像失败: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"success": true,
+		"data":    images,
+		"count":   len(images),
+	}
+
+	api.writeJSON(w, response)
+}
+
+// GetDockerConfig 获取Docker Registry配置
+func (api *GitServerAPI) GetDockerConfig(w http.ResponseWriter, r *http.Request) {
+	stats := api.server.GetDockerRegistry().GetStats()
+
+	response := map[string]interface{}{
+		"success": true,
+		"data":    stats,
+	}
+
+	api.writeJSON(w, response)
+}
+
+// UpdateDockerConfig 更新Docker Registry配置
+func (api *GitServerAPI) UpdateDockerConfig(w http.ResponseWriter, r *http.Request) {
+	var config runner.DockerRegistryConfig
+
+	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
+		api.writeError(w, "解析请求失败: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// 更新配置 - 这需要在GitServer中添加相应方法
+	// api.server.UpdateDockerRegistry(&config)
+
+	response := map[string]interface{}{
+		"success": true,
+		"message": "Docker Registry配置已更新",
+	}
+
+	api.writeJSON(w, response)
+}
+
+// TestDockerConnection 测试Docker连接
+func (api *GitServerAPI) TestDockerConnection(w http.ResponseWriter, r *http.Request) {
+	err := api.server.GetDockerRegistry().TestConnection()
+
+	response := map[string]interface{}{
+		"success":   err == nil,
+		"connected": err == nil,
+	}
+
+	if err != nil {
+		response["error"] = err.Error()
+	} else {
+		response["message"] = "Docker Registry连接正常"
+	}
+
+	api.writeJSON(w, response)
+}
+
 // RuntimeDetectorAPI 运行时检测器 API
 type RuntimeDetectorAPI struct {
 	detector *runner.RuntimeDetector

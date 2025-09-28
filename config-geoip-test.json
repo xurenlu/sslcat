@@ -1,0 +1,21 @@
+{
+  "server": {
+    "port": 8443,
+    "host": "0.0.0.0"
+  },
+  "security": {
+    "geo_blocking": {
+      "enabled": true,
+      "database_path": "./data/geoip/GeoLite2-City.mmdb",
+      "update_interval": 168,
+      "allow_unknown": true,
+      "allowed_countries": [],
+      "blocked_countries": []
+    },
+    "enable_waf": false,
+    "enable_ddos": false
+  },
+  "logging": {
+    "level": "info"
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "security": {
+    "geo_blocking": {
+      "enabled": true,
+      "database_path": "./data/geoip/GeoLite2-City.mmdb",
+      "update_interval": 168,
+      "allow_unknown": false,
+      "allowed_countries": [
+        "CN",
+        "US", 
+        "JP",
+        "KR",
+        "SG"
+      ],
+      "blocked_countries": [
+        "XX"
+      ]
+    }
+  },
+  "advanced_waf": {
+    "enabled": true,
+    "max_events": 10000,
+    "rules": [
+      {
+        "id": "geo_sql_injection",
+        "name": "地理位置增强的SQL注入检测",
+        "priority": 50,
+        "enabled": true,
+        "conditions": [
+          {
+            "variable": "REQUEST_BODY",
+            "operator": "regex",
+            "value": "(?i)(union.*select|drop.*table|insert.*into)",
+            "transform": ["lowercase", "urldecode"]
+          }
+        ],
+        "actions": [
+          {
+            "type": "block",
+            "message": "检测到SQL注入攻击，已被阻止"
+          },
+          {
+            "type": "log",
+            "parameters": {
+              "level": "high"
+            }
+          }
+        ],
+        "tags": ["sql", "injection", "high-risk"],
+        "severity": "high",
+        "category": "injection"
+      }
+    ]
+  },
+  "rate_limit": {
+    "ip_rate_limit": {
+      "requests_per_second": 10,
+      "requests_per_minute": 100,
+      "requests_per_hour": 1000,
+      "burst_size": 20
+    },
+    "path_rate_limit": [
+      {
+        "path": "/api/login",
+        "requests_per_minute": 5,
+        "burst_size": 2
+      },
+      {
+        "path": "/api/register", 
+        "requests_per_minute": 3,
+        "burst_size": 1
+      },
+      {
+        "pattern": "^/admin/.*",
+        "requests_per_minute": 20,
+        "burst_size": 5
+      }
+    ],
+    "method_rate_limit": {
+      "POST": 50,
+      "PUT": 30,
+      "DELETE": 10
+    },
+    "global_rate_limit": {
+      "requests_per_second": 1000,
+      "requests_per_minute": 10000
+    }
+  }
+}

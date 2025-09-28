@@ -50,6 +50,20 @@ const Settings: React.FC = () => {
     enableErrorLog: true,
     logLevel: 'info',
     
+    // 压缩设置
+    compressionEnabled: true,
+    compressionAlgorithms: ['br', 'gzip'],
+    compressionMinSize: 1024,
+    compressionGzipLevel: 6,
+    compressionBrotliLevel: 6,
+    
+    // 上游缓存设置
+    upstreamCacheEnabled: true,
+    upstreamCacheDir: './data/upstream-cache',
+    upstreamCacheMaxSize: 1024,
+    upstreamCacheDefaultTTL: 3600,
+    upstreamCacheRespectUpstream: true,
+    
     // 通知设置
     enableNotifications: true,
     notificationChannels: 'email,webhook',
@@ -444,6 +458,134 @@ const Settings: React.FC = () => {
           </CardBody>
         </Card>
       </SimpleGrid>
+
+      {/* 压缩设置 */}
+      <Card mt={6}>
+        <CardHeader>
+          <Heading size="md">内容压缩设置</Heading>
+        </CardHeader>
+        <CardBody>
+          <VStack spacing={4} align="stretch">
+            <FormControl display="flex" alignItems="center">
+              <FormLabel mb="0">启用内容压缩</FormLabel>
+              <Switch
+                isChecked={settings.compressionEnabled}
+                onChange={(e) => handleInputChange('compressionEnabled', e.target.checked)}
+              />
+            </FormControl>
+            
+            {settings.compressionEnabled && (
+              <>
+                <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
+                  <FormControl>
+                    <FormLabel>最小文件大小 (字节)</FormLabel>
+                    <Input
+                      type="number"
+                      value={settings.compressionMinSize}
+                      onChange={(e) => handleInputChange('compressionMinSize', parseInt(e.target.value) || 1024)}
+                      min="100"
+                      max="10240"
+                    />
+                  </FormControl>
+                  
+                  <FormControl>
+                    <FormLabel>Gzip压缩级别</FormLabel>
+                    <Input
+                      type="number"
+                      value={settings.compressionGzipLevel}
+                      onChange={(e) => handleInputChange('compressionGzipLevel', parseInt(e.target.value) || 6)}
+                      min="1"
+                      max="9"
+                    />
+                  </FormControl>
+                  
+                  <FormControl>
+                    <FormLabel>Brotli压缩级别</FormLabel>
+                    <Input
+                      type="number"
+                      value={settings.compressionBrotliLevel}
+                      onChange={(e) => handleInputChange('compressionBrotliLevel', parseInt(e.target.value) || 6)}
+                      min="0"
+                      max="11"
+                    />
+                  </FormControl>
+                </SimpleGrid>
+                
+                <Text fontSize="sm" color="gray.500">
+                  💡 Brotli压缩效果更好但CPU消耗稍高，Gzip兼容性更好。建议同时启用以获得最佳效果。
+                </Text>
+              </>
+            )}
+          </VStack>
+        </CardBody>
+      </Card>
+
+      {/* 上游缓存设置 */}
+      <Card mt={6}>
+        <CardHeader>
+          <Heading size="md">上游缓存设置</Heading>
+        </CardHeader>
+        <CardBody>
+          <VStack spacing={4} align="stretch">
+            <FormControl display="flex" alignItems="center">
+              <FormLabel mb="0">启用上游缓存</FormLabel>
+              <Switch
+                isChecked={settings.upstreamCacheEnabled}
+                onChange={(e) => handleInputChange('upstreamCacheEnabled', e.target.checked)}
+              />
+            </FormControl>
+            
+            {settings.upstreamCacheEnabled && (
+              <>
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                  <FormControl>
+                    <FormLabel>缓存目录</FormLabel>
+                    <Input
+                      value={settings.upstreamCacheDir}
+                      onChange={(e) => handleInputChange('upstreamCacheDir', e.target.value)}
+                      placeholder="./data/upstream-cache"
+                    />
+                  </FormControl>
+                  
+                  <FormControl>
+                    <FormLabel>最大缓存大小 (MB)</FormLabel>
+                    <Input
+                      type="number"
+                      value={settings.upstreamCacheMaxSize}
+                      onChange={(e) => handleInputChange('upstreamCacheMaxSize', parseInt(e.target.value) || 1024)}
+                      min="100"
+                      max="10240"
+                    />
+                  </FormControl>
+                  
+                  <FormControl>
+                    <FormLabel>默认TTL (秒)</FormLabel>
+                    <Input
+                      type="number"
+                      value={settings.upstreamCacheDefaultTTL}
+                      onChange={(e) => handleInputChange('upstreamCacheDefaultTTL', parseInt(e.target.value) || 3600)}
+                      min="60"
+                      max="86400"
+                    />
+                  </FormControl>
+                  
+                  <FormControl display="flex" alignItems="center">
+                    <FormLabel mb="0">遵循上游Cache-Control</FormLabel>
+                    <Switch
+                      isChecked={settings.upstreamCacheRespectUpstream}
+                      onChange={(e) => handleInputChange('upstreamCacheRespectUpstream', e.target.checked)}
+                    />
+                  </FormControl>
+                </SimpleGrid>
+                
+                <Text fontSize="sm" color="gray.500">
+                  💡 上游缓存会自动缓存静态文件（CSS、JS、图片等），遵循Cache-Control策略，显著提升访问速度。
+                </Text>
+              </>
+            )}
+          </VStack>
+        </CardBody>
+      </Card>
 
       {/* 通知设置 */}
       <Card mt={6}>

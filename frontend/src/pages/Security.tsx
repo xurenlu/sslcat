@@ -27,6 +27,11 @@ import {
   FormLabel,
   Input,
   useToast,
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel,
 } from '@chakra-ui/react'
 import {
   FiShield,
@@ -35,8 +40,10 @@ import {
   FiCheckCircle,
   FiClock,
   FiX,
+  FiGlobe,
 } from 'react-icons/fi'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
+import GeoIPConfig from '../components/GeoIPConfig'
 
 interface SecurityEvent {
   id: string
@@ -220,6 +227,22 @@ const Security: React.FC = () => {
           刷新
         </Button>
       </Flex>
+
+      <Tabs>
+        <TabList>
+          <Tab>
+            <Icon as={FiShield} mr={2} />
+            安全概览
+          </Tab>
+          <Tab>
+            <Icon as={FiGlobe} mr={2} />
+            地理位置过滤
+          </Tab>
+        </TabList>
+
+        <TabPanels>
+          <TabPanel px={0}>
+            {/* 原有的安全概览内容 */}
 
       {/* 安全统计 */}
       <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={6} mb={8}>
@@ -443,6 +466,14 @@ const Security: React.FC = () => {
           )}
         </CardBody>
       </Card>
+          </TabPanel>
+          
+          <TabPanel px={0}>
+            {/* 地理位置过滤配置 */}
+            <GeoIPConfig />
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
     </Box>
   )
 }

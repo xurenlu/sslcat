@@ -59,20 +59,53 @@ type Manager struct {
 	stopChan    chan struct{}
 	// TLS 指纹持久化
 	tlsFPRotator *logger.Rotator
+
+	// CORS中间件
+	corsMiddleware *CORSMiddleware
+
+	// 地理位置IP服务
+	geoIPService *GeoIPService
 }
 
 // NewManager 创建安全管理器
 func NewManager(cfg *config.Config) *Manager {
+	// 初始化CORS中间件
+	corsConfig := CORSConfig{
+		Enabled:             cfg.Security.CORS.Enabled,
+		AllowedOrigins:      cfg.Security.CORS.AllowedOrigins,
+		AllowedMethods:      cfg.Security.CORS.AllowedMethods,
+		AllowedHeaders:      cfg.Security.CORS.AllowedHeaders,
+		ExposedHeaders:      cfg.Security.CORS.ExposedHeaders,
+		AllowCredentials:    cfg.Security.CORS.AllowCredentials,
+		MaxAge:              cfg.Security.CORS.MaxAge,
+		AllowPrivateNetwork: cfg.Security.CORS.AllowPrivateNetwork,
+	}
+	corsMiddleware := NewCORSMiddleware(corsConfig)
+
+	// 初始化地理位置IP服务
+	geoIPService, err := NewGeoIPService(cfg.Security.GeoBlocking)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"component": "security_manager",
+		}).Errorf("Failed to initialize GeoIP service: %v", err)
+		// 创建一个禁用的服务实例，避免nil指针
+		geoIPService, _ = NewGeoIPService(config.GeoBlockingConfig{
+			Enabled: false,
+		})
+	}
+
 	return &Manager{
-		config:        cfg,
-		accessLogs:    make(map[string][]AccessLog),
-		blockedIPs:    make(map[string]BlockedIP),
-		attemptCounts: make(map[string]int),
-		lastAttempts:  make(map[string][]time.Time),
-		uaInvalid1Min: make(map[string][]time.Time),
-		uaInvalid5Min: make(map[string][]time.Time),
-		tlsFPCounts:   make(map[string][]time.Time),
-		stopChan:      make(chan struct{}),
+		config:         cfg,
+		accessLogs:     make(map[string][]AccessLog),
+		blockedIPs:     make(map[string]BlockedIP),
+		attemptCounts:  make(map[string]int),
+		lastAttempts:   make(map[string][]time.Time),
+		uaInvalid1Min:  make(map[string][]time.Time),
+		uaInvalid5Min:  make(map[string][]time.Time),
+		tlsFPCounts:    make(map[string][]time.Time),
+		stopChan:       make(chan struct{}),
+		corsMiddleware: corsMiddleware,
+		geoIPService:   geoIPService,
 		log: logrus.WithFields(logrus.Fields{
 			"component": "security_manager",
 		}),
@@ -101,6 +134,9 @@ func (m *Manager) Stop() {
 	close(m.stopChan)
 	if m.tlsFPRotator != nil {
 		_ = m.tlsFPRotator.Close()
+	}
+	if m.geoIPService != nil {
+		_ = m.geoIPService.Close()
 	}
 }
 
@@ -310,7 +346,9 @@ func (m *Manager) GetTLSFingerprintStatsEx() []TLSFPStatEx {
 		for _, t := range times {
 			if t.After(cut) {
 				cnt++
-				if t.After(last) { last = t }
+				if t.After(last) {
+					last = t
+				}
 			}
 		}
 		if cnt > 0 {
@@ -386,6 +424,86 @@ func (m *Manager) isValidUserAgent(userAgent string) bool {
 		}
 	}
 	return false
+}
+
+// CheckIPAccess 检查IP访问权限
+func (m *Manager) CheckIPAccess(ip string) (bool, string) {
+	// 检查IP黑名单
+	if m.isInBlacklist(ip) {
+		return false, "IP is in blacklist"
+	}
+
+	// 检查IP白名单
+	if len(m.config.Security.IPWhitelist) > 0 {
+		if !m.isInWhitelist(ip) {
+			return false, "IP is not in whitelist"
+		}
+	}
+
+	return true, ""
+}
+
+// isInBlacklist 检查IP是否在黑名单中
+func (m *Manager) isInBlacklist(ip string) bool {
+	for _, blockedIP := range m.config.Security.IPBlacklist {
+		if m.matchIPOrCIDR(ip, blockedIP) {
+			return true
+		}
+	}
+	return false
+}
+
+// isInWhitelist 检查IP是否在白名单中
+func (m *Manager) isInWhitelist(ip string) bool {
+	for _, allowedIP := range m.config.Security.IPWhitelist {
+		if m.matchIPOrCIDR(ip, allowedIP) {
+			return true
+		}
+	}
+	return false
+}
+
+// matchIPOrCIDR 匹配IP地址或CIDR网段
+func (m *Manager) matchIPOrCIDR(ip, pattern string) bool {
+	// 如果pattern不包含/，则是单个IP地址
+	if !strings.Contains(pattern, "/") {
+		return ip == pattern
+	}
+
+	// CIDR网段匹配
+	_, network, err := net.ParseCIDR(pattern)
+	if err != nil {
+		m.log.Warnf("Invalid CIDR pattern: %s", pattern)
+		return false
+	}
+
+	clientIP := net.ParseIP(ip)
+	if clientIP == nil {
+		return false
+	}
+
+	return network.Contains(clientIP)
+}
+
+// GetCORSMiddleware 获取CORS中间件
+func (m *Manager) GetCORSMiddleware() *CORSMiddleware {
+	return m.corsMiddleware
+}
+
+// UpdateCORSConfig 更新CORS配置
+func (m *Manager) UpdateCORSConfig(config config.CORSConfig) {
+	corsConfig := CORSConfig{
+		Enabled:             config.Enabled,
+		AllowedOrigins:      config.AllowedOrigins,
+		AllowedMethods:      config.AllowedMethods,
+		AllowedHeaders:      config.AllowedHeaders,
+		ExposedHeaders:      config.ExposedHeaders,
+		AllowCredentials:    config.AllowCredentials,
+		MaxAge:              config.MaxAge,
+		AllowPrivateNetwork: config.AllowPrivateNetwork,
+	}
+	m.corsMiddleware = NewCORSMiddleware(corsConfig)
+	m.log.Info("CORS configuration updated")
 }
 
 // loadBlockedIPs 加载被封禁的IP列表
@@ -623,9 +741,60 @@ func (m *Manager) GetSecurityStats() map[string]interface{} {
 		}
 	}
 
-	return map[string]interface{}{
+	stats := map[string]interface{}{
 		"blocked_ips":      totalBlocked,
 		"recent_attempts":  recentAttempts,
 		"total_access_ips": len(m.accessLogs),
 	}
+
+	// 添加地理位置服务统计信息
+	if m.geoIPService != nil {
+		stats["geoip"] = m.geoIPService.GetStats()
+	}
+
+	return stats
+}
+
+// CheckGeoAccess 检查IP的地理位置访问权限
+func (m *Manager) CheckGeoAccess(ip string) (*GeoFilterResult, error) {
+	if m.geoIPService == nil {
+		return &GeoFilterResult{
+			Allowed: true,
+			Reason:  "GeoIP service not available",
+		}, nil
+	}
+
+	return m.geoIPService.CheckCountryAccess(ip)
+}
+
+// GetGeoLocation 获取IP的地理位置信息
+func (m *Manager) GetGeoLocation(ip string) (*GeoLocation, error) {
+	if m.geoIPService == nil {
+		return nil, fmt.Errorf("GeoIP service not available")
+	}
+
+	return m.geoIPService.GetLocation(ip)
+}
+
+// GetGeoIPService 获取地理位置IP服务
+func (m *Manager) GetGeoIPService() *GeoIPService {
+	return m.geoIPService
+}
+
+// UpdateGeoConfig 更新地理位置配置
+func (m *Manager) UpdateGeoConfig(config config.GeoBlockingConfig) error {
+	// 重新初始化地理位置服务
+	if m.geoIPService != nil {
+		_ = m.geoIPService.Close()
+	}
+
+	geoIPService, err := NewGeoIPService(config)
+	if err != nil {
+		return fmt.Errorf("failed to update GeoIP service: %w", err)
+	}
+
+	m.geoIPService = geoIPService
+	m.log.Info("GeoIP configuration updated")
+
+	return nil
 }

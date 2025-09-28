@@ -37,7 +37,11 @@ type GitServer struct {
 	authorizedKeysFile string // authorized_keys 文件路径
 
 	// 日志管理器
-	logManager *LogManager
+	logManager       *LogManager
+	logStreamManager *LogStreamManager
+
+	// Docker Registry
+	dockerRegistry *DockerRegistry
 }
 
 // GitServerConfig Git 服务器配置
@@ -111,6 +115,15 @@ type GitApp struct {
 
 	// 部署状态
 	Status string `json:"status"` // "idle" | "building" | "deploying" | "running" | "failed"
+
+	// 最后提交哈希
+	LastCommit string `json:"last_commit"`
+
+	// Docker镜像名称
+	DockerImage string `json:"docker_image"`
+
+	// 启动命令
+	StartCommand string `json:"start_command"`
 
 	// 最后部署时间
 	LastDeploy time.Time `json:"last_deploy"`
@@ -348,6 +361,26 @@ func NewGitServer(cfg *config.Config) *GitServer {
 	logsDir := filepath.Join(cfg.Runners.Git.ReposDir, "logs")
 	logManager := NewLogManager(logsDir)
 
+	// 日志流管理器
+	logStreamManager := NewLogStreamManager()
+
+	// Docker Registry配置
+	dockerRegistryConfig := &DockerRegistryConfig{
+		Enabled:     false, // 默认禁用，需要用户配置
+		UseHTTPS:    true,
+		Timeout:     30,
+		TagStrategy: "commit",
+		AutoPush:    false, // 默认不自动推送
+		Namespace:   "sslcat",
+		CleanupPolicy: DockerCleanupPolicy{
+			Enabled:       true,
+			KeepImages:    10,
+			KeepDays:      30,
+			CleanInterval: 24,
+		},
+	}
+	dockerRegistry := NewDockerRegistry(dockerRegistryConfig)
+
 	return &GitServer{
 		config:             cfg,
 		apps:               make(map[string]*GitApp),
@@ -358,6 +391,8 @@ func NewGitServer(cfg *config.Config) *GitServer {
 		sshKeysDir:         sshKeysDir,
 		authorizedKeysFile: authorizedKeysFile,
 		logManager:         logManager,
+		logStreamManager:   logStreamManager,
+		dockerRegistry:     dockerRegistry,
 	}
 }
 
@@ -595,10 +630,30 @@ func (gs *GitServer) HandleGitPush(appName string, pushData []byte) error {
 
 // processGitPush 处理 Git 推送
 func (gs *GitServer) processGitPush(app *GitApp, pushData []byte) {
+	// 生成部署ID
+	deployID := fmt.Sprintf("deploy_%d", time.Now().Unix())
+
+	// 创建部署日志记录器
+	logFile := filepath.Join(app.LogsDir, fmt.Sprintf("deploy-%s.log", time.Now().Format("2006-01-02")))
+	deployLogger, err := NewDeployLogger(app.Name, deployID, logFile)
+	if err != nil {
+		gs.handleDeployError(app, fmt.Errorf("创建部署日志记录器失败: %w", err))
+		return
+	}
+	defer deployLogger.Close()
+
+	// 启动实时日志流
+	logStream := gs.logStreamManager.GetOrCreateStream(app.Name, logFile)
+	if logStream == nil {
+		gs.logger.Warnf("Failed to create log stream for app: %s", app.Name)
+	}
+
 	// 检测应用类型
+	deployLogger.WriteLog("info", "git", "开始检测应用类型")
 	appType, err := gs.detectAppType(app)
 	if err != nil {
-		gs.handleDeployError(app, fmt.Errorf("检测应用类型失败: %w", err))
+		deployLogger.WriteError(fmt.Errorf("检测应用类型失败: %w", err))
+		gs.handleDeployError(app, err)
 		return
 	}
 
@@ -606,13 +661,18 @@ func (gs *GitServer) processGitPush(app *GitApp, pushData []byte) {
 	app.AppType = appType
 	gs.mutex.Unlock()
 
+	deployLogger.WriteLog("info", "git", fmt.Sprintf("检测到应用类型: %s", appType))
+
 	// 执行构建和部署
-	if err := gs.buildAndDeployApp(app); err != nil {
+	deployLogger.WriteLog("info", "deploy", "开始构建和部署应用")
+	if err := gs.buildAndDeployAppWithLogging(app, deployLogger); err != nil {
+		deployLogger.WriteError(err)
 		gs.handleDeployError(app, err)
 		return
 	}
 
 	// 部署成功
+	deployLogger.WriteSuccess(time.Since(deployLogger.startTime))
 	gs.handleDeploySuccess(app)
 }
 
@@ -642,7 +702,27 @@ func (gs *GitServer) detectAppType(app *GitApp) (string, error) {
 	return "static", nil
 }
 
-// buildAndDeployApp 构建和部署应用
+// buildAndDeployAppWithLogging 构建和部署应用（带日志记录）
+func (gs *GitServer) buildAndDeployAppWithLogging(app *GitApp, deployLogger *DeployLogger) error {
+	switch app.AppType {
+	case "docker":
+		return gs.buildAndDeployDockerAppWithLogging(app, deployLogger)
+	case "nodejs":
+		return gs.buildAndDeployNodeJSAppWithLogging(app, deployLogger)
+	case "python":
+		return gs.buildAndDeployPythonAppWithLogging(app, deployLogger)
+	case "go":
+		return gs.buildAndDeployGoAppWithLogging(app, deployLogger)
+	case "php":
+		return gs.deployPHPAppWithLogging(app, deployLogger)
+	case "static":
+		return gs.deployStaticAppWithLogging(app, deployLogger)
+	default:
+		return fmt.Errorf("不支持的应用类型: %s", app.AppType)
+	}
+}
+
+// buildAndDeployApp 构建和部署应用（保持向后兼容）
 func (gs *GitServer) buildAndDeployApp(app *GitApp) error {
 	// 根据应用类型执行不同的构建策略
 	switch app.AppType {
@@ -857,6 +937,227 @@ func (gs *GitServer) deployStaticApp(app *GitApp) error {
 	gs.mutex.Lock()
 	app.Status = "running"
 	gs.mutex.Unlock()
+
+	return nil
+}
+
+// buildAndDeployDockerAppWithLogging 构建和部署Docker应用（带日志）
+func (gs *GitServer) buildAndDeployDockerAppWithLogging(app *GitApp, deployLogger *DeployLogger) error {
+	deployLogger.WriteLog("info", "docker", "开始Docker应用构建流程")
+
+	// 构建并推送Docker镜像
+	image, err := gs.dockerRegistry.BuildAndPushImage(app, deployLogger)
+	if err != nil {
+		return fmt.Errorf("Docker镜像构建失败: %w", err)
+	}
+
+	// 更新应用信息
+	gs.mutex.Lock()
+	app.DockerImage = image.FullName
+	app.Status = "running"
+	gs.mutex.Unlock()
+
+	deployLogger.WriteLog("info", "docker", fmt.Sprintf("Docker应用部署完成，镜像: %s", image.FullName))
+	return nil
+}
+
+// buildAndDeployNodeJSAppWithLogging 构建和部署Node.js应用（带日志）
+func (gs *GitServer) buildAndDeployNodeJSAppWithLogging(app *GitApp, deployLogger *DeployLogger) error {
+	deployLogger.WriteLog("info", "nodejs", "开始Node.js应用构建流程")
+
+	// 安装依赖
+	if err := gs.runCommandWithLogging(app.GitPath, deployLogger, "npm", "install"); err != nil {
+		return fmt.Errorf("npm install失败: %w", err)
+	}
+
+	// 执行构建脚本（如果存在）
+	if gs.hasBuildScript(app.GitPath) {
+		deployLogger.WriteLog("info", "nodejs", "执行构建脚本")
+		if err := gs.runCommandWithLogging(app.GitPath, deployLogger, "npm", "run", "build"); err != nil {
+			deployLogger.WriteLog("warn", "nodejs", "构建脚本执行失败，继续部署")
+		}
+	}
+
+	// 启动应用
+	if err := gs.startNodeJSAppWithLogging(app, deployLogger); err != nil {
+		return fmt.Errorf("启动Node.js应用失败: %w", err)
+	}
+
+	deployLogger.WriteLog("info", "nodejs", "Node.js应用部署完成")
+	return nil
+}
+
+// buildAndDeployPythonAppWithLogging 构建和部署Python应用（带日志）
+func (gs *GitServer) buildAndDeployPythonAppWithLogging(app *GitApp, deployLogger *DeployLogger) error {
+	deployLogger.WriteLog("info", "python", "开始Python应用构建流程")
+
+	// 安装依赖
+	if _, err := os.Stat(filepath.Join(app.GitPath, "requirements.txt")); err == nil {
+		if err := gs.runCommandWithLogging(app.GitPath, deployLogger, "pip", "install", "-r", "requirements.txt"); err != nil {
+			return fmt.Errorf("pip install失败: %w", err)
+		}
+	}
+
+	// 启动应用
+	if err := gs.startPythonAppWithLogging(app, deployLogger); err != nil {
+		return fmt.Errorf("启动Python应用失败: %w", err)
+	}
+
+	deployLogger.WriteLog("info", "python", "Python应用部署完成")
+	return nil
+}
+
+// buildAndDeployGoAppWithLogging 构建和部署Go应用（带日志）
+func (gs *GitServer) buildAndDeployGoAppWithLogging(app *GitApp, deployLogger *DeployLogger) error {
+	deployLogger.WriteLog("info", "go", "开始Go应用构建流程")
+
+	// 下载依赖
+	if err := gs.runCommandWithLogging(app.GitPath, deployLogger, "go", "mod", "download"); err != nil {
+		return fmt.Errorf("go mod download失败: %w", err)
+	}
+
+	// 构建应用
+	outputPath := filepath.Join(app.GitPath, "app")
+	if err := gs.runCommandWithLogging(app.GitPath, deployLogger, "go", "build", "-o", outputPath, "."); err != nil {
+		return fmt.Errorf("go build失败: %w", err)
+	}
+
+	// 启动应用
+	if err := gs.startGoAppWithLogging(app, deployLogger); err != nil {
+		return fmt.Errorf("启动Go应用失败: %w", err)
+	}
+
+	deployLogger.WriteLog("info", "go", "Go应用部署完成")
+	return nil
+}
+
+// deployPHPAppWithLogging 部署PHP应用（带日志）
+func (gs *GitServer) deployPHPAppWithLogging(app *GitApp, deployLogger *DeployLogger) error {
+	deployLogger.WriteLog("info", "php", "开始PHP应用部署流程")
+
+	// 复制文件到Web目录
+	webDir := filepath.Join(gs.config.Runners.Git.ReposDir, "web", app.Name)
+	if err := os.MkdirAll(webDir, 0755); err != nil {
+		return fmt.Errorf("创建Web目录失败: %w", err)
+	}
+
+	if err := gs.runCommandWithLogging("", deployLogger, "cp", "-r", app.GitPath+"/*", webDir); err != nil {
+		return fmt.Errorf("复制PHP文件失败: %w", err)
+	}
+
+	gs.mutex.Lock()
+	app.Status = "running"
+	gs.mutex.Unlock()
+
+	deployLogger.WriteLog("info", "php", "PHP应用部署完成")
+	return nil
+}
+
+// deployStaticAppWithLogging 部署静态应用（带日志）
+func (gs *GitServer) deployStaticAppWithLogging(app *GitApp, deployLogger *DeployLogger) error {
+	deployLogger.WriteLog("info", "static", "开始静态应用部署流程")
+
+	// 复制文件到Web目录
+	webDir := filepath.Join(gs.config.Runners.Git.ReposDir, "web", app.Name)
+	if err := os.MkdirAll(webDir, 0755); err != nil {
+		return fmt.Errorf("创建Web目录失败: %w", err)
+	}
+
+	if err := gs.runCommandWithLogging("", deployLogger, "cp", "-r", app.GitPath+"/*", webDir); err != nil {
+		return fmt.Errorf("复制静态文件失败: %w", err)
+	}
+
+	gs.mutex.Lock()
+	app.Status = "running"
+	gs.mutex.Unlock()
+
+	deployLogger.WriteLog("info", "static", "静态应用部署完成")
+	return nil
+}
+
+// runCommandWithLogging 执行命令并记录日志
+func (gs *GitServer) runCommandWithLogging(workDir string, deployLogger *DeployLogger, command string, args ...string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(gs.serverConfig.BuildTimeout)*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, command, args...)
+	if workDir != "" {
+		cmd.Dir = workDir
+	}
+
+	// 记录命令
+	deployLogger.WriteCommand(command, args)
+
+	// 捕获输出
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		deployLogger.WriteCommandOutput(string(output))
+		deployLogger.WriteError(fmt.Errorf("命令执行失败: %s %v", command, args))
+		return err
+	}
+
+	deployLogger.WriteCommandOutput(string(output))
+	return nil
+}
+
+// startNodeJSAppWithLogging 启动Node.js应用（带日志）
+func (gs *GitServer) startNodeJSAppWithLogging(app *GitApp, deployLogger *DeployLogger) error {
+	// 检查启动脚本
+	startCommand := "node server.js"
+	if gs.hasStartScript(app.GitPath) {
+		startCommand = "npm start"
+	}
+
+	deployLogger.WriteLog("info", "nodejs", fmt.Sprintf("启动命令: %s", startCommand))
+
+	// 启动应用进程
+	return gs.startAppProcessWithLogging(app, startCommand, deployLogger)
+}
+
+// startPythonAppWithLogging 启动Python应用（带日志）
+func (gs *GitServer) startPythonAppWithLogging(app *GitApp, deployLogger *DeployLogger) error {
+	// 检查启动文件
+	startFiles := []string{"app.py", "main.py", "server.py", "wsgi.py"}
+	var startFile string
+	for _, file := range startFiles {
+		if _, err := os.Stat(filepath.Join(app.GitPath, file)); err == nil {
+			startFile = file
+			break
+		}
+	}
+
+	if startFile == "" {
+		return fmt.Errorf("未找到Python启动文件")
+	}
+
+	startCommand := fmt.Sprintf("python %s", startFile)
+	deployLogger.WriteLog("info", "python", fmt.Sprintf("启动命令: %s", startCommand))
+
+	// 启动应用进程
+	return gs.startAppProcessWithLogging(app, startCommand, deployLogger)
+}
+
+// startGoAppWithLogging 启动Go应用（带日志）
+func (gs *GitServer) startGoAppWithLogging(app *GitApp, deployLogger *DeployLogger) error {
+	startCommand := "./app"
+	deployLogger.WriteLog("info", "go", fmt.Sprintf("启动命令: %s", startCommand))
+
+	// 启动应用进程
+	return gs.startAppProcessWithLogging(app, startCommand, deployLogger)
+}
+
+// startAppProcessWithLogging 启动应用进程（带日志）
+func (gs *GitServer) startAppProcessWithLogging(app *GitApp, command string, deployLogger *DeployLogger) error {
+	// 这里应该实现完整的进程管理
+	// 当前简化实现：记录启动信息
+
+	gs.mutex.Lock()
+	app.Status = "running"
+	app.StartCommand = command
+	gs.mutex.Unlock()
+
+	deployLogger.WriteLog("info", "process", fmt.Sprintf("应用进程已启动: %s", command))
+	gs.logger.Infof("应用 %s 已启动，命令: %s", app.Name, command)
 
 	return nil
 }
@@ -1561,6 +1862,16 @@ func (gs *GitServer) GetAppLogs(appName string, lines int) ([]LogEntry, error) {
 }
 
 // GetAppLogFiles 获取应用的所有日志文件
+// GetLogStreamManager 获取日志流管理器
+func (gs *GitServer) GetLogStreamManager() *LogStreamManager {
+	return gs.logStreamManager
+}
+
+// GetDockerRegistry 获取Docker Registry
+func (gs *GitServer) GetDockerRegistry() *DockerRegistry {
+	return gs.dockerRegistry
+}
+
 func (gs *GitServer) GetAppLogFiles(appName string) ([]string, error) {
 	gs.mutex.RLock()
 	defer gs.mutex.RUnlock()

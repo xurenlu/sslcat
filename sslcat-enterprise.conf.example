@@ -1,0 +1,353 @@
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 443,
+    "debug": false,
+    "access_log_enabled": true,
+    "access_log_format": "json",
+    "access_log_path": "./data/access.log",
+    "access_log_max_size": 104857600,
+    "access_log_max_files": 10,
+    "read_timeout_sec": 30,
+    "write_timeout_sec": 30,
+    "idle_timeout_sec": 120,
+    "max_upload_bytes": 104857600
+  },
+  "ssl": {
+    "email": "admin@example.com",
+    "staging": false,
+    "auto_renew": true,
+    "disable_self_signed": false,
+    "cert_dir": "./data/certs",
+    "key_dir": "./data/keys",
+    "challenge_methods": ["http-01", "dns-01"]
+  },
+  "admin": {
+    "username": "admin",
+    "password_file": "./data/admin.pass",
+    "first_run": true,
+    "enable_totp": false
+  },
+  "compression": {
+    "enabled": true,
+    "algorithms": ["br", "gzip"],
+    "min_size": 1024,
+    "level": {
+      "gzip": 6,
+      "brotli": 6
+    },
+    "types": [
+      ".js", ".css", ".html", ".htm", ".xml", ".json", 
+      ".txt", ".svg", ".md", ".yaml", ".yml", ".csv", 
+      ".rss", ".atom"
+    ],
+    "excluded_types": [
+      ".gz", ".br", ".zip", ".rar", ".7z", ".bz2", ".xz",
+      ".jpg", ".jpeg", ".png", ".gif", ".webp", ".ico", 
+      ".bmp", ".tiff", ".woff", ".woff2", ".ttf", ".eot", 
+      ".otf", ".mp3", ".mp4", ".avi", ".mov", ".wmv", 
+      ".flv", ".wav", ".ogg", ".pdf"
+    ],
+    "content_types": [
+      "text/css", "text/plain", "text/xml",
+      "application/javascript", "application/json", 
+      "application/xml", "application/rss+xml",
+      "application/atom+xml", "image/svg+xml"
+    ]
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "api.example.com",
+        "enabled": true,
+        "ssl_only": true,
+        
+        "load_balancer_enabled": true,
+        "load_balancer_algorithm": "weighted_round_robin",
+        "load_balancer_backends": [
+          {
+            "id": "api-primary",
+            "host": "192.168.1.10",
+            "port": 8080,
+            "weight": 3,
+            "enabled": true,
+            "health_check_enabled": true,
+            "health_check_path": "/api/health",
+            "health_check_method": "GET",
+            "expected_status_code": 200,
+            "max_connections": 200,
+            "connect_timeout": 30,
+            "read_timeout": 30,
+            "write_timeout": 30,
+            "tls_enabled": false,
+            "tls_insecure": false
+          },
+          {
+            "id": "api-secondary",
+            "host": "192.168.1.11",
+            "port": 8080,
+            "weight": 2,
+            "enabled": true,
+            "health_check_enabled": true,
+            "health_check_path": "/api/health",
+            "health_check_method": "GET",
+            "expected_status_code": 200,
+            "max_connections": 150,
+            "connect_timeout": 30,
+            "read_timeout": 30,
+            "write_timeout": 30,
+            "tls_enabled": false,
+            "tls_insecure": false
+          },
+          {
+            "id": "api-backup",
+            "host": "192.168.1.12",
+            "port": 8080,
+            "weight": 1,
+            "enabled": true,
+            "health_check_enabled": true,
+            "health_check_path": "/api/health",
+            "health_check_method": "GET",
+            "expected_status_code": 200,
+            "max_connections": 100,
+            "connect_timeout": 30,
+            "read_timeout": 30,
+            "write_timeout": 30,
+            "tls_enabled": false,
+            "tls_insecure": false
+          }
+        ],
+        
+        "health_check_enabled": true,
+        "health_check_path": "/api/health",
+        "health_check_interval": 30,
+        "health_check_timeout": 5,
+        "health_check_method": "GET",
+        "expected_status_code": 200,
+        
+        "failover_enabled": true,
+        "max_retries": 3,
+        "retry_interval": 1,
+        "failure_threshold": 3,
+        "recovery_threshold": 2,
+        
+        "session_affinity_enabled": false
+      },
+      {
+        "domain": "web.example.com",
+        "enabled": true,
+        "ssl_only": true,
+        
+        "load_balancer_enabled": true,
+        "load_balancer_algorithm": "least_conn",
+        "load_balancer_backends": [
+          {
+            "id": "web-server-1",
+            "host": "192.168.1.20",
+            "port": 80,
+            "weight": 1,
+            "enabled": true,
+            "health_check_enabled": true,
+            "health_check_path": "/",
+            "health_check_method": "HEAD",
+            "expected_status_code": 200
+          },
+          {
+            "id": "web-server-2",
+            "host": "192.168.1.21",
+            "port": 80,
+            "weight": 1,
+            "enabled": true,
+            "health_check_enabled": true,
+            "health_check_path": "/",
+            "health_check_method": "HEAD",
+            "expected_status_code": 200
+          }
+        ],
+        
+        "health_check_enabled": true,
+        "health_check_interval": 15,
+        "health_check_timeout": 3,
+        
+        "session_affinity_enabled": true,
+        "session_affinity_method": "ip",
+        "session_affinity_ttl": 3600
+      },
+      {
+        "domain": "app.example.com",
+        "enabled": true,
+        "ssl_only": true,
+        
+        "load_balancer_enabled": true,
+        "load_balancer_algorithm": "ip_hash",
+        "load_balancer_backends": [
+          {
+            "id": "app-node-1",
+            "host": "192.168.1.30",
+            "port": 3000,
+            "weight": 1,
+            "enabled": true,
+            "health_check_enabled": true,
+            "health_check_path": "/health",
+            "health_check_method": "GET",
+            "expected_status_code": 200,
+            "tls_enabled": true,
+            "tls_insecure": true
+          },
+          {
+            "id": "app-node-2",
+            "host": "192.168.1.31",
+            "port": 3000,
+            "weight": 1,
+            "enabled": true,
+            "health_check_enabled": true,
+            "health_check_path": "/health",
+            "health_check_method": "GET",
+            "expected_status_code": 200,
+            "tls_enabled": true,
+            "tls_insecure": true
+          }
+        ],
+        
+        "health_check_enabled": true,
+        "health_check_interval": 20,
+        "health_check_timeout": 8,
+        
+        "session_affinity_enabled": true,
+        "session_affinity_method": "cookie",
+        "session_affinity_cookie": "JSESSIONID",
+        "session_affinity_ttl": 7200
+      },
+      {
+        "domain": "static.example.com",
+        "enabled": true,
+        "ssl_only": true,
+        
+        "load_balancer_enabled": true,
+        "load_balancer_algorithm": "round_robin",
+        "load_balancer_backends": [
+          {
+            "id": "static-cdn-1",
+            "host": "192.168.1.40",
+            "port": 80,
+            "weight": 1,
+            "enabled": true,
+            "health_check_enabled": true,
+            "health_check_path": "/status",
+            "health_check_method": "GET",
+            "expected_status_code": 200
+          },
+          {
+            "id": "static-cdn-2",
+            "host": "192.168.1.41",
+            "port": 80,
+            "weight": 1,
+            "enabled": true,
+            "health_check_enabled": true,
+            "health_check_path": "/status",
+            "health_check_method": "GET",
+            "expected_status_code": 200
+          }
+        ],
+        
+        "health_check_enabled": true,
+        "health_check_interval": 60,
+        "health_check_timeout": 5,
+        
+        "cdn_enabled": true,
+        "cdn_preset": "static",
+        "cdn_ttl_seconds": 86400,
+        
+        "session_affinity_enabled": false
+      },
+      {
+        "domain": "legacy.example.com",
+        "target": "192.168.1.100",
+        "port": 8080,
+        "enabled": true,
+        "ssl_only": false,
+        "load_balancer_enabled": false,
+        "optimize_host_header": true
+      }
+    ],
+    "unmatched_behavior": "404"
+  },
+  "security": {
+    "max_attempts": 5,
+    "block_duration": "5m",
+    "max_attempts_5min": 15,
+    "enable_ua_filter": true,
+    "enable_waf": true,
+    "enable_ddos": true,
+    "ip_whitelist": [],
+    "ip_blacklist": [],
+    "allowed_user_agents": [
+      "Mozilla/5.0*",
+      "Chrome/*",
+      "Safari/*",
+      "Edge/*"
+    ]
+  },
+  "cdn_cache": {
+    "enabled": true,
+    "cache_dir": "./data/cache",
+    "max_size_bytes": 2147483648,
+    "default_ttl_seconds": 3600,
+    "clean_interval_seconds": 3600,
+    "max_object_bytes": 104857600
+  },
+  "admin_prefix": "/sslcat-panel",
+  "cluster": {
+    "mode": "standalone",
+    "node_id": "node-1"
+  },
+  "static_sites": [],
+  "php_sites": [],
+  "runners": {
+    "git": {
+      "enabled": false,
+      "repos_dir": "./data/repos",
+      "max_concurrent": 5
+    }
+  },
+  "threat_intel": {
+    "enabled": false,
+    "sources": {},
+    "detection": {
+      "real_time_enabled": false,
+      "threat_score_threshold": 7.0
+    },
+    "auto_response": {
+      "enabled": false,
+      "actions": ["log", "monitor"]
+    }
+  },
+  "notification": {
+    "enabled": false,
+    "channels": {
+      "email": {
+        "enabled": false,
+        "smtp_host": "",
+        "smtp_port": 587,
+        "username": "",
+        "password": "",
+        "from": "",
+        "to": []
+      },
+      "webhook": {
+        "enabled": false,
+        "url": "",
+        "headers": {},
+        "timeout": 30
+      },
+      "syslog": {
+        "enabled": false,
+        "address": "localhost:514",
+        "network": "udp"
+      },
+      "console": {
+        "enabled": true
+      }
+    }
+  }
+}

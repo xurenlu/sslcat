@@ -60,7 +60,14 @@ import {
   FiKey,
   FiFolder,
   FiCopy,
+  FiTerminal,
+  FiPackage,
+  FiClock,
 } from 'react-icons/fi'
+import { useConfig, buildPath, buildApiPath } from '../contexts/ConfigContext'
+import RealtimeLogs from '../components/RealtimeLogs'
+import DockerImageManager from '../components/DockerImageManager'
+import DeployHistory from '../components/DeployHistory'
 
 interface GitApp {
   id: string
@@ -130,6 +137,8 @@ const GitServerManagement: React.FC = () => {
     name: '',
     publicKey: '',
   })
+  
+  const [selectedApp, setSelectedApp] = useState<string>('')
 
   const refreshData = async () => {
     setLoading(true)
@@ -507,6 +516,27 @@ const GitServerManagement: React.FC = () => {
               <Badge colorScheme="green">{sshKeys.length}</Badge>
             </HStack>
           </Tab>
+          
+          <Tab>
+            <HStack>
+              <Icon as={FiTerminal} />
+              <Text>实时日志</Text>
+            </HStack>
+          </Tab>
+          
+          <Tab>
+            <HStack>
+              <Icon as={FiPackage} />
+              <Text>Docker镜像</Text>
+            </HStack>
+          </Tab>
+          
+          <Tab>
+            <HStack>
+              <Icon as={FiClock} />
+              <Text>部署历史</Text>
+            </HStack>
+          </Tab>
         </TabList>
 
         <TabPanels>
@@ -518,6 +548,7 @@ const GitServerManagement: React.FC = () => {
                   <Table variant="simple">
                     <Thead>
                       <Tr>
+                        <Th>选择</Th>
                         <Th>应用信息</Th>
                         <Th>仓库</Th>
                         <Th>状态</Th>
@@ -528,7 +559,21 @@ const GitServerManagement: React.FC = () => {
                     </Thead>
                     <Tbody>
                       {apps.map((app) => (
-                        <Tr key={app.id}>
+                        <Tr 
+                          key={app.id}
+                          bg={selectedApp === app.name ? 'blue.50' : 'transparent'}
+                          _hover={{ bg: 'gray.50' }}
+                        >
+                          <Td>
+                            <Button
+                              size="sm"
+                              variant={selectedApp === app.name ? 'solid' : 'outline'}
+                              colorScheme="blue"
+                              onClick={() => setSelectedApp(selectedApp === app.name ? '' : app.name)}
+                            >
+                              {selectedApp === app.name ? '已选中' : '选择'}
+                            </Button>
+                          </Td>
                           <Td>
                             <VStack align="start" spacing={1}>
                               <HStack>
@@ -690,6 +735,53 @@ const GitServerManagement: React.FC = () => {
                   )}
                 </CardBody>
               </Card>
+            </VStack>
+          </TabPanel>
+          
+          {/* 实时日志 */}
+          <TabPanel>
+            <VStack spacing={4} align="stretch">
+              {selectedApp ? (
+                <RealtimeLogs 
+                  appName={selectedApp} 
+                  autoScroll={true}
+                  maxLines={500}
+                  showControls={true}
+                />
+              ) : (
+                <Alert status="info">
+                  <AlertIcon />
+                  请先选择一个应用来查看实时日志
+                </Alert>
+              )}
+            </VStack>
+          </TabPanel>
+          
+          {/* Docker镜像 */}
+          <TabPanel>
+            <VStack spacing={4} align="stretch">
+              {selectedApp ? (
+                <DockerImageManager appName={selectedApp} />
+              ) : (
+                <Alert status="info">
+                  <AlertIcon />
+                  请先选择一个应用来管理Docker镜像
+                </Alert>
+              )}
+            </VStack>
+          </TabPanel>
+          
+          {/* 部署历史 */}
+          <TabPanel>
+            <VStack spacing={4} align="stretch">
+              {selectedApp ? (
+                <DeployHistory appName={selectedApp} />
+              ) : (
+                <Alert status="info">
+                  <AlertIcon />
+                  请先选择一个应用来查看部署历史
+                </Alert>
+              )}
             </VStack>
           </TabPanel>
         </TabPanels>

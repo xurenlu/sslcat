@@ -1,0 +1,85 @@
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 443,
+    "debug": false
+  },
+  "ssl": {
+    "email": "your-email@example.com",
+    "staging": false,
+    "auto_renew": true,
+    "cert_dir": "./data/certs",
+    "key_dir": "./data/keys"
+  },
+  "admin": {
+    "username": "admin",
+    "password_file": "./data/admin.pass",
+    "first_run": true
+  },
+  "compression": {
+    "enabled": true,
+    "algorithms": ["br", "gzip"],
+    "min_size": 1024,
+    "level": {
+      "gzip": 6,
+      "brotli": 6
+    },
+    "types": [
+      ".js", ".css", ".html", ".htm", ".xml", ".json", 
+      ".txt", ".svg", ".md", ".yaml", ".yml", ".csv", 
+      ".rss", ".atom"
+    ],
+    "excluded_types": [
+      ".gz", ".br", ".zip", ".rar", ".7z", ".bz2", ".xz",
+      ".jpg", ".jpeg", ".png", ".gif", ".webp", ".ico", 
+      ".bmp", ".tiff", ".woff", ".woff2", ".ttf", ".eot", 
+      ".otf", ".mp3", ".mp4", ".avi", ".mov", ".wmv", 
+      ".flv", ".wav", ".ogg", ".pdf"
+    ],
+    "content_types": [
+      "text/html", "text/css", "text/plain", "text/xml",
+      "application/javascript", "application/json", 
+      "application/xml", "application/rss+xml",
+      "application/atom+xml", "image/svg+xml"
+    ]
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "127.0.0.1",
+        "port": 8080,
+        "enabled": true,
+        "ssl_only": true
+      }
+    ]
+  },
+  "security": {
+    "max_attempts": 5,
+    "block_duration": "5m",
+    "max_attempts_5min": 15,
+    "enable_ua_filter": true,
+    "enable_waf": false,
+    "enable_ddos": true
+  },
+  "cdn_cache": {
+    "enabled": true,
+    "max_size_mb": 1024,
+    "default_ttl_seconds": 3600
+  },
+  "admin_prefix": "/sslcat-panel",
+  "cluster": {
+    "mode": "standalone"
+  },
+  "static_sites": [],
+  "php_sites": [],
+  "runners": {
+    "enabled": false
+  },
+  "threat_intel": {
+    "enabled": false
+  },
+  "notification": {
+    "enabled": false
+  }
+}
