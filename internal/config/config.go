@@ -37,6 +37,8 @@ type Config struct {
 	ThreatIntel ThreatIntelConfig `json:"threat_intel"`
 	// 通知配置
 	Notification NotificationConfig `json:"notification"`
+	// 上游缓存配置
+	UpstreamCache UpstreamCacheConfig `json:"upstream_cache"`
 }
 
 // ServerConfig 服务器配置
@@ -781,6 +783,21 @@ func Load(configFile string) (*Config, error) {
 				CleanupInterval: 7200, // 2小时
 			},
 		},
+		UpstreamCache: UpstreamCacheConfig{
+			Enabled:         true,
+			CacheDir:        "./data/upstream-cache",
+			MaxSizeBytes:    1024 * 1024 * 1024, // 1GB
+			DefaultTTL:      1 * time.Hour,      // 1小时
+			RespectUpstream: true,
+			MinFileSize:     1024,              // 1KB
+			MaxFileSize:     100 * 1024 * 1024, // 100MB
+			CacheableTypes: []string{
+				"image/jpeg", "image/png", "image/gif", "image/webp",
+				"text/css", "text/javascript", "application/javascript",
+				"font/woff", "font/woff2", "application/font-woff",
+				"video/mp4", "audio/mpeg",
+			},
+		},
 	}
 
 	// 如果配置文件存在，则加载
@@ -1150,4 +1167,21 @@ type SyslogChannelConfig struct {
 // ConsoleChannelConfig 控制台通知渠道配置
 type ConsoleChannelConfig struct {
 	Enabled bool `json:"enabled"` // 是否启用
+}
+
+// UpstreamCacheConfig 上游缓存配置
+type UpstreamCacheConfig struct {
+	Enabled         bool          `json:"enabled"`          // 是否启用上游缓存
+	CacheDir        string        `json:"cache_dir"`        // 缓存目录
+	MaxSizeBytes    int64         `json:"max_size_bytes"`   // 最大缓存总大小（字节）
+	DefaultTTL      time.Duration `json:"default_ttl"`      // 默认TTL
+	RespectUpstream bool          `json:"respect_upstream"` // 是否遵循上游的Cache-Control
+	MinFileSize     int64         `json:"min_file_size"`    // 最小缓存文件大小（字节）
+	MaxFileSize     int64         `json:"max_file_size"`    // 最大缓存文件大小（字节）
+
+	// 可缓存的文件类型
+	CacheableTypes []string `json:"cacheable_types"`
+
+	// 可缓存的Content-Type
+	CacheableContentTypes []string `json:"cacheable_content_types"`
 }

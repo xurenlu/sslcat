@@ -55,6 +55,8 @@ interface UpstreamCacheConfigProps {
   max_size_bytes: number
   default_ttl_seconds: number
   respect_upstream: boolean
+  min_file_size?: number  // 最小缓存文件大小（字节）
+  max_file_size?: number  // 最大缓存文件大小（字节）
   
   // 统计信息（可选）
   stats?: UpstreamCacheStats
@@ -71,6 +73,8 @@ const UpstreamCacheConfig: React.FC<UpstreamCacheConfigProps> = ({
   max_size_bytes,
   default_ttl_seconds,
   respect_upstream,
+  min_file_size = 1024,        // 默认1KB
+  max_file_size = 104857600,   // 默认100MB
   stats,
   onFieldChange,
   onPurgeCache,
@@ -274,6 +278,56 @@ const UpstreamCacheConfig: React.FC<UpstreamCacheConfigProps> = ({
                   优先使用上游服务器的缓存指令
                 </Text>
               </FormControl>
+
+              <Divider />
+
+              {/* 文件大小限制配置 */}
+              <Box>
+                <Heading size="sm" mb={4} display="flex" alignItems="center">
+                  <Icon as={FiHardDrive} mr={2} />
+                  文件大小限制
+                </Heading>
+                
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                  <FormControl>
+                    <FormLabel>最小缓存文件大小</FormLabel>
+                    <NumberInput
+                      value={Math.round(min_file_size / 1024)}
+                      onChange={(_, value) => onFieldChange('min_file_size', (value || 1) * 1024)}
+                      min={0.1}
+                      max={1024}
+                    >
+                      <NumberInputField />
+                      <NumberInputStepper>
+                        <NumberIncrementStepper />
+                        <NumberDecrementStepper />
+                      </NumberInputStepper>
+                    </NumberInput>
+                    <Text fontSize="sm" color="gray.500" mt={1}>
+                      小于此大小的文件不会被缓存 (KB)
+                    </Text>
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel>最大缓存文件大小</FormLabel>
+                    <NumberInput
+                      value={Math.round(max_file_size / 1024 / 1024)}
+                      onChange={(_, value) => onFieldChange('max_file_size', (value || 100) * 1024 * 1024)}
+                      min={1}
+                      max={1024}
+                    >
+                      <NumberInputField />
+                      <NumberInputStepper>
+                        <NumberIncrementStepper />
+                        <NumberDecrementStepper />
+                      </NumberInputStepper>
+                    </NumberInput>
+                    <Text fontSize="sm" color="gray.500" mt={1}>
+                      大于此大小的文件不会被缓存 (MB)
+                    </Text>
+                  </FormControl>
+                </SimpleGrid>
+              </Box>
             </VStack>
           </Box>
 

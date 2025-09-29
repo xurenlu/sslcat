@@ -20,6 +20,7 @@ import GitServerManagement from './pages/GitServerManagement'
 import UserManagement from './pages/UserManagement'
 import ChangePassword from './pages/ChangePassword'
 import CDNManagement from './pages/CDNManagement'
+import Statistics from './pages/Statistics'
 
 const AppRoutes: React.FC = () => {
   const { adminPrefix, isLoading, error } = useConfig()
@@ -119,6 +120,11 @@ const AppRoutes: React.FC = () => {
       <Route path={`${adminPrefix}/cdn`} element={
         <AuthGuard>
           <CDNManagement />
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/statistics`} element={
+        <AuthGuard>
+          <Statistics />
         </AuthGuard>
       } />
     </Routes>

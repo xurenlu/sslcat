@@ -29,6 +29,7 @@ import {
   FiLogOut,
   FiHardDrive,
   FiKey,
+  FiBarChart3,
 } from 'react-icons/fi'
 
 interface SidebarProps {
@@ -84,6 +85,7 @@ const SidebarContent = () => {
     { name: t.navigation.sites, icon: FiGlobe, path: buildPath(adminPrefix, '/sites') },
     { name: t.navigation.ssl, icon: FiShield, path: buildPath(adminPrefix, '/ssl') },
     { name: t.navigation.cdnCache, icon: FiHardDrive, path: buildPath(adminPrefix, '/cdn') },
+    { name: '访问统计', icon: FiBarChart3, path: buildPath(adminPrefix, '/statistics') },
     { name: t.navigation.settings, icon: FiSettings, path: buildPath(adminPrefix, '/settings') },
     { name: t.navigation.dns, icon: FiGlobe, path: buildPath(adminPrefix, '/dns') },
     { name: t.navigation.security, icon: FiShield, path: buildPath(adminPrefix, '/security') },

@@ -24,6 +24,7 @@ import { FiArrowLeft, FiZap, FiGlobe, FiShield, FiSave, FiPlus, FiClock } from '
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useConfig, buildPath, buildApiPath } from '../contexts/ConfigContext'
 import LoadBalancerConfig from '../components/LoadBalancerConfig'
+import WebSocketConfig from '../components/WebSocketConfig'
 
 interface ProxyAuthUser {
   username: string
@@ -97,6 +98,12 @@ interface ProxyRuleForm {
   tls_handshake_timeout_sec: number
   expect_continue_timeout_sec: number
   health_check_timeout_sec: number
+  // WebSocket优化配置
+  websocket_optimized: boolean
+  websocket_buffer_size: number
+  websocket_read_timeout: number
+  websocket_write_timeout: number
+  websocket_ping_interval: number
 }
 
 const ProxyEdit: React.FC = () => {
@@ -161,6 +168,12 @@ const ProxyEdit: React.FC = () => {
     tls_handshake_timeout_sec: 10,
     expect_continue_timeout_sec: 1,
     health_check_timeout_sec: 5,
+    // WebSocket优化配置
+    websocket_optimized: true,
+    websocket_buffer_size: 100,
+    websocket_read_timeout: 30,
+    websocket_write_timeout: 10,
+    websocket_ping_interval: 30,
   })
 
   // 加载现有规则数据
@@ -243,6 +256,12 @@ const ProxyEdit: React.FC = () => {
             tls_handshake_timeout_sec: rule.tls_handshake_timeout_sec || 10,
             expect_continue_timeout_sec: rule.expect_continue_timeout_sec || 1,
             health_check_timeout_sec: rule.health_check_timeout_sec || 5,
+            // WebSocket优化配置
+            websocket_optimized: rule.websocket_optimized ?? true,
+            websocket_buffer_size: rule.websocket_buffer_size || 100,
+            websocket_read_timeout: rule.websocket_read_timeout || 30,
+            websocket_write_timeout: rule.websocket_write_timeout || 10,
+            websocket_ping_interval: rule.websocket_ping_interval || 30,
           })
         }
       } catch (error) {
@@ -798,6 +817,20 @@ const ProxyEdit: React.FC = () => {
                     </SimpleGrid>
                   </VStack>
                 </Box>
+
+                {/* WebSocket优化配置 */}
+                <Card>
+                  <CardBody>
+                    <WebSocketConfig
+                      websocket_optimized={formData.websocket_optimized}
+                      websocket_buffer_size={formData.websocket_buffer_size}
+                      websocket_read_timeout={formData.websocket_read_timeout}
+                      websocket_write_timeout={formData.websocket_write_timeout}
+                      websocket_ping_interval={formData.websocket_ping_interval}
+                      onFieldChange={handleInputChange}
+                    />
+                  </CardBody>
+                </Card>
 
                 {/* 提交按钮 */}
                 <HStack spacing={4} justify="flex-end">

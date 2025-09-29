@@ -42,7 +42,9 @@ type UpstreamCache struct {
 	enabled         bool
 	maxSizeBytes    int64
 	defaultTTL      time.Duration
-	respectUpstream bool // 是否遵循上游的Cache-Control
+	respectUpstream bool  // 是否遵循上游的Cache-Control
+	minFileSize     int64 // 最小缓存文件大小
+	maxFileSize     int64 // 最大缓存文件大小
 }
 
 // UpstreamCacheConfig 上游缓存配置
@@ -105,6 +107,53 @@ func NewUpstreamCache(cfg *config.Config) *UpstreamCache {
 		maxSizeBytes:    1024 * 1024 * 1024, // 默认1GB
 		defaultTTL:      1 * time.Hour,      // 默认1小时
 		respectUpstream: true,               // 默认遵循上游Cache-Control
+		minFileSize:     1024,               // 默认1KB
+		maxFileSize:     100 * 1024 * 1024,  // 默认100MB
+	}
+}
+
+// NewUpstreamCacheWithConfig 创建带配置的上游缓存管理器
+func NewUpstreamCacheWithConfig(cfg *config.Config, cacheConfig *UpstreamCacheConfig) *UpstreamCache {
+	cacheDir := cacheConfig.CacheDir
+	if cacheDir == "" {
+		cacheDir = "./data/upstream-cache"
+	}
+
+	// 创建缓存目录
+	os.MkdirAll(cacheDir, 0755)
+
+	// 设置默认值
+	minSize := cacheConfig.MinSize
+	if minSize <= 0 {
+		minSize = 1024 // 默认1KB
+	}
+
+	maxSize := cacheConfig.MaxSize
+	if maxSize <= 0 {
+		maxSize = 100 * 1024 * 1024 // 默认100MB
+	}
+
+	maxSizeBytes := cacheConfig.MaxSizeBytes
+	if maxSizeBytes <= 0 {
+		maxSizeBytes = 1024 * 1024 * 1024 // 默认1GB
+	}
+
+	defaultTTL := cacheConfig.DefaultTTL
+	if defaultTTL <= 0 {
+		defaultTTL = 1 * time.Hour // 默认1小时
+	}
+
+	return &UpstreamCache{
+		cfg:             cfg,
+		log:             logrus.WithFields(logrus.Fields{"component": "upstream_cache"}),
+		compressor:      compression.NewCompressor(compression.FromConfig(cfg)),
+		cacheDir:        cacheDir,
+		enabled:         cacheConfig.Enabled,
+		maxSizeBytes:    maxSizeBytes,
+		defaultTTL:      defaultTTL,
+		respectUpstream: cacheConfig.RespectUpstream,
+		minFileSize:     minSize,
+		maxFileSize:     maxSize,
 	}
 }
 
@@ -128,13 +177,13 @@ func (uc *UpstreamCache) ShouldCache(resp *http.Response) bool {
 	// 检查Content-Length
 	contentLength := resp.ContentLength
 	if contentLength > 0 {
-		// 文件太大不缓存（默认10MB）
-		if contentLength > 100*1024*1024 {
+		// 文件太大不缓存（可配置，默认100MB）
+		if contentLength > uc.maxFileSize {
 			return false
 		}
 
-		// 文件太小不缓存（默认1KB）
-		if contentLength < 1024 {
+		// 文件太小不缓存（可配置，默认1KB）
+		if contentLength < uc.minFileSize {
 			return false
 		}
 	}

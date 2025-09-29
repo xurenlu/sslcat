@@ -24,6 +24,7 @@ import { FiArrowLeft, FiZap, FiGlobe, FiShield, FiPlus, FiClock } from 'react-ic
 import { useNavigate } from 'react-router-dom'
 import { useConfig, buildPath, buildApiPath } from '../contexts/ConfigContext'
 import LoadBalancerConfig from '../components/LoadBalancerConfig'
+import WebSocketConfig from '../components/WebSocketConfig'
 
 interface ProxyAuthUser {
   username: string
@@ -97,6 +98,12 @@ interface ProxyRuleForm {
   tls_handshake_timeout_sec: number
   expect_continue_timeout_sec: number
   health_check_timeout_sec: number
+  // WebSocket优化配置
+  websocket_optimized: boolean
+  websocket_buffer_size: number
+  websocket_read_timeout: number
+  websocket_write_timeout: number
+  websocket_ping_interval: number
 }
 
 const ProxyAdd: React.FC = () => {
@@ -156,6 +163,12 @@ const ProxyAdd: React.FC = () => {
     tls_handshake_timeout_sec: 10,
     expect_continue_timeout_sec: 1,
     health_check_timeout_sec: 5,
+    // WebSocket优化配置
+    websocket_optimized: true,
+    websocket_buffer_size: 100,
+    websocket_read_timeout: 30,
+    websocket_write_timeout: 10,
+    websocket_ping_interval: 30,
   })
 
   const handleInputChange = (field: string, value: any) => {
@@ -722,6 +735,20 @@ const ProxyAdd: React.FC = () => {
                   </SimpleGrid>
                 </VStack>
               </Box>
+
+              {/* WebSocket优化配置 */}
+              <Card>
+                <CardBody>
+                  <WebSocketConfig
+                    websocket_optimized={formData.websocket_optimized}
+                    websocket_buffer_size={formData.websocket_buffer_size}
+                    websocket_read_timeout={formData.websocket_read_timeout}
+                    websocket_write_timeout={formData.websocket_write_timeout}
+                    websocket_ping_interval={formData.websocket_ping_interval}
+                    onFieldChange={handleInputChange}
+                  />
+                </CardBody>
+              </Card>
 
               {/* 提示信息 */}
               <Alert status="info">

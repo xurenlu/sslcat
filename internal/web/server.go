@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	"github.com/xurenlu/sslcat/internal/runner"
 	"github.com/xurenlu/sslcat/internal/security"
 	"github.com/xurenlu/sslcat/internal/ssl"
+	"github.com/xurenlu/sslcat/internal/statistics"
 
 	"io"
 
@@ -84,6 +86,9 @@ type Server struct {
 	notificationIntegrator *notification.NotificationIntegrator
 	// Runner 模块
 	gitServer *runner.GitServer
+	// 统计收集器和API
+	statisticsCollector *statistics.Collector
+	statisticsAPI       *StatisticsAPI
 }
 
 // NewServer 创建Web服务器
@@ -160,6 +165,11 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 
 	// 设置通知集成器
 	server.notificationIntegrator = notificationIntegrator
+
+	// 初始化统计收集器
+	statsEnabled := true // 默认启用，可以通过配置控制
+	server.statisticsCollector = statistics.NewCollector("./data/statistics", statsEnabled)
+	server.statisticsAPI = NewStatisticsAPI(server.statisticsCollector)
 
 	// 初始化审计日志轮转器（10MB*10）
 	if rot, err := logger.NewRotator("./data/audit.log", 10*1024*1024, 10); err == nil {
@@ -540,6 +550,11 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/cdn/purge", s.handleAPICDNPurge)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/cdn/rules", s.handleAPICDNRules)
 
+	// 统计API
+	if s.statisticsAPI != nil {
+		s.statisticsAPI.RegisterRoutes(s.mux, s.config.AdminPrefix+"/api")
+	}
+
 	// Prometheus 指标
 	s.mux.Handle("/metrics", s.prometheusMetrics.Handler())
 	// 图形验证码
@@ -684,7 +699,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// 处理请求
 	s.log.Debugf("Routing to mux for: %s %s", r.Method, r.URL.Path)
-	s.mux.ServeHTTP(w, r)
+
+	// 应用统计中间件
+	if s.statisticsAPI != nil {
+		handler := s.statisticsAPI.RecordMiddleware(s.mux)
+		handler.ServeHTTP(w, r)
+	} else {
+		s.mux.ServeHTTP(w, r)
+	}
 }
 
 func (s *Server) isSupportedLanguage(lang string) bool {
@@ -987,6 +1009,13 @@ func (s *Server) getSystemStats() map[string]interface{} {
 	uptime := time.Since(s.startTime)
 
 	return map[string]interface{}{
+		// 前端期望的字段名（小写开头）
+		"activeRules":   len(s.config.Proxy.Rules),
+		"cachedProxies": proxyStats["total_requests"], // 使用总请求数
+		"publicIP":      s.fetchPublicIPv4(),
+		"goVersion":     runtime.Version(),
+
+		// 保持向后兼容的大写字段
 		"ActiveRules":     len(s.config.Proxy.Rules),
 		"CachedProxies":   proxyStats["cached_proxies"],
 		"TotalRequests":   proxyStats["total_requests"],

@@ -254,7 +254,22 @@ if [[ ! -f "$CONF_LINUX" ]]; then
     "auth_key": ""
   },
   "static_sites": [],
-  "php_sites": []
+  "php_sites": [],
+  "upstream_cache": {
+    "enabled": true,
+    "cache_dir": "./data/upstream-cache",
+    "max_size_bytes": 1073741824,
+    "default_ttl": "1h0m0s",
+    "respect_upstream": true,
+    "min_file_size": 1024,
+    "max_file_size": 104857600,
+    "cacheable_types": [
+      "image/jpeg", "image/png", "image/gif", "image/webp",
+      "text/css", "text/javascript", "application/javascript",
+      "font/woff", "font/woff2", "application/font-woff",
+      "video/mp4", "audio/mpeg"
+    ]
+  }
 }
 JSON
 fi
