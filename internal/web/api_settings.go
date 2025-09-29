@@ -2,8 +2,11 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
+
+	"github.com/xurenlu/sslcat/internal/notification"
 )
 
 // handleAPISettings 获取系统设置
@@ -119,11 +122,26 @@ func (s *Server) handleAPISettingsUpdate(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// 如果管理前缀变化，重建路由
+	// 如果管理前缀变化，重建路由并发送通知
 	if oldPrefix != s.config.AdminPrefix {
 		s.mux = http.NewServeMux()
 		s.setupRoutes()
 		s.templateRenderer.ClearCache()
+		
+		// 发送前缀变更通知
+		if s.notificationIntegrator != nil {
+			notification := &notification.Notification{
+				Type:    "admin_prefix_changed",
+				Level:   notification.LevelInfo,
+				Title:   "管理前缀已更改",
+				Message: fmt.Sprintf("管理面板前缀已从 %s 更改为 %s。请使用新的URL访问管理面板。", oldPrefix, s.config.AdminPrefix),
+				Details: map[string]any{
+					"old_prefix": oldPrefix,
+					"new_prefix": s.config.AdminPrefix,
+				},
+			}
+			s.notificationIntegrator.GetManager().Send(notification)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -209,12 +227,27 @@ func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// 如果管理前缀变化，重建路由
+	// 如果管理前缀变化，重建路由并发送通知
 	if oldPrefix != s.config.AdminPrefix {
 		s.mux = http.NewServeMux()
 		s.setupRoutes()
 		s.templateRenderer.ClearCache()
 		s.log.Infof("管理前缀已从 %s 更改为 %s，路由已重建", oldPrefix, s.config.AdminPrefix)
+		
+		// 发送前缀变更通知
+		if s.notificationIntegrator != nil {
+			notification := &notification.Notification{
+				Type:    "admin_prefix_changed",
+				Level:   notification.LevelInfo,
+				Title:   "管理前缀已更改",
+				Message: fmt.Sprintf("管理面板前缀已从 %s 更改为 %s。请使用新的URL访问管理面板。", oldPrefix, s.config.AdminPrefix),
+				Details: map[string]any{
+					"old_prefix": oldPrefix,
+					"new_prefix": s.config.AdminPrefix,
+				},
+			}
+			s.notificationIntegrator.GetManager().Send(notification)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
