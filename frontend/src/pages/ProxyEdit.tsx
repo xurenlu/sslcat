@@ -458,6 +458,11 @@ const ProxyEdit: React.FC = () => {
                       />
                       <Text fontSize="sm" color="gray.500" mt={1}>
                         完整的代理目标地址，包含协议、主机和端口
+                        {formData.load_balancer_enabled && (
+                          <Text as="span" color="orange.500" fontWeight="medium">
+                            （注意：启用负载均衡后，此字段将被忽略，系统将使用下方配置的后端服务器）
+                          </Text>
+                        )}
                       </Text>
                     </FormControl>
                   </VStack>

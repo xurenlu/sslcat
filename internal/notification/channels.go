@@ -3,7 +3,6 @@ package notification
 import (
 	"bytes"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -266,22 +265,13 @@ func (whc *WebhookChannel) Send(notification *Notification) error {
 		return nil
 	}
 
-	// 构建请求体
-	payload := map[string]any{
-		"id":        notification.ID,
-		"type":      notification.Type,
-		"level":     notification.Level.String(),
-		"title":     notification.Title,
-		"message":   notification.Message,
-		"details":   notification.Details,
-		"timestamp": notification.Timestamp.Format(time.RFC3339),
-		"source":    notification.Source,
-		"resolved":  notification.Resolved,
-	}
+	// 获取平台适配器
+	adapter := GetPlatformAdapter(whc.url)
 
-	jsonData, err := json.Marshal(payload)
+	// 使用适配器转换消息格式
+	jsonData, err := adapter.Adapt(notification)
 	if err != nil {
-		return fmt.Errorf("序列化通知数据失败: %v", err)
+		return fmt.Errorf("适配通知格式失败: %v", err)
 	}
 
 	// 创建HTTP请求
@@ -290,11 +280,15 @@ func (whc *WebhookChannel) Send(notification *Notification) error {
 		return fmt.Errorf("创建HTTP请求失败: %v", err)
 	}
 
-	// 设置默认头部
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "SSLcat-Notification/1.0")
+	// 设置适配器指定的Content-Type
+	req.Header.Set("Content-Type", adapter.GetContentType())
 
-	// 设置自定义头部
+	// 设置适配器的默认头部
+	for key, value := range adapter.GetHeaders() {
+		req.Header.Set(key, value)
+	}
+
+	// 设置自定义头部（覆盖默认头部）
 	for key, value := range whc.headers {
 		req.Header.Set(key, value)
 	}
@@ -310,7 +304,9 @@ func (whc *WebhookChannel) Send(notification *Notification) error {
 		return fmt.Errorf("Webhook返回错误状态码: %d", resp.StatusCode)
 	}
 
-	whc.log.Infof("Webhook通知已发送到: %s", whc.url)
+	// 检测平台类型用于日志
+	platform := DetectPlatform(whc.url)
+	whc.log.Infof("Webhook通知已发送到 %s 平台: %s", platform, whc.url)
 	return nil
 }
 

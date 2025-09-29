@@ -155,6 +155,9 @@ const LoadBalancerConfig: React.FC<LoadBalancerConfigProps> = ({
         <Text fontSize="sm" color="gray.500" mt={2}>
           启用后可以将请求分发到多个后端服务器，提高可用性和性能
         </Text>
+        <Text fontSize="sm" color="blue.500" mt={1} fontWeight="medium">
+          ⚠️ 启用负载均衡后，上方的"目标地址"字段将被忽略，系统将使用下方配置的后端服务器列表
+        </Text>
       </Box>
 
       {load_balancer_enabled && (

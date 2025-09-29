@@ -293,7 +293,11 @@ const ProxyList: React.FC = () => {
             <Box textAlign="center" py={8}>
               <Icon as={FiZap} boxSize={12} color="gray.300" mb={4} />
               <Text color="gray.500" mb={4}>暂无代理规则</Text>
-              <Button leftIcon={<Icon as={FiPlus} />} colorScheme="blue">
+              <Button 
+                leftIcon={<Icon as={FiPlus} />} 
+                colorScheme="blue"
+                onClick={() => navigate(buildPath(adminPrefix, '/proxy/add'))}
+              >
                 创建第一个规则
               </Button>
             </Box>
