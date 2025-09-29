@@ -31,15 +31,20 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
       if (pathSegments.length > 0) {
         // 如果当前路径包含前缀，使用它
         detectedPrefix = '/' + pathSegments[0]
+        console.log('Detected prefix from URL:', detectedPrefix)
         setAdminPrefix(detectedPrefix)
       }
       
       // 然后尝试从API获取最新配置进行验证/更新
       try {
-        const response = await fetch(`${detectedPrefix}/api/settings`)
+        console.log('Attempting to fetch config from:', `${detectedPrefix}/api/settings`)
+        const response = await fetch(`${detectedPrefix}/api/settings`, {
+          credentials: 'include'
+        })
         if (response.ok) {
           const data = await response.json()
           const serverPrefix = data.admin_prefix || detectedPrefix
+          console.log('Server returned prefix:', serverPrefix)
           // 如果服务器返回的前缀与检测到的不同，更新它
           if (serverPrefix !== detectedPrefix) {
             console.log('Server prefix differs from detected:', { detected: detectedPrefix, server: serverPrefix })
@@ -48,10 +53,12 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
         } else {
           // 如果API调用失败，但路径检测成功，继续使用检测到的前缀
           console.warn('Failed to fetch config from API, using detected prefix:', detectedPrefix)
+          console.warn('Response status:', response.status, response.statusText)
         }
       } catch (apiError) {
         // API调用失败，使用检测到的前缀或默认值
         console.warn('Failed to fetch config from API, using fallback prefix:', detectedPrefix)
+        console.warn('API error:', apiError)
         setAdminPrefix(detectedPrefix)
       }
     } catch (err) {

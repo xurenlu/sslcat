@@ -3,6 +3,7 @@ package waf
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"sort"
@@ -268,6 +269,7 @@ func (e *AdvancedEngine) AddAdvancedRule(rule *AdvancedRule) error {
 	return nil
 }
 
+// @Todo 待集成
 // CheckRequestAdvanced 高级请求检查
 func (e *AdvancedEngine) CheckRequestAdvanced(r *http.Request) ([]*AttackEvent, bool) {
 	if !e.enabled {
@@ -495,10 +497,8 @@ func (e *AdvancedEngine) extractVariables(r *http.Request) map[string]string {
 
 	// 请求体
 	if r.Body != nil {
-		if body, err := r.GetBody(); err == nil {
-			if bodyBytes, err := body.ReadAll(); err == nil {
-				variables["REQUEST_BODY"] = string(bodyBytes)
-			}
+		if bodyBytes, err := io.ReadAll(r.Body); err == nil {
+			variables["REQUEST_BODY"] = string(bodyBytes)
 		}
 	}
 

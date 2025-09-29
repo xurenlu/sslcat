@@ -465,7 +465,7 @@ const Statistics: React.FC = () => {
                     </Tr>
                   </Thead>
                   <Tbody>
-                    {data?.top_ips.slice(0, 10).map((item, index) => (
+                    {(data?.top_ips || []).slice(0, 10).map((item, index) => (
                       <Tr key={item.key}>
                         <Td>
                           <Badge colorScheme={index < 3 ? 'red' : 'gray'}>
@@ -479,7 +479,7 @@ const Statistics: React.FC = () => {
                         </Td>
                         <Td isNumeric>{formatNumber(item.count)}</Td>
                       </Tr>
-                    )) || []}
+                    ))}
                   </Tbody>
                 </Table>
               )}
@@ -510,7 +510,7 @@ const Statistics: React.FC = () => {
                     </Tr>
                   </Thead>
                   <Tbody>
-                    {data?.top_user_agents.slice(0, 10).map((item, index) => (
+                    {(data?.top_user_agents || []).slice(0, 10).map((item, index) => (
                       <Tr key={item.key}>
                         <Td>
                           <Badge colorScheme={index < 3 ? 'blue' : 'gray'}>
@@ -524,7 +524,7 @@ const Statistics: React.FC = () => {
                         </Td>
                         <Td isNumeric>{formatNumber(item.count)}</Td>
                       </Tr>
-                    )) || []}
+                    ))}
                   </Tbody>
                 </Table>
               )}
@@ -559,7 +559,7 @@ const Statistics: React.FC = () => {
                     </Tr>
                   </Thead>
                   <Tbody>
-                    {data?.top_cities.slice(0, 10).map((item, index) => (
+                    {(data?.top_cities || []).slice(0, 10).map((item, index) => (
                       <Tr key={item.key}>
                         <Td>
                           <Badge colorScheme={index < 3 ? 'green' : 'gray'}>
@@ -573,7 +573,7 @@ const Statistics: React.FC = () => {
                         </Td>
                         <Td isNumeric>{formatNumber(item.count)}</Td>
                       </Tr>
-                    )) || []}
+                    ))}
                   </Tbody>
                 </Table>
               )}
