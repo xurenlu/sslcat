@@ -696,17 +696,40 @@ const Settings: React.FC = () => {
 
             {/* 其他通知渠道 */}
             <Box border="1px" borderColor="gray.200" borderRadius="md" p={4}>
-              <Heading size="sm" mb={4}>{t.settings.otherNotification}</Heading>
+              <Heading size="sm" mb={4}>其他通知渠道 (Webhook)</Heading>
               <FormControl>
-                <FormLabel>{t.settings.webhookUrl}</FormLabel>
+                <FormLabel>Webhook URL</FormLabel>
                 <Input
                   value={settings.webhookUrl || ''}
                   onChange={(e) => handleInputChange('webhookUrl', e.target.value)}
                   placeholder="https://your-webhook-endpoint.com/notify"
                 />
                 <Text fontSize="sm" color="gray.500" mt={1}>
-                  {t.settings.supportDingtalk}
+                  支持自动格式适配的平台：
                 </Text>
+                <VStack align="start" spacing={1} mt={2}>
+                  <Text fontSize="xs" color="blue.600">
+                    • 企业微信: qyapi.weixin.qq.com
+                  </Text>
+                  <Text fontSize="xs" color="blue.600">
+                    • 飞书: open.feishu.cn
+                  </Text>
+                  <Text fontSize="xs" color="blue.600">
+                    • 钉钉: oapi.dingtalk.com
+                  </Text>
+                  <Text fontSize="xs" color="blue.600">
+                    • Slack: hooks.slack.com
+                  </Text>
+                  <Text fontSize="xs" color="blue.600">
+                    • Discord: discord.com
+                  </Text>
+                  <Text fontSize="xs" color="blue.600">
+                    • Telegram: api.telegram.org
+                  </Text>
+                  <Text fontSize="xs" color="gray.500">
+                    • 其他: 通用JSON格式
+                  </Text>
+                </VStack>
               </FormControl>
             </Box>
             
