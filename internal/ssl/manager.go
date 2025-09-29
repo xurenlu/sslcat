@@ -124,6 +124,7 @@ type CertificateInfo struct {
 	Status     string    `json:"status"`
 	IsWildcard bool      `json:"is_wildcard"`
 	SelfSigned bool      `json:"self_signed"`
+	Issuer     string    `json:"issuer"`
 }
 
 // GetCertificateList 获取证书列表
@@ -149,6 +150,21 @@ func (m *Manager) GetCertificateList() []CertificateInfo {
 
 			selfSigned := x509Cert.Issuer.String() == x509Cert.Subject.String()
 
+			// 获取颁发机构名称
+			issuer := "未知"
+			if selfSigned {
+				issuer = "自签名证书"
+			} else {
+				// 尝试从证书中提取颁发机构名称
+				if len(x509Cert.Issuer.Organization) > 0 {
+					issuer = x509Cert.Issuer.Organization[0]
+				} else if len(x509Cert.Issuer.CommonName) > 0 {
+					issuer = x509Cert.Issuer.CommonName
+				} else {
+					issuer = "Let's Encrypt" // 默认假设是 Let's Encrypt
+				}
+			}
+
 			certs = append(certs, CertificateInfo{
 				Domain:     domain,
 				IssuedAt:   x509Cert.NotBefore,
@@ -156,6 +172,7 @@ func (m *Manager) GetCertificateList() []CertificateInfo {
 				Status:     status,
 				IsWildcard: strings.HasPrefix(domain, "*."),
 				SelfSigned: selfSigned,
+				Issuer:     issuer,
 			})
 		}
 	}
@@ -999,6 +1016,21 @@ func (m *Manager) ListCertificatesFromDisk() []CertificateInfo {
 
 		selfSigned := x509Cert.Issuer.String() == x509Cert.Subject.String()
 
+		// 获取颁发机构名称
+		issuer := "未知"
+		if selfSigned {
+			issuer = "自签名证书"
+		} else {
+			// 尝试从证书中提取颁发机构名称
+			if len(x509Cert.Issuer.Organization) > 0 {
+				issuer = x509Cert.Issuer.Organization[0]
+			} else if len(x509Cert.Issuer.CommonName) > 0 {
+				issuer = x509Cert.Issuer.CommonName
+			} else {
+				issuer = "Let's Encrypt" // 默认假设是 Let's Encrypt
+			}
+		}
+
 		certs = append(certs, CertificateInfo{
 			Domain:     domain,
 			IssuedAt:   x509Cert.NotBefore,
@@ -1006,6 +1038,7 @@ func (m *Manager) ListCertificatesFromDisk() []CertificateInfo {
 			Status:     status,
 			IsWildcard: strings.HasPrefix(domain, "*."),
 			SelfSigned: selfSigned,
+			Issuer:     issuer,
 		})
 	}
 	// 合并内存缓存中的证书（如 ACME 刚获取）

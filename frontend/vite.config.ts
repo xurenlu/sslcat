@@ -14,11 +14,18 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
+    port: 9980,
+    host: '0.0.0.0',
     proxy: {
       '/api': {
-        target: 'http://localhost:8443',
+        target: 'http://localhost:80',
         changeOrigin: true,
+        secure: false,
+      },
+      '/sslcat-panel': {
+        target: 'http://localhost:80',
+        changeOrigin: true,
+        secure: false,
       },
     },
   },

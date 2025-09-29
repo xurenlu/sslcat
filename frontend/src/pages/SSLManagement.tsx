@@ -32,13 +32,13 @@ import {
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
 
 interface SSLCertificate {
-  id: string
   domain: string
+  issued_at: string
+  expires_at: string
+  status: string
+  is_wildcard: boolean
+  self_signed: boolean
   issuer: string
-  expires: string
-  status: 'valid' | 'expiring' | 'expired'
-  autoRenew: boolean
-  created: string
 }
 
 const SSLManagement: React.FC = () => {
@@ -76,20 +76,17 @@ const SSLManagement: React.FC = () => {
     }
   }
 
-  const deleteCertificate = async (id: string) => {
-    const cert = certificates.find(c => c.id === id)
-    if (!cert) return
-
-    if (!window.confirm(`确定要删除域名 "${cert.domain}" 的证书吗？\n\n此操作不可撤销，删除后将无法使用 HTTPS 访问该域名。`)) {
+  const deleteCertificate = async (domain: string) => {
+    if (!window.confirm(`确定要删除域名 "${domain}" 的证书吗？\n\n此操作不可撤销，删除后将无法使用 HTTPS 访问该域名。`)) {
       return
     }
 
     try {
       // TODO: 实际的 API 调用
-      setCertificates(certificates.filter(cert => cert.id !== id))
+      setCertificates(certificates.filter(cert => cert.domain !== domain))
       toast({
         title: '证书删除成功',
-        description: `域名 ${cert.domain} 的证书已删除`,
+        description: `域名 ${domain} 的证书已删除`,
         status: 'success',
         duration: 3000,
         isClosable: true,
@@ -105,15 +102,33 @@ const SSLManagement: React.FC = () => {
     }
   }
 
-  const renewCertificate = async (id: string) => {
-    const cert = certificates.find(c => c.id === id)
-    if (!cert) return
+  const downloadCertificate = async (domain: string) => {
+    try {
+      // TODO: 实际的 API 调用
+      toast({
+        title: '证书下载已启动',
+        description: `正在下载域名 ${domain} 的证书`,
+        status: 'info',
+        duration: 3000,
+        isClosable: true,
+      })
+    } catch (error) {
+      toast({
+        title: '证书下载失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: 4000,
+        isClosable: true,
+      })
+    }
+  }
 
+  const renewCertificate = async (domain: string) => {
     try {
       // TODO: 实际的 API 调用
       toast({
         title: '证书更新已启动',
-        description: `正在为域名 ${cert.domain} 申请新证书`,
+        description: `正在为域名 ${domain} 申请新证书`,
         status: 'info',
         duration: 3000,
         isClosable: true,
@@ -121,14 +136,14 @@ const SSLManagement: React.FC = () => {
 
       // 模拟更新状态
       setCertificates(certs => certs.map(c => 
-        c.id === id ? { ...c, status: 'valid' as const } : c
+        c.domain === domain ? { ...c, status: '有效' } : c
       ))
 
       // 延迟显示成功消息
       setTimeout(() => {
         toast({
           title: '证书更新成功',
-          description: `域名 ${cert.domain} 的证书已成功更新`,
+          description: `域名 ${domain} 的证书已成功更新`,
           status: 'success',
           duration: 4000,
           isClosable: true,
@@ -187,20 +202,15 @@ const SSLManagement: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'valid': return 'green'
-      case 'expiring': return 'orange'
-      case 'expired': return 'red'
+      case '有效': return 'green'
+      case '即将过期': return 'orange'
+      case '过期': return 'red'
       default: return 'gray'
     }
   }
 
   const getStatusText = (status: string) => {
-    switch (status) {
-      case 'valid': return '有效'
-      case 'expiring': return '即将过期'
-      case 'expired': return '已过期'
-      default: return status
-    }
+    return status
   }
 
   const getDaysUntilExpiry = (expiryDate: string) => {
@@ -208,6 +218,22 @@ const SSLManagement: React.FC = () => {
     const now = new Date()
     const diff = expiry.getTime() - now.getTime()
     return Math.ceil(diff / (1000 * 3600 * 24))
+  }
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  const getIssuerName = (cert: SSLCertificate) => {
+    // 使用后端返回的颁发机构信息
+    return cert.issuer || '未知'
   }
 
   return (
@@ -261,25 +287,32 @@ const SSLManagement: React.FC = () => {
                 </Tr>
               </Thead>
               <Tbody>
-                {certificates.map((cert) => {
-                  const daysLeft = getDaysUntilExpiry(cert.expires)
+                {certificates.map((cert, index) => {
+                  const daysLeft = getDaysUntilExpiry(cert.expires_at)
                   return (
-                    <Tr key={cert.id}>
+                    <Tr key={`${cert.domain}-${index}`}>
                       <Td>
-                        <Text fontFamily="mono">{cert.domain}</Text>
+                        <VStack align="start" spacing={1}>
+                          <Text fontFamily="mono">{cert.domain}</Text>
+                          {cert.is_wildcard && (
+                            <Badge size="sm" colorScheme="blue">通配符</Badge>
+                          )}
+                        </VStack>
                       </Td>
-                      <Td>{cert.issuer}</Td>
+                      <Td>
+                        <Text fontSize="sm">{getIssuerName(cert)}</Text>
+                      </Td>
                       <Td>
                         <VStack align="start" spacing={1}>
                           <Badge colorScheme={getStatusColor(cert.status)}>
                             {getStatusText(cert.status)}
                           </Badge>
-                          {cert.status === 'expiring' && (
+                          {cert.status === '即将过期' && (
                             <Text fontSize="xs" color="orange.600">
                               {daysLeft} 天后过期
                             </Text>
                           )}
-                          {cert.status === 'expired' && (
+                          {cert.status === '过期' && (
                             <Text fontSize="xs" color="red.600">
                               已过期 {Math.abs(daysLeft)} 天
                             </Text>
@@ -288,8 +321,8 @@ const SSLManagement: React.FC = () => {
                       </Td>
                       <Td>
                         <VStack align="start" spacing={1}>
-                          <Text fontSize="sm">{cert.expires}</Text>
-                          {cert.status === 'valid' && (
+                          <Text fontSize="sm">{formatDate(cert.expires_at)}</Text>
+                          {cert.status === '有效' && (
                             <Progress
                               size="sm"
                               value={Math.max(0, Math.min(100, (daysLeft / 90) * 100))}
@@ -301,11 +334,15 @@ const SSLManagement: React.FC = () => {
                       </Td>
                       <Td>
                         <Icon
-                          as={cert.autoRenew ? FiCheck : FiX}
-                          color={cert.autoRenew ? 'green.500' : 'red.500'}
+                          as={FiCheck}
+                          color="green.500"
                         />
                       </Td>
-                      <Td>{cert.created}</Td>
+                      <Td>
+                        <Text fontSize="sm" color="gray.600">
+                          {formatDate(cert.issued_at)}
+                        </Text>
+                      </Td>
                       <Td>
                         <HStack spacing={2}>
                           <IconButton
@@ -314,7 +351,7 @@ const SSLManagement: React.FC = () => {
                             size="sm"
                             variant="ghost"
                             colorScheme="blue"
-                            onClick={() => renewCertificate(cert.id)}
+                            onClick={() => renewCertificate(cert.domain)}
                           />
                           <IconButton
                             aria-label="下载证书"
@@ -322,6 +359,7 @@ const SSLManagement: React.FC = () => {
                             size="sm"
                             variant="ghost"
                             colorScheme="green"
+                            onClick={() => downloadCertificate(cert.domain)}
                           />
                           <IconButton
                             aria-label="删除证书"
@@ -329,7 +367,7 @@ const SSLManagement: React.FC = () => {
                             size="sm"
                             variant="ghost"
                             colorScheme="red"
-                            onClick={() => deleteCertificate(cert.id)}
+                            onClick={() => deleteCertificate(cert.domain)}
                           />
                         </HStack>
                       </Td>
