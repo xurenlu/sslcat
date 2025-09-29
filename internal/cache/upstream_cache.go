@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -25,10 +26,11 @@ import (
 
 // UpstreamCache 上游缓存管理器
 type UpstreamCache struct {
-	cfg        *config.Config
-	log        *logrus.Entry
-	compressor *compression.Compressor
-	mutex      sync.RWMutex
+	cfg          *config.Config
+	log          *logrus.Entry
+	compressor   *compression.Compressor
+	mimeDetector *MIMEDetector
+	mutex        sync.RWMutex
 
 	// 缓存目录
 	cacheDir string
@@ -102,6 +104,7 @@ func NewUpstreamCache(cfg *config.Config) *UpstreamCache {
 		cfg:             cfg,
 		log:             logrus.WithFields(logrus.Fields{"component": "upstream_cache"}),
 		compressor:      compression.NewCompressor(compression.FromConfig(cfg)),
+		mimeDetector:    NewMIMEDetector(),
 		cacheDir:        cacheDir,
 		enabled:         true,               // 默认启用
 		maxSizeBytes:    1024 * 1024 * 1024, // 默认1GB
@@ -147,6 +150,7 @@ func NewUpstreamCacheWithConfig(cfg *config.Config, cacheConfig *UpstreamCacheCo
 		cfg:             cfg,
 		log:             logrus.WithFields(logrus.Fields{"component": "upstream_cache"}),
 		compressor:      compression.NewCompressor(compression.FromConfig(cfg)),
+		mimeDetector:    NewMIMEDetector(),
 		cacheDir:        cacheDir,
 		enabled:         cacheConfig.Enabled,
 		maxSizeBytes:    maxSizeBytes,
@@ -350,13 +354,19 @@ func (uc *UpstreamCache) Serve(w http.ResponseWriter, req *http.Request) bool {
 		return false
 	}
 
-	// 设置响应头
+	// 设置响应头 - 智能Content-Type检测
 	for key, value := range entry.Headers {
 		// 跳过一些不应该从缓存设置的头部
 		if !uc.shouldCopyHeader(key) {
 			continue
 		}
 		w.Header().Set(key, value)
+	}
+
+	// 智能检测并设置Content-Type
+	smartContentType := uc.getSmartContentType(entry, req.URL.Path)
+	if smartContentType != "" {
+		w.Header().Set("Content-Type", smartContentType)
 	}
 
 	// 添加缓存标识头部
@@ -517,6 +527,46 @@ func (uc *UpstreamCache) isCacheableContentType(contentType string) bool {
 	}
 
 	return false
+}
+
+// getSmartContentType 智能检测Content-Type
+func (uc *UpstreamCache) getSmartContentType(entry *UpstreamCacheEntry, path string) string {
+	// 1. 如果缓存条目中有Content-Type，优先使用
+	if entry.ContentType != "" {
+		uc.log.Debugf("使用缓存的Content-Type: %s", entry.ContentType)
+		return entry.ContentType
+	}
+
+	// 2. 尝试从文件内容检测
+	if uc.mimeDetector != nil {
+		// 读取缓存文件进行检测
+		if data, err := os.ReadFile(entry.FilePath); err == nil {
+			detectedType := uc.mimeDetector.DetectMIME(path, data)
+			if detectedType != "" && detectedType != "application/octet-stream" {
+				uc.log.Debugf("通过文件内容检测到Content-Type: %s", detectedType)
+				return detectedType
+			}
+		}
+	}
+
+	// 3. 通过扩展名猜测
+	if uc.mimeDetector != nil {
+		detectedType := uc.mimeDetector.DetectMIME(path, nil)
+		if detectedType != "" && detectedType != "application/octet-stream" {
+			uc.log.Debugf("通过扩展名检测到Content-Type: %s", detectedType)
+			return detectedType
+		}
+	}
+
+	// 4. 使用系统默认MIME类型
+	if mimeType := mime.TypeByExtension(filepath.Ext(path)); mimeType != "" {
+		uc.log.Debugf("使用系统默认MIME类型: %s", mimeType)
+		return mimeType
+	}
+
+	// 5. 默认返回二进制类型
+	uc.log.Debugf("使用默认Content-Type: application/octet-stream")
+	return "application/octet-stream"
 }
 
 // shouldCopyHeader 检查是否应该复制头部到缓存响应

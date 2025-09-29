@@ -1,3 +1,28 @@
+## [1.3.3] - 2025-01-03
+
+### Added
+- 🎯 **智能MIME类型检测**: 基于文件内容的高精度MIME类型识别，支持静态站点智能内容类型设置
+- 📁 **静态站点增强**: 改进静态文件处理，支持更精确的MIME类型检测和内容类型设置
+- 🔧 **MIME检测器**: 新增独立的MIME类型检测模块，提供更准确的文件类型识别
+
+### Technical
+- 实现基于文件内容的MIME类型检测算法
+- 新增MIME检测器模块：`internal/cache/mime_detector.go`
+- 增强静态文件处理器：`internal/web/static_handler.go`
+- 改进静态站点MIME类型配置和自动检测
+
+### Performance
+- 静态文件MIME类型检测性能优化
+- 智能内容类型设置，提升浏览器兼容性
+- 减少不必要的MIME类型误判
+
+### Documentation
+- STATIC_SITE_MIME_GUIDE.md：静态站点MIME类型配置指南
+- STATIC_SITE_ENHANCEMENT_SUMMARY.md：静态站点功能增强总结
+- SMART_CONTENT_TYPE_GUIDE.md：智能内容类型检测指南
+
+---
+
 ## [1.3.2] - 2025-09-28
 
 ### Added

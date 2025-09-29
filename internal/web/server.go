@@ -89,6 +89,8 @@ type Server struct {
 	// 统计收集器和API
 	statisticsCollector *statistics.Collector
 	statisticsAPI       *StatisticsAPI
+	// 静态文件处理器
+	staticHandler *StaticFileHandler
 }
 
 // NewServer 创建Web服务器
@@ -170,6 +172,9 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	statsEnabled := true // 默认启用，可以通过配置控制
 	server.statisticsCollector = statistics.NewCollector("./data/statistics", statsEnabled)
 	server.statisticsAPI = NewStatisticsAPI(server.statisticsCollector)
+
+	// 初始化静态文件处理器
+	server.staticHandler = NewStaticFileHandler(cfg)
 
 	// 初始化审计日志轮转器（10MB*10）
 	if rot, err := logger.NewRotator("./data/audit.log", 10*1024*1024, 10); err == nil {

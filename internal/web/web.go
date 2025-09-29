@@ -122,10 +122,24 @@ func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request) bool {
 			if fi, err := os.Stat(full); err == nil && fi.IsDir() {
 				idxFile := filepath.Join(full, site.Index)
 				if _, err := os.Stat(idxFile); err == nil {
+					// 使用智能静态文件处理器
+					if s.staticHandler != nil {
+						if err := s.staticHandler.ServeFile(w, r, idxFile); err != nil {
+							s.log.Errorf("Failed to serve static file: %v", err)
+						}
+						return true
+					}
 					http.ServeFile(w, r, idxFile)
 					return true
 				}
 				http.NotFound(w, r)
+				return true
+			}
+			// 使用智能静态文件处理器
+			if s.staticHandler != nil {
+				if err := s.staticHandler.ServeFile(w, r, full); err != nil {
+					s.log.Errorf("Failed to serve static file: %v", err)
+				}
 				return true
 			}
 			http.ServeFile(w, r, full)

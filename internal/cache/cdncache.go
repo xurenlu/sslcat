@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -24,10 +25,11 @@ import (
 
 // CDNCache 本地静态文件缓存管理器
 type CDNCache struct {
-	cfg        *config.Config
-	log        *logrus.Entry
-	compressor *compression.Compressor
-	mutex      sync.Mutex
+	cfg          *config.Config
+	log          *logrus.Entry
+	compressor   *compression.Compressor
+	mimeDetector *MIMEDetector
+	mutex        sync.Mutex
 	// 统计计数器
 	hits   int64
 	misses int64
@@ -53,10 +55,14 @@ func NewCDNCache(cfg *config.Config) *CDNCache {
 	// 创建压缩器
 	compressor := compression.NewCompressor(compression.FromConfig(cfg))
 
+	// 创建MIME检测器
+	mimeDetector := NewMIMEDetector()
+
 	return &CDNCache{
-		cfg:        cfg,
-		log:        logrus.WithFields(logrus.Fields{"component": "cdn_cache"}),
-		compressor: compressor,
+		cfg:          cfg,
+		log:          logrus.WithFields(logrus.Fields{"component": "cdn_cache"}),
+		compressor:   compressor,
+		mimeDetector: mimeDetector,
 	}
 }
 
@@ -113,9 +119,10 @@ func (c *CDNCache) ServeIfFreshWithConfig(w http.ResponseWriter, r *http.Request
 					_ = os.Remove(metaPath)
 					return false
 				}
-				// 回写头并返回内容
-				if meta.ContentType != "" {
-					w.Header().Set("Content-Type", meta.ContentType)
+				// 回写头并返回内容 - 智能Content-Type检测
+				contentType := c.getSmartContentType(meta, r.URL.Path)
+				if contentType != "" {
+					w.Header().Set("Content-Type", contentType)
 				}
 				if meta.Encoding != "" {
 					w.Header().Set("Content-Encoding", meta.Encoding)
@@ -154,9 +161,10 @@ func (c *CDNCache) ServeIfFreshWithConfig(w http.ResponseWriter, r *http.Request
 		return true
 	}
 
-	// 回写头
-	if meta.ContentType != "" {
-		w.Header().Set("Content-Type", meta.ContentType)
+	// 回写头 - 智能Content-Type检测
+	contentType := c.getSmartContentType(meta, r.URL.Path)
+	if contentType != "" {
+		w.Header().Set("Content-Type", contentType)
 	}
 	if meta.Encoding != "" {
 		w.Header().Set("Content-Encoding", meta.Encoding)
@@ -800,4 +808,45 @@ func (c *CDNCache) serveWithAdvancedCompression(w http.ResponseWriter, r *http.R
 func (c *CDNCache) serveWithCompression(w http.ResponseWriter, r *http.Request, file io.Reader, meta *objectMeta) {
 	// 使用新的高级压缩方法
 	c.serveWithAdvancedCompression(w, r, file, meta)
+}
+
+// getSmartContentType 智能检测Content-Type
+func (c *CDNCache) getSmartContentType(meta *objectMeta, path string) string {
+	// 1. 如果元数据中有Content-Type，优先使用
+	if meta.ContentType != "" {
+		c.log.Debugf("使用存储的Content-Type: %s", meta.ContentType)
+		return meta.ContentType
+	}
+
+	// 2. 尝试从文件内容检测
+	if c.mimeDetector != nil {
+		// 读取文件头进行检测
+		filePath, _ := c.cachePaths(&http.Request{URL: &url.URL{Path: path}})
+		if data, err := os.ReadFile(filePath); err == nil {
+			detectedType := c.mimeDetector.DetectMIME(path, data)
+			if detectedType != "" && detectedType != "application/octet-stream" {
+				c.log.Debugf("通过文件内容检测到Content-Type: %s", detectedType)
+				return detectedType
+			}
+		}
+	}
+
+	// 3. 通过扩展名猜测
+	if c.mimeDetector != nil {
+		detectedType := c.mimeDetector.DetectMIME(path, nil)
+		if detectedType != "" && detectedType != "application/octet-stream" {
+			c.log.Debugf("通过扩展名检测到Content-Type: %s", detectedType)
+			return detectedType
+		}
+	}
+
+	// 4. 使用系统默认MIME类型
+	if mimeType := mime.TypeByExtension(filepath.Ext(path)); mimeType != "" {
+		c.log.Debugf("使用系统默认MIME类型: %s", mimeType)
+		return mimeType
+	}
+
+	// 5. 默认返回二进制类型
+	c.log.Debugf("使用默认Content-Type: application/octet-stream")
+	return "application/octet-stream"
 }
