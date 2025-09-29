@@ -158,7 +158,7 @@ const ProxyAdd: React.FC = () => {
     health_check_timeout_sec: 5,
   })
 
-  const handleInputChange = (field: keyof ProxyRuleForm, value: string | boolean | number) => {
+  const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -191,7 +191,7 @@ const ProxyAdd: React.FC = () => {
   }
 
   // 后端服务器管理函数
-  const handleBackendChange = (index: number, field: keyof ProxyBackend, value: string | number | boolean) => {
+  const handleBackendChange = (index: number, field: string, value: any) => {
     setFormData(prev => ({
       ...prev,
       load_balancer_backends: prev.load_balancer_backends.map((backend, i) => 

@@ -196,6 +196,34 @@ const ProxyEdit: React.FC = () => {
             target: rule.target || '',
             enabled: rule.enabled ?? true,
             ssl_only: rule.ssl_only ?? true,
+            
+            // 负载均衡配置
+            load_balancer_enabled: rule.load_balancer_enabled ?? false,
+            load_balancer_algorithm: rule.load_balancer_algorithm || 'round_robin',
+            load_balancer_backends: rule.load_balancer_backends || [],
+            
+            // 会话保持配置
+            session_affinity_enabled: rule.session_affinity_enabled ?? false,
+            session_affinity_method: rule.session_affinity_method || 'ip',
+            session_affinity_cookie: rule.session_affinity_cookie || '',
+            session_affinity_header: rule.session_affinity_header || '',
+            session_affinity_ttl: rule.session_affinity_ttl || 3600,
+            
+            // 健康检查配置
+            health_check_enabled: rule.health_check_enabled ?? false,
+            health_check_path: rule.health_check_path || '/health',
+            health_check_interval: rule.health_check_interval || 30,
+            health_check_timeout: rule.health_check_timeout || 5,
+            health_check_method: rule.health_check_method || 'GET',
+            expected_status_code: rule.expected_status_code || 200,
+            
+            // 故障转移配置
+            failover_enabled: rule.failover_enabled ?? true,
+            max_retries: rule.max_retries || 3,
+            retry_interval: rule.retry_interval || 1,
+            failure_threshold: rule.failure_threshold || 3,
+            recovery_threshold: rule.recovery_threshold || 2,
+            
             // 类CDN设置 - 如果CDN缓存或Host头部优化任一启用，则认为类CDN模式启用
             cdn_mode_enabled: (rule.cdn_enabled ?? false) || (rule.optimize_host_header ?? false),
             cdn_enabled: rule.cdn_enabled ?? false,
@@ -203,10 +231,18 @@ const ProxyEdit: React.FC = () => {
             cdn_ttl_seconds: rule.cdn_ttl_seconds || 259200,
             // HTTP Host头部优化
             optimize_host_header: rule.optimize_host_header ?? false,
+            // 访问控制字段
             auth_enabled: rule.auth_enabled ?? false,
             auth_users: rule.auth_users || [{ username: '', password: '' }],
             auth_session_timeout: rule.auth_session_timeout || 3600,
             auth_cookie_domain: rule.auth_cookie_domain || '',
+            // 代理超时配置
+            connect_timeout_sec: rule.connect_timeout_sec || 30,
+            keep_alive_timeout_sec: rule.keep_alive_timeout_sec || 30,
+            idle_timeout_sec: rule.idle_timeout_sec || 90,
+            tls_handshake_timeout_sec: rule.tls_handshake_timeout_sec || 10,
+            expect_continue_timeout_sec: rule.expect_continue_timeout_sec || 1,
+            health_check_timeout_sec: rule.health_check_timeout_sec || 5,
           })
         }
       } catch (error) {
@@ -227,7 +263,7 @@ const ProxyEdit: React.FC = () => {
     loadRuleData()
   }, [domain, adminPrefix, navigate, toast])
 
-  const handleInputChange = (field: keyof ProxyRuleForm, value: string | boolean | number) => {
+  const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -260,7 +296,7 @@ const ProxyEdit: React.FC = () => {
   }
 
   // 后端服务器管理函数
-  const handleBackendChange = (index: number, field: keyof ProxyBackend, value: string | number | boolean) => {
+  const handleBackendChange = (index: number, field: string, value: any) => {
     setFormData(prev => ({
       ...prev,
       load_balancer_backends: prev.load_balancer_backends.map((backend, i) => 

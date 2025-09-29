@@ -128,7 +128,7 @@ const Settings: React.FC = () => {
     loadNotificationConfig()
   }, [adminPrefix])
 
-  const handleInputChange = (field: string, value: string | boolean) => {
+  const handleInputChange = (field: string, value: string | boolean | number) => {
     setSettings(prev => ({
       ...prev,
       [field]: value,
@@ -264,6 +264,18 @@ const Settings: React.FC = () => {
       enableAccessLog: false,
       enableErrorLog: true,
       logLevel: 'info',
+      // 压缩设置
+      compressionEnabled: true,
+      compressionAlgorithms: ['br', 'gzip'],
+      compressionMinSize: 1024,
+      compressionGzipLevel: 6,
+      compressionBrotliLevel: 6,
+      // 上游缓存设置
+      upstreamCacheEnabled: true,
+      upstreamCacheDir: './data/upstream-cache',
+      upstreamCacheMaxSize: 1024,
+      upstreamCacheDefaultTTL: 3600,
+      upstreamCacheRespectUpstream: true,
       enableNotifications: true,
       notificationChannels: 'email,webhook',
       // 邮件通知配置

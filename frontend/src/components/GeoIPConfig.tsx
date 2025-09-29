@@ -496,7 +496,7 @@ const GeoIPConfig: React.FC = () => {
                   onChange={(e) => setSelectedCountry(e.target.value)}
                   maxW="300px"
                 >
-                  {COMMON_COUNTRIES
+                  {getCommonCountries(t)
                     .filter(country => !config.allowed_countries.includes(country.code))
                     .map(country => (
                       <option key={country.code} value={country.code}>
@@ -548,7 +548,7 @@ const GeoIPConfig: React.FC = () => {
                   onChange={(e) => setSelectedCountry(e.target.value)}
                   maxW="300px"
                 >
-                  {COMMON_COUNTRIES
+                  {getCommonCountries(t)
                     .filter(country => !config.blocked_countries.includes(country.code))
                     .map(country => (
                       <option key={country.code} value={country.code}>
