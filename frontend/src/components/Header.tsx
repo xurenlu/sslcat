@@ -13,11 +13,13 @@ import {
   MenuList,
   MenuItem,
   Avatar,
+  Select,
 } from '@chakra-ui/react'
 import { FiMenu, FiUser, FiLogOut, FiLock } from 'react-icons/fi'
 import { useAuth } from '../contexts/AuthContext'
 import { useConfig, buildPath } from '../contexts/ConfigContext'
 import { Link as RouterLink } from 'react-router-dom'
+import { useLanguage, supportedLanguages } from '../hooks/useLanguage'
 
 interface HeaderProps {
   onMenuClick: () => void
@@ -27,6 +29,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const showMobileMenu = useBreakpointValue({ base: true, md: false })
   const { user, logout } = useAuth()
   const { adminPrefix } = useConfig()
+  const { currentLanguage, changeLanguage } = useLanguage()
 
   return (
     <Box
@@ -51,9 +54,23 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         )}
         <Spacer />
         
-        {/* 用户菜单 */}
+        {/* 用户菜单和语言选择器 */}
         {user && (
           <HStack spacing={3}>
+            {/* 语言选择器 */}
+            <Select
+              size="sm"
+              value={currentLanguage}
+              onChange={(e) => changeLanguage(e.target.value)}
+              width="120px"
+            >
+              {supportedLanguages.map((language) => (
+                <option key={language.code} value={language.code}>
+                  {language.flag} {language.nativeName}
+                </option>
+              ))}
+            </Select>
+            
             <Text fontSize="sm" color="gray.600">
               {user.username}
             </Text>

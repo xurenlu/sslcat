@@ -12,10 +12,8 @@ import {
   Divider,
   Button,
   useBreakpointValue,
-  Select,
 } from '@chakra-ui/react'
 import { Link as RouterLink, useLocation } from 'react-router-dom'
-import { useLanguage } from '../hooks/useLanguage'
 import { useTranslation } from '../hooks/useLanguage'
 import { useConfig, buildPath } from '../contexts/ConfigContext'
 import {
@@ -77,7 +75,6 @@ const NavItem: React.FC<NavItemProps> = ({ icon, children, to, isActive }) => {
 
 const SidebarContent = () => {
   const location = useLocation()
-  const { currentLanguage, changeLanguage, getCurrentLanguage, supportedLanguages } = useLanguage()
   const t = useTranslation()
   const { adminPrefix } = useConfig()
 
@@ -120,23 +117,6 @@ const SidebarContent = () => {
         </VStack>
       </Box>
 
-      {/* Language Selector - 固定 */}
-      <Box p={4} borderBottom="1px" borderColor="gray.200" flexShrink={0}>
-        <Text fontSize="sm" color="gray.600" mb={2}>
-          {t.sidebar.language}
-        </Text>
-        <Select
-          size="sm"
-          value={currentLanguage}
-          onChange={(e) => changeLanguage(e.target.value)}
-        >
-          {supportedLanguages.map((language) => (
-            <option key={language.code} value={language.code}>
-              {language.flag} {language.nativeName}
-            </option>
-          ))}
-        </Select>
-      </Box>
 
       {/* 可滚动的内容区域 */}
       <Box flex={1} overflowY="auto" p={4}>
