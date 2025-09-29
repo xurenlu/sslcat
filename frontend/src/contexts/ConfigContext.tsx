@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { updateApiBaseURL } from '../utils/api'
 
 interface ConfigContextType {
   adminPrefix: string
@@ -23,16 +24,23 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
       setIsLoading(true)
       setError(null)
       
-      // 首先尝试从当前路径推断前缀
+      // 首先尝试从localStorage获取之前保存的前缀
+      const storedPrefix = localStorage.getItem('adminPrefix')
+      let detectedPrefix = storedPrefix || '/sslcat-panel'
+      
+      // 然后尝试从当前路径推断前缀
       const currentPath = window.location.pathname
       const pathSegments = currentPath.split('/').filter(Boolean)
-      let detectedPrefix = '/sslcat-panel' // 默认值
       
       if (pathSegments.length > 0) {
         // 如果当前路径包含前缀，使用它
         detectedPrefix = '/' + pathSegments[0]
         console.log('Detected prefix from URL:', detectedPrefix)
         setAdminPrefix(detectedPrefix)
+        // 保存到localStorage
+        localStorage.setItem('adminPrefix', detectedPrefix)
+        // 更新axios baseURL
+        updateApiBaseURL(detectedPrefix)
       }
       
       // 然后尝试从API获取最新配置进行验证/更新
@@ -49,6 +57,9 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
           if (serverPrefix !== detectedPrefix) {
             console.log('Server prefix differs from detected:', { detected: detectedPrefix, server: serverPrefix })
             setAdminPrefix(serverPrefix)
+            localStorage.setItem('adminPrefix', serverPrefix)
+            // 更新axios baseURL
+            updateApiBaseURL(serverPrefix)
           }
         } else {
           // 如果API调用失败，但路径检测成功，继续使用检测到的前缀
@@ -60,6 +71,9 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
         console.warn('Failed to fetch config from API, using fallback prefix:', detectedPrefix)
         console.warn('API error:', apiError)
         setAdminPrefix(detectedPrefix)
+        localStorage.setItem('adminPrefix', detectedPrefix)
+        // 更新axios baseURL
+        updateApiBaseURL(detectedPrefix)
       }
     } catch (err) {
       console.error('Failed to fetch config:', err)

@@ -11,7 +11,13 @@ const getApiBaseURL = () => {
     return `/${pathSegments[0]}/api`
   }
   
-  // 默认前缀
+  // 如果无法从URL推断，尝试从localStorage获取
+  const storedPrefix = localStorage.getItem('adminPrefix')
+  if (storedPrefix) {
+    return `${storedPrefix}/api`
+  }
+  
+  // 最后回退到默认前缀
   return '/sslcat-panel/api'
 }
 
@@ -23,6 +29,13 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 })
+
+// 动态更新API baseURL的函数
+export const updateApiBaseURL = (newPrefix: string) => {
+  const newBaseURL = `${newPrefix}/api`
+  api.defaults.baseURL = newBaseURL
+  console.log('Updated API baseURL to:', newBaseURL)
+}
 
 // 请求拦截器
 api.interceptors.request.use(
