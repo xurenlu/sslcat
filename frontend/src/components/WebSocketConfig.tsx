@@ -18,7 +18,7 @@ import {
   Tooltip,
   Badge,
 } from '@chakra-ui/react'
-import { FiWifi, FiClock, FiBuffer, FiActivity } from 'react-icons/fi'
+import { FiWifi, FiClock, FiLayers, FiActivity } from 'react-icons/fi'
 
 interface WebSocketConfigProps {
   websocket_optimized: boolean
@@ -69,7 +69,7 @@ const WebSocketConfig: React.FC<WebSocketConfigProps> = ({
               {/* 缓冲区大小 */}
               <FormControl>
                 <FormLabel display="flex" alignItems="center">
-                  <Icon as={FiBuffer} mr={2} />
+                  <Icon as={FiLayers} mr={2} />
                   缓冲区大小
                 </FormLabel>
                 <NumberInput

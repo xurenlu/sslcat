@@ -43,7 +43,7 @@ import {
   FiClock,
   FiTrendingUp,
   FiTrendingDown,
-  FiBarChart3,
+  FiBarChart2,
   FiSettings,
   FiDownload,
   FiMapPin,
@@ -368,7 +368,7 @@ const Statistics: React.FC = () => {
                   <StatNumber fontSize="2xl">{formatNumber(totalStats.total_requests)}</StatNumber>
                   <StatHelpText>当前{getDimensionLabel(dimension)}</StatHelpText>
                 </Box>
-                <Icon as={FiBarChart3} boxSize={8} color="blue.300" />
+                <Icon as={FiBarChart2} boxSize={8} color="blue.300" />
               </HStack>
             </Stat>
           </CardBody>
