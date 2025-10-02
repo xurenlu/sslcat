@@ -76,6 +76,7 @@ export interface Translation {
     title: string
     activeRules: string
     cachedProxies: string
+    totalRequests: string
     publicIP: string
     goVersion: string
     systemStatus: string
@@ -467,6 +468,7 @@ export const zhCN: Translation = {
     title: '仪表板',
     activeRules: '活跃规则',
     cachedProxies: '缓存代理',
+    totalRequests: '总请求数',
     publicIP: '公网IP',
     goVersion: 'Go版本',
     systemStatus: '系统状态',
@@ -842,6 +844,7 @@ export const enUS: Translation = {
     title: 'Dashboard',
     activeRules: 'Active Rules',
     cachedProxies: 'Cached Proxies',
+    totalRequests: 'Total Requests',
     publicIP: 'Public IP',
     goVersion: 'Go Version',
     systemStatus: 'System Status',
@@ -1217,6 +1220,7 @@ export const jaJP: Translation = {
     title: 'ダッシュボード',
     activeRules: 'アクティブルール',
     cachedProxies: 'キャッシュされたプロキシ',
+    totalRequests: '総リクエスト数',
     publicIP: 'パブリックIP',
     goVersion: 'Goバージョン',
     systemStatus: 'システム状態',

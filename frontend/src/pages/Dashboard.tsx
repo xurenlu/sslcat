@@ -178,7 +178,7 @@ const Dashboard: React.FC = () => {
               <HStack justify="space-between">
                 <Box>
                   <StatLabel color="brand.500" fontWeight="bold" textTransform="uppercase" fontSize="xs">
-                    活动域名
+                    {t.dashboard.activeRules}
                   </StatLabel>
                   <StatNumber fontSize="2xl" fontWeight="bold">
                     {stats.activeRules}
@@ -196,7 +196,7 @@ const Dashboard: React.FC = () => {
               <HStack justify="space-between">
                 <Box>
                   <StatLabel color="green.500" fontWeight="bold" textTransform="uppercase" fontSize="xs">
-                    总请求数
+                    {t.dashboard.totalRequests}
                   </StatLabel>
                   <StatNumber fontSize="2xl" fontWeight="bold">
                     {stats.cachedProxies.toLocaleString()}
@@ -214,7 +214,7 @@ const Dashboard: React.FC = () => {
               <HStack justify="space-between">
                 <Box>
                   <StatLabel color="purple.500" fontWeight="bold" textTransform="uppercase" fontSize="xs">
-                    公网IP
+                    {t.dashboard.publicIP}
                   </StatLabel>
                   <StatNumber fontSize="lg" fontWeight="bold">
                     {stats.publicIP}
@@ -232,7 +232,7 @@ const Dashboard: React.FC = () => {
               <HStack justify="space-between">
                 <Box>
                   <StatLabel color="orange.500" fontWeight="bold" textTransform="uppercase" fontSize="xs">
-                    Go版本
+                    {t.dashboard.goVersion}
                   </StatLabel>
                   <StatNumber fontSize="lg" fontWeight="bold">
                     {stats.goVersion}
