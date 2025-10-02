@@ -617,6 +617,7 @@ func (s *Server) registerRunnerRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/create", gitAPI.CreateApp)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/delete", gitAPI.DeleteApp)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/env", gitAPI.UpdateAppEnv)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/routing", gitAPI.UpdateAppRouting)
 
 	// 服务器配置 API 路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/config", gitAPI.GetServerConfig)
@@ -626,6 +627,11 @@ func (s *Server) registerRunnerRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/ssh-keys", gitAPI.ListSSHKeys)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/ssh-key/add", gitAPI.AddSSHKey)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/ssh-key/remove", gitAPI.RemoveSSHKey)
+
+	// 推送历史和密钥绑定 API 路由
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/push-history", gitAPI.GetPushHistory)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/bind-key", gitAPI.BindKeyToApp)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/unbind-key", gitAPI.UnbindKeyFromApp)
 
 	// 日志查看 API 路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/logs", gitAPI.GetAppLogs)

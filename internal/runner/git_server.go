@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -35,6 +37,10 @@ type GitServer struct {
 	sshHomeDir         string // SSH 用户主目录
 	sshKeysDir         string // SSH 密钥目录
 	authorizedKeysFile string // authorized_keys 文件路径
+	gitCmdDir          string // git-shell-commands 目录
+	sshConfigDir       string // sshd 配置目录
+	uid                int
+	gid                int
 
 	// 日志管理器
 	logManager       *LogManager
@@ -146,6 +152,14 @@ type GitApp struct {
 	// 日志相关
 	LogsDir    string `json:"logs_dir,omitempty"`    // 日志目录
 	CurrentLog string `json:"current_log,omitempty"` // 当前日志文件路径
+	RepoDir    string `json:"repo_dir,omitempty"`    // 工作仓库目录
+	BareRepo   string `json:"bare_repo,omitempty"`   // 裸仓库路径
+
+	// 推送记录
+	PushHistory []PushRecord `json:"push_history,omitempty"` // 推送历史
+
+	// SSH密钥绑定
+	AllowedKeys []string `json:"allowed_keys,omitempty"` // 允许推送的SSH密钥指纹列表
 }
 
 // AppDeployConfig 应用部署配置
@@ -338,6 +352,25 @@ type DeployRecord struct {
 	Error string `json:"error,omitempty"`
 }
 
+// PushRecord Git 推送记录
+type PushRecord struct {
+	ID            string    `json:"id"`
+	AppName       string    `json:"app_name"`
+	PusherKey     string    `json:"pusher_key"`     // SSH密钥指纹
+	PusherName    string    `json:"pusher_name"`    // 推送者名称
+	CommitHash    string    `json:"commit_hash"`    // 提交哈希
+	CommitMessage string    `json:"commit_message"` // 提交消息
+	RefName       string    `json:"ref_name"`       // 分支/标签名
+	Status        string    `json:"status"`         // pending/success/failed
+	StartTime     time.Time `json:"start_time"`     // 推送开始时间
+	EndTime       time.Time `json:"end_time"`       // 推送结束时间
+	Duration      int64     `json:"duration"`       // 推送耗时（毫秒）
+	ErrorMessage  string    `json:"error_message"`  // 错误信息
+	LogFile       string    `json:"log_file"`       // 日志文件路径
+	PushSize      int64     `json:"push_size"`      // 推送大小（字节）
+	ClientIP      string    `json:"client_ip"`      // 客户端IP
+}
+
 // NewGitServer 创建新的 Git 服务器
 func NewGitServer(cfg *config.Config) *GitServer {
 	// 默认服务器配置
@@ -351,11 +384,12 @@ func NewGitServer(cfg *config.Config) *GitServer {
 		AutoDomain:      true,
 	}
 
-	// SSH 配置
+	// SSH 配置 - 使用默认值
 	sshUser := "git"
-	sshHomeDir := "/home/git"
-	sshKeysDir := "/home/git/.ssh"
-	authorizedKeysFile := "/home/git/.ssh/authorized_keys"
+	sshHomeDir := filepath.Join("/home", sshUser)
+	sshKeysDir := filepath.Join(sshHomeDir, ".ssh")
+	authorizedKeysFile := filepath.Join(sshKeysDir, "authorized_keys")
+	sshConfigDir := "/etc/ssh/sshd_config.d"
 
 	// 日志管理器
 	logsDir := filepath.Join(cfg.Runners.Git.ReposDir, "logs")
@@ -390,17 +424,15 @@ func NewGitServer(cfg *config.Config) *GitServer {
 		sshHomeDir:         sshHomeDir,
 		sshKeysDir:         sshKeysDir,
 		authorizedKeysFile: authorizedKeysFile,
+		sshConfigDir:       sshConfigDir,
 		logManager:         logManager,
 		logStreamManager:   logStreamManager,
 		dockerRegistry:     dockerRegistry,
 	}
 
-	// 加载持久化的应用和配置
+	// 加载持久化的应用
 	if err := gs.loadApps(); err != nil {
 		gs.logger.Warnf("加载应用列表失败: %v", err)
-	}
-	if err := gs.loadServerConfig(); err != nil {
-		gs.logger.Warnf("加载服务器配置失败: %v", err)
 	}
 
 	// 确保应用拥有环境变量映射
@@ -452,6 +484,9 @@ func (gs *GitServer) Start() error {
 	if gs.config.Runners.Git.AutoCleanup {
 		go gs.cleanupRoutine()
 	}
+
+	// 启动部署触发监听协程
+	go gs.WatchDeployTriggers()
 
 	gs.logger.Info("Git 服务器已启动")
 	return nil
@@ -530,6 +565,8 @@ func (gs *GitServer) CreateApp(appName string) (*GitApp, error) {
 		Name:        appName,
 		DisplayName: appName,
 		GitPath:     gitPath,
+		BareRepo:    filepath.Join(gitPath, "repo.git"),
+		RepoDir:     filepath.Join(gitPath, "repo"),
 		Domain:      domain,
 		Port:        port,
 		Status:      "idle",
@@ -638,40 +675,79 @@ func (gs *GitServer) DeleteApp(appName string) error {
 
 // UpdateAppEnv 更新应用环境变量
 func (gs *GitServer) UpdateAppEnv(appName string, envVars map[string]string) error {
-    gs.mutex.Lock()
-    defer gs.mutex.Unlock()
+	gs.mutex.Lock()
+	defer gs.mutex.Unlock()
 
-    app, exists := gs.apps[appName]
-    if !exists {
-        return fmt.Errorf("应用 %s 不存在", appName)
-    }
+	app, exists := gs.apps[appName]
+	if !exists {
+		return fmt.Errorf("应用 %s 不存在", appName)
+	}
 
-    if envVars == nil {
-        envVars = make(map[string]string)
-    }
+	if envVars == nil {
+		envVars = make(map[string]string)
+	}
 
-    // 更新环境变量
-    app.EnvVars = envVars
-    if app.DeployConfig == nil {
-        app.DeployConfig = &AppDeployConfig{}
-    }
-    if app.DeployConfig.EnvVars == nil {
-        app.DeployConfig.EnvVars = make(map[string]string)
-    }
-    // 清空旧的再赋值，避免引用共享导致的问题
-    for k := range app.DeployConfig.EnvVars {
-        delete(app.DeployConfig.EnvVars, k)
-    }
-    for k, v := range envVars {
-        app.DeployConfig.EnvVars[k] = v
-    }
+	// 更新环境变量
+	app.EnvVars = envVars
+	if app.DeployConfig == nil {
+		app.DeployConfig = &AppDeployConfig{}
+	}
+	if app.DeployConfig.EnvVars == nil {
+		app.DeployConfig.EnvVars = make(map[string]string)
+	}
+	// 清空旧的再赋值，避免引用共享导致的问题
+	for k := range app.DeployConfig.EnvVars {
+		delete(app.DeployConfig.EnvVars, k)
+	}
+	for k, v := range envVars {
+		app.DeployConfig.EnvVars[k] = v
+	}
 
-    if err := gs.saveApps(); err != nil {
-        return fmt.Errorf("保存应用信息失败: %w", err)
-    }
+	if err := gs.saveApps(); err != nil {
+		return fmt.Errorf("保存应用信息失败: %w", err)
+	}
 
-    gs.logger.Infof("应用 %s 环境变量已更新", appName)
-    return nil
+	gs.logger.Infof("应用 %s 环境变量已更新", appName)
+	return nil
+}
+
+// UpdateAppRouting 更新应用的域名和端口，并同步代理规则
+func (gs *GitServer) UpdateAppRouting(appName string, port int, domain string) error {
+	gs.mutex.Lock()
+	defer gs.mutex.Unlock()
+
+	app, exists := gs.apps[appName]
+	if !exists {
+		return fmt.Errorf("应用 %s 不存在", appName)
+	}
+
+	if port <= 0 {
+		return fmt.Errorf("端口必须为正整数")
+	}
+
+	// 检查端口是否被其他应用使用
+	for name, existing := range gs.apps {
+		if name != appName && existing.Port == port {
+			return fmt.Errorf("端口 %d 已被应用 %s 使用", port, name)
+		}
+	}
+
+	// 更新应用信息
+	gs.releasePort(app.Port)
+
+	app.Port = port
+	app.Domain = domain
+
+	if err := gs.saveApps(); err != nil {
+		return fmt.Errorf("保存应用信息失败: %w", err)
+	}
+
+	if err := gs.addProxyRuleForApp(app); err != nil {
+		return fmt.Errorf("更新代理规则失败: %w", err)
+	}
+
+	gs.logger.Infof("应用 %s 的路由信息已更新，域名: %s, 端口: %d", appName, domain, port)
+	return nil
 }
 
 // ==================== Git 推送处理 ====================
@@ -1498,38 +1574,45 @@ func (gs *GitServer) cleanupOldApps() {
 
 // setupSSHUser 设置 SSH 用户和目录
 func (gs *GitServer) setupSSHUser() error {
-	// 检查是否为 root 用户
-	if os.Geteuid() != 0 {
-		gs.logger.Warn("非 root 用户，跳过 SSH 用户设置")
+	gitUser, err := user.Lookup(gs.sshUser)
+	if err != nil {
+		gs.logger.Warnf("SSH用户 %s 不存在，请手动创建: %v", gs.sshUser, err)
 		return nil
 	}
 
-	// 创建 git 用户（如果不存在）
-	if err := gs.createGitUser(); err != nil {
-		return fmt.Errorf("创建 git 用户失败: %w", err)
-	}
-
-	// 创建 SSH 目录
 	if err := os.MkdirAll(gs.sshKeysDir, 0700); err != nil {
 		return fmt.Errorf("创建 SSH 目录失败: %w", err)
 	}
 
-	// 设置目录权限
-	if err := os.Chown(gs.sshKeysDir, 1000, 1000); err != nil { // git 用户 UID
+	// 解析UID和GID
+	uid, _ := strconv.Atoi(gitUser.Uid)
+	gid, _ := strconv.Atoi(gitUser.Gid)
+
+	if err := os.Chown(gs.sshKeysDir, uid, gid); err != nil {
 		gs.logger.Warnf("设置 SSH 目录权限失败: %v", err)
 	}
 
-	// 创建 authorized_keys 文件（如果不存在）
 	if _, err := os.Stat(gs.authorizedKeysFile); os.IsNotExist(err) {
 		if err := os.WriteFile(gs.authorizedKeysFile, []byte{}, 0600); err != nil {
 			return fmt.Errorf("创建 authorized_keys 文件失败: %w", err)
 		}
-		if err := os.Chown(gs.authorizedKeysFile, 1000, 1000); err != nil {
-			gs.logger.Warnf("设置 authorized_keys 文件权限失败: %v", err)
-		}
+		os.Chown(gs.authorizedKeysFile, uid, gid)
 	}
 
-	gs.logger.Info("SSH 用户设置完成")
+	sshdConfig := fmt.Sprintf("Match User %s\n  ForceCommand git-shell -c \"$SSH_ORIGINAL_COMMAND\"\n  AllowTcpForwarding no\n  X11Forwarding no\n", gs.sshUser)
+	configPath := filepath.Join(gs.sshConfigDir, "sslcat_git.conf")
+	os.WriteFile(configPath, []byte(sshdConfig), 0644)
+
+	// 创建 git-shell-commands 目录
+	gitCmdDir := filepath.Join(gs.sshHomeDir, "git-shell-commands")
+	if err := os.MkdirAll(gitCmdDir, 0755); err == nil {
+		os.Chown(gitCmdDir, uid, gid)
+		noLoginScript := filepath.Join(gitCmdDir, "no-interactive-login")
+		os.WriteFile(noLoginScript, []byte("#!/bin/sh\necho 'Interactive shell disabled.'\n"), 0755)
+		os.Chown(noLoginScript, uid, gid)
+	}
+
+	gs.logger.Info("SSH 用户配置完成")
 	return nil
 }
 
@@ -1858,46 +1941,184 @@ func (gs *GitServer) setupGitHooks(app *GitApp) error {
 		return fmt.Errorf("初始化 Git 仓库失败: %w", err)
 	}
 
-	// 设置 post-receive 钩子
-	hookPath := filepath.Join(app.GitPath, "hooks", "post-receive")
-	hookContent := gs.generatePostReceiveHook(app)
+	// 设置 receive-pack 服务脚本
+	generatePath := filepath.Join(app.GitPath, "hooks")
+	if err := os.MkdirAll(generatePath, 0755); err != nil {
+		return fmt.Errorf("创建 hooks 目录失败: %w", err)
+	}
 
-	if err := os.WriteFile(hookPath, []byte(hookContent), 0755); err != nil {
+	preReceivePath := filepath.Join(generatePath, "pre-receive")
+	if err := os.WriteFile(preReceivePath, []byte(gs.generatePreReceiveHook(app)), 0755); err != nil {
+		return fmt.Errorf("创建 pre-receive 钩子失败: %w", err)
+	}
+
+	updatePath := filepath.Join(generatePath, "update")
+	if err := os.WriteFile(updatePath, []byte(gs.generateUpdateHook(app)), 0755); err != nil {
+		return fmt.Errorf("创建 update 钩子失败: %w", err)
+	}
+
+	postReceivePath := filepath.Join(generatePath, "post-receive")
+	if err := os.WriteFile(postReceivePath, []byte(gs.generatePostReceiveHook(app)), 0755); err != nil {
 		return fmt.Errorf("创建 post-receive 钩子失败: %w", err)
+	}
+
+	receivePackPath := filepath.Join(generatePath, "receive-pack")
+	if err := os.WriteFile(receivePackPath, []byte(gs.generateReceivePackWrapper(app)), 0755); err != nil {
+		return fmt.Errorf("创建 receive-pack 脚本失败: %w", err)
+	}
+
+	serviceFile := filepath.Join(app.GitPath, "config")
+	configContent := fmt.Sprintf("[core]\n\trepositoryformatversion = 0\n\tbare = true\n\tlogallrefupdates = true\n\treceivepack = %s\n", receivePackPath)
+	if err := os.WriteFile(serviceFile, []byte(configContent), 0644); err != nil {
+		gs.logger.Warnf("写入仓库配置失败: %v", err)
 	}
 
 	gs.logger.Infof("Git 钩子已设置: %s", app.Name)
 	return nil
 }
 
-// generatePostReceiveHook 生成 post-receive 钩子内容
-func (gs *GitServer) generatePostReceiveHook(app *GitApp) string {
+// generatePreReceiveHook 生成 pre-receive 钩子内容
+func (gs *GitServer) generatePreReceiveHook(app *GitApp) string {
 	return fmt.Sprintf(`#!/bin/bash
-# SSLcat Git Hook - 自动部署钩子
+# SSLcat Git Pre-Receive Hook
 # 应用: %s
-# 时间: %s
+# 功能: 推送前的验证和权限检查
 
 set -e
 
 APP_NAME="%s"
-APP_PATH="%s"
+LOGS_DIR="%s"
+BARE_REPO="%s"
+
+# 记录推送信息
+while read oldrev newrev refname; do
+    echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [info] [git] Pre-receive: $oldrev -> $newrev ($refname)" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+    
+    # 检查推送大小（限制为100MB）
+    if [ "$oldrev" != "0000000000000000000000000000000000000000" ]; then
+        SIZE=$(git --git-dir="$BARE_REPO" rev-list --objects $oldrev..$newrev | 
+               git --git-dir="$BARE_REPO" cat-file --batch-check='%%(objectsize)' | 
+               awk '{sum+=$1} END {print sum}')
+        MAX_SIZE=$((100*1024*1024)) # 100MB
+        if [ "$SIZE" -gt "$MAX_SIZE" ]; then
+            echo "Error: Push size ($SIZE bytes) exceeds limit ($MAX_SIZE bytes)" >&2
+            echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [error] [git] Push rejected: size limit exceeded" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+            exit 1
+        fi
+    fi
+done
+
+echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [info] [git] Pre-receive checks passed" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+exit 0
+`, app.Name, app.Name, app.LogsDir, app.BareRepo)
+}
+
+// generateUpdateHook 生成 update 钩子内容
+func (gs *GitServer) generateUpdateHook(app *GitApp) string {
+	return fmt.Sprintf(`#!/bin/bash
+# SSLcat Git Update Hook
+# 应用: %s
+# 功能: 分支更新验证
+
+set -e
+
+APP_NAME="%s"
+LOGS_DIR="%s"
+REF_NAME=$1
+OLD_REV=$2
+NEW_REV=$3
+
+# 记录分支更新
+echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [info] [git] Update: $REF_NAME from $OLD_REV to $NEW_REV" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+
+# 这里可以添加分支保护逻辑
+# 例如：禁止删除master分支、要求特定格式的提交消息等
+
+exit 0
+`, app.Name, app.Name, app.LogsDir)
+}
+
+// generatePostReceiveHook 生成 post-receive 钩子内容
+func (gs *GitServer) generatePostReceiveHook(app *GitApp) string {
+	// 获取当前可执行文件路径
+	execPath, err := os.Executable()
+	if err != nil {
+		execPath = "/usr/local/bin/sslcat"
+	}
+
+	return fmt.Sprintf(`#!/bin/bash
+# SSLcat Git Post-Receive Hook
+# 应用: %s
+# 功能: 推送后自动部署
+
+set -e
+
+APP_NAME="%s"
+REPO_DIR="%s"
+BARE_REPO="%s"
+LOGS_DIR="%s"
+SSLCAT_BIN="%s"
+
+# 记录推送信息
+while read oldrev newrev refname; do
+    echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [info] [git] Post-receive: $oldrev -> $newrev ($refname)" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+    
+    # 获取提交信息
+    if [ "$oldrev" != "0000000000000000000000000000000000000000" ]; then
+        COMMIT_MSG=$(git --git-dir="$BARE_REPO" log -1 --pretty=format:"%%s" $newrev)
+    else
+        COMMIT_MSG="Initial commit"
+    fi
+    
+    echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [info] [git] Commit: $newrev - $COMMIT_MSG" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+    
+    # 更新工作目录
+    if [ ! -d "$REPO_DIR/.git" ]; then
+        echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [info] [git] Cloning repository to work directory..." >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+        git clone "$BARE_REPO" "$REPO_DIR" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" 2>&1
+    else
+        echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [info] [git] Updating work directory..." >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+        cd "$REPO_DIR"
+        git fetch origin >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" 2>&1
+        git reset --hard $newrev >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" 2>&1
+    fi
+    
+    # 触发部署 - 通过HTTP API调用SSLcat内部部署流程
+    echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [info] [git] Triggering deployment..." >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+    
+    # 这里调用内部部署API或通过Unix socket通信
+    # 简化实现：创建一个标记文件，让SSLcat主进程检测并触发部署
+    DEPLOY_TRIGGER="/tmp/sslcat-deploy-$APP_NAME-$(date +%%s)"
+    echo "$newrev|$refname|$COMMIT_MSG" > "$DEPLOY_TRIGGER"
+    
+    echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [info] [git] Post-receive completed" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+done
+
+exit 0
+`, app.Name, app.Name, app.RepoDir, app.BareRepo, app.LogsDir, execPath)
+}
+
+// generateReceivePackWrapper 生成 receive-pack 包装脚本
+func (gs *GitServer) generateReceivePackWrapper(app *GitApp) string {
+	return fmt.Sprintf(`#!/bin/bash
+# SSLcat Git Receive-Pack Wrapper
+# 应用: %s
+# 功能: Git接收包装器，记录推送信息
+
+APP_NAME="%s"
+BARE_REPO="%s"
 LOGS_DIR="%s"
 
 # 记录推送开始
-echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [info] [git] Git 推送开始" >> "$LOGS_DIR/deploy-$(date '+%%Y-%%m-%%d').log"
+echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [info] [git] Receive-pack started for $APP_NAME" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
 
-# 更新工作目录
-cd "$APP_PATH"
-git --work-tree="$APP_PATH" --git-dir="$APP_PATH/.git" checkout -f
+# 记录环境信息
+echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [info] [git] SSH_CONNECTION: $SSH_CONNECTION" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [info] [git] SSH_CLIENT: $SSH_CLIENT" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
 
-# 触发部署
-echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [info] [git] 触发自动部署" >> "$LOGS_DIR/deploy-$(date '+%%Y-%%m-%%d').log"
-
-# 调用部署脚本
-/opt/sslcat/withssl --deploy-app "$APP_NAME" >> "$LOGS_DIR/deploy-$(date '+%%Y-%%m-%%d').log" 2>&1
-
-echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [info] [git] Git 推送完成" >> "$LOGS_DIR/deploy-$(date '+%%Y-%%m-%%d').log"
-`, app.Name, time.Now().Format("2006-01-02 15:04:05"), app.Name, app.GitPath, app.LogsDir)
+# 执行真正的 git-receive-pack
+exec git-receive-pack "$BARE_REPO" 2>> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+`, app.Name, app.Name, app.BareRepo, app.LogsDir)
 }
 
 // initGitRepo 初始化 Git 仓库
@@ -1907,17 +2128,32 @@ func (gs *GitServer) initGitRepo(app *GitApp) error {
 		return fmt.Errorf("创建应用目录失败: %w", err)
 	}
 
+	if err := os.MkdirAll(app.RepoDir, 0755); err != nil {
+		return fmt.Errorf("创建工作仓库目录失败: %w", err)
+	}
+
+	bearRepo := app.BareRepo
+	if err := os.MkdirAll(bearRepo, 0755); err != nil {
+		return fmt.Errorf("创建裸仓库目录失败: %w", err)
+	}
+
 	// 初始化 Git 仓库
-	cmd := exec.Command("git", "init", "--bare", app.GitPath)
+	cmd := exec.Command("git", "init", "--bare", bearRepo)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("初始化 Git 仓库失败: %w", err)
 	}
 
 	// 设置 Git 配置
 	cmd = exec.Command("git", "config", "core.bare", "true")
-	cmd.Dir = app.GitPath
+	cmd.Dir = bearRepo
 	if err := cmd.Run(); err != nil {
 		gs.logger.Warnf("设置 Git 配置失败: %v", err)
+	}
+
+	// 初始克隆到工作目录
+	cmd = exec.Command("git", "clone", bearRepo, app.RepoDir)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("克隆裸仓库失败: %w", err)
 	}
 
 	return nil
@@ -2034,17 +2270,309 @@ func (gs *GitServer) removeProxyRuleForApp(app *GitApp) error {
 		if rule.ManagedByGitDeploy && rule.GitDeployAppName == app.Name {
 			// 删除规则
 			gs.config.Proxy.Rules = append(gs.config.Proxy.Rules[:i], gs.config.Proxy.Rules[i+1:]...)
-			
+
 			// 保存配置
 			if err := gs.config.Save(gs.config.ConfigFile); err != nil {
 				return fmt.Errorf("保存配置失败: %w", err)
 			}
-			
+
 			gs.logger.Infof("已删除应用 %s 的代理规则", app.Name)
 			return nil
 		}
 	}
-	
+
 	gs.logger.Infof("应用 %s 没有关联的代理规则", app.Name)
 	return nil
+}
+
+// ==================== 推送记录管理 ====================
+
+// AddPushRecord 添加推送记录
+func (gs *GitServer) AddPushRecord(appName string, record PushRecord) error {
+	gs.mutex.Lock()
+	defer gs.mutex.Unlock()
+
+	app, exists := gs.apps[appName]
+	if !exists {
+		return fmt.Errorf("应用 %s 不存在", appName)
+	}
+
+	// 添加推送记录
+	if app.PushHistory == nil {
+		app.PushHistory = make([]PushRecord, 0)
+	}
+	app.PushHistory = append(app.PushHistory, record)
+
+	// 限制历史记录数量（保留最近100条）
+	if len(app.PushHistory) > 100 {
+		app.PushHistory = app.PushHistory[len(app.PushHistory)-100:]
+	}
+
+	// 保存应用信息
+	if err := gs.saveApps(); err != nil {
+		return fmt.Errorf("保存推送记录失败: %w", err)
+	}
+
+	return nil
+}
+
+// GetPushHistory 获取推送历史
+func (gs *GitServer) GetPushHistory(appName string, limit int) ([]PushRecord, error) {
+	gs.mutex.RLock()
+	defer gs.mutex.RUnlock()
+
+	app, exists := gs.apps[appName]
+	if !exists {
+		return nil, fmt.Errorf("应用 %s 不存在", appName)
+	}
+
+	history := app.PushHistory
+	if history == nil {
+		return []PushRecord{}, nil
+	}
+
+	// 如果指定了限制，返回最后的N条记录
+	if limit > 0 && len(history) > limit {
+		return history[len(history)-limit:], nil
+	}
+
+	return history, nil
+}
+
+// UpdatePushRecordStatus 更新推送记录状态
+func (gs *GitServer) UpdatePushRecordStatus(appName, pushID, status string, errorMsg string) error {
+	gs.mutex.Lock()
+	defer gs.mutex.Unlock()
+
+	app, exists := gs.apps[appName]
+	if !exists {
+		return fmt.Errorf("应用 %s 不存在", appName)
+	}
+
+	// 查找并更新推送记录
+	for i := range app.PushHistory {
+		if app.PushHistory[i].ID == pushID {
+			app.PushHistory[i].Status = status
+			app.PushHistory[i].EndTime = time.Now()
+			app.PushHistory[i].Duration = time.Since(app.PushHistory[i].StartTime).Milliseconds()
+			if errorMsg != "" {
+				app.PushHistory[i].ErrorMessage = errorMsg
+			}
+
+			// 保存应用信息
+			if err := gs.saveApps(); err != nil {
+				return fmt.Errorf("保存推送记录失败: %w", err)
+			}
+
+			return nil
+		}
+	}
+
+	return fmt.Errorf("推送记录 %s 不存在", pushID)
+}
+
+// ==================== SSH 密钥绑定管理 ====================
+
+// BindKeyToApp 绑定SSH密钥到应用
+func (gs *GitServer) BindKeyToApp(appName, keyFingerprint string) error {
+	gs.mutex.Lock()
+	defer gs.mutex.Unlock()
+
+	app, exists := gs.apps[appName]
+	if !exists {
+		return fmt.Errorf("应用 %s 不存在", appName)
+	}
+
+	// 检查密钥是否已绑定
+	for _, key := range app.AllowedKeys {
+		if key == keyFingerprint {
+			return fmt.Errorf("密钥 %s 已绑定到应用 %s", keyFingerprint, appName)
+		}
+	}
+
+	// 添加密钥绑定
+	if app.AllowedKeys == nil {
+		app.AllowedKeys = make([]string, 0)
+	}
+	app.AllowedKeys = append(app.AllowedKeys, keyFingerprint)
+
+	// 保存应用信息
+	if err := gs.saveApps(); err != nil {
+		return fmt.Errorf("保存密钥绑定失败: %w", err)
+	}
+
+	gs.logger.Infof("已绑定密钥 %s 到应用 %s", keyFingerprint, appName)
+	return nil
+}
+
+// UnbindKeyFromApp 解绑SSH密钥
+func (gs *GitServer) UnbindKeyFromApp(appName, keyFingerprint string) error {
+	gs.mutex.Lock()
+	defer gs.mutex.Unlock()
+
+	app, exists := gs.apps[appName]
+	if !exists {
+		return fmt.Errorf("应用 %s 不存在", appName)
+	}
+
+	// 查找并删除密钥绑定
+	for i, key := range app.AllowedKeys {
+		if key == keyFingerprint {
+			app.AllowedKeys = append(app.AllowedKeys[:i], app.AllowedKeys[i+1:]...)
+
+			// 保存应用信息
+			if err := gs.saveApps(); err != nil {
+				return fmt.Errorf("保存密钥绑定失败: %w", err)
+			}
+
+			gs.logger.Infof("已解绑密钥 %s 从应用 %s", keyFingerprint, appName)
+			return nil
+		}
+	}
+
+	return fmt.Errorf("密钥 %s 未绑定到应用 %s", keyFingerprint, appName)
+}
+
+// CheckPushPermission 检查推送权限
+func (gs *GitServer) CheckPushPermission(appName, keyFingerprint string) bool {
+	gs.mutex.RLock()
+	defer gs.mutex.RUnlock()
+
+	app, exists := gs.apps[appName]
+	if !exists {
+		return false
+	}
+
+	// 如果应用没有设置密钥限制，则允许所有已添加的密钥推送
+	if len(app.AllowedKeys) == 0 {
+		return true
+	}
+
+	// 检查密钥是否在允许列表中
+	for _, key := range app.AllowedKeys {
+		if key == keyFingerprint {
+			return true
+		}
+	}
+
+	return false
+}
+
+// ==================== Git 推送处理增强 ====================
+
+// ProcessGitPush 处理 Git 推送并创建应用（如果不存在）
+func (gs *GitServer) ProcessGitPush(appName, keyFingerprint, refName, oldRev, newRev string) error {
+	gs.mutex.Lock()
+	app, exists := gs.apps[appName]
+	gs.mutex.Unlock()
+
+	// 如果应用不存在，自动创建
+	if !exists {
+		gs.logger.Infof("应用 %s 不存在，自动创建", appName)
+		var err error
+		app, err = gs.CreateApp(appName)
+		if err != nil {
+			return fmt.Errorf("自动创建应用失败: %w", err)
+		}
+	}
+
+	// 检查推送权限
+	if !gs.CheckPushPermission(appName, keyFingerprint) {
+		return fmt.Errorf("SSH密钥 %s 没有权限推送到应用 %s", keyFingerprint, appName)
+	}
+
+	// 创建推送记录
+	pushID := fmt.Sprintf("push_%d", time.Now().Unix())
+	pushRecord := PushRecord{
+		ID:         pushID,
+		AppName:    appName,
+		PusherKey:  keyFingerprint,
+		CommitHash: newRev,
+		RefName:    refName,
+		Status:     "pending",
+		StartTime:  time.Now(),
+	}
+
+	// 获取提交消息
+	if newRev != "0000000000000000000000000000000000000000" {
+		cmd := exec.Command("git", "--git-dir="+app.BareRepo, "log", "-1", "--pretty=format:%s", newRev)
+		if output, err := cmd.Output(); err == nil {
+			pushRecord.CommitMessage = string(output)
+		}
+	}
+
+	// 添加推送记录
+	if err := gs.AddPushRecord(appName, pushRecord); err != nil {
+		gs.logger.Warnf("添加推送记录失败: %v", err)
+	}
+
+	// 触发部署
+	go gs.processGitPushWithRecord(app, pushID, pushRecord)
+
+	gs.logger.Infof("开始处理应用 %s 的 Git 推送，Push ID: %s", appName, pushID)
+	return nil
+}
+
+// processGitPushWithRecord 处理推送并更新记录
+func (gs *GitServer) processGitPushWithRecord(app *GitApp, pushID string, pushRecord PushRecord) {
+	// 使用现有的 processGitPush 逻辑
+	gs.processGitPush(app, nil)
+
+	// 更新推送记录状态
+	if app.Status == "running" {
+		gs.UpdatePushRecordStatus(app.Name, pushID, "success", "")
+	} else if app.Status == "failed" {
+		gs.UpdatePushRecordStatus(app.Name, pushID, "failed", "部署失败，请查看日志")
+	}
+}
+
+// WatchDeployTriggers 监听部署触发文件
+func (gs *GitServer) WatchDeployTriggers() {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		// 扫描 /tmp 目录下的部署触发文件
+		pattern := "/tmp/sslcat-deploy-*"
+		matches, err := filepath.Glob(pattern)
+		if err != nil {
+			continue
+		}
+
+		for _, triggerFile := range matches {
+			// 读取触发文件
+			data, err := os.ReadFile(triggerFile)
+			if err != nil {
+				continue
+			}
+
+			// 解析触发信息
+			parts := strings.Split(string(data), "|")
+			if len(parts) < 2 {
+				os.Remove(triggerFile)
+				continue
+			}
+
+			// 提取应用名称
+			filename := filepath.Base(triggerFile)
+			appName := strings.TrimPrefix(filename, "sslcat-deploy-")
+			appName = appName[:strings.LastIndex(appName, "-")]
+
+			newRev := parts[0]
+			refName := parts[1]
+			commitMsg := ""
+			if len(parts) > 2 {
+				commitMsg = parts[2]
+			}
+
+			// 触发部署
+			go gs.ProcessGitPush(appName, "system", refName, "", newRev)
+
+			// 删除触发文件
+			os.Remove(triggerFile)
+
+			gs.logger.Infof("检测到部署触发: 应用=%s, 提交=%s, 分支=%s, 消息=%s",
+				appName, newRev, refName, commitMsg)
+		}
+	}
 }

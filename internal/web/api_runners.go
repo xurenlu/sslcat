@@ -149,37 +149,37 @@ func (api *GitServerAPI) UpdateServerConfig(w http.ResponseWriter, r *http.Reque
 
 // UpdateAppEnv 更新应用环境变量
 func (api *GitServerAPI) UpdateAppEnv(w http.ResponseWriter, r *http.Request) {
-    appName := r.URL.Query().Get("name")
-    if appName == "" {
-        api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
-        return
-    }
+	appName := r.URL.Query().Get("name")
+	if appName == "" {
+		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+		return
+	}
 
-    var req struct {
-        EnvVars map[string]string `json:"env_vars"`
-    }
+	var req struct {
+		EnvVars map[string]string `json:"env_vars"`
+	}
 
-    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-        api.writeError(w, "解析请求失败: "+err.Error(), http.StatusBadRequest)
-        return
-    }
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		api.writeError(w, "解析请求失败: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 
-    if req.EnvVars == nil {
-        api.writeError(w, "env_vars 字段不能为空", http.StatusBadRequest)
-        return
-    }
+	if req.EnvVars == nil {
+		api.writeError(w, "env_vars 字段不能为空", http.StatusBadRequest)
+		return
+	}
 
-    if err := api.server.UpdateAppEnv(appName, req.EnvVars); err != nil {
-        api.writeError(w, "更新环境变量失败: "+err.Error(), http.StatusInternalServerError)
-        return
-    }
+	if err := api.server.UpdateAppEnv(appName, req.EnvVars); err != nil {
+		api.writeError(w, "更新环境变量失败: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-    response := map[string]interface{}{
-        "success": true,
-        "message": "环境变量已更新",
-    }
+	response := map[string]interface{}{
+		"success": true,
+		"message": "环境变量已更新",
+	}
 
-    api.writeJSON(w, response)
+	api.writeJSON(w, response)
 }
 
 // ==================== SSH 密钥管理 API ====================
@@ -195,6 +195,37 @@ func (api *GitServerAPI) ListSSHKeys(w http.ResponseWriter, r *http.Request) {
 	response := map[string]interface{}{
 		"success": true,
 		"data":    keys,
+	}
+
+	api.writeJSON(w, response)
+}
+
+// UpdateAppRouting 更新应用的域名与端口
+func (api *GitServerAPI) UpdateAppRouting(w http.ResponseWriter, r *http.Request) {
+	appName := r.URL.Query().Get("name")
+	if appName == "" {
+		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		Domain string `json:"domain"`
+		Port   int    `json:"port"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		api.writeError(w, "解析请求失败: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := api.server.UpdateAppRouting(appName, req.Port, req.Domain); err != nil {
+		api.writeError(w, "更新域名/端口失败: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	response := map[string]interface{}{
+		"success": true,
+		"message": "域名与端口已更新",
 	}
 
 	api.writeJSON(w, response)
@@ -428,6 +459,101 @@ func (api *GitServerAPI) TestDockerConnection(w http.ResponseWriter, r *http.Req
 		response["error"] = err.Error()
 	} else {
 		response["message"] = "Docker Registry连接正常"
+	}
+
+	api.writeJSON(w, response)
+}
+
+// ==================== 推送历史 API ====================
+
+// GetPushHistory 获取推送历史
+func (api *GitServerAPI) GetPushHistory(w http.ResponseWriter, r *http.Request) {
+	appName := r.URL.Query().Get("app")
+	if appName == "" {
+		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+		return
+	}
+
+	limitStr := r.URL.Query().Get("limit")
+	limit := 50 // 默认返回最后50条
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	history, err := api.server.GetPushHistory(appName, limit)
+	if err != nil {
+		api.writeError(w, "获取推送历史失败: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"success": true,
+		"data":    history,
+		"count":   len(history),
+	}
+
+	api.writeJSON(w, response)
+}
+
+// ==================== SSH 密钥绑定 API ====================
+
+// BindKeyToApp 绑定SSH密钥到应用
+func (api *GitServerAPI) BindKeyToApp(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		AppName        string `json:"app_name"`
+		KeyFingerprint string `json:"key_fingerprint"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		api.writeError(w, "解析请求失败: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if req.AppName == "" || req.KeyFingerprint == "" {
+		api.writeError(w, "应用名称和密钥指纹不能为空", http.StatusBadRequest)
+		return
+	}
+
+	if err := api.server.BindKeyToApp(req.AppName, req.KeyFingerprint); err != nil {
+		api.writeError(w, "绑定SSH密钥失败: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"success": true,
+		"message": "SSH密钥绑定成功",
+	}
+
+	api.writeJSON(w, response)
+}
+
+// UnbindKeyFromApp 解绑SSH密钥
+func (api *GitServerAPI) UnbindKeyFromApp(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		AppName        string `json:"app_name"`
+		KeyFingerprint string `json:"key_fingerprint"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		api.writeError(w, "解析请求失败: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if req.AppName == "" || req.KeyFingerprint == "" {
+		api.writeError(w, "应用名称和密钥指纹不能为空", http.StatusBadRequest)
+		return
+	}
+
+	if err := api.server.UnbindKeyFromApp(req.AppName, req.KeyFingerprint); err != nil {
+		api.writeError(w, "解绑SSH密钥失败: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"success": true,
+		"message": "SSH密钥解绑成功",
 	}
 
 	api.writeJSON(w, response)
