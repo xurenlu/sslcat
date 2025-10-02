@@ -1,3 +1,31 @@
+## [1.3.4] - 2025-01-02
+
+### Added
+- 🎨 **侧边栏Logo显示**: 在管理面板左侧添加Logo图片显示，支持模糊效果和hover交互
+- 🌍 **完整语言切换功能**: 修复右上角语言切换器，支持实时切换中文、英文、日文等多语言
+- 📊 **真实版本显示**: 系统状态中显示真实的SSLcat版本号，不再是硬编码版本
+- 🔧 **API认证修复**: 修复前端API请求缺少adminPrefix导致的401认证错误
+
+### Fixed
+- 🔑 **认证状态同步**: 修复useLanguage hook架构问题，确保所有组件共享同一语言状态
+- 🖼️ **Logo路径问题**: 修复Logo图片路径不包含adminPrefix导致的显示问题
+- 📡 **API请求路径**: 修复Dashboard、Security、Notifications等页面API请求路径问题
+- 🔤 **TypeScript类型**: 修复多语言翻译文件的TypeScript类型错误
+
+### Enhanced
+- 🎭 **Logo交互效果**: 默认模糊(blur 2px)，hover时清晰显示并轻微缩放
+- 🌐 **多语言支持**: 完善西班牙语、法语、韩语、德语、俄语、繁体中文翻译
+- 📱 **响应式设计**: Logo和语言切换功能适配不同屏幕尺寸
+- 🔄 **状态管理**: 改进语言切换的Context架构和状态同步
+
+### Technical
+- 重构useLanguage hook，将状态管理移到LanguageProvider中
+- 添加图片类型声明文件支持PNG等格式导入
+- 优化API请求路径构建，确保包含正确的adminPrefix
+- 改进Dashboard组件数据处理，支持多种后端字段格式
+
+---
+
 ## [1.3.3] - 2025-01-03
 
 ### Added
