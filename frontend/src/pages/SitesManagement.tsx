@@ -175,7 +175,7 @@ const SitesManagement: React.FC = () => {
     return tcpPattern.test(addr)
   }
 
-  const handleCreateSite = async () => {
+  const handleSaveSite = async () => {
     try {
       setLoading(true)
       
@@ -191,10 +191,20 @@ const SitesManagement: React.FC = () => {
         return
       }
       
+      const isEditing = editingSite !== null
+      const method = isEditing ? 'PUT' : 'POST'
+      const endpoint = isEditing 
+        ? (modalType === 'static' 
+            ? `/api/static-sites/${editingSite.id}` 
+            : `/api/php-sites/${editingSite.id}`)
+        : (modalType === 'static' 
+            ? '/api/static-sites' 
+            : '/api/php-sites')
+      
       if (modalType === 'static') {
-        // 创建静态站点
-        const response = await fetch(buildApiPath(adminPrefix, '/api/static-sites'), {
-          method: 'POST',
+        // 创建或更新静态站点
+        const response = await fetch(buildApiPath(adminPrefix, endpoint), {
+          method,
           headers: {
             'Content-Type': 'application/json',
           },
@@ -210,12 +220,12 @@ const SitesManagement: React.FC = () => {
 
         if (!response.ok) {
           const errorData = await response.json()
-          throw new Error(errorData.error || '创建静态站点失败')
+          throw new Error(errorData.error || `${isEditing ? '更新' : '创建'}静态站点失败`)
         }
       } else {
-        // 创建 PHP 站点
-        const response = await fetch(buildApiPath(adminPrefix, '/api/php-sites'), {
-          method: 'POST',
+        // 创建或更新 PHP 站点
+        const response = await fetch(buildApiPath(adminPrefix, endpoint), {
+          method,
           headers: {
             'Content-Type': 'application/json',
           },
@@ -237,13 +247,13 @@ const SitesManagement: React.FC = () => {
 
         if (!response.ok) {
           const errorData = await response.json()
-          throw new Error(errorData.error || '创建 PHP 站点失败')
+          throw new Error(errorData.error || `${isEditing ? '更新' : '创建'} PHP 站点失败`)
         }
       }
 
       toast({
-        title: '站点创建成功',
-        description: `${modalType === 'static' ? '静态' : 'PHP'} 站点已成功创建`,
+        title: `站点${isEditing ? '更新' : '创建'}成功`,
+        description: `${modalType === 'static' ? '静态' : 'PHP'} 站点已成功${isEditing ? '更新' : '创建'}`,
         status: 'success',
         duration: 3000,
         isClosable: true,
@@ -252,9 +262,10 @@ const SitesManagement: React.FC = () => {
       onClose()
       refreshData()
       resetForm()
+      setEditingSite(null)
     } catch (error) {
       toast({
-        title: '创建失败',
+        title: `${editingSite ? '更新' : '创建'}失败`,
         description: error instanceof Error ? error.message : '未知错误',
         status: 'error',
         duration: 3000,
@@ -289,6 +300,42 @@ const SitesManagement: React.FC = () => {
         isClosable: true,
       })
     }
+  }
+
+  const handleEditSite = (site: StaticSite | PHPSite, type: 'static' | 'php') => {
+    setEditingSite(site)
+    setModalType(type)
+    
+    // 填充表单数据
+    if (type === 'static') {
+      const staticSite = site as StaticSite
+      setNewSite({
+        domain: staticSite.domain,
+        rootPath: staticSite.rootPath,
+        enabled: staticSite.enabled,
+        indexFile: staticSite.indexFile,
+        phpVersion: '8.1',
+        memoryLimit: '128M',
+        maxExecutionTime: '30',
+        fcgiAddr: 'unix:/var/run/php-fpm.sock',
+        headers: {},
+      })
+    } else {
+      const phpSite = site as PHPSite
+      setNewSite({
+        domain: phpSite.domain,
+        rootPath: phpSite.rootPath,
+        enabled: phpSite.enabled,
+        indexFile: 'index.php',
+        phpVersion: phpSite.phpVersion,
+        memoryLimit: phpSite.memoryLimit,
+        maxExecutionTime: phpSite.maxExecutionTime,
+        fcgiAddr: phpSite.fcgiAddr,
+        headers: {},
+      })
+    }
+    
+    onOpen()
   }
 
   const resetForm = () => {
@@ -412,6 +459,7 @@ const SitesManagement: React.FC = () => {
                                   icon={<FiEdit />}
                                   size="sm"
                                   variant="ghost"
+                                  onClick={() => handleEditSite(site, 'static')}
                                 />
                                 <IconButton
                                   aria-label="删除"
@@ -513,6 +561,7 @@ const SitesManagement: React.FC = () => {
                                   icon={<FiEdit />}
                                   size="sm"
                                   variant="ghost"
+                                  onClick={() => handleEditSite(site, 'php')}
                                 />
                                 <IconButton
                                   aria-label="删除"
@@ -553,7 +602,10 @@ const SitesManagement: React.FC = () => {
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>
-            {modalType === 'static' ? '添加静态站点' : '添加 PHP 站点'}
+            {editingSite 
+              ? (modalType === 'static' ? '编辑静态站点' : '编辑 PHP 站点')
+              : (modalType === 'static' ? '添加静态站点' : '添加 PHP 站点')
+            }
           </ModalHeader>
           <ModalCloseButton />
           <ModalBody>
@@ -642,8 +694,8 @@ const SitesManagement: React.FC = () => {
             <Button variant="ghost" mr={3} onClick={onClose}>
               取消
             </Button>
-            <Button colorScheme="blue" onClick={handleCreateSite}>
-              创建站点
+            <Button colorScheme="blue" onClick={handleSaveSite}>
+              {editingSite ? '更新站点' : '创建站点'}
             </Button>
           </ModalFooter>
         </ModalContent>

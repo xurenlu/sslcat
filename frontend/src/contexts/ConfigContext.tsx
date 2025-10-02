@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { updateApiBaseURL } from '../utils/api'
 
 // 常量定义
-const DEFAULT_ADMIN_PREFIX = '/sslcat-panel'
+const DEFAULT_ADMIN_PREFIX = '/sslcat-panel2'
 const ADMIN_PREFIX_STORAGE_KEY = 'adminPrefix'
 
 interface ConfigContextType {

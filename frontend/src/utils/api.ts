@@ -2,7 +2,7 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { ApiResponse } from '../types'
 
 // 常量定义
-const DEFAULT_ADMIN_PREFIX = '/sslcat-panel'
+const DEFAULT_ADMIN_PREFIX = '/sslcat-panel2'
 const ADMIN_PREFIX_STORAGE_KEY = 'adminPrefix'
 const API_TIMEOUT = 10000
 
