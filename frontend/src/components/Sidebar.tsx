@@ -11,11 +11,13 @@ import {
   Link,
   Divider,
   Button,
+  Image,
   useBreakpointValue,
 } from '@chakra-ui/react'
 import { Link as RouterLink, useLocation } from 'react-router-dom'
 import { useTranslation } from '../hooks/useLanguage'
 import { useConfig, buildPath } from '../contexts/ConfigContext'
+import logoImage from '../logo.png'
 import {
   FiHome,
   FiSettings,
@@ -99,7 +101,29 @@ const SidebarContent = () => {
     <Box h="full" bg="white" borderRight="1px" borderColor="gray.200" display="flex" flexDirection="column">
       {/* Logo - 固定顶部 */}
       <Box p={6} borderBottom="1px" borderColor="gray.200" flexShrink={0}>
-        <VStack spacing={2}>
+        <VStack spacing={3}>
+          {/* Logo 图片 */}
+          <Box
+            position="relative"
+            transition="all 0.3s ease"
+            _hover={{
+              transform: 'scale(1.05)',
+            }}
+          >
+            <Image
+              src={logoImage}
+              alt="SSLcat Logo"
+              boxSize="60px"
+              objectFit="contain"
+              filter="blur(2px)"
+              transition="filter 0.3s ease"
+              _hover={{
+                filter: 'blur(0px)',
+              }}
+            />
+          </Box>
+          
+          {/* 品牌名称 */}
           <Text fontSize="2xl" fontWeight="bold" color="brand.500">
             SSLcat
           </Text>
