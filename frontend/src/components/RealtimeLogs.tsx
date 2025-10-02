@@ -96,7 +96,7 @@ const RealtimeLogs: React.FC<RealtimeLogsProps> = ({
   const eventSourceRef = useRef<EventSource | null>(null)
   const websocketRef = useRef<WebSocket | null>(null)
   const shouldReconnectRef = useRef<boolean>(false)
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reconnectAttemptsRef = useRef<number>(0)
   const logIdsRef = useRef<Set<string>>(new Set()) // 用于去重
   
