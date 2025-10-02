@@ -8,6 +8,7 @@ import {
   Button,
   Icon,
   useColorModeValue,
+  useToast,
   Code,
   Flex,
   Select,
@@ -77,6 +78,7 @@ const RealtimeLogs: React.FC<RealtimeLogsProps> = ({
   showControls = true,
 }) => {
   const { adminPrefix } = useConfig()
+  const toast = useToast()
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [isConnected, setIsConnected] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
@@ -214,7 +216,10 @@ const RealtimeLogs: React.FC<RealtimeLogsProps> = ({
             })
             // 如果是日志流不存在的错误，停止重连
             if (message.error && message.error.includes('日志流不存在')) {
-              stopStreaming()
+              shouldReconnectRef.current = false // 禁止自动重连
+              if (websocketRef.current) {
+                websocketRef.current.close()
+              }
             }
             break
         }
