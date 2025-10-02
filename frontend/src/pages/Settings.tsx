@@ -92,8 +92,45 @@ const Settings: React.FC = () => {
     }))
   }, [adminPrefix])
 
-  // 加载通知配置
+  // 加载基础配置
   useEffect(() => {
+    const loadBasicConfig = async () => {
+      try {
+        const response = await fetch(`${adminPrefix}/api/settings`, {
+          method: 'GET',
+          credentials: 'include',
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && data.config) {
+            const config = data.config
+            setSettings(prev => ({
+              ...prev,
+              // 基础设置
+              httpPort: config.server?.port?.toString() || '80',
+              httpsPort: config.server?.port?.toString() || '443',
+              
+              // SSL设置
+              autoSSL: !config.ssl?.disable_self_signed || true,
+              letsEncryptEmail: config.ssl?.email || '',
+              
+              // 安全设置
+              enableDDoSProtection: config.security?.enable_ddos || false,
+              maxRequestsPerMinute: config.security?.max_attempts_5min?.toString() || '1000',
+              enableRateLimit: config.security?.enable_ua_filter || false,
+              
+              // 日志设置
+              enableAccessLog: config.server?.access_log_enabled || false,
+              logLevel: 'info', // 可以从配置中获取
+            }))
+          }
+        }
+      } catch (error) {
+        console.error('加载基础配置失败:', error)
+      }
+    }
+
     const loadNotificationConfig = async () => {
       try {
         const response = await fetch(`${adminPrefix}/api/notifications/config`, {
@@ -125,7 +162,11 @@ const Settings: React.FC = () => {
       }
     }
 
-    loadNotificationConfig()
+    // 并行加载配置
+    Promise.all([
+      loadBasicConfig(),
+      loadNotificationConfig()
+    ])
   }, [adminPrefix])
 
   const handleInputChange = (field: string, value: string | boolean | number) => {

@@ -55,6 +55,18 @@ type GitServer struct {
 
 // GitServerConfig Git 服务器配置
 type GitServerConfig struct {
+	// 是否启用Git服务器
+	Enabled bool `json:"enabled"`
+
+	// SSH端口
+	Port int `json:"port"`
+
+	// Webhook基础URL
+	Webhook string `json:"webhook"`
+
+	// 默认分支
+	DefaultBranch string `json:"defaultBranch"`
+
 	// 主域名后缀，如 "your-domain.com"
 	DomainSuffix string `json:"domain_suffix"`
 
@@ -112,6 +124,9 @@ type GitApp struct {
 
 	// Git 仓库路径
 	GitPath string `json:"git_path"`
+
+	// Git 推送地址（用于显示给用户）
+	GitURL string `json:"git_url"`
 
 	// 应用类型（自动检测）
 	AppType string `json:"app_type"` // "nodejs" | "python" | "go" | "php" | "static" | "docker"
@@ -378,19 +393,26 @@ type PushRecord struct {
 func NewGitServer(cfg *config.Config) *GitServer {
 	// 默认服务器配置
 	defaultConfig := &GitServerConfig{
+		Enabled:         true,
+		Port:            22,
+		Webhook:         "",
+		DefaultBranch:   "main",
 		DomainSuffix:    "localhost",
 		PortRange:       [2]int{8000, 9000},
 		WelcomeMessage:  "欢迎使用 SSLcat Git 部署平台！",
 		AutoSSL:         true,
+		SSLEmail:        "",
 		DefaultStrategy: "auto",
 		BuildTimeout:    300,
 		AutoDomain:      true,
 	}
 
-	// SSH 配置 - 使用默认值
+	// SSH 配置 - 使用数据目录而不是系统目录
 	sshUser := "git"
-	sshHomeDir := filepath.Join("/home", sshUser)
-	sshKeysDir := filepath.Join(sshHomeDir, ".ssh")
+	// 使用data/keys目录存储SSH密钥，避免权限问题
+	dataDir := filepath.Dir(cfg.Runners.Git.ReposDir)
+	sshKeysDir := filepath.Join(dataDir, "keys", "ssh")
+	sshHomeDir := sshKeysDir // 开发环境下使用相同目录
 	authorizedKeysFile := filepath.Join(sshKeysDir, "authorized_keys")
 	sshConfigDir := "/etc/ssh/sshd_config.d"
 
@@ -551,6 +573,9 @@ func (gs *GitServer) CreateApp(appName string) (*GitApp, error) {
 	// 生成域名
 	domain := gs.generateDomain(appName)
 
+	// 生成Git推送地址
+	gitURL := gs.generateGitURL(appName)
+
 	// 创建应用目录
 	appPath := filepath.Join(gs.config.Runners.Git.ReposDir, appName)
 	if err := os.MkdirAll(appPath, 0755); err != nil {
@@ -571,6 +596,7 @@ func (gs *GitServer) CreateApp(appName string) (*GitApp, error) {
 		Name:        appName,
 		DisplayName: appName,
 		GitPath:     gitPath,
+		GitURL:      gitURL,
 		BareRepo:    filepath.Join(gitPath, "repo.git"),
 		RepoDir:     filepath.Join(gitPath, "repo"),
 		Domain:      domain,
@@ -1487,6 +1513,25 @@ func (gs *GitServer) generateDomain(appName string) string {
 		return fmt.Sprintf("%s.%s", appName, gs.serverConfig.DomainSuffix)
 	}
 	return ""
+}
+
+// generateGitURL 生成Git推送地址
+func (gs *GitServer) generateGitURL(appName string) string {
+	// 使用域名后缀作为主机名，如果没有则使用localhost
+	hostname := gs.serverConfig.DomainSuffix
+	if hostname == "" {
+		hostname = "localhost"
+	}
+
+	// SSH端口
+	port := gs.serverConfig.Port
+	if port == 22 {
+		// 默认SSH端口，不需要在URL中指定
+		return fmt.Sprintf("%s@%s:%s.git", gs.sshUser, hostname, appName)
+	}
+
+	// 非标准SSH端口，使用ssh://协议格式
+	return fmt.Sprintf("ssh://%s@%s:%d/%s.git", gs.sshUser, hostname, port, appName)
 }
 
 // stopApp 停止应用

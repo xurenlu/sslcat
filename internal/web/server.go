@@ -620,11 +620,11 @@ func (s *Server) registerRunnerRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/routing", gitAPI.UpdateAppRouting)
 
 	// 服务器配置 API 路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/config", gitAPI.GetServerConfig)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/config", gitAPI.HandleServerConfig)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/config/update", gitAPI.UpdateServerConfig)
 
 	// SSH 密钥管理 API 路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/ssh-keys", gitAPI.ListSSHKeys)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/ssh-keys", gitAPI.HandleSSHKeys)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/ssh-key/add", gitAPI.AddSSHKey)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/ssh-key/remove", gitAPI.RemoveSSHKey)
 

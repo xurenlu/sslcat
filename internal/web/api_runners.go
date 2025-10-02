@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 	"github.com/xurenlu/sslcat/internal/runner"
@@ -113,6 +114,18 @@ func (api *GitServerAPI) DeleteApp(w http.ResponseWriter, r *http.Request) {
 	api.writeJSON(w, response)
 }
 
+// HandleServerConfig 处理服务器配置的GET和PUT请求
+func (api *GitServerAPI) HandleServerConfig(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case "GET":
+		api.GetServerConfig(w, r)
+	case "PUT":
+		api.UpdateServerConfig(w, r)
+	default:
+		api.writeError(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
 // GetServerConfig 获取服务器配置
 func (api *GitServerAPI) GetServerConfig(w http.ResponseWriter, r *http.Request) {
 	config := api.server.GetServerConfig()
@@ -184,6 +197,18 @@ func (api *GitServerAPI) UpdateAppEnv(w http.ResponseWriter, r *http.Request) {
 
 // ==================== SSH 密钥管理 API ====================
 
+// HandleSSHKeys 处理SSH密钥的GET和POST请求
+func (api *GitServerAPI) HandleSSHKeys(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case "GET":
+		api.ListSSHKeys(w, r)
+	case "POST":
+		api.AddSSHKey(w, r)
+	default:
+		api.writeError(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
 // ListSSHKeys 列出所有 SSH 密钥
 func (api *GitServerAPI) ListSSHKeys(w http.ResponseWriter, r *http.Request) {
 	keys, err := api.server.ListSSHKeys()
@@ -234,8 +259,9 @@ func (api *GitServerAPI) UpdateAppRouting(w http.ResponseWriter, r *http.Request
 // AddSSHKey 添加 SSH 密钥
 func (api *GitServerAPI) AddSSHKey(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Name      string `json:"name"`
-		PublicKey string `json:"public_key"`
+		Name       string `json:"name"`
+		PublicKey  string `json:"public_key"`
+		PublicKey2 string `json:"publicKey"` // 兼容前端的驼峰命名
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -243,12 +269,21 @@ func (api *GitServerAPI) AddSSHKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Name == "" || req.PublicKey == "" {
+	// 优先使用 public_key，如果为空则使用 publicKey
+	publicKey := req.PublicKey
+	if publicKey == "" {
+		publicKey = req.PublicKey2
+	}
+
+	if req.Name == "" || publicKey == "" {
 		api.writeError(w, "密钥名称和公钥不能为空", http.StatusBadRequest)
 		return
 	}
 
-	if err := api.server.AddSSHKey(req.Name, req.PublicKey); err != nil {
+	// 去除公钥末尾的换行符
+	publicKey = strings.TrimSpace(publicKey)
+
+	if err := api.server.AddSSHKey(req.Name, publicKey); err != nil {
 		api.writeError(w, "添加 SSH 密钥失败: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

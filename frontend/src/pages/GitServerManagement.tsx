@@ -81,13 +81,10 @@ import SSHKeyBindings from '../components/SSHKeyBindings'
 interface GitApp {
   id: string
   name: string
-  repository: string
-  branch: string
-  deployPath: string
+  git_url?: string
   status: 'active' | 'inactive' | 'deploying' | 'error'
   lastDeploy: string
   commits: number
-  webhook: string
   autoSSL: boolean
   domain?: string
   port?: number
@@ -109,8 +106,8 @@ interface GitServerConfig {
   enabled: boolean
   port: number
   webhook: string
-  autoSSL: boolean
   defaultBranch: string
+  autoSSL: boolean
   domainSuffix: string
   portRange: [number, number]
   welcomeMessage: string
@@ -128,8 +125,8 @@ const GitServerManagement: React.FC = () => {
     enabled: true,
     port: 22,
     webhook: '',
-    autoSSL: true,
     defaultBranch: 'main',
+    autoSSL: true,
     domainSuffix: 'localhost',
     portRange: [8000, 9000],
     welcomeMessage: '欢迎使用 SSLcat Git 部署平台！',
@@ -154,12 +151,7 @@ const GitServerManagement: React.FC = () => {
 
   const [newApp, setNewApp] = useState({
     name: '',
-    repository: '',
-    branch: 'main',
-    deployPath: '/var/www',
     autoSSL: true,
-    domain: '',
-    port: 0,
   })
 
   const [newKey, setNewKey] = useState({
@@ -362,28 +354,65 @@ const GitServerManagement: React.FC = () => {
   }
 
   const handleCreateApp = async () => {
+    if (!newApp.name) {
+      toast({
+        title: '应用名称不能为空',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+      return
+    }
+
     try {
       const response = await fetch(buildApiPath(adminPrefix, '/git-server/apps'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newApp),
+        body: JSON.stringify({
+          name: newApp.name,
+          auto_ssl: newApp.autoSSL,
+        }),
       })
       
       if (response.ok) {
+        const result = await response.json()
+        const appData = result.data
+        
         toast({
           title: 'Git应用创建成功',
+          description: `Git地址: git@${window.location.hostname}:${newApp.name}.git`,
           status: 'success',
-          duration: 3000,
+          duration: 8000,
           isClosable: true,
         })
         
         onClose()
-        refreshData()
+        await refreshData()
         resetAppForm()
+
+        // 如果创建成功，显示Git推送指令提示
+        setTimeout(() => {
+          toast({
+            title: '推送代码到应用',
+            description: (
+              <Box fontSize="sm">
+                <Text mb={2}>在您的项目目录中执行：</Text>
+                <Code display="block" p={2} fontSize="xs">
+                  git remote add sslcat git@{window.location.hostname}:{newApp.name}.git<br/>
+                  git push sslcat main
+                </Code>
+              </Box>
+            ),
+            status: 'info',
+            duration: 15000,
+            isClosable: true,
+          })
+        }, 1000)
       } else {
-        throw new Error('创建Git应用失败')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || '创建Git应用失败')
       }
     } catch (error) {
       toast({
@@ -533,7 +562,20 @@ const GitServerManagement: React.FC = () => {
           isClosable: true,
         })
         onConfigClose()
-        refreshData()
+        await refreshData()
+        
+        // 如果启用了Git服务器但没有SSH密钥，提示用户添加
+        if (config.enabled && sshKeys.length === 0) {
+          setTimeout(() => {
+            toast({
+              title: '提示：添加SSH密钥',
+              description: '您已启用Git服务器，但还没有配置SSH密钥。请在"SSH密钥"标签页中添加至少一个SSH密钥以允许Git推送。',
+              status: 'warning',
+              duration: 8000,
+              isClosable: true,
+            })
+          }, 500)
+        }
       } else {
         throw new Error('更新配置失败')
       }
@@ -551,12 +593,7 @@ const GitServerManagement: React.FC = () => {
   const resetAppForm = () => {
     setNewApp({
       name: '',
-      repository: '',
-      branch: 'main',
-      deployPath: '/var/www',
       autoSSL: true,
-      domain: '',
-      port: 0,
     })
   }
 
@@ -873,9 +910,8 @@ const GitServerManagement: React.FC = () => {
                         <Tr>
                           <Th>选择</Th>
                           <Th>应用信息</Th>
-                          <Th>仓库</Th>
+                          <Th>Git推送地址</Th>
                           <Th>状态</Th>
-                          <Th>部署路径</Th>
                           <Th>最后部署</Th>
                           <Th>操作</Th>
                         </Tr>
@@ -904,8 +940,7 @@ const GitServerManagement: React.FC = () => {
                                   <Text fontWeight="medium">{app.name}</Text>
                                 </HStack>
                                 <HStack spacing={2}>
-                                  <Badge variant="outline">{app.branch}</Badge>
-                                  <Badge colorScheme="gray">{app.commits} commits</Badge>
+                                  <Badge colorScheme="gray">{app.commits || 0} commits</Badge>
                                   {app.autoSSL && (
                                     <Badge colorScheme="green">SSL</Badge>
                                   )}
@@ -918,6 +953,21 @@ const GitServerManagement: React.FC = () => {
                                 <Text fontSize="sm" color="gray.600">
                                   端口: {app.port ?? '未分配'}
                                 </Text>
+                                {app.git_url && (
+                                  <HStack spacing={1}>
+                                    <Text fontSize="xs" color="gray.500">Git:</Text>
+                                    <Code fontSize="xs" maxW="250px" isTruncated>
+                                      {app.git_url}
+                                    </Code>
+                                    <IconButton
+                                      aria-label="复制Git地址"
+                                      icon={<FiCopy />}
+                                      size="xs"
+                                      variant="ghost"
+                                      onClick={() => copyToClipboard(app.git_url || '')}
+                                    />
+                                  </HStack>
+                                )}
                                 <Button
                                   size="xs"
                                   leftIcon={<Icon as={FiSliders} />}
@@ -939,44 +989,36 @@ const GitServerManagement: React.FC = () => {
                               </VStack>
                             </Td>
                             <Td>
-                              <Code fontSize="xs" maxW="200px" isTruncated>
-                                {app.repository}
-                              </Code>
+                              {app.git_url ? (
+                                <VStack align="start" spacing={1}>
+                                  <Text fontSize="xs" color="gray.500">推送到此地址：</Text>
+                                  <Code fontSize="xs" maxW="200px" isTruncated>
+                                    {app.git_url}
+                                  </Code>
+                                </VStack>
+                              ) : (
+                                <Text fontSize="xs" color="gray.400">等待配置</Text>
+                              )}
                             </Td>
                             <Td>
                               <Badge colorScheme={getStatusColor(app.status)}>
                                 {getStatusText(app.status)}
                               </Badge>
                             </Td>
-                            <Td>
-                              <Code fontSize="xs">{app.deployPath}</Code>
-                            </Td>
-                            <Td>{app.lastDeploy}</Td>
+                            <Td>{app.lastDeploy || '未部署'}</Td>
                             <Td>
                               <HStack spacing={1}>
                                 <IconButton
-                                  aria-label="部署"
+                                  aria-label="重新部署"
                                   icon={<FiUpload />}
                                   size="sm"
                                   variant="ghost"
                                   colorScheme="green"
                                   onClick={() => handleDeployApp(app.id)}
+                                  title="触发重新部署"
                                 />
                                 <IconButton
-                                  aria-label="复制Webhook"
-                                  icon={<FiCopy />}
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => copyToClipboard(app.webhook)}
-                                />
-                                <IconButton
-                                  aria-label="编辑"
-                                  icon={<FiEdit />}
-                                  size="sm"
-                                  variant="ghost"
-                                />
-                                <IconButton
-                                  aria-label="删除"
+                                  aria-label="删除应用"
                                   icon={<FiTrash2 />}
                                   size="sm"
                                   variant="ghost"
@@ -1174,70 +1216,43 @@ const GitServerManagement: React.FC = () => {
             <ModalHeader>创建Git应用</ModalHeader>
             <ModalCloseButton />
             <ModalBody>
-              <VStack spacing={4}>
-                <FormControl>
+              <VStack spacing={4} align="stretch">
+                <Alert status="info" variant="left-accent">
+                  <AlertIcon />
+                  <Box>
+                    <AlertTitle fontSize="sm">说明</AlertTitle>
+                    <AlertDescription fontSize="sm">
+                      创建应用后，系统会自动分配Git仓库地址、域名和端口。您只需要输入应用名称即可。
+                    </AlertDescription>
+                  </Box>
+                </Alert>
+
+                <FormControl isRequired>
                   <FormLabel>应用名称</FormLabel>
                   <Input
                     value={newApp.name}
-                    onChange={(e) => setNewApp({ ...newApp, name: e.target.value })}
-                    placeholder="frontend-app"
+                    onChange={(e) => setNewApp({ ...newApp, name: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
+                    placeholder="my-app"
                   />
+                  <Text fontSize="sm" color="gray.500" mt={1}>
+                    只能包含小写字母、数字和连字符，将用于生成Git仓库地址和域名
+                  </Text>
                 </FormControl>
 
-                <FormControl>
-                  <FormLabel>Git仓库地址</FormLabel>
-                  <Input
-                    value={newApp.repository}
-                    onChange={(e) => setNewApp({ ...newApp, repository: e.target.value })}
-                    placeholder="https://github.com/user/repo.git"
-                  />
-                </FormControl>
-
-                <FormControl>
-                  <FormLabel>分支</FormLabel>
-                  <Input
-                    value={newApp.branch}
-                    onChange={(e) => setNewApp({ ...newApp, branch: e.target.value })}
-                    placeholder="main"
-                  />
-                </FormControl>
-
-                <FormControl>
-                  <FormLabel>部署路径</FormLabel>
-                  <Input
-                    value={newApp.deployPath}
-                    onChange={(e) => setNewApp({ ...newApp, deployPath: e.target.value })}
-                    placeholder="/var/www/app"
-                  />
-                </FormControl>
-
-                <FormControl>
-                  <FormLabel>域名（可选）</FormLabel>
-                  <Input
-                    value={newApp.domain}
-                    onChange={(e) => setNewApp({ ...newApp, domain: e.target.value })}
-                    placeholder="app.example.com"
-                  />
-                </FormControl>
-
-        <FormControl>
-          <FormLabel>端口（可选）</FormLabel>
-          <NumberInput
-            min={1}
-            max={65535}
-            value={newApp.port || ''}
-            onChange={(_, value) => setNewApp({ ...newApp, port: value })}
-          >
-            <NumberInputField placeholder="留空则自动分配端口" />
-            <NumberInputStepper>
-              <NumberIncrementStepper />
-              <NumberDecrementStepper />
-            </NumberInputStepper>
-          </NumberInput>
-        </FormControl>
+                {newApp.name && config.domainSuffix && (
+                  <Alert status="success" variant="subtle">
+                    <AlertIcon />
+                    <Box fontSize="sm">
+                      <Text fontWeight="medium">预览信息：</Text>
+                      <Text>Git地址: <Code fontSize="xs">git@{window.location.hostname}:{newApp.name}.git</Code></Text>
+                      <Text>访问域名: <Code fontSize="xs">{newApp.name}.{config.domainSuffix}</Code></Text>
+                      <Text>端口: 自动分配（{config.portRange[0]}-{config.portRange[1]}）</Text>
+                    </Box>
+                  </Alert>
+                )}
 
                 <FormControl display="flex" alignItems="center">
-                  <FormLabel mb="0">自动SSL证书</FormLabel>
+                  <FormLabel mb="0">启用自动SSL证书</FormLabel>
                   <Switch
                     isChecked={newApp.autoSSL}
                     onChange={(e) => setNewApp({ ...newApp, autoSSL: e.target.checked })}
@@ -1298,9 +1313,9 @@ const GitServerManagement: React.FC = () => {
         </Modal>
 
         {/* 服务器配置模态框 */}
-        <Modal isOpen={isConfigOpen} onClose={onConfigClose}>
+        <Modal isOpen={isConfigOpen} onClose={onConfigClose} size="xl">
           <ModalOverlay />
-          <ModalContent>
+          <ModalContent maxH="90vh" overflowY="auto">
             <ModalHeader>Git服务器配置</ModalHeader>
             <ModalCloseButton />
             <ModalBody>
@@ -1351,6 +1366,117 @@ const GitServerManagement: React.FC = () => {
                   <Switch
                     isChecked={config.autoSSL}
                     onChange={(e) => setConfig({ ...config, autoSSL: e.target.checked })}
+                  />
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel>域名后缀</FormLabel>
+                  <Input
+                    value={config.domainSuffix}
+                    onChange={(e) => setConfig({ ...config, domainSuffix: e.target.value })}
+                    placeholder="localhost"
+                  />
+                  <Text fontSize="sm" color="gray.500" mt={1}>
+                    应用自动分配域名时使用的后缀，如 app-name.{config.domainSuffix}
+                  </Text>
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel>端口范围</FormLabel>
+                  <HStack>
+                    <NumberInput
+                      min={1000}
+                      max={65535}
+                      value={config.portRange[0]}
+                      onChange={(_, value) => setConfig({ ...config, portRange: [value, config.portRange[1]] })}
+                    >
+                      <NumberInputField placeholder="起始端口" />
+                      <NumberInputStepper>
+                        <NumberIncrementStepper />
+                        <NumberDecrementStepper />
+                      </NumberInputStepper>
+                    </NumberInput>
+                    <Text>-</Text>
+                    <NumberInput
+                      min={1000}
+                      max={65535}
+                      value={config.portRange[1]}
+                      onChange={(_, value) => setConfig({ ...config, portRange: [config.portRange[0], value] })}
+                    >
+                      <NumberInputField placeholder="结束端口" />
+                      <NumberInputStepper>
+                        <NumberIncrementStepper />
+                        <NumberDecrementStepper />
+                      </NumberInputStepper>
+                    </NumberInput>
+                  </HStack>
+                  <Text fontSize="sm" color="gray.500" mt={1}>
+                    应用自动分配端口的范围
+                  </Text>
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel>欢迎消息</FormLabel>
+                  <Textarea
+                    value={config.welcomeMessage}
+                    onChange={(e) => setConfig({ ...config, welcomeMessage: e.target.value })}
+                    placeholder="欢迎使用 SSLcat Git 部署平台！"
+                    rows={3}
+                  />
+                  <Text fontSize="sm" color="gray.500" mt={1}>
+                    Git推送时显示的欢迎消息
+                  </Text>
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel>SSL证书邮箱</FormLabel>
+                  <Input
+                    type="email"
+                    value={config.sslEmail}
+                    onChange={(e) => setConfig({ ...config, sslEmail: e.target.value })}
+                    placeholder="admin@example.com"
+                  />
+                  <Text fontSize="sm" color="gray.500" mt={1}>
+                    用于申请Let's Encrypt SSL证书的邮箱地址
+                  </Text>
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel>默认部署策略</FormLabel>
+                  <Input
+                    value={config.defaultStrategy}
+                    onChange={(e) => setConfig({ ...config, defaultStrategy: e.target.value })}
+                    placeholder="auto"
+                  />
+                  <Text fontSize="sm" color="gray.500" mt={1}>
+                    新应用的默认部署策略（auto、docker、static等）
+                  </Text>
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel>构建超时时间（秒）</FormLabel>
+                  <NumberInput
+                    min={60}
+                    max={3600}
+                    value={config.buildTimeout}
+                    onChange={(_, value) => setConfig({ ...config, buildTimeout: value })}
+                  >
+                    <NumberInputField placeholder="300" />
+                    <NumberInputStepper>
+                      <NumberIncrementStepper />
+                      <NumberDecrementStepper />
+                    </NumberInputStepper>
+                  </NumberInput>
+                  <Text fontSize="sm" color="gray.500" mt={1}>
+                    应用构建的最大等待时间
+                  </Text>
+                </FormControl>
+
+                <FormControl display="flex" alignItems="center">
+                  <FormLabel mb="0">启用自动域名分配</FormLabel>
+                  <Switch
+                    isChecked={config.autoDomain}
+                    onChange={(e) => setConfig({ ...config, autoDomain: e.target.checked })}
                   />
                 </FormControl>
               </VStack>
