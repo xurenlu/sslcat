@@ -1,8 +1,10 @@
 package web
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"time"
@@ -344,6 +346,15 @@ func (s *StatisticsAPI) RecordMiddleware(next http.Handler) http.Handler {
 type responseWriter struct {
 	http.ResponseWriter
 	statusCode int
+}
+
+// Hijack 实现 http.Hijacker 接口，用于 WebSocket 升级
+func (rw *responseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := rw.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, fmt.Errorf("responseWriter does not implement http.Hijacker")
+	}
+	return hijacker.Hijack()
 }
 
 func (rw *responseWriter) WriteHeader(statusCode int) {

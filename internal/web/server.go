@@ -612,9 +612,9 @@ func (s *Server) registerRunnerRoutes() {
 	runtimeAPI := NewRuntimeDetectorAPI()
 
 	// Git 服务器 API 路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/apps", gitAPI.ListApps)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/apps", gitAPI.HandleApps) // GET: 列表, POST: 创建
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app", gitAPI.GetApp)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/create", gitAPI.CreateApp)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/create", gitAPI.CreateApp) // 保留兼容性
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/delete", gitAPI.DeleteApp)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/env", gitAPI.UpdateAppEnv)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/routing", gitAPI.UpdateAppRouting)

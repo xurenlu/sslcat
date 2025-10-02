@@ -556,40 +556,55 @@ func (gs *GitServer) UpdateServerConfig(config *GitServerConfig) error {
 
 // CreateApp 创建新应用
 func (gs *GitServer) CreateApp(appName string) (*GitApp, error) {
+	gs.logger.Infof("🚀 开始创建应用: %s", appName)
 	gs.mutex.Lock()
 	defer gs.mutex.Unlock()
 
 	// 检查应用是否已存在
 	if _, exists := gs.apps[appName]; exists {
+		gs.logger.Warnf("应用 %s 已存在", appName)
 		return nil, fmt.Errorf("应用 %s 已存在", appName)
 	}
 
 	// 分配端口
+	gs.logger.Debugf("为应用 %s 分配端口...", appName)
+	gs.logger.Debugf("端口范围: %d-%d", gs.serverConfig.PortRange[0], gs.serverConfig.PortRange[1])
+	gs.logger.Debugf("当前应用数量: %d", len(gs.apps))
 	port, err := gs.allocatePort()
 	if err != nil {
+		gs.logger.Errorf("分配端口失败: %v", err)
 		return nil, fmt.Errorf("分配端口失败: %w", err)
 	}
+	gs.logger.Infof("  ✓ 分配端口: %d", port)
 
 	// 生成域名
 	domain := gs.generateDomain(appName)
+	gs.logger.Infof("  ✓ 生成域名: %s", domain)
 
 	// 生成Git推送地址
 	gitURL := gs.generateGitURL(appName)
+	gs.logger.Infof("  ✓ Git 地址: %s", gitURL)
 
 	// 创建应用目录
 	appPath := filepath.Join(gs.config.Runners.Git.ReposDir, appName)
+	gs.logger.Infof("  创建应用目录: %s", appPath)
 	if err := os.MkdirAll(appPath, 0755); err != nil {
+		gs.logger.Errorf("创建应用目录失败: %v", err)
 		return nil, fmt.Errorf("创建应用目录失败: %w", err)
 	}
+	gs.logger.Infof("  ✓ 应用目录已创建")
 
 	// 初始化 Git 仓库
 	gitPath := filepath.Join(appPath, "git")
 
 	// 创建日志目录
 	logsDir := filepath.Join(appPath, "logs")
+	gs.logger.Debugf("  创建日志目录: %s", logsDir)
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
+		gs.logger.Errorf("创建日志目录失败: %v", err)
 		return nil, fmt.Errorf("创建日志目录失败: %w", err)
 	}
+	gs.logger.Infof("  ✓ 日志目录已创建")
 
 	// 创建应用对象
 	app := &GitApp{
@@ -615,23 +630,34 @@ func (gs *GitServer) CreateApp(appName string) (*GitApp, error) {
 	}
 
 	gs.apps[appName] = app
+	gs.logger.Infof("  ✓ 应用对象已添加到内存 (当前共 %d 个应用)", len(gs.apps))
 
 	// 设置 Git 钩子
+	gs.logger.Debugf("  设置 Git 钩子...")
 	if err := gs.setupGitHooks(app); err != nil {
 		gs.logger.Warnf("设置 Git 钩子失败: %v", err)
+	} else {
+		gs.logger.Infof("  ✓ Git 钩子已设置")
 	}
 
 	// 创建日志流
+	gs.logger.Debugf("  创建日志流...")
 	if err := gs.logStreamManager.CreateStreamForApp(appName, app.CurrentLog); err != nil {
 		gs.logger.Warnf("创建日志流失败: %v", err)
+	} else {
+		gs.logger.Infof("  ✓ 日志流已创建")
 	}
 
 	// 保存应用信息
+	gs.logger.Infof("  💾 保存应用信息到文件...")
 	if err := gs.saveApps(); err != nil {
+		gs.logger.Errorf("❌ 保存应用信息失败: %v", err)
 		return nil, fmt.Errorf("保存应用信息失败: %w", err)
 	}
+	gs.logger.Infof("  ✓ 应用信息已保存")
 
-	gs.logger.Infof("应用 %s 已创建，域名: %s，端口: %d", appName, domain, port)
+	gs.logger.Infof("✅ 应用 %s 创建完成！域名: %s, 端口: %d, Git: %s",
+		appName, domain, port, gitURL)
 	return app, nil
 }
 
@@ -1493,11 +1519,10 @@ func (gs *GitServer) releasePort(port int) {
 }
 
 // isPortInUse 检查端口是否被使用
+// 注意：此方法假设调用者已经持有锁
 func (gs *GitServer) isPortInUse(port int) bool {
 	// 简化实现：检查所有应用是否使用了该端口
-	gs.mutex.RLock()
-	defer gs.mutex.RUnlock()
-
+	// 不需要加锁，因为调用者（CreateApp）已经持有 gs.mutex.Lock()
 	for _, app := range gs.apps {
 		if app.Port == port {
 			return true
@@ -1607,6 +1632,11 @@ func (gs *GitServer) loadApps() error {
 
 // saveApps 保存应用
 func (gs *GitServer) saveApps() error {
+	// 确保目录存在
+	if err := os.MkdirAll(gs.config.Runners.Git.ReposDir, 0755); err != nil {
+		return fmt.Errorf("创建应用目录失败: %w", err)
+	}
+
 	appsFile := filepath.Join(gs.config.Runners.Git.ReposDir, "apps.json")
 	data, err := json.MarshalIndent(gs.apps, "", "  ")
 	if err != nil {
@@ -1617,6 +1647,7 @@ func (gs *GitServer) saveApps() error {
 		return fmt.Errorf("写入应用文件失败: %w", err)
 	}
 
+	gs.logger.Infof("应用数据已保存到 %s (%d 个应用)", appsFile, len(gs.apps))
 	return nil
 }
 

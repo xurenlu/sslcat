@@ -24,9 +24,42 @@ func NewGitServerAPI(gs *runner.GitServer) *GitServerAPI {
 	}
 }
 
+// HandleApps 处理应用列表的GET和POST请求
+func (api *GitServerAPI) HandleApps(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case "GET":
+		api.ListApps(w, r)
+	case "POST":
+		api.CreateApp(w, r)
+	default:
+		api.writeError(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
 // ListApps 列出所有应用
 func (api *GitServerAPI) ListApps(w http.ResponseWriter, r *http.Request) {
+	if api.server == nil {
+		api.logger.Warn("Git Deploy 服务未启用，返回空应用列表")
+		response := map[string]interface{}{
+			"success": true,
+			"data":    []interface{}{},
+			"count":   0,
+		}
+		api.writeJSON(w, response)
+		return
+	}
+
 	apps := api.server.ListApps()
+	api.logger.Infof("获取应用列表: 共 %d 个应用", len(apps))
+
+	// 输出应用详情
+	if len(apps) > 0 {
+		for _, app := range apps {
+			api.logger.Debugf("  - %s (状态: %s, 域名: %s)", app.Name, app.Status, app.Domain)
+		}
+	} else {
+		api.logger.Info("  当前没有应用")
+	}
 
 	response := map[string]interface{}{
 		"success": true,
@@ -68,21 +101,42 @@ func (api *GitServerAPI) CreateApp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		api.logger.Errorf("解析创建应用请求失败: %v", err)
 		api.writeError(w, "解析请求失败: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	api.logger.Infof("开始创建应用: %s (AutoSSL: %v)", req.Name, req.AutoSSL)
+
 	// 验证必填字段
 	if req.Name == "" {
+		api.logger.Warn("应用名称为空")
 		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
 		return
 	}
 
-	app, err := api.server.CreateApp(req.Name)
-	if err != nil {
-		api.writeError(w, "创建应用失败: "+err.Error(), http.StatusInternalServerError)
+	// 检查 Git 服务器是否为 nil（未启用）
+	if api.server == nil {
+		api.logger.Error("Git Deploy 服务未启用，无法创建应用")
+		api.writeError(w, "Git Deploy 服务未启用，请在配置文件中启用 runners.git.enabled", http.StatusServiceUnavailable)
 		return
 	}
+
+	api.logger.Infof("调用 GitServer.CreateApp(%s)...", req.Name)
+	app, err := api.server.CreateApp(req.Name)
+	if err != nil {
+		api.logger.Errorf("创建应用 %s 失败: %v", req.Name, err)
+		// 提供更友好的错误消息
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "目录") || strings.Contains(errMsg, "directory") {
+			errMsg = "创建应用目录失败，请检查 runners.git.repos_dir 配置和目录权限: " + errMsg
+		}
+		api.writeError(w, "创建应用失败: "+errMsg, http.StatusInternalServerError)
+		return
+	}
+
+	api.logger.Infof("✅ 应用 %s 创建成功: 域名=%s, 端口=%d, Git地址=%s",
+		app.Name, app.Domain, app.Port, app.GitURL)
 
 	response := map[string]interface{}{
 		"success": true,
@@ -91,6 +145,7 @@ func (api *GitServerAPI) CreateApp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	api.writeJSON(w, response)
+	api.logger.Infof("响应已发送: 应用 %s 创建成功", req.Name)
 }
 
 // DeleteApp 删除应用
@@ -376,10 +431,30 @@ func (api *GitServerAPI) GetAppLogFiles(w http.ResponseWriter, r *http.Request) 
 // GetAppLogsStream 获取应用实时日志流 (SSE)
 func (api *GitServerAPI) GetAppLogsStream(w http.ResponseWriter, r *http.Request) {
 	appName := r.URL.Query().Get("app")
+	api.logger.Infof("📡 SSE 日志流请求: app=%s, 来自 %s", appName, r.RemoteAddr)
+
 	if appName == "" {
+		api.logger.Warn("SSE 请求缺少应用名称参数")
 		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
 		return
 	}
+
+	// 检查 Git 服务器是否启用
+	if api.server == nil {
+		api.logger.Error("❌ Git Deploy 服务未启用，无法建立 SSE 连接")
+		api.writeError(w, "Git Deploy 服务未启用", http.StatusServiceUnavailable)
+		return
+	}
+
+	// 检查应用是否存在
+	_, err := api.server.GetApp(appName)
+	if err != nil {
+		api.logger.Errorf("❌ 应用 %s 不存在: %v", appName, err)
+		api.writeError(w, "应用不存在: "+err.Error(), http.StatusNotFound)
+		return
+	}
+
+	api.logger.Infof("✅ 建立 SSE 连接: app=%s", appName)
 
 	// 使用日志流管理器处理实时日志连接 (SSE)
 	api.server.GetLogStreamManager().HandleWebSocketLogs(w, r, appName)
@@ -388,10 +463,30 @@ func (api *GitServerAPI) GetAppLogsStream(w http.ResponseWriter, r *http.Request
 // GetAppLogsStreamWS 获取应用实时日志流 (WebSocket)
 func (api *GitServerAPI) GetAppLogsStreamWS(w http.ResponseWriter, r *http.Request) {
 	appName := r.URL.Query().Get("app")
+	api.logger.Infof("📡 WebSocket 日志流请求: app=%s, 来自 %s", appName, r.RemoteAddr)
+
 	if appName == "" {
+		api.logger.Warn("WebSocket 请求缺少应用名称参数")
 		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
 		return
 	}
+
+	// 检查 Git 服务器是否启用
+	if api.server == nil {
+		api.logger.Error("❌ Git Deploy 服务未启用，无法建立 WebSocket 连接")
+		api.writeError(w, "Git Deploy 服务未启用", http.StatusServiceUnavailable)
+		return
+	}
+
+	// 检查应用是否存在
+	_, err := api.server.GetApp(appName)
+	if err != nil {
+		api.logger.Errorf("❌ 应用 %s 不存在: %v", appName, err)
+		api.writeError(w, "应用不存在: "+err.Error(), http.StatusNotFound)
+		return
+	}
+
+	api.logger.Infof("✅ 建立 WebSocket 连接: app=%s", appName)
 
 	// 使用日志流管理器处理 WebSocket 日志连接
 	api.server.GetLogStreamManager().HandleWebSocketLogsWS(w, r, appName)

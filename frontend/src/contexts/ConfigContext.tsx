@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { updateApiBaseURL } from '../utils/api'
 
 // 常量定义
-const FALLBACK_ADMIN_PREFIX = '/sslcat-panel' // 仅作为最后的备用选项
+const FALLBACK_ADMIN_PREFIX = '/sslcat-panel2' // 仅作为最后的备用选项
 const ADMIN_PREFIX_STORAGE_KEY = 'adminPrefix'
 
 interface ConfigContextType {
@@ -182,6 +182,9 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
       setIsLoading(true)
       setError(null)
       
+      // 检测是否在开发模式（Vite dev server）
+      const isDevelopment = window.location.port === '9980'
+      
       // 1. 最高优先级：从当前URL检测前缀
       const urlPrefix = detectPrefixFromURL()
       
@@ -190,6 +193,15 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
       
       // 3. 最低优先级：使用备用前缀
       const fallbackPrefix = FALLBACK_ADMIN_PREFIX
+      
+      // 在开发模式下且URL中没有前缀时，直接使用 fallback 或 localStorage
+      if (isDevelopment && !urlPrefix) {
+        const devPrefix = storedPrefix || fallbackPrefix
+        console.log('开发模式：直接使用 admin prefix:', devPrefix)
+        updatePrefix(devPrefix)
+        setIsLoading(false)
+        return
+      }
       
       // 按优先级尝试前缀
       const prefixesToTry = [urlPrefix, storedPrefix, fallbackPrefix].filter(Boolean) as string[]

@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { Box, Spinner, Center, Text } from '@chakra-ui/react'
 import { LanguageProvider } from './hooks/useLanguage'
 import { ConfigProvider, useConfig } from './contexts/ConfigContext'
@@ -43,6 +43,9 @@ const AppRoutes: React.FC = () => {
 
   return (
     <Routes>
+      {/* 根路径重定向到 admin prefix */}
+      <Route path="/" element={<Navigate to={`${adminPrefix}/dashboard`} replace />} />
+      
       {/* 登录页面不需要认证 */}
       <Route path={`${adminPrefix}/login`} element={<Login />} />
       

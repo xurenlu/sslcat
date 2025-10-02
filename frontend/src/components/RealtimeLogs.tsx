@@ -124,9 +124,16 @@ const RealtimeLogs: React.FC<RealtimeLogsProps> = ({
 
     // 构建 WebSocket URL
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const host = window.location.host
+    
+    // 在开发模式下，WebSocket 需要直接连接到后端端口（绕过 Vite 代理）
+    // 因为 Vite 的代理 ResponseWriter 不支持 Hijacker 接口
+    const isDevelopment = window.location.port === '9980'
+    const host = isDevelopment ? `${window.location.hostname}:80` : window.location.host
+    
     const path = buildApiPath(adminPrefix, `/api/git-server/logs/stream-ws?app=${appName}`)
     const url = `${protocol}//${host}${path}`
+    
+    console.log('WebSocket URL:', url, '(开发模式:', isDevelopment, ')')
 
     const ws = new WebSocket(url)
 
@@ -187,10 +194,28 @@ const RealtimeLogs: React.FC<RealtimeLogsProps> = ({
           
           case 'connected':
             console.log('WebSocket connection established:', message.message)
+            toast({
+              title: 'WebSocket 已连接',
+              description: message.message,
+              status: 'success',
+              duration: 2000,
+              isClosable: true,
+            })
             break
           
           case 'error':
             console.error('WebSocket error:', message.error)
+            toast({
+              title: 'WebSocket 错误',
+              description: message.error || '未知错误',
+              status: 'error',
+              duration: 5000,
+              isClosable: true,
+            })
+            // 如果是日志流不存在的错误，停止重连
+            if (message.error && message.error.includes('日志流不存在')) {
+              stopStreaming()
+            }
             break
         }
       } catch (error) {
@@ -201,12 +226,25 @@ const RealtimeLogs: React.FC<RealtimeLogsProps> = ({
     ws.onerror = (error) => {
       console.error('WebSocket error:', error)
       setIsConnected(false)
+      // onerror 后通常会触发 onclose，所以这里不重复提示
     }
 
     ws.onclose = (event) => {
       console.log('WebSocket closed', event.code, event.reason)
       setIsConnected(false)
       setIsStreaming(false)
+      
+      // 只在非正常关闭时提示错误
+      if (event.code !== 1000 && event.code !== 1005) {
+        const reason = event.reason || `连接关闭 (代码: ${event.code})`
+        toast({
+          title: 'WebSocket 连接断开',
+          description: reason,
+          status: 'warning',
+          duration: 4000,
+          isClosable: true,
+        })
+      }
       
       // 自动重连（只在主动连接时重连，不在手动断开时重连）
       if (shouldReconnectRef.current) {

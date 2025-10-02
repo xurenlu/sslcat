@@ -340,7 +340,22 @@ const GitServerManagement: React.FC = () => {
       }
       const configJson = await configResponse.json()
       if (configJson?.data) {
-        setConfig(configJson.data)
+        // 转换后端返回的字段命名（下划线）为前端使用的驼峰命名
+        const backendConfig = configJson.data
+        setConfig({
+          enabled: backendConfig.enabled,
+          port: backendConfig.port,
+          webhook: backendConfig.webhook,
+          defaultBranch: backendConfig.defaultBranch || backendConfig.default_branch,
+          autoSSL: backendConfig.autoSSL ?? backendConfig.auto_ssl,
+          domainSuffix: backendConfig.domainSuffix || backendConfig.domain_suffix,
+          portRange: backendConfig.portRange || backendConfig.port_range || [8000, 9000],
+          welcomeMessage: backendConfig.welcomeMessage || backendConfig.welcome_message,
+          sslEmail: backendConfig.sslEmail || backendConfig.ssl_email,
+          defaultStrategy: backendConfig.defaultStrategy || backendConfig.default_strategy,
+          buildTimeout: backendConfig.buildTimeout ?? backendConfig.build_timeout,
+          autoDomain: backendConfig.autoDomain ?? backendConfig.auto_domain,
+        })
       }
       
       setLoading(false)
@@ -394,15 +409,33 @@ const GitServerManagement: React.FC = () => {
 
         // 如果创建成功，显示Git推送指令提示
         setTimeout(() => {
+          const gitCommands = `git remote add sslcat git@${window.location.hostname}:${newApp.name}.git
+git push sslcat main`
+          
           toast({
             title: '推送代码到应用',
             description: (
               <Box fontSize="sm">
                 <Text mb={2}>在您的项目目录中执行：</Text>
-                <Code display="block" p={2} fontSize="xs">
-                  git remote add sslcat git@{window.location.hostname}:{newApp.name}.git<br/>
-                  git push sslcat main
-                </Code>
+                <HStack spacing={2} align="stretch">
+                  <Code display="block" p={2} fontSize="xs" flex={1} whiteSpace="pre">
+                    {gitCommands}
+                  </Code>
+                  <IconButton
+                    aria-label="复制命令"
+                    icon={<Icon as={FiCopy} />}
+                    size="sm"
+                    onClick={() => {
+                      navigator.clipboard.writeText(gitCommands)
+                      toast({
+                        title: '已复制到剪贴板',
+                        status: 'success',
+                        duration: 2000,
+                        isClosable: true,
+                      })
+                    }}
+                  />
+                </HStack>
               </Box>
             ),
             status: 'info',
@@ -546,12 +579,28 @@ const GitServerManagement: React.FC = () => {
 
   const handleUpdateConfig = async () => {
     try {
+      // 转换前端的驼峰命名为后端需要的下划线命名
+      const backendConfig = {
+        enabled: config.enabled,
+        port: config.port,
+        webhook: config.webhook,
+        default_branch: config.defaultBranch,
+        auto_ssl: config.autoSSL,
+        domain_suffix: config.domainSuffix,
+        port_range: config.portRange,
+        welcome_message: config.welcomeMessage,
+        ssl_email: config.sslEmail,
+        default_strategy: config.defaultStrategy,
+        build_timeout: config.buildTimeout,
+        auto_domain: config.autoDomain,
+      }
+      
       const response = await fetch(buildApiPath(adminPrefix, '/git-server/config'), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(config),
+        body: JSON.stringify(backendConfig),
       })
       
       if (response.ok) {
