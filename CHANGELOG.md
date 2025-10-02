@@ -1,3 +1,19 @@
+## [1.3.5-rc1] - 2025-01-02
+
+### Fixed
+- 🔧 **证书下载功能**: 修复SSL管理页面证书下载功能，现在可以真正下载证书文件到本地
+- 📁 **文件下载实现**: 前端使用临时a标签触发浏览器下载，支持cert、key、bundle三种文件类型
+- 🛡️ **错误处理增强**: 后端添加文件存在性检查，文件不存在时返回404错误和友好提示
+- 📋 **HTTP头优化**: 设置正确的Content-Type和Content-Disposition头，确保浏览器正确处理下载
+
+### Technical
+- 前端downloadCertificate函数实现真正的API调用
+- 后端handleSSLDownload添加os.Stat文件存在检查
+- 支持动态adminPrefix路径构建
+- 改进用户反馈，下载成功时显示绿色状态提示
+
+---
+
 ## [1.3.4] - 2025-01-02
 
 ### Added
