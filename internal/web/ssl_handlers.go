@@ -210,7 +210,16 @@ func (s *Server) handleSSLDownload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid type", http.StatusBadRequest)
 		return
 	}
+	
+	// 检查文件是否存在
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		s.log.Warnf("Certificate file not found: %s", path)
+		http.Error(w, "certificate file not found", http.StatusNotFound)
+		return
+	}
+	
 	w.Header().Set("Content-Disposition", "attachment; filename="+filename)
+	w.Header().Set("Content-Type", "application/octet-stream")
 	http.ServeFile(w, r, path)
 }
 

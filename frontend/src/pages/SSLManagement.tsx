@@ -104,11 +104,23 @@ const SSLManagement: React.FC = () => {
 
   const downloadCertificate = async (domain: string) => {
     try {
-      // TODO: 实际的 API 调用
+      const effectivePrefix = adminPrefix || '/sslcat-panel2'
+      
+      // 创建下载链接并触发下载
+      const downloadUrl = `${effectivePrefix}/ssl/download?domain=${encodeURIComponent(domain)}&type=cert`
+      
+      // 创建一个临时的 a 标签来触发下载
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = `${domain}.crt`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
       toast({
         title: '证书下载已启动',
         description: `正在下载域名 ${domain} 的证书`,
-        status: 'info',
+        status: 'success',
         duration: 3000,
         isClosable: true,
       })
