@@ -101,6 +101,7 @@ interface GitServerConfig {
 }
 
 const GitServerManagement: React.FC = () => {
+  const { adminPrefix } = useConfig()
   const [apps, setApps] = useState<GitApp[]>([])
   const [sshKeys, setSSHKeys] = useState<SSHKey[]>([])
   const [config, setConfig] = useState<GitServerConfig>({
@@ -144,21 +145,21 @@ const GitServerManagement: React.FC = () => {
     setLoading(true)
     try {
       // 获取Git应用列表
-      const appsResponse = await fetch('/sslcat-panel/api/git-server/apps')
+      const appsResponse = await fetch(buildApiPath(adminPrefix, '/git-server/apps'))
       const appsData = appsResponse.ok ? await appsResponse.json() : []
       // 确保apps是数组
       const apps = Array.isArray(appsData) ? appsData : []
       setApps(apps)
       
       // 获取SSH密钥列表
-      const keysResponse = await fetch('/sslcat-panel/api/git-server/ssh-keys')
+      const keysResponse = await fetch(buildApiPath(adminPrefix, '/git-server/ssh-keys'))
       const keysData = keysResponse.ok ? await keysResponse.json() : []
       // 确保sshKeys是数组
       const sshKeys = Array.isArray(keysData) ? keysData : []
       setSSHKeys(sshKeys)
       
       // 获取服务器配置
-      const configResponse = await fetch('/sslcat-panel/api/git-server/config')
+      const configResponse = await fetch(buildApiPath(adminPrefix, '/git-server/config'))
       if (configResponse.ok) {
         const serverConfig = await configResponse.json()
         setConfig(serverConfig)
@@ -176,7 +177,7 @@ const GitServerManagement: React.FC = () => {
 
   const handleCreateApp = async () => {
     try {
-      const response = await fetch('/sslcat-panel/api/git-server/apps', {
+      const response = await fetch(buildApiPath(adminPrefix, '/git-server/apps'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -211,7 +212,7 @@ const GitServerManagement: React.FC = () => {
 
   const handleDeleteApp = async (id: string) => {
     try {
-      const response = await fetch(`/sslcat-panel/api/git-server/apps/${id}`, {
+      const response = await fetch(buildApiPath(adminPrefix, `/git-server/apps/${id}`), {
         method: 'DELETE',
       })
       
@@ -239,7 +240,7 @@ const GitServerManagement: React.FC = () => {
 
   const handleDeployApp = async (id: string) => {
     try {
-      const response = await fetch(`/sslcat-panel/api/git-server/apps/${id}/deploy`, {
+      const response = await fetch(buildApiPath(adminPrefix, `/git-server/apps/${id}/deploy`), {
         method: 'POST',
       })
       
@@ -267,7 +268,7 @@ const GitServerManagement: React.FC = () => {
 
   const handleAddSSHKey = async () => {
     try {
-      const response = await fetch('/sslcat-panel/api/git-server/ssh-keys', {
+      const response = await fetch(buildApiPath(adminPrefix, '/git-server/ssh-keys'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -302,7 +303,7 @@ const GitServerManagement: React.FC = () => {
 
   const handleDeleteSSHKey = async (id: string) => {
     try {
-      const response = await fetch(`/sslcat-panel/api/git-server/ssh-keys/${id}`, {
+      const response = await fetch(buildApiPath(adminPrefix, `/git-server/ssh-keys/${id}`), {
         method: 'DELETE',
       })
       
@@ -330,7 +331,7 @@ const GitServerManagement: React.FC = () => {
 
   const handleUpdateConfig = async () => {
     try {
-      const response = await fetch('/sslcat-panel/api/git-server/config', {
+      const response = await fetch(buildApiPath(adminPrefix, '/git-server/config'), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
