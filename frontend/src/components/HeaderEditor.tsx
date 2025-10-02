@@ -39,13 +39,9 @@ const HeaderEditor: React.FC<HeaderEditorProps> = ({ value, onChange, placeholde
   }
 
   const addEmpty = () => {
-    const nextEntries = [...currentEntries, ['', '']]
-    const next: Record<string, string> = {}
-    nextEntries.forEach(([k, v]) => {
-      if (k.trim()) {
-        next[k] = v
-      }
-    })
+    const next = { ...value }
+    // 添加一个临时的空条目，使用特殊键名
+    next['__temp__' + Date.now()] = ''
     onChange(next)
   }
 
