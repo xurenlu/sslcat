@@ -31,16 +31,6 @@ const LanguageContext = createContext<{
 
 // 语言提供者组件
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const languageHook = useLanguage()
-  
-  return React.createElement(
-    LanguageContext.Provider,
-    { value: languageHook },
-    children
-  )
-}
-
-export const useLanguage = () => {
   const [currentLanguage, setCurrentLanguage] = useState<string>('zh-CN')
   const [translation, setTranslation] = useState<Translation>(getTranslation('zh-CN'))
 
@@ -64,6 +54,7 @@ export const useLanguage = () => {
   }, [])
 
   const changeLanguage = (languageCode: string) => {
+    console.log('Language changing from', currentLanguage, 'to', languageCode)
     setCurrentLanguage(languageCode)
     setTranslation(getTranslation(languageCode))
     localStorage.setItem('withssl-language', languageCode)
@@ -79,13 +70,28 @@ export const useLanguage = () => {
     return supportedLanguages.find(lang => lang.code === currentLanguage) || supportedLanguages[0]
   }
 
-  return {
+  const contextValue = {
     currentLanguage,
     changeLanguage,
     getCurrentLanguage,
     supportedLanguages,
     t: translation,
   }
+  
+  return React.createElement(
+    LanguageContext.Provider,
+    { value: contextValue },
+    children
+  )
+}
+
+// 使用语言上下文的 Hook
+export const useLanguage = () => {
+  const context = useContext(LanguageContext)
+  if (!context) {
+    throw new Error('useLanguage must be used within a LanguageProvider')
+  }
+  return context
 }
 
 // 使用翻译的 Hook
