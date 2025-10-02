@@ -12,6 +12,7 @@ import {
   Card,
   CardBody,
   HStack,
+  VStack,
   Badge,
   Icon,
   Flex,
@@ -46,6 +47,10 @@ interface ProxyRule {
   auth_users: Array<{username: string, password: string}>
   auth_session_timeout: number
   auth_cookie_domain: string
+  // Git部署服务标记
+  managed_by_git_deploy?: boolean
+  git_deploy_app_name?: string
+  git_deploy_app_id?: string
 }
 
 const ProxyList: React.FC = () => {
@@ -232,10 +237,17 @@ const ProxyList: React.FC = () => {
                 {rules.map((rule) => (
                   <Tr key={rule.domain}>
                     <Td>
-                      <HStack>
-                        <Icon as={FiGlobe} />
-                        <Text fontFamily="mono">{rule.domain}</Text>
-                      </HStack>
+                      <VStack align="start" spacing={1}>
+                        <HStack>
+                          <Icon as={FiGlobe} />
+                          <Text fontFamily="mono">{rule.domain}</Text>
+                        </HStack>
+                        {rule.managed_by_git_deploy && (
+                          <Badge colorScheme="teal" size="sm">
+                            🚀 Git部署: {rule.git_deploy_app_name}
+                          </Badge>
+                        )}
+                      </VStack>
                     </Td>
                     <Td>
                       <Text fontFamily="mono" fontSize="sm">

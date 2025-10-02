@@ -588,6 +588,11 @@ func (gs *GitServer) DeleteApp(appName string) error {
 		gs.logger.Warnf("删除应用目录失败: %v", err)
 	}
 
+	// 删除关联的代理规则
+	if err := gs.removeProxyRuleForApp(app); err != nil {
+		gs.logger.Warnf("删除应用 %s 的代理规则失败: %v", appName, err)
+	}
+
 	// 释放端口
 	gs.releasePort(app.Port)
 
@@ -1310,6 +1315,15 @@ func (gs *GitServer) handleDeploySuccess(app *GitApp) {
 	app.LastDeploy = time.Now()
 	gs.mutex.Unlock()
 
+	// 自动添加代理规则
+	if app.Domain != "" && app.Port > 0 {
+		if err := gs.addProxyRuleForApp(app); err != nil {
+			gs.logger.Errorf("为应用 %s 添加代理规则失败: %v", app.Name, err)
+		} else {
+			gs.logger.Infof("已为应用 %s 自动添加代理规则: %s -> 127.0.0.1:%d", app.Name, app.Domain, app.Port)
+		}
+	}
+
 	gs.logger.Infof("应用 %s 部署成功", app.Name)
 }
 
@@ -1901,4 +1915,70 @@ func (gs *GitServer) WriteAppLog(appName, level, source, message string) error {
 	// 使用应用的日志目录
 	appLogManager := NewLogManager(app.LogsDir)
 	return appLogManager.WriteLog(appName, level, source, message)
+}
+
+// addProxyRuleForApp 为应用自动添加代理规则
+func (gs *GitServer) addProxyRuleForApp(app *GitApp) error {
+	// 检查代理规则是否已存在
+	for i, rule := range gs.config.Proxy.Rules {
+		// 如果已经存在该域名的规则
+		if rule.Domain == app.Domain {
+			// 如果是Git部署服务管理的规则，更新它
+			if rule.ManagedByGitDeploy && rule.GitDeployAppName == app.Name {
+				gs.config.Proxy.Rules[i].Target = "127.0.0.1"
+				gs.config.Proxy.Rules[i].Port = app.Port
+				gs.config.Proxy.Rules[i].Enabled = true
+				gs.logger.Infof("更新应用 %s 的代理规则", app.Name)
+				return gs.config.Save(gs.config.ConfigFile)
+			}
+			// 如果是手动创建的规则，不覆盖
+			gs.logger.Warnf("域名 %s 已存在代理规则，跳过自动添加", app.Domain)
+			return nil
+		}
+	}
+
+	// 创建新的代理规则
+	rule := config.ProxyRule{
+		Domain:             app.Domain,
+		Target:             "127.0.0.1",
+		Port:               app.Port,
+		Enabled:            true,
+		SSLOnly:            app.DeployConfig.SSL.Enabled,
+		ManagedByGitDeploy: true,
+		GitDeployAppName:   app.Name,
+		GitDeployAppID:     app.Name, // 使用应用名称作为ID
+	}
+
+	// 添加代理规则
+	gs.config.Proxy.Rules = append(gs.config.Proxy.Rules, rule)
+
+	// 保存配置
+	if err := gs.config.Save(gs.config.ConfigFile); err != nil {
+		return fmt.Errorf("保存配置失败: %w", err)
+	}
+
+	gs.logger.Infof("已为应用 %s 添加代理规则: %s -> 127.0.0.1:%d", app.Name, app.Domain, app.Port)
+	return nil
+}
+
+// removeProxyRuleForApp 删除应用的代理规则
+func (gs *GitServer) removeProxyRuleForApp(app *GitApp) error {
+	// 查找并删除该应用的代理规则
+	for i, rule := range gs.config.Proxy.Rules {
+		if rule.ManagedByGitDeploy && rule.GitDeployAppName == app.Name {
+			// 删除规则
+			gs.config.Proxy.Rules = append(gs.config.Proxy.Rules[:i], gs.config.Proxy.Rules[i+1:]...)
+			
+			// 保存配置
+			if err := gs.config.Save(gs.config.ConfigFile); err != nil {
+				return fmt.Errorf("保存配置失败: %w", err)
+			}
+			
+			gs.logger.Infof("已删除应用 %s 的代理规则", app.Name)
+			return nil
+		}
+	}
+	
+	gs.logger.Infof("应用 %s 没有关联的代理规则", app.Name)
+	return nil
 }

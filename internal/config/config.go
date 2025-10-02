@@ -184,6 +184,11 @@ type ProxyRule struct {
 	// 自定义头部配置
 	UpstreamRequestHeaders map[string]string `json:"upstream_request_headers,omitempty"`
 	ResponseHeaders        map[string]string `json:"response_headers,omitempty"`
+
+	// Git部署服务标记
+	ManagedByGitDeploy bool   `json:"managed_by_git_deploy"` // 是否由Git部署服务管理
+	GitDeployAppName   string `json:"git_deploy_app_name"`   // 关联的Git应用名称
+	GitDeployAppID     string `json:"git_deploy_app_id"`     // 关联的Git应用ID
 }
 
 // ProxyBackend 代理后端服务器
