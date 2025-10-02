@@ -39,6 +39,7 @@ interface DashboardStats {
   cachedProxies: number
   publicIP: string
   goVersion: string
+  version: string
 }
 
 const Dashboard: React.FC = () => {
@@ -47,6 +48,7 @@ const Dashboard: React.FC = () => {
     cachedProxies: 0,
     publicIP: '未知',
     goVersion: 'go1.21.0',
+    version: 'v1.0.0',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -79,6 +81,7 @@ const Dashboard: React.FC = () => {
         cachedProxies: data.cachedProxies || data.TotalRequests || data.total_requests || 0,
         publicIP: data.publicIP || data.PublicIP || '未知',
         goVersion: data.goVersion || 'go1.21.0',
+        version: data.version || data.Version || 'v1.0.0',
       }
       
       console.log('Dashboard processed stats:', processedStats)
@@ -282,7 +285,7 @@ const Dashboard: React.FC = () => {
                 </HStack>
                 <HStack justify="space-between">
                   <Text fontWeight="medium">版本:</Text>
-                  <Text>SSLcat v1.0.0</Text>
+                  <Text>SSLcat v{stats.version}</Text>
                 </HStack>
                 <HStack justify="space-between">
                   <Text fontWeight="medium">Go版本:</Text>

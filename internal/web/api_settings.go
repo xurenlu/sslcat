@@ -88,7 +88,7 @@ func (s *Server) handleAPISettings(w http.ResponseWriter, r *http.Request) {
 		},
 		"totp_enabled": s.config.Admin.EnableTOTP,
 		"server_info": map[string]interface{}{
-			"version":    "1.3.0",
+			"version":    s.version,
 			"build_time": time.Now().Format("2006-01-02 15:04:05"),
 		},
 	}

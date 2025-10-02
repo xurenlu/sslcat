@@ -1031,6 +1031,7 @@ func (s *Server) getSystemStats() map[string]interface{} {
 		"cachedProxies": proxyStats["total_requests"], // 使用总请求数
 		"publicIP":      s.fetchPublicIPv4(),
 		"goVersion":     runtime.Version(),
+		"version":       s.version, // 添加应用版本
 
 		// 保持向后兼容的大写字段
 		"ActiveRules":     len(s.config.Proxy.Rules),
@@ -1044,6 +1045,7 @@ func (s *Server) getSystemStats() map[string]interface{} {
 		"SSLCertificates": len(s.sslManager.GetCertificateList()),
 		"BlockedIPs":      len(s.securityManager.GetBlockedIPs()),
 		"PublicIP":        s.fetchPublicIPv4(),
+		"Version":         s.version, // 向后兼容的大写版本
 	}
 }
 
