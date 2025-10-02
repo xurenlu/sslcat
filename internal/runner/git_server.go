@@ -493,6 +493,11 @@ func (gs *GitServer) Start() error {
 		return fmt.Errorf("Git 不可用: %w", err)
 	}
 
+	// 尝试自动创建 git 用户（如果不存在）
+	if err := gs.createGitUser(); err != nil {
+		gs.logger.Warnf("创建 git 用户失败: %v，如果需要请手动创建: sudo useradd -r -s /bin/bash -m -d /home/git git", err)
+	}
+
 	// 设置 SSH 用户和目录
 	if err := gs.setupSSHUser(); err != nil {
 		gs.logger.Warnf("设置 SSH 用户失败: %v", err)
@@ -1751,22 +1756,30 @@ func (gs *GitServer) setupSSHUser() error {
 	return nil
 }
 
-// createGitUser 创建 git 用户
+// createGitUser 创建 git 用户（使用标准的 /home/git 目录）
 func (gs *GitServer) createGitUser() error {
 	// 检查用户是否已存在
 	cmd := exec.Command("id", "-u", gs.sshUser)
 	if err := cmd.Run(); err == nil {
-		gs.logger.Info("git 用户已存在")
+		gs.logger.Infof("git 用户已存在")
 		return nil
 	}
 
-	// 创建用户
-	cmd = exec.Command("useradd", "-r", "-s", "/bin/bash", "-m", "-d", gs.sshHomeDir, gs.sshUser)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("创建 git 用户失败: %w", err)
+	// 使用标准的 /home/git 作为 home 目录（最佳实践）
+	homeDir := "/home/git"
+
+	// 创建用户 - 需要 root 权限
+	cmd = exec.Command("useradd", "-r", "-s", "/bin/bash", "-m", "-d", homeDir, gs.sshUser)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// 检查是否是权限问题
+		if strings.Contains(string(output), "Permission denied") || strings.Contains(err.Error(), "permission") {
+			return fmt.Errorf("权限不足（需要 root/sudo 权限）: %w", err)
+		}
+		return fmt.Errorf("创建用户失败: %s, %w", string(output), err)
 	}
 
-	gs.logger.Info("git 用户创建成功")
+	gs.logger.Infof("git 用户创建成功，home 目录: %s", homeDir)
 	return nil
 }
 

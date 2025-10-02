@@ -140,11 +140,16 @@ type PushRecord struct {
 ### 1. 设置 SSH 环境
 
 ```bash
-# 1. 确保 git 用户存在
+# 1. 启动 SSLcat（会自动尝试创建 git 用户和设置 SSH 配置）
+./sslcat
+# 或者如果需要 root 权限自动创建用户：
+sudo ./sslcat
+
+# 如果自动创建失败，可以手动创建 git 用户：
 sudo useradd -r -s /bin/bash -m -d /home/git git
 
-# 2. 启动 SSLcat（会自动设置 SSH 配置）
-./sslcat
+# 2. 重启 sshd 服务（仅首次需要，使 SSH 配置生效）
+sudo systemctl restart sshd
 
 # 3. 添加 SSH 公钥
 curl -X POST http://localhost:8080/admin/api/git-server/ssh-key/add \
@@ -266,16 +271,22 @@ curl -X POST http://localhost:8080/admin/api/git-server/app/bind-key \
 
 ## 注意事项
 
-1. **SSH 服务器配置**: 需要重启 SSHD 以应用配置更改
+1. **Git 用户自动创建**: 
+   - ✅ 启动时会自动尝试创建 git 用户（使用标准的 `/home/git` 目录）
+   - ⚠️ 需要 root/sudo 权限才能自动创建
+   - 💡 如果权限不足，会显示友好提示，可手动创建后再启动
+
+2. **SSH 服务器配置**: 首次启用需要重启 SSHD 以应用配置更改
    ```bash
    sudo systemctl restart sshd
    ```
 
-2. **文件权限**: 确保 git 用户对仓库目录有正确的权限
+3. **文件权限**: 
+   - Git 用户 home: `/home/git`（标准位置）
+   - SSH 密钥目录: `./data/runners/keys/ssh`（SSLcat 管理）
+   - Git 仓库目录: `./data/runners/git`（SSLcat 管理）
 
-3. **防火墙**: 确保 SSH 端口（默认22）对外开放
-
-4. **Git 用户创建**: 首次运行时如果 git 用户不存在，需要手动创建
+4. **防火墙**: 确保 SSH 端口（默认22）对外开放
 
 ## 未来扩展
 

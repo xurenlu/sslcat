@@ -115,13 +115,47 @@ func (api *GitServerAPI) CreateApp(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
+## 自动创建 Git 用户 ✅
+
+**新增功能**：现在启动 Git Deploy 服务时会自动尝试创建 git 用户
+
+**实现方式**：
+- ✅ 在 `Start()` 方法中自动调用 `createGitUser()`
+- ✅ 使用标准的 `/home/git` 作为用户 home 目录（最佳实践）
+- ✅ 如果用户已存在则跳过创建
+- ✅ 如果权限不足会给出友好提示，建议手动创建
+
+**代码改进**：
+```go
+// Start() 方法中添加
+// 尝试自动创建 git 用户（如果不存在）
+if err := gs.createGitUser(); err != nil {
+    gs.logger.Warnf("创建 git 用户失败: %v，如果需要请手动创建: sudo useradd -r -s /bin/bash -m -d /home/git git", err)
+}
+
+// createGitUser() 改进
+func (gs *GitServer) createGitUser() error {
+    // 使用标准的 /home/git 作为 home 目录（最佳实践）
+    homeDir := "/home/git"
+    cmd = exec.Command("useradd", "-r", "-s", "/bin/bash", "-m", "-d", homeDir, gs.sshUser)
+    // ... 错误处理
+}
+```
+
 ## 使用流程
 
 ### 1. 启用 Git Deploy（仅需一次）
 
 ```bash
 # 1. 配置文件中启用 runners.git.enabled = true
-# 2. 重启后端服务
+# 2. 启动服务（会自动尝试创建 git 用户）
+./dev.sh backend
+
+# 如果看到权限不足的警告，需要用 sudo 启动：
+sudo ./sslcat
+
+# 或者手动创建 git 用户后再启动：
+sudo useradd -r -s /bin/bash -m -d /home/git git
 ./dev.sh backend
 ```
 
