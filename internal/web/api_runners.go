@@ -147,6 +147,41 @@ func (api *GitServerAPI) UpdateServerConfig(w http.ResponseWriter, r *http.Reque
 	api.writeJSON(w, response)
 }
 
+// UpdateAppEnv 更新应用环境变量
+func (api *GitServerAPI) UpdateAppEnv(w http.ResponseWriter, r *http.Request) {
+    appName := r.URL.Query().Get("name")
+    if appName == "" {
+        api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+        return
+    }
+
+    var req struct {
+        EnvVars map[string]string `json:"env_vars"`
+    }
+
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        api.writeError(w, "解析请求失败: "+err.Error(), http.StatusBadRequest)
+        return
+    }
+
+    if req.EnvVars == nil {
+        api.writeError(w, "env_vars 字段不能为空", http.StatusBadRequest)
+        return
+    }
+
+    if err := api.server.UpdateAppEnv(appName, req.EnvVars); err != nil {
+        api.writeError(w, "更新环境变量失败: "+err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+    response := map[string]interface{}{
+        "success": true,
+        "message": "环境变量已更新",
+    }
+
+    api.writeJSON(w, response)
+}
+
 // ==================== SSH 密钥管理 API ====================
 
 // ListSSHKeys 列出所有 SSH 密钥

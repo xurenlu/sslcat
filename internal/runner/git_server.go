@@ -381,7 +381,7 @@ func NewGitServer(cfg *config.Config) *GitServer {
 	}
 	dockerRegistry := NewDockerRegistry(dockerRegistryConfig)
 
-	return &GitServer{
+	gs := &GitServer{
 		config:             cfg,
 		apps:               make(map[string]*GitApp),
 		logger:             logrus.WithField("component", "git_server").Logger,
@@ -394,6 +394,31 @@ func NewGitServer(cfg *config.Config) *GitServer {
 		logStreamManager:   logStreamManager,
 		dockerRegistry:     dockerRegistry,
 	}
+
+	// 加载持久化的应用和配置
+	if err := gs.loadApps(); err != nil {
+		gs.logger.Warnf("加载应用列表失败: %v", err)
+	}
+	if err := gs.loadServerConfig(); err != nil {
+		gs.logger.Warnf("加载服务器配置失败: %v", err)
+	}
+
+	// 确保应用拥有环境变量映射
+	gs.mutex.Lock()
+	for _, app := range gs.apps {
+		if app.EnvVars == nil {
+			app.EnvVars = make(map[string]string)
+		}
+		if app.DeployConfig == nil {
+			app.DeployConfig = &AppDeployConfig{}
+		}
+		if app.DeployConfig.EnvVars == nil {
+			app.DeployConfig.EnvVars = make(map[string]string)
+		}
+	}
+	gs.mutex.Unlock()
+
+	return gs
 }
 
 // Start 启动 Git 服务器
@@ -559,6 +584,9 @@ func (gs *GitServer) ListApps() []*GitApp {
 	apps := make([]*GitApp, 0, len(gs.apps))
 	for _, app := range gs.apps {
 		appCopy := *app
+		if appCopy.EnvVars == nil {
+			appCopy.EnvVars = make(map[string]string)
+		}
 		apps = append(apps, &appCopy)
 	}
 
@@ -606,6 +634,44 @@ func (gs *GitServer) DeleteApp(appName string) error {
 
 	gs.logger.Infof("应用 %s 已删除", appName)
 	return nil
+}
+
+// UpdateAppEnv 更新应用环境变量
+func (gs *GitServer) UpdateAppEnv(appName string, envVars map[string]string) error {
+    gs.mutex.Lock()
+    defer gs.mutex.Unlock()
+
+    app, exists := gs.apps[appName]
+    if !exists {
+        return fmt.Errorf("应用 %s 不存在", appName)
+    }
+
+    if envVars == nil {
+        envVars = make(map[string]string)
+    }
+
+    // 更新环境变量
+    app.EnvVars = envVars
+    if app.DeployConfig == nil {
+        app.DeployConfig = &AppDeployConfig{}
+    }
+    if app.DeployConfig.EnvVars == nil {
+        app.DeployConfig.EnvVars = make(map[string]string)
+    }
+    // 清空旧的再赋值，避免引用共享导致的问题
+    for k := range app.DeployConfig.EnvVars {
+        delete(app.DeployConfig.EnvVars, k)
+    }
+    for k, v := range envVars {
+        app.DeployConfig.EnvVars[k] = v
+    }
+
+    if err := gs.saveApps(); err != nil {
+        return fmt.Errorf("保存应用信息失败: %w", err)
+    }
+
+    gs.logger.Infof("应用 %s 环境变量已更新", appName)
+    return nil
 }
 
 // ==================== Git 推送处理 ====================

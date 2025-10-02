@@ -1,3 +1,74 @@
+      <Modal isOpen={isEnvModalOpen} onClose={closeEnvModal} size="xl">
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>{envEditorApp ? `环境变量：${envEditorApp.name}` : '环境变量'}</ModalHeader>
+          <ModalCloseButton disabled={savingEnv} />
+          <ModalBody>
+            <VStack spacing={4} align="stretch">
+              <Alert status="info" variant="left-accent">
+                <AlertIcon />
+                <Box>
+                  <AlertTitle fontSize="sm">提示</AlertTitle>
+                  <AlertDescription fontSize="sm">
+                    环境变量将保存至Git部署配置中，在下一次部署时自动注入容器。未填写变量名的行会被忽略。
+                  </AlertDescription>
+                </Box>
+              </Alert>
+              <VStack spacing={3} align="stretch">
+                {envVars.map((item, index) => (
+                  <HStack key={index} spacing={3} align="flex-start">
+                    <FormControl>
+                      <FormLabel fontSize="sm">变量名</FormLabel>
+                      <Input
+                        placeholder="如 NODE_ENV"
+                        value={item.key}
+                        onChange={(e) => updateEnvRow(index, 'key', e.target.value)}
+                        isDisabled={savingEnv}
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel fontSize="sm">变量值</FormLabel>
+                      <Input
+                        placeholder="变量值"
+                        value={item.value}
+                        onChange={(e) => updateEnvRow(index, 'value', e.target.value)}
+                        isDisabled={savingEnv}
+                      />
+                    </FormControl>
+                    <IconButton
+                      aria-label="删除"
+                      icon={<Icon as={FiTrash2} />}
+                      variant="ghost"
+                      colorScheme="red"
+                      mt={6}
+                      onClick={() => removeEnvRow(index)}
+                      isDisabled={savingEnv || envVars.length === 1}
+                    />
+                  </HStack>
+                ))}
+              </VStack>
+              <Button
+                leftIcon={<Icon as={FiPlus} />}
+                variant="ghost"
+                colorScheme="blue"
+                onClick={addEnvRow}
+                alignSelf="flex-start"
+                isDisabled={savingEnv}
+              >
+                新增变量
+              </Button>
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button onClick={closeEnvModal} mr={3} variant="ghost" isDisabled={savingEnv}>
+              取消
+            </Button>
+            <Button colorScheme="blue" onClick={saveEnvVars} isLoading={savingEnv}>
+              保存
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
 import React, { useState, useEffect } from 'react'
 import {
   Box,
@@ -63,6 +134,7 @@ import {
   FiTerminal,
   FiPackage,
   FiClock,
+  FiSliders,
 } from 'react-icons/fi'
 import { useConfig, buildPath, buildApiPath } from '../contexts/ConfigContext'
 import RealtimeLogs from '../components/RealtimeLogs'
@@ -81,6 +153,7 @@ interface GitApp {
   webhook: string
   autoSSL: boolean
   domain?: string
+  envVars?: Record<string, string>
 }
 
 interface SSHKey {
@@ -154,29 +227,125 @@ const GitServerManagement: React.FC = () => {
   })
   
   const [selectedApp, setSelectedApp] = useState<string>('')
+  const [isEnvModalOpen, setIsEnvModalOpen] = useState(false)
+  const [envEditorApp, setEnvEditorApp] = useState<GitApp | null>(null)
+  const [envVars, setEnvVars] = useState<Array<{ key: string; value: string }>>([
+    { key: '', value: '' },
+  ])
+  const [savingEnv, setSavingEnv] = useState(false)
+
+  const openEnvModal = (app: GitApp) => {
+    setEnvEditorApp(app)
+    const existingVars = (app as any).envVars || {}
+    const entries = Object.entries(existingVars).map(([key, value]) => ({ key, value: String(value ?? '') }))
+    setEnvVars(entries.length > 0 ? entries : [{ key: '', value: '' }])
+    setIsEnvModalOpen(true)
+  }
+
+  const closeEnvModal = () => {
+    setIsEnvModalOpen(false)
+    setEnvEditorApp(null)
+    setEnvVars([{ key: '', value: '' }])
+    setSavingEnv(false)
+  }
+
+  const addEnvRow = () => {
+    setEnvVars((prev) => [...prev, { key: '', value: '' }])
+  }
+
+  const updateEnvRow = (index: number, field: 'key' | 'value', value: string) => {
+    setEnvVars((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+    )
+  }
+
+  const removeEnvRow = (index: number) => {
+    setEnvVars((prev) => {
+      const next = prev.filter((_, i) => i !== index)
+      return next.length > 0 ? next : [{ key: '', value: '' }]
+    })
+  }
+
+  const saveEnvVars = async () => {
+    if (!envEditorApp) {
+      return
+    }
+
+    const filteredVars = envVars
+      .filter((item) => item.key.trim() !== '')
+      .reduce<Record<string, string>>((acc, item) => {
+        acc[item.key] = item.value
+        return acc
+      }, {})
+
+    try {
+      setSavingEnv(true)
+      const response = await fetch(
+        buildApiPath(adminPrefix, `/git-server/app/env?name=${encodeURIComponent(envEditorApp.name)}`),
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ env_vars: filteredVars }),
+        }
+      )
+
+      if (!response.ok) {
+        setSavingEnv(false)
+        throw new Error('更新环境变量失败')
+      }
+
+      toast({
+        title: '环境变量已更新',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      })
+
+      closeEnvModal()
+      refreshData()
+    } catch (error) {
+      setSavingEnv(false)
+      toast({
+        title: '保存失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+    }
+  }
 
   const refreshData = async () => {
     setLoading(true)
     try {
       // 获取Git应用列表
       const appsResponse = await fetch(buildApiPath(adminPrefix, '/git-server/apps'))
-      const appsData = appsResponse.ok ? await appsResponse.json() : []
-      // 确保apps是数组
-      const apps = Array.isArray(appsData) ? appsData : []
+      if (!appsResponse.ok) {
+        throw new Error('获取Git应用列表失败')
+      }
+      const appsJson = await appsResponse.json()
+      const apps = Array.isArray(appsJson?.data) ? appsJson.data : []
       setApps(apps)
       
       // 获取SSH密钥列表
       const keysResponse = await fetch(buildApiPath(adminPrefix, '/git-server/ssh-keys'))
-      const keysData = keysResponse.ok ? await keysResponse.json() : []
-      // 确保sshKeys是数组
-      const sshKeys = Array.isArray(keysData) ? keysData : []
+      if (!keysResponse.ok) {
+        throw new Error('获取SSH密钥失败')
+      }
+      const keysJson = await keysResponse.json()
+      const sshKeys = Array.isArray(keysJson?.data) ? keysJson.data : []
       setSSHKeys(sshKeys)
       
       // 获取服务器配置
       const configResponse = await fetch(buildApiPath(adminPrefix, '/git-server/config'))
-      if (configResponse.ok) {
-        const serverConfig = await configResponse.json()
-        setConfig(serverConfig)
+      if (!configResponse.ok) {
+        throw new Error('获取服务器配置失败')
+      }
+      const configJson = await configResponse.json()
+      if (configJson?.data) {
+        setConfig(configJson.data)
       }
       
       setLoading(false)
@@ -607,6 +776,15 @@ const GitServerManagement: React.FC = () => {
                                   域名: {app.domain}
                                 </Text>
                               )}
+                              <Button
+                                size="xs"
+                                leftIcon={<Icon as={FiSliders} />}
+                                variant="ghost"
+                                colorScheme="blue"
+                                onClick={() => openEnvModal(app)}
+                              >
+                                环境变量
+                              </Button>
                             </VStack>
                           </Td>
                           <Td>

@@ -616,6 +616,7 @@ func (s *Server) registerRunnerRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app", gitAPI.GetApp)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/create", gitAPI.CreateApp)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/delete", gitAPI.DeleteApp)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/env", gitAPI.UpdateAppEnv)
 
 	// 服务器配置 API 路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/config", gitAPI.GetServerConfig)
