@@ -80,6 +80,9 @@ const SidebarContent = () => {
   const location = useLocation()
   const t = useTranslation()
   const { adminPrefix } = useConfig()
+  
+  // 构建带有 adminPrefix 的 logo 路径
+  const logoSrc = `${adminPrefix}${logoImage}`
 
   const menuItems = [
     { name: t.navigation.dashboard, icon: FiHome, path: buildPath(adminPrefix, '/dashboard') },
@@ -111,7 +114,7 @@ const SidebarContent = () => {
             }}
           >
             <Image
-              src={logoImage}
+              src={logoSrc}
               alt="SSLcat Logo"
               boxSize="60px"
               objectFit="contain"
