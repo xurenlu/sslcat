@@ -75,6 +75,8 @@ import { useConfig, buildPath, buildApiPath } from '../contexts/ConfigContext'
 import RealtimeLogs from '../components/RealtimeLogs'
 import DockerImageManager from '../components/DockerImageManager'
 import DeployHistory from '../components/DeployHistory'
+import PushHistory from '../components/PushHistory'
+import SSHKeyBindings from '../components/SSHKeyBindings'
 
 interface GitApp {
   id: string
@@ -90,6 +92,8 @@ interface GitApp {
   domain?: string
   port?: number
   envVars?: Record<string, string>
+  allowed_keys?: string[]
+  push_history?: any[]
 }
 
 interface SSHKey {
@@ -849,6 +853,13 @@ const GitServerManagement: React.FC = () => {
                 <Text>部署历史</Text>
               </HStack>
             </Tab>
+            
+            <Tab>
+              <HStack>
+                <Icon as={FiGitBranch} />
+                <Text>推送记录</Text>
+              </HStack>
+            </Tab>
           </TabList>
 
           <TabPanels>
@@ -1113,6 +1124,42 @@ const GitServerManagement: React.FC = () => {
                   <Alert status="info">
                     <AlertIcon />
                     请先选择一个应用来查看部署历史
+                  </Alert>
+                )}
+              </VStack>
+            </TabPanel>
+            
+            {/* 推送记录 */}
+            <TabPanel>
+              <VStack spacing={4} align="stretch">
+                {selectedApp ? (
+                  <>
+                    <Card>
+                      <CardBody>
+                        <VStack align="stretch" spacing={4}>
+                          <Heading size="md">Git 推送历史</Heading>
+                          <PushHistory appName={selectedApp} limit={50} />
+                        </VStack>
+                      </CardBody>
+                    </Card>
+                    
+                    <Card>
+                      <CardBody>
+                        <VStack align="stretch" spacing={4}>
+                          <Heading size="md">SSH 密钥绑定</Heading>
+                          <SSHKeyBindings 
+                            appName={selectedApp}
+                            allowedKeys={apps.find(a => a.name === selectedApp)?.allowed_keys || []}
+                            onUpdate={refreshData}
+                          />
+                        </VStack>
+                      </CardBody>
+                    </Card>
+                  </>
+                ) : (
+                  <Alert status="info">
+                    <AlertIcon />
+                    请先选择一个应用来查看推送记录和管理SSH密钥绑定
                   </Alert>
                 )}
               </VStack>
