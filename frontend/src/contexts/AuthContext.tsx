@@ -29,11 +29,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const { adminPrefix } = useConfig()
   const navigate = useNavigate()
 
+  // 获取有效的 admin prefix，确保不为空
+  const getEffectivePrefix = () => {
+    return adminPrefix || '/sslcat-panel2'
+  }
+
   // 检查认证状态
   const checkAuth = async (): Promise<boolean> => {
     try {
-      console.log('检查认证状态，adminPrefix:', adminPrefix)
-      const response = await fetch(`${adminPrefix}/api/auth/me`, {
+      const effectivePrefix = getEffectivePrefix()
+      console.log('检查认证状态，adminPrefix:', adminPrefix, 'effectivePrefix:', effectivePrefix)
+      const response = await fetch(`${effectivePrefix}/api/auth/me`, {
         credentials: 'include', // 包含 cookies
       })
       
@@ -62,7 +68,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // 登录
   const login = async (username: string, password: string): Promise<boolean> => {
     try {
-      const response = await fetch(`${adminPrefix}/api/auth/login`, {
+      const effectivePrefix = getEffectivePrefix()
+      const response = await fetch(`${effectivePrefix}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -89,7 +96,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // 登出
   const logout = async () => {
     try {
-      await fetch(`${adminPrefix}/api/auth/logout`, {
+      const effectivePrefix = getEffectivePrefix()
+      await fetch(`${effectivePrefix}/api/auth/logout`, {
         method: 'POST',
         credentials: 'include',
       })
@@ -97,7 +105,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.error('Logout error:', error)
     } finally {
       setUser(null)
-      navigate(`${adminPrefix}/login`)
+      const effectivePrefix = getEffectivePrefix()
+      navigate(`${effectivePrefix}/login`)
     }
   }
 

@@ -83,8 +83,10 @@ const Notifications: React.FC = () => {
   const refreshNotifications = async () => {
     setLoading(true)
     try {
+      // 确保 adminPrefix 不为空，否则使用备用前缀
+      const effectivePrefix = adminPrefix || '/sslcat-panel2'
       // 使用安全日志API作为通知数据源
-      const response = await fetch(buildApiPath(adminPrefix, '/api/security-logs'), {
+      const response = await fetch(buildApiPath(effectivePrefix, '/api/security-logs'), {
         method: 'GET',
         credentials: 'include',
       })

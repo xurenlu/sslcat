@@ -86,8 +86,10 @@ const Security: React.FC = () => {
   const refreshData = async () => {
     setLoading(true)
     try {
+      // 确保 adminPrefix 不为空，否则使用备用前缀
+      const effectivePrefix = adminPrefix || '/sslcat-panel2'
       // 获取安全日志（暂时使用这个API）
-      const logsResponse = await fetch(buildApiPath(adminPrefix, '/api/security-logs'), {
+      const logsResponse = await fetch(buildApiPath(effectivePrefix, '/api/security-logs'), {
         method: 'GET',
         credentials: 'include',
       })
