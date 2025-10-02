@@ -2,18 +2,26 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { ApiResponse } from '../types'
 
 // 常量定义
-const DEFAULT_ADMIN_PREFIX = '/sslcat-panel2'
+const FALLBACK_ADMIN_PREFIX = '/sslcat-panel' // 仅作为最后的备用选项
 const ADMIN_PREFIX_STORAGE_KEY = 'adminPrefix'
 const API_TIMEOUT = 10000
 
 // 动态获取 API baseURL
 const getApiBaseURL = (): string => {
-  // 优先级：URL检测 > localStorage > 默认值
+  // 优先级：URL检测 > localStorage > 备用值
   const pathSegments = window.location.pathname.split('/').filter(Boolean)
-  const urlPrefix = pathSegments.length > 0 ? `/${pathSegments[0]}` : null
-  const storedPrefix = localStorage.getItem(ADMIN_PREFIX_STORAGE_KEY)
+  let urlPrefix = null
   
-  const prefix = urlPrefix || storedPrefix || DEFAULT_ADMIN_PREFIX
+  if (pathSegments.length > 0) {
+    const detectedPrefix = `/${pathSegments[0]}`
+    // 验证这看起来像一个admin prefix
+    if (detectedPrefix.includes('panel') || detectedPrefix.includes('admin') || detectedPrefix.includes('sslcat')) {
+      urlPrefix = detectedPrefix
+    }
+  }
+  
+  const storedPrefix = localStorage.getItem(ADMIN_PREFIX_STORAGE_KEY)
+  const prefix = urlPrefix || storedPrefix || FALLBACK_ADMIN_PREFIX
   return `${prefix}/api`
 }
 

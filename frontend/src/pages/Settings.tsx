@@ -27,7 +27,7 @@ import { useConfig } from '../contexts/ConfigContext'
 import { useTranslation } from '../hooks/useLanguage'
 
 const Settings: React.FC = () => {
-  const { adminPrefix, refreshConfig } = useConfig()
+  const { adminPrefix, refreshConfig, changeAdminPrefix } = useConfig()
   const t = useTranslation()
   const [settings, setSettings] = useState({
     // 基础设置
@@ -166,16 +166,31 @@ const Settings: React.FC = () => {
           isClosable: true,
         })
         
-        // 如果adminPrefix发生变化，刷新配置并重定向到新的前缀
+        // 如果adminPrefix发生变化，使用新的changeAdminPrefix函数
         if (settings.adminPrefix !== adminPrefix) {
-          // 先刷新配置
-          await refreshConfig()
-          // 然后重定向到新的URL
-          setTimeout(() => {
-            const newUrl = `${settings.adminPrefix}/settings`
-            console.log('Redirecting to new admin prefix:', newUrl)
-            window.location.href = newUrl
-          }, 1000)
+          await changeAdminPrefix(
+            settings.adminPrefix,
+            (newPrefix) => {
+              // 成功回调
+              toast({
+                title: 'Admin Prefix更改成功',
+                description: `管理面板前缀已更改为: ${newPrefix}，通知已发送`,
+                status: 'success',
+                duration: 5000,
+                isClosable: true,
+              })
+            },
+            (error) => {
+              // 错误回调
+              toast({
+                title: 'Admin Prefix更改失败',
+                description: error.message,
+                status: 'error',
+                duration: 5000,
+                isClosable: true,
+              })
+            }
+          )
         }
       } else {
         const errorData = await response.json()
