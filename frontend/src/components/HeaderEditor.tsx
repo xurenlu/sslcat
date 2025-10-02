@@ -51,7 +51,7 @@ const HeaderEditor: React.FC<HeaderEditorProps> = ({ value, onChange, placeholde
 
   return (
     <VStack spacing={3} align="stretch">
-      {entries.length === 0 && (
+      {currentEntries.length === 0 && (
         <Text fontSize="sm" color="gray.500">暂无自定义头，可手动添加或使用预设。</Text>
       )}
       {currentEntries.map(([key, val], index) => (

@@ -91,6 +91,7 @@ const SitesManagement: React.FC = () => {
     memoryLimit: '128M',
     maxExecutionTime: '30',
     fcgiAddr: 'unix:/var/run/php-fpm.sock',
+    headers: {} as Record<string, string>,
   })
 
   const refreshData = async () => {
@@ -300,6 +301,7 @@ const SitesManagement: React.FC = () => {
       memoryLimit: '128M',
       maxExecutionTime: '30',
       fcgiAddr: 'unix:/var/run/php-fpm.sock',
+      headers: {} as Record<string, string>,
     })
     setEditingSite(null)
   }
