@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/xurenlu/sslcat/internal/config"
-	"github.com/xurenlu/sslcat/internal/notification"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -581,21 +580,9 @@ func (s *Server) handleSettingsSave(w http.ResponseWriter, r *http.Request) {
 			s.setupRoutes()
 			// 清理模板缓存，确保使用新的配置
 			s.templateRenderer.ClearCache()
-			
-		// 发送前缀变更通知
-		if s.notificationIntegrator != nil {
-			notification := &notification.Notification{
-				Type:    "admin_prefix_changed",
-				Level:   notification.LevelInfo,
-				Title:   "管理前缀已更改",
-				Message: fmt.Sprintf("管理面板前缀已从 %s 更改为 %s。请使用新的URL访问管理面板。", oldPrefix, s.config.AdminPrefix),
-				Details: map[string]any{
-					"old_prefix": oldPrefix,
-					"new_prefix": s.config.AdminPrefix,
-				},
-			}
-			s.notificationIntegrator.GetManager().Send(notification)
-		}
+
+			// 发送前缀变更通知
+			s.sendAdminPrefixChangeNotification(oldPrefix, s.config.AdminPrefix)
 		}
 	}
 

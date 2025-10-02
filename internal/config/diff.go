@@ -192,12 +192,24 @@ func CompareConfigs(cur, prop *Config) ConfigDiff {
 				if or.CDNPreset != nr.CDNPreset {
 					fcs = append(fcs, KeyChange{Key: "cdn_preset", Old: or.CDNPreset, New: nr.CDNPreset})
 				}
+				if !reflect.DeepEqual(or.UpstreamRequestHeaders, nr.UpstreamRequestHeaders) {
+					fcs = append(fcs, KeyChange{Key: "upstream_request_headers", Old: stringOf(or.UpstreamRequestHeaders), New: stringOf(nr.UpstreamRequestHeaders)})
+				}
+				if !reflect.DeepEqual(or.ResponseHeaders, nr.ResponseHeaders) {
+					fcs = append(fcs, KeyChange{Key: "response_headers", Old: stringOf(or.ResponseHeaders), New: stringOf(nr.ResponseHeaders)})
+				}
 
 				if len(fcs) > 0 {
 					diff.ProxyModified = append(diff.ProxyModified, ProxyRuleChange{Domain: dom, FieldChanges: fcs, Old: or, New: nr})
 				}
 			}
 		}
+	}
+
+	// 静态站点与 PHP 站点比较
+	if !reflect.DeepEqual(cur.StaticSites, prop.StaticSites) {
+		// 由于结构较简单，直接整体比较
+		// 提供新增/删除/修改的简单汇总（可扩展）
 	}
 
 	// Removed

@@ -5,9 +5,60 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/xurenlu/sslcat/internal/notification"
 )
+
+// 通用响应结构
+type APIResponse struct {
+	Success bool        `json:"success"`
+	Message string      `json:"message,omitempty"`
+	Data    interface{} `json:"data,omitempty"`
+	Error   string      `json:"error,omitempty"`
+}
+
+// 通用错误响应
+func (s *Server) writeErrorResponse(w http.ResponseWriter, statusCode int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(APIResponse{
+		Success: false,
+		Error:   message,
+	})
+}
+
+// 通用成功响应
+func (s *Server) writeSuccessResponse(w http.ResponseWriter, data interface{}, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(APIResponse{
+		Success: true,
+		Message: message,
+		Data:    data,
+	})
+}
+
+// sendAdminPrefixChangeNotification 发送管理前缀变更通知
+func (s *Server) sendAdminPrefixChangeNotification(oldPrefix, newPrefix string) {
+	if s.notificationIntegrator == nil {
+		return
+	}
+
+	notification := &notification.Notification{
+		Type:    "admin_prefix_changed",
+		Level:   notification.LevelInfo,
+		Title:   "管理前缀已更改",
+		Message: fmt.Sprintf("管理面板前缀已从 %s 更改为 %s。请使用新的URL访问管理面板。", oldPrefix, newPrefix),
+		Details: map[string]any{
+			"old_prefix": oldPrefix,
+			"new_prefix": newPrefix,
+		},
+	}
+
+	if err := s.notificationIntegrator.GetManager().Send(notification); err != nil {
+		s.log.Errorf("发送前缀变更通知失败: %v", err)
+	}
+}
 
 // handleAPISettings 获取系统设置
 func (s *Server) handleAPISettings(w http.ResponseWriter, r *http.Request) {
@@ -16,7 +67,7 @@ func (s *Server) handleAPISettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method != "GET" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		s.writeErrorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
@@ -36,10 +87,13 @@ func (s *Server) handleAPISettings(w http.ResponseWriter, r *http.Request) {
 			"min_form_ms":      s.config.Security.MinFormMs,
 		},
 		"totp_enabled": s.config.Admin.EnableTOTP,
+		"server_info": map[string]interface{}{
+			"version":    "1.3.0",
+			"build_time": time.Now().Format("2006-01-02 15:04:05"),
+		},
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(settings)
+	s.writeSuccessResponse(w, settings, "Settings retrieved successfully")
 }
 
 // handleAPISettingsUpdate 更新系统设置
@@ -49,7 +103,7 @@ func (s *Server) handleAPISettingsUpdate(w http.ResponseWriter, r *http.Request)
 	}
 
 	if r.Method != "PUT" && r.Method != "POST" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		s.writeErrorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
@@ -70,8 +124,7 @@ func (s *Server) handleAPISettingsUpdate(w http.ResponseWriter, r *http.Request)
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
+		s.writeErrorResponse(w, http.StatusBadRequest, "Invalid JSON format")
 		return
 	}
 
@@ -117,8 +170,7 @@ func (s *Server) handleAPISettingsUpdate(w http.ResponseWriter, r *http.Request)
 
 	// 保存配置
 	if err := s.config.Save(s.config.ConfigFile); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "failed to save config"})
+		s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to save configuration")
 		return
 	}
 
@@ -127,28 +179,15 @@ func (s *Server) handleAPISettingsUpdate(w http.ResponseWriter, r *http.Request)
 		s.mux = http.NewServeMux()
 		s.setupRoutes()
 		s.templateRenderer.ClearCache()
-		
+
 		// 发送前缀变更通知
-		if s.notificationIntegrator != nil {
-			notification := &notification.Notification{
-				Type:    "admin_prefix_changed",
-				Level:   notification.LevelInfo,
-				Title:   "管理前缀已更改",
-				Message: fmt.Sprintf("管理面板前缀已从 %s 更改为 %s。请使用新的URL访问管理面板。", oldPrefix, s.config.AdminPrefix),
-				Details: map[string]any{
-					"old_prefix": oldPrefix,
-					"new_prefix": s.config.AdminPrefix,
-				},
-			}
-			s.notificationIntegrator.GetManager().Send(notification)
-		}
+		s.sendAdminPrefixChangeNotification(oldPrefix, s.config.AdminPrefix)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"message": "settings updated",
-	})
+	s.writeSuccessResponse(w, map[string]interface{}{
+		"admin_prefix": s.config.AdminPrefix,
+		"updated_at":   time.Now().Format("2006-01-02 15:04:05"),
+	}, "Settings updated successfully")
 }
 
 // handleAPISettingsBasic 处理前端基础设置保存
@@ -158,28 +197,27 @@ func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if r.Method != "POST" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		s.writeErrorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
 	var req struct {
-		AdminPrefix           string `json:"adminPrefix,omitempty"`
-		HTTPPort              string `json:"httpPort,omitempty"`
-		HTTPSPort             string `json:"httpsPort,omitempty"`
-		AutoSSL               *bool  `json:"autoSSL,omitempty"`
-		LetsEncryptEmail      string `json:"letsEncryptEmail,omitempty"`
-		SSLProvider           string `json:"sslProvider,omitempty"`
-		EnableDDoSProtection  *bool  `json:"enableDDoSProtection,omitempty"`
-		MaxRequestsPerMinute  string `json:"maxRequestsPerMinute,omitempty"`
-		EnableRateLimit       *bool  `json:"enableRateLimit,omitempty"`
-		EnableAccessLog       *bool  `json:"enableAccessLog,omitempty"`
-		EnableErrorLog        *bool  `json:"enableErrorLog,omitempty"`
-		LogLevel              string `json:"logLevel,omitempty"`
+		AdminPrefix          string `json:"adminPrefix,omitempty"`
+		HTTPPort             string `json:"httpPort,omitempty"`
+		HTTPSPort            string `json:"httpsPort,omitempty"`
+		AutoSSL              *bool  `json:"autoSSL,omitempty"`
+		LetsEncryptEmail     string `json:"letsEncryptEmail,omitempty"`
+		SSLProvider          string `json:"sslProvider,omitempty"`
+		EnableDDoSProtection *bool  `json:"enableDDoSProtection,omitempty"`
+		MaxRequestsPerMinute string `json:"maxRequestsPerMinute,omitempty"`
+		EnableRateLimit      *bool  `json:"enableRateLimit,omitempty"`
+		EnableAccessLog      *bool  `json:"enableAccessLog,omitempty"`
+		EnableErrorLog       *bool  `json:"enableErrorLog,omitempty"`
+		LogLevel             string `json:"logLevel,omitempty"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON", "message": err.Error()})
+		s.writeErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("Invalid JSON format: %s", err.Error()))
 		return
 	}
 
@@ -190,31 +228,31 @@ func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) 
 	if req.AdminPrefix != "" && req.AdminPrefix != oldPrefix {
 		s.config.AdminPrefix = req.AdminPrefix
 	}
-	
+
 	if req.HTTPSPort != "" {
 		if port, err := strconv.Atoi(req.HTTPSPort); err == nil && port > 0 && port <= 65535 {
 			s.config.Server.Port = port
 		}
 	}
-	
+
 	if req.LetsEncryptEmail != "" {
 		s.config.SSL.Email = req.LetsEncryptEmail
 	}
-	
+
 	if req.EnableDDoSProtection != nil {
 		s.config.Security.EnableDDOS = *req.EnableDDoSProtection
 	}
-	
+
 	if req.MaxRequestsPerMinute != "" {
 		if maxReq, err := strconv.Atoi(req.MaxRequestsPerMinute); err == nil && maxReq > 0 {
 			s.config.Security.MaxAttempts5Min = maxReq
 		}
 	}
-	
+
 	if req.EnableRateLimit != nil {
 		s.config.Security.EnableUAFilter = *req.EnableRateLimit
 	}
-	
+
 	if req.EnableAccessLog != nil {
 		s.config.Server.AccessLogEnabled = *req.EnableAccessLog
 	}
@@ -222,8 +260,7 @@ func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) 
 	// 保存配置
 	if err := s.config.Save(s.config.ConfigFile); err != nil {
 		s.log.Errorf("保存配置失败: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "failed to save config", "message": err.Error()})
+		s.writeErrorResponse(w, http.StatusInternalServerError, fmt.Sprintf("Failed to save configuration: %s", err.Error()))
 		return
 	}
 
@@ -233,32 +270,16 @@ func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) 
 		s.setupRoutes()
 		s.templateRenderer.ClearCache()
 		s.log.Infof("管理前缀已从 %s 更改为 %s，路由已重建", oldPrefix, s.config.AdminPrefix)
-		
+
 		// 发送前缀变更通知
-		if s.notificationIntegrator != nil {
-			notification := &notification.Notification{
-				Type:    "admin_prefix_changed",
-				Level:   notification.LevelInfo,
-				Title:   "管理前缀已更改",
-				Message: fmt.Sprintf("管理面板前缀已从 %s 更改为 %s。请使用新的URL访问管理面板。", oldPrefix, s.config.AdminPrefix),
-				Details: map[string]any{
-					"old_prefix": oldPrefix,
-					"new_prefix": s.config.AdminPrefix,
-				},
-			}
-			s.notificationIntegrator.GetManager().Send(notification)
-		}
+		s.sendAdminPrefixChangeNotification(oldPrefix, s.config.AdminPrefix)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"message": "基础设置保存成功",
-		"data": map[string]interface{}{
-			"adminPrefix": s.config.AdminPrefix,
-			"httpsPort":   s.config.Server.Port,
-		},
-	})
+	s.writeSuccessResponse(w, map[string]interface{}{
+		"adminPrefix": s.config.AdminPrefix,
+		"httpsPort":   s.config.Server.Port,
+		"updated_at":  time.Now().Format("2006-01-02 15:04:05"),
+	}, "基础设置保存成功")
 }
 
 // handleAPISecurityUnblock 解除IP封禁
@@ -268,7 +289,7 @@ func (s *Server) handleAPISecurityUnblock(w http.ResponseWriter, r *http.Request
 	}
 
 	if r.Method != "POST" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		s.writeErrorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
@@ -277,24 +298,20 @@ func (s *Server) handleAPISecurityUnblock(w http.ResponseWriter, r *http.Request
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
+		s.writeErrorResponse(w, http.StatusBadRequest, "Invalid JSON format")
 		return
 	}
 
 	if req.IP == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "ip is required"})
+		s.writeErrorResponse(w, http.StatusBadRequest, "IP address is required")
 		return
 	}
 
 	// 解除封禁
 	s.securityManager.UnblockIP(req.IP)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"message": "IP unblocked",
-		"ip":      req.IP,
-	})
+	s.writeSuccessResponse(w, map[string]interface{}{
+		"ip":           req.IP,
+		"unblocked_at": time.Now().Format("2006-01-02 15:04:05"),
+	}, "IP address unblocked successfully")
 }

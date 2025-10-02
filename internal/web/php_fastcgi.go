@@ -72,6 +72,7 @@ func (s *Server) servePHP(w http.ResponseWriter, r *http.Request) bool {
 
 		// 应用安全响应头
 		s.applySecurityHeaders(w, site.Domain)
+		s.applyCustomSiteHeaders(w, site.ResponseHeaders)
 
 		// 建立到 PHP-FPM 的连接（支持 unix:/path 或 tcp host:port）
 		conn, err := dialFCGI(site.FCGIAddr, 10*time.Second)
@@ -189,6 +190,20 @@ func (s *Server) applySecurityHeaders(w http.ResponseWriter, domain string) {
 
 	// 隐藏 PHP 版本
 	w.Header().Set("X-Powered-By", "sslcat")
+}
+
+func (s *Server) applyCustomSiteHeaders(w http.ResponseWriter, headers map[string]string) {
+	for key, value := range headers {
+		trimmedKey := strings.TrimSpace(key)
+		if trimmedKey == "" {
+			continue
+		}
+		if value == "" {
+			w.Header().Del(trimmedKey)
+			continue
+		}
+		w.Header().Set(trimmedKey, value)
+	}
 }
 
 // recordPHPPerformance 记录 PHP 性能指标

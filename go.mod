@@ -1,8 +1,8 @@
 module github.com/xurenlu/sslcat
 
-go 1.24.0
+go 1.25
 
-toolchain go1.24.7
+toolchain go1.25.1
 
 require github.com/sirupsen/logrus v1.9.3
 

@@ -70,12 +70,14 @@ func (s *Server) handleAPIProxyRulesPost(w http.ResponseWriter, r *http.Request)
 		AuthCookieDomain   string                 `json:"auth_cookie_domain"`
 
 		// 代理超时配置
-		ConnectTimeoutSec        int `json:"connect_timeout_sec"`
-		KeepAliveTimeoutSec      int `json:"keep_alive_timeout_sec"`
-		IdleTimeoutSec           int `json:"idle_timeout_sec"`
-		TLSHandshakeTimeoutSec   int `json:"tls_handshake_timeout_sec"`
-		ExpectContinueTimeoutSec int `json:"expect_continue_timeout_sec"`
-		HealthCheckTimeoutSec    int `json:"health_check_timeout_sec"`
+		ConnectTimeoutSec        int               `json:"connect_timeout_sec"`
+		KeepAliveTimeoutSec      int               `json:"keep_alive_timeout_sec"`
+		IdleTimeoutSec           int               `json:"idle_timeout_sec"`
+		TLSHandshakeTimeoutSec   int               `json:"tls_handshake_timeout_sec"`
+		ExpectContinueTimeoutSec int               `json:"expect_continue_timeout_sec"`
+		HealthCheckTimeoutSec    int               `json:"health_check_timeout_sec"`
+		UpstreamRequestHeaders   map[string]string `json:"upstream_request_headers"`
+		ResponseHeaders          map[string]string `json:"response_headers"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -83,6 +85,9 @@ func (s *Server) handleAPIProxyRulesPost(w http.ResponseWriter, r *http.Request)
 		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
 		return
 	}
+
+	req.UpstreamRequestHeaders = sanitizeHeaderMap(req.UpstreamRequestHeaders)
+	req.ResponseHeaders = sanitizeHeaderMap(req.ResponseHeaders)
 
 	if req.Domain == "" || req.Target == "" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -163,6 +168,8 @@ func (s *Server) handleAPIProxyRulesPost(w http.ResponseWriter, r *http.Request)
 		TLSHandshakeTimeoutSec:   req.TLSHandshakeTimeoutSec,
 		ExpectContinueTimeoutSec: req.ExpectContinueTimeoutSec,
 		HealthCheckTimeoutSec:    req.HealthCheckTimeoutSec,
+		UpstreamRequestHeaders:   sanitizeHeaderMap(req.UpstreamRequestHeaders),
+		ResponseHeaders:          sanitizeHeaderMap(req.ResponseHeaders),
 	}
 
 	if existingIndex >= 0 {
@@ -302,13 +309,15 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 			CDNDefaultTTLSeconds int    `json:"cdn_ttl_seconds"`
 			// HTTP Host头部优化
 			OptimizeHostHeader bool `json:"optimize_host_header"`
-			// 代理超时配置
-			ConnectTimeoutSec        int `json:"connect_timeout_sec"`
-			KeepAliveTimeoutSec      int `json:"keep_alive_timeout_sec"`
-			IdleTimeoutSec           int `json:"idle_timeout_sec"`
-			TLSHandshakeTimeoutSec   int `json:"tls_handshake_timeout_sec"`
-			ExpectContinueTimeoutSec int `json:"expect_continue_timeout_sec"`
-			HealthCheckTimeoutSec    int `json:"health_check_timeout_sec"`
+			// 代理超时配置 / 自定义头
+			ConnectTimeoutSec        int               `json:"connect_timeout_sec"`
+			KeepAliveTimeoutSec      int               `json:"keep_alive_timeout_sec"`
+			IdleTimeoutSec           int               `json:"idle_timeout_sec"`
+			TLSHandshakeTimeoutSec   int               `json:"tls_handshake_timeout_sec"`
+			ExpectContinueTimeoutSec int               `json:"expect_continue_timeout_sec"`
+			HealthCheckTimeoutSec    int               `json:"health_check_timeout_sec"`
+			UpstreamRequestHeaders   map[string]string `json:"upstream_request_headers"`
+			ResponseHeaders          map[string]string `json:"response_headers"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

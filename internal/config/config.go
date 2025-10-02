@@ -180,6 +180,10 @@ type ProxyRule struct {
 	WebSocketReadTimeout  int  `json:"websocket_read_timeout"`  // WebSocket读取超时（秒），默认30
 	WebSocketWriteTimeout int  `json:"websocket_write_timeout"` // WebSocket写入超时（秒），默认10
 	WebSocketPingInterval int  `json:"websocket_ping_interval"` // WebSocket心跳间隔（秒），默认30
+
+	// 自定义头部配置
+	UpstreamRequestHeaders map[string]string `json:"upstream_request_headers,omitempty"`
+	ResponseHeaders        map[string]string `json:"response_headers,omitempty"`
 }
 
 // ProxyBackend 代理后端服务器
@@ -481,6 +485,9 @@ type StaticSite struct {
 	Root    string `json:"root"`
 	Index   string `json:"index"`
 	Enabled bool   `json:"enabled"`
+
+	// 自定义响应头
+	ResponseHeaders map[string]string `json:"response_headers,omitempty"`
 }
 
 // PHPSite PHP 站点配置
@@ -491,6 +498,9 @@ type PHPSite struct {
 	Enabled  bool              `json:"enabled"`
 	FCGIAddr string            `json:"fcgi_addr"` // unix:/path/php-fpm.sock 或 127.0.0.1:9000
 	Vars     map[string]string `json:"vars"`
+
+	// 自定义响应头
+	ResponseHeaders map[string]string `json:"response_headers,omitempty"`
 
 	// 新增优化配置
 	OptimizationConfig *PHPOptimizationConfig `json:"optimization_config,omitempty"`

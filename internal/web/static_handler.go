@@ -71,6 +71,9 @@ func (h *StaticFileHandler) ServeFile(w http.ResponseWriter, r *http.Request, fi
 	// 设置安全头
 	h.setSecurityHeaders(w, r, filePath)
 
+	// 设置自定义响应头
+	h.setCustomHeaders(w, r)
+
 	// 处理条件请求
 	if h.handleConditionalRequest(w, r, fileInfo) {
 		return nil
@@ -198,6 +201,35 @@ func (h *StaticFileHandler) setSecurityHeaders(w http.ResponseWriter, r *http.Re
 	// 对于可执行文件，设置下载头
 	if h.isExecutableFile(filePath) {
 		w.Header().Set("Content-Disposition", "attachment")
+	}
+}
+
+// setCustomHeaders 设置静态站点自定义响应头
+func (h *StaticFileHandler) setCustomHeaders(w http.ResponseWriter, r *http.Request) {
+	host := r.Host
+	if idx := strings.Index(host, ":"); idx != -1 {
+		host = host[:idx]
+	}
+
+	for _, site := range h.config.StaticSites {
+		if !site.Enabled {
+			continue
+		}
+		if !strings.EqualFold(site.Domain, host) {
+			continue
+		}
+		for key, value := range site.ResponseHeaders {
+			trimmedKey := strings.TrimSpace(key)
+			if trimmedKey == "" {
+				continue
+			}
+			if value == "" {
+				w.Header().Del(trimmedKey)
+				continue
+			}
+			w.Header().Set(trimmedKey, value)
+		}
+		break
 	}
 }
 

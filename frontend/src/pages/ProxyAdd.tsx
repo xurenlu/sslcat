@@ -20,9 +20,11 @@ import {
   AlertIcon,
   Flex,
 } from '@chakra-ui/react'
-import { FiArrowLeft, FiZap, FiGlobe, FiShield, FiPlus, FiClock } from 'react-icons/fi'
+import { FiArrowLeft, FiZap, FiGlobe, FiShield, FiPlus, FiClock, FiSettings } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
 import { useConfig, buildPath, buildApiPath } from '../contexts/ConfigContext'
+import HeaderEditor from '../components/HeaderEditor'
+import { CORS_PRESET } from '../constants/cors'
 import LoadBalancerConfig from '../components/LoadBalancerConfig'
 import WebSocketConfig from '../components/WebSocketConfig'
 
@@ -104,6 +106,8 @@ interface ProxyRuleForm {
   websocket_read_timeout: number
   websocket_write_timeout: number
   websocket_ping_interval: number
+  upstream_request_headers: Record<string, string>
+  response_headers: Record<string, string>
 }
 
 const ProxyAdd: React.FC = () => {
@@ -169,7 +173,19 @@ const ProxyAdd: React.FC = () => {
     websocket_read_timeout: 30,
     websocket_write_timeout: 10,
     websocket_ping_interval: 30,
+    upstream_request_headers: {},
+    response_headers: {},
   })
+
+  const applyCorsPreset = () => {
+    setFormData(prev => ({
+      ...prev,
+      response_headers: {
+        ...prev.response_headers,
+        ...CORS_PRESET.response,
+      },
+    }))
+  }
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({
@@ -271,6 +287,8 @@ const ProxyAdd: React.FC = () => {
           auth_users: formData.auth_users.filter(user => user.username.trim() && user.password.trim()),
           auth_session_timeout: formData.auth_session_timeout,
           auth_cookie_domain: formData.auth_cookie_domain || formData.domain,
+          upstream_request_headers: formData.upstream_request_headers,
+          response_headers: formData.response_headers,
         }),
       })
 
@@ -372,6 +390,36 @@ const ProxyAdd: React.FC = () => {
               </Box>
 
               <Divider />
+
+              <Box>
+                <Heading size="md" mb={4} color="gray.700">
+                  <Icon as={FiSettings} mr={2} />
+                  自定义头部
+                </Heading>
+                <VStack align="stretch" spacing={6}>
+                  <Box>
+                    <Flex justify="space-between" align="center" mb={2}>
+                      <Text fontWeight="medium">上游请求头</Text>
+                      <Button size="sm" variant="outline" onClick={applyCorsPreset}>一键填充 CORS 预设</Button>
+                    </Flex>
+                    <HeaderEditor
+                      value={formData.upstream_request_headers}
+                      onChange={headers => handleInputChange('upstream_request_headers', headers)}
+                      placeholderKey="X-Forwarded-For"
+                      placeholderValue="client-ip"
+                    />
+                  </Box>
+                  <Box>
+                    <Text fontWeight="medium" mb={2}>响应头</Text>
+                    <HeaderEditor
+                      value={formData.response_headers}
+                      onChange={headers => handleInputChange('response_headers', headers)}
+                      placeholderKey="Access-Control-Allow-Origin"
+                      placeholderValue="*"
+                    />
+                  </Box>
+                </VStack>
+              </Box>
 
               {/* 负载均衡配置 */}
               <LoadBalancerConfig

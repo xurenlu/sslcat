@@ -142,6 +142,7 @@ func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request) bool {
 				}
 				return true
 			}
+			s.applyCustomSiteHeaders(w, site.ResponseHeaders)
 			http.ServeFile(w, r, full)
 			return true
 		}

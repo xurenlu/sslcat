@@ -28,6 +28,7 @@ import (
 	"github.com/xurenlu/sslcat/internal/security"
 	"github.com/xurenlu/sslcat/internal/ssl"
 	"github.com/xurenlu/sslcat/internal/statistics"
+	"github.com/xurenlu/sslcat/internal/waf"
 
 	"io"
 
@@ -60,6 +61,10 @@ type Server struct {
 
 	// Prometheus指标
 	prometheusMetrics *metrics.PrometheusMetrics
+	
+	// WAF引擎
+	wafEngine *waf.AdvancedEngine
+	
 	// 导入配置暂存
 	pendingImportJSON string
 	pendingImport     *config.Config
@@ -101,6 +106,9 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	// 初始化Prometheus指标
 	prometheusMetrics := metrics.NewPrometheusMetrics()
 
+	// 初始化WAF引擎
+	wafEngine := waf.NewAdvancedEngine()
+
 	// 初始化翻译器（从嵌入读取）
 	translator := i18n.NewTranslator(i18n.LangZhCN, "")
 	// 通过嵌入 i18n 文件加载翻译
@@ -136,6 +144,7 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		gitServer:         gitServer,
 		compressor:        compressor,
 		prometheusMetrics: prometheusMetrics,
+		wafEngine:         wafEngine,
 		log: logrus.WithFields(logrus.Fields{
 			"component": "web_server",
 		}),
@@ -680,12 +689,15 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 可选：WAF 检测（开启时才生效）
-	if s.config.Security.EnableWAF {
-		// 这里假设后续我们会在 Server 中集成一个 wafEngine（如 s.wafEngine），
-		// 当前版本仅预留接口示意。如果已存在 waf 引擎实例，可在此调用：
-		// if evt, blocked := s.wafEngine.CheckRequest(r); blocked { ... }
-		// 为保持稳定，此处不引入新字段，仅做占位以便后续扩展。
+	// WAF 检测（开启时才生效）
+	if s.config.Security.EnableWAF && s.wafEngine != nil {
+		if events, blocked := s.wafEngine.CheckRequestAdvanced(r); blocked {
+			s.log.Warnf("WAF blocked request from %s: %d events detected", s.getClientIP(r), len(events))
+			http.Error(w, "Request blocked by WAF", http.StatusForbidden)
+			return
+		} else if len(events) > 0 {
+			s.log.Infof("WAF detected %d security events from %s", len(events), s.getClientIP(r))
+		}
 	}
 
 	// DDoS 防护检测（开启时才生效，但跳过管理面板登录）

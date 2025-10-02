@@ -29,10 +29,11 @@ func (s *Server) handleAPIStaticSites(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var req struct {
-			Domain  string `json:"domain"`
-			Root    string `json:"root"`
-			Index   string `json:"index"`
-			Enabled bool   `json:"enabled"`
+			Domain  string            `json:"domain"`
+			Root    string            `json:"root"`
+			Index   string            `json:"index"`
+			Enabled bool              `json:"enabled"`
+			Headers map[string]string `json:"headers"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -61,10 +62,11 @@ func (s *Server) handleAPIStaticSites(w http.ResponseWriter, r *http.Request) {
 		}
 
 		newSite := config.StaticSite{
-			Domain:  req.Domain,
-			Root:    req.Root,
-			Index:   req.Index,
-			Enabled: req.Enabled,
+			Domain:          req.Domain,
+			Root:            req.Root,
+			Index:           req.Index,
+			Enabled:         req.Enabled,
+			ResponseHeaders: sanitizeHeaderMap(req.Headers),
 		}
 
 		if existingIndex >= 0 {
@@ -118,6 +120,7 @@ func (s *Server) handleAPIPHPSites(w http.ResponseWriter, r *http.Request) {
 			Enabled  bool              `json:"enabled"`
 			FCGIAddr string            `json:"fcgi_addr"`
 			Vars     map[string]string `json:"vars"`
+			Headers  map[string]string `json:"headers"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -152,12 +155,13 @@ func (s *Server) handleAPIPHPSites(w http.ResponseWriter, r *http.Request) {
 		}
 
 		newSite := config.PHPSite{
-			Domain:   req.Domain,
-			Root:     req.Root,
-			Index:    req.Index,
-			Enabled:  req.Enabled,
-			FCGIAddr: req.FCGIAddr,
-			Vars:     req.Vars,
+			Domain:          req.Domain,
+			Root:            req.Root,
+			Index:           req.Index,
+			Enabled:         req.Enabled,
+			FCGIAddr:        req.FCGIAddr,
+			Vars:            req.Vars,
+			ResponseHeaders: sanitizeHeaderMap(req.Headers),
 		}
 
 		if existingIndex >= 0 {

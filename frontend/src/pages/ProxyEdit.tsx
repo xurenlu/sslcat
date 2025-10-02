@@ -20,9 +20,11 @@ import {
   Flex,
   SimpleGrid,
 } from '@chakra-ui/react'
-import { FiArrowLeft, FiZap, FiGlobe, FiShield, FiSave, FiPlus, FiClock } from 'react-icons/fi'
+import { FiArrowLeft, FiZap, FiGlobe, FiShield, FiSave, FiPlus, FiClock, FiSettings } from 'react-icons/fi'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useConfig, buildPath, buildApiPath } from '../contexts/ConfigContext'
+import HeaderEditor from '../components/HeaderEditor'
+import { CORS_PRESET } from '../constants/cors'
 import LoadBalancerConfig from '../components/LoadBalancerConfig'
 import WebSocketConfig from '../components/WebSocketConfig'
 
@@ -104,6 +106,8 @@ interface ProxyRuleForm {
   websocket_read_timeout: number
   websocket_write_timeout: number
   websocket_ping_interval: number
+  upstream_request_headers: Record<string, string>
+  response_headers: Record<string, string>
 }
 
 const ProxyEdit: React.FC = () => {
@@ -174,6 +178,8 @@ const ProxyEdit: React.FC = () => {
     websocket_read_timeout: 30,
     websocket_write_timeout: 10,
     websocket_ping_interval: 30,
+    upstream_request_headers: {},
+    response_headers: {},
   })
 
   // 加载现有规则数据
@@ -262,6 +268,8 @@ const ProxyEdit: React.FC = () => {
             websocket_read_timeout: rule.websocket_read_timeout || 30,
             websocket_write_timeout: rule.websocket_write_timeout || 10,
             websocket_ping_interval: rule.websocket_ping_interval || 30,
+            upstream_request_headers: rule.upstream_request_headers || {},
+            response_headers: rule.response_headers || {},
           })
         }
       } catch (error) {
@@ -354,6 +362,16 @@ const ProxyEdit: React.FC = () => {
     }
   }
 
+  const applyCorsPreset = () => {
+    setFormData(prev => ({
+      ...prev,
+      response_headers: {
+        ...prev.response_headers,
+        ...CORS_PRESET.response,
+      },
+    }))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -382,6 +400,8 @@ const ProxyEdit: React.FC = () => {
           auth_users: formData.auth_users.filter(user => user.username.trim() && user.password.trim()),
           auth_session_timeout: formData.auth_session_timeout,
           auth_cookie_domain: formData.auth_cookie_domain || formData.domain,
+          upstream_request_headers: formData.upstream_request_headers,
+          response_headers: formData.response_headers,
         }),
       })
 
@@ -488,6 +508,36 @@ const ProxyEdit: React.FC = () => {
                 </Box>
 
                 <Divider />
+
+                <Box>
+                  <Heading size="md" mb={4} display="flex" alignItems="center">
+                    <Icon as={FiSettings} mr={2} />
+                    自定义头部
+                  </Heading>
+                  <VStack align="stretch" spacing={6}>
+                    <Box>
+                      <Text fontWeight="medium" mb={2}>上游请求头</Text>
+                      <HeaderEditor
+                        value={formData.upstream_request_headers}
+                        onChange={(headers) => handleInputChange('upstream_request_headers', headers)}
+                        placeholderKey="X-Forwarded-For"
+                        placeholderValue="client-ip"
+                      />
+                    </Box>
+                    <Box>
+                      <Flex justify="space-between" align="center" mb={2}>
+                        <Text fontWeight="medium">响应头</Text>
+                        <Button size="sm" variant="outline" onClick={applyCorsPreset}>一键填充 CORS 预设</Button>
+                      </Flex>
+                      <HeaderEditor
+                        value={formData.response_headers}
+                        onChange={(headers) => handleInputChange('response_headers', headers)}
+                        placeholderKey="Access-Control-Allow-Origin"
+                        placeholderValue="*"
+                      />
+                    </Box>
+                  </VStack>
+                </Box>
 
                 {/* 负载均衡配置 */}
                 <LoadBalancerConfig

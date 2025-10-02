@@ -400,6 +400,18 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 		r.Header.Set("X-Forwarded-Port", m.getPort(r))
 		r.Header.Set("X-Real-IP", clientIP)
 
+		for key, value := range rule.UpstreamRequestHeaders {
+			trimmedKey := strings.TrimSpace(key)
+			if trimmedKey == "" {
+				continue
+			}
+			if value == "" {
+				r.Header.Del(trimmedKey)
+				continue
+			}
+			r.Header.Set(trimmedKey, value)
+		}
+
 		// 正确处理 X-Forwarded-For 链
 		if existing := r.Header.Get("X-Forwarded-For"); existing != "" {
 			r.Header.Set("X-Forwarded-For", existing+", "+clientIP)
@@ -440,6 +452,18 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 
 		// 添加代理标识和后端信息
 		resp.Header.Set("X-Proxy-By", "SSLcat/"+m.version)
+
+		for key, value := range rule.ResponseHeaders {
+			trimmedKey := strings.TrimSpace(key)
+			if trimmedKey == "" {
+				continue
+			}
+			if value == "" {
+				resp.Header.Del(trimmedKey)
+				continue
+			}
+			resp.Header.Set(trimmedKey, value)
+		}
 		resp.Header.Set("X-Backend-ID", backend.ID)
 		resp.Header.Set("X-Backend-Address", backend.GetAddress())
 		resp.Header.Set("X-Response-Time", responseTime.String())
@@ -645,6 +669,18 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 		r.Header.Set("X-Forwarded-Port", m.getPort(r))
 		r.Header.Set("X-Real-IP", clientIP)
 
+		for key, value := range rule.UpstreamRequestHeaders {
+			trimmedKey := strings.TrimSpace(key)
+			if trimmedKey == "" {
+				continue
+			}
+			if value == "" {
+				r.Header.Del(trimmedKey)
+				continue
+			}
+			r.Header.Set(trimmedKey, value)
+		}
+
 		// 正确处理 X-Forwarded-For 链
 		if existing := r.Header.Get("X-Forwarded-For"); existing != "" {
 			r.Header.Set("X-Forwarded-For", existing+", "+clientIP)
@@ -687,6 +723,17 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 		resp.Header.Del("X-Content-Type-Options")
 		// 添加代理标识
 		resp.Header.Set("X-Proxy-By", "SSLcat/"+m.version)
+		for key, value := range rule.ResponseHeaders {
+			trimmedKey := strings.TrimSpace(key)
+			if trimmedKey == "" {
+				continue
+			}
+			if value == "" {
+				resp.Header.Del(trimmedKey)
+				continue
+			}
+			resp.Header.Set(trimmedKey, value)
+		}
 		// CDN 缓存落盘（全局或域名启用）
 		// 使用之前定义的cdnEnabled变量
 		if m.cdnCache != nil && cdnEnabled {

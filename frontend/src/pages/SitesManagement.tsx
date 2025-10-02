@@ -203,6 +203,7 @@ const SitesManagement: React.FC = () => {
             root: newSite.rootPath,
             index: newSite.indexFile,
             enabled: newSite.enabled,
+            headers: newSite.headers,
           }),
         })
 
@@ -229,6 +230,7 @@ const SitesManagement: React.FC = () => {
               MEMORY_LIMIT: newSite.memoryLimit,
               MAX_EXECUTION_TIME: newSite.maxExecutionTime,
             },
+            headers: newSite.headers,
           }),
         })
 
