@@ -98,6 +98,13 @@ interface GitServerConfig {
   webhook: string
   autoSSL: boolean
   defaultBranch: string
+  domainSuffix: string
+  portRange: [number, number]
+  welcomeMessage: string
+  sslEmail: string
+  defaultStrategy: string
+  buildTimeout: number
+  autoDomain: boolean
 }
 
 const GitServerManagement: React.FC = () => {
@@ -110,6 +117,13 @@ const GitServerManagement: React.FC = () => {
     webhook: '',
     autoSSL: true,
     defaultBranch: 'main',
+    domainSuffix: 'localhost',
+    portRange: [8000, 9000],
+    welcomeMessage: '欢迎使用 SSLcat Git 部署平台！',
+    sslEmail: '',
+    defaultStrategy: 'auto',
+    buildTimeout: 300,
+    autoDomain: true,
   })
   const [loading, setLoading] = useState(false)
   const { isOpen, onOpen, onClose } = useDisclosure()
@@ -932,8 +946,11 @@ const GitServerManagement: React.FC = () => {
                 <Input
                   value={config.webhook}
                   onChange={(e) => setConfig({ ...config, webhook: e.target.value })}
-                  placeholder="https://example.com/webhook"
+                  placeholder="https://your-domain.com/webhook"
                 />
+                <Text fontSize="sm" color="gray.500" mt={1}>
+                  部署完成后的回调通知URL，支持企业微信、飞书、钉钉、Slack等平台
+                </Text>
               </FormControl>
 
               <FormControl>

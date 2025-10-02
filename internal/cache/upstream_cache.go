@@ -680,7 +680,7 @@ func (uc *UpstreamCache) Clean() error {
 	uc.log.Info("Starting upstream cache cleanup")
 
 	metaDir := filepath.Join(uc.cacheDir, "meta")
-	
+
 	// 检查meta目录是否存在，如果不存在则创建
 	if _, err := os.Stat(metaDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(metaDir, 0755); err != nil {
@@ -782,7 +782,7 @@ func (uc *UpstreamCache) PurgeByPattern(pattern string) error {
 	}
 
 	metaDir := filepath.Join(uc.cacheDir, "meta")
-	
+
 	// 检查meta目录是否存在
 	if _, err := os.Stat(metaDir); os.IsNotExist(err) {
 		uc.log.Info("Meta directory does not exist, nothing to purge")
