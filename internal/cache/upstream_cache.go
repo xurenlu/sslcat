@@ -97,8 +97,10 @@ func NewUpstreamCache(cfg *config.Config) *UpstreamCache {
 		cacheDir = filepath.Join(cfg.CDNCache.CacheDir, "upstream")
 	}
 
-	// 创建缓存目录
+	// 创建缓存目录和子目录
 	os.MkdirAll(cacheDir, 0755)
+	os.MkdirAll(filepath.Join(cacheDir, "meta"), 0755)
+	os.MkdirAll(filepath.Join(cacheDir, "data"), 0755)
 
 	return &UpstreamCache{
 		cfg:             cfg,
@@ -122,8 +124,10 @@ func NewUpstreamCacheWithConfig(cfg *config.Config, cacheConfig *UpstreamCacheCo
 		cacheDir = "./data/upstream-cache"
 	}
 
-	// 创建缓存目录
+	// 创建缓存目录和子目录
 	os.MkdirAll(cacheDir, 0755)
+	os.MkdirAll(filepath.Join(cacheDir, "meta"), 0755)
+	os.MkdirAll(filepath.Join(cacheDir, "data"), 0755)
 
 	// 设置默认值
 	minSize := cacheConfig.MinSize
@@ -675,8 +679,19 @@ func (uc *UpstreamCache) GetStats() map[string]interface{} {
 func (uc *UpstreamCache) Clean() error {
 	uc.log.Info("Starting upstream cache cleanup")
 
+	metaDir := filepath.Join(uc.cacheDir, "meta")
+	
+	// 检查meta目录是否存在，如果不存在则创建
+	if _, err := os.Stat(metaDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(metaDir, 0755); err != nil {
+			return fmt.Errorf("failed to create meta directory: %w", err)
+		}
+		uc.log.Info("Created meta directory for cache cleanup")
+		return nil // 新创建的目录没有内容需要清理
+	}
+
 	cleaned := 0
-	err := filepath.Walk(filepath.Join(uc.cacheDir, "meta"), func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(metaDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -741,8 +756,10 @@ func (uc *UpstreamCache) PurgeAll() error {
 		return fmt.Errorf("failed to purge cache: %w", err)
 	}
 
-	// 重新创建缓存目录
+	// 重新创建缓存目录和子目录
 	os.MkdirAll(uc.cacheDir, 0755)
+	os.MkdirAll(filepath.Join(uc.cacheDir, "meta"), 0755)
+	os.MkdirAll(filepath.Join(uc.cacheDir, "data"), 0755)
 
 	// 重置统计
 	uc.mutex.Lock()
@@ -764,8 +781,16 @@ func (uc *UpstreamCache) PurgeByPattern(pattern string) error {
 		return fmt.Errorf("invalid pattern: %w", err)
 	}
 
+	metaDir := filepath.Join(uc.cacheDir, "meta")
+	
+	// 检查meta目录是否存在
+	if _, err := os.Stat(metaDir); os.IsNotExist(err) {
+		uc.log.Info("Meta directory does not exist, nothing to purge")
+		return nil
+	}
+
 	purged := 0
-	err = filepath.Walk(filepath.Join(uc.cacheDir, "meta"), func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(metaDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
