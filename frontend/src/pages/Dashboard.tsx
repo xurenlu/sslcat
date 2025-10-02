@@ -58,7 +58,10 @@ const Dashboard: React.FC = () => {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch(buildApiPath(adminPrefix, '/stats'), {
+      // 确保 adminPrefix 不为空，否则使用备用前缀
+      const effectivePrefix = adminPrefix || '/sslcat-panel2'
+      console.log('Dashboard refreshStats - adminPrefix:', adminPrefix, 'effectivePrefix:', effectivePrefix)
+      const response = await fetch(buildApiPath(effectivePrefix, '/stats'), {
         method: 'GET',
         credentials: 'include', // 包含认证 cookies
       })
@@ -68,7 +71,18 @@ const Dashboard: React.FC = () => {
       }
 
       const data = await response.json()
-      setStats(data)
+      console.log('Dashboard stats data received:', data)
+      
+      // 确保数据结构正确，处理可能的 null/undefined 值
+      const processedStats = {
+        activeRules: data.activeRules || data.ActiveRules || 0,
+        cachedProxies: data.cachedProxies || data.TotalRequests || data.total_requests || 0,
+        publicIP: data.publicIP || data.PublicIP || '未知',
+        goVersion: data.goVersion || 'go1.21.0',
+      }
+      
+      console.log('Dashboard processed stats:', processedStats)
+      setStats(processedStats)
       setLoading(false)
       toast({
         title: t.common.success,
@@ -185,7 +199,7 @@ const Dashboard: React.FC = () => {
                     总请求数
                   </StatLabel>
                   <StatNumber fontSize="2xl" fontWeight="bold">
-                    {stats.cachedProxies}
+                    {stats.cachedProxies.toLocaleString()}
                   </StatNumber>
                 </Box>
                 <Icon as={FiServer} boxSize={8} color="gray.300" />
