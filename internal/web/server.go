@@ -636,7 +636,8 @@ func (s *Server) registerRunnerRoutes() {
 	// 日志查看 API 路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/logs", gitAPI.GetAppLogs)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/log-files", gitAPI.GetAppLogFiles)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/logs/stream", gitAPI.GetAppLogsStream)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/logs/stream", gitAPI.GetAppLogsStream)      // SSE
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/logs/stream-ws", gitAPI.GetAppLogsStreamWS) // WebSocket
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/logs/history", gitAPI.GetAppLogsHistory)
 
 	// Docker Registry API 路由

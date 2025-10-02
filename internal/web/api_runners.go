@@ -338,7 +338,7 @@ func (api *GitServerAPI) GetAppLogFiles(w http.ResponseWriter, r *http.Request) 
 	api.writeJSON(w, response)
 }
 
-// GetAppLogsStream 获取应用实时日志流
+// GetAppLogsStream 获取应用实时日志流 (SSE)
 func (api *GitServerAPI) GetAppLogsStream(w http.ResponseWriter, r *http.Request) {
 	appName := r.URL.Query().Get("app")
 	if appName == "" {
@@ -346,8 +346,20 @@ func (api *GitServerAPI) GetAppLogsStream(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// 使用日志流管理器处理实时日志连接
+	// 使用日志流管理器处理实时日志连接 (SSE)
 	api.server.GetLogStreamManager().HandleWebSocketLogs(w, r, appName)
+}
+
+// GetAppLogsStreamWS 获取应用实时日志流 (WebSocket)
+func (api *GitServerAPI) GetAppLogsStreamWS(w http.ResponseWriter, r *http.Request) {
+	appName := r.URL.Query().Get("app")
+	if appName == "" {
+		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+		return
+	}
+
+	// 使用日志流管理器处理 WebSocket 日志连接
+	api.server.GetLogStreamManager().HandleWebSocketLogsWS(w, r, appName)
 }
 
 // GetAppLogsHistory 获取应用历史日志

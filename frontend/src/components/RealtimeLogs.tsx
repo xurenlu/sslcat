@@ -44,7 +44,23 @@ interface LogEntry {
   message: string
   app_name: string
   deploy_id?: string
-  raw: string
+  raw?: string
+  metadata?: {
+    deploy_id?: string
+    status?: string
+    progress?: number
+    error?: string
+    [key: string]: any
+  }
+}
+
+interface WebSocketMessage {
+  type: 'log' | 'ping' | 'connected' | 'error' | 'deploy_status'
+  data?: LogEntry
+  error?: string
+  app?: string
+  message?: string
+  timestamp?: number
 }
 
 interface RealtimeLogsProps {
@@ -69,8 +85,20 @@ const RealtimeLogs: React.FC<RealtimeLogsProps> = ({
   const [filterLevel, setFilterLevel] = useState('all')
   const [filterSource, setFilterSource] = useState('all')
   
+  const [connectionType, setConnectionType] = useState<'sse' | 'websocket'>('websocket')
+  const [deployStatus, setDeployStatus] = useState<{
+    status: string
+    progress: number
+    message: string
+  } | null>(null)
+  
   const logsEndRef = useRef<HTMLDivElement>(null)
   const eventSourceRef = useRef<EventSource | null>(null)
+  const websocketRef = useRef<WebSocket | null>(null)
+  const shouldReconnectRef = useRef<boolean>(false)
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const reconnectAttemptsRef = useRef<number>(0)
+  const logIdsRef = useRef<Set<string>>(new Set()) // 用于去重
   
   const bgColor = useColorModeValue('gray.50', 'gray.900')
   const borderColor = useColorModeValue('gray.200', 'gray.700')
@@ -82,8 +110,127 @@ const RealtimeLogs: React.FC<RealtimeLogsProps> = ({
     }
   }
 
-  // 连接实时日志流
-  const connectLogStream = () => {
+  // 连接 WebSocket 日志流
+  const connectWebSocket = () => {
+    if (websocketRef.current) {
+      websocketRef.current.close()
+    }
+
+    // 清理之前的重连定时器
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current)
+      reconnectTimeoutRef.current = null
+    }
+
+    // 构建 WebSocket URL
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const host = window.location.host
+    const path = buildApiPath(adminPrefix, `/api/git-server/logs/stream-ws?app=${appName}`)
+    const url = `${protocol}//${host}${path}`
+
+    const ws = new WebSocket(url)
+
+    ws.onopen = () => {
+      setIsConnected(true)
+      setIsStreaming(true)
+      reconnectAttemptsRef.current = 0 // 重置重连次数
+      console.log('WebSocket connected')
+    }
+
+    ws.onmessage = (event) => {
+      try {
+        const message: WebSocketMessage = JSON.parse(event.data)
+        
+        switch (message.type) {
+          case 'log':
+            if (message.data) {
+              // 生成日志唯一ID用于去重
+              const logId = `${message.data.timestamp}_${message.data.message.substring(0, 50)}`
+              
+              // 检查是否已经收到过这条日志
+              if (logIdsRef.current.has(logId)) {
+                console.debug('Skipping duplicate log:', logId)
+                break
+              }
+              
+              // 添加到已收到集合
+              logIdsRef.current.add(logId)
+              
+              // 限制去重集合大小（保留最近1000条）
+              if (logIdsRef.current.size > 1000) {
+                const idsArray = Array.from(logIdsRef.current)
+                logIdsRef.current = new Set(idsArray.slice(-500))
+              }
+              
+              setLogs(prevLogs => {
+                const newLogs = [...prevLogs, message.data!]
+                if (newLogs.length > maxDisplayLines) {
+                  return newLogs.slice(-maxDisplayLines)
+                }
+                return newLogs
+              })
+              
+              // 检查是否是部署状态日志
+              if (message.data.source === 'deploy_status' && message.data.metadata) {
+                setDeployStatus({
+                  status: message.data.metadata.status || 'unknown',
+                  progress: message.data.metadata.progress || 0,
+                  message: message.data.message,
+                })
+              }
+            }
+            break
+          
+          case 'ping':
+            console.log('Received WebSocket ping')
+            break
+          
+          case 'connected':
+            console.log('WebSocket connection established:', message.message)
+            break
+          
+          case 'error':
+            console.error('WebSocket error:', message.error)
+            break
+        }
+      } catch (error) {
+        console.error('Failed to parse WebSocket message:', error)
+      }
+    }
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error)
+      setIsConnected(false)
+    }
+
+    ws.onclose = (event) => {
+      console.log('WebSocket closed', event.code, event.reason)
+      setIsConnected(false)
+      setIsStreaming(false)
+      
+      // 自动重连（只在主动连接时重连，不在手动断开时重连）
+      if (shouldReconnectRef.current) {
+        reconnectAttemptsRef.current++
+        
+        // 指数退避策略：3秒、6秒、12秒...最多30秒
+        const delay = Math.min(3000 * Math.pow(2, reconnectAttemptsRef.current - 1), 30000)
+        
+        console.log(`WebSocket will reconnect in ${delay}ms (attempt ${reconnectAttemptsRef.current})`)
+        
+        reconnectTimeoutRef.current = setTimeout(() => {
+          if (shouldReconnectRef.current) {
+            console.log('Reconnecting WebSocket...')
+            connectWebSocket()
+          }
+        }, delay)
+      }
+    }
+
+    websocketRef.current = ws
+  }
+
+  // 连接 SSE 日志流
+  const connectSSE = () => {
     if (eventSourceRef.current) {
       eventSourceRef.current.close()
     }
@@ -94,15 +241,14 @@ const RealtimeLogs: React.FC<RealtimeLogsProps> = ({
     eventSource.onopen = () => {
       setIsConnected(true)
       setIsStreaming(true)
-      console.log('Log stream connected')
+      console.log('SSE stream connected')
     }
 
-    eventSource.onmessage = (event) => {
+    eventSource.addEventListener('log', (event) => {
       try {
         const logEntry: LogEntry = JSON.parse(event.data)
         setLogs(prevLogs => {
           const newLogs = [...prevLogs, logEntry]
-          // 限制日志条数
           if (newLogs.length > maxDisplayLines) {
             return newLogs.slice(-maxDisplayLines)
           }
@@ -111,22 +257,21 @@ const RealtimeLogs: React.FC<RealtimeLogsProps> = ({
       } catch (error) {
         console.error('Failed to parse log entry:', error)
       }
-    }
+    })
 
-    eventSource.addEventListener('ping', (event) => {
-      // 心跳事件，保持连接活跃
-      console.log('Received ping from log stream')
+    eventSource.addEventListener('ping', () => {
+      console.log('Received SSE ping')
     })
 
     eventSource.onerror = (error) => {
-      console.error('Log stream error:', error)
+      console.error('SSE stream error:', error)
       setIsConnected(false)
       setIsStreaming(false)
       
       // 自动重连
       setTimeout(() => {
         if (isStreaming) {
-          connectLogStream()
+          connectSSE()
         }
       }, 3000)
     }
@@ -134,14 +279,39 @@ const RealtimeLogs: React.FC<RealtimeLogsProps> = ({
     eventSourceRef.current = eventSource
   }
 
+  // 连接实时日志流
+  const connectLogStream = () => {
+    shouldReconnectRef.current = true // 标记允许自动重连
+    reconnectAttemptsRef.current = 0
+    
+    if (connectionType === 'websocket') {
+      connectWebSocket()
+    } else {
+      connectSSE()
+    }
+  }
+
   // 断开日志流
   const disconnectLogStream = () => {
+    shouldReconnectRef.current = false // 禁止自动重连
+    
+    // 清理重连定时器
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current)
+      reconnectTimeoutRef.current = null
+    }
+    
+    if (websocketRef.current) {
+      websocketRef.current.close()
+      websocketRef.current = null
+    }
     if (eventSourceRef.current) {
       eventSourceRef.current.close()
       eventSourceRef.current = null
     }
     setIsConnected(false)
     setIsStreaming(false)
+    setDeployStatus(null)
   }
 
   // 加载历史日志
@@ -166,6 +336,7 @@ const RealtimeLogs: React.FC<RealtimeLogsProps> = ({
   // 清空日志
   const clearLogs = () => {
     setLogs([])
+    logIdsRef.current.clear() // 同时清空去重集合
   }
 
   // 下载日志

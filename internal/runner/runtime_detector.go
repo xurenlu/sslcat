@@ -53,9 +53,19 @@ func (rd *RuntimeDetector) DetectProjectType(projectPath string) (*ProjectInfo, 
 
 // detectRuntime 检测运行时类型
 func (rd *RuntimeDetector) detectRuntime(projectPath string) string {
-	// 检查 Go 项目
-	if rd.hasFile(projectPath, "go.mod") {
-		return "golang"
+	// 最高优先级：Dockerfile
+	if rd.hasFile(projectPath, "Dockerfile") {
+		return "docker"
+	}
+
+	// 检查 Deno 项目
+	if rd.hasAnyFile(projectPath, []string{"deno.json", "deno.jsonc"}) {
+		return "deno"
+	}
+
+	// 检查 Bun 项目
+	if rd.hasFile(projectPath, "bun.lockb") || rd.hasFile(projectPath, "bunfig.toml") {
+		return "bun"
 	}
 
 	// 检查 Node.js 项目
@@ -68,14 +78,14 @@ func (rd *RuntimeDetector) detectRuntime(projectPath string) string {
 		return "python"
 	}
 
-	// 检查 PHP 项目
-	if rd.hasFile(projectPath, "composer.json") {
-		return "php"
+	// 检查 Go 项目
+	if rd.hasFile(projectPath, "go.mod") {
+		return "golang"
 	}
 
-	// 检查 Ruby 项目
-	if rd.hasFile(projectPath, "Gemfile") {
-		return "ruby"
+	// 检查 Rust 项目
+	if rd.hasFile(projectPath, "Cargo.toml") {
+		return "rust"
 	}
 
 	// 检查 Java 项目
@@ -83,14 +93,24 @@ func (rd *RuntimeDetector) detectRuntime(projectPath string) string {
 		return "java"
 	}
 
-	// 检查 C# 项目
-	if rd.hasFile(projectPath, "*.csproj") || rd.hasFile(projectPath, "*.sln") {
-		return "csharp"
+	// 检查 .NET 项目
+	if rd.hasFile(projectPath, "*.csproj") || rd.hasFile(projectPath, "*.fsproj") || rd.hasFile(projectPath, "*.vbproj") || rd.hasFile(projectPath, "*.sln") {
+		return "dotnet"
 	}
 
-	// 检查 Rust 项目
-	if rd.hasFile(projectPath, "Cargo.toml") {
-		return "rust"
+	// 检查 Ruby 项目
+	if rd.hasFile(projectPath, "Gemfile") || rd.hasFile(projectPath, "config.ru") {
+		return "ruby"
+	}
+
+	// 检查 PHP 项目
+	if rd.hasFile(projectPath, "composer.json") || rd.hasFile(projectPath, "index.php") {
+		return "php"
+	}
+
+	// 检查静态文件
+	if rd.hasAnyFile(projectPath, []string{"index.html", "index.htm"}) {
+		return "static"
 	}
 
 	// 检查 C/C++ 项目

@@ -8,6 +8,7 @@ require github.com/sirupsen/logrus v1.9.3
 
 require (
 	github.com/andybalholm/brotli v1.2.0
+	github.com/gorilla/websocket v1.5.3
 	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/oschwald/geoip2-golang v1.13.0
 	github.com/pquerna/otp v1.5.0

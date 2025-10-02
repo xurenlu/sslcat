@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
 )
 
@@ -207,7 +208,7 @@ func (ls *LogStream) GetHistoryLogs(limit int) ([]LogEntry, error) {
 
 // parseLogLine 解析日志行
 func (ls *LogStream) parseLogLine(line string) LogEntry {
-	// 尝试解析结构化日志
+	// 尝试解析结构化日志（JSON格式）
 	if strings.HasPrefix(line, "{") {
 		var entry LogEntry
 		if err := json.Unmarshal([]byte(line), &entry); err == nil {
@@ -215,43 +216,119 @@ func (ls *LogStream) parseLogLine(line string) LogEntry {
 		}
 	}
 
-	// 解析标准格式日志: [timestamp] [level] [source] message
+	// 初始化默认日志条目
 	entry := LogEntry{
 		Timestamp: time.Now(),
 		Level:     "info",
 		Source:    "app",
 		Message:   line,
 		AppName:   ls.appName,
+		Metadata:  make(map[string]interface{}),
 	}
 
-	// 简单的时间戳解析
+	originalLine := line
+
+	// 解析时间戳 - 支持多种格式
 	if strings.HasPrefix(line, "[") {
 		if endIdx := strings.Index(line, "]"); endIdx > 0 {
 			timestampStr := line[1:endIdx]
-			if t, err := time.Parse("2006-01-02 15:04:05", timestampStr); err == nil {
-				entry.Timestamp = t
-				line = line[endIdx+1:]
+
+			// 尝试多种时间格式
+			timeFormats := []string{
+				"2006-01-02 15:04:05",
+				"2006-01-02T15:04:05",
+				"2006-01-02 15:04:05.000",
+				time.RFC3339,
+			}
+
+			for _, format := range timeFormats {
+				if t, err := time.Parse(format, timestampStr); err == nil {
+					entry.Timestamp = t
+					line = strings.TrimSpace(line[endIdx+1:])
+					break
+				}
 			}
 		}
 	}
 
-	// 解析日志级别
-	if strings.Contains(line, "[info]") {
-		entry.Level = "info"
-		entry.Source = "deploy"
-	} else if strings.Contains(line, "[error]") {
-		entry.Level = "error"
-		entry.Source = "deploy"
-	} else if strings.Contains(line, "[warn]") {
-		entry.Level = "warn"
-		entry.Source = "deploy"
-	} else if strings.Contains(line, "[debug]") {
-		entry.Level = "debug"
+	// 解析日志级别和来源
+	levelParsed := false
+
+	// 解析 [level] 格式
+	if strings.HasPrefix(line, "[") {
+		if endIdx := strings.Index(line, "]"); endIdx > 0 {
+			levelStr := strings.ToLower(line[1:endIdx])
+			line = strings.TrimSpace(line[endIdx+1:])
+
+			switch levelStr {
+			case "info", "information":
+				entry.Level = "info"
+				levelParsed = true
+			case "error", "err", "fatal":
+				entry.Level = "error"
+				levelParsed = true
+			case "warn", "warning":
+				entry.Level = "warn"
+				levelParsed = true
+			case "debug", "trace":
+				entry.Level = "debug"
+				levelParsed = true
+			case "git", "build", "deploy", "docker", "nodejs", "python", "go", "php", "static":
+				entry.Source = levelStr
+				entry.Level = "info"
+				levelParsed = true
+			}
+		}
+	}
+
+	// 如果没有解析到级别，使用关键词匹配
+	if !levelParsed {
+		lineLower := strings.ToLower(line)
+		if strings.Contains(lineLower, "error") || strings.Contains(lineLower, "failed") || strings.Contains(lineLower, "fail") {
+			entry.Level = "error"
+		} else if strings.Contains(lineLower, "warn") || strings.Contains(lineLower, "warning") {
+			entry.Level = "warn"
+		} else if strings.Contains(lineLower, "debug") || strings.Contains(lineLower, "trace") {
+			entry.Level = "debug"
+		}
+	}
+
+	// 解析来源
+	lineLower := strings.ToLower(line)
+	if strings.Contains(lineLower, "git push") || strings.Contains(lineLower, "git clone") {
+		entry.Source = "git"
+	} else if strings.Contains(lineLower, "npm") || strings.Contains(lineLower, "node") || strings.Contains(lineLower, "yarn") {
+		entry.Source = "nodejs"
+	} else if strings.Contains(lineLower, "pip") || strings.Contains(lineLower, "python") {
+		entry.Source = "python"
+	} else if strings.Contains(lineLower, "go build") || strings.Contains(lineLower, "go mod") {
+		entry.Source = "go"
+	} else if strings.Contains(lineLower, "docker") {
+		entry.Source = "docker"
+	} else if strings.Contains(lineLower, "composer") || strings.Contains(lineLower, "php") {
+		entry.Source = "php"
+	} else if strings.Contains(lineLower, "build") || strings.Contains(lineLower, "compile") {
+		entry.Source = "build"
+	} else if strings.Contains(lineLower, "deploy") || strings.Contains(lineLower, "starting") || strings.Contains(lineLower, "started") {
 		entry.Source = "deploy"
 	}
 
 	// 提取消息内容
 	entry.Message = strings.TrimSpace(line)
+	if entry.Message == "" {
+		entry.Message = originalLine
+	}
+
+	// 提取额外元数据
+	if strings.Contains(entry.Message, "端口:") || strings.Contains(entry.Message, "port:") {
+		entry.Metadata["has_port"] = true
+	}
+	if strings.Contains(entry.Message, "成功") || strings.Contains(entry.Message, "success") {
+		entry.Metadata["success"] = true
+	}
+	if strings.Contains(entry.Message, "耗时:") || strings.Contains(entry.Message, "duration:") {
+		entry.Metadata["has_duration"] = true
+	}
 
 	return entry
 }
@@ -332,32 +409,8 @@ func (lw *LogWatcher) ReadNewLines() ([]LogEntry, error) {
 			continue
 		}
 
-		// 解析日志行
-		entry := LogEntry{
-			Timestamp: time.Now(),
-			Level:     "info",
-			Source:    "app",
-			Message:   lineStr,
-			AppName:   "",
-		}
-
-		// 简单的日志解析
-		if strings.Contains(lineStr, "[error]") || strings.Contains(lineStr, "ERROR") {
-			entry.Level = "error"
-		} else if strings.Contains(lineStr, "[warn]") || strings.Contains(lineStr, "WARN") {
-			entry.Level = "warn"
-		} else if strings.Contains(lineStr, "[debug]") || strings.Contains(lineStr, "DEBUG") {
-			entry.Level = "debug"
-		}
-
-		if strings.Contains(lineStr, "[git]") {
-			entry.Source = "git"
-		} else if strings.Contains(lineStr, "[build]") {
-			entry.Source = "build"
-		} else if strings.Contains(lineStr, "[deploy]") {
-			entry.Source = "deploy"
-		}
-
+		// 使用改进的日志解析器
+		entry := lw.parseLogLine(lineStr)
 		entries = append(entries, entry)
 	}
 
@@ -365,6 +418,49 @@ func (lw *LogWatcher) ReadNewLines() ([]LogEntry, error) {
 	lw.position = currentSize
 
 	return entries, nil
+}
+
+// parseLogLine 解析日志行（LogWatcher版本，简化版）
+func (lw *LogWatcher) parseLogLine(line string) LogEntry {
+	// 尝试解析结构化日志（JSON格式）
+	if strings.HasPrefix(line, "{") {
+		var entry LogEntry
+		if err := json.Unmarshal([]byte(line), &entry); err == nil {
+			return entry
+		}
+	}
+
+	// 初始化默认日志条目
+	entry := LogEntry{
+		Timestamp: time.Now(),
+		Level:     "info",
+		Source:    "app",
+		Message:   line,
+		Metadata:  make(map[string]interface{}),
+	}
+
+	// 简化的日志级别检测
+	lineLower := strings.ToLower(line)
+	if strings.Contains(lineLower, "error") || strings.Contains(lineLower, "failed") {
+		entry.Level = "error"
+	} else if strings.Contains(lineLower, "warn") || strings.Contains(lineLower, "warning") {
+		entry.Level = "warn"
+	} else if strings.Contains(lineLower, "debug") {
+		entry.Level = "debug"
+	}
+
+	// 来源检测
+	if strings.Contains(lineLower, "[git]") || strings.Contains(lineLower, "git") {
+		entry.Source = "git"
+	} else if strings.Contains(lineLower, "[build]") || strings.Contains(lineLower, "build") {
+		entry.Source = "build"
+	} else if strings.Contains(lineLower, "[deploy]") || strings.Contains(lineLower, "deploy") {
+		entry.Source = "deploy"
+	} else if strings.Contains(lineLower, "docker") {
+		entry.Source = "docker"
+	}
+
+	return entry
 }
 
 // Close 关闭日志监听器
@@ -377,9 +473,10 @@ func (lw *LogWatcher) Close() error {
 
 // LogStreamManager 日志流管理器
 type LogStreamManager struct {
-	streams map[string]*LogStream
-	mutex   sync.RWMutex
-	log     *logrus.Entry
+	streams  map[string]*LogStream
+	mutex    sync.RWMutex
+	log      *logrus.Entry
+	upgrader websocket.Upgrader
 }
 
 // NewLogStreamManager 创建日志流管理器
@@ -389,6 +486,13 @@ func NewLogStreamManager() *LogStreamManager {
 		log: logrus.WithFields(logrus.Fields{
 			"component": "log_stream_manager",
 		}),
+		upgrader: websocket.Upgrader{
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
+			CheckOrigin: func(r *http.Request) bool {
+				return true // 允许所有来源，生产环境应该限制
+			},
+		},
 	}
 }
 
@@ -623,6 +727,168 @@ func (dl *DeployLogger) Close() error {
 
 		return dl.file.Close()
 	}
+
+	return nil
+}
+
+// ==================== WebSocket 支持 ====================
+
+// HandleWebSocketLogsWS 处理 WebSocket 日志连接（真正的 WebSocket）
+func (lsm *LogStreamManager) HandleWebSocketLogsWS(w http.ResponseWriter, r *http.Request, appName string) {
+	// 升级到 WebSocket 连接
+	conn, err := lsm.upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		lsm.log.Errorf("WebSocket upgrade failed: %v", err)
+		return
+	}
+	defer conn.Close()
+
+	// 获取或创建日志流
+	stream := lsm.GetStream(appName)
+	if stream == nil {
+		// 尝试创建日志流（如果应用存在）
+		lsm.log.Warnf("Log stream not found for app %s, attempting to create", appName)
+		conn.WriteJSON(map[string]interface{}{
+			"type":  "error",
+			"error": fmt.Sprintf("日志流不存在，应用 %s 可能未部署", appName),
+		})
+		return
+	}
+
+	// 生成客户端 ID
+	clientID := fmt.Sprintf("ws_client_%d", time.Now().UnixNano())
+
+	// 添加客户端到日志流
+	logChan := stream.AddClient(clientID)
+	defer stream.RemoveClient(clientID)
+
+	// 发送连接成功消息
+	conn.WriteJSON(map[string]interface{}{
+		"type":    "connected",
+		"app":     appName,
+		"message": "WebSocket 连接已建立",
+	})
+
+	// 发送历史日志
+	if history, err := stream.GetHistoryLogs(50); err == nil {
+		for _, entry := range history {
+			conn.WriteJSON(map[string]interface{}{
+				"type": "log",
+				"data": entry,
+			})
+		}
+	}
+
+	// 创建一个 context 用于取消
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+
+	// 启动一个 goroutine 读取客户端消息（用于心跳检测）
+	go func() {
+		for {
+			_, _, err := conn.ReadMessage()
+			if err != nil {
+				cancel()
+				return
+			}
+		}
+	}()
+
+	// 定时器用于心跳
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	// 监听新日志并发送
+	for {
+		select {
+		case entry, ok := <-logChan:
+			if !ok {
+				return
+			}
+
+			// 发送日志到 WebSocket
+			err := conn.WriteJSON(map[string]interface{}{
+				"type": "log",
+				"data": entry,
+			})
+			if err != nil {
+				lsm.log.Warnf("Failed to write log to WebSocket: %v", err)
+				return
+			}
+
+		case <-ticker.C:
+			// 发送心跳
+			err := conn.WriteJSON(map[string]interface{}{
+				"type":      "ping",
+				"timestamp": time.Now().Unix(),
+			})
+			if err != nil {
+				return
+			}
+
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// DeployStatusUpdate 部署状态更新
+type DeployStatusUpdate struct {
+	AppName   string    `json:"app_name"`
+	DeployID  string    `json:"deploy_id"`
+	Status    string    `json:"status"` // building, deploying, success, failed
+	Progress  int       `json:"progress"`
+	Message   string    `json:"message"`
+	Timestamp time.Time `json:"timestamp"`
+	Error     string    `json:"error,omitempty"`
+}
+
+// BroadcastDeployStatus 广播部署状态更新
+func (lsm *LogStreamManager) BroadcastDeployStatus(status DeployStatusUpdate) {
+	// 获取应用的日志流
+	stream := lsm.GetStream(status.AppName)
+	if stream == nil {
+		return
+	}
+
+	// 构造状态更新日志条目
+	entry := LogEntry{
+		Timestamp: status.Timestamp,
+		Level:     "info",
+		Source:    "deploy_status",
+		Message:   status.Message,
+		AppName:   status.AppName,
+		Metadata: map[string]interface{}{
+			"deploy_id": status.DeployID,
+			"status":    status.Status,
+			"progress":  status.Progress,
+			"error":     status.Error,
+		},
+	}
+
+	// 广播到所有客户端
+	stream.broadcastLog(entry)
+}
+
+// CreateStreamForApp 为应用创建日志流
+func (lsm *LogStreamManager) CreateStreamForApp(appName, logFile string) error {
+	lsm.mutex.Lock()
+	defer lsm.mutex.Unlock()
+
+	// 检查是否已存在
+	if _, exists := lsm.streams[appName]; exists {
+		lsm.log.Debugf("Log stream for %s already exists", appName)
+		return nil
+	}
+
+	// 创建并启动日志流
+	stream := NewLogStream(appName, logFile)
+	if err := stream.Start(); err != nil {
+		return fmt.Errorf("failed to start log stream: %w", err)
+	}
+
+	lsm.streams[appName] = stream
+	lsm.log.Infof("Created log stream for app: %s", appName)
 
 	return nil
 }

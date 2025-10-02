@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时日志流测试 - SSLcat</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            margin-top: 0;
+            color: #333;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        input, select, button {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #0052a3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status.connecting {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .indicator.green { background: #28a745; }
+        .indicator.red { background: #dc3545; }
+        .indicator.yellow { background: #ffc107; }
+        .deploy-status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 6px;
+            background: #e7f3ff;
+            border-left: 4px solid #0066cc;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 24px;
+            background: #e0e0e0;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #0066cc, #0052a3);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .logs-container {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 6px;
+            height: 500px;
+            overflow-y: auto;
+            font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .log-entry {
+            margin: 4px 0;
+            padding: 4px 8px;
+            border-radius: 3px;
+        }
+        .log-entry:hover {
+            background: rgba(255,255,255,0.05);
+        }
+        .log-timestamp {
+            color: #858585;
+            margin-right: 8px;
+        }
+        .log-level {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-right: 8px;
+            text-transform: uppercase;
+        }
+        .log-level.info { background: #0066cc; color: white; }
+        .log-level.warn { background: #ffc107; color: #000; }
+        .log-level.error { background: #dc3545; color: white; }
+        .log-level.debug { background: #6c757d; color: white; }
+        .log-source {
+            color: #569cd6;
+            margin-right: 8px;
+        }
+        .log-message {
+            color: #d4d4d4;
+        }
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        .stat-item {
+            flex: 1;
+            min-width: 150px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #0066cc;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔥 实时日志流测试</h1>
+        
+        <div class="controls">
+            <input type="text" id="appName" placeholder="应用名称" value="myapp">
+            <select id="connectionType">
+                <option value="websocket">WebSocket</option>
+                <option value="sse">Server-Sent Events</option>
+            </select>
+            <button id="connectBtn" onclick="connect()">连接</button>
+            <button id="disconnectBtn" onclick="disconnect()" disabled>断开</button>
+            <button onclick="clearLogs()">清空日志</button>
+            <button onclick="downloadLogs()">下载日志</button>
+            <div class="status disconnected" id="status">
+                <span class="indicator red"></span>
+                <span>未连接</span>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-value" id="totalLogs">0</div>
+                <div class="stat-label">日志总数</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="errorCount">0</div>
+                <div class="stat-label">错误</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="warnCount">0</div>
+                <div class="stat-label">警告</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="uptime">00:00</div>
+                <div class="stat-label">连接时长</div>
+            </div>
+        </div>
+
+        <div class="deploy-status" id="deployStatus" style="display: none;">
+            <h3 style="margin-top: 0;">部署状态</h3>
+            <div id="deployMessage">准备开始部署...</div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressBar" style="width: 0%">0%</div>
+            </div>
+        </div>
+
+        <div class="logs-container" id="logsContainer">
+            <div style="color: #858585; text-align: center; padding: 20px;">
+                等待连接...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let eventSource = null;
+        let logs = [];
+        let stats = { total: 0, errors: 0, warnings: 0 };
+        let startTime = null;
+        let uptimeInterval = null;
+        let shouldReconnect = false;
+        let reconnectTimeout = null;
+        let reconnectAttempts = 0;
+        let logIds = new Set(); // 用于去重
+
+        function updateStatus(status, text) {
+            const statusEl = document.getElementById('status');
+            statusEl.className = `status ${status}`;
+            
+            let indicatorClass = 'red';
+            if (status === 'connected') indicatorClass = 'green';
+            if (status === 'connecting') indicatorClass = 'yellow';
+            
+            statusEl.innerHTML = `<span class="indicator ${indicatorClass}"></span><span>${text}</span>`;
+            
+            document.getElementById('connectBtn').disabled = (status === 'connected' || status === 'connecting');
+            document.getElementById('disconnectBtn').disabled = (status === 'disconnected');
+        }
+
+        function connect() {
+            const appName = document.getElementById('appName').value;
+            const connectionType = document.getElementById('connectionType').value;
+            
+            if (!appName) {
+                alert('请输入应用名称');
+                return;
+            }
+
+            shouldReconnect = true;
+            reconnectAttempts = 0;
+
+            if (connectionType === 'websocket') {
+                connectWebSocket(appName);
+            } else {
+                connectSSE(appName);
+            }
+
+            startTime = Date.now();
+            uptimeInterval = setInterval(updateUptime, 1000);
+        }
+
+        function connectWebSocket(appName) {
+            updateStatus('connecting', '正在连接 WebSocket...');
+            
+            // 清理之前的重连定时器
+            if (reconnectTimeout) {
+                clearTimeout(reconnectTimeout);
+                reconnectTimeout = null;
+            }
+            
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const url = `${protocol}//${window.location.host}/admin/api/git-server/logs/stream-ws?app=${appName}`;
+            
+            ws = new WebSocket(url);
+
+            ws.onopen = () => {
+                updateStatus('connected', 'WebSocket 已连接');
+                addSystemLog('WebSocket 连接已建立');
+                reconnectAttempts = 0; // 重置重连次数
+            };
+
+            ws.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                handleMessage(message);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                addSystemLog('WebSocket 错误', 'error');
+            };
+
+            ws.onclose = (event) => {
+                updateStatus('disconnected', 'WebSocket 已断开');
+                addSystemLog(`WebSocket 连接已关闭 (code: ${event.code})`);
+                clearInterval(uptimeInterval);
+                
+                // 自动重连
+                if (shouldReconnect) {
+                    reconnectAttempts++;
+                    // 指数退避：3秒、6秒、12秒...最多30秒
+                    const delay = Math.min(3000 * Math.pow(2, reconnectAttempts - 1), 30000);
+                    
+                    addSystemLog(`${delay/1000}秒后重连 (尝试 ${reconnectAttempts})`, 'warn');
+                    
+                    reconnectTimeout = setTimeout(() => {
+                        if (shouldReconnect) {
+                            addSystemLog('正在重连...', 'info');
+                            connectWebSocket(appName);
+                        }
+                    }, delay);
+                }
+            };
+        }
+
+        function connectSSE(appName) {
+            updateStatus('connecting', '正在连接 SSE...');
+            
+            const url = `/admin/api/git-server/logs/stream?app=${appName}`;
+            eventSource = new EventSource(url);
+
+            eventSource.onopen = () => {
+                updateStatus('connected', 'SSE 已连接');
+                addSystemLog('SSE 连接已建立');
+            };
+
+            eventSource.addEventListener('log', (event) => {
+                const logEntry = JSON.parse(event.data);
+                handleMessage({ type: 'log', data: logEntry });
+            });
+
+            eventSource.addEventListener('ping', () => {
+                console.log('Received ping');
+            });
+
+            eventSource.onerror = (error) => {
+                console.error('SSE error:', error);
+                updateStatus('disconnected', 'SSE 连接错误');
+                addSystemLog('SSE 错误', 'error');
+                clearInterval(uptimeInterval);
+            };
+        }
+
+        function disconnect() {
+            shouldReconnect = false; // 禁止自动重连
+            
+            // 清理重连定时器
+            if (reconnectTimeout) {
+                clearTimeout(reconnectTimeout);
+                reconnectTimeout = null;
+            }
+            
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            clearInterval(uptimeInterval);
+            updateStatus('disconnected', '已断开连接');
+        }
+
+        function handleMessage(message) {
+            switch (message.type) {
+                case 'log':
+                    addLog(message.data);
+                    break;
+                case 'connected':
+                    addSystemLog(message.message || '连接成功');
+                    break;
+                case 'ping':
+                    console.log('Received ping');
+                    break;
+                case 'error':
+                    addSystemLog(message.error || '发生错误', 'error');
+                    break;
+            }
+        }
+
+        function addLog(logEntry) {
+            // 生成日志唯一ID用于去重
+            const logId = `${logEntry.timestamp}_${logEntry.message.substring(0, 50)}`;
+            
+            // 检查是否已经收到过这条日志
+            if (logIds.has(logId)) {
+                console.debug('Skipping duplicate log:', logId);
+                return;
+            }
+            
+            // 添加到已收到集合
+            logIds.add(logId);
+            
+            // 限制去重集合大小（保留最近1000条）
+            if (logIds.size > 1000) {
+                const idsArray = Array.from(logIds);
+                logIds = new Set(idsArray.slice(-500));
+            }
+            
+            logs.push(logEntry);
+            stats.total++;
+            
+            if (logEntry.level === 'error') stats.errors++;
+            if (logEntry.level === 'warn') stats.warnings++;
+            
+            // 检查部署状态
+            if (logEntry.source === 'deploy_status' && logEntry.metadata) {
+                updateDeployStatus(logEntry.metadata);
+            }
+            
+            const timestamp = new Date(logEntry.timestamp).toLocaleTimeString();
+            const html = `
+                <div class="log-entry">
+                    <span class="log-timestamp">${timestamp}</span>
+                    <span class="log-level ${logEntry.level}">${logEntry.level}</span>
+                    <span class="log-source">[${logEntry.source}]</span>
+                    <span class="log-message">${escapeHtml(logEntry.message)}</span>
+                </div>
+            `;
+            
+            const container = document.getElementById('logsContainer');
+            if (container.children[0]?.textContent.includes('等待连接')) {
+                container.innerHTML = '';
+            }
+            container.insertAdjacentHTML('beforeend', html);
+            container.scrollTop = container.scrollHeight;
+            
+            updateStats();
+        }
+
+        function addSystemLog(message, level = 'info') {
+            addLog({
+                timestamp: new Date().toISOString(),
+                level: level,
+                source: 'system',
+                message: message,
+                app_name: ''
+            });
+        }
+
+        function updateDeployStatus(metadata) {
+            const statusDiv = document.getElementById('deployStatus');
+            const messageDiv = document.getElementById('deployMessage');
+            const progressBar = document.getElementById('progressBar');
+            
+            statusDiv.style.display = 'block';
+            messageDiv.textContent = `状态: ${metadata.status} - ${metadata.message || ''}`;
+            
+            const progress = metadata.progress || 0;
+            progressBar.style.width = `${progress}%`;
+            progressBar.textContent = `${progress}%`;
+            
+            if (metadata.status === 'success') {
+                progressBar.style.background = 'linear-gradient(90deg, #28a745, #20c997)';
+            } else if (metadata.status === 'failed') {
+                progressBar.style.background = 'linear-gradient(90deg, #dc3545, #c82333)';
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('totalLogs').textContent = stats.total;
+            document.getElementById('errorCount').textContent = stats.errors;
+            document.getElementById('warnCount').textContent = stats.warnings;
+        }
+
+        function updateUptime() {
+            if (!startTime) return;
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            document.getElementById('uptime').textContent = 
+                `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        function clearLogs() {
+            logs = [];
+            logIds.clear(); // 同时清空去重集合
+            stats = { total: 0, errors: 0, warnings: 0 };
+            document.getElementById('logsContainer').innerHTML = 
+                '<div style="color: #858585; text-align: center; padding: 20px;">日志已清空</div>';
+            updateStats();
+        }
+
+        function downloadLogs() {
+            const text = logs.map(log => 
+                `[${log.timestamp}] [${log.level}] [${log.source}] ${log.message}`
+            ).join('\n');
+            
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `sslcat-logs-${new Date().toISOString().slice(0, 19)}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 页面关闭时断开连接
+        window.addEventListener('beforeunload', () => {
+            disconnect();
+        });
+    </script>
+</body>
+</html>
+

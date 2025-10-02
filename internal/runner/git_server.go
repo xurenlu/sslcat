@@ -48,6 +48,9 @@ type GitServer struct {
 
 	// Docker Registry
 	dockerRegistry *DockerRegistry
+
+	// Builder Registry
+	builderRegistry *BuilderRegistry
 }
 
 // GitServerConfig Git 服务器配置
@@ -430,6 +433,9 @@ func NewGitServer(cfg *config.Config) *GitServer {
 		dockerRegistry:     dockerRegistry,
 	}
 
+	// 初始化 Builder Registry
+	gs.builderRegistry = gs.InitBuilders()
+
 	// 加载持久化的应用
 	if err := gs.loadApps(); err != nil {
 		gs.logger.Warnf("加载应用列表失败: %v", err)
@@ -587,6 +593,11 @@ func (gs *GitServer) CreateApp(appName string) (*GitApp, error) {
 	// 设置 Git 钩子
 	if err := gs.setupGitHooks(app); err != nil {
 		gs.logger.Warnf("设置 Git 钩子失败: %v", err)
+	}
+
+	// 创建日志流
+	if err := gs.logStreamManager.CreateStreamForApp(appName, app.CurrentLog); err != nil {
+		gs.logger.Warnf("创建日志流失败: %v", err)
 	}
 
 	// 保存应用信息
@@ -795,6 +806,16 @@ func (gs *GitServer) processGitPush(app *GitApp, pushData []byte) {
 		gs.logger.Warnf("Failed to create log stream for app: %s", app.Name)
 	}
 
+	// 广播部署开始状态
+	gs.logStreamManager.BroadcastDeployStatus(DeployStatusUpdate{
+		AppName:   app.Name,
+		DeployID:  deployID,
+		Status:    "building",
+		Progress:  10,
+		Message:   "开始部署流程",
+		Timestamp: time.Now(),
+	})
+
 	// 检测应用类型
 	deployLogger.WriteLog("info", "git", "开始检测应用类型")
 	appType, err := gs.detectAppType(app)
@@ -810,63 +831,101 @@ func (gs *GitServer) processGitPush(app *GitApp, pushData []byte) {
 
 	deployLogger.WriteLog("info", "git", fmt.Sprintf("检测到应用类型: %s", appType))
 
+	// 广播构建状态
+	gs.logStreamManager.BroadcastDeployStatus(DeployStatusUpdate{
+		AppName:   app.Name,
+		DeployID:  deployID,
+		Status:    "building",
+		Progress:  30,
+		Message:   fmt.Sprintf("检测到应用类型: %s，开始构建", appType),
+		Timestamp: time.Now(),
+	})
+
 	// 执行构建和部署
 	deployLogger.WriteLog("info", "deploy", "开始构建和部署应用")
+
+	// 广播部署中状态
+	gs.logStreamManager.BroadcastDeployStatus(DeployStatusUpdate{
+		AppName:   app.Name,
+		DeployID:  deployID,
+		Status:    "deploying",
+		Progress:  60,
+		Message:   "正在部署应用",
+		Timestamp: time.Now(),
+	})
+
 	if err := gs.buildAndDeployAppWithLogging(app, deployLogger); err != nil {
 		deployLogger.WriteError(err)
+
+		// 广播部署失败状态
+		gs.logStreamManager.BroadcastDeployStatus(DeployStatusUpdate{
+			AppName:   app.Name,
+			DeployID:  deployID,
+			Status:    "failed",
+			Progress:  100,
+			Message:   "部署失败",
+			Error:     err.Error(),
+			Timestamp: time.Now(),
+		})
+
 		gs.handleDeployError(app, err)
 		return
 	}
 
 	// 部署成功
 	deployLogger.WriteSuccess(time.Since(deployLogger.startTime))
+
+	// 广播部署成功状态
+	gs.logStreamManager.BroadcastDeployStatus(DeployStatusUpdate{
+		AppName:   app.Name,
+		DeployID:  deployID,
+		Status:    "success",
+		Progress:  100,
+		Message:   fmt.Sprintf("部署成功 - 耗时: %v", time.Since(deployLogger.startTime)),
+		Timestamp: time.Now(),
+	})
 	gs.handleDeploySuccess(app)
 }
 
-// detectAppType 检测应用类型
+// detectAppType 检测应用类型（使用 Builder Registry）
 func (gs *GitServer) detectAppType(app *GitApp) (string, error) {
-	// 检查各种项目文件来确定应用类型
-	checks := []struct {
-		file    string
-		appType string
-	}{
-		{"package.json", "nodejs"},
-		{"requirements.txt", "python"},
-		{"go.mod", "go"},
-		{"composer.json", "php"},
-		{"Dockerfile", "docker"},
-		{"index.html", "static"},
+	builder, err := gs.builderRegistry.DetectBuilder(app.GitPath)
+	if err != nil {
+		// 如果检测失败，默认使用静态文件
+		gs.logger.Warnf("应用类型检测失败，使用静态文件类型: %v", err)
+		return "static", nil
 	}
 
-	for _, check := range checks {
-		filePath := filepath.Join(app.GitPath, check.file)
-		if _, err := os.Stat(filePath); err == nil {
-			return check.appType, nil
-		}
-	}
-
-	// 默认返回静态类型
-	return "static", nil
+	appType := builder.GetType()
+	gs.logger.Infof("检测到应用类型: %s (%s)", appType, builder.GetDisplayName())
+	return appType, nil
 }
 
-// buildAndDeployAppWithLogging 构建和部署应用（带日志记录）
+// buildAndDeployAppWithLogging 构建和部署应用（带日志记录）使用 Builder Registry
 func (gs *GitServer) buildAndDeployAppWithLogging(app *GitApp, deployLogger *DeployLogger) error {
-	switch app.AppType {
-	case "docker":
-		return gs.buildAndDeployDockerAppWithLogging(app, deployLogger)
-	case "nodejs":
-		return gs.buildAndDeployNodeJSAppWithLogging(app, deployLogger)
-	case "python":
-		return gs.buildAndDeployPythonAppWithLogging(app, deployLogger)
-	case "go":
-		return gs.buildAndDeployGoAppWithLogging(app, deployLogger)
-	case "php":
-		return gs.deployPHPAppWithLogging(app, deployLogger)
-	case "static":
-		return gs.deployStaticAppWithLogging(app, deployLogger)
-	default:
+	// 获取对应的 Builder
+	builder, err := gs.builderRegistry.GetBuilder(app.AppType)
+	if err != nil {
+		deployLogger.WriteLog("error", "system", fmt.Sprintf("未找到支持的构建器: %s", app.AppType))
 		return fmt.Errorf("不支持的应用类型: %s", app.AppType)
 	}
+
+	deployLogger.WriteLog("info", "system", fmt.Sprintf("使用构建器: %s", builder.GetDisplayName()))
+
+	// 构建应用
+	if err := builder.BuildWithLogging(app, deployLogger); err != nil {
+		deployLogger.WriteLog("error", builder.GetType(), fmt.Sprintf("构建失败: %v", err))
+		return fmt.Errorf("构建失败: %w", err)
+	}
+
+	// 启动应用
+	if err := builder.StartWithLogging(app, deployLogger); err != nil {
+		deployLogger.WriteLog("error", builder.GetType(), fmt.Sprintf("启动失败: %v", err))
+		return fmt.Errorf("启动失败: %w", err)
+	}
+
+	deployLogger.WriteLog("success", "system", "应用部署成功")
+	return nil
 }
 
 // buildAndDeployApp 构建和部署应用（保持向后兼容）
@@ -1795,11 +1854,12 @@ func (gs *GitServer) keyExists(fingerprint string) bool {
 
 // LogEntry 日志条目
 type LogEntry struct {
-	Timestamp time.Time `json:"timestamp"`
-	Level     string    `json:"level"` // "info" | "warn" | "error" | "debug"
-	Message   string    `json:"message"`
-	Source    string    `json:"source"` // "git" | "build" | "deploy" | "run"
-	AppName   string    `json:"app_name"`
+	Timestamp time.Time              `json:"timestamp"`
+	Level     string                 `json:"level"` // "info" | "warn" | "error" | "debug"
+	Message   string                 `json:"message"`
+	Source    string                 `json:"source"` // "git" | "build" | "deploy" | "run" | "deploy_status"
+	AppName   string                 `json:"app_name"`
+	Metadata  map[string]interface{} `json:"metadata,omitempty"` // 额外元数据
 }
 
 // LogManager 日志管理器
