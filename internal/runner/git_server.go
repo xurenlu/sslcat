@@ -16,6 +16,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/xurenlu/sslcat/internal/config"
+	"github.com/xurenlu/sslcat/internal/i18n"
 )
 
 // GitServer Git 服务器管理器 - 类似 Dokku/Heroku 的部署平台
@@ -24,6 +25,9 @@ type GitServer struct {
 	apps   map[string]*GitApp // 应用列表，key 是应用名称
 	mutex  sync.RWMutex
 	logger *logrus.Logger
+
+	// 翻译器
+	translator *i18n.Translator
 
 	// Git 服务器配置
 	serverConfig *GitServerConfig
@@ -390,7 +394,7 @@ type PushRecord struct {
 }
 
 // NewGitServer 创建新的 Git 服务器
-func NewGitServer(cfg *config.Config) *GitServer {
+func NewGitServer(cfg *config.Config, translator *i18n.Translator) *GitServer {
 	// 默认服务器配置
 	defaultConfig := &GitServerConfig{
 		Enabled:         true,
@@ -399,7 +403,7 @@ func NewGitServer(cfg *config.Config) *GitServer {
 		DefaultBranch:   "main",
 		DomainSuffix:    "localhost",
 		PortRange:       [2]int{8000, 9000},
-		WelcomeMessage:  "欢迎使用 SSLcat Git 部署平台！",
+		WelcomeMessage:  translator.T("git_server.welcome_message"),
 		AutoSSL:         true,
 		SSLEmail:        "",
 		DefaultStrategy: "auto",
@@ -444,6 +448,7 @@ func NewGitServer(cfg *config.Config) *GitServer {
 		config:             cfg,
 		apps:               make(map[string]*GitApp),
 		logger:             logrus.WithField("component", "git_server").Logger,
+		translator:         translator,
 		serverConfig:       defaultConfig,
 		sshUser:            sshUser,
 		sshHomeDir:         sshHomeDir,
@@ -460,7 +465,7 @@ func NewGitServer(cfg *config.Config) *GitServer {
 
 	// 加载持久化的应用
 	if err := gs.loadApps(); err != nil {
-		gs.logger.Warnf("加载应用列表失败: %v", err)
+		gs.logger.Warnf(gs.translator.T("git_server.load_apps_failed")+": %v", err)
 	}
 
 	// 确保应用拥有环境变量映射
@@ -484,33 +489,33 @@ func NewGitServer(cfg *config.Config) *GitServer {
 // Start 启动 Git 服务器
 func (gs *GitServer) Start() error {
 	if !gs.config.Runners.Git.Enabled {
-		gs.logger.Info("Git 服务器未启用")
+		gs.logger.Info(gs.translator.T("git_server.not_enabled"))
 		return nil
 	}
 
 	// 检查 Git 是否可用
 	if err := gs.checkGit(); err != nil {
-		return fmt.Errorf("Git 不可用: %w", err)
+		return fmt.Errorf(gs.translator.T("git_server.unavailable")+": %w", err)
 	}
 
 	// 尝试自动创建 git 用户（如果不存在）
 	if err := gs.createGitUser(); err != nil {
-		gs.logger.Warnf("创建 git 用户失败: %v，如果需要请手动创建: sudo useradd -r -s /bin/bash -m -d /home/git git", err)
+		gs.logger.Warnf(gs.translator.T("git_server.create_user_failed")+": %v，如果需要请手动创建: sudo useradd -r -s /bin/bash -m -d /home/git git", err)
 	}
 
 	// 设置 SSH 用户和目录
 	if err := gs.setupSSHUser(); err != nil {
-		gs.logger.Warnf("设置 SSH 用户失败: %v", err)
+		gs.logger.Warnf(gs.translator.T("git_server.setup_ssh_failed")+": %v", err)
 	}
 
 	// 创建应用目录
 	if err := os.MkdirAll(gs.config.Runners.Git.ReposDir, 0755); err != nil {
-		return fmt.Errorf("创建应用目录失败: %w", err)
+		return fmt.Errorf(gs.translator.T("git_server.create_app_dir_failed")+": %w", err)
 	}
 
 	// 加载现有应用
 	if err := gs.loadApps(); err != nil {
-		gs.logger.Warnf("加载应用失败: %v", err)
+		gs.logger.Warnf(gs.translator.T("git_server.load_app_failed")+": %v", err)
 	}
 
 	// 启动清理协程
@@ -521,13 +526,13 @@ func (gs *GitServer) Start() error {
 	// 启动部署触发监听协程
 	go gs.WatchDeployTriggers()
 
-	gs.logger.Info("Git 服务器已启动")
+	gs.logger.Info(gs.translator.T("git_server.started"))
 	return nil
 }
 
 // Stop 停止 Git 服务器
 func (gs *GitServer) Stop() {
-	gs.logger.Info("Git 服务器已停止")
+	gs.logger.Info(gs.translator.T("git_server.stopped"))
 }
 
 // ==================== Git 服务器配置管理 ====================
@@ -550,10 +555,10 @@ func (gs *GitServer) UpdateServerConfig(config *GitServerConfig) error {
 
 	// 保存配置到文件
 	if err := gs.saveServerConfig(); err != nil {
-		return fmt.Errorf("保存服务器配置失败: %w", err)
+		return fmt.Errorf(gs.translator.T("git_server.save_config_failed")+": %w", err)
 	}
 
-	gs.logger.Info("服务器配置已更新")
+	gs.logger.Info(gs.translator.T("git_server.config_updated"))
 	return nil
 }
 
@@ -561,43 +566,43 @@ func (gs *GitServer) UpdateServerConfig(config *GitServerConfig) error {
 
 // CreateApp 创建新应用
 func (gs *GitServer) CreateApp(appName string) (*GitApp, error) {
-	gs.logger.Infof("🚀 开始创建应用: %s", appName)
+	gs.logger.Infof("🚀 %s: %s", gs.translator.T("git_server.creating_app"), appName)
 	gs.mutex.Lock()
 	defer gs.mutex.Unlock()
 
 	// 检查应用是否已存在
 	if _, exists := gs.apps[appName]; exists {
-		gs.logger.Warnf("应用 %s 已存在", appName)
-		return nil, fmt.Errorf("应用 %s 已存在", appName)
+		gs.logger.Warnf(gs.translator.T("git_server.app_exists")+" %s", appName)
+		return nil, fmt.Errorf(gs.translator.T("git_server.app_exists")+" %s", appName)
 	}
 
 	// 分配端口
-	gs.logger.Debugf("为应用 %s 分配端口...", appName)
-	gs.logger.Debugf("端口范围: %d-%d", gs.serverConfig.PortRange[0], gs.serverConfig.PortRange[1])
-	gs.logger.Debugf("当前应用数量: %d", len(gs.apps))
+	gs.logger.Debugf(gs.translator.T("git_server.allocating_port")+" %s...", appName)
+	gs.logger.Debugf(gs.translator.T("git_server.port_range")+": %d-%d", gs.serverConfig.PortRange[0], gs.serverConfig.PortRange[1])
+	gs.logger.Debugf(gs.translator.T("git_server.current_apps")+": %d", len(gs.apps))
 	port, err := gs.allocatePort()
 	if err != nil {
-		gs.logger.Errorf("分配端口失败: %v", err)
-		return nil, fmt.Errorf("分配端口失败: %w", err)
+		gs.logger.Errorf(gs.translator.T("git_server.port_allocation_failed")+": %v", err)
+		return nil, fmt.Errorf(gs.translator.T("git_server.port_allocation_failed")+": %w", err)
 	}
-	gs.logger.Infof("  ✓ 分配端口: %d", port)
+	gs.logger.Infof("  ✓ %s: %d", gs.translator.T("git_server.port_allocated"), port)
 
 	// 生成域名
 	domain := gs.generateDomain(appName)
-	gs.logger.Infof("  ✓ 生成域名: %s", domain)
+	gs.logger.Infof("  ✓ %s: %s", gs.translator.T("git_server.domain_generated"), domain)
 
 	// 生成Git推送地址
 	gitURL := gs.generateGitURL(appName)
-	gs.logger.Infof("  ✓ Git 地址: %s", gitURL)
+	gs.logger.Infof("  ✓ %s: %s", gs.translator.T("git_server.git_url"), gitURL)
 
 	// 创建应用目录
 	appPath := filepath.Join(gs.config.Runners.Git.ReposDir, appName)
-	gs.logger.Infof("  创建应用目录: %s", appPath)
+	gs.logger.Infof("  %s: %s", gs.translator.T("git_server.creating_app_dir"), appPath)
 	if err := os.MkdirAll(appPath, 0755); err != nil {
-		gs.logger.Errorf("创建应用目录失败: %v", err)
-		return nil, fmt.Errorf("创建应用目录失败: %w", err)
+		gs.logger.Errorf(gs.translator.T("git_server.create_app_dir_failed")+": %v", err)
+		return nil, fmt.Errorf(gs.translator.T("git_server.create_app_dir_failed")+": %w", err)
 	}
-	gs.logger.Infof("  ✓ 应用目录已创建")
+	gs.logger.Infof("  ✓ %s", gs.translator.T("git_server.app_dir_created"))
 
 	// 初始化 Git 仓库
 	gitPath := filepath.Join(appPath, "git")
@@ -606,10 +611,10 @@ func (gs *GitServer) CreateApp(appName string) (*GitApp, error) {
 	logsDir := filepath.Join(appPath, "logs")
 	gs.logger.Debugf("  创建日志目录: %s", logsDir)
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
-		gs.logger.Errorf("创建日志目录失败: %v", err)
-		return nil, fmt.Errorf("创建日志目录失败: %w", err)
+		gs.logger.Errorf(gs.translator.T("git_server.creating_logs_dir")+": %v", err)
+		return nil, fmt.Errorf(gs.translator.T("git_server.creating_logs_dir")+": %w", err)
 	}
-	gs.logger.Infof("  ✓ 日志目录已创建")
+	gs.logger.Infof("  ✓ %s", gs.translator.T("git_server.logs_dir_created"))
 
 	// 创建应用对象
 	app := &GitApp{

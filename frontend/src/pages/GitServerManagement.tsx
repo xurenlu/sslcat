@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Box,
   Heading,
@@ -118,6 +119,7 @@ interface GitServerConfig {
 }
 
 const GitServerManagement: React.FC = () => {
+  const { t } = useTranslation()
   const { adminPrefix } = useConfig()
   const [apps, setApps] = useState<GitApp[]>([])
   const [sshKeys, setSSHKeys] = useState<SSHKey[]>([])
@@ -459,7 +461,7 @@ git push sslcat main`
                     {gitCommands}
                   </Code>
                   <IconButton
-                    aria-label="复制命令"
+                    aria-label={t('frontend.copy_command')}
                     icon={<Icon as={FiCopy} />}
                     size="sm"
                     onClick={() => {
@@ -655,7 +657,7 @@ git push sslcat main`
           setTimeout(() => {
             toast({
               title: '提示：添加SSH密钥',
-              description: '您已启用Git服务器，但还没有配置SSH密钥。请在"SSH密钥"标签页中添加至少一个SSH密钥以允许Git推送。',
+              description: t('frontend.ssh_key_notice'),
               status: 'warning',
               duration: 8000,
               isClosable: true,
@@ -748,7 +750,7 @@ git push sslcat main`
                     <FormControl>
                       <FormLabel fontSize="sm">变量名</FormLabel>
                       <Input
-                        placeholder="如 NODE_ENV"
+                        placeholder={t('frontend.env_var_name')}
                         value={item.key}
                         onChange={(e) => updateEnvRow(index, 'key', e.target.value)}
                         isDisabled={savingEnv}
@@ -757,14 +759,14 @@ git push sslcat main`
                     <FormControl>
                       <FormLabel fontSize="sm">变量值</FormLabel>
                       <Input
-                        placeholder="变量值"
+                        placeholder={t('frontend.env_var_value')}
                         value={item.value}
                         onChange={(e) => updateEnvRow(index, 'value', e.target.value)}
                         isDisabled={savingEnv}
                       />
                     </FormControl>
                     <IconButton
-                      aria-label="删除"
+                      aria-label={t('frontend.delete')}
                       icon={<Icon as={FiTrash2} />}
                       variant="ghost"
                       colorScheme="red"
@@ -834,7 +836,7 @@ git push sslcat main`
                   onChange={(_, value) => setRoutingPort(value)}
                   isDisabled={savingRouting}
                 >
-                  <NumberInputField placeholder="请输入端口号" />
+                  <NumberInputField placeholder={t('frontend.port_placeholder')} />
                   <NumberInputStepper>
                     <NumberIncrementStepper />
                     <NumberDecrementStepper />
@@ -1075,7 +1077,7 @@ git push sslcat main`
                                       {app.git_url}
                                     </Code>
                                     <IconButton
-                                      aria-label="复制Git地址"
+                                      aria-label={t('frontend.copy_git_url')}
                                       icon={<FiCopy />}
                                       size="xs"
                                       variant="ghost"
@@ -1124,16 +1126,16 @@ git push sslcat main`
                             <Td>
                               <HStack spacing={1}>
                                 <IconButton
-                                  aria-label="重新部署"
+                                  aria-label={t('frontend.redeploy')}
                                   icon={<FiUpload />}
                                   size="sm"
                                   variant="ghost"
                                   colorScheme="green"
                                   onClick={() => handleDeployApp(app.id)}
-                                  title="触发重新部署"
+                                  title={t('frontend.trigger_redeploy')}
                                 />
                                 <IconButton
-                                  aria-label="删除应用"
+                                  aria-label={t('frontend.delete_app')}
                                   icon={<FiTrash2 />}
                                   size="sm"
                                   variant="ghost"
@@ -1205,14 +1207,14 @@ git push sslcat main`
                               <Td>
                                 <HStack spacing={2}>
                                   <IconButton
-                                    aria-label="复制指纹"
+                                    aria-label={t('frontend.copy_fingerprint')}
                                     icon={<FiCopy />}
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => copyToClipboard(key.fingerprint)}
                                   />
                                   <IconButton
-                                    aria-label="删除"
+                                    aria-label={t('frontend.delete')}
                                     icon={<FiTrash2 />}
                                     size="sm"
                                     variant="ghost"
@@ -1505,7 +1507,7 @@ git push sslcat main`
                       value={config.portRange[0]}
                       onChange={(_, value) => setConfig({ ...config, portRange: [value, config.portRange[1]] })}
                     >
-                      <NumberInputField placeholder="起始端口" />
+                      <NumberInputField placeholder={t('frontend.start_port')} />
                       <NumberInputStepper>
                         <NumberIncrementStepper />
                         <NumberDecrementStepper />
@@ -1518,7 +1520,7 @@ git push sslcat main`
                       value={config.portRange[1]}
                       onChange={(_, value) => setConfig({ ...config, portRange: [config.portRange[0], value] })}
                     >
-                      <NumberInputField placeholder="结束端口" />
+                      <NumberInputField placeholder={t('frontend.end_port')} />
                       <NumberInputStepper>
                         <NumberIncrementStepper />
                         <NumberDecrementStepper />
@@ -1535,7 +1537,7 @@ git push sslcat main`
                   <Textarea
                     value={config.welcomeMessage}
                     onChange={(e) => setConfig({ ...config, welcomeMessage: e.target.value })}
-                    placeholder="欢迎使用 SSLcat Git 部署平台！"
+                    placeholder={t('frontend.welcome_message')}
                     rows={3}
                   />
                   <Text fontSize="sm" color="gray.500" mt={1}>

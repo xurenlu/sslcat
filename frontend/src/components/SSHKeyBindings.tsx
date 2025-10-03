@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Box,
   VStack,
@@ -63,6 +64,7 @@ const SSHKeyBindings: React.FC<SSHKeyBindingsProps> = ({
   allowedKeys = [],
   onUpdate,
 }) => {
+  const { t } = useTranslation()
   const { adminPrefix } = useConfig()
   const [allKeys, setAllKeys] = useState<SSHKey[]>([])
   const [loading, setLoading] = useState(false)
@@ -286,7 +288,7 @@ const SSHKeyBindings: React.FC<SSHKeyBindingsProps> = ({
                     </Td>
                     <Td>
                       <IconButton
-                        aria-label="解绑密钥"
+                        aria-label={t('frontend.unbind_key')}
                         icon={<FiTrash2 />}
                         size="sm"
                         colorScheme="red"
@@ -325,7 +327,7 @@ const SSHKeyBindings: React.FC<SSHKeyBindingsProps> = ({
               </Text>
 
               <Select
-                placeholder="选择SSH密钥"
+                placeholder={t('frontend.select_ssh_key')}
                 value={selectedKey}
                 onChange={(e) => setSelectedKey(e.target.value)}
               >

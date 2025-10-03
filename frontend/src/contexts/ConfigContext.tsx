@@ -139,7 +139,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
     try {
       const notificationData = {
         type: 'admin_prefix_changed',
-        message: `管理面板访问前缀已从 "${oldPrefix}" 更改为 "${newPrefix}"`,
+        message: `Admin panel access prefix changed from "${oldPrefix}" to "${newPrefix}"`,
         details: {
           old_prefix: oldPrefix,
           new_prefix: newPrefix,
