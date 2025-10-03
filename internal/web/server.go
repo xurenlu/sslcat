@@ -640,6 +640,9 @@ func (s *Server) registerRunnerRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/logs/stream-ws", gitAPI.GetAppLogsStreamWS) // WebSocket
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/logs/history", gitAPI.GetAppLogsHistory)
 
+	// SSH 服务管理 API 路由
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/restart-sshd", gitAPI.RestartSSHD)
+
 	// Docker Registry API 路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/docker/images", gitAPI.GetDockerImages)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/docker/config", gitAPI.GetDockerConfig)

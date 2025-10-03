@@ -816,3 +816,24 @@ func (s *Server) handleGitServer(w http.ResponseWriter, r *http.Request) {
 	html := s.generateGitServerManagementHTML(data)
 	w.Write([]byte(html))
 }
+
+// RestartSSHD 重启 SSH 服务
+func (api *GitServerAPI) RestartSSHD(w http.ResponseWriter, r *http.Request) {
+	if api.server == nil {
+		api.writeError(w, "Git Deploy 服务未启用", http.StatusServiceUnavailable)
+		return
+	}
+
+	// 调用 GitServer 的 restartSSHD 方法
+	if err := api.server.RestartSSHD(); err != nil {
+		api.logger.Errorf("重启 SSH 服务失败: %v", err)
+		api.writeError(w, "重启 SSH 服务失败: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"success": true,
+		"message": "SSH 服务重启成功",
+	}
+	api.writeJSON(w, response)
+}

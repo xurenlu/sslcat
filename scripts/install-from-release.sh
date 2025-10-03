@@ -9,6 +9,8 @@ VER=""
 DEST_LINUX="/opt/sslcat"
 CONF_LINUX="/etc/sslcat/sslcat.conf"
 LANG_CODE=""
+INSTALL_DOCKER=false
+INSTALL_GIT_USER=false
 
 normalize_lang() {
   local x="${1,,}"
@@ -83,6 +85,60 @@ i18n() {
     es:panel_hint) echo "[sslcat] Panel de administración: http://%s:80/sslcat-panel/ o https://<tu-dominio>/sslcat-panel/ (se solicitará cambiar la contraseña en el primer inicio)";;
     ja:panel_hint) echo "[sslcat] 管理パネル: http://%s:80/sslcat-panel/ または https://<あなたのドメイン>/sslcat-panel/（初回ログイン時にパスワード変更が必要）";;
 
+    zh:checking_docker) echo "[sslcat] 检查 Docker 是否已安装...";;
+    en:checking_docker) echo "[sslcat] Checking if Docker is installed...";;
+    fr:checking_docker) echo "[sslcat] Vérification de l'installation de Docker...";;
+    es:checking_docker) echo "[sslcat] Verificando si Docker está instalado...";;
+    ja:checking_docker) echo "[sslcat] Docker がインストールされているかチェック中...";;
+
+    zh:docker_not_found) echo "[sslcat] Docker 未安装，尝试安装 Docker...";;
+    en:docker_not_found) echo "[sslcat] Docker not found, attempting to install Docker...";;
+    fr:docker_not_found) echo "[sslcat] Docker non trouvé, tentative d'installation...";;
+    es:docker_not_found) echo "[sslcat] Docker no encontrado, intentando instalar...";;
+    ja:docker_not_found) echo "[sslcat] Docker が見つかりません。インストールを試行中...";;
+
+    zh:docker_installed) echo "[sslcat] Docker 安装成功";;
+    en:docker_installed) echo "[sslcat] Docker installed successfully";;
+    fr:docker_installed) echo "[sslcat] Docker installé avec succès";;
+    es:docker_installed) echo "[sslcat] Docker instalado exitosamente";;
+    ja:docker_installed) echo "[sslcat] Docker のインストールが完了しました";;
+
+    zh:docker_install_failed) echo "[sslcat] Docker 安装失败，请手动安装: https://docs.docker.com/get-docker/";;
+    en:docker_install_failed) echo "[sslcat] Docker installation failed, please install manually: https://docs.docker.com/get-docker/";;
+    fr:docker_install_failed) echo "[sslcat] Échec de l'installation de Docker, installez manuellement: https://docs.docker.com/get-docker/";;
+    es:docker_install_failed) echo "[sslcat] Falló la instalación de Docker, instale manualmente: https://docs.docker.com/get-docker/";;
+    ja:docker_install_failed) echo "[sslcat] Docker のインストールに失敗しました。手動でインストールしてください: https://docs.docker.com/get-docker/";;
+
+    zh:checking_git_user) echo "[sslcat] 检查 git 用户是否存在...";;
+    en:checking_git_user) echo "[sslcat] Checking if git user exists...";;
+    fr:checking_git_user) echo "[sslcat] Vérification de l'existence de l'utilisateur git...";;
+    es:checking_git_user) echo "[sslcat] Verificando si existe el usuario git...";;
+    ja:checking_git_user) echo "[sslcat] git ユーザーが存在するかチェック中...";;
+
+    zh:git_user_not_found) echo "[sslcat] git 用户不存在，创建 git 用户...";;
+    en:git_user_not_found) echo "[sslcat] git user not found, creating git user...";;
+    fr:git_user_not_found) echo "[sslcat] Utilisateur git non trouvé, création en cours...";;
+    es:git_user_not_found) echo "[sslcat] Usuario git no encontrado, creando usuario git...";;
+    ja:git_user_not_found) echo "[sslcat] git ユーザーが見つかりません。作成中...";;
+
+    zh:git_user_created) echo "[sslcat] git 用户创建成功";;
+    en:git_user_created) echo "[sslcat] git user created successfully";;
+    fr:git_user_created) echo "[sslcat] Utilisateur git créé avec succès";;
+    es:git_user_created) echo "[sslcat] Usuario git creado exitosamente";;
+    ja:git_user_created) echo "[sslcat] git ユーザーが作成されました";;
+
+    zh:git_user_exists) echo "[sslcat] git 用户已存在";;
+    en:git_user_exists) echo "[sslcat] git user already exists";;
+    fr:git_user_exists) echo "[sslcat] Utilisateur git existe déjà";;
+    es:git_user_exists) echo "[sslcat] Usuario git ya existe";;
+    ja:git_user_exists) echo "[sslcat] git ユーザーは既に存在します";;
+
+    zh:installing_dependencies) echo "[sslcat] 安装系统依赖...";;
+    en:installing_dependencies) echo "[sslcat] Installing system dependencies...";;
+    fr:installing_dependencies) echo "[sslcat] Installation des dépendances système...";;
+    es:installing_dependencies) echo "[sslcat] Instalando dependencias del sistema...";;
+    ja:installing_dependencies) echo "[sslcat] システム依存関係をインストール中...";;
+
     *) echo "[sslcat] %s";;
   esac
 }
@@ -99,6 +155,12 @@ while [[ $# -gt 0 ]]; do
     -l|--lang)
       USER_LANG="${2:-}"
       shift 2 ;;
+    --install-docker)
+      INSTALL_DOCKER=true
+      shift ;;
+    --install-git-user)
+      INSTALL_GIT_USER=true
+      shift ;;
     *) shift ;;
   esac
 done
@@ -109,6 +171,104 @@ if [[ -z "$VER" ]]; then
   VER="1.3.2"
   msg missing_version "$VER"
 fi
+
+# 检测并安装系统依赖
+install_dependencies() {
+  msg installing_dependencies
+  
+  # 检测操作系统类型
+  if [[ -f /etc/debian_version ]]; then
+    # Debian/Ubuntu 系统
+    apt-get update -qq
+    apt-get install -y curl wget tar gzip git
+  elif [[ -f /etc/redhat-release ]]; then
+    # RHEL/CentOS/Fedora 系统
+    if command -v dnf >/dev/null 2>&1; then
+      dnf install -y curl wget tar gzip git
+    elif command -v yum >/dev/null 2>&1; then
+      yum install -y curl wget tar gzip git
+    fi
+  elif [[ -f /etc/arch-release ]]; then
+    # Arch Linux
+    pacman -S --noconfirm curl wget tar gzip git
+  elif [[ "$OS" == "darwin" ]]; then
+    # macOS - 检查 Homebrew
+    if ! command -v brew >/dev/null 2>&1; then
+      echo "请先安装 Homebrew: https://brew.sh/"
+      exit 1
+    fi
+    brew install curl wget git
+  fi
+}
+
+# 检测并安装 Docker
+install_docker() {
+  msg checking_docker
+  
+  if command -v docker >/dev/null 2>&1; then
+    echo "Docker 已安装"
+    return 0
+  fi
+  
+  msg docker_not_found
+  
+  # 检测操作系统并安装 Docker
+  if [[ -f /etc/debian_version ]]; then
+    # Debian/Ubuntu
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sh get-docker.sh
+    systemctl enable docker
+    systemctl start docker
+    rm get-docker.sh
+  elif [[ -f /etc/redhat-release ]]; then
+    # RHEL/CentOS/Fedora
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sh get-docker.sh
+    systemctl enable docker
+    systemctl start docker
+    rm get-docker.sh
+  elif [[ "$OS" == "darwin" ]]; then
+    # macOS
+    if command -v brew >/dev/null 2>&1; then
+      brew install --cask docker
+    else
+      msg docker_install_failed
+      return 1
+    fi
+  else
+    msg docker_install_failed
+    return 1
+  fi
+  
+  if command -v docker >/dev/null 2>&1; then
+    msg docker_installed
+  else
+    msg docker_install_failed
+    return 1
+  fi
+}
+
+# 检测并创建 git 用户
+setup_git_user() {
+  msg checking_git_user
+  
+  if id -u git >/dev/null 2>&1; then
+    msg git_user_exists
+    return 0
+  fi
+  
+  msg git_user_not_found
+  
+  # 创建 git 用户
+  useradd -r -s /bin/bash -m -d /home/git git
+  
+  if id -u git >/dev/null 2>&1; then
+    msg git_user_created
+  else
+    echo "创建 git 用户失败"
+    return 1
+  fi
+}
 
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH_RAW=$(uname -m)
@@ -137,6 +297,19 @@ if [[ "$OS" == "darwin" ]]; then
   msg installed_path "/usr/local/bin/sslcat"
   msg run_hint "sslcat --config sslcat.conf --port 8080"
   exit 0
+fi
+
+# 安装系统依赖
+install_dependencies
+
+# 安装 Docker（如果需要）
+if [[ "$INSTALL_DOCKER" == "true" ]]; then
+  install_docker
+fi
+
+# 设置 git 用户（如果需要）
+if [[ "$INSTALL_GIT_USER" == "true" ]]; then
+  setup_git_user
 fi
 
 # Linux: 安装到 /opt/sslcat 并写入 systemd 与默认配置
@@ -255,6 +428,16 @@ if [[ ! -f "$CONF_LINUX" ]]; then
   },
   "static_sites": [],
   "php_sites": [],
+  "runners": {
+    "git": {
+      "enabled": true,
+      "repos_dir": "/var/lib/sslcat/runners/git",
+      "max_concurrent": 3,
+      "clone_timeout": 300,
+      "auto_cleanup": true,
+      "cleanup_interval": 7200
+    }
+  },
   "upstream_cache": {
     "enabled": true,
     "cache_dir": "./data/upstream-cache",

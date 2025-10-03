@@ -1753,6 +1753,14 @@ func (gs *GitServer) setupSSHUser() error {
 	}
 
 	gs.logger.Info("SSH 用户配置完成")
+
+	// 尝试自动重启 sshd 服务
+	if err := gs.restartSSHD(); err != nil {
+		gs.logger.Warnf("自动重启 SSH 服务失败: %v，请手动执行: sudo systemctl restart sshd", err)
+	} else {
+		gs.logger.Info("SSH 服务已自动重启")
+	}
+
 	return nil
 }
 
@@ -1935,8 +1943,62 @@ func (gs *GitServer) keyExists(fingerprint string) bool {
 			return true
 		}
 	}
-
 	return false
+}
+
+// restartSSHD 重启 SSH 服务
+func (gs *GitServer) restartSSHD() error {
+	// 检测操作系统类型
+	osType := gs.detectOSType()
+
+	var cmd *exec.Cmd
+	switch osType {
+	case "linux":
+		// Linux 系统使用 systemctl
+		cmd = exec.Command("systemctl", "restart", "sshd")
+	case "darwin":
+		// macOS 系统使用 launchctl
+		cmd = exec.Command("launchctl", "unload", "/System/Library/LaunchDaemons/ssh.plist")
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("卸载 SSH 服务失败: %w", err)
+		}
+		cmd = exec.Command("launchctl", "load", "/System/Library/LaunchDaemons/ssh.plist")
+	default:
+		return fmt.Errorf("不支持的操作系统: %s", osType)
+	}
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("重启 SSH 服务失败: %s, %w", string(output), err)
+	}
+
+	gs.logger.Infof("SSH 服务重启成功: %s", string(output))
+	return nil
+}
+
+// detectOSType 检测操作系统类型
+func (gs *GitServer) detectOSType() string {
+	// 检查是否存在 systemctl 命令（Linux）
+	if _, err := exec.LookPath("systemctl"); err == nil {
+		// 进一步检查是否是 systemd 系统
+		cmd := exec.Command("systemctl", "--version")
+		if err := cmd.Run(); err == nil {
+			return "linux"
+		}
+	}
+
+	// 检查是否是 macOS
+	if _, err := exec.LookPath("launchctl"); err == nil {
+		return "darwin"
+	}
+
+	// 默认返回 linux
+	return "linux"
+}
+
+// RestartSSHD 公开的 SSH 服务重启方法（供 API 调用）
+func (gs *GitServer) RestartSSHD() error {
+	return gs.restartSSHD()
 }
 
 // ==================== 日志管理 ====================

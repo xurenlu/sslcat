@@ -368,6 +368,43 @@ const GitServerManagement: React.FC = () => {
     }
   }
 
+  const handleRestartSSHD = async () => {
+    setLoading(true)
+    try {
+      const response = await fetch(`${adminPrefix}/api/git-server/restart-sshd`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      const data = await response.json()
+      
+      if (response.ok) {
+        toast({
+          title: 'SSH 服务重启成功',
+          description: data.message || 'SSH 服务已成功重启',
+          status: 'success',
+          duration: 5000,
+          isClosable: true,
+        })
+      } else {
+        throw new Error(data.message || '重启失败')
+      }
+    } catch (error) {
+      console.error('重启 SSH 服务失败:', error)
+      toast({
+        title: '重启 SSH 服务失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleCreateApp = async () => {
     if (!newApp.name) {
       toast({
@@ -856,6 +893,35 @@ git push sslcat main`
             {config.enabled ? `服务器正在运行，端口 ${config.port}` : '服务器已禁用'}
           </AlertDescription>
         </Alert>
+
+        {/* SSH 服务重启提示 */}
+        {config.enabled && (
+          <Alert status="info" mb={6}>
+            <AlertIcon />
+            <Box flex="1">
+              <AlertTitle>需要重启 SSH 服务</AlertTitle>
+              <AlertDescription>
+                首次启用 Git Deploy 服务后，需要重启 SSH 服务以使配置生效。
+                <br />
+                <Text as="span" fontWeight="bold" color="blue.600">
+                  Linux: sudo systemctl restart sshd
+                </Text>
+                <br />
+                <Text as="span" fontWeight="bold" color="blue.600">
+                  macOS: sudo launchctl unload /System/Library/LaunchDaemons/ssh.plist && sudo launchctl load /System/Library/LaunchDaemons/ssh.plist
+                </Text>
+              </AlertDescription>
+            </Box>
+            <Button
+              colorScheme="blue"
+              size="sm"
+              onClick={handleRestartSSHD}
+              isLoading={loading}
+            >
+              自动重启 SSH
+            </Button>
+          </Alert>
+        )}
 
         {/* 统计信息 */}
         <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={6} mb={8}>
