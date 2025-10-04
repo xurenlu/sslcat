@@ -164,8 +164,8 @@ const GitServerManagement: React.FC = () => {
   const [selectedApp, setSelectedApp] = useState<string>('')
   const [isEnvModalOpen, setIsEnvModalOpen] = useState(false)
   const [envEditorApp, setEnvEditorApp] = useState<GitApp | null>(null)
-  const [envVars, setEnvVars] = useState<Array<{ key: string; value: string }>>([
-    { key: '', value: '' },
+  const [envVars, setEnvVars] = useState<Array<{ id: string; key: string; value: string }>>([
+    { id: Date.now().toString(), key: '', value: '' },
   ])
   const [savingEnv, setSavingEnv] = useState(false)
   const [isRoutingModalOpen, setIsRoutingModalOpen] = useState(false)
@@ -181,20 +181,24 @@ const GitServerManagement: React.FC = () => {
   const openEnvModal = (app: GitApp) => {
     setEnvEditorApp(app)
     const existingVars = (app as any).envVars || {}
-    const entries = Object.entries(existingVars).map(([key, value]) => ({ key, value: String(value ?? '') }))
-    setEnvVars(entries.length > 0 ? entries : [{ key: '', value: '' }])
+    const entries = Object.entries(existingVars).map(([key, value], index) => ({ 
+      id: `${Date.now()}-${index}`, 
+      key, 
+      value: String(value ?? '') 
+    }))
+    setEnvVars(entries.length > 0 ? entries : [{ id: Date.now().toString(), key: '', value: '' }])
     setIsEnvModalOpen(true)
   }
 
   const closeEnvModal = () => {
     setIsEnvModalOpen(false)
     setEnvEditorApp(null)
-    setEnvVars([{ key: '', value: '' }])
+    setEnvVars([{ id: Date.now().toString(), key: '', value: '' }])
     setSavingEnv(false)
   }
 
   const addEnvRow = () => {
-    setEnvVars((prev) => [...prev, { key: '', value: '' }])
+    setEnvVars((prev) => [...prev, { id: Date.now().toString(), key: '', value: '' }])
   }
 
   const updateEnvRow = (index: number, field: 'key' | 'value', value: string) => {
@@ -206,7 +210,7 @@ const GitServerManagement: React.FC = () => {
   const removeEnvRow = (index: number) => {
     setEnvVars((prev) => {
       const next = prev.filter((_, i) => i !== index)
-      return next.length > 0 ? next : [{ key: '', value: '' }]
+      return next.length > 0 ? next : [{ id: Date.now().toString(), key: '', value: '' }]
     })
   }
 
@@ -849,7 +853,7 @@ git push sslcat main`
               </Alert>
               <VStack spacing={3} align="stretch">
                 {envVars.map((item, index) => (
-                  <HStack key={index} spacing={3} align="flex-start">
+                  <HStack key={item.id} spacing={3} align="flex-start">
                     <FormControl>
                       <FormLabel fontSize="sm">变量名</FormLabel>
                       <Input
