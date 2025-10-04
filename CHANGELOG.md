@@ -1,3 +1,51 @@
+## [1.3.5-rc26] - 2025-10-04
+
+### 🔧 Configuration & Improvements
+
+#### Git Hook 配置自动检测 - 智能适配 adminPrefix
+- **核心改进**: 安装脚本自动检测 SSLcat 配置，生成正确的 API URL
+- **解决问题**: 
+  - 用户可能修改了 `admin_prefix`，硬编码的默认值不适用
+  - SSH command= 执行时环境变量不会自动传递
+  
+- **实现方式**:
+  - 安装脚本读取 `sslcat.conf` 自动检测 `admin_prefix` 和 `port`
+  - 生成系统级配置文件 `/etc/sslcat/git-hook.conf`
+  - `sslcat-git-hook` 脚本启动时自动加载配置文件
+  - 支持多个配置文件位置（按优先级）
+  
+- **配置文件优先级**:
+  1. `/etc/sslcat/git-hook.conf` (系统级，推荐)
+  2. `~/.sslcat-git-hook.conf` (用户级)
+  3. `~/.bashrc` (兼容性)
+  
+- **自动检测示例**:
+  ```bash
+  sudo ./scripts/install-git-hook.sh
+  # 输出：
+  # 📋 检测 SSLcat 配置...
+  #   找到配置文件: /opt/sslcat/sslcat.conf
+  #   检测到的配置：
+  #     Admin Prefix: /sslcat-panel2
+  #     Server Port:  9942
+  #     Repos Dir:    /opt/sslcat/data/runners/git
+  #     API URL:      http://localhost:9942/sslcat-panel2
+  # ✅ 配置文件已创建: /etc/sslcat/git-hook.conf
+  ```
+
+- **手动配置** (如果自动检测失败):
+  ```bash
+  sudo nano /etc/sslcat/git-hook.conf
+  # 修改为您的实际配置
+  export SSLCAT_API_URL="http://localhost:9942/your-custom-prefix"
+  export SSLCAT_REPOS_DIR="/your/custom/path"
+  ```
+
+- **文件**:
+  - `scripts/sslcat-git-hook:10-21` - 配置文件加载逻辑
+  - `scripts/install-git-hook.sh:29-118` - 自动检测和配置生成
+  - `scripts/git-hook.conf.example` - 配置文件模板
+
 ## [1.3.5-rc25] - 2025-10-04
 
 ### 🔐 Security & Authentication

@@ -26,6 +26,97 @@ chmod +x "$TARGET_PATH"
 echo "✅ sslcat-git-hook 已安装到: $TARGET_PATH"
 echo ""
 
+# 创建配置文件（如果不存在）
+CONFIG_DIR="/etc/sslcat"
+CONFIG_FILE="$CONFIG_DIR/git-hook.conf"
+
+echo "📋 检测 SSLcat 配置..."
+
+# 尝试自动检测配置
+DETECTED_ADMIN_PREFIX=""
+DETECTED_PORT=""
+DETECTED_REPOS_DIR=""
+
+# 查找 sslcat 配置文件的常见位置
+for conf_path in "/etc/sslcat/sslcat.conf" "$SCRIPT_DIR/../sslcat.conf" "$SCRIPT_DIR/../data/sslcat.conf"; do
+    if [[ -f "$conf_path" ]]; then
+        echo "  找到配置文件: $conf_path"
+        # 使用 jq 或 grep 提取配置
+        if command -v jq >/dev/null 2>&1; then
+            DETECTED_ADMIN_PREFIX=$(jq -r '.admin_prefix // empty' "$conf_path" 2>/dev/null || echo "")
+            DETECTED_PORT=$(jq -r '.server.port // empty' "$conf_path" 2>/dev/null || echo "")
+            DETECTED_REPOS_DIR=$(jq -r '.runners.git.repos_dir // empty' "$conf_path" 2>/dev/null || echo "")
+        else
+            # 如果没有 jq，尝试用 grep 提取（不太精确）
+            DETECTED_ADMIN_PREFIX=$(grep -o '"admin_prefix"[[:space:]]*:[[:space:]]*"[^"]*"' "$conf_path" | sed 's/.*"\([^"]*\)".*/\1/' || echo "")
+            DETECTED_PORT=$(grep -o '"port"[[:space:]]*:[[:space:]]*[0-9]*' "$conf_path" | grep -o '[0-9]*' | head -1 || echo "")
+            DETECTED_REPOS_DIR=$(grep -o '"repos_dir"[[:space:]]*:[[:space:]]*"[^"]*"' "$conf_path" | sed 's/.*"\([^"]*\)".*/\1/' || echo "")
+        fi
+        break
+    fi
+done
+
+# 设置默认值
+ADMIN_PREFIX="${DETECTED_ADMIN_PREFIX:-/sslcat-panel2}"
+SERVER_PORT="${DETECTED_PORT:-9942}"
+REPOS_DIR="${DETECTED_REPOS_DIR:-/opt/sslcat/data/runners/git}"
+
+# 构建 API URL
+API_URL="http://localhost:${SERVER_PORT}${ADMIN_PREFIX}"
+
+echo "  检测到的配置："
+echo "    Admin Prefix: $ADMIN_PREFIX"
+echo "    Server Port:  $SERVER_PORT"
+echo "    Repos Dir:    $REPOS_DIR"
+echo "    API URL:      $API_URL"
+echo ""
+
+echo "📋 创建配置文件..."
+if [[ ! -f "$CONFIG_FILE" ]]; then
+    mkdir -p "$CONFIG_DIR"
+    cat > "$CONFIG_FILE" << EOF
+# SSLcat Git Hook 配置文件
+# 自动生成于: $(date)
+# 
+# 此配置从 SSLcat 主配置文件自动检测而来
+# 如果 SSLcat 配置变更，请重新运行安装脚本或手动修改此文件
+
+# SSLcat API 地址
+export SSLCAT_API_URL="$API_URL"
+
+# Git 仓库存储目录
+export SSLCAT_REPOS_DIR="$REPOS_DIR"
+
+# 注意：如果修改了 SSLcat 的 admin_prefix 或端口，需要同步更新此文件
+EOF
+    chmod 644 "$CONFIG_FILE"
+    echo "✅ 配置文件已创建: $CONFIG_FILE"
+else
+    echo "ℹ️  配置文件已存在: $CONFIG_FILE"
+    echo ""
+    echo "⚠️  检测到配置文件已存在，新配置为："
+    echo "    $API_URL"
+    echo ""
+    read -p "是否要更新配置文件? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        cat > "$CONFIG_FILE" << EOF
+# SSLcat Git Hook 配置文件
+# 更新于: $(date)
+
+# SSLcat API 地址
+export SSLCAT_API_URL="$API_URL"
+
+# Git 仓库存储目录
+export SSLCAT_REPOS_DIR="$REPOS_DIR"
+EOF
+        echo "✅ 配置文件已更新"
+    else
+        echo "ℹ️  保持现有配置不变"
+    fi
+fi
+echo ""
+
 # 设置环境变量（可选）
 echo "📝 配置说明："
 echo ""

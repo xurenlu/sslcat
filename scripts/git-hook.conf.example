@@ -1,0 +1,24 @@
+# SSLcat Git Hook 配置文件
+# 
+# 此文件应该安装到以下位置之一（按优先级排序）：
+# 1. /etc/sslcat/git-hook.conf (系统级，推荐)
+# 2. ~/.sslcat-git-hook.conf (用户级)
+#
+# 说明：
+# - SSH command= 执行时不会加载 .bashrc，所以需要单独的配置文件
+# - 如果不创建此文件，脚本将使用默认值
+
+# SSLcat API 地址
+# 默认: http://localhost/sslcat-panel
+export SSLCAT_API_URL="http://localhost/sslcat-panel"
+
+# Git 仓库存储目录
+# 默认: /opt/sslcat/data/runners/git
+export SSLCAT_REPOS_DIR="/opt/sslcat/data/runners/git"
+
+# 如果您的 SSLcat 运行在非标准端口：
+# export SSLCAT_API_URL="http://localhost:9942/sslcat-panel2"
+
+# 如果您的仓库目录在其他位置：
+# export SSLCAT_REPOS_DIR="/var/lib/sslcat/git"
+

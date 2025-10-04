@@ -7,7 +7,20 @@
 
 set -eo pipefail
 
-# 配置
+# 尝试加载环境配置（SSH command= 执行时环境变量可能不会被传递）
+# 按优先级顺序尝试加载配置文件
+if [[ -f /etc/sslcat/git-hook.conf ]]; then
+    # 系统级配置（推荐）
+    source /etc/sslcat/git-hook.conf
+elif [[ -f ~/.sslcat-git-hook.conf ]]; then
+    # 用户级配置
+    source ~/.sslcat-git-hook.conf
+elif [[ -f ~/.bashrc ]]; then
+    # 尝试加载 .bashrc（可能包含 SSLCAT_ 变量）
+    source ~/.bashrc 2>/dev/null || true
+fi
+
+# 配置（使用环境变量或默认值）
 SSLCAT_API_URL="${SSLCAT_API_URL:-http://localhost/sslcat-panel}"
 SSLCAT_REPOS_DIR="${SSLCAT_REPOS_DIR:-/opt/sslcat/data/runners/git}"
 KEY_NAME="$1"
