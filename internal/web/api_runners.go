@@ -29,11 +29,26 @@ func NewGitServerAPI(gs *runner.GitServer, webServer *Server) *GitServerAPI {
 // checkAuthWithLocalhostBypass 检查认证，但对 localhost 请求豁免
 // 用于支持 sslcat-git-hook 等内部工具的 API 调用
 func (api *GitServerAPI) checkAuthWithLocalhostBypass(w http.ResponseWriter, r *http.Request) bool {
+	// 详细记录请求信息用于调试
+	api.logger.Infof("[Auth Debug] Path: %s, RemoteAddr: %s", r.URL.Path, r.RemoteAddr)
+	api.logger.Infof("[Auth Debug] CF-Connecting-IP: %s", r.Header.Get("CF-Connecting-IP"))
+	api.logger.Infof("[Auth Debug] X-Real-IP: %s", r.Header.Get("X-Real-IP"))
+	api.logger.Infof("[Auth Debug] X-Forwarded-For: %s", r.Header.Get("X-Forwarded-For"))
+	api.logger.Infof("[Auth Debug] User-Agent: %s", r.Header.Get("User-Agent"))
+	
+	var clientIP string
+	if api.webServer != nil {
+		clientIP = api.webServer.getClientIP(r)
+		api.logger.Infof("[Auth Debug] Computed Client IP: %s", clientIP)
+	}
+	
 	// 检查是否是 localhost 请求
 	if api.webServer != nil && api.webServer.isLocalhostRequest(r) {
-		api.logger.Debugf("Localhost request detected from %s, bypassing authentication", api.webServer.getClientIP(r))
+		api.logger.Infof("✓ Localhost request detected from %s, bypassing authentication", clientIP)
 		return true
 	}
+
+	api.logger.Warnf("✗ NOT localhost request (IP: %s), requiring authentication", clientIP)
 
 	// 非 localhost 请求，需要正常认证
 	if api.webServer != nil && !api.webServer.checkAuth(w, r) {
