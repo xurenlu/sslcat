@@ -2837,6 +2837,10 @@ ADMIN_PREFIX="%s"
 APP_DOMAIN="%s"
 APP_PROTOCOL="%s"
 
+# 配置 git 安全目录
+git config --global --add safe.directory "$REPO_DIR" 2>/dev/null || true
+git config --global --add safe.directory "$BARE_REPO" 2>/dev/null || true
+
 # 颜色定义
 COLOR_RESET='\033[0m'
 COLOR_BOLD='\033[1m'
