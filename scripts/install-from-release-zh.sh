@@ -312,6 +312,49 @@ if [[ "$INSTALL_GIT_USER" == "true" ]]; then
   setup_git_user
 fi
 
+# 安装 git hook wrapper 脚本
+install_git_hook() {
+  echo "[sslcat] 安装 git hook wrapper 脚本..."
+  
+  # 检查是否已安装
+  if [[ -f "/usr/local/bin/sslcat-git-hook" ]]; then
+    echo "[sslcat] git hook wrapper 脚本已存在"
+    return 0
+  fi
+  
+  # 创建脚本目录
+  sudo mkdir -p /opt/sslcat/scripts
+  
+  # 下载 sslcat-git-hook 脚本
+  if ! curl -fsSL "https://sslcat.com/xurenlu/sslcat/main/scripts/sslcat-git-hook" -o /tmp/sslcat-git-hook; then
+    echo "[sslcat] 下载 sslcat-git-hook 脚本失败，跳过安装"
+    return 1
+  fi
+  
+  # 安装脚本
+  sudo install -m 0755 /tmp/sslcat-git-hook /usr/local/bin/sslcat-git-hook
+  sudo install -m 0755 /tmp/sslcat-git-hook /opt/sslcat/scripts/sslcat-git-hook
+  
+  # 创建配置文件
+  sudo mkdir -p /etc/sslcat
+  sudo bash -c "cat > /etc/sslcat/git-hook.conf" <<EOF
+# SSLcat Git Hook 配置文件
+# 自动生成于: $(date)
+
+# SSLcat API 地址
+export SSLCAT_API_URL="http://localhost:80/sslcat-panel"
+
+# Git 仓库存储目录
+export SSLCAT_REPOS_DIR="/var/lib/sslcat/runners/git"
+EOF
+  
+  echo "[sslcat] git hook wrapper 脚本安装成功"
+  rm -f /tmp/sslcat-git-hook
+}
+
+# 安装 git hook wrapper 脚本
+install_git_hook
+
 # Linux: 安装到 /opt/sslcat 并写入 systemd 与默认配置
 sudo mkdir -p "$DEST_LINUX" /var/lib/sslcat/{certs,keys,logs} /etc/sslcat
 tar -xzf "$TMP/pkg${EXT}" -C "$TMP"

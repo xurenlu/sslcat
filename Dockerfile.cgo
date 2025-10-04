@@ -1,47 +1,79 @@
-# Dockerfile for CGO build
-FROM golang:1.24-alpine AS builder
+# Dockerfile for CGO build with China proxy optimization
+# 使用多阶段构建解决交叉编译问题
+FROM --platform=linux/amd64 golang:1.25-alpine AS builder
 
-# Install CGO dependencies
-RUN apk add --no-cache gcc musl-dev sqlite-dev
+# 配置 Alpine 中国镜像源
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 
-# Set working directory
+# 设置 Go 代理环境变量（中国镜像）
+ENV GOPROXY=https://goproxy.cn,direct
+ENV GOSUMDB=sum.golang.google.cn
+ENV GONOPROXY=""
+ENV GONOSUMDB=""
+
+# 安装 CGO 依赖
+RUN apk add --no-cache \
+    gcc \
+    musl-dev \
+    sqlite-dev \
+    git \
+    ca-certificates \
+    tzdata
+
+# 设置工作目录
 WORKDIR /app
 
-# Copy go mod files
+# 复制 go mod 文件
 COPY go.mod go.sum ./
 
-# Download dependencies
+# 下载依赖（使用中国代理）
 RUN go mod download
 
-# Copy source code
+# 复制源代码
 COPY . .
 
-# Build with CGO enabled
-RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build \
+# 构建 CGO 版本（在 AMD64 环境中构建 AMD64 版本）
+RUN CGO_ENABLED=1 go build \
     -ldflags "-s -w -X main.version=dev -X main.build=$(date -u +%Y-%m-%d_%H:%M:%S)" \
-    -o withssl-cgo main.go
+    -o sslcat-cgo main.go
 
-# Final stage
+# 最终阶段
 FROM alpine:latest
 
-# Install runtime dependencies
-RUN apk add --no-cache ca-certificates sqlite
+# 配置 Alpine 中国镜像源
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 
-# Copy binary
-COPY --from=builder /app/withssl-cgo /usr/local/bin/withssl
+# 安装运行时依赖
+RUN apk add --no-cache \
+    ca-certificates \
+    sqlite \
+    tzdata
 
-# Create user
-RUN addgroup -g 1000 withssl && \
-    adduser -D -s /bin/false -u 1000 -G withssl withssl
+# 设置时区
+ENV TZ=Asia/Shanghai
 
-# Set permissions
-RUN chmod +x /usr/local/bin/withssl
+# 复制二进制文件
+COPY --from=builder /app/sslcat-cgo /opt/sslcat/sslcat
 
-# Switch to non-root user
-USER withssl
+# 创建用户和目录
+RUN addgroup -g 1000 sslcat && \
+    adduser -D -s /bin/false -u 1000 -G sslcat sslcat && \
+    mkdir -p /etc/sslcat /var/lib/sslcat/{certs,keys,logs} /opt/sslcat && \
+    chown -R sslcat:sslcat /var/lib/sslcat
 
-# Expose ports
+# 设置权限
+RUN chmod +x /opt/sslcat/sslcat && \
+    chown sslcat:sslcat /opt/sslcat/sslcat
+
+# 切换到非root用户
+USER sslcat
+
+# 暴露端口
 EXPOSE 80 443
 
-# Default command
-CMD ["/usr/local/bin/withssl"]
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:80/health || exit 1
+
+# 默认命令
+CMD ["/opt/sslcat/sslcat", "--config", "/etc/sslcat/sslcat.conf"]

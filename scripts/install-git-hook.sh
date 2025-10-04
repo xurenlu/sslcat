@@ -90,8 +90,14 @@ ADMIN_PREFIX="${DETECTED_ADMIN_PREFIX:-/sslcat-panel2}"
 SERVER_PORT="${DETECTED_PORT:-9942}"
 REPOS_DIR="${DETECTED_REPOS_DIR:-/opt/sslcat/data/runners/git}"
 
-# 构建 API URL
-API_URL="http://localhost:${SERVER_PORT}${ADMIN_PREFIX}"
+# 智能构建 API URL
+# 当端口为 443 时，使用 HTTP (80) 进行 API 调用，因为 443 是 HTTPS 端口
+if [[ "$SERVER_PORT" == "443" ]]; then
+    API_URL="http://localhost:80${ADMIN_PREFIX}"
+    echo "  ⚠️  检测到端口 443，使用 HTTP (80) 进行 API 调用"
+else
+    API_URL="http://localhost:${SERVER_PORT}${ADMIN_PREFIX}"
+fi
 
 echo "  检测到的配置："
 echo "    Admin Prefix: $ADMIN_PREFIX"

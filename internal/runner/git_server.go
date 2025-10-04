@@ -549,6 +549,11 @@ func (gs *GitServer) Start() error {
 		gs.logger.Warnf(gs.translator.T("git_server.setup_ssh_failed")+": %v", err)
 	}
 
+	// 自动安装 git hook wrapper 脚本
+	if err := gs.installGitHook(); err != nil {
+		gs.logger.Warnf("自动安装 git hook wrapper 脚本失败: %v", err)
+	}
+
 	// 创建应用目录
 	if err := os.MkdirAll(gs.config.Runners.Git.ReposDir, 0755); err != nil {
 		return fmt.Errorf(gs.translator.T("git_server.create_app_dir_failed")+": %w", err)
@@ -1970,9 +1975,28 @@ func (gs *GitServer) setupSSHUser() error {
 
 	gs.logger.Infof("使用 git 用户的实际 home 目录: %s", actualHomeDir)
 
-	// 创建标准的 .ssh 目录，使用 700 权限（SSH 要求）
-	if err := os.MkdirAll(gs.sshKeysDir, 0700); err != nil {
-		return fmt.Errorf("创建 SSH 目录失败: %w", err)
+	// 检查 .ssh 目录是否已存在，如果不存在才创建
+	if info, err := os.Stat(gs.sshKeysDir); err != nil {
+		if os.IsNotExist(err) {
+			// 目录不存在，尝试创建
+			if err := os.MkdirAll(gs.sshKeysDir, 0700); err != nil {
+				// 如果是只读文件系统错误，尝试使用现有目录或跳过
+				if strings.Contains(err.Error(), "read-only file system") {
+					gs.logger.Warnf("检测到只读文件系统，无法创建 SSH 目录: %v", err)
+					return nil // 跳过目录创建，继续后续操作
+				} else {
+					return fmt.Errorf("创建 SSH 目录失败: %w", err)
+				}
+			} else {
+				gs.logger.Infof("成功创建 SSH 目录: %s", gs.sshKeysDir)
+			}
+		} else {
+			return fmt.Errorf("检查 SSH 目录状态失败: %w", err)
+		}
+	} else if info.IsDir() {
+		gs.logger.Infof("SSH 目录已存在: %s", gs.sshKeysDir)
+	} else {
+		return fmt.Errorf("SSH 目录路径被文件占用: %s", gs.sshKeysDir)
 	}
 
 	// 设置目录所有者为 git 用户
@@ -2060,7 +2084,7 @@ WELCOME
 	return nil
 }
 
-// createGitUser 创建 git 用户（使用标准的 /home/git 目录）
+// createGitUser 创建 git 用户（智能选择 home 目录）
 func (gs *GitServer) createGitUser() error {
 	// 检查用户是否已存在
 	cmd := exec.Command("id", "-u", gs.sshUser)
@@ -2069,8 +2093,8 @@ func (gs *GitServer) createGitUser() error {
 		return nil
 	}
 
-	// 使用标准的 /home/git 作为 home 目录（最佳实践）
-	homeDir := "/home/git"
+	// 智能选择 home 目录，优先使用标准位置，如果不可用则使用替代位置
+	homeDir := gs.findAvailableHomeDir()
 
 	// 查找 git-shell 路径
 	gitShellPath := "/usr/bin/git-shell" // 默认路径
@@ -2093,6 +2117,42 @@ func (gs *GitServer) createGitUser() error {
 	return nil
 }
 
+// findAvailableHomeDir 查找可用的 home 目录
+func (gs *GitServer) findAvailableHomeDir() string {
+	// 按优先级尝试不同的目录
+	candidates := []string{
+		"/home/git",      // 标准位置
+		"/var/lib/git",   // 系统用户常用位置
+		"/opt/git",       // 替代位置
+		"/usr/local/git", // 本地安装位置
+		"/tmp/git",       // 临时位置（最后选择）
+	}
+
+	for _, dir := range candidates {
+		// 检查目录是否已存在且可写
+		if info, err := os.Stat(dir); err == nil {
+			if info.IsDir() {
+				// 检查是否可写
+				if err := os.MkdirAll(filepath.Join(dir, ".test"), 0755); err == nil {
+					os.RemoveAll(filepath.Join(dir, ".test"))
+					gs.logger.Infof("找到可用的 home 目录: %s", dir)
+					return dir
+				}
+			}
+		} else if os.IsNotExist(err) {
+			// 目录不存在，尝试创建
+			if err := os.MkdirAll(dir, 0755); err == nil {
+				gs.logger.Infof("创建新的 home 目录: %s", dir)
+				return dir
+			}
+		}
+	}
+
+	// 如果所有候选目录都不可用，使用默认位置并记录警告
+	gs.logger.Warnf("所有候选 home 目录都不可用，使用默认位置 /home/git")
+	return "/home/git"
+}
+
 // AddSSHKey 添加 SSH 密钥（Dokku 风格：支持自动创建应用）
 func (gs *GitServer) AddSSHKey(keyName, publicKey string) error {
 	// 验证公钥格式
@@ -2108,9 +2168,65 @@ func (gs *GitServer) AddSSHKey(keyName, publicKey string) error {
 		return fmt.Errorf("密钥已存在")
 	}
 
-	// 确保SSH目录存在
-	if err := os.MkdirAll(gs.sshKeysDir, 0700); err != nil {
-		return fmt.Errorf("创建 SSH 目录失败: %w", err)
+	// 检查SSH目录是否存在，如果不存在才创建
+	if info, err := os.Stat(gs.sshKeysDir); err != nil {
+		if os.IsNotExist(err) {
+			// 目录不存在，尝试创建
+			if err := os.MkdirAll(gs.sshKeysDir, 0700); err != nil {
+				// 如果创建目录失败，检查是否是权限问题或只读文件系统
+				if strings.Contains(err.Error(), "read-only file system") || strings.Contains(err.Error(), "Permission denied") {
+					gs.logger.Warnf("创建 SSH 目录失败，尝试检查 git 用户是否已存在: %v", err)
+
+					// 检查 git 用户是否存在
+					if gitUser, lookupErr := user.Lookup(gs.sshUser); lookupErr == nil {
+						// 用户存在，使用实际的 home 目录
+						actualHomeDir := gitUser.HomeDir
+						actualSSHKeysDir := filepath.Join(actualHomeDir, ".ssh")
+						actualAuthorizedKeysFile := filepath.Join(actualSSHKeysDir, "authorized_keys")
+
+						// 更新路径
+						gs.sshHomeDir = actualHomeDir
+						gs.sshKeysDir = actualSSHKeysDir
+						gs.authorizedKeysFile = actualAuthorizedKeysFile
+
+						// 解析UID和GID
+						uid, _ := strconv.Atoi(gitUser.Uid)
+						gid, _ := strconv.Atoi(gitUser.Gid)
+						gs.uid = uid
+						gs.gid = gid
+
+						gs.logger.Infof("检测到现有 git 用户，使用 home 目录: %s", actualHomeDir)
+
+						// 再次检查实际的 SSH 目录是否存在
+						if _, statErr := os.Stat(gs.sshKeysDir); os.IsNotExist(statErr) {
+							gs.logger.Warnf("实际用户的 .ssh 目录也不存在，跳过目录创建")
+						} else {
+							gs.logger.Infof("使用现有的 SSH 目录: %s", gs.sshKeysDir)
+						}
+
+						// 尝试创建 authorized_keys 文件（如果不存在）
+						if _, statErr := os.Stat(gs.authorizedKeysFile); os.IsNotExist(statErr) {
+							if writeErr := os.WriteFile(gs.authorizedKeysFile, []byte{}, 0600); writeErr != nil {
+								gs.logger.Warnf("无法创建 authorized_keys 文件: %v", writeErr)
+							}
+						}
+					} else {
+						gs.logger.Warnf("git 用户不存在: %v", lookupErr)
+						return fmt.Errorf("创建 SSH 目录失败且 git 用户不存在: %w", err)
+					}
+				} else {
+					return fmt.Errorf("创建 SSH 目录失败: %w", err)
+				}
+			} else {
+				gs.logger.Infof("成功创建 SSH 目录: %s", gs.sshKeysDir)
+			}
+		} else {
+			return fmt.Errorf("检查 SSH 目录状态失败: %w", err)
+		}
+	} else if info.IsDir() {
+		gs.logger.Infof("SSH 目录已存在: %s", gs.sshKeysDir)
+	} else {
+		return fmt.Errorf("SSH 目录路径被文件占用: %s", gs.sshKeysDir)
 	}
 
 	// Dokku 风格：添加 command= 参数来拦截 git 命令
@@ -3650,4 +3766,148 @@ func (gs *GitServer) SendDeployNotification(notifType, appName, commitSHA, commi
 		gs.logger.Warnf("未知的通知类型: %s", notifType)
 		return fmt.Errorf("未知的通知类型: %s", notifType)
 	}
+}
+
+// installGitHook 自动安装 git hook wrapper 脚本
+func (gs *GitServer) installGitHook() error {
+	// 检查 wrapper 脚本是否已经安装
+	wrapperPath := "/usr/local/bin/sslcat-git-hook"
+	if info, err := os.Stat(wrapperPath); err == nil && info.Mode().IsRegular() {
+		gs.logger.Infof("git hook wrapper 脚本已存在: %s", wrapperPath)
+		return nil
+	}
+
+	gs.logger.Infof("开始自动安装 git hook wrapper 脚本...")
+
+	// 尝试找到 install-git-hook.sh 脚本
+	scriptPaths := []string{
+		"/opt/sslcat/scripts/install-git-hook.sh", // 标准安装路径
+		"/usr/local/bin/install-git-hook.sh",      // 可能的安装路径
+		"./scripts/install-git-hook.sh",           // 开发环境
+		"scripts/install-git-hook.sh",             // 相对路径
+	}
+
+	var scriptPath string
+	for _, path := range scriptPaths {
+		if info, err := os.Stat(path); err == nil && info.Mode().IsRegular() {
+			scriptPath = path
+			break
+		}
+	}
+
+	if scriptPath == "" {
+		// 如果找不到脚本，尝试手动安装
+		return gs.manualInstallGitHook()
+	}
+
+	gs.logger.Infof("找到安装脚本: %s", scriptPath)
+
+	// 执行安装脚本
+	cmd := exec.Command("bash", scriptPath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		gs.logger.Errorf("执行 git hook 安装脚本失败: %v, 输出: %s", err, string(output))
+		// 如果脚本执行失败，尝试手动安装
+		return gs.manualInstallGitHook()
+	}
+
+	gs.logger.Infof("git hook wrapper 脚本安装成功")
+	gs.logger.Debugf("安装输出: %s", string(output))
+	return nil
+}
+
+// manualInstallGitHook 手动安装 git hook wrapper 脚本
+func (gs *GitServer) manualInstallGitHook() error {
+	gs.logger.Infof("尝试手动安装 git hook wrapper 脚本...")
+
+	// 检查 wrapper 脚本源码是否存在
+	wrapperSourcePaths := []string{
+		"/opt/sslcat/scripts/sslcat-git-hook", // 标准安装路径
+		"/usr/local/bin/sslcat-git-hook",      // 可能的安装路径
+		"./scripts/sslcat-git-hook",           // 开发环境
+		"scripts/sslcat-git-hook",             // 相对路径
+	}
+
+	var sourcePath string
+	for _, path := range wrapperSourcePaths {
+		if info, err := os.Stat(path); err == nil && info.Mode().IsRegular() {
+			sourcePath = path
+			break
+		}
+	}
+
+	if sourcePath == "" {
+		return fmt.Errorf("找不到 sslcat-git-hook 脚本源码")
+	}
+
+	// 复制脚本到目标位置
+	targetPath := "/usr/local/bin/sslcat-git-hook"
+
+	// 读取源文件
+	sourceData, err := os.ReadFile(sourcePath)
+	if err != nil {
+		return fmt.Errorf("读取源脚本失败: %w", err)
+	}
+
+	// 写入目标文件
+	if err := os.WriteFile(targetPath, sourceData, 0755); err != nil {
+		return fmt.Errorf("写入目标脚本失败: %w", err)
+	}
+
+	gs.logger.Infof("手动安装 git hook wrapper 脚本成功: %s", targetPath)
+
+	// 尝试创建配置文件
+	return gs.createGitHookConfig()
+}
+
+// createGitHookConfig 创建 git hook 配置文件
+func (gs *GitServer) createGitHookConfig() error {
+	configDir := "/etc/sslcat"
+	configFile := filepath.Join(configDir, "git-hook.conf")
+
+	// 检查配置文件是否已存在
+	if _, err := os.Stat(configFile); err == nil {
+		gs.logger.Infof("git hook 配置文件已存在: %s", configFile)
+		return nil
+	}
+
+	// 创建配置目录
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		gs.logger.Warnf("创建配置目录失败: %v", err)
+		return nil // 非致命错误
+	}
+
+	// 构建 API URL
+	var apiURL string
+	if gs.config.Server.Port == 443 {
+		// 当端口为 443 时，使用 HTTP (80) 进行 API 调用
+		apiURL = fmt.Sprintf("http://localhost:80%s", gs.config.AdminPrefix)
+	} else {
+		apiURL = fmt.Sprintf("http://localhost:%d%s", gs.config.Server.Port, gs.config.AdminPrefix)
+	}
+
+	// 创建配置文件内容
+	configContent := fmt.Sprintf(`# SSLcat Git Hook 配置文件
+# 自动生成于: %s
+# 
+# 此配置从 SSLcat 主配置文件自动检测而来
+# 如果 SSLcat 配置变更，请重新运行安装脚本或手动修改此文件
+
+# SSLcat API 地址
+export SSLCAT_API_URL="%s"
+
+# Git 仓库存储目录
+export SSLCAT_REPOS_DIR="%s"
+
+# 注意：如果修改了 SSLcat 的 admin_prefix 或端口，需要同步更新此文件
+`, time.Now().Format("2006-01-02 15:04:05"), apiURL, gs.config.Runners.Git.ReposDir)
+
+	// 写入配置文件
+	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		gs.logger.Warnf("创建 git hook 配置文件失败: %v", err)
+		return nil // 非致命错误
+	}
+
+	gs.logger.Infof("git hook 配置文件创建成功: %s", configFile)
+	return nil
 }
