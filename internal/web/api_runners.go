@@ -34,12 +34,12 @@ func (api *GitServerAPI) checkAuthWithLocalhostBypass(w http.ResponseWriter, r *
 		api.logger.Debugf("Localhost request detected from %s, bypassing authentication", api.webServer.getClientIP(r))
 		return true
 	}
-	
+
 	// 非 localhost 请求，需要正常认证
 	if api.webServer != nil && !api.webServer.checkAuth(w, r) {
 		return false
 	}
-	
+
 	return true
 }
 
@@ -146,7 +146,7 @@ func (api *GitServerAPI) CreateApp(w http.ResponseWriter, r *http.Request) {
 	if !api.checkAuthWithLocalhostBypass(w, r) {
 		return
 	}
-	
+
 	var req struct {
 		Name        string `json:"name"`
 		DisplayName string `json:"display_name"`
@@ -159,8 +159,8 @@ func (api *GitServerAPI) CreateApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	api.logger.Infof("开始创建应用: %s (AutoSSL: %v) [来自: %s]", 
-		req.Name, req.AutoSSL, 
+	api.logger.Infof("开始创建应用: %s (AutoSSL: %v) [来自: %s]",
+		req.Name, req.AutoSSL,
 		func() string {
 			if api.webServer != nil {
 				return api.webServer.getClientIP(r)

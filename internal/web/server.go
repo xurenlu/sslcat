@@ -979,16 +979,16 @@ func (s *Server) isPrivateIP(ip string) bool {
 // 用于内部 API 调用（如 sslcat-git-hook）的认证豁免
 func (s *Server) isLocalhostRequest(r *http.Request) bool {
 	clientIP := s.getClientIP(r)
-	
+
 	// 检查是否是 localhost
 	// 支持 IPv4 的 127.0.0.1 和 IPv6 的 ::1
-	if clientIP == "127.0.0.1" || 
-	   clientIP == "::1" || 
-	   strings.HasPrefix(clientIP, "127.") ||
-	   clientIP == "localhost" {
+	if clientIP == "127.0.0.1" ||
+		clientIP == "::1" ||
+		strings.HasPrefix(clientIP, "127.") ||
+		clientIP == "localhost" {
 		return true
 	}
-	
+
 	return false
 }
 

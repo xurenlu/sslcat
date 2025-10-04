@@ -1956,9 +1956,23 @@ func (gs *GitServer) setupSSHUser() error {
 	uid, _ := strconv.Atoi(gitUser.Uid)
 	gid, _ := strconv.Atoi(gitUser.Gid)
 
+	// 使用实际的用户 home 目录（而不是硬编码的 /home/git）
+	actualHomeDir := gitUser.HomeDir
+	actualSSHKeysDir := filepath.Join(actualHomeDir, ".ssh")
+	actualAuthorizedKeysFile := filepath.Join(actualSSHKeysDir, "authorized_keys")
+
+	// 更新路径（使用实际的 home 目录）
+	gs.sshHomeDir = actualHomeDir
+	gs.sshKeysDir = actualSSHKeysDir
+	gs.authorizedKeysFile = actualAuthorizedKeysFile
+	gs.uid = uid
+	gs.gid = gid
+
+	gs.logger.Infof("使用 git 用户的实际 home 目录: %s", actualHomeDir)
+
 	// 创建标准的 .ssh 目录，使用 700 权限（SSH 要求）
 	if err := os.MkdirAll(gs.sshKeysDir, 0700); err != nil {
-		return fmt.Errorf("创建 .ssh 目录失败: %w", err)
+		return fmt.Errorf("创建 SSH 目录失败: %w", err)
 	}
 
 	// 设置目录所有者为 git 用户
