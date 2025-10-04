@@ -582,7 +582,19 @@ func (gs *GitServer) UpdateServerConfig(config *GitServerConfig) error {
 
 	gs.serverConfig = config
 
-	// 保存配置到文件
+	// 同步更新主配置文件中的 runners.git.enabled
+	// 这样重启服务后配置才会生效
+	gs.config.Runners.Git.Enabled = config.Enabled
+	
+	// 保存主配置文件
+	if err := gs.config.Save(gs.config.ConfigFile); err != nil {
+		gs.logger.Warnf("保存主配置文件失败: %v", err)
+		// 继续执行，不中断流程
+	} else {
+		gs.logger.Info("主配置文件已更新")
+	}
+
+	// 保存 Git Server 内部配置到文件
 	if err := gs.saveServerConfig(); err != nil {
 		return fmt.Errorf(gs.translator.T("git_server.save_config_failed")+": %w", err)
 	}
