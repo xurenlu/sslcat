@@ -1011,6 +1011,56 @@ func (api *GitServerAPI) HandleDeployNotification(w http.ResponseWriter, r *http
 	api.writeJSON(w, response)
 }
 
+// ReinstallHooks 重新安装应用的 Git hooks
+func (api *GitServerAPI) ReinstallHooks(w http.ResponseWriter, r *http.Request) {
+	if !api.webServer.checkAuth(w, r) {
+		return
+	}
+	
+	if r.Method != "POST" {
+		api.writeError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	
+	appName := r.URL.Query().Get("name")
+	if appName == "" {
+		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+		return
+	}
+	
+	if api.server == nil {
+		api.writeError(w, "Git Deploy 服务未启用", http.StatusServiceUnavailable)
+		return
+	}
+	
+	api.logger.Infof("重新安装应用 %s 的 Git hooks", appName)
+	
+	// 获取应用
+	app, err := api.server.GetApp(appName)
+	if err != nil || app == nil {
+		api.writeError(w, "应用不存在: "+appName, http.StatusNotFound)
+		return
+	}
+	
+	// 重新安装 hooks
+	if err := api.server.SetupGitHooksForApp(app); err != nil {
+		api.logger.Errorf("重新安装 hooks 失败: %v", err)
+		api.writeError(w, "重新安装 hooks 失败: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	response := map[string]interface{}{
+		"success": true,
+		"message": "Git hooks 已重新安装",
+		"data": map[string]interface{}{
+			"app_name":  appName,
+			"bare_repo": app.BareRepo,
+		},
+	}
+	
+	api.writeJSON(w, response)
+}
+
 // HandleAppAction 处理应用相关的操作 (RESTful风格)
 // 支持 /api/git-server/apps/{name}/deploy
 func (api *GitServerAPI) HandleAppAction(w http.ResponseWriter, r *http.Request) {

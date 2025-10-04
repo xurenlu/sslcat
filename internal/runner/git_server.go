@@ -1080,7 +1080,7 @@ func (gs *GitServer) detectAppType(app *GitApp) (string, error) {
 	// 使用工作目录而不是裸仓库目录进行检测
 	detectPath := app.RepoDir
 	gs.logger.Debugf("检测应用类型，路径: %s", detectPath)
-	
+
 	builder, err := gs.builderRegistry.DetectBuilder(detectPath)
 	if err != nil {
 		// 如果检测失败，默认使用静态文件
@@ -2577,6 +2577,11 @@ func (lm *LogManager) GetLogFiles(appName string) ([]string, error) {
 }
 
 // ==================== Git 钩子管理 ====================
+
+// SetupGitHooksForApp 为应用设置 Git 钩子（公开方法）
+func (gs *GitServer) SetupGitHooksForApp(app *GitApp) error {
+	return gs.setupGitHooks(app)
+}
 
 // setupGitHooks 设置 Git 钩子
 func (gs *GitServer) setupGitHooks(app *GitApp) error {
