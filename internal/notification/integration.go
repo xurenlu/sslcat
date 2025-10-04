@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/xurenlu/sslcat/internal/config"
 )
 
 // NotificationIntegrator 通知集成器
@@ -22,7 +23,7 @@ func NewNotificationIntegrator() *NotificationIntegrator {
 }
 
 // NewNotificationIntegratorFromConfig 从配置创建通知集成器
-func NewNotificationIntegratorFromConfig(notificationConfig interface{}) *NotificationIntegrator {
+func NewNotificationIntegratorFromConfig(notificationConfig config.NotificationConfig) *NotificationIntegrator {
 	manager := NewNotificationManagerFromConfig(notificationConfig)
 	return &NotificationIntegrator{
 		manager: manager,

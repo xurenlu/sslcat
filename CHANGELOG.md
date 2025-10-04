@@ -124,20 +124,48 @@ remote:   https://myapp.example.com
 
 ### 🛠️ Configuration
 
-#### 邮件通知配置
+#### 推荐：通过 Web 界面配置
+访问管理面板 → 设置 → 通知，在界面上配置：
+- ✅ **邮件通知**: 配置 SMTP 服务器、端口、用户名、密码等
+- ✅ **Webhook 通知**: 配置 Slack/企业微信/钉钉 等 Webhook URL
+- ✅ **Syslog 通知**: 配置 Syslog 服务器地址
+- ✅ **控制台输出**: 一键开启/关闭
+
+配置会保存到 `sslcat.conf` 的 `notification` 字段中。
+
+#### 或者：直接编辑配置文件
+在 `sslcat.conf` 中添加：
+```json
+{
+  "notification": {
+    "enabled": true,
+    "channels": {
+      "email": {
+        "enabled": true,
+        "smtp_host": "smtp.gmail.com",
+        "smtp_port": 587,
+        "username": "your-email@gmail.com",
+        "password": "your-app-password",
+        "from": "sslcat@yourdomain.com",
+        "to": ["admin@yourdomain.com"],
+        "use_tls": true
+      },
+      "webhook": {
+        "enabled": true,
+        "url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL",
+        "timeout": 10
+      }
+    }
+  }
+}
+```
+
+#### 向后兼容：环境变量
+如果配置文件中未启用通知，系统会尝试从环境变量读取（仅用于向后兼容）：
 ```bash
 export NOTIFICATION_SMTP_HOST="smtp.gmail.com"
 export NOTIFICATION_SMTP_PORT="587"
-export NOTIFICATION_SMTP_USERNAME="your-email@gmail.com"
-export NOTIFICATION_SMTP_PASSWORD="your-app-password"
-export NOTIFICATION_SMTP_FROM="sslcat@yourdomain.com"
-export NOTIFICATION_SMTP_TO="admin@yourdomain.com"
-export NOTIFICATION_SMTP_TLS="true"
-```
-
-#### Webhook 配置
-```bash
-export WITHSSL_WEBHOOK_URL="https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+export WITHSSL_WEBHOOK_URL="https://hooks.slack.com/..."
 ```
 
 #### 超时时间调整

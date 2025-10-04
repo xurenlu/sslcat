@@ -467,9 +467,16 @@ func NewGitServer(cfg *config.Config, translator *i18n.Translator) *GitServer {
 		deployDB = nil // 继续运行，但没有数据库支持
 	}
 
-	// 初始化通知管理器
-	notificationMgr := notification.NewNotificationManager()
-	logrus.Infof("通知管理器已初始化")
+	// 初始化通知管理器 - 从配置文件读取
+	var notificationMgr *notification.NotificationManager
+	if cfg.Notification.Enabled {
+		notificationMgr = notification.NewNotificationManagerFromConfig(cfg.Notification)
+		logrus.Infof("通知管理器已从配置文件初始化")
+	} else {
+		// 如果配置文件未启用，尝试从环境变量读取（向后兼容）
+		notificationMgr = notification.NewNotificationManager()
+		logrus.Infof("通知管理器已从环境变量初始化（向后兼容）")
+	}
 
 	gs := &GitServer{
 		config:              cfg,

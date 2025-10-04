@@ -63,21 +63,21 @@ post-receive hook 执行
 
 ## 配置通知渠道
 
-### 1. 邮件通知
+### ⭐ 推荐方式：通过 Web 界面配置
 
-通过环境变量配置：
+1. 登录 SSLcat 管理面板
+2. 进入 **设置** → **通知**
+3. 在界面上配置各个渠道：
+   - 📧 **邮件通知**: SMTP 服务器、端口、认证信息
+   - 🔗 **Webhook**: Slack/企业微信/钉钉等 URL
+   - 📝 **Syslog**: 服务器地址和端口
+   - 💻 **控制台**: 开关按钮
 
-```bash
-export NOTIFICATION_SMTP_HOST="smtp.gmail.com"
-export NOTIFICATION_SMTP_PORT="587"
-export NOTIFICATION_SMTP_USERNAME="your-email@gmail.com"
-export NOTIFICATION_SMTP_PASSWORD="your-app-password"
-export NOTIFICATION_SMTP_FROM="sslcat@yourdomain.com"
-export NOTIFICATION_SMTP_TO="admin@yourdomain.com,dev@yourdomain.com"
-export NOTIFICATION_SMTP_TLS="true"
-```
+配置会自动保存到 `sslcat.conf`，无需手动编辑文件。
 
-或在配置文件中：
+### 方式二：直接编辑配置文件
+
+在 `sslcat.conf` 中添加或修改 `notification` 部分：
 
 ```json
 {
@@ -93,52 +93,40 @@ export NOTIFICATION_SMTP_TLS="true"
         "from": "sslcat@yourdomain.com",
         "to": ["admin@yourdomain.com", "dev@yourdomain.com"],
         "use_tls": true
-      }
-    }
-  }
-}
-```
-
-### 2. Webhook 通知
-
-```bash
-export WITHSSL_WEBHOOK_URL="https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
-```
-
-或在配置中：
-
-```json
-{
-  "notification": {
-    "channels": {
+      },
       "webhook": {
         "enabled": true,
         "url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL",
         "timeout": 10
-      }
-    }
-  }
-}
-```
-
-### 3. Syslog 通知
-
-```bash
-export WITHSSL_SYSLOG_ADDR="localhost:514"
-```
-
-### 4. 控制台输出
-
-```json
-{
-  "notification": {
-    "channels": {
+      },
+      "syslog": {
+        "enabled": true,
+        "address": "localhost:514"
+      },
       "console": {
         "enabled": true
       }
     }
   }
 }
+```
+
+重启 SSLcat 后配置生效。
+
+### 方式三：环境变量（向后兼容）
+
+⚠️ 仅在配置文件中未启用通知时使用（不推荐）：
+
+```bash
+export NOTIFICATION_SMTP_HOST="smtp.gmail.com"
+export NOTIFICATION_SMTP_PORT="587"
+export NOTIFICATION_SMTP_USERNAME="your-email@gmail.com"
+export NOTIFICATION_SMTP_PASSWORD="your-app-password"
+export NOTIFICATION_SMTP_FROM="sslcat@yourdomain.com"
+export NOTIFICATION_SMTP_TO="admin@yourdomain.com,dev@yourdomain.com"
+export NOTIFICATION_SMTP_TLS="true"
+export WITHSSL_WEBHOOK_URL="https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+export WITHSSL_SYSLOG_ADDR="localhost:514"
 ```
 
 ## 通知消息格式

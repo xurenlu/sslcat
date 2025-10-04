@@ -107,7 +107,7 @@ func NewNotificationManager() *NotificationManager {
 }
 
 // NewNotificationManagerFromConfig 从配置创建通知管理器
-func NewNotificationManagerFromConfig(configData interface{}) *NotificationManager {
+func NewNotificationManagerFromConfig(cfg config.NotificationConfig) *NotificationManager {
 	nm := &NotificationManager{
 		channels:    make(map[string]NotificationChannel),
 		log:         logrus.WithFields(logrus.Fields{"component": "notification"}),
@@ -116,15 +116,44 @@ func NewNotificationManagerFromConfig(configData interface{}) *NotificationManag
 		maxHistory:  1000,
 	}
 
-	// 尝试从interface{}中提取配置
-	// 由于interface{}类型，我们使用类型断言或反射
-	// 这里先创建一个基础的控制台输出作为后备
-	nm.channels["console"] = NewConsoleChannelFromConfig(config.ConsoleChannelConfig{Enabled: true})
+	// 从配置文件初始化各个渠道
+	// 邮件通知
+	if cfg.Channels.Email.Enabled {
+		emailChannel := NewEmailChannelFromConfig(cfg.Channels.Email)
+		if emailChannel != nil {
+			nm.channels["email"] = emailChannel
+			nm.log.Info("邮件通知渠道已从配置启用")
+		}
+	}
 
-	// 从环境变量作为后备配置
-	nm.initDefaultChannels()
+	// Webhook通知
+	if cfg.Channels.Webhook.Enabled {
+		webhookChannel := NewWebhookChannelFromConfig(cfg.Channels.Webhook)
+		if webhookChannel != nil {
+			nm.channels["webhook"] = webhookChannel
+			nm.log.Info("Webhook通知渠道已从配置启用")
+		}
+	}
 
-	nm.log.Info("通知管理器已初始化（使用默认配置）")
+	// Syslog通知
+	if cfg.Channels.Syslog.Enabled {
+		syslogChannel := NewSyslogChannelFromConfig(cfg.Channels.Syslog)
+		if syslogChannel != nil {
+			nm.channels["syslog"] = syslogChannel
+			nm.log.Info("Syslog通知渠道已从配置启用")
+		}
+	}
+
+	// 控制台通知
+	if cfg.Channels.Console.Enabled {
+		consoleChannel := NewConsoleChannelFromConfig(cfg.Channels.Console)
+		if consoleChannel != nil {
+			nm.channels["console"] = consoleChannel
+			nm.log.Info("控制台通知渠道已从配置启用")
+		}
+	}
+
+	nm.log.Infof("通知管理器已从配置初始化，启用 %d 个渠道", len(nm.channels))
 	return nm
 }
 
