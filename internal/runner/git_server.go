@@ -2936,6 +2936,10 @@ while read oldrev newrev refname; do
             exit 1
         }
         echo "[DEBUG] PWD after cd: $(pwd)" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+        echo "[DEBUG] ls -la .git: $(ls -la .git 2>&1 | head -3)" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+        echo "[DEBUG] GIT_DIR env: $GIT_DIR" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+        echo "[DEBUG] Unsetting GIT_DIR" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+        unset GIT_DIR
         echo "[DEBUG] Running: git -c safe.directory=$REPO_DIR fetch origin" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
         if git -c safe.directory="$REPO_DIR" fetch origin >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" 2>&1; then
             echo "[DEBUG] git fetch succeeded" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
