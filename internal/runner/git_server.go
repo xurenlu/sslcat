@@ -1814,19 +1814,25 @@ func (gs *GitServer) loadApps() error {
 
 	gs.apps = apps
 
-	// 为已存在的应用补充缺失的符号链接
-	gs.logger.Infof("检查并创建缺失的 Git SSH 符号链接...")
-	for _, app := range gs.apps {
-		symlinkPath := filepath.Join(gs.sshHomeDir, app.Name+".git")
-		// 检查符号链接是否存在
-		if _, err := os.Lstat(symlinkPath); os.IsNotExist(err) {
-			// 符号链接不存在，创建它
-			if err := gs.createGitSymlink(app); err != nil {
-				gs.logger.Warnf("为应用 %s 创建符号链接失败: %v", app.Name, err)
-			} else {
-				gs.logger.Infof("已为应用 %s 补充 Git SSH 符号链接", app.Name)
+	// 为已存在的应用补充缺失的符号链接（仅当 home 目录可写时）
+	testFile := filepath.Join(gs.sshHomeDir, ".sslcat_symlink_test")
+	if err := os.WriteFile(testFile, []byte("test"), 0600); err == nil {
+		os.Remove(testFile)
+		gs.logger.Infof("检查并创建缺失的 Git SSH 符号链接...")
+		for _, app := range gs.apps {
+			symlinkPath := filepath.Join(gs.sshHomeDir, app.Name+".git")
+			// 检查符号链接是否存在
+			if _, err := os.Lstat(symlinkPath); os.IsNotExist(err) {
+				// 符号链接不存在，创建它
+				if err := gs.createGitSymlink(app); err != nil {
+					gs.logger.Warnf("为应用 %s 创建符号链接失败: %v", app.Name, err)
+				} else {
+					gs.logger.Infof("已为应用 %s 补充 Git SSH 符号链接", app.Name)
+				}
 			}
 		}
+	} else {
+		gs.logger.Warnf("Git home 目录不可写，跳过符号链接检查")
 	}
 
 	return nil
@@ -2059,24 +2065,9 @@ func (gs *GitServer) setupSSHUser() error {
 		gs.logger.Warnf("设置 authorized_keys 文件权限失败: %v", err)
 	}
 
-	// 生成 sshd 配置
-	// git 用户的 shell 已设置为 git-shell，不需要 ForceCommand
-	// 只配置安全限制即可
-	var sshdConfig string
-	if gs.useManagedKeys {
-		// 使用受管目录时，需要指定 AuthorizedKeysFile
-		sshdConfig = fmt.Sprintf("Match User %s\n  AuthorizedKeysFile %s\n  AllowTcpForwarding no\n  X11Forwarding no\n",
-			gs.sshUser, gs.managedAuthorizedKeysFile)
-		gs.logger.Infof("使用受管 authorized_keys 文件: %s", gs.managedAuthorizedKeysFile)
-	} else {
-		sshdConfig = fmt.Sprintf("Match User %s\n  AllowTcpForwarding no\n  X11Forwarding no\n", gs.sshUser)
-	}
-	configPath := filepath.Join(gs.sshConfigDir, "sslcat_git.conf")
-	if err := os.WriteFile(configPath, []byte(sshdConfig), 0644); err != nil {
-		gs.logger.Warnf("创建 sshd 配置文件失败 (%s): %v", configPath, err)
-	} else {
-		gs.logger.Infof("sshd 配置文件已创建: %s", configPath)
-	}
+	// 生成 sshd 配置（总是在最后写入，确保 useManagedKeys 已设置）
+	// 这个配置会在函数末尾再次写入，确保使用正确的路径
+	gs.writeSshdConfig()
 
 	// 创建 git-shell-commands 目录和友好提示脚本
 	gitCmdDir := filepath.Join(gs.sshHomeDir, "git-shell-commands")
@@ -2114,6 +2105,9 @@ WELCOME
 	}
 
 	gs.logger.Info("SSH 用户配置完成")
+
+	// 最后再次写入 sshd 配置，确保使用正确的 AuthorizedKeysFile 路径
+	gs.writeSshdConfig()
 
 	// 尝试自动重启 sshd 服务
 	if err := gs.restartSSHD(); err != nil {
@@ -2451,6 +2445,25 @@ func (gs *GitServer) keyExists(fingerprint string) bool {
 		}
 	}
 	return false
+}
+
+// writeSshdConfig 写入 sshd 配置文件
+func (gs *GitServer) writeSshdConfig() {
+	var sshdConfig string
+	if gs.useManagedKeys {
+		// 使用受管目录时，需要指定 AuthorizedKeysFile
+		sshdConfig = fmt.Sprintf("Match User %s\n  AuthorizedKeysFile %s\n  AllowTcpForwarding no\n  X11Forwarding no\n",
+			gs.sshUser, gs.managedAuthorizedKeysFile)
+		gs.logger.Infof("使用受管 authorized_keys 文件: %s", gs.managedAuthorizedKeysFile)
+	} else {
+		sshdConfig = fmt.Sprintf("Match User %s\n  AllowTcpForwarding no\n  X11Forwarding no\n", gs.sshUser)
+	}
+	configPath := filepath.Join(gs.sshConfigDir, "sslcat_git.conf")
+	if err := os.WriteFile(configPath, []byte(sshdConfig), 0644); err != nil {
+		gs.logger.Warnf("创建 sshd 配置文件失败 (%s): %v", configPath, err)
+	} else {
+		gs.logger.Infof("sshd 配置文件已创建: %s", configPath)
+	}
 }
 
 // restartSSHD 重启 SSH 服务
@@ -3110,6 +3123,15 @@ func (gs *GitServer) initGitRepo(app *GitApp) error {
 // 当用户执行 git push git@host:appname.git 时，git-shell 会在 /home/git/ 下查找 appname.git
 // 因此需要创建符号链接指向实际的裸仓库位置
 func (gs *GitServer) createGitSymlink(app *GitApp) error {
+	// 检查 home 目录是否可写
+	testFile := filepath.Join(gs.sshHomeDir, ".sslcat_symlink_test")
+	if err := os.WriteFile(testFile, []byte("test"), 0600); err != nil {
+		// home 目录不可写，跳过符号链接创建
+		gs.logger.Warnf("Git home 目录 %s 不可写，跳过符号链接创建（Git push 仍可通过绝对路径工作）", gs.sshHomeDir)
+		return nil
+	}
+	os.Remove(testFile)
+
 	// 符号链接路径：/home/git/appname.git -> /path/to/repos/appname/git/repo.git
 	symlinkPath := filepath.Join(gs.sshHomeDir, app.Name+".git")
 	targetPath := app.BareRepo
