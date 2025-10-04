@@ -551,6 +551,10 @@ func (gs *GitServer) Start() error {
 	// 启动部署触发监听协程
 	go gs.WatchDeployTriggers()
 
+	// 输出关键路径信息
+	gs.logger.Infof("authorized_keys 文件路径: %s", gs.authorizedKeysFile)
+	gs.logger.Infof("SSH 密钥目录: %s", gs.sshKeysDir)
+
 	gs.logger.Info(gs.translator.T("git_server.started"))
 	return nil
 }
@@ -1977,7 +1981,7 @@ func (gs *GitServer) AddSSHKey(keyName, publicKey string) error {
 		return fmt.Errorf("写入 authorized_keys 文件失败: %w", err)
 	}
 
-	gs.logger.Infof("SSH 密钥已添加: %s", keyName)
+	gs.logger.Infof("SSH 密钥已添加: %s -> %s", keyName, gs.authorizedKeysFile)
 	return nil
 }
 
@@ -2011,7 +2015,7 @@ func (gs *GitServer) RemoveSSHKey(fingerprint string) error {
 		return fmt.Errorf("更新 authorized_keys 文件失败: %w", err)
 	}
 
-	gs.logger.Infof("SSH 密钥已删除: %s", fingerprint)
+	gs.logger.Infof("SSH 密钥已删除: %s -> %s", fingerprint, gs.authorizedKeysFile)
 	return nil
 }
 
