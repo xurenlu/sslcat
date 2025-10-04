@@ -2961,11 +2961,20 @@ while read oldrev newrev refname; do
     # 触发部署
     print_header "Deploying application"
     
-    # 创建触发文件
-    DEPLOY_TRIGGER="/tmp/sslcat-deploy-$APP_NAME-$(date +%%s)"
-    echo "$newrev|$refname|$COMMIT_MSG" > "$DEPLOY_TRIGGER"
+    # 直接调用部署 API
+    print_info "Triggering deployment via API..."
+    DEPLOY_RESPONSE=$(curl -s -X POST "http://localhost:$ADMIN_PORT$ADMIN_PREFIX/api/git-server/apps/$APP_NAME/deploy" \
+        -H "Content-Type: application/json" \
+        -d "{\"commit\":\"$newrev\",\"ref\":\"$refname\",\"message\":\"$COMMIT_MSG\"}" 2>&1)
     
-    # 等待部署开始并监控日志
+    if echo "$DEPLOY_RESPONSE" | grep -q '"success":true'; then
+        print_success "Deployment triggered successfully"
+    else
+        print_warning "Failed to trigger deployment API, will monitor logs anyway"
+        echo "[DEBUG] API Response: $DEPLOY_RESPONSE" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+    fi
+    
+    # 等待部署开始
     print_info "Waiting for deployment to start..."
     
     # 简单的日志监控 - 读取最新的部署日志
