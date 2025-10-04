@@ -1010,3 +1010,96 @@ func (api *GitServerAPI) HandleDeployNotification(w http.ResponseWriter, r *http
 	}
 	api.writeJSON(w, response)
 }
+
+// HandleAppAction 处理应用相关的操作 (RESTful风格)
+// 支持 /api/git-server/apps/{name}/deploy
+func (api *GitServerAPI) HandleAppAction(w http.ResponseWriter, r *http.Request) {
+	// 解析 URL 路径: /api/git-server/apps/{name}/{action}
+	path := r.URL.Path
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	
+	// 找到 apps 后面的部分
+	appsIndex := -1
+	for i, part := range parts {
+		if part == "apps" {
+			appsIndex = i
+			break
+		}
+	}
+	
+	if appsIndex == -1 || len(parts) < appsIndex+3 {
+		api.writeError(w, "Invalid URL path", http.StatusBadRequest)
+		return
+	}
+	
+	appName := parts[appsIndex+1]
+	action := parts[appsIndex+2]
+	
+	api.logger.Infof("App action: %s -> %s (method: %s)", appName, action, r.Method)
+	
+	switch action {
+	case "deploy":
+		api.TriggerDeploy(w, r, appName)
+	default:
+		api.writeError(w, "Unknown action: "+action, http.StatusNotFound)
+	}
+}
+
+// TriggerDeploy 触发应用部署 (由 post-receive hook 调用)
+func (api *GitServerAPI) TriggerDeploy(w http.ResponseWriter, r *http.Request, appName string) {
+	// 认证检查（localhost 请求豁免）
+	if !api.checkAuthWithLocalhostBypass(w, r) {
+		return
+	}
+	
+	if r.Method != "POST" {
+		api.writeError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	
+	var req struct {
+		Commit  string `json:"commit"`
+		Ref     string `json:"ref"`
+		Message string `json:"message"`
+	}
+	
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		api.logger.Warnf("解析部署请求失败: %v (使用空数据)", err)
+		// 允许空 body
+	}
+	
+	api.logger.Infof("触发应用部署: %s (commit: %s, ref: %s)", appName, req.Commit, req.Ref)
+	
+	if api.server == nil {
+		api.writeError(w, "Git Deploy 服务未启用", http.StatusServiceUnavailable)
+		return
+	}
+	
+	// 获取应用
+	app, err := api.server.GetApp(appName)
+	if err != nil || app == nil {
+		api.writeError(w, "应用不存在: "+appName, http.StatusNotFound)
+		return
+	}
+	
+	// 触发部署 - 直接调用 ProcessGitPush
+	go func() {
+		api.logger.Infof("开始异步部署应用: %s", appName)
+		// 使用 ProcessGitPush 触发部署流程
+		if err := api.server.ProcessGitPush(appName, "web-trigger", req.Ref, "", req.Commit); err != nil {
+			api.logger.Errorf("部署应用失败: %v", err)
+		}
+	}()
+	
+	response := map[string]interface{}{
+		"success": true,
+		"message": "部署已触发",
+		"data": map[string]interface{}{
+			"app_name": appName,
+			"commit":   req.Commit,
+			"ref":      req.Ref,
+		},
+	}
+	
+	api.writeJSON(w, response)
+}
