@@ -2585,13 +2585,38 @@ func (gs *GitServer) SetupGitHooksForApp(app *GitApp) error {
 
 // setupGitHooks 设置 Git 钩子
 func (gs *GitServer) setupGitHooks(app *GitApp) error {
-	// 创建 Git 仓库（如果不存在）
-	if err := gs.initGitRepo(app); err != nil {
-		return fmt.Errorf("初始化 Git 仓库失败: %w", err)
+	// 查找实际的裸仓库位置
+	var actualBareRepo string
+	var bareRepoExists bool
+	
+	// 1. 检查配置的裸仓库路径
+	if info, err := os.Stat(filepath.Join(app.BareRepo, "HEAD")); err == nil && !info.IsDir() {
+		actualBareRepo = app.BareRepo
+		bareRepoExists = true
+		gs.logger.Infof("找到裸仓库: %s", actualBareRepo)
+	}
+	
+	// 2. 检查 /home/git 下的符号链接或直接仓库
+	if !bareRepoExists {
+		homeRepo := filepath.Join("/home/git", app.Name+".git")
+		if info, err := os.Stat(filepath.Join(homeRepo, "HEAD")); err == nil && !info.IsDir() {
+			actualBareRepo = homeRepo
+			bareRepoExists = true
+			gs.logger.Infof("找到裸仓库（在 /home/git）: %s", actualBareRepo)
+		}
+	}
+	
+	// 3. 如果都不存在，尝试初始化
+	if !bareRepoExists {
+		gs.logger.Infof("裸仓库不存在，开始初始化")
+		if err := gs.initGitRepo(app); err != nil {
+			return fmt.Errorf("初始化 Git 仓库失败: %w", err)
+		}
+		actualBareRepo = app.BareRepo
 	}
 
-	// 设置 receive-pack 服务脚本
-	generatePath := filepath.Join(app.GitPath, "hooks")
+	// 设置 hooks 到实际的裸仓库
+	generatePath := filepath.Join(actualBareRepo, "hooks")
 	if err := os.MkdirAll(generatePath, 0755); err != nil {
 		return fmt.Errorf("创建 hooks 目录失败: %w", err)
 	}
