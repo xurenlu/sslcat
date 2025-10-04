@@ -25,6 +25,7 @@ import {
   useDisclosure,
   FormControl,
   FormLabel,
+  FormHelperText,
   Input,
   Switch,
   Select,
@@ -464,6 +465,20 @@ const DockerImageManager: React.FC<DockerImageManagerProps> = ({ appName }) => {
                         })}
                         placeholder="registry.example.com"
                       />
+                      <FormHelperText>
+                        请勿包含 http:// 或 https:// 前缀，系统会自动添加
+                      </FormHelperText>
+                    </FormControl>
+
+                    <FormControl display="flex" alignItems="center">
+                      <FormLabel mb="0">使用 HTTPS</FormLabel>
+                      <Switch
+                        isChecked={registryConfig.use_https}
+                        onChange={(e) => setRegistryConfig({
+                          ...registryConfig,
+                          use_https: e.target.checked
+                        })}
+                      />
                     </FormControl>
 
                     <HStack>
@@ -481,7 +496,7 @@ const DockerImageManager: React.FC<DockerImageManagerProps> = ({ appName }) => {
                       <FormControl>
                         <FormLabel>密码</FormLabel>
                         <Input
-                          type="password"
+                          type="text"
                           value={registryConfig.password}
                           onChange={(e) => setRegistryConfig({
                             ...registryConfig,

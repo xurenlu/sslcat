@@ -551,8 +551,10 @@ func (dr *DockerRegistry) TestConnectionWithConfig(config *DockerRegistryConfig)
 	dr.log.Infof("  URL: %s", config.URL)
 	dr.log.Infof("  UseHTTPS: %v", config.UseHTTPS)
 	dr.log.Infof("  Username: %s", config.Username)
+	dr.log.Infof("  Password: %s", config.Password)
+	dr.log.Infof("  Namespace: %s", config.Namespace)
 	dr.log.Infof("  Timeout: %d", config.Timeout)
-	
+
 	if config.URL == "" {
 		dr.log.Info("  URL 为空，测试本地 Docker daemon")
 		// 测试本地Docker daemon
@@ -591,7 +593,7 @@ func (dr *DockerRegistry) TestConnectionWithConfig(config *DockerRegistryConfig)
 	} else {
 		dr.log.Infof("  超时设置: %d 秒", timeout)
 	}
-	
+
 	client := &http.Client{Timeout: time.Duration(timeout) * time.Second}
 	req, err := http.NewRequest("GET", testURL, nil)
 	if err != nil {
