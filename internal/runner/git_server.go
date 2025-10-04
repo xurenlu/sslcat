@@ -2105,27 +2105,40 @@ func (gs *GitServer) restartSSHD() error {
 	osType := gs.detectOSType()
 
 	var cmd *exec.Cmd
+	var needsSudo bool
+	
 	switch osType {
 	case "linux":
-		// Linux 系统使用 systemctl
-		cmd = exec.Command("systemctl", "restart", "sshd")
+		// Linux 系统使用 systemctl（需要 sudo）
+		cmd = exec.Command("sudo", "systemctl", "restart", "sshd")
+		needsSudo = true
 	case "darwin":
-		// macOS 系统使用 launchctl
-		cmd = exec.Command("launchctl", "unload", "/System/Library/LaunchDaemons/ssh.plist")
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("卸载 SSH 服务失败: %w", err)
-		}
-		cmd = exec.Command("launchctl", "load", "/System/Library/LaunchDaemons/ssh.plist")
+		// macOS 系统使用新的 launchctl kickstart API（需要 sudo）
+		// kickstart 会重启服务，-k 表示先停止再启动
+		cmd = exec.Command("sudo", "launchctl", "kickstart", "-k", "system/com.openssh.sshd")
+		needsSudo = true
 	default:
 		return fmt.Errorf("不支持的操作系统: %s", osType)
 	}
 
+	gs.logger.Infof("尝试重启 SSH 服务 (OS: %s, 需要sudo: %v)...", osType, needsSudo)
+	
 	output, err := cmd.CombinedOutput()
+	outputStr := strings.TrimSpace(string(output))
+	
 	if err != nil {
-		return fmt.Errorf("重启 SSH 服务失败: %s, %w", string(output), err)
+		// 检查是否是权限问题
+		if strings.Contains(outputStr, "permission") || strings.Contains(outputStr, "not permitted") {
+			return fmt.Errorf("权限不足：SSH 服务重启需要 sudo 权限。请在服务器上手动执行：\nsudo launchctl kickstart -k system/com.openssh.sshd (macOS)\n或\nsudo systemctl restart sshd (Linux)")
+		}
+		return fmt.Errorf("重启 SSH 服务失败: %s, %w", outputStr, err)
 	}
 
-	gs.logger.Infof("SSH 服务重启成功: %s", string(output))
+	if outputStr != "" {
+		gs.logger.Infof("SSH 服务重启成功: %s", outputStr)
+	} else {
+		gs.logger.Info("SSH 服务重启命令已执行")
+	}
 	return nil
 }
 
