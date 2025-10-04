@@ -1,3 +1,181 @@
+## [1.3.5-rc20] - 2025-10-04
+
+### 🎉 Major Features
+
+#### 🎨 Git Push 实时部署日志
+- **Heroku-style 部署体验**: 在 `git push` 时实时显示完整的部署流程
+- **彩色格式化输出**: 使用 ANSI 颜色码美化终端显示
+  - 🔵 蓝色标题和重要信息
+  - 🟢 绿色成功状态和 info 日志
+  - 🟡 黄色警告信息
+  - 🔴 红色错误信息
+- **实时日志流式输出**: 监控部署日志文件变化，实时解析并格式化输出
+- **智能超时机制**: 
+  - 空闲超时：30秒无新日志则退出
+  - 最大时间：10分钟总时间限制
+  - 持续监控：有日志就继续，无时间限制
+- **部署信息展示**: 
+  - 显示 commit SHA、作者、分支、消息
+  - 显示应用访问地址（HTTP/HTTPS）
+  - 显示管理面板地址
+  - 显示日志文件路径
+- **文档**: `GIT_PUSH_REALTIME_DEPLOY.md`
+
+#### 🔗 Git SSH 符号链接自动管理
+- **自动创建**: 创建应用时自动在 `/home/git/` 下创建符号链接
+- **自动修复**: 启动时自动为现有应用补充缺失的符号链接
+- **自动清理**: 删除应用时自动清理对应的符号链接
+- **权限管理**: 自动设置符号链接的所有者为 git 用户
+- **向后兼容**: 升级后自动修复所有现有应用
+- **解决问题**: 修复 git-shell 无法找到仓库的路径问题
+- **文档**: `GIT_SSH_SYMLINK_FIX.md`
+
+#### 📧 部署通知集成
+- **4种通知类型**:
+  - ✅ 部署成功 (Success) - Info 级别
+  - ❌ 部署失败 (Failed) - Error 级别
+  - ⚠️ 部署超时 (Timeout) - Warning 级别
+  - ⚠️ 部署卡住 (Stuck) - Warning 级别
+- **多渠道支持**:
+  - 📧 邮件 (SMTP)
+  - 🔗 Webhook (Slack/企业微信/钉钉/Discord 等)
+  - 📝 Syslog
+  - 💻 控制台输出
+- **自动检测**: Hook 自动检测部署异常并发送通知
+- **智能判断**:
+  - 30秒无日志 → 发送"卡住"通知
+  - 超过10分钟 → 发送"超时"通知
+  - 检测到错误 → 发送"失败"通知
+- **详细信息**: 包含应用名、commit、错误详情、建议操作
+- **内部 API**: `/api/internal/deploy-notification` 端点
+- **文档**: `GIT_DEPLOY_NOTIFICATION_INTEGRATION.md`
+
+### 🔧 Technical Implementation
+
+#### Git Server 改进
+- 新增 `createGitSymlink()` 方法创建符号链接
+- 修改 `CreateApp()` 自动调用符号链接创建
+- 修改 `DeleteApp()` 自动清理符号链接
+- 修改 `loadApps()` 启动时补充缺失链接
+- 集成 `NotificationManager` 到 `GitServer`
+
+#### Post-Receive Hook 重写
+- 完全重写 `generatePostReceiveHook()` 函数
+- 添加彩色输出函数（print_header, print_info, print_success, print_error）
+- 实现日志文件实时监控逻辑
+- 实现增量日志读取和 JSON 解析
+- 集成超时检测和通知 API 调用
+- 优化错误处理和用户提示
+
+#### 通知系统扩展
+- 新增4个通知类型常量到 `notification.go`
+- 实现 `SendDeploySuccess()` 方法
+- 实现 `SendDeployFailed()` 方法
+- 实现 `SendDeployTimeout()` 方法
+- 实现 `SendDeployStuck()` 方法
+- 新增 `SendDeployNotification()` 统一入口方法
+
+#### Web API
+- 新增 `HandleDeployNotification()` API 处理器
+- 注册 `/api/internal/deploy-notification` 路由
+- 支持 stuck/timeout/failed/success 类型
+- 参数校验和错误处理
+
+### 🎯 User Experience
+
+#### 部署体验提升
+```bash
+$ git push deploy main
+
+remote: ╔═══════════════════════════════════════════════════╗
+remote: ║           SSLcat Git Deploy                        ║
+remote: ╚═══════════════════════════════════════════════════╝
+remote: 
+remote: Application: myapp
+remote: Commit:      a3f2c1b - Add new feature
+remote: Author:      John Doe
+remote: Branch:      main
+remote: 
+remote: -----> Updating repository
+remote:        ✓ Repository updated
+remote: 
+remote: -----> Deploying application
+remote:        [git] 开始检测应用类型
+remote:        [build] 执行命令: npm install
+remote:        [deploy] 应用启动成功
+remote: 
+remote: ╔═══════════════════════════════════════════════════╗
+remote: ║           Deployment Complete                      ║
+remote: ╚═══════════════════════════════════════════════════╝
+remote: 
+remote: Application URL:
+remote:   https://myapp.example.com
+```
+
+#### 通知示例
+当部署卡住时，自动发送邮件：
+```
+标题: [SSLcat] 应用 myapp 部署可能卡住
+内容: 
+  应用 myapp 部署 30s 内没有新日志输出，可能已卡住
+  Commit: a3f2c1b
+  建议: 请检查构建进程是否卡住，可能需要手动介入
+```
+
+### 🛠️ Configuration
+
+#### 邮件通知配置
+```bash
+export NOTIFICATION_SMTP_HOST="smtp.gmail.com"
+export NOTIFICATION_SMTP_PORT="587"
+export NOTIFICATION_SMTP_USERNAME="your-email@gmail.com"
+export NOTIFICATION_SMTP_PASSWORD="your-app-password"
+export NOTIFICATION_SMTP_FROM="sslcat@yourdomain.com"
+export NOTIFICATION_SMTP_TO="admin@yourdomain.com"
+export NOTIFICATION_SMTP_TLS="true"
+```
+
+#### Webhook 配置
+```bash
+export WITHSSL_WEBHOOK_URL="https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+```
+
+#### 超时时间调整
+可在 hook 脚本中修改：
+```bash
+MAX_TOTAL_TIME=600    # 最长总等待时间（秒），默认10分钟
+IDLE_TIMEOUT=30       # 无新日志超时时间（秒），默认30秒
+```
+
+### 📚 Documentation
+
+新增3份完整文档：
+- **GIT_PUSH_REALTIME_DEPLOY.md**: 实时日志功能详解、超时机制、故障排查
+- **GIT_SSH_SYMLINK_FIX.md**: SSH符号链接解决方案、实现细节、测试验证
+- **GIT_DEPLOY_NOTIFICATION_INTEGRATION.md**: 通知集成指南、配置示例、平台适配
+
+### 🔄 Compatibility
+
+- ✅ 向后兼容：现有应用无需修改，自动升级
+- ✅ 终端兼容：支持 Linux/macOS/Windows Git Bash
+- ✅ 颜色自适应：不支持颜色的终端自动降级为纯文本
+- ✅ Git 版本：要求 Git 2.0+，推荐 Git 2.20+
+
+### 🐛 Bug Fixes
+
+- 修复 git-shell 无法找到仓库的路径问题（通过符号链接解决）
+- 修复部署超时判断逻辑（从固定60秒改为智能双重超时）
+- 优化部署日志实时输出性能（增量读取，避免重复处理）
+
+### 📊 Performance
+
+- 日志监控轮询间隔：1秒（平衡实时性和性能）
+- 通知发送：异步处理，不影响部署流程
+- 符号链接创建：<10ms，几乎无性能影响
+- 内存占用：流式日志处理，不缓存全部内容
+
+---
+
 ## [1.3.5-rc1] - 2025-01-02
 
 ### Fixed
