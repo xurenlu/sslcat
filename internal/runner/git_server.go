@@ -3748,10 +3748,16 @@ func (gs *GitServer) installGitHook() error {
 	wrapperPath := "/usr/local/bin/sslcat-git-hook"
 	if info, err := os.Stat(wrapperPath); err == nil && info.Mode().IsRegular() {
 		// 确保复制一份到 git-shell-commands
-		if err := gs.copyFile(wrapperPath, gitShellHook, 0755); err != nil {
-			gs.logger.Warnf("复制 git hook 脚本到 git-shell-commands 失败: %v", err)
-		} else {
-			gs.logger.Infof("已同步 git hook 脚本到 git-shell-commands: %s", gitShellHook)
+		if sourceData, err := os.ReadFile(wrapperPath); err == nil {
+			if err := os.WriteFile(gitShellHook, sourceData, 0755); err != nil {
+				gs.logger.Warnf("复制 git hook 脚本到 git-shell-commands 失败: %v", err)
+			} else {
+				// 设置正确的所有者
+				if gs.uid > 0 && gs.gid > 0 {
+					os.Chown(gitShellHook, gs.uid, gs.gid)
+				}
+				gs.logger.Infof("已同步 git hook 脚本到 git-shell-commands: %s", gitShellHook)
+			}
 		}
 		return nil
 	}
@@ -3819,8 +3825,9 @@ func (gs *GitServer) manualInstallGitHook() error {
 		return fmt.Errorf("找不到 sslcat-git-hook 脚本源码")
 	}
 
-	// 复制脚本到目标位置
+	// 复制脚本到两个位置：/usr/local/bin 和 git-shell-commands
 	targetPath := "/usr/local/bin/sslcat-git-hook"
+	gitShellHook := filepath.Join(gs.sshHomeDir, "git-shell-commands", "sslcat-git-hook")
 
 	// 读取源文件
 	sourceData, err := os.ReadFile(sourcePath)
@@ -3828,9 +3835,22 @@ func (gs *GitServer) manualInstallGitHook() error {
 		return fmt.Errorf("读取源脚本失败: %w", err)
 	}
 
-	// 写入目标文件
+	// 写入 /usr/local/bin（兼容）
 	if err := os.WriteFile(targetPath, sourceData, 0755); err != nil {
 		return fmt.Errorf("写入目标脚本失败: %w", err)
+	}
+
+	// 写入 git-shell-commands（主要）
+	gitCmdDir := filepath.Join(gs.sshHomeDir, "git-shell-commands")
+	if err := os.MkdirAll(gitCmdDir, 0755); err == nil {
+		if err := os.WriteFile(gitShellHook, sourceData, 0755); err == nil {
+			// 设置正确的所有者
+			if gs.uid > 0 && gs.gid > 0 {
+				os.Chown(gitShellHook, gs.uid, gs.gid)
+				os.Chown(gitCmdDir, gs.uid, gs.gid)
+			}
+			gs.logger.Infof("git hook 脚本已安装到 git-shell-commands: %s", gitShellHook)
+		}
 	}
 
 	gs.logger.Infof("手动安装 git hook wrapper 脚本成功: %s", targetPath)
