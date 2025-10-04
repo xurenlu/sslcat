@@ -1808,7 +1808,7 @@ func (gs *GitServer) loadApps() error {
 	// 修复应用路径（确保是绝对路径）
 	// 获取工作目录，用于转换相对路径
 	workDir, _ := os.Getwd()
-	
+
 	for _, app := range gs.apps {
 		// 修复 LogsDir 路径
 		if !filepath.IsAbs(app.LogsDir) {
@@ -1822,12 +1822,19 @@ func (gs *GitServer) loadApps() error {
 			}
 			gs.logger.Infof("修复应用 %s 的 LogsDir 路径: %s", app.Name, app.LogsDir)
 		}
-		
-		// 确保日志目录存在
+
+		// 确保日志目录存在并设置正确权限
 		if err := os.MkdirAll(app.LogsDir, 0755); err != nil {
 			gs.logger.Warnf("创建日志目录失败: %v", err)
+		} else {
+			// 设置日志目录为 git 用户所有
+			if gs.uid > 0 && gs.gid > 0 {
+				if err := os.Chown(app.LogsDir, gs.uid, gs.gid); err != nil {
+					gs.logger.Warnf("设置日志目录权限失败: %v", err)
+				}
+			}
 		}
-		
+
 		// 修复其他可能的相对路径
 		if app.GitPath != "" && !filepath.IsAbs(app.GitPath) {
 			absPath := filepath.Join(workDir, app.GitPath)
@@ -1855,7 +1862,7 @@ func (gs *GitServer) loadApps() error {
 			}
 		}
 	}
-	
+
 	// 保存修复后的路径
 	if err := gs.saveApps(); err != nil {
 		gs.logger.Warnf("保存应用配置失败: %v", err)
