@@ -1077,7 +1077,11 @@ func (gs *GitServer) processGitPush(app *GitApp, pushData []byte) {
 
 // detectAppType 检测应用类型（使用 Builder Registry）
 func (gs *GitServer) detectAppType(app *GitApp) (string, error) {
-	builder, err := gs.builderRegistry.DetectBuilder(app.GitPath)
+	// 使用工作目录而不是裸仓库目录进行检测
+	detectPath := app.RepoDir
+	gs.logger.Debugf("检测应用类型，路径: %s", detectPath)
+	
+	builder, err := gs.builderRegistry.DetectBuilder(detectPath)
 	if err != nil {
 		// 如果检测失败，默认使用静态文件
 		gs.logger.Warnf("应用类型检测失败，使用静态文件类型: %v", err)
