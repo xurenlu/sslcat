@@ -585,7 +585,7 @@ func (gs *GitServer) UpdateServerConfig(config *GitServerConfig) error {
 	// 同步更新主配置文件中的 runners.git.enabled
 	// 这样重启服务后配置才会生效
 	gs.config.Runners.Git.Enabled = config.Enabled
-	
+
 	// 保存主配置文件
 	if err := gs.config.Save(gs.config.ConfigFile); err != nil {
 		gs.logger.Warnf("保存主配置文件失败: %v", err)
@@ -1910,14 +1910,20 @@ func (gs *GitServer) setupSSHUser() error {
 
 	sshdConfig := fmt.Sprintf("Match User %s\n  ForceCommand git-shell -c \"$SSH_ORIGINAL_COMMAND\"\n  AllowTcpForwarding no\n  X11Forwarding no\n", gs.sshUser)
 	configPath := filepath.Join(gs.sshConfigDir, "sslcat_git.conf")
-	os.WriteFile(configPath, []byte(sshdConfig), 0644)
+	if err := os.WriteFile(configPath, []byte(sshdConfig), 0644); err != nil {
+		gs.logger.Warnf("创建 sshd 配置文件失败 (%s): %v", configPath, err)
+	} else {
+		gs.logger.Infof("sshd 配置文件已创建: %s", configPath)
+	}
 
 	// 创建 git-shell-commands 目录
 	gitCmdDir := filepath.Join(gs.sshHomeDir, "git-shell-commands")
 	if err := os.MkdirAll(gitCmdDir, 0755); err == nil {
 		os.Chown(gitCmdDir, uid, gid)
 		noLoginScript := filepath.Join(gitCmdDir, "no-interactive-login")
-		os.WriteFile(noLoginScript, []byte("#!/bin/sh\necho 'Interactive shell disabled.'\n"), 0755)
+		if err := os.WriteFile(noLoginScript, []byte("#!/bin/sh\necho 'Interactive shell disabled.'\n"), 0755); err != nil {
+			gs.logger.Warnf("创建 no-interactive-login 脚本失败: %v", err)
+		}
 		os.Chown(noLoginScript, uid, gid)
 	}
 
