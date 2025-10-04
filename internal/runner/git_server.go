@@ -2766,15 +2766,16 @@ BARE_REPO="%s"
 while read oldrev newrev refname; do
     echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [info] [git] Pre-receive: $oldrev -> $newrev ($refname)" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
     
-    # 检查推送大小（限制为100MB）
+    # 检查推送大小（限制为500MB，足够大多数应用）
     if [ "$oldrev" != "0000000000000000000000000000000000000000" ]; then
-        SIZE=$(git --git-dir="$BARE_REPO" rev-list --objects $oldrev..$newrev | 
-               git --git-dir="$BARE_REPO" cat-file --batch-check='%%(objectsize)' | 
-               awk '{sum+=$1} END {print sum}')
-        MAX_SIZE=$((100*1024*1024)) # 100MB
-        if [ "$SIZE" -gt "$MAX_SIZE" ]; then
+        # 计算推送中新增对象的总大小
+        SIZE=$(git -c safe.directory="$BARE_REPO" --git-dir="$BARE_REPO" rev-list --objects $oldrev..$newrev 2>/dev/null | 
+               git -c safe.directory="$BARE_REPO" --git-dir="$BARE_REPO" cat-file --batch-check='%%(objectname) %%(objectsize)' 2>/dev/null | 
+               awk '{sum+=$2} END {print sum+0}')
+        MAX_SIZE=$((500*1024*1024)) # 500MB
+        if [ -n "$SIZE" ] && [ "$SIZE" -gt 0 ] && [ "$SIZE" -gt "$MAX_SIZE" ]; then
             echo "Error: Push size ($SIZE bytes) exceeds limit ($MAX_SIZE bytes)" >&2
-            echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [error] [git] Push rejected: size limit exceeded" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+            echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [error] [git] Push rejected: size limit exceeded ($SIZE bytes)" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
             exit 1
         fi
     fi
