@@ -47,6 +47,10 @@ const (
 	TypeUserAction     NotificationType = "user_action"
 	TypeSystemStartup  NotificationType = "system_startup"
 	TypeSystemShutdown NotificationType = "system_shutdown"
+	TypeDeploySuccess  NotificationType = "deploy_success"
+	TypeDeployFailed   NotificationType = "deploy_failed"
+	TypeDeployTimeout  NotificationType = "deploy_timeout"
+	TypeDeployStuck    NotificationType = "deploy_stuck"
 )
 
 // String 返回通知类型的字符串表示
@@ -330,6 +334,81 @@ func (nm *NotificationManager) SendUserAction(username, action, resource string,
 	// 合并详细信息
 	for k, v := range details {
 		notification.Details[k] = v
+	}
+
+	return nm.Send(notification)
+}
+
+// SendDeploySuccess 发送部署成功通知
+func (nm *NotificationManager) SendDeploySuccess(appName, commitSHA, commitMsg, domain string, duration time.Duration) error {
+	notification := &Notification{
+		Type:    TypeDeploySuccess,
+		Level:   LevelInfo,
+		Title:   fmt.Sprintf("应用 %s 部署成功", appName),
+		Message: fmt.Sprintf("应用 %s 已成功部署到 %s", appName, domain),
+		Details: map[string]any{
+			"app_name":   appName,
+			"commit_sha": commitSHA,
+			"commit_msg": commitMsg,
+			"domain":     domain,
+			"duration":   duration.String(),
+		},
+	}
+
+	return nm.Send(notification)
+}
+
+// SendDeployFailed 发送部署失败通知
+func (nm *NotificationManager) SendDeployFailed(appName, commitSHA, commitMsg, reason string, errorDetails string) error {
+	notification := &Notification{
+		Type:    TypeDeployFailed,
+		Level:   LevelError,
+		Title:   fmt.Sprintf("应用 %s 部署失败", appName),
+		Message: fmt.Sprintf("应用 %s 部署失败: %s", appName, reason),
+		Details: map[string]any{
+			"app_name":      appName,
+			"commit_sha":    commitSHA,
+			"commit_msg":    commitMsg,
+			"reason":        reason,
+			"error_details": errorDetails,
+		},
+	}
+
+	return nm.Send(notification)
+}
+
+// SendDeployTimeout 发送部署超时通知
+func (nm *NotificationManager) SendDeployTimeout(appName, commitSHA, duration string) error {
+	notification := &Notification{
+		Type:    TypeDeployTimeout,
+		Level:   LevelWarning,
+		Title:   fmt.Sprintf("应用 %s 部署超时", appName),
+		Message: fmt.Sprintf("应用 %s 部署超过 %s 仍未完成，可能仍在后台运行", appName, duration),
+		Details: map[string]any{
+			"app_name":   appName,
+			"commit_sha": commitSHA,
+			"duration":   duration,
+			"suggestion": "请检查管理面板或日志文件确认部署状态",
+		},
+	}
+
+	return nm.Send(notification)
+}
+
+// SendDeployStuck 发送部署卡住通知
+func (nm *NotificationManager) SendDeployStuck(appName, commitSHA, lastLog string, idleDuration string) error {
+	notification := &Notification{
+		Type:    TypeDeployStuck,
+		Level:   LevelWarning,
+		Title:   fmt.Sprintf("应用 %s 部署可能卡住", appName),
+		Message: fmt.Sprintf("应用 %s 部署 %s 内没有新日志输出，可能已卡住", appName, idleDuration),
+		Details: map[string]any{
+			"app_name":      appName,
+			"commit_sha":    commitSHA,
+			"idle_duration": idleDuration,
+			"last_log":      lastLog,
+			"suggestion":    "请检查构建进程是否卡住，可能需要手动介入",
+		},
 	}
 
 	return nm.Send(notification)

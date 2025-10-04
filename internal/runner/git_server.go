@@ -18,6 +18,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/xurenlu/sslcat/internal/config"
 	"github.com/xurenlu/sslcat/internal/i18n"
+	"github.com/xurenlu/sslcat/internal/notification"
 )
 
 // GitServer Git 服务器管理器 - 类似 Dokku/Heroku 的部署平台
@@ -59,6 +60,9 @@ type GitServer struct {
 
 	// 部署数据库
 	deployDB *DeployDatabase
+
+	// 通知管理器
+	notificationManager *notification.NotificationManager
 }
 
 // GitServerConfig Git 服务器配置
@@ -463,21 +467,26 @@ func NewGitServer(cfg *config.Config, translator *i18n.Translator) *GitServer {
 		deployDB = nil // 继续运行，但没有数据库支持
 	}
 
+	// 初始化通知管理器
+	notificationMgr := notification.NewNotificationManager()
+	logrus.Infof("通知管理器已初始化")
+
 	gs := &GitServer{
-		config:             cfg,
-		apps:               make(map[string]*GitApp),
-		logger:             logrus.WithField("component", "git_server").Logger,
-		translator:         translator,
-		serverConfig:       defaultConfig,
-		sshUser:            sshUser,
-		sshHomeDir:         sshHomeDir,
-		sshKeysDir:         sshKeysDir,
-		authorizedKeysFile: authorizedKeysFile,
-		sshConfigDir:       sshConfigDir,
-		logManager:         logManager,
-		logStreamManager:   logStreamManager,
-		dockerRegistry:     dockerRegistry,
-		deployDB:           deployDB,
+		config:              cfg,
+		apps:                make(map[string]*GitApp),
+		logger:              logrus.WithField("component", "git_server").Logger,
+		translator:          translator,
+		serverConfig:        defaultConfig,
+		sshUser:             sshUser,
+		sshHomeDir:          sshHomeDir,
+		sshKeysDir:          sshKeysDir,
+		authorizedKeysFile:  authorizedKeysFile,
+		sshConfigDir:        sshConfigDir,
+		logManager:          logManager,
+		logStreamManager:    logStreamManager,
+		dockerRegistry:      dockerRegistry,
+		deployDB:            deployDB,
+		notificationManager: notificationMgr,
 	}
 
 	// 初始化 Builder Registry
@@ -693,6 +702,14 @@ func (gs *GitServer) CreateApp(appName string, autoSSL bool) (*GitApp, error) {
 		gs.logger.Infof("  ✓ Git 钩子已设置")
 	}
 
+	// 创建符号链接，让 git-shell 能够找到仓库
+	gs.logger.Debugf("  创建 Git SSH 符号链接...")
+	if err := gs.createGitSymlink(app); err != nil {
+		gs.logger.Warnf("创建 Git SSH 符号链接失败: %v (这不会影响 Web 界面管理，但 SSH push 可能需要手动创建)", err)
+	} else {
+		gs.logger.Infof("  ✓ Git SSH 符号链接已创建")
+	}
+
 	// 创建日志流
 	gs.logger.Debugf("  创建日志流...")
 	if err := gs.logStreamManager.CreateStreamForApp(appName, app.CurrentLog); err != nil {
@@ -767,6 +784,16 @@ func (gs *GitServer) DeleteApp(appName string) error {
 	appPath := filepath.Join(gs.config.Runners.Git.ReposDir, appName)
 	if err := os.RemoveAll(appPath); err != nil {
 		gs.logger.Warnf("删除应用目录失败: %v", err)
+	}
+
+	// 删除 Git SSH 符号链接
+	symlinkPath := filepath.Join(gs.sshHomeDir, appName+".git")
+	if _, err := os.Lstat(symlinkPath); err == nil {
+		if err := os.Remove(symlinkPath); err != nil {
+			gs.logger.Warnf("删除 Git SSH 符号链接失败: %v", err)
+		} else {
+			gs.logger.Infof("Git SSH 符号链接已删除: %s", symlinkPath)
+		}
 	}
 
 	// 删除关联的代理规则
@@ -1748,6 +1775,22 @@ func (gs *GitServer) loadApps() error {
 	}
 
 	gs.apps = apps
+
+	// 为已存在的应用补充缺失的符号链接
+	gs.logger.Infof("检查并创建缺失的 Git SSH 符号链接...")
+	for _, app := range gs.apps {
+		symlinkPath := filepath.Join(gs.sshHomeDir, app.Name+".git")
+		// 检查符号链接是否存在
+		if _, err := os.Lstat(symlinkPath); os.IsNotExist(err) {
+			// 符号链接不存在，创建它
+			if err := gs.createGitSymlink(app); err != nil {
+				gs.logger.Warnf("为应用 %s 创建符号链接失败: %v", app.Name, err)
+			} else {
+				gs.logger.Infof("已为应用 %s 补充 Git SSH 符号链接", app.Name)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -2489,16 +2532,19 @@ exit 0
 
 // generatePostReceiveHook 生成 post-receive 钩子内容
 func (gs *GitServer) generatePostReceiveHook(app *GitApp) string {
-	// 获取当前可执行文件路径
-	execPath, err := os.Executable()
-	if err != nil {
-		execPath = "/usr/local/bin/sslcat"
+	// 获取服务器配置
+	adminPort := gs.config.Server.Port
+	adminPrefix := gs.config.AdminPrefix
+	domain := app.Domain
+	protocol := "http"
+	if app.DeployConfig != nil && app.DeployConfig.SSL.Enabled {
+		protocol = "https"
 	}
 
 	return fmt.Sprintf(`#!/bin/bash
 # SSLcat Git Post-Receive Hook
 # 应用: %s
-# 功能: 推送后自动部署
+# 功能: 推送后实时部署并输出日志
 
 set -e
 
@@ -2506,45 +2552,242 @@ APP_NAME="%s"
 REPO_DIR="%s"
 BARE_REPO="%s"
 LOGS_DIR="%s"
-SSLCAT_BIN="%s"
+ADMIN_PORT="%d"
+ADMIN_PREFIX="%s"
+APP_DOMAIN="%s"
+APP_PROTOCOL="%s"
+
+# 颜色定义
+COLOR_RESET='\033[0m'
+COLOR_BOLD='\033[1m'
+COLOR_GREEN='\033[0;32m'
+COLOR_BLUE='\033[0;34m'
+COLOR_YELLOW='\033[0;33m'
+COLOR_CYAN='\033[0;36m'
+COLOR_RED='\033[0;31m'
+
+# 输出函数
+print_header() {
+    echo -e "${COLOR_BOLD}${COLOR_CYAN}"
+    echo "-----> $1"
+    echo -e "${COLOR_RESET}"
+}
+
+print_info() {
+    echo -e "${COLOR_GREEN}       $1${COLOR_RESET}"
+}
+
+print_warning() {
+    echo -e "${COLOR_YELLOW}       ⚠ $1${COLOR_RESET}"
+}
+
+print_error() {
+    echo -e "${COLOR_RED}       ✗ $1${COLOR_RESET}"
+}
+
+print_success() {
+    echo -e "${COLOR_BOLD}${COLOR_GREEN}       ✓ $1${COLOR_RESET}"
+}
 
 # 记录推送信息
 while read oldrev newrev refname; do
+    # 写入日志文件
     echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [info] [git] Post-receive: $oldrev -> $newrev ($refname)" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
     
     # 获取提交信息
     if [ "$oldrev" != "0000000000000000000000000000000000000000" ]; then
         COMMIT_MSG=$(git --git-dir="$BARE_REPO" log -1 --pretty=format:"%%s" $newrev)
+        COMMIT_AUTHOR=$(git --git-dir="$BARE_REPO" log -1 --pretty=format:"%%an" $newrev)
+        SHORT_SHA=$(git --git-dir="$BARE_REPO" rev-parse --short $newrev)
     else
         COMMIT_MSG="Initial commit"
+        COMMIT_AUTHOR="Unknown"
+        SHORT_SHA=$(echo $newrev | cut -c1-7)
     fi
     
-    echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [info] [git] Commit: $newrev - $COMMIT_MSG" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+    # 显示欢迎信息
+    echo ""
+    echo -e "${COLOR_BOLD}${COLOR_BLUE}╔═══════════════════════════════════════════════════════════════╗${COLOR_RESET}"
+    echo -e "${COLOR_BOLD}${COLOR_BLUE}║${COLOR_RESET}                    ${COLOR_BOLD}SSLcat Git Deploy${COLOR_RESET}                       ${COLOR_BOLD}${COLOR_BLUE}║${COLOR_RESET}"
+    echo -e "${COLOR_BOLD}${COLOR_BLUE}╚═══════════════════════════════════════════════════════════════╝${COLOR_RESET}"
+    echo ""
+    echo -e "${COLOR_CYAN}Application:${COLOR_RESET} ${COLOR_BOLD}$APP_NAME${COLOR_RESET}"
+    echo -e "${COLOR_CYAN}Commit:${COLOR_RESET}      $SHORT_SHA - $COMMIT_MSG"
+    echo -e "${COLOR_CYAN}Author:${COLOR_RESET}      $COMMIT_AUTHOR"
+    echo -e "${COLOR_CYAN}Branch:${COLOR_RESET}      ${refname##refs/heads/}"
+    echo ""
     
     # 更新工作目录
+    print_header "Updating repository"
     if [ ! -d "$REPO_DIR/.git" ]; then
-        echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [info] [git] Cloning repository to work directory..." >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
-        git clone "$BARE_REPO" "$REPO_DIR" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" 2>&1
+        print_info "Cloning repository to work directory..."
+        if git clone "$BARE_REPO" "$REPO_DIR" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" 2>&1; then
+            print_success "Repository cloned"
+        else
+            print_error "Failed to clone repository"
+            exit 1
+        fi
     else
-        echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [info] [git] Updating work directory..." >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+        print_info "Fetching latest changes..."
         cd "$REPO_DIR"
-        git fetch origin >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" 2>&1
-        git reset --hard $newrev >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" 2>&1
+        if git fetch origin >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" 2>&1 && \
+           git reset --hard $newrev >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" 2>&1; then
+            print_success "Repository updated"
+        else
+            print_error "Failed to update repository"
+            exit 1
+        fi
     fi
     
-    # 触发部署 - 通过HTTP API调用SSLcat内部部署流程
-    echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [info] [git] Triggering deployment..." >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+    # 触发部署
+    print_header "Deploying application"
     
-    # 这里调用内部部署API或通过Unix socket通信
-    # 简化实现：创建一个标记文件，让SSLcat主进程检测并触发部署
+    # 创建触发文件
     DEPLOY_TRIGGER="/tmp/sslcat-deploy-$APP_NAME-$(date +%%s)"
     echo "$newrev|$refname|$COMMIT_MSG" > "$DEPLOY_TRIGGER"
+    
+    # 等待部署开始并监控日志
+    print_info "Waiting for deployment to start..."
+    
+    # 简单的日志监控 - 读取最新的部署日志
+    DEPLOY_LOG="$LOGS_DIR/deploy-$(date '+%%Y-%%m-%%d').log"
+    
+    # 等待几秒让部署开始
+    sleep 2
+    
+    # 跟踪日志文件的最后位置
+    if [ -f "$DEPLOY_LOG" ]; then
+        # 获取当前文件大小作为起始点
+        START_POS=$(wc -c < "$DEPLOY_LOG" 2>/dev/null || echo 0)
+        
+        print_info "Streaming deployment logs..."
+        echo ""
+        
+        # 监控日志 - 只要有新日志就持续等待
+        # 只有在 IDLE_TIMEOUT 秒内没有新日志时才超时退出
+        MAX_TOTAL_TIME=600    # 最长总等待时间 10 分钟
+        IDLE_TIMEOUT=30       # 无新日志超时时间 30 秒
+        TOTAL_ELAPSED=0
+        IDLE_ELAPSED=0
+        DEPLOY_DONE=false
+        
+        while [ $TOTAL_ELAPSED -lt $MAX_TOTAL_TIME ] && [ "$DEPLOY_DONE" = "false" ]; do
+            if [ -f "$DEPLOY_LOG" ]; then
+                # 读取新增的日志内容
+                CURRENT_POS=$(wc -c < "$DEPLOY_LOG" 2>/dev/null || echo 0)
+                
+                if [ $CURRENT_POS -gt $START_POS ]; then
+                    # 有新日志，重置空闲计时器
+                    IDLE_ELAPSED=0
+                    
+                    # 提取新的日志行
+                    NEW_LOGS=$(tail -c +$((START_POS + 1)) "$DEPLOY_LOG" 2>/dev/null || echo "")
+                    
+                    # 逐行处理并格式化输出
+                    echo "$NEW_LOGS" | while IFS= read -r line; do
+                        if [ -n "$line" ]; then
+                            # 尝试解析JSON格式的日志
+                            if echo "$line" | grep -q '"level"'; then
+                                # JSON格式日志
+                                LEVEL=$(echo "$line" | grep -o '"level":"[^"]*"' | cut -d'"' -f4 || echo "info")
+                                MESSAGE=$(echo "$line" | grep -o '"message":"[^"]*"' | cut -d'"' -f4 || echo "$line")
+                                SOURCE=$(echo "$line" | grep -o '"source":"[^"]*"' | cut -d'"' -f4 || echo "")
+                                
+                                case "$LEVEL" in
+                                    "error")
+                                        echo -e "${COLOR_RED}       [$SOURCE] $MESSAGE${COLOR_RESET}"
+                                        ;;
+                                    "warn")
+                                        echo -e "${COLOR_YELLOW}       [$SOURCE] $MESSAGE${COLOR_RESET}"
+                                        ;;
+                                    "info")
+                                        echo -e "${COLOR_GREEN}       [$SOURCE] $MESSAGE${COLOR_RESET}"
+                                        ;;
+                                    *)
+                                        echo -e "       [$SOURCE] $MESSAGE"
+                                        ;;
+                                esac
+                                
+                                # 检查是否部署完成
+                                if echo "$MESSAGE" | grep -q "部署成功\|部署完成\|deployment.*success\|deployment.*complete"; then
+                                    DEPLOY_DONE=true
+                                fi
+                                if echo "$MESSAGE" | grep -q "部署失败\|deployment.*failed"; then
+                                    DEPLOY_DONE=true
+                                fi
+                            else
+                                # 纯文本日志
+                                echo "       $line"
+                            fi
+                        fi
+                    done
+                    
+                    START_POS=$CURRENT_POS
+                else
+                    # 没有新日志，增加空闲计时
+                    IDLE_ELAPSED=$((IDLE_ELAPSED + 1))
+                    
+                    # 空闲超时检查
+                    if [ $IDLE_ELAPSED -ge $IDLE_TIMEOUT ]; then
+                        print_warning "No new logs for ${IDLE_TIMEOUT}s, deployment may still be running in background"
+                        print_info "Check admin panel or logs for details: tail -f $DEPLOY_LOG"
+                        
+                        # 发送部署卡住通知 API
+                        curl -s -X POST "http://localhost:${ADMIN_PORT}${ADMIN_PREFIX}/api/internal/deploy-notification" \
+                          -H "Content-Type: application/json" \
+                          -d "{\"type\":\"stuck\",\"app_name\":\"$APP_NAME\",\"commit_sha\":\"$SHORT_SHA\",\"idle_duration\":\"${IDLE_TIMEOUT}s\"}" \
+                          >/dev/null 2>&1 || true
+                        
+                        break
+                    fi
+                fi
+            fi
+            
+            sleep 1
+            TOTAL_ELAPSED=$((TOTAL_ELAPSED + 1))
+        done
+        
+        # 检查是否超过最大总时间
+        if [ $TOTAL_ELAPSED -ge $MAX_TOTAL_TIME ]; then
+            print_warning "Deployment timeout after ${MAX_TOTAL_TIME}s, but may still be running"
+            print_info "Check admin panel or logs for status"
+            
+            # 发送部署超时通知 API
+            curl -s -X POST "http://localhost:${ADMIN_PORT}${ADMIN_PREFIX}/api/internal/deploy-notification" \
+              -H "Content-Type: application/json" \
+              -d "{\"type\":\"timeout\",\"app_name\":\"$APP_NAME\",\"commit_sha\":\"$SHORT_SHA\",\"duration\":\"${MAX_TOTAL_TIME}s\"}" \
+              >/dev/null 2>&1 || true
+        fi
+        
+        echo ""
+    else
+        print_warning "Deployment log file not found, check admin panel for details"
+    fi
+    
+    # 显示部署结果
+    echo ""
+    echo -e "${COLOR_BOLD}${COLOR_GREEN}╔═══════════════════════════════════════════════════════════════╗${COLOR_RESET}"
+    echo -e "${COLOR_BOLD}${COLOR_GREEN}║${COLOR_RESET}                    ${COLOR_BOLD}Deployment Complete${COLOR_RESET}                      ${COLOR_BOLD}${COLOR_GREEN}║${COLOR_RESET}"
+    echo -e "${COLOR_BOLD}${COLOR_GREEN}╚═══════════════════════════════════════════════════════════════╝${COLOR_RESET}"
+    echo ""
+    echo -e "${COLOR_CYAN}Application URL:${COLOR_RESET}"
+    echo -e "  ${COLOR_BOLD}${APP_PROTOCOL}://${APP_DOMAIN}${COLOR_RESET}"
+    echo ""
+    echo -e "${COLOR_CYAN}Admin Panel:${COLOR_RESET}"
+    echo -e "  http://localhost:${ADMIN_PORT}${ADMIN_PREFIX}"
+    echo ""
+    echo -e "${COLOR_CYAN}View Logs:${COLOR_RESET}"
+    echo -e "  tail -f $DEPLOY_LOG"
+    echo ""
+    
+    print_success "Push accepted and deployed to ${APP_PROTOCOL}://${APP_DOMAIN}"
+    echo ""
     
     echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [info] [git] Post-receive completed" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
 done
 
 exit 0
-`, app.Name, app.Name, app.RepoDir, app.BareRepo, app.LogsDir, execPath)
+`, app.Name, app.Name, app.RepoDir, app.BareRepo, app.LogsDir, adminPort, adminPrefix, domain, protocol)
 }
 
 // generateReceivePackWrapper 生成 receive-pack 包装脚本
@@ -2605,6 +2848,41 @@ func (gs *GitServer) initGitRepo(app *GitApp) error {
 		return fmt.Errorf("克隆裸仓库失败: %w", err)
 	}
 
+	return nil
+}
+
+// createGitSymlink 创建符号链接，让 git-shell 能够通过 SSH 访问仓库
+// 当用户执行 git push git@host:appname.git 时，git-shell 会在 /home/git/ 下查找 appname.git
+// 因此需要创建符号链接指向实际的裸仓库位置
+func (gs *GitServer) createGitSymlink(app *GitApp) error {
+	// 符号链接路径：/home/git/appname.git -> /path/to/repos/appname/git/repo.git
+	symlinkPath := filepath.Join(gs.sshHomeDir, app.Name+".git")
+	targetPath := app.BareRepo
+
+	// 检查符号链接是否已存在
+	if _, err := os.Lstat(symlinkPath); err == nil {
+		// 符号链接已存在，先删除旧的
+		gs.logger.Debugf("符号链接已存在，删除旧链接: %s", symlinkPath)
+		if err := os.Remove(symlinkPath); err != nil {
+			return fmt.Errorf("删除旧符号链接失败: %w", err)
+		}
+	}
+
+	// 创建符号链接
+	gs.logger.Debugf("创建符号链接: %s -> %s", symlinkPath, targetPath)
+	if err := os.Symlink(targetPath, symlinkPath); err != nil {
+		return fmt.Errorf("创建符号链接失败: %w", err)
+	}
+
+	// 设置符号链接的所有者为 git 用户
+	if gs.uid > 0 && gs.gid > 0 {
+		// Lchown 修改符号链接本身的所有者，而不是目标文件
+		if err := os.Lchown(symlinkPath, gs.uid, gs.gid); err != nil {
+			gs.logger.Warnf("设置符号链接所有者失败: %v", err)
+		}
+	}
+
+	gs.logger.Infof("Git SSH 符号链接已创建: %s -> %s", symlinkPath, targetPath)
 	return nil
 }
 
@@ -3245,4 +3523,45 @@ func (gs *GitServer) stopContainer(containerID string) error {
 	}
 
 	return nil
+}
+
+// ==================== 部署通知集成 ====================
+
+// SendDeployNotification 发送部署通知
+func (gs *GitServer) SendDeployNotification(notifType, appName, commitSHA, commitMsg,
+	idleDuration, duration, reason, errorDetails, domain string) error {
+
+	if gs.notificationManager == nil {
+		gs.logger.Warn("通知管理器未初始化，跳过通知发送")
+		return nil
+	}
+
+	gs.logger.Infof("发送部署通知: type=%s, app=%s, commit=%s", notifType, appName, commitSHA)
+
+	switch notifType {
+	case "stuck":
+		// 部署卡住通知
+		return gs.notificationManager.SendDeployStuck(appName, commitSHA, "", idleDuration)
+
+	case "timeout":
+		// 部署超时通知
+		return gs.notificationManager.SendDeployTimeout(appName, commitSHA, duration)
+
+	case "failed":
+		// 部署失败通知
+		return gs.notificationManager.SendDeployFailed(appName, commitSHA, commitMsg, reason, errorDetails)
+
+	case "success":
+		// 部署成功通知（可选，根据配置决定是否发送）
+		// 计算部署时间（这里简化处理，实际可以从日志中提取）
+		durationTime, _ := time.ParseDuration(duration)
+		if durationTime == 0 {
+			durationTime = 1 * time.Minute // 默认值
+		}
+		return gs.notificationManager.SendDeploySuccess(appName, commitSHA, commitMsg, domain, durationTime)
+
+	default:
+		gs.logger.Warnf("未知的通知类型: %s", notifType)
+		return fmt.Errorf("未知的通知类型: %s", notifType)
+	}
 }

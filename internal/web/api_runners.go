@@ -68,14 +68,14 @@ func (api *GitServerAPI) ListApps(w http.ResponseWriter, r *http.Request) {
 		appJSON, _ := json.Marshal(app)
 		var appMap map[string]interface{}
 		json.Unmarshal(appJSON, &appMap)
-		
+
 		// 添加 autoSSL 字段
 		if app.DeployConfig != nil {
 			appMap["autoSSL"] = app.DeployConfig.SSL.Enabled
 		} else {
 			appMap["autoSSL"] = false
 		}
-		
+
 		appsWithAutoSSL = append(appsWithAutoSSL, appMap)
 	}
 
@@ -106,7 +106,7 @@ func (api *GitServerAPI) GetApp(w http.ResponseWriter, r *http.Request) {
 	appJSON, _ := json.Marshal(app)
 	var appMap map[string]interface{}
 	json.Unmarshal(appJSON, &appMap)
-	
+
 	if app.DeployConfig != nil {
 		appMap["autoSSL"] = app.DeployConfig.SSL.Enabled
 	} else {
@@ -171,7 +171,7 @@ func (api *GitServerAPI) CreateApp(w http.ResponseWriter, r *http.Request) {
 	appJSON, _ := json.Marshal(app)
 	var appMap map[string]interface{}
 	json.Unmarshal(appJSON, &appMap)
-	
+
 	if app.DeployConfig != nil {
 		appMap["autoSSL"] = app.DeployConfig.SSL.Enabled
 	} else {
@@ -931,6 +931,51 @@ func (api *GitServerAPI) RestartSSHD(w http.ResponseWriter, r *http.Request) {
 	response := map[string]interface{}{
 		"success": true,
 		"message": "SSH 服务重启成功",
+	}
+	api.writeJSON(w, response)
+}
+
+// HandleDeployNotification 处理部署通知（内部 API，由 hook 调用）
+func (api *GitServerAPI) HandleDeployNotification(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		api.writeError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if api.server == nil {
+		api.writeError(w, "Git Deploy 服务未启用", http.StatusServiceUnavailable)
+		return
+	}
+
+	var req struct {
+		Type         string `json:"type"` // stuck, timeout, success, failed
+		AppName      string `json:"app_name"`
+		CommitSHA    string `json:"commit_sha"`
+		CommitMsg    string `json:"commit_msg"`
+		IdleDuration string `json:"idle_duration"` // for stuck
+		Duration     string `json:"duration"`      // for timeout
+		Reason       string `json:"reason"`        // for failed
+		ErrorDetails string `json:"error_details"` // for failed
+		Domain       string `json:"domain"`        // for success
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		api.logger.Errorf("解析部署通知请求失败: %v", err)
+		api.writeError(w, "解析请求失败", http.StatusBadRequest)
+		return
+	}
+
+	// 调用 GitServer 的通知方法
+	if err := api.server.SendDeployNotification(req.Type, req.AppName, req.CommitSHA, req.CommitMsg,
+		req.IdleDuration, req.Duration, req.Reason, req.ErrorDetails, req.Domain); err != nil {
+		api.logger.Errorf("发送部署通知失败: %v", err)
+		api.writeError(w, "发送通知失败: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"success": true,
+		"message": "通知已发送",
 	}
 	api.writeJSON(w, response)
 }

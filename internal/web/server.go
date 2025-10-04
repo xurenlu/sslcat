@@ -650,6 +650,9 @@ func (s *Server) registerRunnerRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/docker/config/update", gitAPI.UpdateDockerConfig)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/docker/test", gitAPI.TestDockerConnection)
 
+	// 部署通知 API 路由（内部使用，由 Git hooks 调用）
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/internal/deploy-notification", gitAPI.HandleDeployNotification)
+
 	// 运行时检测 API 路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/runtime-detector/detect", runtimeAPI.DetectProject)
 }
