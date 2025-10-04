@@ -786,8 +786,9 @@ func (s *Server) securityMiddleware(w http.ResponseWriter, r *http.Request) bool
 		return false
 	}
 
-	// 检查User-Agent
-	if strings.HasPrefix(path, s.config.AdminPrefix) && (userAgent == "" || s.isCommonBotUserAgent(userAgent)) {
+	// 检查User-Agent（localhost 请求豁免）
+	isLocalhost := clientIP == "127.0.0.1" || clientIP == "::1" || clientIP == "localhost"
+	if strings.HasPrefix(path, s.config.AdminPrefix) && !isLocalhost && (userAgent == "" || s.isCommonBotUserAgent(userAgent)) {
 		s.log.Warnf("Suspicious User-Agent attempted to access admin panel: %s from %s", userAgent, clientIP)
 		s.securityManager.LogAccess(clientIP, userAgent, path, false)
 		http.Error(w, "Access denied", http.StatusForbidden)
