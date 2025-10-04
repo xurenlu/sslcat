@@ -93,6 +93,7 @@ create_app() {
     local response
     response=$(curl -s -X POST "$SSLCAT_API_URL/api/git-server/apps" \
         -H "Content-Type: application/json" \
+        -H "User-Agent: SSLcat-Git-Hook/1.0 (Internal)" \
         -d "{\"name\":\"$app_name\",\"auto_ssl\":true}" 2>&1)
     
     if [[ $? -eq 0 ]] && echo "$response" | grep -q '"success":true'; then
