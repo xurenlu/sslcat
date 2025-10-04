@@ -180,5 +180,7 @@
   "frontend.delete_app_instruction": "削除を確認するには、アプリケーション名「{appName}」を入力してください：",
   "frontend.delete_app_name_mismatch": "アプリケーション名が一致しません",
   "frontend.delete_app_cancelled": "削除操作がキャンセルされました",
-  "frontend.manual_deploy_not_supported": "手動デプロイはまだサポートされていません。Git pushを介してデプロイをトリガーしてください。"
+  "frontend.manual_deploy_not_supported": "手動デプロイはまだサポートされていません。Git pushを介してデプロイをトリガーしてください。",
+  "frontend.ssh_key_notice": "Gitサーバーを有効にしましたが、まだSSHキーを設定していません。Gitプッシュを許可するには、「SSHキー」タブで少なくとも1つのSSHキーを追加してください。",
+  "frontend.select_ssh_key": "SSHキーを選択"
 }

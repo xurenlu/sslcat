@@ -180,5 +180,7 @@
   "frontend.delete_app_instruction": "Bitte geben Sie den Anwendungsnamen \"{appName}\" ein, um das Löschen zu bestätigen:",
   "frontend.delete_app_name_mismatch": "Anwendungsname stimmt nicht überein",
   "frontend.delete_app_cancelled": "Löschvorgang abgebrochen",
-  "frontend.manual_deploy_not_supported": "Manuelles Deployment wird noch nicht unterstützt. Bitte lösen Sie das Deployment über Git push aus."
+  "frontend.manual_deploy_not_supported": "Manuelles Deployment wird noch nicht unterstützt. Bitte lösen Sie das Deployment über Git push aus.",
+  "frontend.ssh_key_notice": "Sie haben den Git-Server aktiviert, aber noch keine SSH-Schlüssel konfiguriert. Bitte fügen Sie mindestens einen SSH-Schlüssel im \"SSH-Schlüssel\"-Tab hinzu, um Git-Push zu ermöglichen.",
+  "frontend.select_ssh_key": "SSH-Schlüssel auswählen"
 }

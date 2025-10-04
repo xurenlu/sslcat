@@ -2176,34 +2176,34 @@ func (gs *GitServer) AddSSHKey(keyName, publicKey string) error {
 				// 如果创建目录失败，检查是否是权限问题或只读文件系统
 				if strings.Contains(err.Error(), "read-only file system") || strings.Contains(err.Error(), "Permission denied") {
 					gs.logger.Warnf("创建 SSH 目录失败，尝试检查 git 用户是否已存在: %v", err)
-					
+
 					// 检查 git 用户是否存在
 					if gitUser, lookupErr := user.Lookup(gs.sshUser); lookupErr == nil {
 						// 用户存在，使用实际的 home 目录
 						actualHomeDir := gitUser.HomeDir
 						actualSSHKeysDir := filepath.Join(actualHomeDir, ".ssh")
 						actualAuthorizedKeysFile := filepath.Join(actualSSHKeysDir, "authorized_keys")
-						
+
 						// 更新路径
 						gs.sshHomeDir = actualHomeDir
 						gs.sshKeysDir = actualSSHKeysDir
 						gs.authorizedKeysFile = actualAuthorizedKeysFile
-						
+
 						// 解析UID和GID
 						uid, _ := strconv.Atoi(gitUser.Uid)
 						gid, _ := strconv.Atoi(gitUser.Gid)
 						gs.uid = uid
 						gs.gid = gid
-						
+
 						gs.logger.Infof("检测到现有 git 用户，使用 home 目录: %s", actualHomeDir)
-						
+
 						// 再次检查实际的 SSH 目录是否存在
 						if _, statErr := os.Stat(gs.sshKeysDir); os.IsNotExist(statErr) {
 							gs.logger.Warnf("实际用户的 .ssh 目录也不存在，跳过目录创建")
 						} else {
 							gs.logger.Infof("使用现有的 SSH 目录: %s", gs.sshKeysDir)
 						}
-						
+
 						// 尝试创建 authorized_keys 文件（如果不存在）
 						if _, statErr := os.Stat(gs.authorizedKeysFile); os.IsNotExist(statErr) {
 							if writeErr := os.WriteFile(gs.authorizedKeysFile, []byte{}, 0600); writeErr != nil {
@@ -2246,8 +2246,31 @@ func (gs *GitServer) AddSSHKey(keyName, publicKey string) error {
 	keyEntry := fmt.Sprintf("# %s\ncommand=\"%s %s\",%s %s\n",
 		keyName, wrapperScript, keyName, restrictions, publicKey)
 
+	// 在打开文件前，再次确保文件存在
+	if err := gs.ensureAuthorizedKeysFile(); err != nil {
+		return fmt.Errorf("确保 authorized_keys 文件存在失败: %w", err)
+	}
+	
+	// 检查文件权限和所有者
+	if info, err := os.Stat(gs.authorizedKeysFile); err != nil {
+		return fmt.Errorf("检查 authorized_keys 文件状态失败: %w", err)
+	} else {
+		gs.logger.Debugf("authorized_keys 文件信息: 权限=%s, 所有者=%d:%d", 
+			info.Mode().String(), gs.uid, gs.gid)
+	}
+	
 	file, err := os.OpenFile(gs.authorizedKeysFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
+		// 提供更详细的错误信息
+		gs.logger.Errorf("打开 authorized_keys 文件失败: %v", err)
+		gs.logger.Errorf("文件路径: %s", gs.authorizedKeysFile)
+		gs.logger.Errorf("当前用户: %d:%d", gs.uid, gs.gid)
+		
+		// 检查父目录权限
+		if parentInfo, parentErr := os.Stat(filepath.Dir(gs.authorizedKeysFile)); parentErr == nil {
+			gs.logger.Errorf("父目录权限: %s", parentInfo.Mode().String())
+		}
+		
 		return fmt.Errorf("打开 authorized_keys 文件失败: %w", err)
 	}
 	defer file.Close()
@@ -3940,17 +3963,29 @@ func (gs *GitServer) ensureAuthorizedKeysFile() error {
 	} else if os.IsNotExist(err) {
 		// 文件不存在，创建它
 		gs.logger.Infof("创建 authorized_keys 文件: %s", gs.authorizedKeysFile)
-		
-		// 确保父目录存在
-		if err := os.MkdirAll(filepath.Dir(gs.authorizedKeysFile), 0700); err != nil {
+
+		// 确保父目录存在，并设置正确的权限
+		sshDir := filepath.Dir(gs.authorizedKeysFile)
+		if err := os.MkdirAll(sshDir, 0700); err != nil {
 			return fmt.Errorf("创建 .ssh 目录失败: %w", err)
 		}
 		
+		// 确保 .ssh 目录权限正确（SSH StrictModes 要求）
+		if err := os.Chmod(sshDir, 0700); err != nil {
+			gs.logger.Warnf("设置 .ssh 目录权限失败: %v", err)
+		}
+		
+		// 确保 home 目录权限正确（SSH StrictModes 要求）
+		// home 目录不能被 group/others 写入
+		if err := os.Chmod(gs.sshHomeDir, 0755); err != nil {
+			gs.logger.Warnf("设置 home 目录权限失败: %v", err)
+		}
+
 		// 创建空文件
 		if err := os.WriteFile(gs.authorizedKeysFile, []byte{}, 0600); err != nil {
 			return fmt.Errorf("创建 authorized_keys 文件失败: %w", err)
 		}
-		
+
 		// 设置正确的所有者
 		if gs.uid > 0 && gs.gid > 0 {
 			if err := os.Chown(gs.authorizedKeysFile, gs.uid, gs.gid); err != nil {
@@ -3961,7 +3996,7 @@ func (gs *GitServer) ensureAuthorizedKeysFile() error {
 				gs.logger.Warnf("设置 .ssh 目录所有者失败: %v", err)
 			}
 		}
-		
+
 		gs.logger.Infof("authorized_keys 文件创建成功: %s", gs.authorizedKeysFile)
 		return nil
 	} else {

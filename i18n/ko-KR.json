@@ -180,5 +180,7 @@
   "frontend.delete_app_instruction": "삭제를 확인하려면 애플리케이션 이름 \"{appName}\"을(를) 입력하세요:",
   "frontend.delete_app_name_mismatch": "애플리케이션 이름이 일치하지 않습니다",
   "frontend.delete_app_cancelled": "삭제 작업이 취소되었습니다",
-  "frontend.manual_deploy_not_supported": "수동 배포는 아직 지원되지 않습니다. Git push를 통해 배포를 트리거하세요."
+  "frontend.manual_deploy_not_supported": "수동 배포는 아직 지원되지 않습니다. Git push를 통해 배포를 트리거하세요.",
+  "frontend.ssh_key_notice": "Git 서버를 활성화했지만 아직 SSH 키를 구성하지 않았습니다. Git 푸시를 허용하려면 \"SSH 키\" 탭에서 최소 하나의 SSH 키를 추가하세요.",
+  "frontend.select_ssh_key": "SSH 키 선택"
 }

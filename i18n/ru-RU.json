@@ -180,5 +180,7 @@
   "frontend.delete_app_instruction": "Пожалуйста, введите имя приложения \"{appName}\" для подтверждения удаления:",
   "frontend.delete_app_name_mismatch": "Имя приложения не совпадает",
   "frontend.delete_app_cancelled": "Операция удаления отменена",
-  "frontend.manual_deploy_not_supported": "Ручное развертывание еще не поддерживается. Пожалуйста, запустите развертывание через Git push."
+  "frontend.manual_deploy_not_supported": "Ручное развертывание еще не поддерживается. Пожалуйста, запустите развертывание через Git push.",
+  "frontend.ssh_key_notice": "Вы включили Git-сервер, но еще не настроили SSH-ключи. Пожалуйста, добавьте хотя бы один SSH-ключ на вкладке \"SSH-ключи\" для разрешения Git push.",
+  "frontend.select_ssh_key": "Выбрать SSH-ключ"
 }

@@ -180,5 +180,7 @@
   "frontend.delete_app_instruction": "請輸入應用程式名稱「{appName}」以確認刪除：",
   "frontend.delete_app_name_mismatch": "應用程式名稱不符",
   "frontend.delete_app_cancelled": "刪除操作已取消",
-  "frontend.manual_deploy_not_supported": "尚不支援手動部署。請透過Git push觸發部署。"
+  "frontend.manual_deploy_not_supported": "尚不支援手動部署。請透過Git push觸發部署。",
+  "frontend.ssh_key_notice": "您已啟用Git伺服器，但還沒有配置SSH金鑰。請在「SSH金鑰」標籤頁中新增至少一個SSH金鑰以允許Git推送。",
+  "frontend.select_ssh_key": "選擇SSH金鑰"
 }

@@ -180,5 +180,7 @@
   "frontend.delete_app_instruction": "Por favor, escriba el nombre de la aplicación \"{appName}\" para confirmar la eliminación:",
   "frontend.delete_app_name_mismatch": "El nombre de la aplicación no coincide",
   "frontend.delete_app_cancelled": "Operación de eliminación cancelada",
-  "frontend.manual_deploy_not_supported": "El despliegue manual aún no está soportado. Por favor, active el despliegue mediante Git push."
+  "frontend.manual_deploy_not_supported": "El despliegue manual aún no está soportado. Por favor, active el despliegue mediante Git push.",
+  "frontend.ssh_key_notice": "Ha habilitado el servidor Git pero aún no ha configurado claves SSH. Por favor, agregue al menos una clave SSH en la pestaña \"Claves SSH\" para permitir Git push.",
+  "frontend.select_ssh_key": "Seleccionar clave SSH"
 }
