@@ -77,7 +77,7 @@ const DNSManagement: React.FC = () => {
     endpoint: '',
   })
 
-  const refreshData = async () => {
+  const refreshData = async (showToast: boolean = false) => {
     setLoading(true)
     try {
       // 首先触发缓存刷新
@@ -113,20 +113,23 @@ const DNSManagement: React.FC = () => {
         
         setProviders(formattedProviders)
         
-        // 显示刷新成功提示
-        toast({
-          title: '刷新成功',
-          description: 'DNS 提供商数据已更新',
-          status: 'success',
-          duration: 2000,
-          isClosable: true,
-        })
+        // 只在手动刷新时显示提示
+        if (showToast) {
+          toast({
+            title: '刷新成功',
+            description: 'DNS 提供商数据已更新',
+            status: 'success',
+            duration: 2000,
+            isClosable: true,
+          })
+        }
         
       } else {
         throw new Error('获取DNS数据失败')
       }
     } catch (error) {
       console.error('获取DNS数据失败:', error)
+      // 错误时总是显示提示
       toast({
         title: '获取失败',
         description: error instanceof Error ? error.message : '未知错误',
@@ -347,7 +350,7 @@ const DNSManagement: React.FC = () => {
         <HStack>
           <Button
             leftIcon={<Icon as={FiRefreshCw} />}
-            onClick={refreshData}
+            onClick={() => refreshData(true)}
             isLoading={loading}
             variant="outline"
           >

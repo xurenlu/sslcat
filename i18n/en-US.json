@@ -246,5 +246,11 @@
   "frontend.welcome_message": "Welcome to SSLcat Git Deploy Platform!",
   "frontend.unbind_key": "Unbind Key",
   "frontend.select_ssh_key": "Select SSH Key",
-  "frontend.admin_panel_prefix_changed": "Admin panel access prefix changed from \"{oldPrefix}\" to \"{newPrefix}\""
+  "frontend.admin_panel_prefix_changed": "Admin panel access prefix changed from \"{oldPrefix}\" to \"{newPrefix}\"",
+  "frontend.delete_app_confirm": "Confirm Delete Application",
+  "frontend.delete_app_warning": "This is a dangerous operation and cannot be undone. All data, code, logs and configurations for this application will be permanently deleted.",
+  "frontend.delete_app_instruction": "Please type the application name \"{appName}\" to confirm deletion:",
+  "frontend.delete_app_name_mismatch": "Application name does not match",
+  "frontend.delete_app_cancelled": "Delete operation cancelled",
+  "frontend.manual_deploy_not_supported": "Manual deployment is not yet supported. Please trigger deployment via Git push."
 }

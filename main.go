@@ -15,6 +15,7 @@ import (
 
 	"github.com/xurenlu/sslcat/internal/cache"
 	"github.com/xurenlu/sslcat/internal/config"
+	"github.com/xurenlu/sslcat/internal/i18n"
 	"github.com/xurenlu/sslcat/internal/logger"
 	"github.com/xurenlu/sslcat/internal/notification"
 	"github.com/xurenlu/sslcat/internal/proxy"
@@ -200,8 +201,11 @@ func main() {
 	cdnCache.StartCleaner()
 	proxyManager := proxy.NewManager(cfg, sslManager, securityManager, cdnCache, version)
 
+	// 初始化翻译器
+	translator := i18n.NewTranslator(i18n.LangZhCN, "i18n")
+
 	// 初始化 Runner 模块
-	gitServer := runner.NewGitServer(cfg)
+	gitServer := runner.NewGitServer(cfg, translator)
 
 	webServer := web.NewServer(cfg, proxyManager, securityManager, sslManager, gitServer, notificationIntegrator, version)
 

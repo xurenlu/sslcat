@@ -171,5 +171,12 @@
   "git_deploy_server.description": "Git Deploy Serverは、Railway、Heroku、Dokkuに似たデプロイメントプラットフォームで、以下をサポートします：",
   "git_deploy_server.return": "Git Deploy Serverに戻る",
   "git_deploy_server.create_app_title": "アプリケーション作成 - SSLcat Git Deploy Server",
-  "git_deploy_server.server_config_title": "サーバー設定 - SSLcat Git Deploy Server"
+  "git_deploy_server.server_config_title": "サーバー設定 - SSLcat Git Deploy Server",
+  
+  "frontend.delete_app_confirm": "アプリケーション削除の確認",
+  "frontend.delete_app_warning": "これは危険な操作であり、元に戻すことはできません。このアプリケーションのすべてのデータ、コード、ログ、および設定が完全に削除されます。",
+  "frontend.delete_app_instruction": "削除を確認するには、アプリケーション名「{appName}」を入力してください：",
+  "frontend.delete_app_name_mismatch": "アプリケーション名が一致しません",
+  "frontend.delete_app_cancelled": "削除操作がキャンセルされました",
+  "frontend.manual_deploy_not_supported": "手動デプロイはまだサポートされていません。Git pushを介してデプロイをトリガーしてください。"
 }

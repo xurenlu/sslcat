@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/user"
@@ -55,6 +56,9 @@ type GitServer struct {
 
 	// Builder Registry
 	builderRegistry *BuilderRegistry
+	
+	// 部署数据库
+	deployDB *DeployDatabase
 }
 
 // GitServerConfig Git 服务器配置
@@ -182,6 +186,14 @@ type GitApp struct {
 
 	// SSH密钥绑定
 	AllowedKeys []string `json:"allowed_keys,omitempty"` // 允许推送的SSH密钥指纹列表
+
+	// 配置变更标记
+	PendingRestart bool `json:"pending_restart,omitempty"` // 是否有未应用的配置变更需要重启
+	
+	// 容器信息（蓝绿部署）
+	ContainerID     string `json:"container_id,omitempty"`      // 当前活跃容器ID
+	OldContainerID  string `json:"old_container_id,omitempty"`  // 旧容器ID（等待停止）
+	ContainerStatus string `json:"container_status,omitempty"`  // 容器状态
 }
 
 // AppDeployConfig 应用部署配置
@@ -444,6 +456,13 @@ func NewGitServer(cfg *config.Config, translator *i18n.Translator) *GitServer {
 	}
 	dockerRegistry := NewDockerRegistry(dockerRegistryConfig)
 
+	// 初始化部署数据库
+	deployDB, err := NewDeployDatabase(dataDir)
+	if err != nil {
+		logrus.Errorf("初始化部署数据库失败: %v", err)
+		deployDB = nil // 继续运行，但没有数据库支持
+	}
+
 	gs := &GitServer{
 		config:             cfg,
 		apps:               make(map[string]*GitApp),
@@ -458,6 +477,7 @@ func NewGitServer(cfg *config.Config, translator *i18n.Translator) *GitServer {
 		logManager:         logManager,
 		logStreamManager:   logStreamManager,
 		dockerRegistry:     dockerRegistry,
+		deployDB:           deployDB,
 	}
 
 	// 初始化 Builder Registry
@@ -776,11 +796,42 @@ func (gs *GitServer) UpdateAppEnv(appName string, envVars map[string]string) err
 		app.DeployConfig.EnvVars[k] = v
 	}
 
+	// 标记为需要重启
+	app.PendingRestart = true
+
 	if err := gs.saveApps(); err != nil {
 		return fmt.Errorf("保存应用信息失败: %w", err)
 	}
 
-	gs.logger.Infof("应用 %s 环境变量已更新", appName)
+	gs.logger.Infof("应用 %s 环境变量已更新，需要重新部署以应用更改", appName)
+	return nil
+}
+
+// RedeployApp 手动触发应用重新部署
+func (gs *GitServer) RedeployApp(appName string) error {
+	gs.mutex.Lock()
+	app, exists := gs.apps[appName]
+	if !exists {
+		gs.mutex.Unlock()
+		return fmt.Errorf("应用 %s 不存在", appName)
+	}
+
+	// 检查应用是否正在部署中
+	if app.Status == "building" || app.Status == "deploying" {
+		gs.mutex.Unlock()
+		return fmt.Errorf("应用正在部署中，请稍后再试")
+	}
+
+	// 清除重启标记
+	app.PendingRestart = false
+	app.Status = "building"
+	app.LastDeploy = time.Now()
+	gs.mutex.Unlock()
+
+	// 在后台执行部署
+	go gs.processGitPush(app, nil)
+
+	gs.logger.Infof("手动触发应用 %s 的重新部署", appName)
 	return nil
 }
 
@@ -1157,16 +1208,46 @@ func (gs *GitServer) startGoApp(app *GitApp) error {
 	return gs.startAppProcess(app, "./app")
 }
 
-// startDockerApp 启动 Docker 应用
+// startDockerApp 启动 Docker 应用（蓝绿部署）
 func (gs *GitServer) startDockerApp(app *GitApp, imageName string) error {
-	// 停止现有容器
-	containerName := fmt.Sprintf("sslcat-%s", app.Name)
-	gs.runCommand("", "docker", "stop", containerName)
-	gs.runCommand("", "docker", "rm", containerName)
+	// 为新容器分配一个临时端口
+	newPort, err := gs.allocatePort()
+	if err != nil {
+		return fmt.Errorf("无法分配新端口: %w", err)
+	}
+
+	// 生成新容器名称（带时间戳）
+	timestamp := time.Now().Unix()
+	newContainerName := fmt.Sprintf("sslcat-%s-%d", app.Name, timestamp)
 
 	// 启动新容器
-	cmd := fmt.Sprintf("docker run -d --name %s -p %d:80 %s", containerName, app.Port, imageName)
-	return gs.runCommand("", "sh", "-c", cmd)
+	cmd := fmt.Sprintf("docker run -d --name %s -p %d:80 %s", newContainerName, newPort, imageName)
+	if err := gs.runCommand("", "sh", "-c", cmd); err != nil {
+		gs.releasePort(newPort)
+		return fmt.Errorf("启动新容器失败: %w", err)
+	}
+
+	gs.logger.Infof("新容器已启动: %s, 端口: %d", newContainerName, newPort)
+
+	// 获取容器ID
+	getIDCmd := exec.Command("docker", "inspect", "-f", "{{.Id}}", newContainerName)
+	containerIDBytes, err := getIDCmd.Output()
+	if err != nil {
+		gs.logger.Errorf("获取容器ID失败: %v", err)
+		return fmt.Errorf("获取容器ID失败: %w", err)
+	}
+	newContainerID := strings.TrimSpace(string(containerIDBytes))
+
+	// 执行蓝绿部署
+	if err := gs.BlueGreenDeploy(app, newContainerID, newPort); err != nil {
+		// 蓝绿部署失败，清理新容器
+		gs.logger.Errorf("蓝绿部署失败: %v", err)
+		gs.stopContainer(newContainerID)
+		gs.releasePort(newPort)
+		return fmt.Errorf("蓝绿部署失败: %w", err)
+	}
+
+	return nil
 }
 
 // deployPHPApp 部署 PHP 应用
@@ -1222,10 +1303,17 @@ func (gs *GitServer) buildAndDeployDockerAppWithLogging(app *GitApp, deployLogge
 	// 更新应用信息
 	gs.mutex.Lock()
 	app.DockerImage = image.FullName
-	app.Status = "running"
 	gs.mutex.Unlock()
 
-	deployLogger.WriteLog("info", "docker", fmt.Sprintf("Docker应用部署完成，镜像: %s", image.FullName))
+	deployLogger.WriteLog("info", "docker", fmt.Sprintf("Docker镜像构建完成: %s", image.FullName))
+	
+	// 启动Docker容器（使用蓝绿部署）
+	deployLogger.WriteLog("info", "docker", "开始启动新容器（蓝绿部署）")
+	if err := gs.startDockerApp(app, image.FullName); err != nil {
+		return fmt.Errorf("启动Docker容器失败: %w", err)
+	}
+
+	deployLogger.WriteLog("info", "docker", "Docker应用部署完成")
 	return nil
 }
 
@@ -2791,4 +2879,207 @@ func (gs *GitServer) WatchDeployTriggers() {
 				appName, newRev, refName, commitMsg)
 		}
 	}
+}
+
+// ==================== 蓝绿部署功能 ====================
+
+// healthCheck 健康检查
+func (gs *GitServer) healthCheck(port int, timeout time.Duration) bool {
+	// 尝试连接应用端口
+	url := fmt.Sprintf("http://localhost:%d", port)
+	client := http.Client{
+		Timeout: timeout,
+	}
+
+	start := time.Now()
+	deadline := start.Add(timeout)
+
+	for time.Now().Before(deadline) {
+		resp, err := client.Get(url)
+		if err == nil {
+			resp.Body.Close()
+			// 只要能连接上就认为健康
+			if resp.StatusCode < 500 {
+				gs.logger.Infof("健康检查成功: 端口=%d, 状态码=%d, 耗时=%v", port, resp.StatusCode, time.Since(start))
+				return true
+			}
+		}
+
+		// 等待1秒后重试
+		time.Sleep(1 * time.Second)
+	}
+
+	gs.logger.Warnf("健康检查失败: 端口=%d, 超时=%v", port, timeout)
+	return false
+}
+
+// BlueGreenDeploy 蓝绿部署
+func (gs *GitServer) BlueGreenDeploy(app *GitApp, newContainerID string, newPort int) error {
+	deployID := fmt.Sprintf("bg_deploy_%d", time.Now().Unix())
+
+	gs.logger.Infof("开始蓝绿部署: 应用=%s, 新容器=%s, 新端口=%d", app.Name, newContainerID, newPort)
+
+	// 记录部署事件
+	if gs.deployDB != nil {
+		gs.deployDB.AddDeployEvent(
+			app.Name, deployID, "blue_green_start",
+			app.ContainerID, newContainerID,
+			app.Port, newPort,
+			"started", "开始蓝绿部署",
+		)
+	}
+
+	// 1. 保存旧容器信息
+	oldContainerID := app.ContainerID
+	oldPort := app.Port
+
+	gs.logger.Infof("旧容器信息: ID=%s, 端口=%d", oldContainerID, oldPort)
+
+	// 2. 更新应用信息（指向新容器）
+	gs.mutex.Lock()
+	app.OldContainerID = oldContainerID
+	app.ContainerID = newContainerID
+	app.Port = newPort
+	app.ContainerStatus = "switching"
+	gs.mutex.Unlock()
+
+	// 3. 健康检查（最多等待30秒）
+	gs.logger.Infof("开始健康检查: 新端口=%d", newPort)
+	if !gs.healthCheck(newPort, 30*time.Second) {
+		// 健康检查失败，回滚
+		gs.logger.Errorf("新容器健康检查失败，开始回滚")
+
+		gs.mutex.Lock()
+		app.ContainerID = oldContainerID
+		app.Port = oldPort
+		app.OldContainerID = ""
+		app.ContainerStatus = "active"
+		gs.mutex.Unlock()
+
+		// 停止新容器
+		go gs.stopContainer(newContainerID)
+
+		if gs.deployDB != nil {
+			gs.deployDB.AddDeployEvent(
+				app.Name, deployID, "blue_green_rollback",
+				oldContainerID, newContainerID,
+				oldPort, newPort,
+				"failed", "健康检查失败，已回滚",
+			)
+		}
+
+		return fmt.Errorf("新容器健康检查失败")
+	}
+
+	// 4. 更新数据库中的容器状态
+	if gs.deployDB != nil {
+		// 添加新容器记录
+		newVersion := &ContainerVersion{
+			AppName:     app.Name,
+			ContainerID: newContainerID,
+			ImageName:   app.DockerImage,
+			Port:        newPort,
+			Status:      "active",
+			CommitHash:  app.LastCommit,
+			StartedAt:   time.Now(),
+			HealthCheck: true,
+		}
+		gs.deployDB.AddContainerVersion(newVersion)
+
+		// 更新旧容器状态为停止中
+		if oldContainerID != "" {
+			gs.deployDB.UpdateContainerStatus(oldContainerID, "stopping")
+		}
+	}
+
+	// 5. 切换代理规则到新端口
+	gs.logger.Infof("切换代理规则: %s -> localhost:%d", app.Domain, newPort)
+	if err := gs.addProxyRuleForApp(app); err != nil {
+		gs.logger.Errorf("切换代理规则失败: %v", err)
+		// 继续执行，不回滚
+	}
+
+	if gs.deployDB != nil {
+		gs.deployDB.AddDeployEvent(
+			app.Name, deployID, "proxy_switched",
+			oldContainerID, newContainerID,
+			oldPort, newPort,
+			"success", "代理规则已切换",
+		)
+	}
+
+	// 6. 延迟停止旧容器（1分钟后）
+	if oldContainerID != "" {
+		gs.logger.Infof("将在60秒后停止旧容器: %s", oldContainerID)
+
+		go func() {
+			time.Sleep(60 * time.Second)
+
+			gs.logger.Infof("开始停止旧容器: %s", oldContainerID)
+			if err := gs.stopContainer(oldContainerID); err != nil {
+				gs.logger.Errorf("停止旧容器失败: %v", err)
+			} else {
+				gs.logger.Infof("旧容器已停止: %s", oldContainerID)
+
+				// 更新数据库状态
+				if gs.deployDB != nil {
+					gs.deployDB.UpdateContainerStatus(oldContainerID, "stopped")
+					gs.deployDB.AddDeployEvent(
+						app.Name, deployID, "old_container_stopped",
+						oldContainerID, newContainerID,
+						oldPort, newPort,
+						"success", "旧容器已停止",
+					)
+				}
+			}
+
+			// 清理应用的旧容器ID
+			gs.mutex.Lock()
+			if app.OldContainerID == oldContainerID {
+				app.OldContainerID = ""
+			}
+			app.ContainerStatus = "active"
+			gs.mutex.Unlock()
+
+			gs.saveApps()
+		}()
+	}
+
+	// 7. 保存应用状态
+	gs.saveApps()
+
+	gs.logger.Infof("蓝绿部署完成: 应用=%s, 新容器=%s, 新端口=%d", app.Name, newContainerID, newPort)
+
+	if gs.deployDB != nil {
+		gs.deployDB.AddDeployEvent(
+			app.Name, deployID, "blue_green_complete",
+			oldContainerID, newContainerID,
+			oldPort, newPort,
+			"success", "蓝绿部署完成",
+		)
+	}
+
+	return nil
+}
+
+// stopContainer 停止容器
+func (gs *GitServer) stopContainer(containerID string) error {
+	if containerID == "" {
+		return nil
+	}
+
+	cmd := exec.Command("docker", "stop", containerID)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("停止容器失败: %v, 输出: %s", err, string(output))
+	}
+
+	// 删除容器
+	cmd = exec.Command("docker", "rm", containerID)
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		gs.logger.Warnf("删除容器失败: %v, 输出: %s", err, string(output))
+	}
+
+	return nil
 }

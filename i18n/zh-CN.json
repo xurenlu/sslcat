@@ -246,5 +246,11 @@
   "frontend.welcome_message": "欢迎使用 SSLcat Git 部署平台！",
   "frontend.unbind_key": "解绑密钥",
   "frontend.select_ssh_key": "选择SSH密钥",
-  "frontend.admin_panel_prefix_changed": "管理面板访问前缀已从 \"{oldPrefix}\" 更改为 \"{newPrefix}\""
+  "frontend.admin_panel_prefix_changed": "管理面板访问前缀已从 \"{oldPrefix}\" 更改为 \"{newPrefix}\"",
+  "frontend.delete_app_confirm": "确认删除应用",
+  "frontend.delete_app_warning": "这是一个危险操作，无法撤销。此应用的所有数据、代码、日志和配置将被永久删除。",
+  "frontend.delete_app_instruction": "请输入应用名称 \"{appName}\" 来确认删除：",
+  "frontend.delete_app_name_mismatch": "应用名称不匹配",
+  "frontend.delete_app_cancelled": "已取消删除操作",
+  "frontend.manual_deploy_not_supported": "暂不支持手动部署，请通过 Git push 触发部署。"
 }

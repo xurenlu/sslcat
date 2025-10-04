@@ -243,8 +243,30 @@ func (api *GitServerAPI) UpdateAppEnv(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := map[string]interface{}{
+		"success":         true,
+		"message":         "环境变量已更新，请重新部署应用以应用更改",
+		"pending_restart": true,
+	}
+
+	api.writeJSON(w, response)
+}
+
+// RedeployApp 手动触发应用重新部署
+func (api *GitServerAPI) RedeployApp(w http.ResponseWriter, r *http.Request) {
+	appName := r.URL.Query().Get("name")
+	if appName == "" {
+		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+		return
+	}
+
+	if err := api.server.RedeployApp(appName); err != nil {
+		api.writeError(w, "触发重新部署失败: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
 		"success": true,
-		"message": "环境变量已更新",
+		"message": "应用重新部署已启动",
 	}
 
 	api.writeJSON(w, response)

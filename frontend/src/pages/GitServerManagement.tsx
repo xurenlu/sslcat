@@ -173,6 +173,10 @@ const GitServerManagement: React.FC = () => {
   const [routingDomain, setRoutingDomain] = useState('')
   const [routingPort, setRoutingPort] = useState<number>(0)
   const [savingRouting, setSavingRouting] = useState(false)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [deleteAppTarget, setDeleteAppTarget] = useState<GitApp | null>(null)
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('')
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const openEnvModal = (app: GitApp) => {
     setEnvEditorApp(app)
@@ -236,10 +240,13 @@ const GitServerManagement: React.FC = () => {
         throw new Error('更新环境变量失败')
       }
 
+      const responseData = await response.json().catch(() => ({}))
+      
       toast({
         title: '环境变量已更新',
+        description: responseData.message || '请重新部署应用以应用更改',
         status: 'success',
-        duration: 3000,
+        duration: 5000,
         isClosable: true,
       })
 
@@ -497,11 +504,41 @@ git push sslcat main`
     }
   }
 
-  const handleDeleteApp = async (id: string) => {
-    try {
-      const response = await fetch(buildApiPath(adminPrefix, `/git-server/apps/${id}`), {
-        method: 'DELETE',
+  const openDeleteModal = (app: GitApp) => {
+    setDeleteAppTarget(app)
+    setDeleteConfirmInput('')
+    setIsDeleteModalOpen(true)
+  }
+
+  const closeDeleteModal = () => {
+    setIsDeleteModalOpen(false)
+    setDeleteAppTarget(null)
+    setDeleteConfirmInput('')
+    setIsDeleting(false)
+  }
+
+  const handleDeleteApp = async () => {
+    if (!deleteAppTarget) return
+
+    // 验证输入的应用名称
+    if (deleteConfirmInput !== deleteAppTarget.name) {
+      toast({
+        title: t('frontend.delete_app_name_mismatch'),
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
       })
+      return
+    }
+
+    try {
+      setIsDeleting(true)
+      const response = await fetch(
+        buildApiPath(adminPrefix, `/git-server/app/delete?name=${encodeURIComponent(deleteAppTarget.name)}`),
+        {
+          method: 'DELETE',
+        }
+      )
       
       if (response.ok) {
         toast({
@@ -510,9 +547,11 @@ git push sslcat main`
           duration: 3000,
           isClosable: true,
         })
+        closeDeleteModal()
         refreshData()
       } else {
-        throw new Error('删除Git应用失败')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || '删除Git应用失败')
       }
     } catch (error) {
       toast({
@@ -522,25 +561,32 @@ git push sslcat main`
         duration: 3000,
         isClosable: true,
       })
+    } finally {
+      setIsDeleting(false)
     }
   }
 
-  const handleDeployApp = async (id: string) => {
+  const handleDeployApp = async (appName: string) => {
     try {
-      const response = await fetch(buildApiPath(adminPrefix, `/git-server/apps/${id}/deploy`), {
-        method: 'POST',
-      })
+      const response = await fetch(
+        buildApiPath(adminPrefix, `/git-server/app/redeploy?name=${encodeURIComponent(appName)}`),
+        {
+          method: 'POST',
+        }
+      )
       
       if (response.ok) {
         toast({
-          title: '部署已启动',
+          title: '重新部署已启动',
+          description: '应用正在重新部署中，请稍候...',
           status: 'info',
-          duration: 3000,
+          duration: 5000,
           isClosable: true,
         })
         refreshData()
       } else {
-        throw new Error('部署应用失败')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || '触发部署失败')
       }
     } catch (error) {
       toast({
@@ -726,8 +772,65 @@ git push sslcat main`
     refreshData()
   }, [])
 
+  // 获取需要重新部署的应用
+  const pendingApps = apps.filter(app => (app as any).pending_restart === true)
+
   return (
     <>
+      {/* 浮层提醒：有应用需要重新部署 */}
+      {pendingApps.length > 0 && (
+        <Box
+          position="fixed"
+          top="60px"
+          right="20px"
+          zIndex={9999}
+          bg="orange.500"
+          color="white"
+          p={4}
+          borderRadius="md"
+          boxShadow="lg"
+          maxW="400px"
+        >
+          <VStack align="stretch" spacing={2}>
+            <HStack justify="space-between">
+              <HStack>
+                <Icon as={FiUpload} boxSize={5} />
+                <Text fontWeight="bold">配置已更新</Text>
+              </HStack>
+              <IconButton
+                aria-label="关闭"
+                icon={<Icon as={FiRefreshCw} />}
+                size="xs"
+                variant="ghost"
+                color="white"
+                _hover={{ bg: 'orange.600' }}
+                onClick={() => {
+                  // 不做任何事，让用户自己点击重新部署按钮
+                }}
+              />
+            </HStack>
+            <Text fontSize="sm">
+              以下应用的配置已更新，需要重新部署以应用更改：
+            </Text>
+            <VStack align="stretch" spacing={1} maxH="200px" overflowY="auto">
+              {pendingApps.map(app => (
+                <HStack key={app.name} justify="space-between" bg="orange.600" p={2} borderRadius="sm">
+                  <Text fontSize="sm" fontWeight="medium">{app.name}</Text>
+                  <Button
+                    size="xs"
+                    colorScheme="whiteAlpha"
+                    leftIcon={<Icon as={FiUpload} />}
+                    onClick={() => handleDeployApp(app.name)}
+                  >
+                    重新部署
+                  </Button>
+                </HStack>
+              ))}
+            </VStack>
+          </VStack>
+        </Box>
+      )}
+
       <Modal isOpen={isEnvModalOpen} onClose={closeEnvModal} size="xl">
         <ModalOverlay />
         <ModalContent>
@@ -1131,7 +1234,7 @@ git push sslcat main`
                                   size="sm"
                                   variant="ghost"
                                   colorScheme="green"
-                                  onClick={() => handleDeployApp(app.id)}
+                                  onClick={() => handleDeployApp(app.name)}
                                   title={t('frontend.trigger_redeploy')}
                                 />
                                 <IconButton
@@ -1140,7 +1243,7 @@ git push sslcat main`
                                   size="sm"
                                   variant="ghost"
                                   colorScheme="red"
-                                  onClick={() => handleDeleteApp(app.id)}
+                                  onClick={() => openDeleteModal(app)}
                                 />
                               </HStack>
                             </Td>
@@ -1424,6 +1527,75 @@ git push sslcat main`
               </Button>
               <Button colorScheme="green" onClick={handleAddSSHKey}>
                 添加密钥
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+
+        {/* 删除应用确认对话框 */}
+        <Modal isOpen={isDeleteModalOpen} onClose={closeDeleteModal} size="md">
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>{t('frontend.delete_app_confirm')}</ModalHeader>
+            <ModalCloseButton isDisabled={isDeleting} />
+            <ModalBody>
+              <VStack spacing={4} align="stretch">
+                <Alert status="error" variant="left-accent">
+                  <AlertIcon />
+                  <Box>
+                    <AlertTitle fontSize="sm">危险操作</AlertTitle>
+                    <AlertDescription fontSize="sm">
+                      {t('frontend.delete_app_warning')}
+                    </AlertDescription>
+                  </Box>
+                </Alert>
+
+                {deleteAppTarget && (
+                  <>
+                    <Box>
+                      <Text fontSize="sm" mb={2}>
+                        {t('frontend.delete_app_instruction').replace('{appName}', deleteAppTarget.name)}
+                      </Text>
+                      <Input
+                        value={deleteConfirmInput}
+                        onChange={(e) => setDeleteConfirmInput(e.target.value)}
+                        placeholder={deleteAppTarget.name}
+                        isDisabled={isDeleting}
+                        autoFocus
+                      />
+                    </Box>
+
+                    <Box bg="gray.50" p={3} borderRadius="md">
+                      <Text fontSize="sm" fontWeight="medium" mb={1}>即将删除的应用信息：</Text>
+                      <Text fontSize="sm">应用名称: {deleteAppTarget.name}</Text>
+                      {deleteAppTarget.domain && (
+                        <Text fontSize="sm">域名: {deleteAppTarget.domain}</Text>
+                      )}
+                      {deleteAppTarget.port && (
+                        <Text fontSize="sm">端口: {deleteAppTarget.port}</Text>
+                      )}
+                    </Box>
+                  </>
+                )}
+              </VStack>
+            </ModalBody>
+
+            <ModalFooter>
+              <Button 
+                variant="ghost" 
+                mr={3} 
+                onClick={closeDeleteModal}
+                isDisabled={isDeleting}
+              >
+                取消
+              </Button>
+              <Button 
+                colorScheme="red" 
+                onClick={handleDeleteApp}
+                isLoading={isDeleting}
+                isDisabled={!deleteAppTarget || deleteConfirmInput !== deleteAppTarget.name}
+              >
+                确认删除
               </Button>
             </ModalFooter>
           </ModalContent>
