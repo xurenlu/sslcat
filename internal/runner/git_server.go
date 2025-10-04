@@ -3183,10 +3183,15 @@ func (gs *GitServer) initGitRepo(app *GitApp) error {
 	}
 
 	// 设置 Git 配置
-	cmd = exec.Command("git", "config", "core.bare", "true")
-	cmd.Dir = bearRepo
+	cmd = exec.Command("git", "--git-dir", bearRepo, "config", "core.bare", "true")
 	if err := cmd.Run(); err != nil {
 		gs.logger.Warnf("设置 Git 配置失败: %v", err)
+	}
+	
+	// 设置 safe.directory 以避免 dubious ownership 错误
+	cmd = exec.Command("git", "--git-dir", bearRepo, "config", "--local", "safe.directory", "*")
+	if err := cmd.Run(); err != nil {
+		gs.logger.Warnf("设置 safe.directory 失败: %v", err)
 	}
 
 	// 初始克隆到工作目录
@@ -3220,7 +3225,7 @@ func (gs *GitServer) initGitRepo(app *GitApp) error {
 func (gs *GitServer) createGitSymlink(app *GitApp) error {
 	// 用 root 权限强制创建符号链接
 	symlinkPath := filepath.Join(gs.sshHomeDir, app.Name+".git")
-	
+
 	// 确保目标路径是绝对路径
 	targetPath := app.BareRepo
 	if !filepath.IsAbs(targetPath) {
