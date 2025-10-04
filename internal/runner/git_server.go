@@ -1889,23 +1889,39 @@ func (gs *GitServer) setupSSHUser() error {
 		return nil
 	}
 
-	if err := os.MkdirAll(gs.sshKeysDir, 0700); err != nil {
-		return fmt.Errorf("创建 SSH 目录失败: %w", err)
-	}
-
 	// 解析UID和GID
 	uid, _ := strconv.Atoi(gitUser.Uid)
 	gid, _ := strconv.Atoi(gitUser.Gid)
 
+	// 创建 SSH 目录，使用 755 权限允许 git 用户访问
+	// 注意：父目录也需要可执行权限
+	if err := os.MkdirAll(gs.sshKeysDir, 0755); err != nil {
+		return fmt.Errorf("创建 SSH 目录失败: %w", err)
+	}
+
+	// 设置目录所有者为 git 用户
 	if err := os.Chown(gs.sshKeysDir, uid, gid); err != nil {
 		gs.logger.Warnf("设置 SSH 目录权限失败: %v", err)
 	}
+	
+	// 确保父目录也有执行权限
+	keysDir := filepath.Dir(gs.sshKeysDir)
+	os.Chmod(keysDir, 0755)
 
+	// 创建或确保 authorized_keys 文件存在
 	if _, err := os.Stat(gs.authorizedKeysFile); os.IsNotExist(err) {
 		if err := os.WriteFile(gs.authorizedKeysFile, []byte{}, 0600); err != nil {
 			return fmt.Errorf("创建 authorized_keys 文件失败: %w", err)
 		}
-		os.Chown(gs.authorizedKeysFile, uid, gid)
+	}
+	
+	// 始终设置正确的所有者和权限（即使文件已存在）
+	// SSH 要求 authorized_keys 必须由用户拥有且权限为 600
+	if err := os.Chown(gs.authorizedKeysFile, uid, gid); err != nil {
+		gs.logger.Warnf("设置 authorized_keys 文件所有者失败: %v", err)
+	}
+	if err := os.Chmod(gs.authorizedKeysFile, 0600); err != nil {
+		gs.logger.Warnf("设置 authorized_keys 文件权限失败: %v", err)
 	}
 
 	// 生成 sshd 配置，指定自定义的 authorized_keys 路径
