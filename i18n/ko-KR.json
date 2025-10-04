@@ -171,5 +171,12 @@
   "git_deploy_server.description": "Git Deploy Server는 Railway, Heroku, Dokku와 유사한 배포 플랫폼으로 다음을 지원합니다:",
   "git_deploy_server.return": "Git Deploy Server로 돌아가기",
   "git_deploy_server.create_app_title": "애플리케이션 생성 - SSLcat Git Deploy Server",
-  "git_deploy_server.server_config_title": "서버 설정 - SSLcat Git Deploy Server"
+  "git_deploy_server.server_config_title": "서버 설정 - SSLcat Git Deploy Server",
+  
+  "frontend.delete_app_confirm": "애플리케이션 삭제 확인",
+  "frontend.delete_app_warning": "이것은 위험한 작업이며 되돌릴 수 없습니다. 이 애플리케이션의 모든 데이터, 코드, 로그 및 구성이 영구적으로 삭제됩니다.",
+  "frontend.delete_app_instruction": "삭제를 확인하려면 애플리케이션 이름 \"{appName}\"을(를) 입력하세요:",
+  "frontend.delete_app_name_mismatch": "애플리케이션 이름이 일치하지 않습니다",
+  "frontend.delete_app_cancelled": "삭제 작업이 취소되었습니다",
+  "frontend.manual_deploy_not_supported": "수동 배포는 아직 지원되지 않습니다. Git push를 통해 배포를 트리거하세요."
 }

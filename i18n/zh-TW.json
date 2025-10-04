@@ -171,5 +171,12 @@
   "git_deploy_server.description": "Git Deploy Server是類似Railway、Heroku、Dokku的部署平臺，支援：",
   "git_deploy_server.return": "返回Git Deploy Server",
   "git_deploy_server.create_app_title": "建立應用程式 - SSLcat Git Deploy Server",
-  "git_deploy_server.server_config_title": "伺服器設定 - SSLcat Git Deploy Server"
+  "git_deploy_server.server_config_title": "伺服器設定 - SSLcat Git Deploy Server",
+  
+  "frontend.delete_app_confirm": "確認刪除應用程式",
+  "frontend.delete_app_warning": "這是一個危險操作，無法復原。此應用程式的所有資料、程式碼、記錄和配置將被永久刪除。",
+  "frontend.delete_app_instruction": "請輸入應用程式名稱「{appName}」以確認刪除：",
+  "frontend.delete_app_name_mismatch": "應用程式名稱不符",
+  "frontend.delete_app_cancelled": "刪除操作已取消",
+  "frontend.manual_deploy_not_supported": "尚不支援手動部署。請透過Git push觸發部署。"
 }

@@ -171,5 +171,12 @@
   "git_deploy_server.description": "Git Deploy Server - это платформа развёртывания, похожая на Railway, Heroku, Dokku, которая поддерживает:",
   "git_deploy_server.return": "Вернуться к Git Deploy Server",
   "git_deploy_server.create_app_title": "Создать приложение - SSLcat Git Deploy Server",
-  "git_deploy_server.server_config_title": "Конфигурация сервера - SSLcat Git Deploy Server"
+  "git_deploy_server.server_config_title": "Конфигурация сервера - SSLcat Git Deploy Server",
+  
+  "frontend.delete_app_confirm": "Подтвердите удаление приложения",
+  "frontend.delete_app_warning": "Это опасная операция, которую нельзя отменить. Все данные, код, журналы и конфигурации этого приложения будут удалены навсегда.",
+  "frontend.delete_app_instruction": "Пожалуйста, введите имя приложения \"{appName}\" для подтверждения удаления:",
+  "frontend.delete_app_name_mismatch": "Имя приложения не совпадает",
+  "frontend.delete_app_cancelled": "Операция удаления отменена",
+  "frontend.manual_deploy_not_supported": "Ручное развертывание еще не поддерживается. Пожалуйста, запустите развертывание через Git push."
 }

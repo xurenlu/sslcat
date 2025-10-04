@@ -171,5 +171,12 @@
   "git_deploy_server.description": "Git Deploy Server ist eine Deployment-Plattform ähnlich Railway, Heroku, Dokku, die folgendes unterstützt:",
   "git_deploy_server.return": "Zurück zu Git Deploy Server",
   "git_deploy_server.create_app_title": "Anwendung erstellen - SSLcat Git Deploy Server",
-  "git_deploy_server.server_config_title": "Server-Konfiguration - SSLcat Git Deploy Server"
+  "git_deploy_server.server_config_title": "Server-Konfiguration - SSLcat Git Deploy Server",
+  
+  "frontend.delete_app_confirm": "Löschen der Anwendung bestätigen",
+  "frontend.delete_app_warning": "Dies ist eine gefährliche Operation, die nicht rückgängig gemacht werden kann. Alle Daten, Code, Protokolle und Konfigurationen dieser Anwendung werden dauerhaft gelöscht.",
+  "frontend.delete_app_instruction": "Bitte geben Sie den Anwendungsnamen \"{appName}\" ein, um das Löschen zu bestätigen:",
+  "frontend.delete_app_name_mismatch": "Anwendungsname stimmt nicht überein",
+  "frontend.delete_app_cancelled": "Löschvorgang abgebrochen",
+  "frontend.manual_deploy_not_supported": "Manuelles Deployment wird noch nicht unterstützt. Bitte lösen Sie das Deployment über Git push aus."
 }
