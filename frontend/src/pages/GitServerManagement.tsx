@@ -162,6 +162,44 @@ const GitServerManagement: React.FC = () => {
   })
   
   const [selectedApp, setSelectedApp] = useState<string>('')
+
+  // 从 SSH 公钥中解析名称（通常是公钥末尾的注释部分）
+  const parseKeyName = (publicKey: string): string => {
+    const trimmed = publicKey.trim()
+    if (!trimmed) return ''
+    
+    // SSH 公钥格式: ssh-rsa AAAAB3NzaC... user@hostname
+    const parts = trimmed.split(/\s+/)
+    if (parts.length >= 3) {
+      // 返回最后一部分作为名称（通常是 user@hostname）
+      return parts[parts.length - 1]
+    }
+    return ''
+  }
+
+  // 处理公钥输入变化，自动解析名称
+  const handlePublicKeyChange = (value: string) => {
+    setNewKey(prev => {
+      const updates: any = { publicKey: value }
+      
+      // 只在名称为空时自动填充
+      if (!prev.name && value.trim()) {
+        const parsedName = parseKeyName(value)
+        if (parsedName) {
+          updates.name = parsedName
+        }
+      }
+      
+      return { ...prev, ...updates }
+    })
+  }
+
+  // 关闭SSH密钥模态框并清空表单
+  const handleKeyModalClose = () => {
+    setNewKey({ name: '', publicKey: '' })
+    onKeyClose()
+  }
+
   const [isEnvModalOpen, setIsEnvModalOpen] = useState(false)
   const [envEditorApp, setEnvEditorApp] = useState<GitApp | null>(null)
   const [envVars, setEnvVars] = useState<Array<{ id: string; key: string; value: string }>>([
@@ -621,9 +659,8 @@ git push sslcat main`
           isClosable: true,
         })
         
-        onKeyClose()
+        handleKeyModalClose()
         refreshData()
-        resetKeyForm()
       } else {
         throw new Error('添加SSH密钥失败')
       }
@@ -640,8 +677,8 @@ git push sslcat main`
 
   const handleDeleteSSHKey = async (id: string) => {
     try {
-      const response = await fetch(buildApiPath(adminPrefix, `/git-server/ssh-keys/${id}`), {
-        method: 'DELETE',
+      const response = await fetch(buildApiPath(adminPrefix, `/git-server/ssh-key/remove?fingerprint=${encodeURIComponent(id)}`), {
+        method: 'POST',
       })
       
       if (response.ok) {
@@ -1497,7 +1534,7 @@ git push sslcat main`
         </Modal>
 
         {/* 添加SSH密钥模态框 */}
-        <Modal isOpen={isKeyOpen} onClose={onKeyClose} size="lg">
+        <Modal isOpen={isKeyOpen} onClose={handleKeyModalClose} size="lg">
           <ModalOverlay />
           <ModalContent>
             <ModalHeader>添加SSH密钥</ModalHeader>
@@ -1517,16 +1554,19 @@ git push sslcat main`
                   <FormLabel>公钥内容</FormLabel>
                   <Textarea
                     value={newKey.publicKey}
-                    onChange={(e) => setNewKey({ ...newKey, publicKey: e.target.value })}
-                    placeholder="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC..."
+                    onChange={(e) => handlePublicKeyChange(e.target.value)}
+                    placeholder="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC... user@hostname"
                     rows={6}
                   />
+                  <Text fontSize="xs" color="gray.500" mt={1}>
+                    粘贴公钥后将自动提取名称（如果名称为空）
+                  </Text>
                 </FormControl>
               </VStack>
             </ModalBody>
 
             <ModalFooter>
-              <Button variant="ghost" mr={3} onClick={onKeyClose}>
+              <Button variant="ghost" mr={3} onClick={handleKeyModalClose}>
                 取消
               </Button>
               <Button colorScheme="green" onClick={handleAddSSHKey}>
