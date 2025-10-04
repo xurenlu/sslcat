@@ -1085,7 +1085,7 @@ func (api *GitServerAPI) ReinstallHooks(w http.ResponseWriter, r *http.Request) 
 func (api *GitServerAPI) HandleAppAction(w http.ResponseWriter, r *http.Request) {
 	// 调试日志 - 确认 handler 被调用
 	api.logger.Infof("[HandleAppAction] Called with URL: %s, Method: %s", r.URL.Path, r.Method)
-	
+
 	// 解析 URL 路径: /api/git-server/apps/{name}/{action}
 	path := r.URL.Path
 	parts := strings.Split(strings.Trim(path, "/"), "/")

@@ -31,18 +31,38 @@ func (b *DockerBuilder) Build(app *GitApp) error {
 func (b *DockerBuilder) BuildWithLogging(app *GitApp, logger *DeployLogger) error {
 	logger.WriteLog("info", "docker", "开始 Docker 应用构建流程")
 
-	// 使用 DockerRegistry 构建镜像
+	// 检查是否有 Docker Registry
 	dockerRegistry := b.gs.GetDockerRegistry()
-	if dockerRegistry == nil {
-		return fmt.Errorf("Docker Registry 未初始化")
+
+	imageName := fmt.Sprintf("sslcat-%s:latest", app.Name)
+
+	// 判断是否启用了 Registry
+	registryEnabled := false
+	if dockerRegistry != nil {
+		config := dockerRegistry.GetConfig()
+		registryEnabled = config != nil && config.Enabled
 	}
 
-	image, err := dockerRegistry.BuildAndPushImage(app, logger)
-	if err != nil {
-		return fmt.Errorf("Docker 镜像构建失败: %w", err)
+	if registryEnabled {
+		// 有 Registry：构建并推送到私有仓库
+		logger.WriteLog("info", "docker", "使用 Docker Registry 构建镜像")
+		image, err := dockerRegistry.BuildAndPushImage(app, logger)
+		if err != nil {
+			return fmt.Errorf("Docker 镜像构建失败: %w", err)
+		}
+		logger.WriteLog("info", "docker", fmt.Sprintf("镜像构建并推送成功: %s", image.Name))
+	} else {
+		// 没有 Registry：直接在本地构建
+		logger.WriteLog("info", "docker", "本地构建 Docker 镜像（无 Registry）")
+
+		// 执行 docker build
+		if err := b.runCommandWithLogging(app.RepoDir, logger, "docker", "build", "-t", imageName, "."); err != nil {
+			return fmt.Errorf("本地 Docker 镜像构建失败: %w", err)
+		}
+
+		logger.WriteLog("info", "docker", fmt.Sprintf("本地镜像构建成功: %s", imageName))
 	}
 
-	logger.WriteLog("info", "docker", fmt.Sprintf("镜像构建成功: %s", image.Name))
 	return nil
 }
 
