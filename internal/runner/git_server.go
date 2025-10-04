@@ -2101,14 +2101,14 @@ func (gs *GitServer) AddSSHKey(keyName, publicKey string) error {
 
 	// Dokku 风格：添加 command= 参数来拦截 git 命令
 	// 这样可以实现 git push 时自动创建应用
-	
+
 	// wrapper 脚本路径（安装时会复制到 /usr/local/bin）
 	wrapperScript := "/usr/local/bin/sslcat-git-hook"
-	
+
 	// 构建 authorized_keys 条目
 	// 格式：command="wrapper KEY_NAME",限制选项 公钥
 	restrictions := "no-agent-forwarding,no-user-rc,no-X11-forwarding,no-port-forwarding"
-	keyEntry := fmt.Sprintf("# %s\ncommand=\"%s %s\",%s %s\n", 
+	keyEntry := fmt.Sprintf("# %s\ncommand=\"%s %s\",%s %s\n",
 		keyName, wrapperScript, keyName, restrictions, publicKey)
 
 	file, err := os.OpenFile(gs.authorizedKeysFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
@@ -2189,7 +2189,7 @@ func (gs *GitServer) ListSSHKeys() ([]SSHKey, error) {
 			keyName := strings.TrimPrefix(line, "# ")
 			if i+1 < len(lines) && !strings.HasPrefix(lines[i+1], "#") && lines[i+1] != "" {
 				keyLine := lines[i+1]
-				
+
 				// 提取公钥（可能包含 command= 前缀）
 				var publicKey string
 				if strings.Contains(keyLine, "command=") {
@@ -2205,7 +2205,7 @@ func (gs *GitServer) ListSSHKeys() ([]SSHKey, error) {
 					// 标准格式：ssh-rsa AAAA...
 					publicKey = keyLine
 				}
-				
+
 				if publicKey != "" {
 					fingerprint := gs.generateFingerprint(publicKey)
 					keys = append(keys, SSHKey{

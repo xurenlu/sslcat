@@ -1,3 +1,46 @@
+## [1.3.5-rc25] - 2025-10-04
+
+### 🔐 Security & Authentication
+
+#### Localhost API 认证豁免 - 支持内部工具调用
+- **核心功能**: 来自 localhost (127.0.0.1 或 ::1) 的 API 请求免除认证
+- **使用场景**: 
+  - `sslcat-git-hook` wrapper 脚本无需提供用户名密码即可调用 API
+  - 其他本地工具和脚本可以直接调用内部 API
+  - 保持安全性：只对 localhost 请求豁免，远程请求仍需认证
+  
+- **实现方式**:
+  - 新增 `isLocalhostRequest()` 函数检查请求来源
+  - 支持 IPv4 (127.0.0.1, 127.x.x.x) 和 IPv6 (::1)
+  - 在 `GitServerAPI` 中添加 `checkAuthWithLocalhostBypass()` 方法
+  - 只对创建应用等特定 API 端点启用豁免
+  
+- **安全考虑**:
+  - ✅ 只检查客户端 IP，无法伪造
+  - ✅ 只豁免 localhost，私网地址仍需认证
+  - ✅ 可以通过防火墙限制对管理端口的访问
+  - ✅ 日志记录所有 localhost 请求以便审计
+  
+- **使用示例**:
+  ```bash
+  # 从服务器本地调用 API（无需认证）
+  curl -X POST http://localhost:9942/sslcat-panel2/api/git-server/apps \
+    -H "Content-Type: application/json" \
+    -d '{"name":"test","auto_ssl":true}'
+  
+  # 从远程调用（仍需认证）
+  curl -X POST http://server-ip:9942/sslcat-panel2/api/git-server/apps \
+    -H "Content-Type: application/json" \
+    -H "Cookie: session=xxx" \
+    -d '{"name":"test","auto_ssl":true}'
+  ```
+
+- **文件**:
+  - `internal/web/server.go:978-993` - isLocalhostRequest 函数
+  - `internal/web/api_runners.go:29-44` - checkAuthWithLocalhostBypass 方法
+  - `internal/web/api_runners.go:145-148` - CreateApp 认证检查
+  - `scripts/sslcat-git-hook:81-83` - 简化 API 调用（无需认证）
+
 ## [1.3.5-rc24] - 2025-10-04
 
 ### 🎉 Major Features

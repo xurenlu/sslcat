@@ -607,8 +607,8 @@ func (s *Server) setupRoutes() {
 
 // registerRunnerRoutes 注册 Runner API 路由
 func (s *Server) registerRunnerRoutes() {
-	// 创建 API 处理器
-	gitAPI := NewGitServerAPI(s.gitServer)
+	// 创建 API 处理器，传递 webServer 引用以支持 localhost 认证豁免
+	gitAPI := NewGitServerAPI(s.gitServer, s)
 	runtimeAPI := NewRuntimeDetectorAPI()
 
 	// Git 服务器 API 路由
@@ -973,6 +973,23 @@ func (s *Server) isPrivateIP(ip string) bool {
 		strings.HasPrefix(ip, "172.16.") ||
 		strings.HasPrefix(ip, "127.") ||
 		ip == "::1"
+}
+
+// isLocalhostRequest 检查请求是否来自 localhost
+// 用于内部 API 调用（如 sslcat-git-hook）的认证豁免
+func (s *Server) isLocalhostRequest(r *http.Request) bool {
+	clientIP := s.getClientIP(r)
+	
+	// 检查是否是 localhost
+	// 支持 IPv4 的 127.0.0.1 和 IPv6 的 ::1
+	if clientIP == "127.0.0.1" || 
+	   clientIP == "::1" || 
+	   strings.HasPrefix(clientIP, "127.") ||
+	   clientIP == "localhost" {
+		return true
+	}
+	
+	return false
 }
 
 func (s *Server) isCommonBotUserAgent(ua string) bool {

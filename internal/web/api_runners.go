@@ -12,16 +12,35 @@ import (
 
 // GitServerAPI Git 服务器 API 处理器
 type GitServerAPI struct {
-	server *runner.GitServer
-	logger *logrus.Logger
+	server    *runner.GitServer
+	logger    *logrus.Logger
+	webServer *Server // 添加对 web server 的引用，用于认证检查
 }
 
 // NewGitServerAPI 创建新的 Git 服务器 API
-func NewGitServerAPI(gs *runner.GitServer) *GitServerAPI {
+func NewGitServerAPI(gs *runner.GitServer, webServer *Server) *GitServerAPI {
 	return &GitServerAPI{
-		server: gs,
-		logger: logrus.WithField("component", "git_server_api").Logger,
+		server:    gs,
+		webServer: webServer,
+		logger:    logrus.WithField("component", "git_server_api").Logger,
 	}
+}
+
+// checkAuthWithLocalhostBypass 检查认证，但对 localhost 请求豁免
+// 用于支持 sslcat-git-hook 等内部工具的 API 调用
+func (api *GitServerAPI) checkAuthWithLocalhostBypass(w http.ResponseWriter, r *http.Request) bool {
+	// 检查是否是 localhost 请求
+	if api.webServer != nil && api.webServer.isLocalhostRequest(r) {
+		api.logger.Debugf("Localhost request detected from %s, bypassing authentication", api.webServer.getClientIP(r))
+		return true
+	}
+	
+	// 非 localhost 请求，需要正常认证
+	if api.webServer != nil && !api.webServer.checkAuth(w, r) {
+		return false
+	}
+	
+	return true
 }
 
 // HandleApps 处理应用列表的GET和POST请求
@@ -123,6 +142,11 @@ func (api *GitServerAPI) GetApp(w http.ResponseWriter, r *http.Request) {
 
 // CreateApp 创建应用
 func (api *GitServerAPI) CreateApp(w http.ResponseWriter, r *http.Request) {
+	// 认证检查（localhost 请求豁免，用于支持 sslcat-git-hook）
+	if !api.checkAuthWithLocalhostBypass(w, r) {
+		return
+	}
+	
 	var req struct {
 		Name        string `json:"name"`
 		DisplayName string `json:"display_name"`
@@ -135,7 +159,14 @@ func (api *GitServerAPI) CreateApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	api.logger.Infof("开始创建应用: %s (AutoSSL: %v)", req.Name, req.AutoSSL)
+	api.logger.Infof("开始创建应用: %s (AutoSSL: %v) [来自: %s]", 
+		req.Name, req.AutoSSL, 
+		func() string {
+			if api.webServer != nil {
+				return api.webServer.getClientIP(r)
+			}
+			return "unknown"
+		}())
 
 	// 验证必填字段
 	if req.Name == "" {
