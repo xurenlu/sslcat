@@ -701,6 +701,16 @@ func (gs *GitServer) CreateApp(appName string, autoSSL bool) (*GitApp, error) {
 	gs.apps[appName] = app
 	gs.logger.Infof("  ✓ 应用对象已添加到内存 (当前共 %d 个应用)", len(gs.apps))
 
+	// 初始化 Git 仓库（必须在设置钩子之前）
+	gs.logger.Debugf("  初始化 Git 裸仓库...")
+	if err := gs.initGitRepo(app); err != nil {
+		gs.logger.Errorf("初始化 Git 仓库失败: %v", err)
+		// 清理已创建的数据
+		delete(gs.apps, appName)
+		return nil, fmt.Errorf("初始化 Git 仓库失败: %w", err)
+	}
+	gs.logger.Infof("  ✓ Git 仓库已初始化")
+
 	// 设置 Git 钩子
 	gs.logger.Debugf("  设置 Git 钩子...")
 	if err := gs.setupGitHooks(app); err != nil {

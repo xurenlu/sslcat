@@ -1,3 +1,23 @@
+## [1.3.5-rc22] - 2025-10-04
+
+### 🐛 Bug Fixes
+
+#### Git Deploy - 修复创建应用后无法推送的严重 Bug
+- **问题描述**: 通过 API 或 Web 界面创建 Git 应用后，执行 `git push` 会报错 `'xxx.git' does not appear to be a git repository`
+- **根本原因**: `CreateApp` 函数没有调用 `initGitRepo` 初始化 Git 裸仓库，导致：
+  - Git 裸仓库目录不存在
+  - 符号链接指向不存在的目标
+  - 无法接收 git push
+- **修复内容**: 在 `CreateApp` 函数中添加 `initGitRepo` 调用
+  - 执行 `git init --bare` 初始化裸仓库
+  - 克隆到工作目录
+  - 确保在设置 Git hooks 之前完成初始化
+- **影响范围**: 所有通过 API/Web 界面创建的应用（自动创建的应用不受影响）
+- **升级建议**: 
+  - 已创建但无法推送的应用需要删除后重新创建
+  - 或者手动在服务器上执行 `git init --bare /path/to/app/git/repo.git`
+- **文件**: `internal/runner/git_server.go:701-712`
+
 ## [1.3.5-rc20] - 2025-10-04
 
 ### 🎉 Major Features
