@@ -1994,17 +1994,25 @@ func (gs *GitServer) setupSSHUser() error {
 
 	gs.logger.Infof("使用 git 用户的实际 home 目录: %s", actualHomeDir)
 
-	// 检查 home 目录是否可写
+	// 检查 git 用户对 home 目录是否有写权限（而不是 root）
+	// 使用 syscall.Access 检查 git 用户的权限
 	homeDirWritable := true
 	testFile := filepath.Join(actualHomeDir, ".sslcat_write_test")
+	
+	// 先用 root 身份创建测试文件
 	if err := os.WriteFile(testFile, []byte("test"), 0600); err != nil {
 		homeDirWritable = false
-		gs.logger.Warnf("home 目录不可写，将使用受管目录: %v", err)
+		gs.logger.Warnf("home 目录创建文件失败: %v", err)
 	} else {
+		// 尝试将文件所有者改为 git 用户
+		if err := os.Chown(testFile, uid, gid); err != nil {
+			homeDirWritable = false
+			gs.logger.Warnf("home 目录无法设置 git 用户所有权，将使用受管目录: %v", err)
+		}
 		os.Remove(testFile)
 	}
 
-	// 如果 home 目录不可写，切换到受管目录
+	// 如果 home 目录不可写（对 git 用户），切换到受管目录
 	if !homeDirWritable {
 		gs.logger.Warnf("检测到 %s 不可写，切换到受管 SSH 密钥目录: %s", actualHomeDir, gs.managedSSHDir)
 		gs.useManagedKeys = true
@@ -2205,40 +2213,49 @@ func (gs *GitServer) AddSSHKey(keyName, publicKey string) error {
 
 	// 如果尚未使用受管目录，检查是否需要切换
 	if !gs.useManagedKeys {
-		// 检查 home 目录是否可写
+		// 检查 git 用户对 home 目录是否有写权限
 		testFile := filepath.Join(gs.sshHomeDir, ".sslcat_write_test")
+		needFallback := false
+		
 		if err := os.WriteFile(testFile, []byte("test"), 0600); err != nil {
-			// home 目录不可写，切换到受管目录
-			gs.logger.Warnf("检测到 home 目录不可写，切换到受管 SSH 密钥目录: %s", gs.managedSSHDir)
+			needFallback = true
+		} else {
+			// 尝试将文件所有者改为 git 用户
+			if gitUser, lookupErr := user.Lookup(gs.sshUser); lookupErr == nil {
+				uid, _ := strconv.Atoi(gitUser.Uid)
+				gid, _ := strconv.Atoi(gitUser.Gid)
+				if err := os.Chown(testFile, uid, gid); err != nil {
+					needFallback = true
+					gs.logger.Warnf("无法设置 git 用户所有权: %v", err)
+				}
+			}
+			os.Remove(testFile)
+		}
+		
+		if needFallback {
+			// home 目录对 git 用户不可写，切换到受管目录
+			gs.logger.Warnf("检测到 home 目录对 git 用户不可写，切换到受管 SSH 密钥目录: %s", gs.managedSSHDir)
 			gs.useManagedKeys = true
-
+			
 			// 确保受管目录存在
 			if err := os.MkdirAll(gs.managedSSHDir, 0700); err != nil {
 				return fmt.Errorf("创建受管 SSH 目录失败: %w", err)
 			}
-
+			
 			// 更新路径指向受管目录
 			gs.sshKeysDir = gs.managedSSHDir
 			gs.authorizedKeysFile = gs.managedAuthorizedKeysFile
-
-			// 更新 sshd 配置
-			var sshdConfig string
+			
+			// 更新 git 用户信息
 			if gitUser, lookupErr := user.Lookup(gs.sshUser); lookupErr == nil {
 				uid, _ := strconv.Atoi(gitUser.Uid)
 				gid, _ := strconv.Atoi(gitUser.Gid)
 				gs.uid = uid
 				gs.gid = gid
 			}
-			sshdConfig = fmt.Sprintf("Match User %s\n  AuthorizedKeysFile %s\n  AllowTcpForwarding no\n  X11Forwarding no\n",
-				gs.sshUser, gs.managedAuthorizedKeysFile)
-			configPath := filepath.Join(gs.sshConfigDir, "sslcat_git.conf")
-			if err := os.WriteFile(configPath, []byte(sshdConfig), 0644); err != nil {
-				gs.logger.Warnf("更新 sshd 配置文件失败: %v", err)
-			} else {
-				gs.logger.Infof("sshd 配置已更新为使用受管 authorized_keys: %s", configPath)
-			}
-		} else {
-			os.Remove(testFile)
+			
+			// 更新 sshd 配置
+			gs.writeSshdConfig()
 		}
 	}
 
