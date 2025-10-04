@@ -73,14 +73,23 @@ parse_git_command() {
 app_exists() {
     local app_name="$1"
     
-    # 先检查文件系统上的裸仓库
-    local app_dir="$SSLCAT_REPOS_DIR/$app_name"
-    local bare_repo="$app_dir/git/repo.git"
-    if [[ -d "$bare_repo" ]] && [[ -f "$bare_repo/HEAD" ]]; then
+    # 检查多个可能的仓库位置
+    # 1. /home/git 下的符号链接或直接仓库
+    local home_repo="/home/git/${app_name}.git"
+    if [[ -d "$home_repo" ]] && [[ -f "$home_repo/HEAD" ]]; then
+        log "找到仓库: $home_repo"
         return 0
     fi
     
-    # 如果文件系统上不存在，通过 API 获取应用列表检查
+    # 2. 标准的 ReposDir 路径
+    local app_dir="$SSLCAT_REPOS_DIR/$app_name"
+    local bare_repo="$app_dir/git/repo.git"
+    if [[ -d "$bare_repo" ]] && [[ -f "$bare_repo/HEAD" ]]; then
+        log "找到仓库: $bare_repo"
+        return 0
+    fi
+    
+    # 3. 如果文件系统上都不存在，通过 API 获取应用列表检查
     local response
     response=$(curl -s -X GET "$SSLCAT_API_URL/api/git-server/apps" \
         -H "User-Agent: SSLcat-Git-Hook/1.0 (Internal)" 2>&1)
@@ -135,10 +144,23 @@ create_app() {
 execute_git_command() {
     local app_name="$1"
     local git_cmd="$2"
-    local bare_repo="$SSLCAT_REPOS_DIR/$app_name/git/repo.git"
+    local bare_repo=""
+    
+    # 尝试多个可能的仓库位置
+    # 1. /home/git 下的符号链接或直接仓库
+    local home_repo="/home/git/${app_name}.git"
+    if [[ -d "$home_repo" ]] && [[ -f "$home_repo/HEAD" ]]; then
+        bare_repo="$home_repo"
+    else
+        # 2. 标准的 ReposDir 路径
+        bare_repo="$SSLCAT_REPOS_DIR/$app_name/git/repo.git"
+    fi
     
     if [[ ! -d "$bare_repo" ]]; then
         log_error "仓库路径不存在: $bare_repo"
+        log_error "已尝试的路径:"
+        log_error "  - /home/git/${app_name}.git"
+        log_error "  - $SSLCAT_REPOS_DIR/$app_name/git/repo.git"
         exit 1
     fi
     
