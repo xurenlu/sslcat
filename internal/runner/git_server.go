@@ -2101,12 +2101,15 @@ func (gs *GitServer) AddSSHKey(keyName, publicKey string) error {
 
 	// Dokku 风格：添加 command= 参数来拦截 git 命令
 	// 这样可以实现 git push 时自动创建应用
-	// command="sslcat-git-receive %KEY_FINGERPRINT%" 会在 git push 时执行
-	// 注意：这需要创建一个 wrapper 脚本
 	
-	// 添加密钥到 authorized_keys
-	// 使用标准格式：注释 + 密钥
-	keyEntry := fmt.Sprintf("# %s\n%s\n", keyName, publicKey)
+	// wrapper 脚本路径（安装时会复制到 /usr/local/bin）
+	wrapperScript := "/usr/local/bin/sslcat-git-hook"
+	
+	// 构建 authorized_keys 条目
+	// 格式：command="wrapper KEY_NAME",限制选项 公钥
+	restrictions := "no-agent-forwarding,no-user-rc,no-X11-forwarding,no-port-forwarding"
+	keyEntry := fmt.Sprintf("# %s\ncommand=\"%s %s\",%s %s\n", 
+		keyName, wrapperScript, keyName, restrictions, publicKey)
 
 	file, err := os.OpenFile(gs.authorizedKeysFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
@@ -2125,7 +2128,8 @@ func (gs *GitServer) AddSSHKey(keyName, publicKey string) error {
 		}
 	}
 
-	gs.logger.Infof("SSH 密钥已添加: %s -> %s", keyName, gs.authorizedKeysFile)
+	gs.logger.Infof("SSH 密钥已添加（Dokku 风格）: %s -> %s", keyName, gs.authorizedKeysFile)
+	gs.logger.Infof("  ✓ 支持 git push 自动创建应用")
 	return nil
 }
 
@@ -2184,16 +2188,35 @@ func (gs *GitServer) ListSSHKeys() ([]SSHKey, error) {
 			// 这是注释行，包含密钥名称
 			keyName := strings.TrimPrefix(line, "# ")
 			if i+1 < len(lines) && !strings.HasPrefix(lines[i+1], "#") && lines[i+1] != "" {
-				publicKey := lines[i+1]
-				fingerprint := gs.generateFingerprint(publicKey)
-				keys = append(keys, SSHKey{
-					ID:          fingerprint,
-					Name:        keyName,
-					PublicKey:   publicKey,
-					Fingerprint: fingerprint,
-					CreatedAt:   time.Now(),
-					Enabled:     true,
-				})
+				keyLine := lines[i+1]
+				
+				// 提取公钥（可能包含 command= 前缀）
+				var publicKey string
+				if strings.Contains(keyLine, "command=") {
+					// Dokku 风格：command="..." ssh-rsa AAAA...
+					// 找到公钥类型开始的位置
+					for _, keyType := range []string{"ssh-rsa", "ssh-ed25519", "ecdsa-sha2-nistp256", "ecdsa-sha2-nistp384", "ecdsa-sha2-nistp521"} {
+						if idx := strings.Index(keyLine, keyType); idx != -1 {
+							publicKey = keyLine[idx:]
+							break
+						}
+					}
+				} else {
+					// 标准格式：ssh-rsa AAAA...
+					publicKey = keyLine
+				}
+				
+				if publicKey != "" {
+					fingerprint := gs.generateFingerprint(publicKey)
+					keys = append(keys, SSHKey{
+						ID:          fingerprint,
+						Name:        keyName,
+						PublicKey:   publicKey,
+						Fingerprint: fingerprint,
+						CreatedAt:   time.Now(),
+						Enabled:     true,
+					})
+				}
 			}
 		}
 	}
@@ -2884,7 +2907,7 @@ func (gs *GitServer) initGitRepo(app *GitApp) error {
 	// 设置 git 用户所有权（如果 git 用户存在）
 	if gs.uid > 0 && gs.gid > 0 {
 		gs.logger.Debugf("设置 Git 仓库所有者为 git 用户 (uid:%d, gid:%d)", gs.uid, gs.gid)
-		
+
 		// 递归设置整个应用目录的所有者
 		// 使用 chown -R 命令会更高效
 		cmd = exec.Command("chown", "-R", fmt.Sprintf("%d:%d", gs.uid, gs.gid), filepath.Dir(app.GitPath))

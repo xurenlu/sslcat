@@ -1,0 +1,153 @@
+#!/bin/bash
+# SSLcat Git Hook Wrapper
+# 类似 Dokku，支持 git push 自动创建应用
+#
+# 在 authorized_keys 中使用：
+# command="/usr/local/bin/sslcat-git-hook KEY_NAME",no-agent-forwarding,no-user-rc,no-X11-forwarding,no-port-forwarding ssh-rsa AAAAB3...
+
+set -eo pipefail
+
+# 配置
+SSLCAT_API_URL="${SSLCAT_API_URL:-http://localhost/sslcat-panel}"
+SSLCAT_REPOS_DIR="${SSLCAT_REPOS_DIR:-/opt/sslcat/data/runners/git}"
+KEY_NAME="$1"
+
+# 日志函数
+log() {
+    echo "[sslcat-git-hook] $*" >&2
+}
+
+log_error() {
+    echo "[sslcat-git-hook] ERROR: $*" >&2
+}
+
+# 解析 Git 命令
+# SSH_ORIGINAL_COMMAND 格式：
+# - git-receive-pack 'appname.git'
+# - git-upload-pack 'appname.git'
+parse_git_command() {
+    local cmd="$SSH_ORIGINAL_COMMAND"
+    
+    if [[ -z "$cmd" ]]; then
+        log_error "No SSH command provided"
+        exit 1
+    fi
+    
+    # 提取命令类型和仓库名
+    if [[ "$cmd" =~ ^git-receive-pack\ \'([^\']+)\'$ ]] || \
+       [[ "$cmd" =~ ^git-upload-pack\ \'([^\']+)\'$ ]]; then
+        
+        local repo="${BASH_REMATCH[1]}"
+        # 移除 .git 后缀
+        APP_NAME="${repo%.git}"
+        
+        # 提取命令类型
+        if [[ "$cmd" =~ ^git-receive-pack ]]; then
+            GIT_CMD="git-receive-pack"
+        else
+            GIT_CMD="git-upload-pack"
+        fi
+        
+        log "Parsed command: $GIT_CMD, app: $APP_NAME"
+        return 0
+    else
+        log_error "Invalid Git command: $cmd"
+        exit 1
+    fi
+}
+
+# 检查应用是否存在
+app_exists() {
+    local app_name="$1"
+    local app_dir="$SSLCAT_REPOS_DIR/$app_name"
+    local bare_repo="$app_dir/git/repo.git"
+    
+    # 检查裸仓库是否存在且有效
+    if [[ -d "$bare_repo" ]] && [[ -f "$bare_repo/HEAD" ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# 通过 API 创建应用
+create_app() {
+    local app_name="$1"
+    
+    log "应用 '$app_name' 不存在，正在自动创建..."
+    
+    # 调用 SSLcat API 创建应用
+    local response
+    response=$(curl -s -X POST "$SSLCAT_API_URL/api/git-server/apps" \
+        -H "Content-Type: application/json" \
+        -d "{\"name\":\"$app_name\",\"auto_ssl\":true}" 2>&1)
+    
+    if [[ $? -eq 0 ]] && echo "$response" | grep -q '"success":true'; then
+        log "✓ 应用 '$app_name' 创建成功"
+        
+        # 等待几秒让文件系统同步
+        sleep 2
+        
+        # 验证创建是否成功
+        if app_exists "$app_name"; then
+            log "✓ 验证通过，应用已就绪"
+            return 0
+        else
+            log_error "应用创建后验证失败"
+            return 1
+        fi
+    else
+        log_error "创建应用失败"
+        log_error "API 响应: $response"
+        return 1
+    fi
+}
+
+# 执行 Git 命令
+execute_git_command() {
+    local app_name="$1"
+    local git_cmd="$2"
+    local bare_repo="$SSLCAT_REPOS_DIR/$app_name/git/repo.git"
+    
+    if [[ ! -d "$bare_repo" ]]; then
+        log_error "仓库路径不存在: $bare_repo"
+        exit 1
+    fi
+    
+    log "执行: $git_cmd '$bare_repo'"
+    
+    # 执行真正的 Git 命令
+    exec "$git_cmd" "$bare_repo"
+}
+
+# 主流程
+main() {
+    log "SSH_ORIGINAL_COMMAND: $SSH_ORIGINAL_COMMAND"
+    log "KEY_NAME: $KEY_NAME"
+    
+    # 1. 解析 Git 命令
+    parse_git_command
+    
+    # 2. 检查应用是否存在
+    if ! app_exists "$APP_NAME"; then
+        # 只有在 push (receive-pack) 时才自动创建
+        if [[ "$GIT_CMD" == "git-receive-pack" ]]; then
+            if ! create_app "$APP_NAME"; then
+                log_error "无法创建应用 '$APP_NAME'"
+                exit 1
+            fi
+        else
+            log_error "应用 '$APP_NAME' 不存在且不是 push 操作，无法自动创建"
+            exit 1
+        fi
+    else
+        log "应用 '$APP_NAME' 已存在"
+    fi
+    
+    # 3. 执行 Git 命令
+    execute_git_command "$APP_NAME" "$GIT_CMD"
+}
+
+# 运行主流程
+main "$@"
+

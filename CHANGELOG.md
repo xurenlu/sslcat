@@ -1,3 +1,68 @@
+## [1.3.5-rc24] - 2025-10-04
+
+### 🎉 Major Features
+
+#### 🚀 Dokku 风格 Git 部署 - 自动创建应用
+- **核心功能**: `git push` 可以自动创建不存在的应用，无需预先通过 API/Web 界面创建！
+- **实现方式**: 
+  - 创建 `sslcat-git-hook` wrapper 脚本拦截 Git SSH 命令
+  - 在 `authorized_keys` 中使用 `command=` 参数调用 wrapper
+  - Wrapper 解析应用名称，检查是否存在，不存在则自动创建
+  - 创建完成后透明转发给真正的 `git-receive-pack`
+  
+- **使用体验**:
+  ```bash
+  # 无需预先创建，直接推送！
+  git remote add deploy git@server:newapp.git
+  git push deploy main
+  # → 自动创建应用 "newapp" 并开始部署
+  ```
+
+- **SSH 密钥格式**（Dokku 风格）:
+  ```
+  command="/usr/local/bin/sslcat-git-hook keyname",no-agent-forwarding,no-user-rc,no-X11-forwarding,no-port-forwarding ssh-rsa AAAAB3...
+  ```
+
+- **安全特性**:
+  - 添加 SSH 安全限制选项（no-agent-forwarding 等）
+  - 只允许执行 wrapper 脚本，无法获得 shell 访问
+  - 所有操作通过内网 API 完成，安全可控
+
+- **向后兼容**:
+  - ✅ 旧格式的 SSH 密钥继续正常工作
+  - ✅ 旧密钥不支持自动创建，需要预先创建应用
+  - ✅ 新添加的密钥自动使用 Dokku 风格
+
+- **安装部署**:
+  ```bash
+  # 自动安装 wrapper 脚本
+  sudo ./scripts/install-git-hook.sh
+  ```
+
+- **工作流程**:
+  1. 用户执行 `git push git@host:appname.git`
+  2. SSH 调用 `sslcat-git-hook` wrapper
+  3. Wrapper 解析应用名称 "appname"
+  4. 检查应用是否存在
+  5. 不存在则调用 API 创建（2秒等待同步）
+  6. 验证创建成功
+  7. 转发给 `git-receive-pack` 开始部署
+
+- **对比 Dokku**:
+  | 特性 | SSLcat | Dokku |
+  |------|--------|-------|
+  | 自动创建应用 | ✅ | ✅ |
+  | SSH Command Wrapper | ✅ | ✅ |
+  | Web 管理界面 | ✅ | ❌ |
+  | 实时部署日志 | ✅ | ✅ |
+
+- **文档**: `DOKKU_STYLE_GIT_DEPLOY.md`
+- **文件**:
+  - `scripts/sslcat-git-hook` - Wrapper 脚本实现
+  - `scripts/install-git-hook.sh` - 自动安装脚本
+  - `internal/runner/git_server.go:2082-2133` - AddSSHKey 添加 command= 支持
+  - `internal/runner/git_server.go:2170-2225` - ListSSHKeys 支持新格式解析
+
 ## [1.3.5-rc23] - 2025-10-04
 
 ### 🐛 Bug Fixes
