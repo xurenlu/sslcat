@@ -39,17 +39,14 @@ type GitServer struct {
 	webhookPort   int
 
 	// SSH 配置
-	sshUser                   string // SSH 用户名，默认为 "git"
-	sshHomeDir                string // SSH 用户主目录
-	sshKeysDir                string // SSH 密钥目录
-	authorizedKeysFile        string // authorized_keys 文件路径
-	managedSSHDir             string // 受管 SSH 密钥目录（回退）
-	managedAuthorizedKeysFile string // 受管目录下的 authorized_keys 文件
-	useManagedKeys            bool   // 是否启用受管目录
-	gitCmdDir                 string // git-shell-commands 目录
-	sshConfigDir              string // sshd 配置目录
-	uid                       int
-	gid                       int
+	sshUser            string // SSH 用户名，默认为 "git"
+	sshHomeDir         string // SSH 用户主目录
+	sshKeysDir         string // SSH 密钥目录
+	authorizedKeysFile string // authorized_keys 文件路径
+	gitCmdDir          string // git-shell-commands 目录
+	sshConfigDir       string // sshd 配置目录
+	uid                int
+	gid                int
 
 	// 日志管理器
 	logManager       *LogManager
@@ -436,13 +433,6 @@ func NewGitServer(cfg *config.Config, translator *i18n.Translator) *GitServer {
 	sshHomeDir := "/home/git"
 	sshKeysDir := filepath.Join(sshHomeDir, ".ssh")
 	authorizedKeysFile := filepath.Join(sshKeysDir, "authorized_keys")
-	runnerDataDir := filepath.Dir(cfg.Runners.Git.ReposDir)
-	managedSSHDir := filepath.Join(runnerDataDir, "keys", "ssh")
-	if absPath, err := filepath.Abs(managedSSHDir); err == nil {
-		managedSSHDir = absPath
-	}
-	managedAuthorizedKeysFile := filepath.Join(managedSSHDir, "authorized_keys")
-	useManagedKeys := false
 	sshConfigDir := "/etc/ssh/sshd_config.d"
 
 	// 日志管理器
@@ -489,24 +479,21 @@ func NewGitServer(cfg *config.Config, translator *i18n.Translator) *GitServer {
 	}
 
 	gs := &GitServer{
-		config:                    cfg,
-		apps:                      make(map[string]*GitApp),
-		logger:                    logrus.WithField("component", "git_server").Logger,
-		translator:                translator,
-		serverConfig:              defaultConfig,
-		sshUser:                   sshUser,
-		sshHomeDir:                sshHomeDir,
-		sshKeysDir:                sshKeysDir,
-		authorizedKeysFile:        authorizedKeysFile,
-		managedSSHDir:             managedSSHDir,
-		managedAuthorizedKeysFile: managedAuthorizedKeysFile,
-		useManagedKeys:            useManagedKeys,
-		sshConfigDir:              sshConfigDir,
-		logManager:                logManager,
-		logStreamManager:          logStreamManager,
-		dockerRegistry:            dockerRegistry,
-		deployDB:                  deployDB,
-		notificationManager:       notificationMgr,
+		config:              cfg,
+		apps:                make(map[string]*GitApp),
+		logger:              logrus.WithField("component", "git_server").Logger,
+		translator:          translator,
+		serverConfig:        defaultConfig,
+		sshUser:             sshUser,
+		sshHomeDir:          sshHomeDir,
+		sshKeysDir:          sshKeysDir,
+		authorizedKeysFile:  authorizedKeysFile,
+		sshConfigDir:        sshConfigDir,
+		logManager:          logManager,
+		logStreamManager:    logStreamManager,
+		dockerRegistry:      dockerRegistry,
+		deployDB:            deployDB,
+		notificationManager: notificationMgr,
 	}
 
 	// 初始化 Builder Registry
@@ -1990,13 +1977,12 @@ func (gs *GitServer) setupSSHUser() error {
 
 	// 直接使用标准的 /home/git/.ssh 目录，用 root 权限强制创建
 	gs.logger.Infof("使用标准 SSH 目录: %s", gs.sshKeysDir)
-	gs.useManagedKeys = false  // 使用标准目录，不需要特殊 sshd 配置
-	
+
 	// 用 root 权限强制创建 .ssh 目录
 	if err := os.MkdirAll(gs.sshKeysDir, 0700); err != nil {
 		return fmt.Errorf("创建 SSH 目录失败: %w", err)
 	}
-	
+
 	gs.logger.Infof("SSH 密钥目录: %s", gs.sshKeysDir)
 	gs.logger.Infof("authorized_keys 文件: %s", gs.authorizedKeysFile)
 
@@ -2169,7 +2155,7 @@ func (gs *GitServer) AddSSHKey(keyName, publicKey string) error {
 		return fmt.Errorf("密钥已存在")
 	}
 
-	// 确保 SSH 目录存在（useManagedKeys 已在 setupSSHUser 中设置为 true）
+	// 确保 SSH 目录存在
 	if err := os.MkdirAll(gs.sshKeysDir, 0700); err != nil {
 		return fmt.Errorf("创建 SSH 目录失败: %w", err)
 	}
@@ -2375,24 +2361,6 @@ func (gs *GitServer) keyExists(fingerprint string) bool {
 }
 
 // writeSshdConfig 写入 sshd 配置文件
-func (gs *GitServer) writeSshdConfig() {
-	var sshdConfig string
-	if gs.useManagedKeys {
-		// 使用受管目录时，需要指定 AuthorizedKeysFile
-		sshdConfig = fmt.Sprintf("Match User %s\n  AuthorizedKeysFile %s\n  AllowTcpForwarding no\n  X11Forwarding no\n",
-			gs.sshUser, gs.managedAuthorizedKeysFile)
-		gs.logger.Infof("使用受管 authorized_keys 文件: %s", gs.managedAuthorizedKeysFile)
-	} else {
-		sshdConfig = fmt.Sprintf("Match User %s\n  AllowTcpForwarding no\n  X11Forwarding no\n", gs.sshUser)
-	}
-	configPath := filepath.Join(gs.sshConfigDir, "sslcat_git.conf")
-	if err := os.WriteFile(configPath, []byte(sshdConfig), 0644); err != nil {
-		gs.logger.Warnf("创建 sshd 配置文件失败 (%s): %v", configPath, err)
-	} else {
-		gs.logger.Infof("sshd 配置文件已创建: %s", configPath)
-	}
-}
-
 // restartSSHD 重启 SSH 服务
 func (gs *GitServer) restartSSHD() error {
 	// 检测操作系统类型

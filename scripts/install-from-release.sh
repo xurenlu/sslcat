@@ -469,6 +469,8 @@ ExecStart=/opt/sslcat/sslcat --config /etc/sslcat/sslcat.conf
 Restart=always
 RestartSec=3
 User=root
+ProtectHome=false
+ReadWritePaths=/var/lib/sslcat /etc/sslcat /opt/sslcat /home/git/
 
 [Install]
 WantedBy=multi-user.target
