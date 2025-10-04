@@ -1926,9 +1926,9 @@ func (gs *GitServer) setupSSHUser() error {
 	}
 
 	// 生成 sshd 配置
-	// 使用标准路径 /home/git/.ssh/authorized_keys，不需要显式指定 AuthorizedKeysFile
-	// SSH 会自动查找这个位置
-	sshdConfig := fmt.Sprintf("Match User %s\n  ForceCommand git-shell -c \"$SSH_ORIGINAL_COMMAND\"\n  AllowTcpForwarding no\n  X11Forwarding no\n", gs.sshUser)
+	// git 用户的 shell 已设置为 git-shell，不需要 ForceCommand
+	// 只配置安全限制即可
+	sshdConfig := fmt.Sprintf("Match User %s\n  AllowTcpForwarding no\n  X11Forwarding no\n", gs.sshUser)
 	configPath := filepath.Join(gs.sshConfigDir, "sslcat_git.conf")
 	if err := os.WriteFile(configPath, []byte(sshdConfig), 0644); err != nil {
 		gs.logger.Warnf("创建 sshd 配置文件失败 (%s): %v", configPath, err)
@@ -1936,15 +1936,39 @@ func (gs *GitServer) setupSSHUser() error {
 		gs.logger.Infof("sshd 配置文件已创建: %s", configPath)
 	}
 
-	// 创建 git-shell-commands 目录
+	// 创建 git-shell-commands 目录和友好提示脚本
 	gitCmdDir := filepath.Join(gs.sshHomeDir, "git-shell-commands")
 	if err := os.MkdirAll(gitCmdDir, 0755); err == nil {
 		os.Chown(gitCmdDir, uid, gid)
+		
+		// 创建友好的 no-interactive-login 提示脚本
 		noLoginScript := filepath.Join(gitCmdDir, "no-interactive-login")
-		if err := os.WriteFile(noLoginScript, []byte("#!/bin/sh\necho 'Interactive shell disabled.'\n"), 0755); err != nil {
+		welcomeMessage := `#!/bin/sh
+cat << 'WELCOME'
+┌──────────────────────────────────────────────────────┐
+│        欢迎使用 SSLcat Git 部署服务                  │
+│        Welcome to SSLcat Git Deploy Service          │
+└──────────────────────────────────────────────────────┘
+
+⚠️  此账户仅用于 Git 操作，不支持交互式 Shell 登录。
+    This account is for Git operations only, 
+    interactive shell login is disabled.
+
+📝 使用方法 / Usage:
+   git clone git@` + gs.config.Server.Host + `:your-app.git
+   git push origin main
+
+📚 更多信息 / More info:
+   访问管理面板查看 Git Deploy 文档
+
+WELCOME
+`
+		if err := os.WriteFile(noLoginScript, []byte(welcomeMessage), 0755); err != nil {
 			gs.logger.Warnf("创建 no-interactive-login 脚本失败: %v", err)
+		} else {
+			os.Chown(noLoginScript, uid, gid)
+			gs.logger.Info("git-shell 欢迎脚本已创建")
 		}
-		os.Chown(noLoginScript, uid, gid)
 	}
 
 	gs.logger.Info("SSH 用户配置完成")
@@ -1970,9 +1994,15 @@ func (gs *GitServer) createGitUser() error {
 
 	// 使用标准的 /home/git 作为 home 目录（最佳实践）
 	homeDir := "/home/git"
+	
+	// 查找 git-shell 路径
+	gitShellPath := "/usr/bin/git-shell" // 默认路径
+	if path, err := exec.LookPath("git-shell"); err == nil {
+		gitShellPath = path
+	}
 
-	// 创建用户 - 需要 root 权限
-	cmd = exec.Command("useradd", "-r", "-s", "/bin/bash", "-m", "-d", homeDir, gs.sshUser)
+	// 创建用户 - 需要 root 权限，shell 设置为 git-shell
+	cmd = exec.Command("useradd", "-r", "-s", gitShellPath, "-m", "-d", homeDir, gs.sshUser)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// 检查是否是权限问题
