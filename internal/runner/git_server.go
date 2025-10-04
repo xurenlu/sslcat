@@ -1904,11 +1904,18 @@ func (gs *GitServer) setupSSHUser() error {
 		gs.logger.Warnf("设置 SSH 目录权限失败: %v", err)
 	}
 
-	// 确保父目录（keys/）也有正确的权限和所有者
-	// SSH 要求整个目录链的所有者必须是目标用户或 root
+	// 确保父目录也有正确的权限和所有者（满足 SSH StrictModes）
+	// SSH StrictModes 要求目录链的所有者必须是目标用户或 root
+	
+	// keys 目录：git 用户拥有
 	keysDir := filepath.Dir(gs.sshKeysDir)
-	os.Chmod(keysDir, 0755)
-	os.Chown(keysDir, uid, gid) // 将 keys 目录也设置为 git 用户拥有
+	os.MkdirAll(keysDir, 0755)
+	os.Chown(keysDir, uid, gid)
+	
+	// runners 目录：root 拥有（更安全，满足 SSH 要求）
+	runnersDir := filepath.Dir(keysDir)
+	os.MkdirAll(runnersDir, 0755)
+	os.Chown(runnersDir, 0, 0) // root:root
 
 	// 创建或确保 authorized_keys 文件存在
 	if _, err := os.Stat(gs.authorizedKeysFile); os.IsNotExist(err) {
