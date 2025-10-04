@@ -1908,7 +1908,10 @@ func (gs *GitServer) setupSSHUser() error {
 		os.Chown(gs.authorizedKeysFile, uid, gid)
 	}
 
-	sshdConfig := fmt.Sprintf("Match User %s\n  ForceCommand git-shell -c \"$SSH_ORIGINAL_COMMAND\"\n  AllowTcpForwarding no\n  X11Forwarding no\n", gs.sshUser)
+	// 生成 sshd 配置，指定自定义的 authorized_keys 路径
+	// 将相对路径转换为绝对路径（sshd 需要绝对路径）
+	absAuthorizedKeysFile, _ := filepath.Abs(gs.authorizedKeysFile)
+	sshdConfig := fmt.Sprintf("Match User %s\n  AuthorizedKeysFile %s\n  ForceCommand git-shell -c \"$SSH_ORIGINAL_COMMAND\"\n  AllowTcpForwarding no\n  X11Forwarding no\n", gs.sshUser, absAuthorizedKeysFile)
 	configPath := filepath.Join(gs.sshConfigDir, "sslcat_git.conf")
 	if err := os.WriteFile(configPath, []byte(sshdConfig), 0644); err != nil {
 		gs.logger.Warnf("创建 sshd 配置文件失败 (%s): %v", configPath, err)
