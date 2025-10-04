@@ -1806,28 +1806,59 @@ func (gs *GitServer) loadApps() error {
 	gs.apps = apps
 
 	// 修复应用路径（确保是绝对路径）
+	// 获取工作目录，用于转换相对路径
+	workDir, _ := os.Getwd()
+	
 	for _, app := range gs.apps {
 		// 修复 LogsDir 路径
 		if !filepath.IsAbs(app.LogsDir) {
-			app.LogsDir = filepath.Join(gs.config.Runners.Git.ReposDir, app.Name, "logs")
+			// 先尝试基于工作目录的相对路径
+			absPath := filepath.Join(workDir, app.LogsDir)
+			if _, err := os.Stat(absPath); err == nil {
+				app.LogsDir = absPath
+			} else {
+				// 否则使用标准路径
+				app.LogsDir = filepath.Join(gs.config.Runners.Git.ReposDir, app.Name, "logs")
+			}
 			gs.logger.Infof("修复应用 %s 的 LogsDir 路径: %s", app.Name, app.LogsDir)
 		}
-
+		
 		// 确保日志目录存在
 		if err := os.MkdirAll(app.LogsDir, 0755); err != nil {
 			gs.logger.Warnf("创建日志目录失败: %v", err)
 		}
-
+		
 		// 修复其他可能的相对路径
 		if app.GitPath != "" && !filepath.IsAbs(app.GitPath) {
-			app.GitPath = filepath.Join(gs.config.Runners.Git.ReposDir, app.Name, "git")
+			absPath := filepath.Join(workDir, app.GitPath)
+			if _, err := os.Stat(absPath); err == nil {
+				app.GitPath = absPath
+			} else {
+				app.GitPath = filepath.Join(gs.config.Runners.Git.ReposDir, app.Name, "git")
+			}
 		}
 		if app.BareRepo != "" && !filepath.IsAbs(app.BareRepo) {
-			app.BareRepo = filepath.Join(gs.config.Runners.Git.ReposDir, app.Name, "git", "repo.git")
+			absPath := filepath.Join(workDir, app.BareRepo)
+			if _, err := os.Stat(filepath.Join(absPath, "HEAD")); err == nil {
+				app.BareRepo = absPath
+				gs.logger.Infof("修复应用 %s 的 BareRepo 路径: %s", app.Name, app.BareRepo)
+			} else {
+				app.BareRepo = filepath.Join(gs.config.Runners.Git.ReposDir, app.Name, "git", "repo.git")
+			}
 		}
 		if app.RepoDir != "" && !filepath.IsAbs(app.RepoDir) {
-			app.RepoDir = filepath.Join(gs.config.Runners.Git.ReposDir, app.Name, "git", "repo")
+			absPath := filepath.Join(workDir, app.RepoDir)
+			if _, err := os.Stat(absPath); err == nil {
+				app.RepoDir = absPath
+			} else {
+				app.RepoDir = filepath.Join(gs.config.Runners.Git.ReposDir, app.Name, "git", "repo")
+			}
 		}
+	}
+	
+	// 保存修复后的路径
+	if err := gs.saveApps(); err != nil {
+		gs.logger.Warnf("保存应用配置失败: %v", err)
 	}
 
 	// 为已存在的应用补充缺失的符号链接
@@ -2622,10 +2653,10 @@ func (gs *GitServer) setupGitHooks(app *GitApp) error {
 	// 查找实际的裸仓库位置
 	var actualBareRepo string
 	var bareRepoExists bool
-	
+
 	gs.logger.Infof("开始查找应用 %s 的裸仓库", app.Name)
 	gs.logger.Debugf("当前 app.BareRepo: %s", app.BareRepo)
-	
+
 	// 1. 检查配置的裸仓库路径
 	checkPath1 := app.BareRepo
 	headFile1 := filepath.Join(checkPath1, "HEAD")
@@ -2637,7 +2668,7 @@ func (gs *GitServer) setupGitHooks(app *GitApp) error {
 	} else {
 		gs.logger.Debugf("路径 1 不存在或无效: %v", err)
 	}
-	
+
 	// 2. 检查 /home/git 下的符号链接或直接仓库
 	if !bareRepoExists {
 		homeRepo := filepath.Join("/home/git", app.Name+".git")
@@ -2651,7 +2682,7 @@ func (gs *GitServer) setupGitHooks(app *GitApp) error {
 			gs.logger.Debugf("路径 2 不存在或无效: %v", err)
 		}
 	}
-	
+
 	// 3. 如果都不存在，尝试初始化
 	if !bareRepoExists {
 		gs.logger.Warnf("裸仓库不存在，开始初始化")
