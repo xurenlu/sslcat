@@ -1035,21 +1035,24 @@ func (api *GitServerAPI) ReinstallHooks(w http.ResponseWriter, r *http.Request) 
 	}
 
 	api.logger.Infof("重新安装应用 %s 的 Git hooks", appName)
-
-	// 获取应用
+	
+	// 获取应用（注意：这里获取的是副本）
 	app, err := api.server.GetApp(appName)
 	if err != nil || app == nil {
 		api.writeError(w, "应用不存在: "+appName, http.StatusNotFound)
 		return
 	}
-
-	// 重新安装 hooks
+	
+	// 重新安装 hooks（会更新 app.BareRepo）
 	if err := api.server.SetupGitHooksForApp(app); err != nil {
 		api.logger.Errorf("重新安装 hooks 失败: %v", err)
 		api.writeError(w, "重新安装 hooks 失败: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-
+	
+	// 重新获取应用以获得更新后的 BareRepo
+	app, _ = api.server.GetApp(appName)
+	
 	response := map[string]interface{}{
 		"success": true,
 		"message": "Git hooks 已重新安装",

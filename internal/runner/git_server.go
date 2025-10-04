@@ -1812,12 +1812,12 @@ func (gs *GitServer) loadApps() error {
 			app.LogsDir = filepath.Join(gs.config.Runners.Git.ReposDir, app.Name, "logs")
 			gs.logger.Infof("修复应用 %s 的 LogsDir 路径: %s", app.Name, app.LogsDir)
 		}
-		
+
 		// 确保日志目录存在
 		if err := os.MkdirAll(app.LogsDir, 0755); err != nil {
 			gs.logger.Warnf("创建日志目录失败: %v", err)
 		}
-		
+
 		// 修复其他可能的相对路径
 		if app.GitPath != "" && !filepath.IsAbs(app.GitPath) {
 			app.GitPath = filepath.Join(gs.config.Runners.Git.ReposDir, app.Name, "git")
@@ -2605,7 +2605,16 @@ func (lm *LogManager) GetLogFiles(appName string) ([]string, error) {
 
 // SetupGitHooksForApp 为应用设置 Git 钩子（公开方法）
 func (gs *GitServer) SetupGitHooksForApp(app *GitApp) error {
-	return gs.setupGitHooks(app)
+	// 获取内存中的实际 app 对象（而不是副本）
+	gs.mutex.Lock()
+	actualApp, exists := gs.apps[app.Name]
+	gs.mutex.Unlock()
+	
+	if !exists {
+		return fmt.Errorf("应用 %s 不存在", app.Name)
+	}
+	
+	return gs.setupGitHooks(actualApp)
 }
 
 // setupGitHooks 设置 Git 钩子
@@ -2638,6 +2647,16 @@ func (gs *GitServer) setupGitHooks(app *GitApp) error {
 			return fmt.Errorf("初始化 Git 仓库失败: %w", err)
 		}
 		actualBareRepo = app.BareRepo
+	}
+
+	// 更新 app 对象的 BareRepo 为实际路径
+	if actualBareRepo != app.BareRepo {
+		gs.logger.Infof("更新应用 %s 的 BareRepo: %s -> %s", app.Name, app.BareRepo, actualBareRepo)
+		app.BareRepo = actualBareRepo
+		// 保存更新后的配置
+		if err := gs.saveApps(); err != nil {
+			gs.logger.Warnf("保存应用配置失败: %v", err)
+		}
 	}
 
 	// 设置 hooks 到实际的裸仓库
