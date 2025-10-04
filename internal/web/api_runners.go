@@ -35,13 +35,13 @@ func (api *GitServerAPI) checkAuthWithLocalhostBypass(w http.ResponseWriter, r *
 	api.logger.Infof("[Auth Debug] X-Real-IP: %s", r.Header.Get("X-Real-IP"))
 	api.logger.Infof("[Auth Debug] X-Forwarded-For: %s", r.Header.Get("X-Forwarded-For"))
 	api.logger.Infof("[Auth Debug] User-Agent: %s", r.Header.Get("User-Agent"))
-	
+
 	var clientIP string
 	if api.webServer != nil {
 		clientIP = api.webServer.getClientIP(r)
 		api.logger.Infof("[Auth Debug] Computed Client IP: %s", clientIP)
 	}
-	
+
 	// 检查是否是 localhost 请求
 	if api.webServer != nil && api.webServer.isLocalhostRequest(r) {
 		api.logger.Infof("✓ Localhost request detected from %s, bypassing authentication", clientIP)
