@@ -2969,12 +2969,19 @@ while read oldrev newrev refname; do
     else
         API_URL="http://localhost:$ADMIN_PORT$ADMIN_PREFIX/api/git-server/apps/$APP_NAME/deploy"
     fi
-    echo "[DEBUG] Calling API: $API_URL" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
-    DEPLOY_RESPONSE=$(curl -s -k --max-time 5 -X POST "$API_URL" \
+    echo "[DEBUG] Calling API: $API_URL" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" 2>&1
+    
+    # 尝试调用API，捕获所有错误
+    set +e  # 临时禁用 exit on error
+    DEPLOY_RESPONSE=$(timeout 10 curl -v -k --max-time 5 -X POST "$API_URL" \
         -H "Content-Type: application/json" \
         -H "User-Agent: SSLcat-Git-Hook/1.0 (Internal)" \
         -d "{\"commit\":\"$newrev\",\"ref\":\"$refname\",\"message\":\"$COMMIT_MSG\"}" 2>&1)
-    echo "[DEBUG] API Response: $DEPLOY_RESPONSE" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+    CURL_EXIT=$?
+    set -e  # 重新启用 exit on error
+    
+    echo "[DEBUG] curl exit code: $CURL_EXIT" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" 2>&1
+    echo "[DEBUG] API Response: $DEPLOY_RESPONSE" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" 2>&1
     
     if echo "$DEPLOY_RESPONSE" | grep -q '"success":true'; then
         print_success "Deployment triggered successfully"
