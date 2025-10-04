@@ -657,8 +657,15 @@ func (gs *GitServer) CreateApp(appName string, autoSSL bool) (*GitApp, error) {
 	gitURL := gs.generateGitURL(appName)
 	gs.logger.Infof("  ✓ %s: %s", gs.translator.T("git_server.git_url"), gitURL)
 
-	// 创建应用目录
+	// 创建应用目录（确保使用绝对路径）
 	appPath := filepath.Join(gs.config.Runners.Git.ReposDir, appName)
+	if !filepath.IsAbs(appPath) {
+		absPath, err := filepath.Abs(appPath)
+		if err != nil {
+			return nil, fmt.Errorf("转换应用路径为绝对路径失败: %w", err)
+		}
+		appPath = absPath
+	}
 	gs.logger.Infof("  %s: %s", gs.translator.T("git_server.creating_app_dir"), appPath)
 	if err := os.MkdirAll(appPath, 0755); err != nil {
 		gs.logger.Errorf(gs.translator.T("git_server.create_app_dir_failed")+": %v", err)
@@ -666,10 +673,10 @@ func (gs *GitServer) CreateApp(appName string, autoSSL bool) (*GitApp, error) {
 	}
 	gs.logger.Infof("  ✓ %s", gs.translator.T("git_server.app_dir_created"))
 
-	// 初始化 Git 仓库
+	// 初始化 Git 仓库（使用绝对路径）
 	gitPath := filepath.Join(appPath, "git")
 
-	// 创建日志目录
+	// 创建日志目录（使用绝对路径）
 	logsDir := filepath.Join(appPath, "logs")
 	gs.logger.Debugf("  创建日志目录: %s", logsDir)
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
@@ -3187,7 +3194,7 @@ func (gs *GitServer) initGitRepo(app *GitApp) error {
 	if err := cmd.Run(); err != nil {
 		gs.logger.Warnf("设置 Git 配置失败: %v", err)
 	}
-	
+
 	// 设置 safe.directory 以避免 dubious ownership 错误
 	cmd = exec.Command("git", "--git-dir", bearRepo, "config", "--local", "safe.directory", "*")
 	if err := cmd.Run(); err != nil {
