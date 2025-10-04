@@ -2969,9 +2969,12 @@ while read oldrev newrev refname; do
     else
         API_URL="http://localhost:$ADMIN_PORT$ADMIN_PREFIX/api/git-server/apps/$APP_NAME/deploy"
     fi
-    DEPLOY_RESPONSE=$(curl -s -k -X POST "$API_URL" \
+    echo "[DEBUG] Calling API: $API_URL" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+    DEPLOY_RESPONSE=$(curl -s -k --max-time 5 -X POST "$API_URL" \
         -H "Content-Type: application/json" \
+        -H "User-Agent: SSLcat-Git-Hook/1.0 (Internal)" \
         -d "{\"commit\":\"$newrev\",\"ref\":\"$refname\",\"message\":\"$COMMIT_MSG\"}" 2>&1)
+    echo "[DEBUG] API Response: $DEPLOY_RESPONSE" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
     
     if echo "$DEPLOY_RESPONSE" | grep -q '"success":true'; then
         print_success "Deployment triggered successfully"
