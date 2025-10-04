@@ -333,28 +333,28 @@ func main() {
 						return
 					}
 
-				// 域名访问的处理逻辑
-				// 检查是否是管理面板路径或API路径
-				if strings.HasPrefix(r.URL.Path, cfg.AdminPrefix) {
-					// 检查是否是来自 localhost 的 API 请求（不重定向，直接处理）
-					clientIP := r.RemoteAddr
-					if idx := strings.LastIndex(clientIP, ":"); idx != -1 {
-						clientIP = clientIP[:idx]
-					}
-					isLocalhost := clientIP == "127.0.0.1" || clientIP == "::1" || strings.HasPrefix(clientIP, "127.")
-					isAPIPath := strings.Contains(r.URL.Path, "/api/")
-					
-					if isLocalhost && isAPIPath {
-						// localhost 的 API 请求直接处理，不重定向
-						webServer.ServeHTTP(w, r)
+					// 域名访问的处理逻辑
+					// 检查是否是管理面板路径或API路径
+					if strings.HasPrefix(r.URL.Path, cfg.AdminPrefix) {
+						// 检查是否是来自 localhost 的 API 请求（不重定向，直接处理）
+						clientIP := r.RemoteAddr
+						if idx := strings.LastIndex(clientIP, ":"); idx != -1 {
+							clientIP = clientIP[:idx]
+						}
+						isLocalhost := clientIP == "127.0.0.1" || clientIP == "::1" || strings.HasPrefix(clientIP, "127.")
+						isAPIPath := strings.Contains(r.URL.Path, "/api/")
+
+						if isLocalhost && isAPIPath {
+							// localhost 的 API 请求直接处理，不重定向
+							webServer.ServeHTTP(w, r)
+							return
+						}
+
+						// 其他管理面板路径重定向到HTTPS
+						httpsURL := fmt.Sprintf("https://%s%s", r.Host, r.RequestURI)
+						http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
 						return
 					}
-					
-					// 其他管理面板路径重定向到HTTPS
-					httpsURL := fmt.Sprintf("https://%s%s", r.Host, r.RequestURI)
-					http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
-					return
-				}
 
 					// 其他路径通过代理处理（如果有配置）
 					if rule := proxyManager.GetProxyConfig(r.Host); rule != nil {

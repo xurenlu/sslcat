@@ -2975,7 +2975,8 @@ while read oldrev newrev refname; do
     
     # 尝试调用API，捕获所有错误
     set +e  # 临时禁用 exit on error
-    DEPLOY_RESPONSE=$(timeout 10 curl -s -L -k --max-time 10 -X POST "$API_URL" \
+    # 注意：不使用 -L，避免跟随重定向导致 RemoteAddr 变成公网 IP
+    DEPLOY_RESPONSE=$(timeout 10 curl -s --max-time 10 -X POST "$API_URL" \
         -H "Content-Type: application/json" \
         -H "User-Agent: SSLcat-Git-Hook/1.0 (Internal)" \
         -d "{\"commit\":\"$newrev\",\"ref\":\"$refname\",\"message\":\"$COMMIT_MSG\"}" 2>&1)
