@@ -663,7 +663,7 @@ func (gs *GitServer) CreateApp(appName string, autoSSL bool) (*GitApp, error) {
 			},
 		},
 	}
-	
+
 	gs.logger.Infof("  ✓ SSL 配置: Enabled=%v, Email=%s", autoSSL, gs.serverConfig.SSLEmail)
 
 	gs.apps[appName] = app
@@ -1778,10 +1778,10 @@ func (gs *GitServer) saveDockerRegistryConfig() error {
 	}
 
 	configFile := filepath.Join(gs.config.Runners.Git.ReposDir, "docker_registry_config.json")
-	
+
 	// 获取当前配置
 	config := gs.dockerRegistry.GetConfig()
-	
+
 	data, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
 		return fmt.Errorf("序列化 Docker Registry 配置失败: %w", err)
@@ -1802,7 +1802,7 @@ func (gs *GitServer) loadDockerRegistryConfig() error {
 	}
 
 	configFile := filepath.Join(gs.config.Runners.Git.ReposDir, "docker_registry_config.json")
-	
+
 	// 如果文件不存在，使用默认配置
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
 		gs.logger.Info("Docker Registry 配置文件不存在，使用默认配置")
@@ -2106,7 +2106,7 @@ func (gs *GitServer) restartSSHD() error {
 
 	var cmd *exec.Cmd
 	var needsSudo bool
-	
+
 	switch osType {
 	case "linux":
 		// Linux 系统使用 systemctl（需要 sudo）
@@ -2122,10 +2122,10 @@ func (gs *GitServer) restartSSHD() error {
 	}
 
 	gs.logger.Infof("尝试重启 SSH 服务 (OS: %s, 需要sudo: %v)...", osType, needsSudo)
-	
+
 	output, err := cmd.CombinedOutput()
 	outputStr := strings.TrimSpace(string(output))
-	
+
 	if err != nil {
 		// 检查是否是权限问题
 		if strings.Contains(outputStr, "permission") || strings.Contains(outputStr, "not permitted") {
@@ -2570,16 +2570,16 @@ func (gs *GitServer) UpdateDockerRegistryConfig(config *DockerRegistryConfig) er
 	if gs.dockerRegistry == nil {
 		return fmt.Errorf("Docker Registry not initialized")
 	}
-	
+
 	gs.dockerRegistry.UpdateConfig(config)
 	gs.logger.Info("Docker Registry configuration updated successfully")
-	
+
 	// 持久化配置
 	if err := gs.saveDockerRegistryConfig(); err != nil {
 		gs.logger.Warnf("保存 Docker Registry 配置失败: %v", err)
 		// 不返回错误，配置已更新到内存
 	}
-	
+
 	return nil
 }
 
