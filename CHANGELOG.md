@@ -1,3 +1,46 @@
+## [1.3.5-rc27] - 2025-10-04
+
+### 🔧 Configuration & Dependencies
+
+#### 自动安装 jq - 确保配置检测可靠性
+- **改进**: 安装脚本自动检测并安装 jq，确保 JSON 解析准确
+- **背景**: v1.3.5-rc26 引入了配置自动检测，依赖 jq 解析 JSON
+- **问题**: 如果系统没有 jq，grep 降级方案不够可靠
+  
+- **实现**:
+  - 检测系统包管理器（apt-get/yum/dnf/brew）
+  - 自动安装 jq 包
+  - 安装失败时给出明确提示和手动安装命令
+  - 显示使用的解析方式（jq 或 grep）
+  
+- **支持的系统**:
+  - ✅ Debian/Ubuntu (apt-get)
+  - ✅ CentOS/RHEL (yum)
+  - ✅ Fedora (dnf)
+  - ✅ macOS (brew)
+  
+- **安装输出示例**:
+  ```bash
+  📋 检测 SSLcat 配置...
+  ⚠️  未检测到 jq，正在尝试安装...
+  [apt-get installing jq...]
+    找到配置文件: /opt/sslcat/sslcat.conf
+    ✓ 使用 jq 解析配置
+    检测到的配置：
+      Admin Prefix: /sslcat-panel2
+      ...
+  ```
+
+- **降级提示**:
+  ```bash
+  ❌ 无法自动安装 jq，将使用 grep 降级方案（可能不够准确）
+  💡 建议手动安装 jq 以获得更好的配置检测：
+     Debian/Ubuntu: apt-get install jq
+     CentOS/RHEL:   yum install jq
+  ```
+
+- **文件**: `scripts/install-git-hook.sh:35-60` - jq 自动安装逻辑
+
 ## [1.3.5-rc26] - 2025-10-04
 
 ### 🔧 Configuration & Improvements

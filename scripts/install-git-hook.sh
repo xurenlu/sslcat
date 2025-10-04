@@ -32,6 +32,33 @@ CONFIG_FILE="$CONFIG_DIR/git-hook.conf"
 
 echo "📋 检测 SSLcat 配置..."
 
+# 检查 jq 是否安装，如果没有则尝试安装
+if ! command -v jq >/dev/null 2>&1; then
+    echo "⚠️  未检测到 jq，正在尝试安装..."
+    
+    # 检测系统类型并安装 jq
+    if command -v apt-get >/dev/null 2>&1; then
+        # Debian/Ubuntu
+        apt-get update -qq && apt-get install -y -qq jq
+    elif command -v yum >/dev/null 2>&1; then
+        # CentOS/RHEL
+        yum install -y -q jq
+    elif command -v dnf >/dev/null 2>&1; then
+        # Fedora
+        dnf install -y -q jq
+    elif command -v brew >/dev/null 2>&1; then
+        # macOS
+        brew install jq
+    else
+        echo "  ❌ 无法自动安装 jq，将使用 grep 降级方案（可能不够准确）"
+        echo "  💡 建议手动安装 jq 以获得更好的配置检测："
+        echo "     Debian/Ubuntu: apt-get install jq"
+        echo "     CentOS/RHEL:   yum install jq"
+        echo "     macOS:         brew install jq"
+        echo ""
+    fi
+fi
+
 # 尝试自动检测配置
 DETECTED_ADMIN_PREFIX=""
 DETECTED_PORT=""
@@ -43,14 +70,16 @@ for conf_path in "/etc/sslcat/sslcat.conf" "$SCRIPT_DIR/../sslcat.conf" "$SCRIPT
         echo "  找到配置文件: $conf_path"
         # 使用 jq 或 grep 提取配置
         if command -v jq >/dev/null 2>&1; then
+            echo "  ✓ 使用 jq 解析配置"
             DETECTED_ADMIN_PREFIX=$(jq -r '.admin_prefix // empty' "$conf_path" 2>/dev/null || echo "")
             DETECTED_PORT=$(jq -r '.server.port // empty' "$conf_path" 2>/dev/null || echo "")
             DETECTED_REPOS_DIR=$(jq -r '.runners.git.repos_dir // empty' "$conf_path" 2>/dev/null || echo "")
         else
             # 如果没有 jq，尝试用 grep 提取（不太精确）
-            DETECTED_ADMIN_PREFIX=$(grep -o '"admin_prefix"[[:space:]]*:[[:space:]]*"[^"]*"' "$conf_path" | sed 's/.*"\([^"]*\)".*/\1/' || echo "")
+            echo "  ⚠️  使用 grep 降级方案（可能不够准确）"
+            DETECTED_ADMIN_PREFIX=$(grep -o '"admin_prefix"[[:space:]]*:[[:space:]]*"[^"]*"' "$conf_path" | sed 's/.*"\([^"]*\)".*/\1/' | head -1 || echo "")
             DETECTED_PORT=$(grep -o '"port"[[:space:]]*:[[:space:]]*[0-9]*' "$conf_path" | grep -o '[0-9]*' | head -1 || echo "")
-            DETECTED_REPOS_DIR=$(grep -o '"repos_dir"[[:space:]]*:[[:space:]]*"[^"]*"' "$conf_path" | sed 's/.*"\([^"]*\)".*/\1/' || echo "")
+            DETECTED_REPOS_DIR=$(grep -o '"repos_dir"[[:space:]]*:[[:space:]]*"[^"]*"' "$conf_path" | sed 's/.*"\([^"]*\)".*/\1/' | head -1 || echo "")
         fi
         break
     fi
