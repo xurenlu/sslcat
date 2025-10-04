@@ -590,8 +590,8 @@ func (gs *GitServer) UpdateServerConfig(config *GitServerConfig) error {
 // ==================== 应用管理 ====================
 
 // CreateApp 创建新应用
-func (gs *GitServer) CreateApp(appName string) (*GitApp, error) {
-	gs.logger.Infof("🚀 %s: %s", gs.translator.T("git_server.creating_app"), appName)
+func (gs *GitServer) CreateApp(appName string, autoSSL bool) (*GitApp, error) {
+	gs.logger.Infof("🚀 %s: %s (AutoSSL: %v)", gs.translator.T("git_server.creating_app"), appName, autoSSL)
 	gs.mutex.Lock()
 	defer gs.mutex.Unlock()
 
@@ -658,11 +658,13 @@ func (gs *GitServer) CreateApp(appName string) (*GitApp, error) {
 		DeployConfig: &AppDeployConfig{
 			Strategy: gs.serverConfig.DefaultStrategy,
 			SSL: SSLConfig{
-				Enabled: gs.serverConfig.AutoSSL,
+				Enabled: autoSSL, // 使用传入的参数
 				Email:   gs.serverConfig.SSLEmail,
 			},
 		},
 	}
+	
+	gs.logger.Infof("  ✓ SSL 配置: Enabled=%v, Email=%s", autoSSL, gs.serverConfig.SSLEmail)
 
 	gs.apps[appName] = app
 	gs.logger.Infof("  ✓ 应用对象已添加到内存 (当前共 %d 个应用)", len(gs.apps))
@@ -2848,9 +2850,9 @@ func (gs *GitServer) ProcessGitPush(appName, keyFingerprint, refName, oldRev, ne
 
 	// 如果应用不存在，自动创建
 	if !exists {
-		gs.logger.Infof("应用 %s 不存在，自动创建", appName)
+		gs.logger.Infof("应用 %s 不存在，自动创建（使用服务器默认SSL配置: %v）", appName, gs.serverConfig.AutoSSL)
 		var err error
-		app, err = gs.CreateApp(appName)
+		app, err = gs.CreateApp(appName, gs.serverConfig.AutoSSL)
 		if err != nil {
 			return fmt.Errorf("自动创建应用失败: %w", err)
 		}

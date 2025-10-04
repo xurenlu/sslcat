@@ -61,9 +61,27 @@ func (api *GitServerAPI) ListApps(w http.ResponseWriter, r *http.Request) {
 		api.logger.Info("  当前没有应用")
 	}
 
+	// 转换为 map 数组，添加 autoSSL 字段
+	appsWithAutoSSL := make([]map[string]interface{}, 0, len(apps))
+	for _, app := range apps {
+		// 使用 json.Marshal/Unmarshal 转换为 map
+		appJSON, _ := json.Marshal(app)
+		var appMap map[string]interface{}
+		json.Unmarshal(appJSON, &appMap)
+		
+		// 添加 autoSSL 字段
+		if app.DeployConfig != nil {
+			appMap["autoSSL"] = app.DeployConfig.SSL.Enabled
+		} else {
+			appMap["autoSSL"] = false
+		}
+		
+		appsWithAutoSSL = append(appsWithAutoSSL, appMap)
+	}
+
 	response := map[string]interface{}{
 		"success": true,
-		"data":    apps,
+		"data":    appsWithAutoSSL,
 		"count":   len(apps),
 	}
 
@@ -84,9 +102,20 @@ func (api *GitServerAPI) GetApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 转换为 map 并添加 autoSSL 字段
+	appJSON, _ := json.Marshal(app)
+	var appMap map[string]interface{}
+	json.Unmarshal(appJSON, &appMap)
+	
+	if app.DeployConfig != nil {
+		appMap["autoSSL"] = app.DeployConfig.SSL.Enabled
+	} else {
+		appMap["autoSSL"] = false
+	}
+
 	response := map[string]interface{}{
 		"success": true,
-		"data":    app,
+		"data":    appMap,
 	}
 
 	api.writeJSON(w, response)
@@ -122,8 +151,8 @@ func (api *GitServerAPI) CreateApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	api.logger.Infof("调用 GitServer.CreateApp(%s)...", req.Name)
-	app, err := api.server.CreateApp(req.Name)
+	api.logger.Infof("调用 GitServer.CreateApp(%s, %v)...", req.Name, req.AutoSSL)
+	app, err := api.server.CreateApp(req.Name, req.AutoSSL)
 	if err != nil {
 		api.logger.Errorf("创建应用 %s 失败: %v", req.Name, err)
 		// 提供更友好的错误消息
@@ -135,13 +164,24 @@ func (api *GitServerAPI) CreateApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	api.logger.Infof("✅ 应用 %s 创建成功: 域名=%s, 端口=%d, Git地址=%s",
-		app.Name, app.Domain, app.Port, app.GitURL)
+	api.logger.Infof("✅ 应用 %s 创建成功: 域名=%s, 端口=%d, Git地址=%s, AutoSSL=%v",
+		app.Name, app.Domain, app.Port, app.GitURL, req.AutoSSL)
+
+	// 转换为 map 并添加 autoSSL 字段
+	appJSON, _ := json.Marshal(app)
+	var appMap map[string]interface{}
+	json.Unmarshal(appJSON, &appMap)
+	
+	if app.DeployConfig != nil {
+		appMap["autoSSL"] = app.DeployConfig.SSL.Enabled
+	} else {
+		appMap["autoSSL"] = false
+	}
 
 	response := map[string]interface{}{
 		"success": true,
 		"message": "应用创建成功",
-		"data":    app,
+		"data":    appMap,
 	}
 
 	api.writeJSON(w, response)
