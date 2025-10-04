@@ -615,10 +615,13 @@ func (api *GitServerAPI) UpdateDockerConfig(w http.ResponseWriter, r *http.Reque
 
 // TestDockerConnection 测试Docker连接
 func (api *GitServerAPI) TestDockerConnection(w http.ResponseWriter, r *http.Request) {
+	api.logger.Info("收到 Docker Registry 测试连接请求")
+	
 	// 从请求中读取配置（如果有），否则使用当前配置
 	var config runner.DockerRegistryConfig
 	
 	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
+		api.logger.Warnf("解析请求配置失败，使用当前配置: %v", err)
 		// 如果没有传递配置，使用当前配置
 		err = api.server.GetDockerRegistry().TestConnection()
 		
@@ -628,8 +631,10 @@ func (api *GitServerAPI) TestDockerConnection(w http.ResponseWriter, r *http.Req
 		}
 		
 		if err != nil {
+			api.logger.Errorf("测试连接失败: %v", err)
 			response["error"] = err.Error()
 		} else {
+			api.logger.Info("测试连接成功")
 			response["message"] = "Docker Registry连接正常"
 		}
 		
@@ -637,6 +642,8 @@ func (api *GitServerAPI) TestDockerConnection(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	api.logger.Info("使用前端传递的配置测试连接")
+	
 	// 使用传递的配置测试连接
 	err := api.server.GetDockerRegistry().TestConnectionWithConfig(&config)
 
@@ -646,8 +653,10 @@ func (api *GitServerAPI) TestDockerConnection(w http.ResponseWriter, r *http.Req
 	}
 
 	if err != nil {
+		api.logger.Errorf("测试连接失败: %v", err)
 		response["error"] = err.Error()
 	} else {
+		api.logger.Info("测试连接成功")
 		response["message"] = "Docker Registry连接正常"
 	}
 

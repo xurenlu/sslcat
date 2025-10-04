@@ -547,12 +547,21 @@ func (dr *DockerRegistry) TestConnection() error {
 
 // TestConnectionWithConfig 测试Registry连接（使用指定配置）
 func (dr *DockerRegistry) TestConnectionWithConfig(config *DockerRegistryConfig) error {
+	dr.log.Infof("开始测试 Docker Registry 连接...")
+	dr.log.Infof("  URL: %s", config.URL)
+	dr.log.Infof("  UseHTTPS: %v", config.UseHTTPS)
+	dr.log.Infof("  Username: %s", config.Username)
+	dr.log.Infof("  Timeout: %d", config.Timeout)
+	
 	if config.URL == "" {
+		dr.log.Info("  URL 为空，测试本地 Docker daemon")
 		// 测试本地Docker daemon
 		cmd := exec.Command("docker", "version")
 		if err := cmd.Run(); err != nil {
+			dr.log.Errorf("  ❌ Docker daemon 不可用: %v", err)
 			return fmt.Errorf("Docker daemon not available: %w", err)
 		}
+		dr.log.Info("  ✓ Docker daemon 可用")
 		return nil
 	}
 
@@ -562,21 +571,31 @@ func (dr *DockerRegistry) TestConnectionWithConfig(config *DockerRegistryConfig)
 		// 默认使用 HTTPS
 		if config.UseHTTPS {
 			url = "https://" + url
+			dr.log.Infof("  自动添加 HTTPS 协议: %s", url)
 		} else {
 			url = "http://" + url
+			dr.log.Infof("  自动添加 HTTP 协议: %s", url)
 		}
+	} else {
+		dr.log.Infof("  URL 已包含协议: %s", url)
 	}
 
 	// 测试远程Registry连接
 	testURL := fmt.Sprintf("%s/v2/", url)
+	dr.log.Infof("  测试 URL: %s", testURL)
 
 	timeout := config.Timeout
 	if timeout == 0 {
 		timeout = 10 // 默认10秒
+		dr.log.Infof("  使用默认超时: %d 秒", timeout)
+	} else {
+		dr.log.Infof("  超时设置: %d 秒", timeout)
 	}
+	
 	client := &http.Client{Timeout: time.Duration(timeout) * time.Second}
 	req, err := http.NewRequest("GET", testURL, nil)
 	if err != nil {
+		dr.log.Errorf("  ❌ 创建请求失败: %v", err)
 		return fmt.Errorf("failed to create test request: %w", err)
 	}
 
@@ -584,24 +603,34 @@ func (dr *DockerRegistry) TestConnectionWithConfig(config *DockerRegistryConfig)
 	if config.Username != "" && config.Password != "" {
 		auth := base64.StdEncoding.EncodeToString([]byte(config.Username + ":" + config.Password))
 		req.Header.Set("Authorization", "Basic "+auth)
+		dr.log.Info("  已添加 Basic 认证")
+	} else {
+		dr.log.Info("  未配置认证信息")
 	}
 
+	dr.log.Info("  发送请求...")
 	resp, err := client.Do(req)
 	if err != nil {
+		dr.log.Errorf("  ❌ 连接失败: %v", err)
 		return fmt.Errorf("failed to connect to registry: %w", err)
 	}
 	defer resp.Body.Close()
 
+	dr.log.Infof("  响应状态码: %d", resp.StatusCode)
+
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusUnauthorized {
 		body, _ := io.ReadAll(resp.Body)
+		dr.log.Errorf("  ❌ Registry 返回错误状态: %d, body: %s", resp.StatusCode, string(body))
 		return fmt.Errorf("registry returned status: %d, body: %s", resp.StatusCode, string(body))
 	}
 
 	// 401 也算连接成功，只是认证失败
 	if resp.StatusCode == http.StatusUnauthorized {
+		dr.log.Warn("  ⚠️  认证失败 - 请检查用户名和密码")
 		return fmt.Errorf("authentication failed - please check username and password")
 	}
 
+	dr.log.Info("  ✓ 连接成功！")
 	return nil
 }
 
