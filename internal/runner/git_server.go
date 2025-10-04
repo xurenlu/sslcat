@@ -2906,22 +2906,49 @@ while read oldrev newrev refname; do
     
     # 更新工作目录
     print_header "Updating repository"
+    
+    # 调试信息
+    echo "[DEBUG] Current user: $(whoami)" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+    echo "[DEBUG] Current dir: $(pwd)" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+    echo "[DEBUG] REPO_DIR: $REPO_DIR" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+    echo "[DEBUG] BARE_REPO: $BARE_REPO" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+    echo "[DEBUG] GIT_CONFIG_COUNT: $GIT_CONFIG_COUNT" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+    echo "[DEBUG] GIT_CONFIG_KEY_0: $GIT_CONFIG_KEY_0" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+    echo "[DEBUG] GIT_CONFIG_VALUE_0: $GIT_CONFIG_VALUE_0" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+    
     if [ ! -d "$REPO_DIR/.git" ]; then
         print_info "Cloning repository to work directory..."
+        echo "[DEBUG] Running: git clone $BARE_REPO $REPO_DIR" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
         if git clone "$BARE_REPO" "$REPO_DIR" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" 2>&1; then
             print_success "Repository cloned"
         else
             print_error "Failed to clone repository"
+            cat "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" | tail -10
             exit 1
         fi
     else
         print_info "Fetching latest changes..."
-        cd "$REPO_DIR"
-        if git fetch origin >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" 2>&1 && \
-           git reset --hard $newrev >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" 2>&1; then
-            print_success "Repository updated"
+        echo "[DEBUG] Changing to: $REPO_DIR" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+        cd "$REPO_DIR" || {
+            echo "[ERROR] Failed to cd to $REPO_DIR" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+            print_error "Failed to change directory"
+            exit 1
+        }
+        echo "[DEBUG] PWD after cd: $(pwd)" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+        echo "[DEBUG] Running: git fetch origin" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+        if git fetch origin >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" 2>&1; then
+            echo "[DEBUG] git fetch succeeded" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+            echo "[DEBUG] Running: git reset --hard $newrev" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+            if git reset --hard $newrev >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" 2>&1; then
+                print_success "Repository updated"
+            else
+                print_error "Failed to reset to $newrev"
+                cat "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" | tail -10
+                exit 1
+            fi
         else
-            print_error "Failed to update repository"
+            print_error "Failed to fetch from origin"
+            cat "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" | tail -10
             exit 1
         fi
     fi
