@@ -664,14 +664,18 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// 使用Info级别确保能看到日志
 	s.log.Infof("=== ServeHTTP: %s %s from %s ===", r.Method, r.URL.Path, s.getClientIP(r))
 	// 若通过IP访问且存在可用的LE域名，强制跳转到 https://域名 + AdminPrefix（仅限管理面板路径或根）
+	// 但排除 localhost/127.0.0.1，这些用于内部 API 调用
 	host := r.Host
 	hostOnly := host
 	if idx := strings.Index(host, ":"); idx != -1 {
 		hostOnly = host[:idx]
 	}
 	if net.ParseIP(hostOnly) != nil {
-		// 仅当访问管理面板路径时才重定向
-		if s.leRedirectHost != "" && strings.HasPrefix(r.URL.Path, s.config.AdminPrefix) {
+		// 检查是否为 localhost/127.0.0.1，这些不应该重定向
+		isLocalhost := hostOnly == "127.0.0.1" || hostOnly == "::1" || hostOnly == "localhost"
+		
+		// 仅当访问管理面板路径时才重定向（但排除 localhost）
+		if !isLocalhost && s.leRedirectHost != "" && strings.HasPrefix(r.URL.Path, s.config.AdminPrefix) {
 			target := "https://" + s.leRedirectHost + r.RequestURI
 			http.Redirect(w, r, target, http.StatusMovedPermanently)
 			return
