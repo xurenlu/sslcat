@@ -1940,7 +1940,7 @@ func (gs *GitServer) setupSSHUser() error {
 	gitCmdDir := filepath.Join(gs.sshHomeDir, "git-shell-commands")
 	if err := os.MkdirAll(gitCmdDir, 0755); err == nil {
 		os.Chown(gitCmdDir, uid, gid)
-		
+
 		// 创建友好的 no-interactive-login 提示脚本
 		noLoginScript := filepath.Join(gitCmdDir, "no-interactive-login")
 		welcomeMessage := `#!/bin/sh
@@ -1959,7 +1959,7 @@ cat << 'WELCOME'
    git push origin main
 
 📚 更多信息 / More info:
-   访问管理面板查看 Git Deploy 文档
+   https://sslcat.com
 
 WELCOME
 `
@@ -1994,7 +1994,7 @@ func (gs *GitServer) createGitUser() error {
 
 	// 使用标准的 /home/git 作为 home 目录（最佳实践）
 	homeDir := "/home/git"
-	
+
 	// 查找 git-shell 路径
 	gitShellPath := "/usr/bin/git-shell" // 默认路径
 	if path, err := exec.LookPath("git-shell"); err == nil {
