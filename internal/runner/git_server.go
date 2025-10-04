@@ -2963,7 +2963,13 @@ while read oldrev newrev refname; do
     
     # 直接调用部署 API
     print_info "Triggering deployment via API..."
-    DEPLOY_RESPONSE=$(curl -s -X POST "http://localhost:$ADMIN_PORT$ADMIN_PREFIX/api/git-server/apps/$APP_NAME/deploy" \
+    # 使用正确的协议：443端口用https，其他端口用http
+    if [ "$ADMIN_PORT" = "443" ]; then
+        API_URL="https://localhost$ADMIN_PREFIX/api/git-server/apps/$APP_NAME/deploy"
+    else
+        API_URL="http://localhost:$ADMIN_PORT$ADMIN_PREFIX/api/git-server/apps/$APP_NAME/deploy"
+    fi
+    DEPLOY_RESPONSE=$(curl -s -k -X POST "$API_URL" \
         -H "Content-Type: application/json" \
         -d "{\"commit\":\"$newrev\",\"ref\":\"$refname\",\"message\":\"$COMMIT_MSG\"}" 2>&1)
     
