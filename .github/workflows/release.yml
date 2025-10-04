@@ -25,26 +25,26 @@ jobs:
             arch_tag: linux-amd64
             archive: tar.gz
             ext: ""
-          - goos: darwin
-            goarch: amd64
-            arch_tag: darwin-amd64
-            archive: tar.gz
-            ext: ""
-          - goos: darwin
-            goarch: arm64
-            arch_tag: darwin-arm64
-            archive: tar.gz
-            ext: ""
-          - goos: windows
-            goarch: amd64
-            arch_tag: windows-amd64
-            archive: zip
-            ext: .exe
-          - goos: windows
-            goarch: arm64
-            arch_tag: windows-arm64
-            archive: zip
-            ext: .exe
+          # - goos: darwin
+          #   goarch: amd64
+          #   arch_tag: darwin-amd64
+          #   archive: tar.gz
+          #   ext: ""
+          # - goos: darwin
+          #   goarch: arm64
+          #   arch_tag: darwin-arm64
+          #   archive: tar.gz
+          #   ext: ""
+          # - goos: windows
+          #   goarch: amd64
+          #   arch_tag: windows-amd64
+          #   archive: zip
+          #   ext: .exe
+          # - goos: windows
+          #   goarch: arm64
+          #   arch_tag: windows-arm64
+          #   archive: zip
+          #   ext: .exe
 
     steps:
       - name: Checkout
@@ -78,38 +78,19 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc libc6-dev
-          # 为不同平台安装交叉编译工具链
-          if [ "${{ matrix.goos }}" = "darwin" ]; then
-            # macOS 交叉编译需要 osxcross
-            sudo apt-get install -y clang llvm-dev libxml2-dev uuid-dev libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev libncurses5-dev libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev
-            # 安装 osxcross
-            git clone https://github.com/tpoechtrager/osxcross.git /tmp/osxcross
-            cd /tmp/osxcross
-            # 下载 macOS SDK (需要从 Apple 开发者网站获取)
-            # 这里我们使用一个简化的方法，禁用 CGO 用于 macOS 交叉编译
-          elif [ "${{ matrix.goos }}" = "windows" ]; then
-            # Windows 交叉编译
-            sudo apt-get install -y gcc-mingw-w64-x86-64 gcc-mingw-w64-i686
-          fi
+          # 仅需要 Linux 构建，简化依赖安装
 
       - name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          # 根据平台设置 CGO 和编译器
-          CGO_ENABLED: ${{ matrix.goos == 'linux' && '1' || '0' }}
-          # Windows 交叉编译环境
-          CC_windows: x86_64-w64-mingw32-gcc
-          CXX_windows: x86_64-w64-mingw32-g++
+          # Linux 构建启用 CGO
+          CGO_ENABLED: 1
         run: |
           mkdir -p build artifacts
           VERSION="${GITHUB_REF_NAME}"
           if [ -z "$VERSION" ]; then VERSION="dev"; fi
-          if [ "${{ matrix.goos }}" = "linux" ]; then
-            echo "Building $BIN_NAME for $GOOS/$GOARCH (version=$VERSION) with CGO SQLite"
-          else
-            echo "Building $BIN_NAME for $GOOS/$GOARCH (version=$VERSION) with pure Go SQLite"
-          fi
+          echo "Building $BIN_NAME for $GOOS/$GOARCH (version=$VERSION) with CGO SQLite"
           go build -trimpath -ldflags "-s -w -X main.version=$VERSION -X main.build=$GITHUB_RUN_ID" -o build/${BIN_NAME}${{ matrix.ext }} .
 
       - name: Package
