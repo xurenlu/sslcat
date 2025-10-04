@@ -72,11 +72,21 @@ parse_git_command() {
 # 检查应用是否存在
 app_exists() {
     local app_name="$1"
+    
+    # 先检查文件系统上的裸仓库
     local app_dir="$SSLCAT_REPOS_DIR/$app_name"
     local bare_repo="$app_dir/git/repo.git"
-    
-    # 检查裸仓库是否存在且有效
     if [[ -d "$bare_repo" ]] && [[ -f "$bare_repo/HEAD" ]]; then
+        return 0
+    fi
+    
+    # 如果文件系统上不存在，通过 API 获取应用列表检查
+    local response
+    response=$(curl -s -X GET "$SSLCAT_API_URL/api/git-server/apps" \
+        -H "User-Agent: SSLcat-Git-Hook/1.0 (Internal)" 2>&1)
+    
+    if [[ $? -eq 0 ]] && echo "$response" | grep -q "\"name\":\"$app_name\""; then
+        log "应用 '$app_name' 在数据库中存在，但 Git 仓库未初始化"
         return 0
     else
         return 1
@@ -110,6 +120,10 @@ create_app() {
             log_error "应用创建后验证失败"
             return 1
         fi
+    elif echo "$response" | grep -q "app_exists"; then
+        # 应用已存在，这是正常情况
+        log "✓ 应用 '$app_name' 已存在，跳过创建"
+        return 0
     else
         log_error "创建应用失败"
         log_error "API 响应: $response"
