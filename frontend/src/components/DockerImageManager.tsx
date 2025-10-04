@@ -190,12 +190,25 @@ const DockerImageManager: React.FC<DockerImageManagerProps> = ({ appName }) => {
 
   // 测试Registry连接
   const testConnection = async () => {
+    if (!registryConfig) {
+      toast({
+        title: '配置为空',
+        description: '请先配置 Docker Registry',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+      return
+    }
+
     try {
       const response = await fetch(
         buildApiPath(adminPrefix, '/api/git-server/docker/test'),
         {
           method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
+          body: JSON.stringify(registryConfig),
         }
       )
       
@@ -205,7 +218,7 @@ const DockerImageManager: React.FC<DockerImageManagerProps> = ({ appName }) => {
         title: data.connected ? '连接成功' : '连接失败',
         description: data.message || data.error,
         status: data.connected ? 'success' : 'error',
-        duration: 3000,
+        duration: 5000,
         isClosable: true,
       })
     } catch (error) {

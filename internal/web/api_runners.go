@@ -615,7 +615,30 @@ func (api *GitServerAPI) UpdateDockerConfig(w http.ResponseWriter, r *http.Reque
 
 // TestDockerConnection 测试Docker连接
 func (api *GitServerAPI) TestDockerConnection(w http.ResponseWriter, r *http.Request) {
-	err := api.server.GetDockerRegistry().TestConnection()
+	// 从请求中读取配置（如果有），否则使用当前配置
+	var config runner.DockerRegistryConfig
+	
+	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
+		// 如果没有传递配置，使用当前配置
+		err = api.server.GetDockerRegistry().TestConnection()
+		
+		response := map[string]interface{}{
+			"success":   err == nil,
+			"connected": err == nil,
+		}
+		
+		if err != nil {
+			response["error"] = err.Error()
+		} else {
+			response["message"] = "Docker Registry连接正常"
+		}
+		
+		api.writeJSON(w, response)
+		return
+	}
+
+	// 使用传递的配置测试连接
+	err := api.server.GetDockerRegistry().TestConnectionWithConfig(&config)
 
 	response := map[string]interface{}{
 		"success":   err == nil,

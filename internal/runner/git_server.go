@@ -488,6 +488,11 @@ func NewGitServer(cfg *config.Config, translator *i18n.Translator) *GitServer {
 		gs.logger.Warnf(gs.translator.T("git_server.load_apps_failed")+": %v", err)
 	}
 
+	// 加载 Docker Registry 配置
+	if err := gs.loadDockerRegistryConfig(); err != nil {
+		gs.logger.Warnf("加载 Docker Registry 配置失败: %v", err)
+	}
+
 	// 确保应用拥有环境变量映射
 	gs.mutex.Lock()
 	for _, app := range gs.apps {
@@ -1764,6 +1769,59 @@ func (gs *GitServer) saveServerConfig() error {
 	return nil
 }
 
+// saveDockerRegistryConfig 保存 Docker Registry 配置
+func (gs *GitServer) saveDockerRegistryConfig() error {
+	if gs.dockerRegistry == nil {
+		return fmt.Errorf("Docker Registry not initialized")
+	}
+
+	configFile := filepath.Join(gs.config.Runners.Git.ReposDir, "docker_registry_config.json")
+	
+	// 获取当前配置
+	config := gs.dockerRegistry.GetConfig()
+	
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return fmt.Errorf("序列化 Docker Registry 配置失败: %w", err)
+	}
+
+	if err := os.WriteFile(configFile, data, 0644); err != nil {
+		return fmt.Errorf("写入 Docker Registry 配置失败: %w", err)
+	}
+
+	gs.logger.Infof("Docker Registry 配置已保存到 %s", configFile)
+	return nil
+}
+
+// loadDockerRegistryConfig 加载 Docker Registry 配置
+func (gs *GitServer) loadDockerRegistryConfig() error {
+	if gs.dockerRegistry == nil {
+		return fmt.Errorf("Docker Registry not initialized")
+	}
+
+	configFile := filepath.Join(gs.config.Runners.Git.ReposDir, "docker_registry_config.json")
+	
+	// 如果文件不存在，使用默认配置
+	if _, err := os.Stat(configFile); os.IsNotExist(err) {
+		gs.logger.Info("Docker Registry 配置文件不存在，使用默认配置")
+		return nil
+	}
+
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		return fmt.Errorf("读取 Docker Registry 配置失败: %w", err)
+	}
+
+	var config DockerRegistryConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return fmt.Errorf("解析 Docker Registry 配置失败: %w", err)
+	}
+
+	gs.dockerRegistry.UpdateConfig(&config)
+	gs.logger.Infof("Docker Registry 配置已从 %s 加载", configFile)
+	return nil
+}
+
 // checkGit 检查 Git 是否可用
 func (gs *GitServer) checkGit() error {
 	cmd := exec.Command("git", "version")
@@ -2500,6 +2558,13 @@ func (gs *GitServer) UpdateDockerRegistryConfig(config *DockerRegistryConfig) er
 	
 	gs.dockerRegistry.UpdateConfig(config)
 	gs.logger.Info("Docker Registry configuration updated successfully")
+	
+	// 持久化配置
+	if err := gs.saveDockerRegistryConfig(); err != nil {
+		gs.logger.Warnf("保存 Docker Registry 配置失败: %v", err)
+		// 不返回错误，配置已更新到内存
+	}
+	
 	return nil
 }
 

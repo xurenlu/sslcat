@@ -540,13 +540,14 @@ func (dr *DockerRegistry) CleanupOldImages(appName string) error {
 	return nil
 }
 
-// TestConnection 测试Registry连接
+// TestConnection 测试Registry连接（使用当前配置）
 func (dr *DockerRegistry) TestConnection() error {
-	if !dr.config.Enabled {
-		return fmt.Errorf("Docker registry is disabled")
-	}
+	return dr.TestConnectionWithConfig(dr.config)
+}
 
-	if dr.config.URL == "" {
+// TestConnectionWithConfig 测试Registry连接（使用指定配置）
+func (dr *DockerRegistry) TestConnectionWithConfig(config *DockerRegistryConfig) error {
+	if config.URL == "" {
 		// 测试本地Docker daemon
 		cmd := exec.Command("docker", "version")
 		if err := cmd.Run(); err != nil {
@@ -555,18 +556,33 @@ func (dr *DockerRegistry) TestConnection() error {
 		return nil
 	}
 
-	// 测试远程Registry连接
-	testURL := fmt.Sprintf("%s/v2/", dr.config.URL)
+	// 确保 URL 有协议前缀
+	url := config.URL
+	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+		// 默认使用 HTTPS
+		if config.UseHTTPS {
+			url = "https://" + url
+		} else {
+			url = "http://" + url
+		}
+	}
 
-	client := &http.Client{Timeout: time.Duration(dr.config.Timeout) * time.Second}
+	// 测试远程Registry连接
+	testURL := fmt.Sprintf("%s/v2/", url)
+
+	timeout := config.Timeout
+	if timeout == 0 {
+		timeout = 10 // 默认10秒
+	}
+	client := &http.Client{Timeout: time.Duration(timeout) * time.Second}
 	req, err := http.NewRequest("GET", testURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create test request: %w", err)
 	}
 
 	// 添加认证
-	if dr.config.Username != "" && dr.config.Password != "" {
-		auth := base64.StdEncoding.EncodeToString([]byte(dr.config.Username + ":" + dr.config.Password))
+	if config.Username != "" && config.Password != "" {
+		auth := base64.StdEncoding.EncodeToString([]byte(config.Username + ":" + config.Password))
 		req.Header.Set("Authorization", "Basic "+auth)
 	}
 
@@ -576,8 +592,14 @@ func (dr *DockerRegistry) TestConnection() error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("registry returned status: %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusUnauthorized {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("registry returned status: %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	// 401 也算连接成功，只是认证失败
+	if resp.StatusCode == http.StatusUnauthorized {
+		return fmt.Errorf("authentication failed - please check username and password")
 	}
 
 	return nil
@@ -631,4 +653,9 @@ func (dr *DockerRegistry) StartCleanupScheduler() {
 func (dr *DockerRegistry) UpdateConfig(newConfig *DockerRegistryConfig) {
 	dr.config = newConfig
 	dr.log.Info("Docker Registry configuration updated")
+}
+
+// GetConfig 获取 Docker Registry 配置
+func (dr *DockerRegistry) GetConfig() *DockerRegistryConfig {
+	return dr.config
 }
