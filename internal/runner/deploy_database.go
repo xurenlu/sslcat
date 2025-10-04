@@ -20,17 +20,17 @@ type DeployDatabase struct {
 
 // ContainerVersion 容器版本信息
 type ContainerVersion struct {
-	ID          int64     `json:"id"`
-	AppName     string    `json:"app_name"`
-	ContainerID string    `json:"container_id"`
-	ImageName   string    `json:"image_name"`
-	Port        int       `json:"port"`
-	Status      string    `json:"status"` // "active" | "pending" | "stopping" | "stopped"
-	CommitHash  string    `json:"commit_hash"`
-	CreatedAt   time.Time `json:"created_at"`
-	StartedAt   time.Time `json:"started_at"`
+	ID          int64      `json:"id"`
+	AppName     string     `json:"app_name"`
+	ContainerID string     `json:"container_id"`
+	ImageName   string     `json:"image_name"`
+	Port        int        `json:"port"`
+	Status      string     `json:"status"` // "active" | "pending" | "stopping" | "stopped"
+	CommitHash  string     `json:"commit_hash"`
+	CreatedAt   time.Time  `json:"created_at"`
+	StartedAt   time.Time  `json:"started_at"`
 	StoppedAt   *time.Time `json:"stopped_at,omitempty"`
-	HealthCheck bool      `json:"health_check"`
+	HealthCheck bool       `json:"health_check"`
 }
 
 // NewDeployDatabase 创建部署数据库管理器
@@ -137,8 +137,8 @@ func (ddb *DeployDatabase) AddContainerVersion(version *ContainerVersion) (int64
 		INSERT INTO container_versions 
 		(app_name, container_id, image_name, port, status, commit_hash, started_at, health_check)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`, version.AppName, version.ContainerID, version.ImageName, version.Port, 
-	   version.Status, version.CommitHash, version.StartedAt, version.HealthCheck)
+	`, version.AppName, version.ContainerID, version.ImageName, version.Port,
+		version.Status, version.CommitHash, version.StartedAt, version.HealthCheck)
 
 	if err != nil {
 		return 0, fmt.Errorf("添加容器版本失败: %v", err)
@@ -309,11 +309,11 @@ func (ddb *DeployDatabase) GetDeployEvents(appName string, limit int) ([]map[str
 	var events []map[string]interface{}
 	for rows.Next() {
 		var (
-			id                                         int64
-			appName, deployID, eventType, status, msg  string
-			oldContainerID, newContainerID             sql.NullString
-			oldPort, newPort                           sql.NullInt64
-			createdAt                                  time.Time
+			id                                        int64
+			appName, deployID, eventType, status, msg string
+			oldContainerID, newContainerID            sql.NullString
+			oldPort, newPort                          sql.NullInt64
+			createdAt                                 time.Time
 		)
 
 		if err := rows.Scan(
@@ -324,13 +324,13 @@ func (ddb *DeployDatabase) GetDeployEvents(appName string, limit int) ([]map[str
 		}
 
 		event := map[string]interface{}{
-			"id":          id,
-			"app_name":    appName,
-			"deploy_id":   deployID,
-			"event_type":  eventType,
-			"status":      status,
-			"message":     msg,
-			"created_at":  createdAt,
+			"id":         id,
+			"app_name":   appName,
+			"deploy_id":  deployID,
+			"event_type": eventType,
+			"status":     status,
+			"message":    msg,
+			"created_at": createdAt,
 		}
 
 		if oldContainerID.Valid {
@@ -351,4 +351,3 @@ func (ddb *DeployDatabase) GetDeployEvents(appName string, limit int) ([]map[str
 
 	return events, nil
 }
-

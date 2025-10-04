@@ -56,7 +56,7 @@ type GitServer struct {
 
 	// Builder Registry
 	builderRegistry *BuilderRegistry
-	
+
 	// 部署数据库
 	deployDB *DeployDatabase
 }
@@ -189,11 +189,11 @@ type GitApp struct {
 
 	// 配置变更标记
 	PendingRestart bool `json:"pending_restart,omitempty"` // 是否有未应用的配置变更需要重启
-	
+
 	// 容器信息（蓝绿部署）
-	ContainerID     string `json:"container_id,omitempty"`      // 当前活跃容器ID
-	OldContainerID  string `json:"old_container_id,omitempty"`  // 旧容器ID（等待停止）
-	ContainerStatus string `json:"container_status,omitempty"`  // 容器状态
+	ContainerID     string `json:"container_id,omitempty"`     // 当前活跃容器ID
+	OldContainerID  string `json:"old_container_id,omitempty"` // 旧容器ID（等待停止）
+	ContainerStatus string `json:"container_status,omitempty"` // 容器状态
 }
 
 // AppDeployConfig 应用部署配置
@@ -1306,7 +1306,7 @@ func (gs *GitServer) buildAndDeployDockerAppWithLogging(app *GitApp, deployLogge
 	gs.mutex.Unlock()
 
 	deployLogger.WriteLog("info", "docker", fmt.Sprintf("Docker镜像构建完成: %s", image.FullName))
-	
+
 	// 启动Docker容器（使用蓝绿部署）
 	deployLogger.WriteLog("info", "docker", "开始启动新容器（蓝绿部署）")
 	if err := gs.startDockerApp(app, image.FullName); err != nil {
@@ -2490,6 +2490,17 @@ func (gs *GitServer) GetLogStreamManager() *LogStreamManager {
 // GetDockerRegistry 获取Docker Registry
 func (gs *GitServer) GetDockerRegistry() *DockerRegistry {
 	return gs.dockerRegistry
+}
+
+// UpdateDockerRegistryConfig 更新 Docker Registry 配置
+func (gs *GitServer) UpdateDockerRegistryConfig(config *DockerRegistryConfig) error {
+	if gs.dockerRegistry == nil {
+		return fmt.Errorf("Docker Registry not initialized")
+	}
+	
+	gs.dockerRegistry.UpdateConfig(config)
+	gs.logger.Info("Docker Registry configuration updated successfully")
+	return nil
 }
 
 func (gs *GitServer) GetAppLogFiles(appName string) ([]string, error) {

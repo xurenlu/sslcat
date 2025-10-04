@@ -626,3 +626,9 @@ func (dr *DockerRegistry) StartCleanupScheduler() {
 
 	dr.log.Infof("Started Docker registry cleanup scheduler (interval: %d hours)", dr.config.CleanupPolicy.CleanInterval)
 }
+
+// UpdateConfig 更新 Docker Registry 配置
+func (dr *DockerRegistry) UpdateConfig(newConfig *DockerRegistryConfig) {
+	dr.config = newConfig
+	dr.log.Info("Docker Registry configuration updated")
+}

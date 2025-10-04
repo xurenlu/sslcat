@@ -599,8 +599,11 @@ func (api *GitServerAPI) UpdateDockerConfig(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// 更新配置 - 这需要在GitServer中添加相应方法
-	// api.server.UpdateDockerRegistry(&config)
+	// 更新配置
+	if err := api.server.UpdateDockerRegistryConfig(&config); err != nil {
+		api.writeError(w, "更新配置失败: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	response := map[string]interface{}{
 		"success": true,
