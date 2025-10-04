@@ -173,6 +173,8 @@
   "git_deploy_server.create_app_title": "Anwendung erstellen - SSLcat Git Deploy Server",
   "git_deploy_server.server_config_title": "Server-Konfiguration - SSLcat Git Deploy Server",
   
+  "git_server.welcome_message": "Welcome to SSLcat Git Deploy Platform!",
+  
   "frontend.delete_app_confirm": "Löschen der Anwendung bestätigen",
   "frontend.delete_app_warning": "Dies ist eine gefährliche Operation, die nicht rückgängig gemacht werden kann. Alle Daten, Code, Protokolle und Konfigurationen dieser Anwendung werden dauerhaft gelöscht.",
   "frontend.delete_app_instruction": "Bitte geben Sie den Anwendungsnamen \"{appName}\" ein, um das Löschen zu bestätigen:",
