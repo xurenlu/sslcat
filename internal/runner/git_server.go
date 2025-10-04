@@ -2024,6 +2024,7 @@ func (gs *GitServer) setupSSHUser() error {
 
 	// 创建 git-shell-commands 目录和友好提示脚本
 	gitCmdDir := filepath.Join(gs.sshHomeDir, "git-shell-commands")
+	gs.gitCmdDir = gitCmdDir
 	if err := os.MkdirAll(gitCmdDir, 0755); err == nil {
 		os.Chown(gitCmdDir, uid, gid)
 
@@ -2169,8 +2170,8 @@ func (gs *GitServer) AddSSHKey(keyName, publicKey string) error {
 	// Dokku 风格：添加 command= 参数来拦截 git 命令
 	// 这样可以实现 git push 时自动创建应用
 
-	// wrapper 脚本路径（安装时会复制到 /usr/local/bin）
-	wrapperScript := "/usr/local/bin/sslcat-git-hook"
+	// wrapper 脚本名称（git-shell 会在 git-shell-commands 目录查找）
+	wrapperScript := "sslcat-git-hook"
 
 	// 构建 authorized_keys 条目
 	// 格式：command="wrapper KEY_NAME",限制选项 公钥
@@ -3731,10 +3732,27 @@ func (gs *GitServer) SendDeployNotification(notifType, appName, commitSHA, commi
 
 // installGitHook 自动安装 git hook wrapper 脚本
 func (gs *GitServer) installGitHook() error {
-	// 检查 wrapper 脚本是否已经安装
+	// 检查 git-shell-commands 目录
+	gitShellDir := filepath.Join(gs.sshHomeDir, "git-shell-commands")
+	if err := os.MkdirAll(gitShellDir, 0755); err != nil {
+		return fmt.Errorf("创建 git-shell-commands 目录失败: %w", err)
+	}
+	gitShellHook := filepath.Join(gitShellDir, "sslcat-git-hook")
+	// 检查 wrapper 脚本是否已经安装到 git-shell-commands
+	if info, err := os.Stat(gitShellHook); err == nil && info.Mode().IsRegular() {
+		gs.logger.Infof("git hook wrapper 脚本已存在: %s", gitShellHook)
+		return nil
+	}
+
+	// 保留 /usr/local/bin 作为兼容路径
 	wrapperPath := "/usr/local/bin/sslcat-git-hook"
 	if info, err := os.Stat(wrapperPath); err == nil && info.Mode().IsRegular() {
-		gs.logger.Infof("git hook wrapper 脚本已存在: %s", wrapperPath)
+		// 确保复制一份到 git-shell-commands
+		if err := gs.copyFile(wrapperPath, gitShellHook, 0755); err != nil {
+			gs.logger.Warnf("复制 git hook 脚本到 git-shell-commands 失败: %v", err)
+		} else {
+			gs.logger.Infof("已同步 git hook 脚本到 git-shell-commands: %s", gitShellHook)
+		}
 		return nil
 	}
 
