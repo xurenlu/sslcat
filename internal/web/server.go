@@ -672,7 +672,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if net.ParseIP(hostOnly) != nil {
 		// 仅当访问管理面板路径时才重定向
 		if s.leRedirectHost != "" && strings.HasPrefix(r.URL.Path, s.config.AdminPrefix) {
-			target := "https://" + s.leRedirectHost + s.config.AdminPrefix
+			target := "https://" + s.leRedirectHost + r.RequestURI
 			http.Redirect(w, r, target, http.StatusMovedPermanently)
 			return
 		}
