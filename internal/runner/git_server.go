@@ -2963,17 +2963,19 @@ while read oldrev newrev refname; do
     
     # 直接调用部署 API
     print_info "Triggering deployment via API..."
-    # 使用正确的协议：443端口用https，其他端口用http
+    # 使用正确的协议和端口
+    # 注意：HTTPS 需要通过 127.0.0.1 直接连接，避免 SNI 问题
     if [ "$ADMIN_PORT" = "443" ]; then
-        API_URL="https://localhost$ADMIN_PREFIX/api/git-server/apps/$APP_NAME/deploy"
+        # 使用 http 连接到 80 端口，避免 HTTPS SNI 问题
+        API_URL="http://127.0.0.1:80$ADMIN_PREFIX/api/git-server/apps/$APP_NAME/deploy"
     else
-        API_URL="http://localhost:$ADMIN_PORT$ADMIN_PREFIX/api/git-server/apps/$APP_NAME/deploy"
+        API_URL="http://127.0.0.1:$ADMIN_PORT$ADMIN_PREFIX/api/git-server/apps/$APP_NAME/deploy"
     fi
     echo "[DEBUG] Calling API: $API_URL" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" 2>&1
     
     # 尝试调用API，捕获所有错误
     set +e  # 临时禁用 exit on error
-    DEPLOY_RESPONSE=$(timeout 10 curl -v -k --max-time 5 -X POST "$API_URL" \
+    DEPLOY_RESPONSE=$(timeout 10 curl -s --max-time 5 -X POST "$API_URL" \
         -H "Content-Type: application/json" \
         -H "User-Agent: SSLcat-Git-Hook/1.0 (Internal)" \
         -d "{\"commit\":\"$newrev\",\"ref\":\"$refname\",\"message\":\"$COMMIT_MSG\"}" 2>&1)
