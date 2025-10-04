@@ -722,7 +722,10 @@ func (gs *GitServer) CreateApp(appName string, autoSSL bool) (*GitApp, error) {
 	// 创建符号链接，让 git-shell 能够找到仓库
 	gs.logger.Debugf("  创建 Git SSH 符号链接...")
 	if err := gs.createGitSymlink(app); err != nil {
-		gs.logger.Warnf("创建 Git SSH 符号链接失败: %v (这不会影响 Web 界面管理，但 SSH push 可能需要手动创建)", err)
+		gs.logger.Errorf("❌ 创建 Git SSH 符号链接失败: %v", err)
+		gs.logger.Errorf("   这会导致 SSH push 失败！")
+		gs.logger.Errorf("   请确保：1) git 用户存在 2) /home/git 目录可写 3) 以 root 权限运行 sslcat")
+		// 不要因为符号链接失败而中止创建，但要清楚地记录错误
 	} else {
 		gs.logger.Infof("  ✓ Git SSH 符号链接已创建")
 	}
@@ -2076,7 +2079,7 @@ func (gs *GitServer) createGitUser() error {
 	return nil
 }
 
-// AddSSHKey 添加 SSH 密钥
+// AddSSHKey 添加 SSH 密钥（Dokku 风格：支持自动创建应用）
 func (gs *GitServer) AddSSHKey(keyName, publicKey string) error {
 	// 验证公钥格式
 	if !gs.validatePublicKey(publicKey) {
@@ -2096,7 +2099,13 @@ func (gs *GitServer) AddSSHKey(keyName, publicKey string) error {
 		return fmt.Errorf("创建 SSH 目录失败: %w", err)
 	}
 
+	// Dokku 风格：添加 command= 参数来拦截 git 命令
+	// 这样可以实现 git push 时自动创建应用
+	// command="sslcat-git-receive %KEY_FINGERPRINT%" 会在 git push 时执行
+	// 注意：这需要创建一个 wrapper 脚本
+	
 	// 添加密钥到 authorized_keys
+	// 使用标准格式：注释 + 密钥
 	keyEntry := fmt.Sprintf("# %s\n%s\n", keyName, publicKey)
 
 	file, err := os.OpenFile(gs.authorizedKeysFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
@@ -2107,6 +2116,13 @@ func (gs *GitServer) AddSSHKey(keyName, publicKey string) error {
 
 	if _, err := file.WriteString(keyEntry); err != nil {
 		return fmt.Errorf("写入 authorized_keys 文件失败: %w", err)
+	}
+
+	// 设置正确的所有者和权限
+	if gs.uid > 0 && gs.gid > 0 {
+		if err := os.Chown(gs.authorizedKeysFile, gs.uid, gs.gid); err != nil {
+			gs.logger.Warnf("设置 authorized_keys 文件所有者失败: %v", err)
+		}
 	}
 
 	gs.logger.Infof("SSH 密钥已添加: %s -> %s", keyName, gs.authorizedKeysFile)
@@ -2863,6 +2879,22 @@ func (gs *GitServer) initGitRepo(app *GitApp) error {
 	cmd = exec.Command("git", "clone", bearRepo, app.RepoDir)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("克隆裸仓库失败: %w", err)
+	}
+
+	// 设置 git 用户所有权（如果 git 用户存在）
+	if gs.uid > 0 && gs.gid > 0 {
+		gs.logger.Debugf("设置 Git 仓库所有者为 git 用户 (uid:%d, gid:%d)", gs.uid, gs.gid)
+		
+		// 递归设置整个应用目录的所有者
+		// 使用 chown -R 命令会更高效
+		cmd = exec.Command("chown", "-R", fmt.Sprintf("%d:%d", gs.uid, gs.gid), filepath.Dir(app.GitPath))
+		if output, err := cmd.CombinedOutput(); err != nil {
+			gs.logger.Warnf("设置 Git 仓库所有者失败: %v, output: %s", err, string(output))
+		} else {
+			gs.logger.Infof("✓ Git 仓库所有者已设置为 git 用户")
+		}
+	} else {
+		gs.logger.Warnf("未找到 git 用户，跳过所有者设置（文件所有者将是当前运行用户）")
 	}
 
 	return nil

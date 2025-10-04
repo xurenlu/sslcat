@@ -1,22 +1,50 @@
-## [1.3.5-rc22] - 2025-10-04
+## [1.3.5-rc23] - 2025-10-04
 
 ### 🐛 Bug Fixes
 
-#### Git Deploy - 修复创建应用后无法推送的严重 Bug
+#### Git Deploy - 修复创建应用后无法推送的严重 Bug（完整修复）
 - **问题描述**: 通过 API 或 Web 界面创建 Git 应用后，执行 `git push` 会报错 `'xxx.git' does not appear to be a git repository`
-- **根本原因**: `CreateApp` 函数没有调用 `initGitRepo` 初始化 Git 裸仓库，导致：
-  - Git 裸仓库目录不存在
-  - 符号链接指向不存在的目标
-  - 无法接收 git push
-- **修复内容**: 在 `CreateApp` 函数中添加 `initGitRepo` 调用
-  - 执行 `git init --bare` 初始化裸仓库
-  - 克隆到工作目录
-  - 确保在设置 Git hooks 之前完成初始化
-- **影响范围**: 所有通过 API/Web 界面创建的应用（自动创建的应用不受影响）
+- **根本原因**: 
+  1. `CreateApp` 函数没有调用 `initGitRepo` 初始化 Git 裸仓库
+  2. 创建的文件所有者是 root 而不是 git 用户
+  3. 符号链接创建失败时只记录警告，不够明显
+  
+- **修复内容** (rc22 + rc23):
+  - ✅ 在 `CreateApp` 函数中添加 `initGitRepo` 调用
+  - ✅ `initGitRepo` 现在会自动设置 git 用户所有权 (`chown -R git:git`)
+  - ✅ 改进符号链接失败的错误日志，明确提示需要 root 权限
+  - ✅ `AddSSHKey` 现在会自动设置 authorized_keys 文件的所有者
+  
+- **完整的初始化流程**:
+  1. 创建目录结构
+  2. 执行 `git init --bare` 初始化裸仓库
+  3. 克隆到工作目录
+  4. **递归设置整个应用目录为 git 用户所有** (新增)
+  5. 创建符号链接 `/home/git/appname.git -> 裸仓库路径`
+  6. 设置 Git hooks
+  
+- **影响范围**: 所有通过 API/Web 界面创建的应用
 - **升级建议**: 
-  - 已创建但无法推送的应用需要删除后重新创建
-  - 或者手动在服务器上执行 `git init --bare /path/to/app/git/repo.git`
-- **文件**: `internal/runner/git_server.go:701-712`
+  - 删除旧应用重新创建（推荐）
+  - 或手动修复：
+    ```bash
+    # 在服务器上执行
+    cd /opt/sslcat/data/runners/git/appname/git
+    git init --bare repo.git
+    chown -R git:git /opt/sslcat/data/runners/git/appname
+    ln -s /opt/sslcat/data/runners/git/appname/git/repo.git /home/git/appname.git
+    chown -h git:git /home/git/appname.git
+    ```
+    
+- **关于 Dokku 风格自动创建**: 
+  - Dokku 通过在 authorized_keys 中使用 `command=` 参数实现
+  - 需要额外的 wrapper 脚本来拦截 git 命令
+  - 计划在未来版本中实现（需要架构调整）
+  
+- **文件**: 
+  - `internal/runner/git_server.go:701-712` - 添加 initGitRepo 调用
+  - `internal/runner/git_server.go:2868-2884` - 设置 git 用户所有权
+  - `internal/runner/git_server.go:2121-2126` - AddSSHKey 设置所有者
 
 ## [1.3.5-rc20] - 2025-10-04
 
