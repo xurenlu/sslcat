@@ -27,11 +27,11 @@ echo ""
 # 定义编译目标
 declare -A targets=(
     ["linux-amd64"]="linux amd64"
-    ["linux-arm64"]="linux arm64"
-    ["linux-arm"]="linux arm"
-    ["darwin-amd64"]="darwin amd64"
-    ["darwin-arm64"]="darwin arm64"
-    ["windows-amd64"]="windows amd64"
+    # ["linux-arm64"]="linux arm64"
+    # ["linux-arm"]="linux arm"
+    # ["darwin-amd64"]="darwin amd64"
+    # ["darwin-arm64"]="darwin arm64"
+    # ["windows-amd64"]="windows amd64"
 )
 
 # 编译所有目标

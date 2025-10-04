@@ -75,15 +75,15 @@ build-all: deps build-frontend
 	@mkdir -p $(BUILD_DIR)
 	@echo "  🐧 构建 Linux AMD64..."
 	@GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64 main.go
-	@echo "  🐧 构建 Linux ARM64..."
-	@GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-arm64 main.go
-	@echo "  🍎 构建 macOS AMD64..."
-	@GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64 main.go
-	@echo "  🍎 构建 macOS ARM64 (M1/M2)..."
-	@GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64 main.go
-	@echo "  🪟 构建 Windows AMD64..."
-	@GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe main.go
-	@echo "✅ 多平台构建完成"
+	# @echo "  🐧 构建 Linux ARM64..."
+	# @GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-arm64 main.go
+	# @echo "  🍎 构建 macOS AMD64..."
+	# @GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64 main.go
+	# @echo "  🍎 构建 macOS ARM64 (M1/M2)..."
+	# @GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64 main.go
+	# @echo "  🪟 构建 Windows AMD64..."
+	# @GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe main.go
+	@echo "✅ 多平台构建完成（仅 Linux AMD64）"
 
 # 构建 Linux 服务器版本（最常用）
 .PHONY: build-linux
@@ -172,6 +172,21 @@ docker:
 	@docker tag sslcat:$(VERSION) sslcat:latest
 	@echo "Docker镜像创建完成"
 
+# 创建CGO Docker镜像（中国优化版）
+.PHONY: docker-cgo
+docker-cgo:
+	@echo "创建CGO Docker镜像（中国优化版）..."
+	@./scripts/build-cgo-docker.sh -t sslcat-cgo:$(VERSION) -c
+	@docker tag sslcat-cgo:$(VERSION) sslcat-cgo:latest
+	@echo "CGO Docker镜像创建完成"
+
+# 构建并提取CGO二进制文件
+.PHONY: docker-cgo-extract
+docker-cgo-extract:
+	@echo "构建CGO Docker镜像并提取二进制文件..."
+	@./scripts/build-cgo-docker.sh -t sslcat-cgo:$(VERSION) -e -o $(BUILD_DIR) -c
+	@echo "CGO二进制文件已提取到 $(BUILD_DIR)/sslcat-linux-amd64-cgo"
+
 # 运行Docker容器
 .PHONY: docker-run
 docker-run:
@@ -224,6 +239,8 @@ help:
 	@echo "  docs         - 生成文档"
 	@echo "  api-docs     - 生成API文档"
 	@echo "  docker       - 创建Docker镜像"
+	@echo "  docker-cgo   - 创建CGO Docker镜像（中国优化版）"
+	@echo "  docker-cgo-extract - 构建CGO镜像并提取二进制文件"
 	@echo "  docker-run   - 运行Docker容器"
 	@echo "  docker-stop  - 停止Docker容器"
 	@echo "  check        - 代码质量检查"
