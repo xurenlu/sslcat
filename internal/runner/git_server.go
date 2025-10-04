@@ -2609,11 +2609,11 @@ func (gs *GitServer) SetupGitHooksForApp(app *GitApp) error {
 	gs.mutex.Lock()
 	actualApp, exists := gs.apps[app.Name]
 	gs.mutex.Unlock()
-	
+
 	if !exists {
 		return fmt.Errorf("应用 %s 不存在", app.Name)
 	}
-	
+
 	return gs.setupGitHooks(actualApp)
 }
 
@@ -2622,27 +2622,39 @@ func (gs *GitServer) setupGitHooks(app *GitApp) error {
 	// 查找实际的裸仓库位置
 	var actualBareRepo string
 	var bareRepoExists bool
-
+	
+	gs.logger.Infof("开始查找应用 %s 的裸仓库", app.Name)
+	gs.logger.Debugf("当前 app.BareRepo: %s", app.BareRepo)
+	
 	// 1. 检查配置的裸仓库路径
-	if info, err := os.Stat(filepath.Join(app.BareRepo, "HEAD")); err == nil && !info.IsDir() {
-		actualBareRepo = app.BareRepo
+	checkPath1 := app.BareRepo
+	headFile1 := filepath.Join(checkPath1, "HEAD")
+	gs.logger.Debugf("检查路径 1: %s (HEAD: %s)", checkPath1, headFile1)
+	if info, err := os.Stat(headFile1); err == nil && !info.IsDir() {
+		actualBareRepo = checkPath1
 		bareRepoExists = true
-		gs.logger.Infof("找到裸仓库: %s", actualBareRepo)
+		gs.logger.Infof("✓ 找到裸仓库: %s", actualBareRepo)
+	} else {
+		gs.logger.Debugf("路径 1 不存在或无效: %v", err)
 	}
-
+	
 	// 2. 检查 /home/git 下的符号链接或直接仓库
 	if !bareRepoExists {
 		homeRepo := filepath.Join("/home/git", app.Name+".git")
-		if info, err := os.Stat(filepath.Join(homeRepo, "HEAD")); err == nil && !info.IsDir() {
+		headFile2 := filepath.Join(homeRepo, "HEAD")
+		gs.logger.Debugf("检查路径 2: %s (HEAD: %s)", homeRepo, headFile2)
+		if info, err := os.Stat(headFile2); err == nil && !info.IsDir() {
 			actualBareRepo = homeRepo
 			bareRepoExists = true
-			gs.logger.Infof("找到裸仓库（在 /home/git）: %s", actualBareRepo)
+			gs.logger.Infof("✓ 找到裸仓库（在 /home/git）: %s", actualBareRepo)
+		} else {
+			gs.logger.Debugf("路径 2 不存在或无效: %v", err)
 		}
 	}
-
+	
 	// 3. 如果都不存在，尝试初始化
 	if !bareRepoExists {
-		gs.logger.Infof("裸仓库不存在，开始初始化")
+		gs.logger.Warnf("裸仓库不存在，开始初始化")
 		if err := gs.initGitRepo(app); err != nil {
 			return fmt.Errorf("初始化 Git 仓库失败: %w", err)
 		}
@@ -2651,12 +2663,16 @@ func (gs *GitServer) setupGitHooks(app *GitApp) error {
 
 	// 更新 app 对象的 BareRepo 为实际路径
 	if actualBareRepo != app.BareRepo {
-		gs.logger.Infof("更新应用 %s 的 BareRepo: %s -> %s", app.Name, app.BareRepo, actualBareRepo)
+		gs.logger.Infof("🔄 更新应用 %s 的 BareRepo: %s -> %s", app.Name, app.BareRepo, actualBareRepo)
 		app.BareRepo = actualBareRepo
 		// 保存更新后的配置
 		if err := gs.saveApps(); err != nil {
 			gs.logger.Warnf("保存应用配置失败: %v", err)
+		} else {
+			gs.logger.Infof("✓ 应用配置已保存")
 		}
+	} else {
+		gs.logger.Infof("BareRepo 路径未变化: %s", app.BareRepo)
 	}
 
 	// 设置 hooks 到实际的裸仓库
