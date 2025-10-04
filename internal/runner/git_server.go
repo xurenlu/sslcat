@@ -2883,9 +2883,9 @@ while read oldrev newrev refname; do
     
     # 获取提交信息
     if [ "$oldrev" != "0000000000000000000000000000000000000000" ]; then
-        COMMIT_MSG=$(git --git-dir="$BARE_REPO" log -1 --pretty=format:"%%s" $newrev)
-        COMMIT_AUTHOR=$(git --git-dir="$BARE_REPO" log -1 --pretty=format:"%%an" $newrev)
-        SHORT_SHA=$(git --git-dir="$BARE_REPO" rev-parse --short $newrev)
+        COMMIT_MSG=$(git -c safe.directory="$BARE_REPO" --git-dir="$BARE_REPO" log -1 --pretty=format:"%%s" $newrev)
+        COMMIT_AUTHOR=$(git -c safe.directory="$BARE_REPO" --git-dir="$BARE_REPO" log -1 --pretty=format:"%%an" $newrev)
+        SHORT_SHA=$(git -c safe.directory="$BARE_REPO" --git-dir="$BARE_REPO" rev-parse --short $newrev)
     else
         COMMIT_MSG="Initial commit"
         COMMIT_AUTHOR="Unknown"
@@ -2918,8 +2918,8 @@ while read oldrev newrev refname; do
     
     if [ ! -d "$REPO_DIR/.git" ]; then
         print_info "Cloning repository to work directory..."
-        echo "[DEBUG] Running: git clone $BARE_REPO $REPO_DIR" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
-        if git clone "$BARE_REPO" "$REPO_DIR" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" 2>&1; then
+        echo "[DEBUG] Running: git -c safe.directory=$BARE_REPO clone $BARE_REPO $REPO_DIR" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+        if git -c safe.directory="$BARE_REPO" -c safe.directory="$REPO_DIR" clone "$BARE_REPO" "$REPO_DIR" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" 2>&1; then
             print_success "Repository cloned"
         else
             print_error "Failed to clone repository"
@@ -2935,11 +2935,11 @@ while read oldrev newrev refname; do
             exit 1
         }
         echo "[DEBUG] PWD after cd: $(pwd)" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
-        echo "[DEBUG] Running: git fetch origin" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
-        if git fetch origin >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" 2>&1; then
+        echo "[DEBUG] Running: git -c safe.directory=$REPO_DIR fetch origin" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+        if git -c safe.directory="$REPO_DIR" fetch origin >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" 2>&1; then
             echo "[DEBUG] git fetch succeeded" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
-            echo "[DEBUG] Running: git reset --hard $newrev" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
-            if git reset --hard $newrev >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" 2>&1; then
+            echo "[DEBUG] Running: git -c safe.directory=$REPO_DIR reset --hard $newrev" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+            if git -c safe.directory="$REPO_DIR" reset --hard $newrev >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log" 2>&1; then
                 print_success "Repository updated"
             else
                 print_error "Failed to reset to $newrev"
