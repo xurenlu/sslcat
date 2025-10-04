@@ -423,12 +423,11 @@ func NewGitServer(cfg *config.Config, translator *i18n.Translator) *GitServer {
 		AutoDomain:      true,
 	}
 
-	// SSH 配置 - 使用数据目录而不是系统目录
+	// SSH 配置 - 使用标准的用户 home 目录
 	sshUser := "git"
-	// 使用data/keys目录存储SSH密钥，避免权限问题
-	dataDir := filepath.Dir(cfg.Runners.Git.ReposDir)
-	sshKeysDir := filepath.Join(dataDir, "keys", "ssh")
-	sshHomeDir := sshKeysDir // 开发环境下使用相同目录
+	// 使用标准的 /home/git/.ssh 目录，符合常规实践
+	sshHomeDir := "/home/git"
+	sshKeysDir := filepath.Join(sshHomeDir, ".ssh")
 	authorizedKeysFile := filepath.Join(sshKeysDir, "authorized_keys")
 	sshConfigDir := "/etc/ssh/sshd_config.d"
 
@@ -457,6 +456,7 @@ func NewGitServer(cfg *config.Config, translator *i18n.Translator) *GitServer {
 	dockerRegistry := NewDockerRegistry(dockerRegistryConfig)
 
 	// 初始化部署数据库
+	dataDir := filepath.Dir(cfg.Runners.Git.ReposDir)
 	deployDB, err := NewDeployDatabase(dataDir)
 	if err != nil {
 		logrus.Errorf("初始化部署数据库失败: %v", err)
@@ -1893,29 +1893,21 @@ func (gs *GitServer) setupSSHUser() error {
 	uid, _ := strconv.Atoi(gitUser.Uid)
 	gid, _ := strconv.Atoi(gitUser.Gid)
 
-	// 创建 SSH 目录，使用 755 权限允许 git 用户访问
-	// 注意：父目录也需要可执行权限
-	if err := os.MkdirAll(gs.sshKeysDir, 0755); err != nil {
-		return fmt.Errorf("创建 SSH 目录失败: %w", err)
+	// 创建标准的 .ssh 目录，使用 700 权限（SSH 要求）
+	if err := os.MkdirAll(gs.sshKeysDir, 0700); err != nil {
+		return fmt.Errorf("创建 .ssh 目录失败: %w", err)
 	}
 
 	// 设置目录所有者为 git 用户
 	if err := os.Chown(gs.sshKeysDir, uid, gid); err != nil {
-		gs.logger.Warnf("设置 SSH 目录权限失败: %v", err)
+		gs.logger.Warnf("设置 .ssh 目录权限失败: %v", err)
 	}
 
-	// 确保父目录也有正确的权限和所有者（满足 SSH StrictModes）
-	// SSH StrictModes 要求目录链的所有者必须是目标用户或 root
-	
-	// keys 目录：git 用户拥有
-	keysDir := filepath.Dir(gs.sshKeysDir)
-	os.MkdirAll(keysDir, 0755)
-	os.Chown(keysDir, uid, gid)
-	
-	// runners 目录：root 拥有（更安全，满足 SSH 要求）
-	runnersDir := filepath.Dir(keysDir)
-	os.MkdirAll(runnersDir, 0755)
-	os.Chown(runnersDir, 0, 0) // root:root
+	// 确保 home 目录权限正确（SSH StrictModes 要求）
+	// home 目录不能被 group/others 写入
+	if err := os.Chmod(gs.sshHomeDir, 0755); err != nil {
+		gs.logger.Warnf("设置 home 目录权限失败: %v", err)
+	}
 
 	// 创建或确保 authorized_keys 文件存在
 	if _, err := os.Stat(gs.authorizedKeysFile); os.IsNotExist(err) {
@@ -1933,10 +1925,10 @@ func (gs *GitServer) setupSSHUser() error {
 		gs.logger.Warnf("设置 authorized_keys 文件权限失败: %v", err)
 	}
 
-	// 生成 sshd 配置，指定自定义的 authorized_keys 路径
-	// 将相对路径转换为绝对路径（sshd 需要绝对路径）
-	absAuthorizedKeysFile, _ := filepath.Abs(gs.authorizedKeysFile)
-	sshdConfig := fmt.Sprintf("Match User %s\n  AuthorizedKeysFile %s\n  ForceCommand git-shell -c \"$SSH_ORIGINAL_COMMAND\"\n  AllowTcpForwarding no\n  X11Forwarding no\n", gs.sshUser, absAuthorizedKeysFile)
+	// 生成 sshd 配置
+	// 使用标准路径 /home/git/.ssh/authorized_keys，不需要显式指定 AuthorizedKeysFile
+	// SSH 会自动查找这个位置
+	sshdConfig := fmt.Sprintf("Match User %s\n  ForceCommand git-shell -c \"$SSH_ORIGINAL_COMMAND\"\n  AllowTcpForwarding no\n  X11Forwarding no\n", gs.sshUser)
 	configPath := filepath.Join(gs.sshConfigDir, "sslcat_git.conf")
 	if err := os.WriteFile(configPath, []byte(sshdConfig), 0644); err != nil {
 		gs.logger.Warnf("创建 sshd 配置文件失败 (%s): %v", configPath, err)
