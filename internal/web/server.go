@@ -673,7 +673,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if net.ParseIP(hostOnly) != nil {
 		// 检查是否为 localhost/127.0.0.1，这些不应该重定向
 		isLocalhost := hostOnly == "127.0.0.1" || hostOnly == "::1" || hostOnly == "localhost"
-		
+
 		// 仅当访问管理面板路径时才重定向（但排除 localhost）
 		if !isLocalhost && s.leRedirectHost != "" && strings.HasPrefix(r.URL.Path, s.config.AdminPrefix) {
 			target := "https://" + s.leRedirectHost + r.RequestURI

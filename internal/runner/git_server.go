@@ -3220,7 +3220,18 @@ func (gs *GitServer) initGitRepo(app *GitApp) error {
 func (gs *GitServer) createGitSymlink(app *GitApp) error {
 	// 用 root 权限强制创建符号链接
 	symlinkPath := filepath.Join(gs.sshHomeDir, app.Name+".git")
+	
+	// 确保目标路径是绝对路径
 	targetPath := app.BareRepo
+	if !filepath.IsAbs(targetPath) {
+		// 相对路径，转换为绝对路径（相对于工作目录）
+		absPath, err := filepath.Abs(targetPath)
+		if err != nil {
+			return fmt.Errorf("转换为绝对路径失败: %w", err)
+		}
+		targetPath = absPath
+		gs.logger.Infof("符号链接目标路径转换为绝对路径: %s", targetPath)
+	}
 
 	// 检查符号链接是否已存在
 	if _, err := os.Lstat(symlinkPath); err == nil {
