@@ -1,10 +1,14 @@
 # SSLcat - SSL Proxy Server
 
+[![Version](https://img.shields.io/badge/version-1.3.9-blue.svg)](https://github.com/xurenlu/sslcat/releases/tag/v1.3.9)
+[![Go Version](https://img.shields.io/badge/go-1.25-00ADD8.svg)](https://golang.org/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 ## ⏱️ Quick Start with SSLcat in 1 Minute
 
 ```bash
 # 1) macOS local quick test (or download darwin package manually)
-curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.3.3/sslcat_v1.3.3_darwin-arm64.tar.gz -o sslcat.tgz
+curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.3.9/sslcat_v1.3.9_darwin-arm64.tar.gz -o sslcat.tgz
 tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
 sslcat --config sslcat.conf --port 8080
 # Browser access: http://localhost:8080/sslcat-panel/

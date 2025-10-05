@@ -1,3 +1,58 @@
+## [1.3.9] - 2025-10-05
+
+### 🚀 主要更新
+
+#### Docker CGO 构建优化
+- **修复**: 更新 Dockerfile.cgo 使用正确的 Go 1.25 版本
+- **优化**: 更新 Docker 镜像源配置（阿里云镜像源失效）
+  - 新增可用镜像源：docker.1panel.live, hub.rat.dev, docker.chenby.cn
+- **文档**: 更新 DOCKER_CGO_BUILD.md 反映最新配置
+
+#### s2.shifen.de 服务器部署支持
+- **新增**: deploy-to-s2.sh 部署脚本
+- **功能**: 完整的 systemd 服务配置
+- **优化**: Docker 自动安装和配置
+
+#### Git 部署日志实时显示
+- **修复**: Git Hook 环境变量设置（HOME, USER, GIT_DIR）
+- **优化**: 实现完整的流式日志输出到 git push 终端
+- **改进**: 部署状态正确检测（成功/失败/未知）
+  - 成功：绿色 "Deployment Complete"
+  - 失败：红色 "Deployment Failed" + exit 1
+  - 未知：黄色 "Deployment Status Unknown"
+- **修复**: 部署日志文件权限，git 用户可读
+- **优化**: 增加日志文件等待时间（最多 10 秒）
+
+#### 自动 SSL 证书申请
+- **新增**: SSLManagerInterface 接口
+- **实现**: SetSSLManager 方法注入 SSL Manager
+- **功能**: 应用创建时自动异步申请 SSL 证书
+- **优化**: Let's Encrypt 邮箱配置支持
+
+#### 前端修复
+- **修复**: 设置页面无法正确读取 SSL 邮箱配置（data.config → data.data）
+- **修复**: 删除应用对话框翻译缺失问题
+- **优化**: 添加 OPTIONS 预检请求处理，减少无用日志
+
+#### Git 仓库权限修复
+- **修复**: Git 仓库 objects 目录权限不足
+- **配置**: core.sharedRepository = group
+- **权限**: objects 目录添加组写入权限（775）
+
+### 🐛 Bug 修复
+
+- 修复 Git push 时 "unable to create temporary object directory" 错误
+- 修复前端 API 响应字段访问错误
+- 修复 DeployLogger 日志文件权限问题
+- 修复 Git Hook 未重新生成的问题
+
+### 📝 技术改进
+
+- DeployLogger 创建时自动设置 git 用户权限
+- Git hook 增加 DEPLOY_STATUS 变量跟踪部署结果
+- SSL Manager 通过依赖注入集成到 Git Server
+- 优化 Docker 构建缓存利用率
+
 ## [1.3.5-rc27] - 2025-10-04
 
 ### 🔧 Configuration & Dependencies
