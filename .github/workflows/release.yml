@@ -25,26 +25,19 @@ jobs:
             arch_tag: linux-amd64
             archive: tar.gz
             ext: ""
-          # - goos: darwin
-          #   goarch: amd64
-          #   arch_tag: darwin-amd64
-          #   archive: tar.gz
-          #   ext: ""
-          # - goos: darwin
-          #   goarch: arm64
-          #   arch_tag: darwin-arm64
-          #   archive: tar.gz
-          #   ext: ""
-          # - goos: windows
-          #   goarch: amd64
-          #   arch_tag: windows-amd64
-          #   archive: zip
-          #   ext: .exe
-          # - goos: windows
-          #   goarch: arm64
-          #   arch_tag: windows-arm64
-          #   archive: zip
-          #   ext: .exe
+            cgo_enabled: 1
+          - goos: darwin
+            goarch: amd64
+            arch_tag: darwin-amd64
+            archive: tar.gz
+            ext: ""
+            cgo_enabled: 0
+          - goos: darwin
+            goarch: arm64
+            arch_tag: darwin-arm64
+            archive: tar.gz
+            ext: ""
+            cgo_enabled: 0
 
     steps:
       - name: Checkout
@@ -74,23 +67,27 @@ jobs:
           mkdir -p ../internal/assets/frontend
           cp -r dist/* ../internal/assets/frontend/
 
-      - name: Install CGO dependencies
+      - name: Install CGO dependencies (Linux only)
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc libc6-dev
-          # 仅需要 Linux 构建，简化依赖安装
+          sudo apt-get install -y gcc libc6-dev sqlite3 libsqlite3-dev
+          # Linux 构建需要 CGO 支持 SQLite
+          # macOS 构建使用纯 Go 实现，不需要 CGO
 
       - name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          # Linux 构建启用 CGO
-          CGO_ENABLED: 1
+          CGO_ENABLED: ${{ matrix.cgo_enabled }}
         run: |
           mkdir -p build artifacts
           VERSION="${GITHUB_REF_NAME}"
           if [ -z "$VERSION" ]; then VERSION="dev"; fi
-          echo "Building $BIN_NAME for $GOOS/$GOARCH (version=$VERSION) with CGO SQLite"
+          if [ "${{ matrix.cgo_enabled }}" = "1" ]; then
+            echo "Building $BIN_NAME for $GOOS/$GOARCH (version=$VERSION) with CGO enabled (SQLite support)"
+          else
+            echo "Building $BIN_NAME for $GOOS/$GOARCH (version=$VERSION) without CGO"
+          fi
           go build -trimpath -ldflags "-s -w -X main.version=$VERSION -X main.build=$GITHUB_RUN_ID" -o build/${BIN_NAME}${{ matrix.ext }} .
 
       - name: Package
