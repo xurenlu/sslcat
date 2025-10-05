@@ -1179,6 +1179,34 @@ func (m *Manager) HasValidSSLCertificates() bool {
 	return false
 }
 
+// HasValidCertificate 检查指定域名是否有有效的非自签名证书
+func (m *Manager) HasValidCertificate(domain string) bool {
+	// 先尝试从缓存或磁盘加载证书
+	cert, err := m.GetCertificate(domain)
+	if err != nil || cert == nil || len(cert.Certificate) == 0 {
+		return false
+	}
+
+	// 解析证书，检查是否为自签名
+	x509Cert, err := x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		return false
+	}
+
+	// 检查是否自签名
+	isSelfSigned := x509Cert.Issuer.String() == x509Cert.Subject.String()
+	if isSelfSigned {
+		return false
+	}
+
+	// 检查是否过期
+	if time.Now().After(x509Cert.NotAfter) {
+		return false
+	}
+
+	return true
+}
+
 // GetFirstValidSSLDomain 获取第一个有效的非自签名SSL证书域名
 func (m *Manager) GetFirstValidSSLDomain() string {
 	certs := m.GetCertificateList()

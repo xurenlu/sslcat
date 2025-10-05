@@ -171,8 +171,23 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	}
 	server.userManager = userManager
 
-	// 初始化会话管理器
-	server.sessionManager = NewSessionManager(server.log)
+	// 初始化会话管理器（使用配置的存储类型）
+	sessionStorage := cfg.Server.SessionStorage
+	if sessionStorage == "" {
+		sessionStorage = "file" // 默认使用文件存储
+	}
+	dataDir := cfg.Server.DataDir
+	if dataDir == "" {
+		dataDir = "./data" // 默认数据目录
+	}
+
+	factory := NewSessionManagerFactory()
+	sessionManager, err := factory.CreateSessionManager(server.log, sessionStorage, dataDir)
+	if err != nil {
+		logrus.Fatalf("创建会话管理器失败: %v", err)
+	}
+	server.sessionManager = sessionManager
+	server.log.Infof("会话管理器已初始化，存储类型: %s，数据目录: %s", sessionStorage, dataDir)
 
 	// 设置通知集成器
 	server.notificationIntegrator = notificationIntegrator

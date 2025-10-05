@@ -180,11 +180,18 @@ docker-cgo:
 	@docker tag sslcat-cgo:$(VERSION) sslcat-cgo:latest
 	@echo "CGO Docker镜像创建完成"
 
-# 构建并提取CGO二进制文件
+# 构建并提取CGO二进制文件（清理缓存，首次构建或完全重建时使用）
 .PHONY: docker-cgo-extract
 docker-cgo-extract:
 	@echo "构建CGO Docker镜像并提取二进制文件..."
 	@./scripts/build-cgo-docker.sh -t sslcat-cgo:$(VERSION) -e -o $(BUILD_DIR) -c
+	@echo "CGO二进制文件已提取到 $(BUILD_DIR)/sslcat-linux-amd64-cgo"
+
+# 快速构建CGO二进制文件（利用缓存，日常开发使用）
+.PHONY: docker-cgo-fast
+docker-cgo-fast:
+	@echo "快速构建CGO Docker镜像并提取二进制文件（利用缓存）..."
+	@./scripts/build-cgo-docker.sh -t sslcat-cgo:$(VERSION) -e -o $(BUILD_DIR)
 	@echo "CGO二进制文件已提取到 $(BUILD_DIR)/sslcat-linux-amd64-cgo"
 
 # 运行Docker容器

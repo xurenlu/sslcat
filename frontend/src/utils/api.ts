@@ -2,7 +2,7 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { ApiResponse } from '../types'
 
 // 常量定义
-const FALLBACK_ADMIN_PREFIX = '/sslcat-panel2' // 仅作为最后的备用选项
+const FALLBACK_ADMIN_PREFIX = '/sslcat-panel' // 仅作为最后的备用选项
 const ADMIN_PREFIX_STORAGE_KEY = 'adminPrefix'
 const API_TIMEOUT = 10000
 

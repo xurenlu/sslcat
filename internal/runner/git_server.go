@@ -63,6 +63,20 @@ type GitServer struct {
 
 	// 通知管理器
 	notificationManager *notification.NotificationManager
+
+	// SSL Manager（用于自动申请证书）
+	sslManager SSLManagerInterface
+}
+
+// SSLManagerInterface SSL Manager 接口
+type SSLManagerInterface interface {
+	EnsureDomainCert(domain string) error
+}
+
+// SetSSLManager 设置 SSL Manager
+func (gs *GitServer) SetSSLManager(sslManager SSLManagerInterface) {
+	gs.sslManager = sslManager
+	gs.logger.Infof("SSL Manager 已注入到 Git Server")
 }
 
 // GitServerConfig Git 服务器配置
@@ -534,6 +548,11 @@ func (gs *GitServer) Start() error {
 		return nil
 	}
 
+	// 尝试从文件加载服务器配置（如果存在）
+	if err := gs.loadServerConfigFromFile(); err != nil {
+		gs.logger.Warnf("加载服务器配置失败: %v，将使用默认配置", err)
+	}
+
 	// 检查 Git 是否可用
 	if err := gs.checkGit(); err != nil {
 		return fmt.Errorf(gs.translator.T("git_server.unavailable")+": %w", err)
@@ -757,6 +776,24 @@ func (gs *GitServer) CreateApp(appName string, autoSSL bool) (*GitApp, error) {
 		return nil, fmt.Errorf("保存应用信息失败: %w", err)
 	}
 	gs.logger.Infof("  ✓ 应用信息已保存")
+
+	// 如果启用了 autoSSL，自动申请 SSL 证书
+	if autoSSL && domain != "" {
+		gs.logger.Infof("  🔒 应用已配置自动 SSL: %s", domain)
+		if gs.sslManager != nil {
+			gs.logger.Infof("  📜 自动申请 SSL 证书...")
+			go func() {
+				// 异步申请，不阻塞应用创建
+				if err := gs.sslManager.EnsureDomainCert(domain); err != nil {
+					gs.logger.Warnf("自动申请 SSL 证书失败 (%s): %v", domain, err)
+				} else {
+					gs.logger.Infof("✓ SSL 证书申请成功: %s", domain)
+				}
+			}()
+		} else {
+			gs.logger.Warnf("  ⚠️  SSL Manager 未注入，证书将在首次 HTTPS 访问时自动申请")
+		}
+	}
 
 	gs.logger.Infof("✅ 应用 %s 创建完成！域名: %s, 端口: %d, Git: %s",
 		appName, domain, port, gitURL)
@@ -1927,9 +1964,67 @@ func (gs *GitServer) saveApps() error {
 	return nil
 }
 
+// loadServerConfigFromFile 从文件加载服务器配置
+func (gs *GitServer) loadServerConfigFromFile() error {
+	// 确保使用绝对路径
+	reposDir := gs.config.Runners.Git.ReposDir
+	if !filepath.IsAbs(reposDir) {
+		absPath, err := filepath.Abs(reposDir)
+		if err != nil {
+			return fmt.Errorf("获取绝对路径失败: %w", err)
+		}
+		reposDir = absPath
+	}
+
+	configFile := filepath.Join(reposDir, "server_config.json")
+
+	// 检查文件是否存在
+	if _, err := os.Stat(configFile); os.IsNotExist(err) {
+		return fmt.Errorf("配置文件不存在: %s", configFile)
+	}
+
+	// 读取配置文件
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		return fmt.Errorf("读取配置文件失败: %w", err)
+	}
+
+	// 解析配置
+	var loadedConfig GitServerConfig
+	if err := json.Unmarshal(data, &loadedConfig); err != nil {
+		return fmt.Errorf("解析配置文件失败: %w", err)
+	}
+
+	// 更新服务器配置
+	gs.serverConfig = &loadedConfig
+	gs.logger.Infof("服务器配置已从文件加载: %s", configFile)
+	gs.logger.Infof("  - 启用状态: %v", loadedConfig.Enabled)
+	gs.logger.Infof("  - 域名后缀: %s", loadedConfig.DomainSuffix)
+	gs.logger.Infof("  - 端口范围: %v", loadedConfig.PortRange)
+
+	return nil
+}
+
 // saveServerConfig 保存服务器配置
 func (gs *GitServer) saveServerConfig() error {
-	configFile := filepath.Join(gs.config.Runners.Git.ReposDir, "server_config.json")
+	// 确保使用绝对路径
+	reposDir := gs.config.Runners.Git.ReposDir
+	if !filepath.IsAbs(reposDir) {
+		// 如果是相对路径，基于工作目录转换为绝对路径
+		absPath, err := filepath.Abs(reposDir)
+		if err != nil {
+			return fmt.Errorf("获取绝对路径失败: %w", err)
+		}
+		reposDir = absPath
+		gs.logger.Infof("将 ReposDir 转换为绝对路径: %s", reposDir)
+	}
+
+	// 确保目录存在
+	if err := os.MkdirAll(reposDir, 0755); err != nil {
+		return fmt.Errorf("创建 ReposDir 目录失败: %w", err)
+	}
+
+	configFile := filepath.Join(reposDir, "server_config.json")
 	data, err := json.MarshalIndent(gs.serverConfig, "", "  ")
 	if err != nil {
 		return fmt.Errorf("序列化服务器配置失败: %w", err)
@@ -1939,6 +2034,7 @@ func (gs *GitServer) saveServerConfig() error {
 		return fmt.Errorf("写入服务器配置失败: %w", err)
 	}
 
+	gs.logger.Infof("服务器配置已保存到: %s", configFile)
 	return nil
 }
 
@@ -1948,7 +2044,23 @@ func (gs *GitServer) saveDockerRegistryConfig() error {
 		return fmt.Errorf("Docker Registry not initialized")
 	}
 
-	configFile := filepath.Join(gs.config.Runners.Git.ReposDir, "docker_registry_config.json")
+	// 确保使用绝对路径
+	reposDir := gs.config.Runners.Git.ReposDir
+	if !filepath.IsAbs(reposDir) {
+		// 如果是相对路径，基于工作目录转换为绝对路径
+		absPath, err := filepath.Abs(reposDir)
+		if err != nil {
+			return fmt.Errorf("获取绝对路径失败: %w", err)
+		}
+		reposDir = absPath
+	}
+
+	// 确保目录存在
+	if err := os.MkdirAll(reposDir, 0755); err != nil {
+		return fmt.Errorf("创建 ReposDir 目录失败: %w", err)
+	}
+
+	configFile := filepath.Join(reposDir, "docker_registry_config.json")
 
 	// 获取当前配置
 	config := gs.dockerRegistry.GetConfig()
@@ -2165,6 +2277,10 @@ func (gs *GitServer) createGitUser() error {
 	cmd := exec.Command("id", "-u", gs.sshUser)
 	if err := cmd.Run(); err == nil {
 		gs.logger.Infof("git 用户已存在")
+		// 用户已存在，确保 home 目录和 .ssh 目录存在
+		if err := gs.ensureGitUserDirectories(); err != nil {
+			gs.logger.Warnf("确保 git 用户目录存在失败: %v", err)
+		}
 		return nil
 	}
 
@@ -2177,18 +2293,102 @@ func (gs *GitServer) createGitUser() error {
 		gitShellPath = path
 	}
 
-	// 创建用户 - 需要 root 权限，shell 设置为 git-shell
-	cmd = exec.Command("useradd", "-r", "-s", gitShellPath, "-m", "-d", homeDir, gs.sshUser)
-	output, err := cmd.CombinedOutput()
+	// 尝试使用 sudo 创建用户
+	var cmd2 *exec.Cmd
+	if os.Getuid() == 0 {
+		// 当前是 root 用户，直接创建
+		cmd2 = exec.Command("useradd", "-r", "-s", gitShellPath, "-m", "-d", homeDir, gs.sshUser)
+	} else {
+		// 非 root 用户，尝试使用 sudo
+		cmd2 = exec.Command("sudo", "useradd", "-r", "-s", gitShellPath, "-m", "-d", homeDir, gs.sshUser)
+	}
+
+	output, err := cmd2.CombinedOutput()
 	if err != nil {
 		// 检查是否是权限问题
 		if strings.Contains(string(output), "Permission denied") || strings.Contains(err.Error(), "permission") {
 			return fmt.Errorf("权限不足（需要 root/sudo 权限）: %w", err)
 		}
+		// 可能是用户已存在的错误，不是致命问题
+		if strings.Contains(string(output), "already exists") {
+			gs.logger.Infof("git 用户已存在（通过 useradd 检测）")
+			return gs.ensureGitUserDirectories()
+		}
 		return fmt.Errorf("创建用户失败: %s, %w", string(output), err)
 	}
 
 	gs.logger.Infof("git 用户创建成功，home 目录: %s", homeDir)
+
+	// 确保目录和权限正确
+	return gs.ensureGitUserDirectories()
+}
+
+// ensureGitUserDirectories 确保 git 用户的目录结构存在
+func (gs *GitServer) ensureGitUserDirectories() error {
+	// 获取 git 用户信息
+	gitUser, err := user.Lookup(gs.sshUser)
+	if err != nil {
+		return fmt.Errorf("查找 git 用户失败: %w", err)
+	}
+
+	homeDir := gitUser.HomeDir
+	sshDir := filepath.Join(homeDir, ".ssh")
+	authorizedKeysFile := filepath.Join(sshDir, "authorized_keys")
+
+	uid, _ := strconv.Atoi(gitUser.Uid)
+	gid, _ := strconv.Atoi(gitUser.Gid)
+
+	// 使用 sudo 确保目录存在
+	var mkdirCmd *exec.Cmd
+	if os.Getuid() == 0 {
+		mkdirCmd = exec.Command("mkdir", "-p", sshDir)
+	} else {
+		mkdirCmd = exec.Command("sudo", "mkdir", "-p", sshDir)
+	}
+
+	if output, err := mkdirCmd.CombinedOutput(); err != nil {
+		gs.logger.Warnf("创建 .ssh 目录失败: %v, %s", err, output)
+		// 不返回错误，继续尝试
+	}
+
+	// 使用 sudo 设置权限
+	var chmodCmd, chownCmd *exec.Cmd
+	if os.Getuid() == 0 {
+		chmodCmd = exec.Command("chmod", "700", sshDir)
+		chownCmd = exec.Command("chown", fmt.Sprintf("%d:%d", uid, gid), sshDir)
+	} else {
+		chmodCmd = exec.Command("sudo", "chmod", "700", sshDir)
+		chownCmd = exec.Command("sudo", "chown", fmt.Sprintf("%d:%d", uid, gid), sshDir)
+	}
+
+	chmodCmd.Run()
+	chownCmd.Run()
+
+	// 创建 authorized_keys 文件
+	if _, err := os.Stat(authorizedKeysFile); os.IsNotExist(err) {
+		var touchCmd *exec.Cmd
+		if os.Getuid() == 0 {
+			touchCmd = exec.Command("touch", authorizedKeysFile)
+		} else {
+			touchCmd = exec.Command("sudo", "touch", authorizedKeysFile)
+		}
+		touchCmd.Run()
+	}
+
+	// 设置 authorized_keys 权限
+	var chmodKeyCmd, chownKeyCmd *exec.Cmd
+	if os.Getuid() == 0 {
+		chmodKeyCmd = exec.Command("chmod", "600", authorizedKeysFile)
+		chownKeyCmd = exec.Command("chown", fmt.Sprintf("%d:%d", uid, gid), authorizedKeysFile)
+	} else {
+		chmodKeyCmd = exec.Command("sudo", "chmod", "600", authorizedKeysFile)
+		chownKeyCmd = exec.Command("sudo", "chown", fmt.Sprintf("%d:%d", uid, gid), authorizedKeysFile)
+	}
+
+	chmodKeyCmd.Run()
+	chownKeyCmd.Run()
+
+	gs.logger.Infof("git 用户目录结构已确保: %s", sshDir)
 	return nil
 }
 
@@ -2266,44 +2466,24 @@ func (gs *GitServer) AddSSHKey(keyName, publicKey string) error {
 	keyEntry := fmt.Sprintf("# %s\ncommand=\"%s %s\",%s %s\n",
 		keyName, wrapperScript, keyName, restrictions, publicKey)
 
-	// 在打开文件前，再次确保文件存在
+	// 确保 authorized_keys 文件存在
 	if err := gs.ensureAuthorizedKeysFile(); err != nil {
 		return fmt.Errorf("确保 authorized_keys 文件存在失败: %w", err)
 	}
 
-	// 检查文件权限和所有者
-	if info, err := os.Stat(gs.authorizedKeysFile); err != nil {
-		return fmt.Errorf("检查 authorized_keys 文件状态失败: %w", err)
-	} else {
-		gs.logger.Debugf("authorized_keys 文件信息: 权限=%s, 所有者=%d:%d",
-			info.Mode().String(), gs.uid, gs.gid)
-	}
-
-	file, err := os.OpenFile(gs.authorizedKeysFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	// 使用 sudo 读取现有内容
+	existingContent, err := gs.sudoReadFile(gs.authorizedKeysFile)
 	if err != nil {
-		// 提供更详细的错误信息
-		gs.logger.Errorf("打开 authorized_keys 文件失败: %v", err)
-		gs.logger.Errorf("文件路径: %s", gs.authorizedKeysFile)
-		gs.logger.Errorf("当前用户: %d:%d", gs.uid, gs.gid)
-
-		// 检查父目录权限
-		if parentInfo, parentErr := os.Stat(filepath.Dir(gs.authorizedKeysFile)); parentErr == nil {
-			gs.logger.Errorf("父目录权限: %s", parentInfo.Mode().String())
-		}
-
-		return fmt.Errorf("打开 authorized_keys 文件失败: %w", err)
+		gs.logger.Warnf("读取 authorized_keys 文件失败: %v，将创建新文件", err)
+		existingContent = []byte{}
 	}
-	defer file.Close()
 
-	if _, err := file.WriteString(keyEntry); err != nil {
+	// 追加新密钥
+	newContent := append(existingContent, []byte(keyEntry)...)
+
+	// 使用 sudo 写入文件
+	if err := gs.sudoWriteFile(gs.authorizedKeysFile, newContent, 0600); err != nil {
 		return fmt.Errorf("写入 authorized_keys 文件失败: %w", err)
-	}
-
-	// 设置正确的所有者和权限
-	if gs.uid > 0 && gs.gid > 0 {
-		if err := os.Chown(gs.authorizedKeysFile, gs.uid, gs.gid); err != nil {
-			gs.logger.Warnf("设置 authorized_keys 文件所有者失败: %v", err)
-		}
 	}
 
 	gs.logger.Infof("SSH 密钥已添加（Dokku 风格）: %s -> %s", keyName, gs.authorizedKeysFile)
@@ -2313,16 +2493,11 @@ func (gs *GitServer) AddSSHKey(keyName, publicKey string) error {
 
 // RemoveSSHKey 删除 SSH 密钥
 func (gs *GitServer) RemoveSSHKey(fingerprint string) error {
-	// 检查文件是否存在
-	if _, err := os.Stat(gs.authorizedKeysFile); os.IsNotExist(err) {
-		gs.logger.Warn("authorized_keys 文件不存在，无需删除密钥")
-		return nil
-	}
-
-	// 读取 authorized_keys 文件
-	content, err := os.ReadFile(gs.authorizedKeysFile)
+	// 使用 sudo 读取 authorized_keys 文件
+	content, err := gs.sudoReadFile(gs.authorizedKeysFile)
 	if err != nil {
-		return fmt.Errorf("读取 authorized_keys 文件失败: %w", err)
+		gs.logger.Warnf("读取 authorized_keys 文件失败: %v，可能文件不存在", err)
+		return nil
 	}
 
 	// 解析并过滤密钥
@@ -2335,9 +2510,9 @@ func (gs *GitServer) RemoveSSHKey(fingerprint string) error {
 		}
 	}
 
-	// 写回文件
-	newContent := strings.Join(newLines, "\n")
-	if err := os.WriteFile(gs.authorizedKeysFile, []byte(newContent), 0600); err != nil {
+	// 使用 sudo 写回文件
+	newContent := strings.Join(newLines, "\n") + "\n"
+	if err := gs.sudoWriteFile(gs.authorizedKeysFile, []byte(newContent), 0600); err != nil {
 		return fmt.Errorf("更新 authorized_keys 文件失败: %w", err)
 	}
 
@@ -2347,15 +2522,12 @@ func (gs *GitServer) RemoveSSHKey(fingerprint string) error {
 
 // ListSSHKeys 列出所有 SSH 密钥
 func (gs *GitServer) ListSSHKeys() ([]SSHKey, error) {
-	// 检查文件是否存在，如果不存在则返回空列表
-	if _, err := os.Stat(gs.authorizedKeysFile); os.IsNotExist(err) {
-		gs.logger.Warn("authorized_keys 文件不存在，返回空列表")
-		return []SSHKey{}, nil
-	}
-
-	content, err := os.ReadFile(gs.authorizedKeysFile)
+	// 使用 sudo 读取文件
+	content, err := gs.sudoReadFile(gs.authorizedKeysFile)
 	if err != nil {
-		return nil, fmt.Errorf("读取 authorized_keys 文件失败: %w", err)
+		// 文件不存在或无法读取，返回空列表
+		gs.logger.Warnf("读取 authorized_keys 文件失败: %v，返回空列表", err)
+		return []SSHKey{}, nil
 	}
 
 	var keys []SSHKey
@@ -3019,7 +3191,18 @@ while read oldrev newrev refname; do
     # 简单的日志监控 - 读取最新的部署日志
     DEPLOY_LOG="$LOGS_DIR/deploy-$(date '+%%Y-%%m-%%d').log"
     
-    # 等待几秒让部署开始
+    # 等待日志文件创建并开始写入（最多等待10秒）
+    WAIT_COUNT=0
+    while [ ! -f "$DEPLOY_LOG" ] && [ $WAIT_COUNT -lt 10 ]; do
+        sleep 1
+        WAIT_COUNT=$((WAIT_COUNT + 1))
+    done
+    
+    if [ ! -f "$DEPLOY_LOG" ]; then
+        print_warning "Deployment log file not created yet"
+    fi
+    
+    # 再等待 2 秒让日志开始写入
     sleep 2
     
     # 跟踪日志文件的最后位置
@@ -3037,6 +3220,7 @@ while read oldrev newrev refname; do
         TOTAL_ELAPSED=0
         IDLE_ELAPSED=0
         DEPLOY_DONE=false
+        DEPLOY_STATUS="unknown"  # unknown | success | failed
         
         while [ $TOTAL_ELAPSED -lt $MAX_TOTAL_TIME ] && [ "$DEPLOY_DONE" = "false" ]; do
             if [ -f "$DEPLOY_LOG" ]; then
@@ -3074,20 +3258,22 @@ while read oldrev newrev refname; do
                                         echo -e "       [$SOURCE] $MESSAGE"
                                         ;;
                                 esac
-                                
-                                # 检查是否部署完成
-                                if echo "$MESSAGE" | grep -q "部署成功\|部署完成\|deployment.*success\|deployment.*complete"; then
-                                    DEPLOY_DONE=true
-                                fi
-                                if echo "$MESSAGE" | grep -q "部署失败\|deployment.*failed"; then
-                                    DEPLOY_DONE=true
-                                fi
                             else
                                 # 纯文本日志
                                 echo "       $line"
                             fi
                         fi
                     done
+                    
+                    # 检查部署状态（在子shell外检查）
+                    if echo "$NEW_LOGS" | grep -q "部署成功\|部署完成\|deployment.*success\|deployment.*complete"; then
+                        DEPLOY_DONE=true
+                        DEPLOY_STATUS="success"
+                    fi
+                    if echo "$NEW_LOGS" | grep -q "部署失败\|deployment.*failed"; then
+                        DEPLOY_DONE=true
+                        DEPLOY_STATUS="failed"
+                    fi
                     
                     START_POS=$CURRENT_POS
                 else
@@ -3133,24 +3319,60 @@ while read oldrev newrev refname; do
     
     # 显示部署结果
     echo ""
-    echo -e "${COLOR_BOLD}${COLOR_GREEN}╔═══════════════════════════════════════════════════════════════╗${COLOR_RESET}"
-    echo -e "${COLOR_BOLD}${COLOR_GREEN}║${COLOR_RESET}                    ${COLOR_BOLD}Deployment Complete${COLOR_RESET}                      ${COLOR_BOLD}${COLOR_GREEN}║${COLOR_RESET}"
-    echo -e "${COLOR_BOLD}${COLOR_GREEN}╚═══════════════════════════════════════════════════════════════╝${COLOR_RESET}"
-    echo ""
-    echo -e "${COLOR_CYAN}Application URL:${COLOR_RESET}"
-    echo -e "  ${COLOR_BOLD}${APP_PROTOCOL}://${APP_DOMAIN}${COLOR_RESET}"
-    echo ""
-    echo -e "${COLOR_CYAN}Admin Panel:${COLOR_RESET}"
-    echo -e "  http://localhost:${ADMIN_PORT}${ADMIN_PREFIX}"
-    echo ""
-    echo -e "${COLOR_CYAN}View Logs:${COLOR_RESET}"
-    echo -e "  tail -f $DEPLOY_LOG"
-    echo ""
-    
-    print_success "Push accepted and deployed to ${APP_PROTOCOL}://${APP_DOMAIN}"
-    echo ""
-    
-    echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [info] [git] Post-receive completed" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+    if [ "$DEPLOY_STATUS" = "failed" ]; then
+        # 部署失败
+        echo -e "${COLOR_BOLD}${COLOR_RED}╔═══════════════════════════════════════════════════════════════╗${COLOR_RESET}"
+        echo -e "${COLOR_BOLD}${COLOR_RED}║${COLOR_RESET}                    ${COLOR_BOLD}${COLOR_RED}Deployment Failed${COLOR_RESET}                       ${COLOR_BOLD}${COLOR_RED}║${COLOR_RESET}"
+        echo -e "${COLOR_BOLD}${COLOR_RED}╚═══════════════════════════════════════════════════════════════╝${COLOR_RESET}"
+        echo ""
+        print_error "Deployment failed, please check logs for details"
+        echo ""
+        echo -e "${COLOR_CYAN}View Logs:${COLOR_RESET}"
+        echo -e "  tail -f $DEPLOY_LOG"
+        echo ""
+        echo -e "${COLOR_CYAN}Admin Panel:${COLOR_RESET}"
+        echo -e "  http://localhost:${ADMIN_PORT}${ADMIN_PREFIX}"
+        echo ""
+        
+        echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [error] [git] Post-receive failed" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+        exit 1
+    elif [ "$DEPLOY_STATUS" = "success" ]; then
+        # 部署成功
+        echo -e "${COLOR_BOLD}${COLOR_GREEN}╔═══════════════════════════════════════════════════════════════╗${COLOR_RESET}"
+        echo -e "${COLOR_BOLD}${COLOR_GREEN}║${COLOR_RESET}                    ${COLOR_BOLD}Deployment Complete${COLOR_RESET}                      ${COLOR_BOLD}${COLOR_GREEN}║${COLOR_RESET}"
+        echo -e "${COLOR_BOLD}${COLOR_GREEN}╚═══════════════════════════════════════════════════════════════╝${COLOR_RESET}"
+        echo ""
+        echo -e "${COLOR_CYAN}Application URL:${COLOR_RESET}"
+        echo -e "  ${COLOR_BOLD}${APP_PROTOCOL}://${APP_DOMAIN}${COLOR_RESET}"
+        echo ""
+        echo -e "${COLOR_CYAN}Admin Panel:${COLOR_RESET}"
+        echo -e "  http://localhost:${ADMIN_PORT}${ADMIN_PREFIX}"
+        echo ""
+        echo -e "${COLOR_CYAN}View Logs:${COLOR_RESET}"
+        echo -e "  tail -f $DEPLOY_LOG"
+        echo ""
+        
+        print_success "Push accepted and deployed to ${APP_PROTOCOL}://${APP_DOMAIN}"
+        echo ""
+        
+        echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [info] [git] Post-receive completed" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+    else
+        # 状态未知（超时或日志不完整）
+        echo -e "${COLOR_BOLD}${COLOR_YELLOW}╔═══════════════════════════════════════════════════════════════╗${COLOR_RESET}"
+        echo -e "${COLOR_BOLD}${COLOR_YELLOW}║${COLOR_RESET}                    ${COLOR_BOLD}${COLOR_YELLOW}Deployment Status Unknown${COLOR_RESET}                ${COLOR_BOLD}${COLOR_YELLOW}║${COLOR_RESET}"
+        echo -e "${COLOR_BOLD}${COLOR_YELLOW}╚═══════════════════════════════════════════════════════════════╝${COLOR_RESET}"
+        echo ""
+        print_warning "Deployment status unclear, please check admin panel"
+        echo ""
+        echo -e "${COLOR_CYAN}Admin Panel:${COLOR_RESET}"
+        echo -e "  http://localhost:${ADMIN_PORT}${ADMIN_PREFIX}"
+        echo ""
+        echo -e "${COLOR_CYAN}View Logs:${COLOR_RESET}"
+        echo -e "  tail -f $DEPLOY_LOG"
+        echo ""
+        
+        echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [warn] [git] Post-receive completed with unknown status" >> "$LOGS_DIR/push-$(date '+%%Y-%%m-%%d').log"
+    fi
 done
 
 exit 0
@@ -3610,13 +3832,60 @@ func (gs *GitServer) ProcessGitPush(appName, keyFingerprint, refName, oldRev, ne
 	app, exists := gs.apps[appName]
 	gs.mutex.Unlock()
 
-	// 如果应用不存在，自动创建
+	// 如果应用不存在，检查是否有对应的 Git 仓库存在
 	if !exists {
-		gs.logger.Infof("应用 %s 不存在，自动创建（使用服务器默认SSL配置: %v）", appName, gs.serverConfig.AutoSSL)
-		var err error
-		app, err = gs.CreateApp(appName, gs.serverConfig.AutoSSL)
-		if err != nil {
-			return fmt.Errorf("自动创建应用失败: %w", err)
+		// 检查 /home/git 下是否存在对应的仓库（符号链接或实际仓库）
+		homeGitRepo := filepath.Join("/home/git", appName+".git")
+		bareRepoExists := false
+		var existingBareRepo string
+
+		if info, err := os.Stat(filepath.Join(homeGitRepo, "HEAD")); err == nil && !info.IsDir() {
+			bareRepoExists = true
+			existingBareRepo = homeGitRepo
+			gs.logger.Infof("发现已存在的 Git 仓库: %s", existingBareRepo)
+		}
+
+		// 如果找不到，检查 ReposDir 下的应用目录
+		if !bareRepoExists {
+			appPath := filepath.Join(gs.config.Runners.Git.ReposDir, appName)
+			possibleBareRepo := filepath.Join(appPath, "git", "repo.git")
+			if info, err := os.Stat(filepath.Join(possibleBareRepo, "HEAD")); err == nil && !info.IsDir() {
+				bareRepoExists = true
+				existingBareRepo = possibleBareRepo
+				gs.logger.Infof("发现已存在的 Git 仓库: %s", existingBareRepo)
+			}
+		}
+
+		// 如果 Git 仓库已存在，尝试恢复应用到内存
+		if bareRepoExists {
+			gs.logger.Warnf("应用 %s 在内存中不存在，但 Git 仓库已存在于 %s", appName, existingBareRepo)
+			gs.logger.Infof("尝试恢复应用 %s 到内存...", appName)
+
+			// 尝试从现有仓库恢复应用
+			recoveredApp, err := gs.recoverAppFromRepository(appName, existingBareRepo)
+			if err != nil {
+				return fmt.Errorf("恢复应用失败: %w，请检查 apps.json 文件或手动删除仓库后重试", err)
+			}
+
+			gs.mutex.Lock()
+			gs.apps[appName] = recoveredApp
+			gs.mutex.Unlock()
+
+			// 保存恢复的应用信息
+			if err := gs.saveApps(); err != nil {
+				gs.logger.Warnf("保存恢复的应用信息失败: %v", err)
+			}
+
+			app = recoveredApp
+			gs.logger.Infof("✓ 应用 %s 已成功恢复到内存", appName)
+		} else {
+			// Git 仓库不存在，创建新应用
+			gs.logger.Infof("应用 %s 不存在，自动创建（使用服务器默认SSL配置: %v）", appName, gs.serverConfig.AutoSSL)
+			var err error
+			app, err = gs.CreateApp(appName, gs.serverConfig.AutoSSL)
+			if err != nil {
+				return fmt.Errorf("自动创建应用失败: %w", err)
+			}
 		}
 	}
 
@@ -3655,6 +3924,105 @@ func (gs *GitServer) ProcessGitPush(appName, keyFingerprint, refName, oldRev, ne
 
 	gs.logger.Infof("开始处理应用 %s 的 Git 推送，Push ID: %s", appName, pushID)
 	return nil
+}
+
+// recoverAppFromRepository 从现有的 Git 仓库恢复应用信息
+func (gs *GitServer) recoverAppFromRepository(appName, bareRepoPath string) (*GitApp, error) {
+	gs.logger.Infof("从 Git 仓库恢复应用 %s：%s", appName, bareRepoPath)
+
+	// 分配端口
+	port, err := gs.allocatePort()
+	if err != nil {
+		return nil, fmt.Errorf("分配端口失败: %w", err)
+	}
+
+	// 生成域名和 Git URL
+	domain := gs.generateDomain(appName)
+	gitURL := gs.generateGitURL(appName)
+
+	// 确定应用路径结构
+	var appPath, gitPath, repoDir, logsDir string
+
+	// 检查 bareRepoPath 的位置来推断应用结构
+	if strings.HasPrefix(bareRepoPath, "/home/git/") {
+		// 仓库在 /home/git 下，可能是符号链接或直接仓库
+		// 假设标准结构：/root/data/git-repos/{appName}/
+		appPath = filepath.Join(gs.config.Runners.Git.ReposDir, appName)
+		gitPath = filepath.Join(appPath, "git")
+		repoDir = filepath.Join(gitPath, "repo")
+		logsDir = filepath.Join(appPath, "logs")
+
+		// 如果应用目录不存在，创建它
+		if _, err := os.Stat(appPath); os.IsNotExist(err) {
+			gs.logger.Infof("创建应用目录: %s", appPath)
+			if err := os.MkdirAll(appPath, 0755); err != nil {
+				return nil, fmt.Errorf("创建应用目录失败: %w", err)
+			}
+		}
+
+		// 创建日志目录
+		if _, err := os.Stat(logsDir); os.IsNotExist(err) {
+			if err := os.MkdirAll(logsDir, 0755); err != nil {
+				return nil, fmt.Errorf("创建日志目录失败: %w", err)
+			}
+		}
+	} else {
+		// 仓库在 ReposDir 下
+		appPath = filepath.Dir(filepath.Dir(bareRepoPath)) // {ReposDir}/{appName}
+		gitPath = filepath.Dir(bareRepoPath)               // {ReposDir}/{appName}/git
+		repoDir = filepath.Join(gitPath, "repo")
+		logsDir = filepath.Join(appPath, "logs")
+	}
+
+	// 创建应用对象
+	app := &GitApp{
+		Name:        appName,
+		DisplayName: appName,
+		GitPath:     gitPath,
+		GitURL:      gitURL,
+		BareRepo:    bareRepoPath,
+		RepoDir:     repoDir,
+		Domain:      domain,
+		Port:        port,
+		Status:      "idle",
+		LogsDir:     logsDir,
+		CurrentLog:  filepath.Join(logsDir, fmt.Sprintf("deploy-%s.log", time.Now().Format("2006-01-02"))),
+		EnvVars:     make(map[string]string),
+		DeployConfig: &AppDeployConfig{
+			Strategy: gs.serverConfig.DefaultStrategy,
+			SSL: SSLConfig{
+				Enabled: gs.serverConfig.AutoSSL,
+				Email:   gs.serverConfig.SSLEmail,
+			},
+		},
+	}
+
+	// 尝试检测应用类型
+	if _, err := os.Stat(repoDir); err == nil {
+		// 工作目录存在，尝试检测类型
+		if appType, err := gs.detectAppType(app); err == nil && appType != "" {
+			app.AppType = appType
+			gs.logger.Infof("检测到应用类型: %s", appType)
+		}
+	}
+
+	// 设置 Git 钩子
+	if err := gs.setupGitHooks(app); err != nil {
+		gs.logger.Warnf("设置 Git 钩子失败: %v", err)
+	}
+
+	// 创建或修复符号链接
+	if err := gs.createGitSymlink(app); err != nil {
+		gs.logger.Warnf("创建 Git SSH 符号链接失败: %v", err)
+	}
+
+	// 创建日志流
+	if err := gs.logStreamManager.CreateStreamForApp(appName, app.CurrentLog); err != nil {
+		gs.logger.Warnf("创建日志流失败: %v", err)
+	}
+
+	gs.logger.Infof("✓ 应用 %s 已从仓库恢复", appName)
+	return app, nil
 }
 
 // processGitPushWithRecord 处理推送并更新记录
@@ -4146,66 +4514,91 @@ export SSLCAT_REPOS_DIR="%s"
 	return nil
 }
 
+// sudoReadFile 使用 sudo 读取文件
+func (gs *GitServer) sudoReadFile(path string) ([]byte, error) {
+	var cmd *exec.Cmd
+	if os.Getuid() == 0 {
+		cmd = exec.Command("cat", path)
+	} else {
+		cmd = exec.Command("sudo", "cat", path)
+	}
+	return cmd.Output()
+}
+
+// sudoWriteFile 使用 sudo 写入文件
+func (gs *GitServer) sudoWriteFile(path string, data []byte, perm os.FileMode) error {
+	// 先写入临时文件
+	tmpFile := path + ".tmp"
+	if err := os.WriteFile(tmpFile, data, 0644); err != nil {
+		return fmt.Errorf("写入临时文件失败: %w", err)
+	}
+	defer os.Remove(tmpFile)
+
+	// 使用 sudo 移动文件
+	var mvCmd, chmodCmd, chownCmd *exec.Cmd
+	if os.Getuid() == 0 {
+		mvCmd = exec.Command("mv", tmpFile, path)
+		chmodCmd = exec.Command("chmod", fmt.Sprintf("%o", perm), path)
+		chownCmd = exec.Command("chown", fmt.Sprintf("%d:%d", gs.uid, gs.gid), path)
+	} else {
+		mvCmd = exec.Command("sudo", "mv", tmpFile, path)
+		chmodCmd = exec.Command("sudo", "chmod", fmt.Sprintf("%o", perm), path)
+		chownCmd = exec.Command("sudo", "chown", fmt.Sprintf("%d:%d", gs.uid, gs.gid), path)
+	}
+
+	if output, err := mvCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("移动文件失败: %s, %w", output, err)
+	}
+
+	chmodCmd.Run()
+	chownCmd.Run()
+
+	return nil
+}
+
 // ensureAuthorizedKeysFile 确保 authorized_keys 文件存在并具有正确的权限
 func (gs *GitServer) ensureAuthorizedKeysFile() error {
-	// 检查文件是否已存在
-	if info, err := os.Stat(gs.authorizedKeysFile); err == nil {
-		if info.Mode().IsRegular() {
-			gs.logger.Infof("authorized_keys 文件已存在: %s", gs.sshKeysDir)
-			// 确保权限正确
-			if err := os.Chmod(gs.authorizedKeysFile, 0600); err != nil {
-				gs.logger.Warnf("设置 authorized_keys 文件权限失败: %v", err)
-			}
-			// 设置正确的所有者
-			if gs.uid > 0 && gs.gid > 0 {
-				if err := os.Chown(gs.authorizedKeysFile, gs.uid, gs.gid); err != nil {
-					gs.logger.Warnf("设置 authorized_keys 文件所有者失败: %v", err)
-				}
-			}
-			return nil
-		} else {
-			return fmt.Errorf("authorized_keys 路径被目录占用: %s", gs.authorizedKeysFile)
-		}
-	} else if os.IsNotExist(err) {
-		// 文件不存在，创建它
-		gs.logger.Infof("创建 authorized_keys 文件: %s", gs.authorizedKeysFile)
-
-		// 确保父目录存在，并设置正确的权限
-		sshDir := filepath.Dir(gs.authorizedKeysFile)
-		if err := os.MkdirAll(sshDir, 0700); err != nil {
-			return fmt.Errorf("创建 .ssh 目录失败: %w", err)
-		}
-
-		// 确保 .ssh 目录权限正确（SSH StrictModes 要求）
-		if err := os.Chmod(sshDir, 0700); err != nil {
-			gs.logger.Warnf("设置 .ssh 目录权限失败: %v", err)
-		}
-
-		// 确保 home 目录权限正确（SSH StrictModes 要求）
-		// home 目录不能被 group/others 写入
-		if err := os.Chmod(gs.sshHomeDir, 0755); err != nil {
-			gs.logger.Warnf("设置 home 目录权限失败: %v", err)
-		}
-
-		// 创建空文件
-		if err := os.WriteFile(gs.authorizedKeysFile, []byte{}, 0600); err != nil {
-			return fmt.Errorf("创建 authorized_keys 文件失败: %w", err)
-		}
-
-		// 设置正确的所有者
-		if gs.uid > 0 && gs.gid > 0 {
-			if err := os.Chown(gs.authorizedKeysFile, gs.uid, gs.gid); err != nil {
-				gs.logger.Warnf("设置 authorized_keys 文件所有者失败: %v", err)
-			}
-			// 同时设置目录的所有者
-			if err := os.Chown(filepath.Dir(gs.authorizedKeysFile), gs.uid, gs.gid); err != nil {
-				gs.logger.Warnf("设置 .ssh 目录所有者失败: %v", err)
-			}
-		}
-
-		gs.logger.Infof("authorized_keys 文件创建成功: %s", gs.authorizedKeysFile)
-		return nil
+	// 使用 sudo 检查文件是否存在
+	var statCmd *exec.Cmd
+	if os.Getuid() == 0 {
+		statCmd = exec.Command("test", "-f", gs.authorizedKeysFile)
 	} else {
-		return fmt.Errorf("检查 authorized_keys 文件状态失败: %w", err)
+		statCmd = exec.Command("sudo", "test", "-f", gs.authorizedKeysFile)
 	}
+
+	if err := statCmd.Run(); err == nil {
+		gs.logger.Infof("authorized_keys 文件已存在: %s", gs.authorizedKeysFile)
+		return nil
+	}
+
+	// 文件不存在，使用 sudo 创建它
+	gs.logger.Infof("创建 authorized_keys 文件: %s", gs.authorizedKeysFile)
+
+	// 使用 sudo 创建空文件
+	var touchCmd *exec.Cmd
+	if os.Getuid() == 0 {
+		touchCmd = exec.Command("touch", gs.authorizedKeysFile)
+	} else {
+		touchCmd = exec.Command("sudo", "touch", gs.authorizedKeysFile)
+	}
+
+	if output, err := touchCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("创建文件失败: %s, %w", output, err)
+	}
+
+	// 设置权限和所有者
+	var chmodCmd, chownCmd *exec.Cmd
+	if os.Getuid() == 0 {
+		chmodCmd = exec.Command("chmod", "600", gs.authorizedKeysFile)
+		chownCmd = exec.Command("chown", fmt.Sprintf("%d:%d", gs.uid, gs.gid), gs.authorizedKeysFile)
+	} else {
+		chmodCmd = exec.Command("sudo", "chmod", "600", gs.authorizedKeysFile)
+		chownCmd = exec.Command("sudo", "chown", fmt.Sprintf("%d:%d", gs.uid, gs.gid), gs.authorizedKeysFile)
+	}
+
+	chmodCmd.Run()
+	chownCmd.Run()
+
+	gs.logger.Infof("authorized_keys 文件创建成功: %s", gs.authorizedKeysFile)
+	return nil
 }

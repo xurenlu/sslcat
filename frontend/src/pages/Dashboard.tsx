@@ -61,7 +61,7 @@ const Dashboard: React.FC = () => {
     setError(null)
     try {
       // 确保 adminPrefix 不为空，否则使用备用前缀
-      const effectivePrefix = adminPrefix || '/sslcat-panel2'
+      const effectivePrefix = adminPrefix || '/sslcat-panel'
       console.log('Dashboard refreshStats - adminPrefix:', adminPrefix, 'effectivePrefix:', effectivePrefix)
       const response = await fetch(buildApiPath(effectivePrefix, '/stats'), {
         method: 'GET',

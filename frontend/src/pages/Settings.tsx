@@ -92,19 +92,18 @@ const Settings: React.FC = () => {
     }))
   }, [adminPrefix])
 
-  // 加载基础配置
-  useEffect(() => {
-    const loadBasicConfig = async () => {
-      try {
-        const response = await fetch(`${adminPrefix}/api/settings`, {
-          method: 'GET',
+  // 加载基础配置（提取为独立方法）
+  const loadBasicConfig = async () => {
+    try {
+      const response = await fetch(`${adminPrefix}/api/settings`, {
+        method: 'GET',
           credentials: 'include',
         })
         
         if (response.ok) {
           const data = await response.json()
-          if (data.success && data.config) {
-            const config = data.config
+          if (data.success && data.data) {
+            const config = data.data
             setSettings(prev => ({
               ...prev,
               // 基础设置
@@ -129,44 +128,48 @@ const Settings: React.FC = () => {
       } catch (error) {
         console.error('加载基础配置失败:', error)
       }
-    }
+  }
 
-    const loadNotificationConfig = async () => {
-      try {
-        const response = await fetch(`${adminPrefix}/api/notifications/config`, {
-          method: 'GET',
-          credentials: 'include',
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          if (data.success && data.config) {
-            const config = data.config
-            setSettings(prev => ({
-              ...prev,
-              enableNotifications: config.enabled || false,
-              smtpHost: config.channels?.email?.smtp_host || '',
-              smtpPort: config.channels?.email?.smtp_port?.toString() || '587',
-              smtpUsername: config.channels?.email?.username || '',
-              smtpPassword: config.channels?.email?.password || '',
-              smtpFrom: config.channels?.email?.from || '',
-              smtpTo: config.channels?.email?.to?.join(',') || '',
-              smtpUseTLS: config.channels?.email?.use_tls || true,
-              slackWebhook: config.channels?.webhook?.url || '',
-              webhookUrl: config.channels?.webhook?.url || '',
-            }))
-          }
+  const loadNotificationConfig = async () => {
+    try {
+      const response = await fetch(`${adminPrefix}/api/notifications/config`, {
+        method: 'GET',
+        credentials: 'include',
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.config) {
+          const config = data.config
+          setSettings(prev => ({
+            ...prev,
+            enableNotifications: config.enabled || false,
+            smtpHost: config.channels?.email?.smtp_host || '',
+            smtpPort: config.channels?.email?.smtp_port?.toString() || '587',
+            smtpUsername: config.channels?.email?.username || '',
+            smtpPassword: config.channels?.email?.password || '',
+            smtpFrom: config.channels?.email?.from || '',
+            smtpTo: config.channels?.email?.to?.join(',') || '',
+            smtpUseTLS: config.channels?.email?.use_tls || true,
+            slackWebhook: config.channels?.webhook?.url || '',
+            webhookUrl: config.channels?.webhook?.url || '',
+          }))
         }
-      } catch (error) {
-        console.error('加载通知配置失败:', error)
       }
+    } catch (error) {
+      console.error('加载通知配置失败:', error)
     }
+  }
 
-    // 并行加载配置
-    Promise.all([
-      loadBasicConfig(),
-      loadNotificationConfig()
-    ])
+  // 页面加载时或 adminPrefix 变化时重新加载配置
+  useEffect(() => {
+    if (adminPrefix) {
+      // 并行加载配置
+      Promise.all([
+        loadBasicConfig(),
+        loadNotificationConfig()
+      ])
+    }
   }, [adminPrefix])
 
   const handleInputChange = (field: string, value: string | boolean | number) => {
@@ -206,6 +209,9 @@ const Settings: React.FC = () => {
           duration: 3000,
           isClosable: true,
         })
+        
+        // 重新加载配置以显示最新保存的值
+        await loadBasicConfig()
         
         // 如果adminPrefix发生变化，使用新的changeAdminPrefix函数
         if (settings.adminPrefix !== adminPrefix) {

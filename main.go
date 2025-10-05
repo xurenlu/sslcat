@@ -207,6 +207,9 @@ func main() {
 	// 初始化 Runner 模块
 	gitServer := runner.NewGitServer(cfg, translator)
 
+	// 注入 SSL Manager 到 Git Server（用于自动申请证书）
+	gitServer.SetSSLManager(sslManager)
+
 	webServer := web.NewServer(cfg, proxyManager, securityManager, sslManager, gitServer, notificationIntegrator, version)
 
 	// 注册可重载组件
@@ -350,21 +353,39 @@ func main() {
 							return
 						}
 
-						// 其他管理面板路径重定向到HTTPS
-						httpsURL := fmt.Sprintf("https://%s%s", r.Host, r.RequestURI)
-						http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
+						// 其他管理面板路径：只有在有有效证书时才重定向到HTTPS
+						host := r.Host
+						if idx := strings.Index(host, ":"); idx != -1 {
+							host = host[:idx]
+						}
+						if sslManager.HasValidCertificate(host) {
+							httpsURL := fmt.Sprintf("https://%s%s", r.Host, r.RequestURI)
+							http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
+							return
+						}
+						// 没有证书时，直接用 HTTP 处理
+						webServer.ServeHTTP(w, r)
 						return
 					}
 
 					// 其他路径通过代理处理（如果有配置）
 					if rule := proxyManager.GetProxyConfig(r.Host); rule != nil {
+						// 如果配置了SSLOnly且有有效证书，才重定向
+						host := r.Host
+						if idx := strings.Index(host, ":"); idx != -1 {
+							host = host[:idx]
+						}
+						if rule.SSLOnly && sslManager.HasValidCertificate(host) {
+							httpsURL := fmt.Sprintf("https://%s%s", r.Host, r.RequestURI)
+							http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
+							return
+						}
 						proxyManager.ProxyRequest(w, r, rule)
 						return
 					}
 
-					// 没有配置的域名重定向到HTTPS
-					httpsURL := fmt.Sprintf("https://%s%s", r.Host, r.RequestURI)
-					http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
+					// 没有配置的域名：默认用 HTTP 处理，不强制重定向
+					webServer.ServeHTTP(w, r)
 				})),
 				ReadTimeout:  readTimeout,
 				WriteTimeout: writeTimeout,

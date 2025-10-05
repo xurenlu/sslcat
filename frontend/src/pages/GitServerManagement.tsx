@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import { useTranslation } from 'react-i18next'
 import {
   Box,
   Heading,
@@ -119,8 +118,19 @@ interface GitServerConfig {
 }
 
 const GitServerManagement: React.FC = () => {
-  const { t } = useTranslation()
   const { adminPrefix } = useConfig()
+  
+  // 简单的翻译函数（fallback）
+  const t = (key: string) => {
+    const translations: Record<string, string> = {
+      'frontend.delete_app_confirm': '确认删除应用',
+      'frontend.delete_app_warning': '这是一个危险操作，无法撤销。此应用的所有数据、代码、日志和配置将被永久删除。',
+      'frontend.delete_app_instruction': '请输入应用名称 "{appName}" 来确认删除：',
+      'frontend.delete_app_name_mismatch': '应用名称不匹配',
+      'frontend.copy_command': '复制命令',
+    }
+    return translations[key] || key
+  }
   const [apps, setApps] = useState<GitApp[]>([])
   const [sshKeys, setSSHKeys] = useState<SSHKey[]>([])
   const [config, setConfig] = useState<GitServerConfig>({
@@ -744,7 +754,7 @@ git push sslcat main`
           setTimeout(() => {
             toast({
               title: '提示：添加SSH密钥',
-              description: t('frontend.ssh_key_notice'),
+              description: '您已启用Git服务器，但还没有配置SSH密钥。请在"SSH密钥"标签页中添加至少一个SSH密钥以允许Git推送。',
               status: 'warning',
               duration: 8000,
               isClosable: true,

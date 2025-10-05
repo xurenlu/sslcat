@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { updateApiBaseURL } from '../utils/api'
 
 // 常量定义
-const FALLBACK_ADMIN_PREFIX = '/sslcat-panel2' // 仅作为最后的备用选项
+const FALLBACK_ADMIN_PREFIX = '/sslcat-panel' // 仅作为最后的备用选项
 const ADMIN_PREFIX_STORAGE_KEY = 'adminPrefix'
 
 interface ConfigContextType {
@@ -182,11 +182,26 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
       setIsLoading(true)
       setError(null)
       
+      // 清理旧的备用值（如果存在）
+      const storedValue = localStorage.getItem(ADMIN_PREFIX_STORAGE_KEY)
+      if (storedValue === '/sslcat-panel2') {
+        console.log('检测到旧的备用值 /sslcat-panel2，清理中...')
+        localStorage.removeItem(ADMIN_PREFIX_STORAGE_KEY)
+      }
+      
       // 检测是否在开发模式（Vite dev server）
       const isDevelopment = window.location.port === '9980'
       
       // 1. 最高优先级：从当前URL检测前缀
       const urlPrefix = detectPrefixFromURL()
+      
+      // 如果从 URL 检测到了前缀，直接使用（最可靠的来源）
+      if (urlPrefix) {
+        console.log('从 URL 检测到 admin prefix:', urlPrefix, '直接使用')
+        updatePrefix(urlPrefix)
+        setIsLoading(false)
+        return
+      }
       
       // 2. 次优先级：从localStorage获取存储的前缀
       const storedPrefix = getStoredPrefix()
@@ -194,49 +209,42 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
       // 3. 最低优先级：使用备用前缀
       const fallbackPrefix = FALLBACK_ADMIN_PREFIX
       
-      // 在开发模式下且URL中没有前缀时，直接使用 fallback 或 localStorage
-      if (isDevelopment && !urlPrefix) {
+      // 在开发模式下且URL中没有前缀时，直接使用 localStorage 或 fallback
+      if (isDevelopment) {
         const devPrefix = storedPrefix || fallbackPrefix
-        console.log('开发模式：直接使用 admin prefix:', devPrefix)
+        console.log('开发模式：使用', storedPrefix ? 'localStorage' : 'fallback', 'prefix:', devPrefix)
         updatePrefix(devPrefix)
         setIsLoading(false)
         return
       }
       
-      // 按优先级尝试前缀
-      const prefixesToTry = [urlPrefix, storedPrefix, fallbackPrefix].filter(Boolean) as string[]
-      
-      let finalPrefix = fallbackPrefix
-      let prefixFound = false
-      
-      // 依次验证每个前缀
-      for (const prefix of prefixesToTry) {
+      // 生产模式下，尝试验证 localStorage 中的前缀
+      if (storedPrefix) {
         try {
-          const validation = await validatePrefix(prefix)
+          console.log('尝试验证 localStorage 中的前缀:', storedPrefix)
+          const validation = await validatePrefix(storedPrefix)
           if (validation.valid) {
-            finalPrefix = validation.serverPrefix || prefix
-            prefixFound = true
-            console.log(`使用admin prefix: ${finalPrefix} (来源: ${prefix === urlPrefix ? 'URL' : prefix === storedPrefix ? 'localStorage' : 'fallback'})`)
-            break
+            const finalPrefix = validation.serverPrefix || storedPrefix
+            console.log('localStorage 前缀验证成功，使用:', finalPrefix)
+            updatePrefix(finalPrefix)
+            setIsLoading(false)
+            return
           }
         } catch (error) {
-          console.warn(`前缀 ${prefix} 验证失败:`, error)
-          continue
+          console.warn('localStorage 前缀验证失败:', error)
         }
       }
       
-      if (!prefixFound) {
-        console.warn('所有前缀验证都失败，使用备用前缀:', fallbackPrefix)
-        finalPrefix = fallbackPrefix
-      }
-      
-      // 更新前缀
-      updatePrefix(finalPrefix)
+      // 最后使用备用前缀（不验证，直接使用）
+      console.log('使用备用 admin prefix:', fallbackPrefix)
+      updatePrefix(fallbackPrefix)
       
     } catch (err) {
       console.error('Failed to fetch config:', err)
       setError(err instanceof Error ? err.message : 'Unknown error')
-      updatePrefix(FALLBACK_ADMIN_PREFIX)
+      // 即使出错也要设置一个前缀
+      const urlPrefix = detectPrefixFromURL()
+      updatePrefix(urlPrefix || FALLBACK_ADMIN_PREFIX)
     } finally {
       setIsLoading(false)
     }
@@ -292,3 +300,4 @@ export const buildApiPath = (prefix: string, path: string): string => {
   const apiPath = path.startsWith('/api') ? path : `/api${path}`
   return buildPath(prefix, apiPath)
 }
+

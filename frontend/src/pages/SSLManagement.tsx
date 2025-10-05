@@ -20,6 +20,17 @@ import {
   useToast,
   Progress,
   VStack,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  ModalCloseButton,
+  FormControl,
+  FormLabel,
+  Input,
+  useDisclosure,
 } from '@chakra-ui/react'
 import {
   FiShield,
@@ -45,6 +56,9 @@ const SSLManagement: React.FC = () => {
   const [certificates, setCertificates] = useState<SSLCertificate[]>([])
   const [loading, setLoading] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [applying, setApplying] = useState(false)
+  const [newDomain, setNewDomain] = useState('')
+  const { isOpen, onOpen, onClose } = useDisclosure()
   const toast = useToast()
   const { adminPrefix } = useConfig()
 
@@ -102,9 +116,67 @@ const SSLManagement: React.FC = () => {
     }
   }
 
+  const applyCertificate = async () => {
+    if (!newDomain.trim()) {
+      toast({
+        title: '请输入域名',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      })
+      return
+    }
+
+    setApplying(true)
+    try {
+      const response = await fetch(buildApiPath(adminPrefix, '/ssl/generate'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          domains: [newDomain.trim()], // 后端期望的是数组
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      toast({
+        title: '证书申请成功',
+        description: `域名 ${newDomain} 的证书已开始申请，请稍后刷新查看`,
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      })
+      
+      setNewDomain('')
+      onClose()
+      
+      // 3秒后自动刷新证书列表
+      setTimeout(() => {
+        refreshCertificates()
+      }, 3000)
+    } catch (error) {
+      console.error('申请SSL证书失败:', error)
+      toast({
+        title: '证书申请失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: 4000,
+        isClosable: true,
+      })
+    } finally {
+      setApplying(false)
+    }
+  }
+
   const downloadCertificate = async (domain: string) => {
     try {
-      const effectivePrefix = adminPrefix || '/sslcat-panel2'
+      const effectivePrefix = adminPrefix || '/sslcat-panel'
       
       // 创建下载链接并触发下载
       const downloadUrl = `${effectivePrefix}/ssl/download?domain=${encodeURIComponent(domain)}&type=cert`
@@ -268,6 +340,7 @@ const SSLManagement: React.FC = () => {
             leftIcon={<Icon as={FiShield} />}
             colorScheme="blue"
             mr={2}
+            onClick={onOpen}
           >
             申请证书
           </Button>
@@ -392,13 +465,53 @@ const SSLManagement: React.FC = () => {
             <Box textAlign="center" py={8}>
               <Icon as={FiShield} boxSize={12} color="gray.300" mb={4} />
               <Text color="gray.500" mb={4}>暂无SSL证书</Text>
-              <Button leftIcon={<Icon as={FiShield} />} colorScheme="blue">
+              <Button leftIcon={<Icon as={FiShield} />} colorScheme="blue" onClick={onOpen}>
                 申请第一个证书
               </Button>
             </Box>
           )}
         </CardBody>
       </Card>
+
+      {/* 申请证书对话框 */}
+      <Modal isOpen={isOpen} onClose={onClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>申请SSL证书</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <FormControl>
+              <FormLabel>域名</FormLabel>
+              <Input
+                placeholder="例如: example.com 或 *.example.com"
+                value={newDomain}
+                onChange={(e) => setNewDomain(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    applyCertificate()
+                  }
+                }}
+              />
+              <Text fontSize="sm" color="gray.500" mt={2}>
+                支持单个域名或通配符域名（如 *.example.com）
+              </Text>
+            </FormControl>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onClose}>
+              取消
+            </Button>
+            <Button
+              colorScheme="blue"
+              onClick={applyCertificate}
+              isLoading={applying}
+              loadingText="申请中..."
+            >
+              申请证书
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </Box>
   )
 }

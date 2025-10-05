@@ -39,8 +39,8 @@ After=network.target
 
 [Service]
 Type=simple
-User=sslcat
-Group=sslcat
+User=root
+Group=root
 WorkingDirectory=$TARGET_DIR
 ExecStart=$TARGET_DIR/sslcat --config /etc/sslcat/sslcat.conf
 ExecReload=/bin/kill -HUP \$MAINPID
@@ -54,8 +54,8 @@ SyslogIdentifier=sslcat
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/var/lib/sslcat /etc/sslcat $TARGET_DIR
+ProtectHome=false
+ReadWritePaths=/var/lib/sslcat /etc/sslcat $TARGET_DIR /home/git
 
 [Install]
 WantedBy=multi-user.target

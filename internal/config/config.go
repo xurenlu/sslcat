@@ -59,6 +59,10 @@ type ServerConfig struct {
 	IdleTimeoutSec  int `json:"idle_timeout_sec"`
 	// 最大上传大小（字节），用于限制 multipart 上传体积
 	MaxUploadBytes int64 `json:"max_upload_bytes"`
+
+	// Session 存储配置
+	SessionStorage string `json:"session_storage"` // memory|file (默认 file)
+	DataDir        string `json:"data_dir"`        // 数据目录（用于文件存储）
 }
 
 // SSLConfig SSL证书配置
@@ -702,10 +706,12 @@ func Load(configFile string) (*Config, error) {
 			AccessLogPath:     "./data/access.log",
 			AccessLogMaxSize:  100 * 1024 * 1024,
 			AccessLogMaxFiles: 10,
-			ReadTimeoutSec:    1800,    // 30分钟
-			WriteTimeoutSec:   1800,    // 30分钟
-			IdleTimeoutSec:    120,     // 2分钟（可调）
-			MaxUploadBytes:    1 << 30, // 1 GiB
+			ReadTimeoutSec:    1800,     // 30分钟
+			WriteTimeoutSec:   1800,     // 30分钟
+			IdleTimeoutSec:    120,      // 2分钟（可调）
+			MaxUploadBytes:    1 << 30,  // 1 GiB
+			SessionStorage:    "file",   // 默认使用文件存储
+			DataDir:           "./data", // 数据目录
 		},
 		SSL: SSLConfig{
 			Staging:            false,

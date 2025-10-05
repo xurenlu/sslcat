@@ -8,7 +8,9 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -637,14 +639,26 @@ type DeployLogger struct {
 // NewDeployLogger 创建部署日志记录器
 func NewDeployLogger(appName, deployID, logFile string) (*DeployLogger, error) {
 	// 确保日志目录存在
-	if err := os.MkdirAll(filepath.Dir(logFile), 0755); err != nil {
+	logDir := filepath.Dir(logFile)
+	if err := os.MkdirAll(logDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create log directory: %w", err)
+	}
+
+	// 尝试设置日志目录权限为 git 用户（如果有权限的话）
+	gitUID, gitGID := getGitUserIDs()
+	if gitUID > 0 && gitGID > 0 {
+		_ = os.Chown(logDir, gitUID, gitGID) // 忽略错误
 	}
 
 	// 打开日志文件
 	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open log file: %w", err)
+	}
+
+	// 设置日志文件权限为 git 用户可读
+	if gitUID > 0 && gitGID > 0 {
+		_ = os.Chown(logFile, gitUID, gitGID) // 忽略错误
 	}
 
 	logger := &DeployLogger{
@@ -659,6 +673,19 @@ func NewDeployLogger(appName, deployID, logFile string) (*DeployLogger, error) {
 	logger.WriteLog("info", "deploy", fmt.Sprintf("部署开始 - Deploy ID: %s", deployID))
 
 	return logger, nil
+}
+
+// getGitUserIDs 获取 git 用户的 UID 和 GID
+func getGitUserIDs() (int, int) {
+	// 尝试查找 git 用户
+	u, err := user.Lookup("git")
+	if err != nil {
+		return 0, 0
+	}
+
+	uid, _ := strconv.Atoi(u.Uid)
+	gid, _ := strconv.Atoi(u.Gid)
+	return uid, gid
 }
 
 // WriteLog 写入日志

@@ -7,11 +7,12 @@
 ## 特性
 
 - ✅ 使用 Go 1.25 版本
-- ✅ 配置中国镜像源加速（阿里云镜像）
+- ✅ 配置中国镜像源加速（多个可用镜像源）
 - ✅ Go 模块代理加速（goproxy.cn）
 - ✅ 多阶段构建解决交叉编译问题
 - ✅ 自动提取二进制文件
 - ✅ 支持 CGO 编译的 SQLite 驱动
+- ✅ 支持清理缓存和快速构建两种模式
 
 ## 快速开始
 
@@ -62,14 +63,25 @@ chmod +x ./sslcat-linux-amd64-cgo
 
 - **基础镜像**: golang:1.25-alpine
 - **目标平台**: linux/amd64
-- **最终镜像大小**: ~90MB
-- **二进制文件大小**: ~38MB
+- **最终镜像大小**: ~98MB
+- **二进制文件大小**: ~41MB
 
 ## 加速配置
 
-### APT 镜像源
+### Alpine 镜像源
 ```dockerfile
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+```
+
+### Docker 镜像源（建议配置）
+```json
+{
+  "registry-mirrors": [
+    "https://docker.1panel.live",
+    "https://hub.rat.dev",
+    "https://docker.chenby.cn"
+  ]
+}
 ```
 
 ### Go 模块代理

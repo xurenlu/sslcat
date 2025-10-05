@@ -9,6 +9,15 @@ import (
 
 // handleAPISSLGenerate 申请SSL证书
 func (s *Server) handleAPISSLGenerate(w http.ResponseWriter, r *http.Request) {
+	// 处理 OPTIONS 预检请求
+	if r.Method == "OPTIONS" {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	if !s.authorizeAPI(w, r, false) { // 需要写权限
 		return
 	}
