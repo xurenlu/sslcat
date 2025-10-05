@@ -17,6 +17,17 @@ jobs:
   # Linux 构建（CGO 启用，支持 SQLite）
   build-linux:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goarch: amd64
+            arch_tag: linux-amd64
+            cc: gcc
+          - goarch: arm64
+            arch_tag: linux-arm64
+            cc: aarch64-linux-gnu-gcc
+    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -49,31 +60,37 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc libc6-dev sqlite3 libsqlite3-dev
+          # ARM64 交叉编译工具链
+          if [ "${{ matrix.goarch }}" = "arm64" ]; then
+            sudo apt-get install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross
+          fi
 
-      - name: Build Linux AMD64 with CGO
+      - name: Build Linux ${{ matrix.goarch }} with CGO
         env:
           GOOS: linux
-          GOARCH: amd64
+          GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 1
+          CC: ${{ matrix.cc }}
         run: |
           mkdir -p build artifacts
           VERSION="${GITHUB_REF_NAME}"
           if [ -z "$VERSION" ]; then VERSION="dev"; fi
-          echo "Building $BIN_NAME for linux/amd64 (version=$VERSION) with CGO enabled (SQLite support)"
+          echo "Building $BIN_NAME for linux/${{ matrix.goarch }} (version=$VERSION) with CGO enabled (SQLite support)"
+          echo "Using compiler: $CC"
           go build -trimpath -ldflags "-s -w -X main.version=$VERSION -X main.build=$GITHUB_RUN_ID" -o build/${BIN_NAME} .
 
       - name: Package Linux
         run: |
           VERSION="${GITHUB_REF_NAME}"
           if [ -z "$VERSION" ]; then VERSION="dev"; fi
-          NAME="${BIN_NAME}_${VERSION}_linux-amd64"
+          NAME="${BIN_NAME}_${VERSION}_${{ matrix.arch_tag }}"
           tar -C build -czf artifacts/${NAME}.tar.gz ${BIN_NAME}
           ls -lh artifacts
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
         with:
-          name: linux-amd64
+          name: ${{ matrix.arch_tag }}
           path: artifacts/*
 
   # macOS 构建（CGO 启用，使用 macOS runner）
@@ -171,11 +188,14 @@ jobs:
           body: |
             ## SSLcat ${{ github.ref_name }}
             
-            ### 📦 下载
+            ### 📦 可用平台
             
-            - **Linux AMD64** (推荐服务器部署，CGO 启用，支持 SQLite)
-            - **macOS Intel** (CGO 启用，支持 SQLite)
-            - **macOS Apple Silicon** (M1/M2/M3，CGO 启用，支持 SQLite)
+            所有平台都启用 **CGO**，完整支持 **SQLite** 数据库！
+            
+            - **Linux AMD64** - x86_64 服务器（推荐）
+            - **Linux ARM64** - ARM 服务器（树莓派、云服务器等）
+            - **macOS Intel** - Intel 芯片 Mac
+            - **macOS Apple Silicon** - M1/M2/M3 芯片 Mac
             
             ### 🚀 快速安装
             
@@ -184,12 +204,26 @@ jobs:
             curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_darwin-$(uname -m).tar.gz -o sslcat.tgz
             tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
             
-            # Linux
+            # Linux AMD64
             curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-amd64.tar.gz -o sslcat.tgz
+            tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
+            
+            # Linux ARM64 (树莓派等)
+            curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-arm64.tar.gz -o sslcat.tgz
             tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
             ```
             
-            详细更新日志请查看 [CHANGELOG.md](https://github.com/xurenlu/sslcat/blob/${{ github.ref_name }}/CHANGELOG.md)
+            ### 📝 更新日志
+            
+            详见 [CHANGELOG.md](https://github.com/xurenlu/sslcat/blob/${{ github.ref_name }}/CHANGELOG.md)
+            
+            ### ✨ 主要特性
+            
+            - ✅ 所有平台 CGO 启用，完整 SQLite 支持
+            - ✅ Git 部署服务器实时日志显示
+            - ✅ 自动 SSL 证书申请
+            - ✅ Docker 构建优化
+            - ✅ 前端配置和翻译修复
           files: artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
