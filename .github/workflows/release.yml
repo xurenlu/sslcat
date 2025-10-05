@@ -14,30 +14,79 @@ env:
   BIN_NAME: sslcat
 
 jobs:
-  build:
+  # Linux 构建（CGO 启用，支持 SQLite）
+  build-linux:
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Print Go version
+        run: go version
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'yarn'
+          cache-dependency-path: 'frontend/yarn.lock'
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          yarn install
+          yarn run build
+          mkdir -p ../internal/assets/frontend
+          cp -r dist/* ../internal/assets/frontend/
+
+      - name: Install CGO dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc libc6-dev sqlite3 libsqlite3-dev
+
+      - name: Build Linux AMD64 with CGO
+        env:
+          GOOS: linux
+          GOARCH: amd64
+          CGO_ENABLED: 1
+        run: |
+          mkdir -p build artifacts
+          VERSION="${GITHUB_REF_NAME}"
+          if [ -z "$VERSION" ]; then VERSION="dev"; fi
+          echo "Building $BIN_NAME for linux/amd64 (version=$VERSION) with CGO enabled (SQLite support)"
+          go build -trimpath -ldflags "-s -w -X main.version=$VERSION -X main.build=$GITHUB_RUN_ID" -o build/${BIN_NAME} .
+
+      - name: Package Linux
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          if [ -z "$VERSION" ]; then VERSION="dev"; fi
+          NAME="${BIN_NAME}_${VERSION}_linux-amd64"
+          tar -C build -czf artifacts/${NAME}.tar.gz ${BIN_NAME}
+          ls -lh artifacts
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-amd64
+          path: artifacts/*
+
+  # macOS 构建（CGO 启用，使用 macOS runner）
+  build-macos:
+    runs-on: macos-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-          - goos: linux
-            goarch: amd64
-            arch_tag: linux-amd64
-            archive: tar.gz
-            ext: ""
-            cgo_enabled: 1
-          - goos: darwin
-            goarch: amd64
+          - goarch: amd64
             arch_tag: darwin-amd64
-            archive: tar.gz
-            ext: ""
-            cgo_enabled: 0
-          - goos: darwin
-            goarch: arm64
+          - goarch: arm64
             arch_tag: darwin-arm64
-            archive: tar.gz
-            ext: ""
-            cgo_enabled: 0
 
     steps:
       - name: Checkout
@@ -67,49 +116,40 @@ jobs:
           mkdir -p ../internal/assets/frontend
           cp -r dist/* ../internal/assets/frontend/
 
-      - name: Install CGO dependencies (Linux only)
+      - name: Install SQLite (macOS)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc libc6-dev sqlite3 libsqlite3-dev
-          # Linux 构建需要 CGO 支持 SQLite
-          # macOS 构建使用纯 Go 实现，不需要 CGO
+          brew install sqlite3
+          # macOS 已经有 Xcode Command Line Tools，无需额外安装 gcc
 
-      - name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
+      - name: Build macOS ${{ matrix.goarch }} with CGO
         env:
-          GOOS: ${{ matrix.goos }}
+          GOOS: darwin
           GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: ${{ matrix.cgo_enabled }}
+          CGO_ENABLED: 1
         run: |
           mkdir -p build artifacts
           VERSION="${GITHUB_REF_NAME}"
           if [ -z "$VERSION" ]; then VERSION="dev"; fi
-          if [ "${{ matrix.cgo_enabled }}" = "1" ]; then
-            echo "Building $BIN_NAME for $GOOS/$GOARCH (version=$VERSION) with CGO enabled (SQLite support)"
-          else
-            echo "Building $BIN_NAME for $GOOS/$GOARCH (version=$VERSION) without CGO"
-          fi
-          go build -trimpath -ldflags "-s -w -X main.version=$VERSION -X main.build=$GITHUB_RUN_ID" -o build/${BIN_NAME}${{ matrix.ext }} .
+          echo "Building $BIN_NAME for darwin/${{ matrix.goarch }} (version=$VERSION) with CGO enabled (SQLite support)"
+          go build -trimpath -ldflags "-s -w -X main.version=$VERSION -X main.build=$GITHUB_RUN_ID" -o build/${BIN_NAME} .
 
-      - name: Package
+      - name: Package macOS
         run: |
           VERSION="${GITHUB_REF_NAME}"
           if [ -z "$VERSION" ]; then VERSION="dev"; fi
           NAME="${BIN_NAME}_${VERSION}_${{ matrix.arch_tag }}"
-          if [ "${{ matrix.archive }}" = "zip" ]; then
-            (cd build && zip -9 ../artifacts/${NAME}.zip ${BIN_NAME}${{ matrix.ext }})
-          else
-            tar -C build -czf artifacts/${NAME}.tar.gz ${BIN_NAME}${{ matrix.ext }}
-          fi
+          tar -C build -czf artifacts/${NAME}.tar.gz ${BIN_NAME}
           ls -lh artifacts
 
-      - name: Upload artifacts
+      - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.arch_tag }}
           path: artifacts/*
 
+  # 创建 Release
   release:
-    needs: build
+    needs: [build-linux, build-macos]
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
@@ -125,11 +165,31 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
           draft: false
           prerelease: false
+          body: |
+            ## SSLcat ${{ github.ref_name }}
+            
+            ### 📦 下载
+            
+            - **Linux AMD64** (推荐服务器部署，CGO 启用，支持 SQLite)
+            - **macOS Intel** (CGO 启用，支持 SQLite)
+            - **macOS Apple Silicon** (M1/M2/M3，CGO 启用，支持 SQLite)
+            
+            ### 🚀 快速安装
+            
+            ```bash
+            # macOS (自动选择架构)
+            curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_darwin-$(uname -m).tar.gz -o sslcat.tgz
+            tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
+            
+            # Linux
+            curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-amd64.tar.gz -o sslcat.tgz
+            tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
+            ```
+            
+            详细更新日志请查看 [CHANGELOG.md](https://github.com/xurenlu/sslcat/blob/${{ github.ref_name }}/CHANGELOG.md)
           files: artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-
