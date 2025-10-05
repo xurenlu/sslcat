@@ -1843,6 +1843,19 @@ func (gs *GitServer) loadApps() error {
 		}
 
 		// 修复其他可能的相对路径
+		// 修复 CurrentLog 路径（确保是绝对路径）
+		if app.CurrentLog != "" && !filepath.IsAbs(app.CurrentLog) {
+			// 如果包含当前日期的 deploy-YYYY-MM-DD.log，则保留文件名，放到 LogsDir 下
+			filename := filepath.Base(app.CurrentLog)
+			if strings.HasPrefix(filename, "deploy-") && strings.HasSuffix(filename, ".log") {
+				app.CurrentLog = filepath.Join(app.LogsDir, filename)
+			} else {
+				// 否则将其视为相对路径，基于工作目录转换
+				app.CurrentLog = filepath.Join(workDir, app.CurrentLog)
+			}
+			gs.logger.Infof("修复应用 %s 的 CurrentLog 路径: %s", app.Name, app.CurrentLog)
+		}
+
 		if app.GitPath != "" && !filepath.IsAbs(app.GitPath) {
 			absPath := filepath.Join(workDir, app.GitPath)
 			if _, err := os.Stat(absPath); err == nil {
