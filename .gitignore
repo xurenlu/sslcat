@@ -26,6 +26,10 @@ go.work
 build/
 dist/
 
+# Deployment directories
+deploy-shifen/
+deploy-whatq/
+
 # IDE files
 .vscode/
 .idea/

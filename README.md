@@ -1,6 +1,6 @@
 # SSLcat - SSL 代理服务器
 
-[![Version](https://img.shields.io/badge/version-1.3.9-blue.svg)](https://github.com/xurenlu/sslcat/releases/tag/v1.3.9)
+[![Version](https://img.shields.io/badge/version-1.3.10--rc1-blue.svg)](https://github.com/xurenlu/sslcat/releases/tag/v1.3.10-rc1)
 [![Go Version](https://img.shields.io/badge/go-1.25-00ADD8.svg)](https://golang.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -8,7 +8,7 @@
 
 ```bash
 # 1) macOS 本地快速试用（或自行下载 darwin 包）
-curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.3.9/sslcat_v1.3.9_darwin-arm64.tar.gz -o sslcat.tgz
+curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.3.10-rc1/sslcat_v1.3.10-rc1_darwin-arm64.tar.gz -o sslcat.tgz
 tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
 sslcat --config sslcat.conf --port 8080
 # 浏览器访问: http://localhost:8080/sslcat-panel/

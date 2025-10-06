@@ -162,18 +162,19 @@ func (gs *GitServer) InitBuilders() *BuilderRegistry {
 	registry := NewBuilderRegistry()
 
 	// 按优先级注册构建器
-	registry.Register(NewDockerBuilder(gs)) // 最高优先级：Dockerfile
-	registry.Register(NewNodeJSBuilder(gs)) // Node.js
-	registry.Register(NewDenoBuilder(gs))   // Deno
-	registry.Register(NewBunBuilder(gs))    // Bun
-	registry.Register(NewPythonBuilder(gs)) // Python
-	registry.Register(NewGoBuilder(gs))     // Go
-	registry.Register(NewRustBuilder(gs))   // Rust
-	registry.Register(NewJavaBuilder(gs))   // Java
-	registry.Register(NewRubyBuilder(gs))   // Ruby
-	registry.Register(NewPHPBuilder(gs))    // PHP
-	registry.Register(NewDotNetBuilder(gs)) // .NET
-	registry.Register(NewStaticBuilder(gs)) // 最低优先级：静态文件
+	registry.Register(NewDockerComposeBuilder(gs)) // 最高优先级：Docker Compose
+	registry.Register(NewDockerBuilder(gs))        // Dockerfile
+	registry.Register(NewNodeJSBuilder(gs))        // Node.js
+	registry.Register(NewDenoBuilder(gs))          // Deno
+	registry.Register(NewBunBuilder(gs))           // Bun
+	registry.Register(NewPythonBuilder(gs))        // Python
+	registry.Register(NewGoBuilder(gs))            // Go
+	registry.Register(NewRustBuilder(gs))          // Rust
+	registry.Register(NewJavaBuilder(gs))          // Java
+	registry.Register(NewRubyBuilder(gs))          // Ruby
+	registry.Register(NewPHPBuilder(gs))           // PHP
+	registry.Register(NewDotNetBuilder(gs))        // .NET
+	registry.Register(NewStaticBuilder(gs))        // 最低优先级：静态文件
 
 	return registry
 }

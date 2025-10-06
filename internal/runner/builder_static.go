@@ -2,9 +2,11 @@ package runner
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 )
 
-// StaticBuilder 静态文件应用构建器
+// StaticBuilder 静态文件应用构建器（基于 Nginx）
 type StaticBuilder struct {
 	*BaseBuilder
 }
@@ -12,107 +14,123 @@ type StaticBuilder struct {
 // NewStaticBuilder 创建静态文件构建器
 func NewStaticBuilder(gs *GitServer) *StaticBuilder {
 	return &StaticBuilder{
-		BaseBuilder: NewBaseBuilder("static", "Static", 8080, gs),
+		BaseBuilder: NewBaseBuilder("static", "Static (Nginx)", 80, gs),
 	}
 }
 
-// Detect 检测是否为静态文件应用（默认兜底）
+// Detect 检测是否为静态文件应用
+// 只有当其他所有 builder 都检测不出来，且根目录存在 index.html 或 index.htm 时才触发
 func (b *StaticBuilder) Detect(appPath string) (bool, error) {
-	// 静态文件构建器作为兜底，总是返回 true
-	// 但在注册表中应该是最低优先级
+	// 检测根目录是否存在 index.html 或 index.htm
 	return b.anyFileExists(appPath, []string{"index.html", "index.htm"}), nil
 }
 
-// Build 构建应用（静态文件无需构建）
+// Build 构建应用（创建临时 Dockerfile 并构建 Docker 镜像）
 func (b *StaticBuilder) Build(app *GitApp) error {
-	// 静态文件无需构建
-	return nil
+	return b.buildDockerImage(app, nil)
 }
 
 // BuildWithLogging 构建应用（带日志）
 func (b *StaticBuilder) BuildWithLogging(app *GitApp, logger *DeployLogger) error {
 	logger.WriteLog("info", "static", "检测到静态文件应用")
-	logger.WriteLog("info", "static", "静态文件无需构建步骤")
+	logger.WriteLog("info", "static", "准备使用 Nginx 镜像构建...")
+	return b.buildDockerImage(app, logger)
+}
+
+// buildDockerImage 构建 Docker 镜像
+func (b *StaticBuilder) buildDockerImage(app *GitApp, logger *DeployLogger) error {
+	// 创建临时 Dockerfile
+	dockerfilePath := filepath.Join(app.RepoDir, "Dockerfile.sslcat-static")
+
+	// 生成 Dockerfile 内容
+	dockerfileContent := `FROM nginx:alpine
+COPY . /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+`
+
+	if logger != nil {
+		logger.WriteLog("info", "static", "创建临时 Dockerfile...")
+	}
+
+	// 写入临时 Dockerfile
+	if err := os.WriteFile(dockerfilePath, []byte(dockerfileContent), 0644); err != nil {
+		return fmt.Errorf("创建 Dockerfile 失败: %w", err)
+	}
+
+	// 确保构建完成后删除临时 Dockerfile
+	defer os.Remove(dockerfilePath)
+
+	imageName := fmt.Sprintf("sslcat-%s:latest", app.Name)
+
+	if logger != nil {
+		logger.WriteLog("info", "static", fmt.Sprintf("构建 Docker 镜像: %s", imageName))
+		if err := b.runCommandWithLogging(app.RepoDir, logger, "docker", "build", "-f", "Dockerfile.sslcat-static", "-t", imageName, "."); err != nil {
+			return fmt.Errorf("Docker 镜像构建失败: %w", err)
+		}
+		logger.WriteLog("info", "static", "镜像构建成功")
+	} else {
+		if err := b.runCommand(app.RepoDir, "docker", "build", "-f", "Dockerfile.sslcat-static", "-t", imageName, "."); err != nil {
+			return fmt.Errorf("Docker 镜像构建失败: %w", err)
+		}
+	}
+
 	return nil
 }
 
-// Start 启动应用（使用简单的 HTTP 服务器）
+// Start 启动应用（使用 Docker 容器运行 Nginx）
 func (b *StaticBuilder) Start(app *GitApp) error {
-	// 使用 Python 的 http.server 或其他简单服务器
-	return b.startHTTPServer(app)
+	imageName := fmt.Sprintf("sslcat-%s:latest", app.Name)
+	containerName := fmt.Sprintf("sslcat-%s", app.Name)
+
+	// 停止并删除旧容器
+	b.runCommand(app.RepoDir, "docker", "stop", containerName)
+	b.runCommand(app.RepoDir, "docker", "rm", containerName)
+
+	// 启动新容器
+	portMapping := fmt.Sprintf("%d:80", app.Port)
+	if err := b.runCommand(app.RepoDir, "docker", "run", "-d",
+		"--name", containerName,
+		"-p", portMapping,
+		imageName); err != nil {
+		return fmt.Errorf("Docker 容器启动失败: %w", err)
+	}
+
+	return nil
 }
 
 // StartWithLogging 启动应用（带日志）
 func (b *StaticBuilder) StartWithLogging(app *GitApp, logger *DeployLogger) error {
-	logger.WriteLog("info", "static", "启动静态文件服务器...")
+	logger.WriteLog("info", "static", "启动 Nginx 容器...")
 
-	if err := b.startHTTPServerWithLogging(app, logger); err != nil {
-		return fmt.Errorf("静态服务器启动失败: %w", err)
+	imageName := fmt.Sprintf("sslcat-%s:latest", app.Name)
+	containerName := fmt.Sprintf("sslcat-%s", app.Name)
+
+	// 停止旧容器
+	logger.WriteLog("info", "static", "停止旧容器（如果存在）...")
+	b.runCommandWithLogging(app.RepoDir, logger, "docker", "stop", containerName)
+	b.runCommandWithLogging(app.RepoDir, logger, "docker", "rm", containerName)
+
+	// 启动新容器
+	logger.WriteLog("info", "static", "启动新的 Nginx 容器...")
+	portMapping := fmt.Sprintf("%d:80", app.Port)
+
+	// 构建环境变量参数
+	args := []string{"run", "-d", "--name", containerName, "-p", portMapping}
+	for key, value := range app.EnvVars {
+		args = append(args, "-e", fmt.Sprintf("%s=%s", key, value))
+	}
+	args = append(args, imageName)
+
+	if err := b.runCommandWithLogging(app.RepoDir, logger, "docker", args...); err != nil {
+		return fmt.Errorf("Nginx 容器启动失败: %w", err)
 	}
 
-	logger.WriteLog("info", "static", "静态文件服务器启动成功")
+	logger.WriteLog("info", "static", fmt.Sprintf("静态站点已成功部署到 http://localhost:%d", app.Port))
 	return nil
 }
 
-// startHTTPServer 启动 HTTP 服务器
-func (b *StaticBuilder) startHTTPServer(app *GitApp) error {
-	// 尝试多种静态文件服务器
-
-	// 优先使用 Python 3
-	if err := b.testCommand("python3", "--version"); err == nil {
-		command := fmt.Sprintf("python3 -m http.server ${PORT:-8080}")
-		return b.startProcess(app, command)
-	}
-
-	// 尝试 Python 2
-	if err := b.testCommand("python", "--version"); err == nil {
-		command := fmt.Sprintf("python -m SimpleHTTPServer ${PORT:-8080}")
-		return b.startProcess(app, command)
-	}
-
-	// 尝试 Node.js 的 http-server (如果已安装)
-	if err := b.testCommand("npx", "--version"); err == nil {
-		command := fmt.Sprintf("npx http-server -p ${PORT:-8080}")
-		return b.startProcess(app, command)
-	}
-
-	return fmt.Errorf("未找到可用的静态文件服务器（需要 Python 或 Node.js）")
-}
-
-// startHTTPServerWithLogging 启动 HTTP 服务器（带日志）
-func (b *StaticBuilder) startHTTPServerWithLogging(app *GitApp, logger *DeployLogger) error {
-	// 尝试多种静态文件服务器
-
-	// 优先使用 Python 3
-	if err := b.testCommand("python3", "--version"); err == nil {
-		logger.WriteLog("info", "static", "使用 Python 3 http.server")
-		command := fmt.Sprintf("python3 -m http.server ${PORT:-8080}")
-		return b.startProcessWithLogging(app, command, logger)
-	}
-
-	// 尝试 Python 2
-	if err := b.testCommand("python", "--version"); err == nil {
-		logger.WriteLog("info", "static", "使用 Python 2 SimpleHTTPServer")
-		command := fmt.Sprintf("python -m SimpleHTTPServer ${PORT:-8080}")
-		return b.startProcessWithLogging(app, command, logger)
-	}
-
-	// 尝试 Node.js 的 http-server
-	if err := b.testCommand("npx", "--version"); err == nil {
-		logger.WriteLog("info", "static", "使用 npx http-server")
-		command := fmt.Sprintf("npx http-server -p ${PORT:-8080}")
-		return b.startProcessWithLogging(app, command, logger)
-	}
-
-	return fmt.Errorf("未找到可用的静态文件服务器（需要 Python 或 Node.js）")
-}
-
-// testCommand 测试命令是否可用
-func (b *StaticBuilder) testCommand(command string, args ...string) error {
-	return b.runCommand(".", command, args...)
-}
-
-// GetDefaultPort 静态文件默认端口
+// GetDefaultPort 静态文件默认端口（Nginx 默认是 80）
 func (b *StaticBuilder) GetDefaultPort() int {
-	return 8080
+	return 80
 }

@@ -53,6 +53,30 @@
 | [Dockerfile](Dockerfile) | Docker 镜像构建文件 |
 | [docker-compose.yml](docker-compose.yml) | Docker Compose 部署配置 |
 
+## 🚀 Git 部署功能
+
+| 文档 | 描述 |
+|------|------|
+| [docs/git-deploy-ssh-plan.md](docs/git-deploy-ssh-plan.md) | Git 部署功能规划和实现计划 |
+| [docs/git-deploy-ssh-implementation.md](docs/git-deploy-ssh-implementation.md) | Git SSH 部署详细实现文档 |
+| [docs/docker-compose-deploy.md](docs/docker-compose-deploy.md) | Docker Compose 自动部署指南 |
+| [DOKKU_STYLE_GIT_DEPLOY.md](DOKKU_STYLE_GIT_DEPLOY.md) | Dokku 风格的 Git 部署说明 |
+
+### 支持的应用类型
+
+SSLcat Git 部署功能支持以下应用类型：
+
+- **🐳 Docker Compose** - 多容器应用部署（新增）
+- **🐋 Dockerfile** - 单容器 Docker 应用
+- **📦 Node.js** - npm/yarn/pnpm/Bun/Deno
+- **🐍 Python** - pip/pipenv/poetry
+- **🦀 Go** - go build
+- **⚙️ Rust** - cargo build
+- **☕ Java** - Maven/Gradle
+- **💎 Ruby** - Bundle
+- **🐘 PHP** - Composer
+- **🌐 Static** - HTML/CSS/JS 静态文件
+
 ## ⚙️ 配置文件
 
 | 文件 | 描述 |
