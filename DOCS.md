@@ -21,6 +21,8 @@
 |------|------|------|
 | [DEPLOYMENT.md](DEPLOYMENT.md) | 🇨🇳 中文 | 详细的部署指南，包含交叉编译、部署脚本使用等 |
 | [DEPLOYMENT_EN.md](DEPLOYMENT_EN.md) | 🇺🇸 English | Complete deployment and operations guide |
+| [docs/port-configuration-guide.md](docs/port-configuration-guide.md) | 🇨🇳 中文 | 端口配置使用指南，标准模式和自定义模式说明 |
+| [docs/static-builder-nginx.md](docs/static-builder-nginx.md) | 🇨🇳 中文 | 静态站点 Builder 完整文档 |
 
 ### 📋 项目总结
 

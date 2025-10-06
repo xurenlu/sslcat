@@ -495,15 +495,16 @@ func (uc *UpstreamCache) isCacheableContentType(contentType string) bool {
 	contentType = strings.ToLower(strings.Split(contentType, ";")[0])
 
 	// 静态资源类型
+	// 注意：不包含 application/json 和 application/xml，因为这些通常是动态 API 响应
 	cacheableTypes := []string{
 		"text/css",
 		"text/javascript",
 		"application/javascript",
 		"application/x-javascript",
 		"text/plain",
-		"application/json",
-		"application/xml",
-		"text/xml",
+		// "application/json",  // 移除：通常是动态 API 响应，不应缓存
+		// "application/xml",   // 移除：通常是动态 API 响应，不应缓存
+		// "text/xml",          // 移除：通常是动态 API 响应，不应缓存
 		"image/jpeg",
 		"image/png",
 		"image/gif",

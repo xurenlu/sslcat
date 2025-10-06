@@ -44,8 +44,14 @@ type Config struct {
 // ServerConfig 服务器配置
 type ServerConfig struct {
 	Host  string `json:"host"`
-	Port  int    `json:"port"`
+	Port  int    `json:"port"` // 向后兼容，保留原字段
 	Debug bool   `json:"debug"`
+
+	// 新的端口配置
+	PortMode    string `json:"port_mode"`    // "standard" | "custom" (默认 "standard")
+	CustomPort  int    `json:"custom_port"`  // 自定义端口（仅在 custom 模式生效）
+	EnableHTTPS bool   `json:"enable_https"` // 是否启用 HTTPS（默认 true）
+
 	// 访问日志
 	AccessLogEnabled  bool   `json:"access_log_enabled"`
 	AccessLogFormat   string `json:"access_log_format"` // nginx|apache|json
@@ -698,9 +704,13 @@ func Load(configFile string) (*Config, error) {
 	// 设置默认值
 	config := &Config{
 		Server: ServerConfig{
-			Host:              "0.0.0.0",
-			Port:              443,
-			Debug:             false,
+			Host:  "0.0.0.0",
+			Port:  443, // 向后兼容，保留原字段
+			Debug: false,
+			// 新的端口配置默认值
+			PortMode:          "standard", // 默认标准模式
+			CustomPort:        8080,       // 默认自定义端口
+			EnableHTTPS:       true,       // 默认启用 HTTPS
 			AccessLogEnabled:  true,
 			AccessLogFormat:   "nginx",
 			AccessLogPath:     "./data/access.log",
@@ -832,6 +842,9 @@ func Load(configFile string) (*Config, error) {
 			return nil, fmt.Errorf("解析配置文件失败: %w", err)
 		}
 	}
+
+	// 配置迁移：处理旧的端口配置
+	migratePortConfig(config)
 
 	// 解析时间字符串
 	if config.Security.BlockDurationStr != "" {
@@ -1205,4 +1218,21 @@ type UpstreamCacheConfig struct {
 
 	// 可缓存的Content-Type
 	CacheableContentTypes []string `json:"cacheable_content_types"`
+}
+
+// migratePortConfig 迁移旧的端口配置到新的配置结构
+func migratePortConfig(config *Config) {
+	// 如果 PortMode 为空，说明是旧配置，需要迁移
+	if config.Server.PortMode == "" {
+		if config.Server.Port == 443 {
+			// 原来是 443 端口，迁移到标准模式
+			config.Server.PortMode = "standard"
+			config.Server.EnableHTTPS = true
+		} else {
+			// 其他端口，迁移到自定义模式
+			config.Server.PortMode = "custom"
+			config.Server.CustomPort = config.Server.Port
+			config.Server.EnableHTTPS = false
+		}
+	}
 }

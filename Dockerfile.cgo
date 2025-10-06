@@ -1,15 +1,6 @@
-# Dockerfile for CGO build with China proxy optimization
+# Dockerfile for CGO build
 # 使用多阶段构建解决交叉编译问题
-FROM --platform=linux/amd64 golang:1.25-alpine AS builder
-
-# 配置 Alpine 中国镜像源
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
-
-# 设置 Go 代理环境变量（中国镜像）
-ENV GOPROXY=https://goproxy.cn,direct
-ENV GOSUMDB=sum.golang.google.cn
-ENV GONOPROXY=""
-ENV GONOSUMDB=""
+FROM golang:1.23-alpine AS builder
 
 # 安装 CGO 依赖
 RUN apk add --no-cache \
@@ -39,9 +30,6 @@ RUN CGO_ENABLED=1 go build \
 
 # 最终阶段
 FROM alpine:latest
-
-# 配置 Alpine 中国镜像源
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 
 # 安装运行时依赖
 RUN apk add --no-cache \

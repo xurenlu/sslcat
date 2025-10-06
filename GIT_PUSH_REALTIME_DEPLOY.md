@@ -197,14 +197,14 @@ SSLcat 主进程会监控这些触发文件并执行部署。
 
 # 可调整参数
 MAX_TOTAL_TIME=600    # 最长总等待时间（秒），默认 10 分钟
-IDLE_TIMEOUT=30       # 无新日志超时时间（秒），默认 30 秒
+IDLE_TIMEOUT=120      # 无新日志超时时间（秒），默认 120 秒 (2分钟)
 ```
 
 **推荐配置**：
-- 小型项目（Node.js 静态站）: `MAX_TOTAL_TIME=300` (5分钟)
-- 中型项目（React/Vue SPA）: `MAX_TOTAL_TIME=600` (10分钟)
-- 大型项目（Go/Java 后端）: `MAX_TOTAL_TIME=1200` (20分钟)
-- Docker 构建项目: `MAX_TOTAL_TIME=1800` (30分钟)
+- 小型项目（Node.js 静态站）: `MAX_TOTAL_TIME=300` (5分钟), `IDLE_TIMEOUT=60` (1分钟)
+- 中型项目（React/Vue SPA）: `MAX_TOTAL_TIME=600` (10分钟), `IDLE_TIMEOUT=120` (2分钟)
+- 大型项目（Go/Java 后端）: `MAX_TOTAL_TIME=1200` (20分钟), `IDLE_TIMEOUT=180` (3分钟)
+- Docker 构建项目: `MAX_TOTAL_TIME=1800` (30分钟), `IDLE_TIMEOUT=300` (5分钟)
 
 ## 兼容性
 
@@ -263,17 +263,18 @@ echo $TERM
 
 ### 3. 日志监控提前退出
 
-**现象**: 看到 "No new logs for 30s" 提示
+**现象**: 看到 "No new logs for 120s (2 min)" 提示
 
 **原因**: 
 1. 部署可能已完成但没有输出"部署成功"关键词
-2. 部署进程卡住，30秒内没有任何日志输出
+2. 部署进程卡住，120秒内没有任何日志输出
 3. 日志写入延迟
+4. 构建工具在编译或下载依赖时长时间静默
 
 **解决**: 
 1. 检查 Web 管理面板的应用状态
 2. 手动查看完整日志：`tail -f /path/to/logs/deploy-*.log`
-3. 如果经常出现，增加 `IDLE_TIMEOUT` 值
+3. 如果经常出现，可以进一步增加 `IDLE_TIMEOUT` 值（如 180秒=3分钟）
 
 ### 4. 权限问题
 
@@ -312,7 +313,7 @@ chmod +x /path/to/repos/{appname}/git/hooks/post-receive
 - **日志读取**: 增量读取，不重复处理
 - **轮询间隔**: 1 秒一次，平衡实时性和性能
 - **智能超时**: 
-  - 空闲超时：30 秒无新日志则退出
+  - 空闲超时：120 秒（2分钟）无新日志则退出
   - 最大时间：10 分钟总时间限制
   - 持续监控：有日志就继续，无时间限制
 - **内存占用**: 流式处理，不缓存全部日志
@@ -323,19 +324,25 @@ chmod +x /path/to/repos/{appname}/git/hooks/post-receive
 
 #### 1. 空闲超时（Idle Timeout）
 
-**默认值**: 30 秒  
-**触发条件**: 连续 30 秒没有任何新日志输出  
+**默认值**: 120 秒（2 分钟）  
+**触发条件**: 连续 120 秒没有任何新日志输出  
 **行为**: 显示警告并退出，但部署继续在后台运行
 
 ```bash
-⚠ No new logs for 30s, deployment may still be running in background
+⚠ No new logs for 120s (2 min), deployment may still be running in background
   Check admin panel or logs for details: tail -f /path/to/deploy.log
 ```
 
 **适用场景**:
 - 部署已完成但没有输出完成关键词
 - 部署进程卡住或出错
+- 构建工具在编译/下载时长时间无输出
 - 需要用户介入检查
+
+**为什么增加到2分钟？**
+- 很多构建工具（npm、go build、docker build）在编译或下载依赖时可能1-2分钟无输出
+- 30秒太短，容易在正常构建中触发"假警报"
+- 2分钟能更好地平衡用户体验和异常检测
 
 #### 2. 最大总时间（Max Total Time）
 

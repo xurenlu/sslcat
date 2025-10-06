@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"crypto/tls"
 	"flag"
 	"fmt"
@@ -29,7 +28,7 @@ import (
 )
 
 var (
-	version = "1.3.5-rc1"
+	version = "1.3.10"
 	build   = "dev"
 )
 
@@ -139,7 +138,11 @@ func main() {
 		cfg.SSL.Staging = true
 	}
 	if *port != 443 {
+		// 使用 --port 参数时，自动切换到自定义模式
 		cfg.Server.Port = *port
+		cfg.Server.PortMode = "custom"
+		cfg.Server.CustomPort = *port
+		cfg.Server.EnableHTTPS = false
 	}
 	if *host != "0.0.0.0" {
 		cfg.Server.Host = *host
@@ -296,119 +299,26 @@ func main() {
 		idleTimeout = 120 * time.Second
 	}
 
-	// 启动HTTP(S)
-	server := &http.Server{
-		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
-		Handler:      webServer,
-		ReadTimeout:  readTimeout,
-		WriteTimeout: writeTimeout,
-		IdleTimeout:  idleTimeout,
-		TLSConfig:    sslManager.GetTLSConfig(),
-	}
-	go func() {
-		log.Infof("HTTPS server listening on %s (multi-domain SSL supported)", server.Addr)
-		if cfg.Server.Port == 443 || cfg.Server.Port == 8443 {
-			if err := server.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
-				log.Fatalf("failed to start HTTPS server: %v", err)
-			}
-		} else {
-			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Fatalf("failed to start HTTP server: %v", err)
-			}
-		}
-	}()
-
-	// 如果是443端口，同时启动80端口的HTTP重定向服务器，并处理 ACME HTTP-01 挑战
-	if cfg.Server.Port == 443 {
-		go func() {
-			redirectServer := &http.Server{
-				Addr: fmt.Sprintf("%s:80", cfg.Server.Host),
-				Handler: sslManager.HTTPChallengeHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					// 检查Host是否为IP地址，如果是IP则不重定向到HTTPS
-					if isIPHost(r.Host) {
-						// IP访问时，检查是否有代理配置
-						if rule := proxyManager.GetProxyConfig(r.Host); rule != nil {
-							proxyManager.ProxyRequest(w, r, rule)
-							return
-						}
-						// IP访问且无代理配置时，返回默认页面
-						webServer.ServeHTTP(w, r)
-						return
-					}
-
-					// 域名访问的处理逻辑
-					// 检查是否是管理面板路径或API路径
-					if strings.HasPrefix(r.URL.Path, cfg.AdminPrefix) {
-						// 检查是否是来自 localhost 的 API 请求（不重定向，直接处理）
-						clientIP := r.RemoteAddr
-						if idx := strings.LastIndex(clientIP, ":"); idx != -1 {
-							clientIP = clientIP[:idx]
-						}
-						isLocalhost := clientIP == "127.0.0.1" || clientIP == "::1" || strings.HasPrefix(clientIP, "127.")
-						isAPIPath := strings.Contains(r.URL.Path, "/api/")
-
-						if isLocalhost && isAPIPath {
-							// localhost 的 API 请求直接处理，不重定向
-							webServer.ServeHTTP(w, r)
-							return
-						}
-
-						// 其他管理面板路径：只有在有有效证书时才重定向到HTTPS
-						host := r.Host
-						if idx := strings.Index(host, ":"); idx != -1 {
-							host = host[:idx]
-						}
-						if sslManager.HasValidCertificate(host) {
-							httpsURL := fmt.Sprintf("https://%s%s", r.Host, r.RequestURI)
-							http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
-							return
-						}
-						// 没有证书时，直接用 HTTP 处理
-						webServer.ServeHTTP(w, r)
-						return
-					}
-
-					// 其他路径通过代理处理（如果有配置）
-					if rule := proxyManager.GetProxyConfig(r.Host); rule != nil {
-						// 如果配置了SSLOnly且有有效证书，才重定向
-						host := r.Host
-						if idx := strings.Index(host, ":"); idx != -1 {
-							host = host[:idx]
-						}
-						if rule.SSLOnly && sslManager.HasValidCertificate(host) {
-							httpsURL := fmt.Sprintf("https://%s%s", r.Host, r.RequestURI)
-							http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
-							return
-						}
-						proxyManager.ProxyRequest(w, r, rule)
-						return
-					}
-
-					// 没有配置的域名：默认用 HTTP 处理，不强制重定向
-					webServer.ServeHTTP(w, r)
-				})),
-				ReadTimeout:  readTimeout,
-				WriteTimeout: writeTimeout,
-			}
-
-			log.Infof("HTTP redirect server listening on %s:80", cfg.Server.Host)
-			if err := redirectServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Errorf("HTTP redirect server error: %v", err)
-			}
-		}()
+	// 根据端口模式启动服务器
+	switch cfg.Server.PortMode {
+	case "standard":
+		startStandardMode(cfg, webServer, sslManager, proxyManager, readTimeout, writeTimeout, idleTimeout)
+	case "custom":
+		startCustomMode(cfg, webServer, readTimeout, writeTimeout, idleTimeout)
+	default:
+		// 默认使用标准模式
+		startStandardMode(cfg, webServer, sslManager, proxyManager, readTimeout, writeTimeout, idleTimeout)
 	}
 
 	// 等待信号
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	sig := <-quit
-	log.Infof("Received signal %v, starting graceful shutdown...", sig)
+	logrus.Infof("Received signal %v, starting graceful shutdown...", sig)
 
 	// 发送系统关闭通知
 	notificationIntegrator.SendSystemShutdownNotification()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
 	securityManager.Stop()
 	proxyManager.Stop()
 	sslManager.Stop()
@@ -416,6 +326,122 @@ func main() {
 	// 停止 Runner 模块
 	gitServer.Stop()
 
-	_ = server.Shutdown(ctx)
-	log.Info("SSLcat server stopped")
+	logrus.Info("SSLcat server stopped")
+}
+
+// startStandardMode 启动标准模式（监听 80 和 443 端口）
+func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *ssl.Manager, proxyManager *proxy.Manager, readTimeout, writeTimeout, idleTimeout time.Duration) {
+	// 启动 HTTPS 服务器 (443)
+	if cfg.Server.EnableHTTPS {
+		httpsServer := &http.Server{
+			Addr:         fmt.Sprintf("%s:443", cfg.Server.Host),
+			Handler:      webServer,
+			ReadTimeout:  readTimeout,
+			WriteTimeout: writeTimeout,
+			IdleTimeout:  idleTimeout,
+			TLSConfig:    sslManager.GetTLSConfig(),
+		}
+		go func() {
+			logrus.Infof("HTTPS server listening on %s:443 (multi-domain SSL supported)", cfg.Server.Host)
+			if err := httpsServer.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
+				logrus.Fatalf("failed to start HTTPS server: %v", err)
+			}
+		}()
+	}
+
+	// 启动 HTTP 重定向服务器 (80)
+	redirectServer := &http.Server{
+		Addr: fmt.Sprintf("%s:80", cfg.Server.Host),
+		Handler: sslManager.HTTPChallengeHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// 检查Host是否为IP地址，如果是IP则不重定向到HTTPS
+			if isIPHost(r.Host) {
+				// IP访问时，检查是否有代理配置
+				if rule := proxyManager.GetProxyConfig(r.Host); rule != nil {
+					proxyManager.ProxyRequest(w, r, rule)
+					return
+				}
+				// IP访问且无代理配置时，返回默认页面
+				webServer.ServeHTTP(w, r)
+				return
+			}
+
+			// 域名访问的处理逻辑
+			// 检查是否是管理面板路径或API路径
+			if strings.HasPrefix(r.URL.Path, cfg.AdminPrefix) {
+				// 检查是否是来自 localhost 的 API 请求（不重定向，直接处理）
+				clientIP := r.RemoteAddr
+				if idx := strings.LastIndex(clientIP, ":"); idx != -1 {
+					clientIP = clientIP[:idx]
+				}
+				isLocalhost := clientIP == "127.0.0.1" || clientIP == "::1" || strings.HasPrefix(clientIP, "127.")
+				isAPIPath := strings.Contains(r.URL.Path, "/api/")
+
+				if isLocalhost && isAPIPath {
+					// localhost 的 API 请求直接处理，不重定向
+					webServer.ServeHTTP(w, r)
+					return
+				}
+
+				// 其他管理面板路径：只有在有有效证书时才重定向到HTTPS
+				host := r.Host
+				if idx := strings.Index(host, ":"); idx != -1 {
+					host = host[:idx]
+				}
+				if sslManager.HasValidCertificate(host) {
+					httpsURL := fmt.Sprintf("https://%s%s", r.Host, r.RequestURI)
+					http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
+					return
+				}
+				// 没有证书时，直接用 HTTP 处理
+				webServer.ServeHTTP(w, r)
+				return
+			}
+
+			// 其他路径通过代理处理（如果有配置）
+			if rule := proxyManager.GetProxyConfig(r.Host); rule != nil {
+				// 如果配置了SSLOnly且有有效证书，才重定向
+				host := r.Host
+				if idx := strings.Index(host, ":"); idx != -1 {
+					host = host[:idx]
+				}
+				if rule.SSLOnly && sslManager.HasValidCertificate(host) {
+					httpsURL := fmt.Sprintf("https://%s%s", r.Host, r.RequestURI)
+					http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
+					return
+				}
+				proxyManager.ProxyRequest(w, r, rule)
+				return
+			}
+
+			// 没有配置的域名：默认用 HTTP 处理，不强制重定向
+			webServer.ServeHTTP(w, r)
+		})),
+		ReadTimeout:  readTimeout,
+		WriteTimeout: writeTimeout,
+	}
+
+	go func() {
+		logrus.Infof("HTTP redirect server listening on %s:80", cfg.Server.Host)
+		if err := redirectServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logrus.Errorf("HTTP redirect server error: %v", err)
+		}
+	}()
+}
+
+// startCustomMode 启动自定义模式（监听单个端口）
+func startCustomMode(cfg *config.Config, webServer http.Handler, readTimeout, writeTimeout, idleTimeout time.Duration) {
+	server := &http.Server{
+		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.CustomPort),
+		Handler:      webServer,
+		ReadTimeout:  readTimeout,
+		WriteTimeout: writeTimeout,
+		IdleTimeout:  idleTimeout,
+	}
+
+	go func() {
+		logrus.Infof("HTTP server listening on %s (custom port mode)", server.Addr)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logrus.Fatalf("failed to start HTTP server: %v", err)
+		}
+	}()
 }

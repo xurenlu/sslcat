@@ -17,6 +17,12 @@ import {
   SimpleGrid,
   Text,
   Select,
+  RadioGroup,
+  Radio,
+  Badge,
+  Alert,
+  AlertIcon,
+  AlertDescription,
 } from '@chakra-ui/react'
 import {
   FiSettings,
@@ -32,8 +38,10 @@ const Settings: React.FC = () => {
   const [settings, setSettings] = useState({
     // 基础设置
     adminPrefix: adminPrefix,
-    httpPort: '80',
-    httpsPort: '443',
+    // 新的端口配置
+    portMode: 'standard', // 'standard' | 'custom'
+    customPort: 8080,
+    enableHttps: true,
     
     // SSL设置
     autoSSL: true,
@@ -107,8 +115,9 @@ const Settings: React.FC = () => {
             setSettings(prev => ({
               ...prev,
               // 基础设置
-              httpPort: config.server?.port?.toString() || '80',
-              httpsPort: config.server?.port?.toString() || '443',
+              portMode: config.server?.port_mode || 'standard',
+              customPort: config.server?.custom_port || 8080,
+              enableHttps: config.server?.enable_https !== false,
               
               // SSL设置
               autoSSL: !config.ssl?.disable_self_signed || true,
@@ -188,8 +197,10 @@ const Settings: React.FC = () => {
         credentials: 'include',
         body: JSON.stringify({
           adminPrefix: settings.adminPrefix,
-          httpPort: settings.httpPort,
-          httpsPort: settings.httpsPort,
+          // 新的端口配置
+          portMode: settings.portMode,
+          customPort: settings.customPort,
+          enableHttps: settings.enableHttps,
           autoSSL: settings.autoSSL,
           letsEncryptEmail: settings.letsEncryptEmail,
           sslProvider: settings.sslProvider,
@@ -315,8 +326,10 @@ const Settings: React.FC = () => {
     // 重置为默认值
     setSettings({
       adminPrefix: adminPrefix,
-      httpPort: '80',
-      httpsPort: '443',
+      // 新的端口配置
+      portMode: 'standard',
+      customPort: 8080,
+      enableHttps: true,
       autoSSL: true,
       letsEncryptEmail: 'admin@example.com',
       sslProvider: 'letsencrypt',
@@ -405,25 +418,104 @@ const Settings: React.FC = () => {
                 />
               </FormControl>
               
+              {/* 端口模式选择 */}
               <FormControl>
-                <FormLabel>{t.settings.httpPort}</FormLabel>
-                <Input
-                  value={settings.httpPort}
-                  onChange={(e) => handleInputChange('httpPort', e.target.value)}
-                  placeholder="80"
-                  type="number"
-                />
+                <FormLabel>端口模式</FormLabel>
+                <RadioGroup 
+                  value={settings.portMode} 
+                  onChange={(value) => handleInputChange('portMode', value)}
+                >
+                  <VStack align="start" spacing={3}>
+                    <Radio value="standard">
+                      <VStack align="start" spacing={1}>
+                        <Text fontWeight="bold">标准模式（推荐）</Text>
+                        <Text fontSize="sm" color="gray.600">
+                          监听 80 和 443 端口，支持完整的 HTTP/HTTPS 功能
+                        </Text>
+                        <Text fontSize="sm" color="green.600">
+                          ✓ 自动 SSL 证书申请和管理<br/>
+                          ✓ HTTP 到 HTTPS 自动重定向<br/>
+                          ✓ 适合生产环境
+                        </Text>
+                      </VStack>
+                    </Radio>
+                    <Radio value="custom">
+                      <VStack align="start" spacing={1}>
+                        <Text fontWeight="bold">自定义端口</Text>
+                        <Text fontSize="sm" color="gray.600">
+                          监听单个自定义端口，仅支持 HTTP
+                        </Text>
+                        <Text fontSize="sm" color="orange.600">
+                          ⚠️ 不支持 SSL 证书自动申请<br/>
+                          ⚠️ 不支持 HTTPS 功能<br/>
+                          ⚠️ 适合开发环境或内网部署
+                        </Text>
+                      </VStack>
+                    </Radio>
+                  </VStack>
+                </RadioGroup>
               </FormControl>
-              
-              <FormControl>
-                <FormLabel>{t.settings.httpsPort}</FormLabel>
-                <Input
-                  value={settings.httpsPort}
-                  onChange={(e) => handleInputChange('httpsPort', e.target.value)}
-                  placeholder="443"
-                  type="number"
-                />
-              </FormControl>
+
+              {/* 标准模式配置 */}
+              {settings.portMode === 'standard' && (
+                <Box p={4} bg="green.50" borderRadius="md">
+                  <VStack spacing={3} align="stretch">
+                    <Text fontWeight="bold" color="green.700">
+                      标准模式配置
+                    </Text>
+                    <HStack>
+                      <Text>HTTP 端口：</Text>
+                      <Badge colorScheme="blue">80</Badge>
+                    </HStack>
+                    <HStack>
+                      <Text>HTTPS 端口：</Text>
+                      <Badge colorScheme="green">443</Badge>
+                    </HStack>
+                    <FormControl>
+                      <FormLabel>启用 HTTPS</FormLabel>
+                      <Switch
+                        isChecked={settings.enableHttps}
+                        onChange={(e) => handleInputChange('enableHttps', e.target.checked)}
+                      />
+                      <Text fontSize="sm" color="gray.600">
+                        启用后会自动申请和管理 SSL 证书
+                      </Text>
+                    </FormControl>
+                  </VStack>
+                </Box>
+              )}
+
+              {/* 自定义模式配置 */}
+              {settings.portMode === 'custom' && (
+                <Box p={4} bg="orange.50" borderRadius="md">
+                  <VStack spacing={3} align="stretch">
+                    <Text fontWeight="bold" color="orange.700">
+                      自定义端口配置
+                    </Text>
+                    <Alert status="warning" borderRadius="md">
+                      <AlertIcon />
+                      <AlertDescription>
+                        自定义端口模式下，SSLcat 将仅监听指定端口，不支持 HTTPS 功能。
+                        如需 HTTPS，请使用标准模式或配置反向代理。
+                      </AlertDescription>
+                    </Alert>
+                    <FormControl>
+                      <FormLabel>监听端口</FormLabel>
+                      <Input
+                        type="number"
+                        value={settings.customPort}
+                        onChange={(e) => handleInputChange('customPort', parseInt(e.target.value))}
+                        placeholder="8080"
+                        min="1024"
+                        max="65535"
+                      />
+                      <Text fontSize="sm" color="gray.600">
+                        建议使用 8080、3000、8000 等非特权端口
+                      </Text>
+                    </FormControl>
+                  </VStack>
+                </Box>
+              )}
             </VStack>
           </CardBody>
         </Card>

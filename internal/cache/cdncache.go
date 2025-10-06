@@ -253,6 +253,22 @@ func (c *CDNCache) MaybeStoreWithConfig(resp *http.Response, forceEnabled bool) 
 	}
 
 	contentType := resp.Header.Get("Content-Type")
+	
+	// 不缓存动态API接口（application/json 和 API 路径）
+	// 排除条件：
+	// 1. Content-Type 是 application/json
+	// 2. URL 路径包含 /api/
+	if strings.HasPrefix(strings.ToLower(contentType), "application/json") {
+		c.log.Debugf("CDN缓存跳过存储(动态JSON API): url=%s, content-type=%s", req.URL.Path, contentType)
+		c.cleanupProcessing(req)
+		return
+	}
+	if strings.Contains(req.URL.Path, "/api/") {
+		c.log.Debugf("CDN缓存跳过存储(API路径): url=%s", req.URL.Path)
+		c.cleanupProcessing(req)
+		return
+	}
+	
 	// 规则 TTL 计算
 	ttl := c.selectTTL(req.URL.Path, contentType)
 	// 域名级默认 TTL 覆盖（由代理暂存至响应头）
@@ -306,17 +322,15 @@ func (c *CDNCache) MaybeStoreWithConfig(resp *http.Response, forceEnabled bool) 
 
 	encoding := resp.Header.Get("Content-Encoding")
 
-	// 解析Last-Modified头部
+	// 解析Last-Modified头部（仅保留原始响应中的，不自动添加）
 	var lastModified time.Time
 	if lastModifiedStr := resp.Header.Get("Last-Modified"); lastModifiedStr != "" {
 		if parsedTime, err := http.ParseTime(lastModifiedStr); err == nil {
 			lastModified = parsedTime
 		}
 	}
-	// 如果没有Last-Modified头部，使用当前时间
-	if lastModified.IsZero() {
-		lastModified = time.Now()
-	}
+	// 注意：不再自动添加 Last-Modified，只保留原始响应中的
+	// 这样可以避免给动态内容（如未被拦截的 JSON）添加不恰当的缓存头
 
 	meta := &objectMeta{
 		Host:          hostOnly(req.Host),

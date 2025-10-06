@@ -3216,7 +3216,7 @@ while read oldrev newrev refname; do
         # 监控日志 - 只要有新日志就持续等待
         # 只有在 IDLE_TIMEOUT 秒内没有新日志时才超时退出
         MAX_TOTAL_TIME=600    # 最长总等待时间 10 分钟
-        IDLE_TIMEOUT=30       # 无新日志超时时间 30 秒
+        IDLE_TIMEOUT=120      # 无新日志超时时间 120 秒 (2分钟)
         TOTAL_ELAPSED=0
         IDLE_ELAPSED=0
         DEPLOY_DONE=false
@@ -3282,7 +3282,7 @@ while read oldrev newrev refname; do
                     
                     # 空闲超时检查
                     if [ $IDLE_ELAPSED -ge $IDLE_TIMEOUT ]; then
-                        print_warning "No new logs for ${IDLE_TIMEOUT}s, deployment may still be running in background"
+                        print_warning "No new logs for ${IDLE_TIMEOUT}s (2 min), deployment may still be running in background"
                         print_info "Check admin panel or logs for details: tail -f $DEPLOY_LOG"
                         
                         # 发送部署卡住通知 API

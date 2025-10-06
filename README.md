@@ -63,6 +63,8 @@ SSLcat 是一个功能强大的企业级 SSL 代理服务器，支持自动证�
 - 📖 [项目总结](项目总结.md) - 详细的功能介绍和技术说明
 - 🚀 [部署指南 (中文)](DEPLOYMENT.md) - 完整的部署和运维文档
 - 🚀 [Deployment Guide (English)](DEPLOYMENT_EN.md) - English deployment guide
+- ⚙️ [端口配置指南](docs/port-configuration-guide.md) - 端口配置使用指南
+- 🏗️ [静态站点 Builder](docs/static-builder-nginx.md) - 静态站点部署文档
 
 ### 🌍 多语言版本
 - 🇺🇸 [English README](README_EN.md) - English version
@@ -201,11 +203,33 @@ sudo systemctl start sslcat
 
 ### 基本配置
 
+#### 标准模式（推荐）
 ```yaml
 server:
   host: "0.0.0.0"
-  port: 443
+  port_mode: "standard"    # 标准模式
+  enable_https: true      # 启用 HTTPS
   debug: false
+```
+
+#### 自定义模式
+```yaml
+server:
+  host: "0.0.0.0"
+  port_mode: "custom"     # 自定义模式
+  custom_port: 8080       # 自定义端口
+  enable_https: false     # 禁用 HTTPS
+  debug: false
+```
+
+#### 命令行方式
+```bash
+# 标准模式（默认）
+sslcat --config sslcat.conf
+
+# 自定义模式
+sslcat --config sslcat.conf --port 8080
+```
 
 ssl:
   email: "your-email@example.com"  # SSL证书邮箱

@@ -61,8 +61,10 @@ export interface DashboardStats {
 
 export interface SystemSettings {
   adminPrefix: string
-  httpPort: string
-  httpsPort: string
+  // 新的端口配置
+  portMode: 'standard' | 'custom'
+  customPort: number
+  enableHttps: boolean
   autoSSL: boolean
   letsEncryptEmail: string
   sslProvider: string
