@@ -151,13 +151,13 @@ const Statistics: React.FC = () => {
       if (result.success) {
         setData(result.data)
       } else {
-        throw new Error(result.message || '获取统计数据失败')
+        throw new Error(result.message || t.statistics.dataFetchFailed)
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '未知错误'
+      const errorMessage = error instanceof Error ? error.message : t.common.error
       setError(errorMessage)
       toast({
-        title: '数据获取失败',
+        title: t.statistics.dataFetchFailed,
         description: errorMessage,
         status: 'error',
         duration: 4000,
@@ -204,7 +204,7 @@ const Statistics: React.FC = () => {
         if (result.success) {
           setConfig(result.config)
           toast({
-            title: '配置更新成功',
+            title: t.statistics.configUpdateSuccess,
             status: 'success',
             duration: 2000,
             isClosable: true,
@@ -213,8 +213,8 @@ const Statistics: React.FC = () => {
       }
     } catch (error) {
       toast({
-        title: '配置更新失败',
-        description: error instanceof Error ? error.message : '未知错误',
+        title: t.statistics.configUpdateFailed,
+        description: error instanceof Error ? error.message : t.common.error,
         status: 'error',
         duration: 4000,
         isClosable: true,
@@ -285,16 +285,16 @@ const Statistics: React.FC = () => {
       {/* 页面标题和控制面板 */}
       <Flex justify="space-between" align="center" mb={6}>
         <VStack align="start" spacing={1}>
-          <Heading size="lg">访问统计</Heading>
-          <Text color="gray.600">网站访问数据分析和高频访问者统计</Text>
+          <Heading size="lg">{t.statistics.title}</Heading>
+          <Text color="gray.600">{t.statistics.subtitle}</Text>
         </VStack>
         
         <HStack spacing={4}>
           {/* 时间维度选择 */}
           <Select value={dimension} onChange={(e) => setDimension(e.target.value as TimeDimension)} width="120px">
-            <option value="hour">按小时</option>
-            <option value="day">按天</option>
-            <option value="month">按月</option>
+            <option value="hour">{t.statistics.hourly}</option>
+            <option value="day">{t.statistics.daily}</option>
+            <option value="month">{t.statistics.monthly}</option>
           </Select>
           
           {/* 时间选择 */}
@@ -308,7 +308,7 @@ const Statistics: React.FC = () => {
           
           {/* 域名选择 */}
           <Select value={domain} onChange={(e) => setDomain(e.target.value)} width="150px">
-            <option value="all">所有域名</option>
+            <option value="all">{t.statistics.allDomains}</option>
             {data && Object.keys(data.domain_stats).map((domainName) => (
               <option key={domainName} value={domainName}>
                 {domainName}
@@ -321,10 +321,10 @@ const Statistics: React.FC = () => {
             <MenuButton as={IconButton} icon={<FiSettings />} variant="outline" />
             <MenuList>
               <MenuItem onClick={() => updateConfig({ enabled: !config?.enabled })}>
-                {config?.enabled ? '禁用统计' : '启用统计'}
+                {config?.enabled ? t.statistics.disableStats : t.statistics.enableStats}
               </MenuItem>
               <MenuItem onClick={() => updateConfig({ geoip_enabled: !config?.geoip_enabled })}>
-                {config?.geoip_enabled ? '禁用地理位置' : '启用地理位置'}
+                {config?.geoip_enabled ? t.statistics.disableGeoLocation : t.statistics.enableGeoLocation}
               </MenuItem>
             </MenuList>
           </Menu>
@@ -336,7 +336,7 @@ const Statistics: React.FC = () => {
             isLoading={loading}
             variant="outline"
           >
-            刷新
+            {t.statistics.refresh}
           </Button>
         </HStack>
       </Flex>
@@ -353,7 +353,7 @@ const Statistics: React.FC = () => {
       {config && !config.enabled && (
         <Alert status="warning" mb={6}>
           <AlertIcon />
-          统计功能当前已禁用，请在配置中启用以收集数据
+          {t.statistics.statsDisabledWarning}
         </Alert>
       )}
 
@@ -364,9 +364,9 @@ const Statistics: React.FC = () => {
             <Stat>
               <HStack justify="space-between">
                 <Box>
-                  <StatLabel color="blue.500" fontWeight="bold">总请求数</StatLabel>
+                  <StatLabel color="blue.500" fontWeight="bold">{t.statistics.totalRequests}</StatLabel>
                   <StatNumber fontSize="2xl">{formatNumber(totalStats.total_requests)}</StatNumber>
-                  <StatHelpText>当前{getDimensionLabel(dimension)}</StatHelpText>
+                  <StatHelpText>{dimension === 'hour' ? t.statistics.currentHour : dimension === 'day' ? t.statistics.currentDay : t.statistics.currentMonth}</StatHelpText>
                 </Box>
                 <Icon as={FiBarChart2} boxSize={8} color="blue.300" />
               </HStack>
@@ -379,9 +379,9 @@ const Statistics: React.FC = () => {
             <Stat>
               <HStack justify="space-between">
                 <Box>
-                  <StatLabel color="red.500" fontWeight="bold">错误请求数</StatLabel>
+                  <StatLabel color="red.500" fontWeight="bold">{t.statistics.errorRequests}</StatLabel>
                   <StatNumber fontSize="2xl">{formatNumber(totalStats.non_success_count)}</StatNumber>
-                  <StatHelpText>非2xx状态码</StatHelpText>
+                  <StatHelpText>{t.statistics.nonSuccessCode}</StatHelpText>
                 </Box>
                 <Icon as={FiTrendingDown} boxSize={8} color="red.300" />
               </HStack>
@@ -394,9 +394,9 @@ const Statistics: React.FC = () => {
             <Stat>
               <HStack justify="space-between">
                 <Box>
-                  <StatLabel color="green.500" fontWeight="bold">成功率</StatLabel>
+                  <StatLabel color="green.500" fontWeight="bold">{t.statistics.successRate}</StatLabel>
                   <StatNumber fontSize="2xl">{getSuccessRate(totalStats).toFixed(1)}%</StatNumber>
-                  <StatHelpText>请求成功率</StatHelpText>
+                  <StatHelpText>{t.statistics.requestSuccessRate}</StatHelpText>
                 </Box>
                 <Icon as={FiTrendingUp} boxSize={8} color="green.300" />
               </HStack>
@@ -409,9 +409,9 @@ const Statistics: React.FC = () => {
             <Stat>
               <HStack justify="space-between">
                 <Box>
-                  <StatLabel color="purple.500" fontWeight="bold">独立访客</StatLabel>
+                  <StatLabel color="purple.500" fontWeight="bold">{t.statistics.uniqueVisitors}</StatLabel>
                   <StatNumber fontSize="2xl">{formatNumber(totalStats.unique_ips)}</StatNumber>
-                  <StatHelpText>唯一IP数量</StatHelpText>
+                  <StatHelpText>{t.statistics.uniqueIPCount}</StatHelpText>
                 </Box>
                 <Icon as={FiGlobe} boxSize={8} color="purple.300" />
               </HStack>
@@ -424,10 +424,10 @@ const Statistics: React.FC = () => {
       <Card mb={8}>
         <CardBody>
           <VStack align="stretch" spacing={4}>
-            <Heading size="md">请求成功率趋势</Heading>
+            <Heading size="md">{t.statistics.successRateTrend}</Heading>
             <Box>
               <Text fontSize="sm" color="gray.600" mb={2}>
-                成功请求: {totalStats.total_requests - totalStats.non_success_count} / 总请求: {totalStats.total_requests}
+                {t.statistics.successRequests}: {totalStats.total_requests - totalStats.non_success_count} / {t.statistics.totalRequests}: {totalStats.total_requests}
               </Text>
               <Progress 
                 value={getSuccessRate(totalStats)} 
@@ -447,8 +447,8 @@ const Statistics: React.FC = () => {
           <CardBody>
             <VStack align="stretch" spacing={4}>
               <HStack justify="space-between">
-                <Heading size="md">高访问IP Top {topN}</Heading>
-                <Tooltip label="基于漏斗模型过滤">
+                <Heading size="md">{t.statistics.topIPs} Top {topN}</Heading>
+                <Tooltip label={t.statistics.basedOnFunnelModel}>
                   <Icon as={FiMonitor} color="gray.400" />
                 </Tooltip>
               </HStack>
@@ -459,9 +459,9 @@ const Statistics: React.FC = () => {
                 <Table size="sm">
                   <Thead>
                     <Tr>
-                      <Th>排名</Th>
-                      <Th>IP地址</Th>
-                      <Th isNumeric>访问次数</Th>
+                      <Th>{t.statistics.ranking}</Th>
+                      <Th>{t.statistics.ipAddress}</Th>
+                      <Th isNumeric>{t.statistics.visitCount}</Th>
                     </Tr>
                   </Thead>
                   <Tbody>
@@ -492,8 +492,8 @@ const Statistics: React.FC = () => {
           <CardBody>
             <VStack align="stretch" spacing={4}>
               <HStack justify="space-between">
-                <Heading size="md">User-Agent Top {topN}</Heading>
-                <Tooltip label="基于漏斗模型过滤">
+                <Heading size="md">{t.statistics.topUserAgents} Top {topN}</Heading>
+                <Tooltip label={t.statistics.basedOnFunnelModel}>
                   <Icon as={FiMonitor} color="gray.400" />
                 </Tooltip>
               </HStack>
@@ -504,9 +504,9 @@ const Statistics: React.FC = () => {
                 <Table size="sm">
                   <Thead>
                     <Tr>
-                      <Th>排名</Th>
-                      <Th>User-Agent</Th>
-                      <Th isNumeric>访问次数</Th>
+                      <Th>{t.statistics.ranking}</Th>
+                      <Th>{t.statistics.userAgent}</Th>
+                      <Th isNumeric>{t.statistics.visitCount}</Th>
                     </Tr>
                   </Thead>
                   <Tbody>
@@ -519,7 +519,7 @@ const Statistics: React.FC = () => {
                         </Td>
                         <Td>
                           <Text fontSize="sm" maxW="200px" isTruncated>
-                            {item.key || 'Unknown'}
+                            {item.key || t.statistics.unknown}
                           </Text>
                         </Td>
                         <Td isNumeric>{formatNumber(item.count)}</Td>
@@ -537,15 +537,15 @@ const Statistics: React.FC = () => {
           <CardBody>
             <VStack align="stretch" spacing={4}>
               <HStack justify="space-between">
-                <Heading size="md">访问城市 Top {topN}</Heading>
-                <Tooltip label="需要启用地理位置功能">
+                <Heading size="md">{t.statistics.topCities} Top {topN}</Heading>
+                <Tooltip label={t.statistics.geoLocationRequired}>
                   <Icon as={FiMapPin} color="gray.400" />
                 </Tooltip>
               </HStack>
               
               {!config?.geoip_enabled ? (
                 <Text color="gray.500" fontSize="sm">
-                  地理位置功能未启用
+                  {t.statistics.geoLocationDisabled}
                 </Text>
               ) : loading ? (
                 <Spinner />
@@ -553,9 +553,9 @@ const Statistics: React.FC = () => {
                 <Table size="sm">
                   <Thead>
                     <Tr>
-                      <Th>排名</Th>
-                      <Th>城市</Th>
-                      <Th isNumeric>访问次数</Th>
+                      <Th>{t.statistics.ranking}</Th>
+                      <Th>{t.statistics.city}</Th>
+                      <Th isNumeric>{t.statistics.visitCount}</Th>
                     </Tr>
                   </Thead>
                   <Tbody>
@@ -568,7 +568,7 @@ const Statistics: React.FC = () => {
                         </Td>
                         <Td>
                           <Text fontSize="sm">
-                            {item.key || 'Unknown'}
+                            {item.key || t.statistics.unknown}
                           </Text>
                         </Td>
                         <Td isNumeric>{formatNumber(item.count)}</Td>
@@ -587,16 +587,16 @@ const Statistics: React.FC = () => {
         <Card>
           <CardBody>
             <VStack align="stretch" spacing={4}>
-              <Heading size="md">域名详细统计</Heading>
+              <Heading size="md">{t.statistics.domainStats}</Heading>
               
               <Table>
                 <Thead>
                   <Tr>
-                    <Th>域名</Th>
-                    <Th isNumeric>总请求数</Th>
-                    <Th isNumeric>错误请求</Th>
-                    <Th isNumeric>成功率</Th>
-                    <Th isNumeric>独立IP</Th>
+                    <Th>{t.statistics.domain}</Th>
+                    <Th isNumeric>{t.statistics.totalRequests}</Th>
+                    <Th isNumeric>{t.statistics.errorRequest}</Th>
+                    <Th isNumeric>{t.statistics.successRate}</Th>
+                    <Th isNumeric>{t.statistics.uniqueIP}</Th>
                   </Tr>
                 </Thead>
                 <Tbody>
@@ -630,21 +630,21 @@ const Statistics: React.FC = () => {
       <Card mt={8}>
         <CardBody>
           <VStack align="stretch" spacing={3}>
-            <Heading size="sm">关于漏斗模型统计</Heading>
+            <Heading size="sm">{t.statistics.aboutFunnelModel}</Heading>
             <Text fontSize="sm" color="gray.600">
-              高访问排行榜采用漏斗模型算法，不是简单的频次统计：
+              {t.statistics.funnelModelDesc}
             </Text>
             <VStack align="start" spacing={2} pl={4}>
-              <Text fontSize="sm">• 只有达到最小访问次数阈值的IP/User-Agent才会进入候选列表</Text>
-              <Text fontSize="sm">• 必须在一定时间跨度内持续访问才能被统计</Text>
-              <Text fontSize="sm">• 采用时间衰减算法，越近期的访问权重越高</Text>
-              <Text fontSize="sm">• 这样可以避免偶发的大量访问对服务器性能造成影响</Text>
+              <Text fontSize="sm">• {t.statistics.funnelFeature1}</Text>
+              <Text fontSize="sm">• {t.statistics.funnelFeature2}</Text>
+              <Text fontSize="sm">• {t.statistics.funnelFeature3}</Text>
+              <Text fontSize="sm">• {t.statistics.funnelFeature4}</Text>
             </VStack>
             {config && (
               <Text fontSize="xs" color="gray.500">
-                当前配置：IP最少{config.ip_funnel?.min_occurrences || 5}次访问，
-                User-Agent最少{config.ua_funnel?.min_occurrences || 3}次访问，
-                城市最少{config.city_funnel?.min_occurrences || 10}次访问
+                {t.statistics.currentConfig}：{t.statistics.ipMinOccurrences}{config.ip_funnel?.min_occurrences || 5}{t.statistics.visits}，
+                {t.statistics.uaMinOccurrences}{config.ua_funnel?.min_occurrences || 3}{t.statistics.visits}，
+                {t.statistics.cityMinOccurrences}{config.city_funnel?.min_occurrences || 10}{t.statistics.visits}
               </Text>
             )}
           </VStack>

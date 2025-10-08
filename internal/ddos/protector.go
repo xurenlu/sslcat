@@ -54,6 +54,8 @@ type ClientInfo struct {
 	RequestRate  float64   `json:"request_rate"`
 	Suspicious   bool      `json:"suspicious"`
 	BlockCount   int       `json:"block_count"`
+	// 滑动窗口：记录每个请求的时间戳
+	RequestTimestamps []time.Time `json:"-"`
 }
 
 // Attack 攻击信息
@@ -202,10 +204,11 @@ func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
 	client, exists := p.clients[clientIP]
 	if !exists {
 		client = &ClientInfo{
-			IP:           clientIP,
-			RequestCount: 0,
-			FirstRequest: now,
-			UserAgent:    userAgent,
+			IP:                clientIP,
+			RequestCount:      0,
+			FirstRequest:      now,
+			UserAgent:         userAgent,
+			RequestTimestamps: make([]time.Time, 0),
 		}
 		p.clients[clientIP] = client
 	}
@@ -221,7 +224,20 @@ func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
 	client.RequestCount++
 	client.LastRequest = now
 
-	// 计算请求速率
+	// 添加当前请求时间戳到滑动窗口
+	client.RequestTimestamps = append(client.RequestTimestamps, now)
+
+	// 清理滑动窗口：移除1小时前的请求记录（保留足够长的历史用于每小时限制检查）
+	cutoffTime := now.Add(-time.Hour)
+	validTimestamps := make([]time.Time, 0, len(client.RequestTimestamps))
+	for _, ts := range client.RequestTimestamps {
+		if ts.After(cutoffTime) {
+			validTimestamps = append(validTimestamps, ts)
+		}
+	}
+	client.RequestTimestamps = validTimestamps
+
+	// 计算请求速率（使用滑动窗口）
 	duration := now.Sub(client.FirstRequest)
 	if duration > 0 {
 		client.RequestRate = float64(client.RequestCount) / duration.Minutes()
@@ -257,28 +273,38 @@ func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
 
 // checkRateLimit 检查请求频率限制
 func (p *Protector) checkRateLimit(client *ClientInfo, threshold ThresholdConfig, now time.Time) (bool, string) {
-	// 检查每分钟请求数 - 改为滑动窗口计算
+	// 检查每分钟请求数 - 使用真正的滑动窗口统计
 	if threshold.RequestsPerMinute > 0 {
-		// 只有在最近1分钟内有足够多的请求才检查速率
 		minuteAgo := now.Add(-time.Minute)
-		if client.FirstRequest.After(minuteAgo) {
-			// 在1分钟内的请求，按实际时间计算速率
-			duration := now.Sub(client.FirstRequest)
-			if duration.Seconds() > 0 {
-				actualRate := float64(client.RequestCount) / duration.Minutes()
-				// 只有当请求数>10且速率超限时才拦截，避免短时间少量请求被误判
-				if client.RequestCount > 10 && actualRate > float64(threshold.RequestsPerMinute) {
-					return true, fmt.Sprintf("每分钟请求数超限: %.1f > %d", actualRate, threshold.RequestsPerMinute)
-				}
+
+		// 统计最近1分钟内的实际请求数
+		requestsInLastMinute := 0
+		for _, ts := range client.RequestTimestamps {
+			if ts.After(minuteAgo) {
+				requestsInLastMinute++
 			}
+		}
+
+		// 只有当最近1分钟的请求数超过阈值时才拦截
+		if requestsInLastMinute > threshold.RequestsPerMinute {
+			return true, fmt.Sprintf("每分钟请求数超限: %d > %d", requestsInLastMinute, threshold.RequestsPerMinute)
 		}
 	}
 
-	// 检查每小时请求数
+	// 检查每小时请求数 - 也使用滑动窗口统计
 	if threshold.RequestsPerHour > 0 {
 		hourAgo := now.Add(-time.Hour)
-		if client.FirstRequest.After(hourAgo) && client.RequestCount > threshold.RequestsPerHour {
-			return true, "每小时请求数超限"
+
+		// 统计最近1小时内的实际请求数
+		requestsInLastHour := 0
+		for _, ts := range client.RequestTimestamps {
+			if ts.After(hourAgo) {
+				requestsInLastHour++
+			}
+		}
+
+		if requestsInLastHour > threshold.RequestsPerHour {
+			return true, fmt.Sprintf("每小时请求数超限: %d > %d", requestsInLastHour, threshold.RequestsPerHour)
 		}
 	}
 
@@ -413,6 +439,7 @@ func (p *Protector) recordAttack(clientIP, userAgent, url, method, attackType, s
 			URL:       url,
 			Reason:    reason,
 			Severity:  severity,
+			Blocked:   blocked,
 		}
 		p.notificationIntegrator.SendDDoSAttackNotification(attackInfo)
 	}
@@ -542,17 +569,50 @@ func (p *Protector) GetStats() map[string]interface{} {
 		}
 	}
 
+	// 统计真实的总攻击数（从日志文件）
+	totalAttacksAll := p.getTotalAttacksFromFile()
+
 	return map[string]interface{}{
 		"enabled":            p.enabled,
 		"level":              p.level.String(),
 		"total_clients":      len(p.clients),
 		"blocked_clients":    blockedClients,
 		"suspicious_clients": suspiciousClients,
-		"total_attacks":      len(p.attacks),
+		"recent_attacks":     len(p.attacks),  // 内存中最近的攻击
+		"total_attacks":      totalAttacksAll, // 真实的总攻击数
 		"blocked_attacks":    blockedAttacks,
 		"attacks_by_type":    attacksByType,
 		"thresholds":         p.thresholds[p.level],
 	}
+}
+
+// getTotalAttacksFromFile 从日志文件统计真实的总攻击数
+func (p *Protector) getTotalAttacksFromFile() int {
+	path := "./data/ddos_attacks.log"
+
+	// 尝试打开文件
+	f, err := os.Open(path)
+	if err != nil {
+		// 文件不存在或无法打开，返回内存中的数量
+		return len(p.attacks)
+	}
+	defer f.Close()
+
+	// 统计非空行数
+	count := 0
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return len(p.attacks)
+	}
+
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			count++
+		}
+	}
+
+	return count
 }
 
 // GetClients 获取客户端信息

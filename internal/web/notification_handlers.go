@@ -59,6 +59,12 @@ func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
+	// 检查模板是否存在，如果不存在则回退到前端 SPA
+	if !s.templateRenderer.TemplateExists("notifications.html") {
+		s.handleSPA(w, r)
+		return
+	}
+
 	s.templateRenderer.DetectLanguageAndRender(w, r, "notifications.html", data)
 }
 
@@ -80,10 +86,35 @@ func (s *Server) handleNotificationTest(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	notificationType := r.FormValue("type")
-	level := r.FormValue("level")
-	title := r.FormValue("title")
-	message := r.FormValue("message")
+	// 支持两种格式：JSON 和 FormData
+	var notificationType, level, title, message string
+
+	// 尝试解析JSON
+	contentType := r.Header.Get("Content-Type")
+	if contentType == "application/json" {
+		var testData struct {
+			Type    string `json:"type"`
+			Level   string `json:"level"`
+			Title   string `json:"title"`
+			Message string `json:"message"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&testData); err != nil {
+			http.Error(w, "无效的JSON数据", http.StatusBadRequest)
+			return
+		}
+
+		notificationType = testData.Type
+		level = testData.Level
+		title = testData.Title
+		message = testData.Message
+	} else {
+		// 兼容表单数据
+		notificationType = r.FormValue("type")
+		level = r.FormValue("level")
+		title = r.FormValue("title")
+		message = r.FormValue("message")
+	}
 
 	if notificationType == "" || level == "" || title == "" || message == "" {
 		http.Error(w, "参数不完整", http.StatusBadRequest)

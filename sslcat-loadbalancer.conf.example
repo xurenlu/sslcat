@@ -5,7 +5,7 @@
     "debug": false,
     "access_log_enabled": true,
     "access_log_format": "json",
-    "access_log_path": "./data/access.log",
+    "access_log_path": "/Users/rocky/Sites/sslcat/data/access.log",
     "read_timeout_sec": 30,
     "write_timeout_sec": 30,
     "idle_timeout_sec": 120,
@@ -15,13 +15,13 @@
     "email": "your-email@example.com",
     "staging": false,
     "auto_renew": true,
-    "cert_dir": "./data/certs",
-    "key_dir": "./data/keys",
+    "cert_dir": "/Users/rocky/Sites/sslcat/data/certs",
+    "key_dir": "/Users/rocky/Sites/sslcat/data/keys",
     "challenge_methods": ["http-01", "dns-01"]
   },
   "admin": {
     "username": "admin",
-    "password_file": "./data/admin.pass",
+    "password_file": "/Users/rocky/Sites/sslcat/data/admin.pass",
     "first_run": true
   },
   "proxy": {

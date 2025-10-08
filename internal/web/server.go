@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/xurenlu/sslcat/internal/ai"
 	"github.com/xurenlu/sslcat/internal/assets"
 	"github.com/xurenlu/sslcat/internal/compression"
 	"github.com/xurenlu/sslcat/internal/config"
@@ -96,6 +97,8 @@ type Server struct {
 	statisticsAPI       *StatisticsAPI
 	// 静态文件处理器
 	staticHandler *StaticFileHandler
+	// AI 安全分析器
+	aiSecurityAnalyzer *ai.SecurityAnalyzer
 }
 
 // NewServer 创建Web服务器
@@ -199,6 +202,22 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 
 	// 初始化静态文件处理器
 	server.staticHandler = NewStaticFileHandler(cfg)
+
+	// 初始化 AI 安全分析器（如果启用）
+	if cfg.AISecurity.Enabled && cfg.AISecurity.APIKey != "" {
+		server.aiSecurityAnalyzer = ai.NewSecurityAnalyzer(cfg.AISecurity, notificationIntegrator)
+
+		// 启动定时分析
+		dataCollector := ai.NewDataCollector(
+			server.ddosProtector,
+			server.securityManager,
+			cfg.AISecurity.AnalysisWindow,
+		)
+		server.aiSecurityAnalyzer.Start(dataCollector.Collect)
+
+		logrus.Infof("AI 安全分析器已启动，模型: %s，间隔: %v",
+			cfg.AISecurity.Model, cfg.AISecurity.CheckInterval)
+	}
 
 	// 初始化审计日志轮转器（10MB*10）
 	if rot, err := logger.NewRotator("./data/audit.log", 10*1024*1024, 10); err == nil {
@@ -491,6 +510,12 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/notifications/test-channels", s.handleNotificationTestChannels)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/notifications/config", s.handleNotificationConfig)
 
+	// AI 安全分析路由
+	s.mux.HandleFunc(s.config.AdminPrefix+"/ai-security", s.handleAISecurityPage)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ai-security/config", s.handleAISecurityConfigAPI)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ai-security/test", s.handleAISecurityTest)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ai-security/analyze-now", s.handleAISecurityAnalyzeNow)
+
 	// CDN 缓存设置已整合到代理配置中
 
 	// 静态站点管理 - 页面路由已迁移到前端SPA
@@ -676,6 +701,25 @@ func (s *Server) registerRunnerRoutes() {
 
 // ServeHTTP 实现http.Handler接口
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// 记录请求开始时间（用于计算请求耗时）
+	startTime := time.Now()
+
+	// 包装 ResponseWriter 以捕获状态码和字节数（使用 statistics.go 中的类型）
+	wrappedWriter := &responseWriter{
+		ResponseWriter: w,
+		statusCode:     200,
+		written:        0,
+	}
+
+	// defer 记录访问日志
+	defer func() {
+		if s.accessLogger != nil {
+			requestDuration := time.Since(startTime)
+			s.accessLogger.LogRequest(r, wrappedWriter.statusCode, wrappedWriter.written,
+				requestDuration, "", 0)
+		}
+	}()
+
 	// 使用Info级别确保能看到日志
 	s.log.Infof("=== ServeHTTP: %s %s from %s ===", r.Method, r.URL.Path, s.getClientIP(r))
 	// 若通过IP访问且存在可用的LE域名，强制跳转到 https://域名 + AdminPrefix（仅限管理面板路径或根）
@@ -692,7 +736,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// 仅当访问管理面板路径时才重定向（但排除 localhost）
 		if !isLocalhost && s.leRedirectHost != "" && strings.HasPrefix(r.URL.Path, s.config.AdminPrefix) {
 			target := "https://" + s.leRedirectHost + r.RequestURI
-			http.Redirect(w, r, target, http.StatusMovedPermanently)
+			http.Redirect(wrappedWriter, r, target, http.StatusMovedPermanently)
 			return
 		}
 	}
@@ -701,7 +745,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if langParam := r.URL.Query().Get("lang"); langParam != "" {
 		if s.isSupportedLanguage(langParam) {
 			// 设置语言 cookie（180 天）
-			http.SetCookie(w, &http.Cookie{
+			http.SetCookie(wrappedWriter, &http.Cookie{
 				Name:     "language",
 				Value:    langParam,
 				Path:     "/",
@@ -715,13 +759,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			q := r.URL.Query()
 			q.Del("lang")
 			r.URL.RawQuery = q.Encode()
-			http.Redirect(w, r, r.URL.String(), http.StatusFound)
+			http.Redirect(wrappedWriter, r, r.URL.String(), http.StatusFound)
 			return
 		}
 	}
 
 	// 安全中间件
-	if !s.securityMiddleware(w, r) {
+	if !s.securityMiddleware(wrappedWriter, r) {
 		return
 	}
 
@@ -729,7 +773,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if s.config.Security.EnableWAF && s.wafEngine != nil {
 		if events, blocked := s.wafEngine.CheckRequestAdvanced(r); blocked {
 			s.log.Warnf("WAF blocked request from %s: %d events detected", s.getClientIP(r), len(events))
-			http.Error(w, "Request blocked by WAF", http.StatusForbidden)
+			http.Error(wrappedWriter, "Request blocked by WAF", http.StatusForbidden)
 			return
 		} else if len(events) > 0 {
 			s.log.Infof("WAF detected %d security events from %s", len(events), s.getClientIP(r))
@@ -740,13 +784,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if s.config.Security.EnableDDOS && s.ddosProtector != nil && !strings.HasPrefix(r.URL.Path, s.config.AdminPrefix+"/login") {
 		if blocked, reason := s.ddosProtector.CheckRequest(r); blocked {
 			s.log.Warnf("DDoS protection blocked request from %s: %s", s.getClientIP(r), reason)
-			http.Error(w, "Request blocked by DDoS protection", http.StatusTooManyRequests)
+			http.Error(wrappedWriter, "Request blocked by DDoS protection", http.StatusTooManyRequests)
 			return
 		}
 	}
 
 	// 代理中间件
-	if s.proxyMiddleware(w, r) {
+	if s.proxyMiddleware(wrappedWriter, r) {
 		return
 	}
 
@@ -756,9 +800,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// 应用统计中间件
 	if s.statisticsAPI != nil {
 		handler := s.statisticsAPI.RecordMiddleware(s.mux)
-		handler.ServeHTTP(w, r)
+		handler.ServeHTTP(wrappedWriter, r)
 	} else {
-		s.mux.ServeHTTP(w, r)
+		s.mux.ServeHTTP(wrappedWriter, r)
 	}
 }
 
@@ -808,8 +852,8 @@ func (s *Server) securityMiddleware(w http.ResponseWriter, r *http.Request) bool
 	}
 
 	// 检查User-Agent（localhost 请求豁免）
-	isLocalhost := clientIP == "127.0.0.1" || clientIP == "::1" || clientIP == "localhost"
-	if strings.HasPrefix(path, s.config.AdminPrefix) && !isLocalhost && (userAgent == "" || s.isCommonBotUserAgent(userAgent)) {
+	// 使用 isLocalhostRequest 来确保无法通过伪造 HTTP 头部绕过检查
+	if strings.HasPrefix(path, s.config.AdminPrefix) && !s.isLocalhostRequest(r) && (userAgent == "" || s.isCommonBotUserAgent(userAgent)) {
 		s.log.Warnf("Suspicious User-Agent attempted to access admin panel: %s from %s", userAgent, clientIP)
 		s.securityManager.LogAccess(clientIP, userAgent, path, false)
 		http.Error(w, "Access denied", http.StatusForbidden)
@@ -959,33 +1003,51 @@ func (s *Server) proxyMiddleware(w http.ResponseWriter, r *http.Request) bool {
 // 工具函数
 
 func (s *Server) getClientIP(r *http.Request) string {
-	// 优先检查Cloudflare头
-	if cfIP := r.Header.Get("CF-Connecting-IP"); cfIP != "" {
-		return strings.TrimSpace(cfIP)
+	// 首先获取真实的连接来源 IP（RemoteAddr）
+	remoteIP := r.RemoteAddr
+	if idx := strings.LastIndex(remoteIP, ":"); idx != -1 {
+		remoteIP = remoteIP[:idx]
 	}
 
-	// 检查X-Real-IP
-	if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
-		return strings.TrimSpace(realIP)
-	}
+	// 安全检查：只有当请求真的来自本地或可信代理时，才信任 HTTP 头部
+	// 这样可以防止攻击者伪造 X-Real-IP 或 X-Forwarded-For 来绕过 localhost 检查
+	isTrustedSource := s.isPrivateIP(remoteIP) || remoteIP == "127.0.0.1" || remoteIP == "::1"
 
-	// 检查X-Forwarded-For
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		ips := strings.Split(xff, ",")
-		if len(ips) > 0 {
-			ip := strings.TrimSpace(ips[0])
-			// 只返回第一个非私有IP
-			if !s.isPrivateIP(ip) {
-				return ip
+	// 只有来自可信来源的请求才检查代理头部
+	if isTrustedSource {
+		// 优先检查Cloudflare头（但必须不是 localhost）
+		if cfIP := r.Header.Get("CF-Connecting-IP"); cfIP != "" {
+			cfIP = strings.TrimSpace(cfIP)
+			// 拒绝将 localhost 作为客户端 IP，防止绕过认证
+			if !s.isLocalhostIP(cfIP) {
+				return cfIP
+			}
+		}
+
+		// 检查X-Real-IP（但必须不是 localhost）
+		if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
+			realIP = strings.TrimSpace(realIP)
+			// 拒绝将 localhost 作为客户端 IP，防止绕过认证
+			if !s.isLocalhostIP(realIP) {
+				return realIP
+			}
+		}
+
+		// 检查X-Forwarded-For（但必须不是 localhost 或私有IP）
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ips := strings.Split(xff, ",")
+			if len(ips) > 0 {
+				ip := strings.TrimSpace(ips[0])
+				// 只返回非私有、非 localhost 的 IP
+				if !s.isPrivateIP(ip) && !s.isLocalhostIP(ip) {
+					return ip
+				}
 			}
 		}
 	}
 
-	// 使用RemoteAddr
-	if idx := strings.LastIndex(r.RemoteAddr, ":"); idx != -1 {
-		return r.RemoteAddr[:idx]
-	}
-	return r.RemoteAddr
+	// 使用真实的 RemoteAddr
+	return remoteIP
 }
 
 func (s *Server) isPrivateIP(ip string) bool {
@@ -997,17 +1059,34 @@ func (s *Server) isPrivateIP(ip string) bool {
 		ip == "::1"
 }
 
+// isLocalhostIP 检查 IP 是否为 localhost
+// 用于防止攻击者伪造 HTTP 头部绕过认证
+func (s *Server) isLocalhostIP(ip string) bool {
+	return ip == "127.0.0.1" ||
+		ip == "::1" ||
+		strings.HasPrefix(ip, "127.") ||
+		ip == "localhost"
+}
+
 // isLocalhostRequest 检查请求是否来自 localhost
 // 用于内部 API 调用（如 sslcat-git-hook）的认证豁免
+//
+// 安全说明：
+// 为了防止攻击者通过伪造 HTTP 头部（如 X-Real-IP: 127.0.0.1）绕过认证，
+// 我们使用 RemoteAddr（TCP 连接的真实来源）来判断，而不是 getClientIP()
 func (s *Server) isLocalhostRequest(r *http.Request) bool {
-	clientIP := s.getClientIP(r)
+	// 使用 RemoteAddr 获取真实的 TCP 连接来源
+	// 这个值无法通过 HTTP 头部伪造
+	remoteAddr := r.RemoteAddr
+	if idx := strings.LastIndex(remoteAddr, ":"); idx != -1 {
+		remoteAddr = remoteAddr[:idx]
+	}
 
 	// 检查是否是 localhost
 	// 支持 IPv4 的 127.0.0.1 和 IPv6 的 ::1
-	if clientIP == "127.0.0.1" ||
-		clientIP == "::1" ||
-		strings.HasPrefix(clientIP, "127.") ||
-		clientIP == "localhost" {
+	if remoteAddr == "127.0.0.1" ||
+		remoteAddr == "::1" ||
+		strings.HasPrefix(remoteAddr, "127.") {
 		return true
 	}
 

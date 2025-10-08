@@ -33,6 +33,7 @@ import {
   FiKey,
   FiBarChart2,
 } from 'react-icons/fi'
+import { FaRobot } from 'react-icons/fa'
 
 interface SidebarProps {
   isOpen: boolean
@@ -45,9 +46,10 @@ interface NavItemProps {
   children: string
   to: string
   isActive?: boolean
+  badge?: string
 }
 
-const NavItem: React.FC<NavItemProps> = ({ icon, children, to, isActive }) => {
+const NavItem: React.FC<NavItemProps> = ({ icon, children, to, isActive, badge }) => {
   return (
     <Link
       as={RouterLink}
@@ -66,11 +68,27 @@ const NavItem: React.FC<NavItemProps> = ({ icon, children, to, isActive }) => {
           color: isActive ? 'white' : 'gray.900',
         }}
         transition="all 0.2s"
+        justify="space-between"
       >
-        <Icon as={icon} boxSize={5} />
-        <Text fontSize="sm" fontWeight="medium">
-          {children}
-        </Text>
+        <HStack>
+          <Icon as={icon} boxSize={5} />
+          <Text fontSize="sm" fontWeight="medium">
+            {children}
+          </Text>
+        </HStack>
+        {badge && (
+          <Box
+            px={2}
+            py={0.5}
+            fontSize="xs"
+            fontWeight="bold"
+            borderRadius="md"
+            bgGradient="linear(to-r, purple.400, purple.600)"
+            color="white"
+          >
+            {badge}
+          </Box>
+        )}
       </HStack>
     </Link>
   )
@@ -96,6 +114,7 @@ const SidebarContent = () => {
     { name: t.navigation.security, icon: FiShield, path: buildPath(adminPrefix, '/security') },
     { name: t.navigation.gitServer, icon: FiGitBranch, path: buildPath(adminPrefix, '/git-server') },
     { name: t.navigation.notifications, icon: FiBell, path: buildPath(adminPrefix, '/notifications') },
+    { name: t.navigation.aiSecurity || '🤖 AI 安全分析', icon: FaRobot, path: buildPath(adminPrefix, '/ai-security'), badge: 'AI' },
     { name: t.navigation.userManagement, icon: FiUsers, path: buildPath(adminPrefix, '/users') },
     { name: t.navigation.changePassword, icon: FiKey, path: buildPath(adminPrefix, '/change-password') },
   ]
@@ -156,6 +175,7 @@ const SidebarContent = () => {
               icon={item.icon}
               to={item.path}
               isActive={location.pathname === item.path}
+              badge={item.badge}
             >
               {item.name}
             </NavItem>

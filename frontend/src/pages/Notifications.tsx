@@ -83,44 +83,48 @@ const Notifications: React.FC = () => {
   const refreshNotifications = async () => {
     setLoading(true)
     try {
-      // 确保 adminPrefix 不为空，否则使用备用前缀
       const effectivePrefix = adminPrefix || '/sslcat-panel'
-      // 使用安全日志API作为通知数据源
-      const response = await fetch(buildApiPath(effectivePrefix, '/api/security-logs'), {
+      
+      // 获取通知统计
+      const statsResponse = await fetch(buildApiPath(effectivePrefix, '/api/notifications/stats'), {
         method: 'GET',
         credentials: 'include',
       })
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+      if (!statsResponse.ok) {
+        throw new Error(`获取统计失败: ${statsResponse.status}`)
       }
 
-      const data = await response.json()
-      const logs = data.logs || []
+      const statsData = await statsResponse.json()
       
-      // 转换日志为通知格式 - 只显示安全事件，过滤正常访问
-      const notifications = logs
-        .filter((log: any) => !log.success) // 只显示失败的访问（安全事件）
-        .slice(0, 20)
-        .map((log: any, index: number) => ({
-          id: index.toString(),
-          level: 'error',
-          type: 'security',
-          title: '安全事件',
-          message: `来自 ${log.ip} 的异常访问被阻止`,
-          timestamp: new Date(log.timestamp).toLocaleString('zh-CN'),
-          source: 'security',
-          details: {
-            ip: log.ip,
-            userAgent: log.userAgent,
-            path: log.path,
-          },
-        }))
+      // 获取通知历史
+      const historyResponse = await fetch(buildApiPath(effectivePrefix, '/api/notifications/history?limit=50'), {
+        method: 'GET',
+        credentials: 'include',
+      })
+
+      if (!historyResponse.ok) {
+        throw new Error(`获取历史失败: ${historyResponse.status}`)
+      }
+
+      const historyData = await historyResponse.json()
+      
+      // 转换通知格式
+      const notifications = (historyData || []).map((notification: any) => ({
+        id: notification.id || '',
+        level: notification.level === 0 ? 'info' : notification.level === 1 ? 'warning' : notification.level === 2 ? 'error' : 'critical',
+        type: notification.type || '',
+        title: notification.title || '',
+        message: notification.message || '',
+        timestamp: notification.timestamp ? new Date(notification.timestamp).toLocaleString('zh-CN') : '',
+        source: notification.source || 'system',
+        details: notification.details || {},
+      }))
       
       setStats({
-        totalNotifications: logs.filter((log: any) => !log.success).length, // 只计算安全事件
-        channelsEnabled: 3,
-        channelsTotal: 5,
+        totalNotifications: statsData.total_notifications || 0,
+        channelsEnabled: statsData.channels_enabled || 0,
+        channelsTotal: statsData.channels_total || 0,
         limit: 50,
       })
       setNotifications(notifications)
@@ -163,16 +167,24 @@ const Notifications: React.FC = () => {
     }
 
     try {
-      // TODO: 实际的 API 调用
-      // const response = await fetch('/api/notifications/test', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(testForm),
-      // })
+      const effectivePrefix = adminPrefix || '/sslcat-panel'
+      const response = await fetch(buildApiPath(effectivePrefix, '/notifications/test'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(testForm),
+      })
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || `HTTP error! status: ${response.status}`)
+      }
+      
+      const result = await response.json()
       
       toast({
         title: '测试通知发送成功',
-        description: `已发送${getLevelText(testForm.level)}级别的"${testForm.title}"通知`,
+        description: result.message || `已发送${getLevelText(testForm.level)}级别的"${testForm.title}"通知`,
         status: 'success',
         duration: 4000,
         isClosable: true,
@@ -201,14 +213,41 @@ const Notifications: React.FC = () => {
 
   const testNotificationChannels = async () => {
     try {
-      // TODO: 实际的 API 调用
-      toast({
-        title: '通知渠道测试完成',
-        description: '所有启用的渠道都测试成功',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
+      const effectivePrefix = adminPrefix || '/sslcat-panel'
+      const response = await fetch(buildApiPath(effectivePrefix, '/api/notifications/test-channels'), {
+        method: 'POST',
+        credentials: 'include',
       })
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || `HTTP error! status: ${response.status}`)
+      }
+      
+      const result = await response.json()
+      
+      // 显示详细结果
+      if (result.results) {
+        const resultText = Object.entries(result.results)
+          .map(([channel, status]) => `${channel}: ${status}`)
+          .join('\n')
+        
+        toast({
+          title: '通知渠道测试完成',
+          description: resultText,
+          status: 'success',
+          duration: 5000,
+          isClosable: true,
+        })
+      } else {
+        toast({
+          title: '通知渠道测试完成',
+          description: '所有启用的渠道都已测试',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        })
+      }
     } catch (error) {
       toast({
         title: '测试失败',

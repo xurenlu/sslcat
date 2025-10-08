@@ -77,7 +77,32 @@ func (b *NodeJSBuilder) BuildWithLogging(app *GitApp, logger *DeployLogger) erro
 	logger.WriteLog("info", "nodejs", "开始 Node.js 应用构建流程")
 
 	packageManager := b.detectPackageManager(app.GitPath)
-	logger.WriteLog("info", "nodejs", fmt.Sprintf("检测到包管理器: %s", packageManager))
+
+	// 检测多个 lockfile 并输出警告到日志
+	hasPnpm := b.fileExists(app.GitPath, "pnpm-lock.yaml")
+	hasYarn := b.fileExists(app.GitPath, "yarn.lock")
+	hasNpmLock := b.fileExists(app.GitPath, "package-lock.json")
+	lockfileCount := 0
+	lockfiles := []string{}
+	if hasPnpm {
+		lockfileCount++
+		lockfiles = append(lockfiles, "pnpm")
+	}
+	if hasYarn {
+		lockfileCount++
+		lockfiles = append(lockfiles, "Yarn")
+	}
+	if hasNpmLock {
+		lockfileCount++
+		lockfiles = append(lockfiles, "npm")
+	}
+
+	if lockfileCount > 1 {
+		logger.WriteLog("warn", "nodejs", fmt.Sprintf("检测到多个包管理器 lockfile: %v", lockfiles))
+		logger.WriteLog("warn", "nodejs", "建议只保留一个 lockfile 以避免依赖冲突")
+	}
+
+	logger.WriteLog("info", "nodejs", fmt.Sprintf("使用包管理器: %s", packageManager))
 
 	// 安装依赖
 	logger.WriteLog("info", "nodejs", "安装依赖中...")
@@ -141,10 +166,38 @@ func (b *NodeJSBuilder) StartWithLogging(app *GitApp, logger *DeployLogger) erro
 
 // detectPackageManager 检测包管理器
 func (b *NodeJSBuilder) detectPackageManager(appPath string) string {
-	if b.fileExists(appPath, "pnpm-lock.yaml") {
+	hasPnpm := b.fileExists(appPath, "pnpm-lock.yaml")
+	hasYarn := b.fileExists(appPath, "yarn.lock")
+	hasNpmLock := b.fileExists(appPath, "package-lock.json")
+
+	// 检测是否有多个 lockfile
+	lockfileCount := 0
+	lockfiles := []string{}
+	if hasPnpm {
+		lockfileCount++
+		lockfiles = append(lockfiles, "pnpm-lock.yaml")
+	}
+	if hasYarn {
+		lockfileCount++
+		lockfiles = append(lockfiles, "yarn.lock")
+	}
+	if hasNpmLock {
+		lockfileCount++
+		lockfiles = append(lockfiles, "package-lock.json")
+	}
+
+	// 如果有多个 lockfile，输出警告
+	if lockfileCount > 1 {
+		b.gs.logger.Warnf("⚠️  检测到多个包管理器 lockfile: %v", lockfiles)
+		b.gs.logger.Warnf("   建议只保留一个 lockfile，删除其他的以避免依赖冲突")
+		b.gs.logger.Warnf("   将使用优先级: pnpm > yarn > npm")
+	}
+
+	// 按优先级返回
+	if hasPnpm {
 		return "pnpm"
 	}
-	if b.fileExists(appPath, "yarn.lock") {
+	if hasYarn {
 		return "yarn"
 	}
 	return "npm"

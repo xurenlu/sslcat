@@ -6,13 +6,13 @@
   },
   "session": {
     "storage_type": "file",
-    "data_dir": "./data",
+    "data_dir": "/Users/rocky/Sites/sslcat/data",
     "session_timeout": 28800,
     "cleanup_interval": 600
   },
   "admin": {
     "username": "admin",
-    "password_file": "./data/admin.pass",
+    "password_file": "/Users/rocky/Sites/sslcat/data/admin.pass",
     "enable_totp": false
   },
   "security": {

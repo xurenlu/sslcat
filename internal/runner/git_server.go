@@ -1830,6 +1830,95 @@ func (gs *GitServer) handleDeployError(app *GitApp, err error) {
 
 // ==================== 数据持久化 ====================
 
+// scanAndRecoverApps 扫描并恢复已存在的 Git 仓库
+func (gs *GitServer) scanAndRecoverApps() error {
+	recoveredCount := 0
+
+	// 1. 扫描 /home/git 目录下的符号链接
+	sshHomeEntries, err := os.ReadDir(gs.sshHomeDir)
+	if err == nil {
+		for _, entry := range sshHomeEntries {
+			if !strings.HasSuffix(entry.Name(), ".git") {
+				continue
+			}
+
+			appName := strings.TrimSuffix(entry.Name(), ".git")
+			symlinkPath := filepath.Join(gs.sshHomeDir, entry.Name())
+
+			// 检查是否为符号链接
+			linkInfo, err := os.Lstat(symlinkPath)
+			if err != nil || linkInfo.Mode()&os.ModeSymlink == 0 {
+				continue
+			}
+
+			// 读取符号链接目标
+			targetPath, err := os.Readlink(symlinkPath)
+			if err != nil {
+				gs.logger.Warnf("读取符号链接失败 %s: %v", symlinkPath, err)
+				continue
+			}
+
+			// 检查目标是否为有效的 Git 裸仓库
+			if _, err := os.Stat(filepath.Join(targetPath, "HEAD")); err == nil {
+				gs.logger.Infof("发现 Git 仓库符号链接: %s -> %s", appName, targetPath)
+
+				// 尝试恢复应用
+				if app, err := gs.recoverAppFromRepository(appName, targetPath); err == nil {
+					gs.apps[appName] = app
+					recoveredCount++
+					gs.logger.Infof("成功恢复应用: %s", appName)
+				} else {
+					gs.logger.Warnf("恢复应用 %s 失败: %v", appName, err)
+				}
+			}
+		}
+	}
+
+	// 2. 扫描 ReposDir 下的应用目录
+	reposDir := gs.config.Runners.Git.ReposDir
+	if !filepath.IsAbs(reposDir) {
+		absPath, _ := filepath.Abs(reposDir)
+		reposDir = absPath
+	}
+
+	repoDirEntries, err := os.ReadDir(reposDir)
+	if err == nil {
+		for _, entry := range repoDirEntries {
+			if !entry.IsDir() {
+				continue
+			}
+
+			appName := entry.Name()
+
+			// 跳过已恢复的应用
+			if _, exists := gs.apps[appName]; exists {
+				continue
+			}
+
+			// 检查标准路径: appName/git/repo.git
+			bareRepoPath := filepath.Join(reposDir, appName, "git", "repo.git")
+			if _, err := os.Stat(filepath.Join(bareRepoPath, "HEAD")); err == nil {
+				gs.logger.Infof("发现 Git 仓库目录: %s", bareRepoPath)
+
+				// 尝试恢复应用
+				if app, err := gs.recoverAppFromRepository(appName, bareRepoPath); err == nil {
+					gs.apps[appName] = app
+					recoveredCount++
+					gs.logger.Infof("成功恢复应用: %s", appName)
+				} else {
+					gs.logger.Warnf("恢复应用 %s 失败: %v", appName, err)
+				}
+			}
+		}
+	}
+
+	if recoveredCount > 0 {
+		gs.logger.Infof("共恢复 %d 个应用", recoveredCount)
+	}
+
+	return nil
+}
+
 // loadApps 加载应用
 func (gs *GitServer) loadApps() error {
 	appsFile := filepath.Join(gs.config.Runners.Git.ReposDir, "apps.json")
@@ -1848,6 +1937,14 @@ func (gs *GitServer) loadApps() error {
 	}
 
 	gs.apps = apps
+
+	// 如果 apps 为空，尝试扫描已存在的 Git 仓库来恢复应用
+	if len(gs.apps) == 0 {
+		gs.logger.Warnf("apps.json 为空，尝试从现有 Git 仓库恢复应用...")
+		if err := gs.scanAndRecoverApps(); err != nil {
+			gs.logger.Warnf("扫描恢复应用失败: %v", err)
+		}
+	}
 
 	// 修复应用路径（确保是绝对路径）
 	// 获取工作目录，用于转换相对路径
@@ -4344,7 +4441,8 @@ func (gs *GitServer) installGitHook() error {
 	// 检查 wrapper 脚本是否已经安装到 git-shell-commands
 	if info, err := os.Stat(gitShellHook); err == nil && info.Mode().IsRegular() {
 		gs.logger.Infof("git hook wrapper 脚本已存在: %s", gitShellHook)
-		return nil
+		// 即使脚本已存在，也要确保配置文件是最新的
+		return gs.createGitHookConfig()
 	}
 
 	// 保留 /usr/local/bin 作为兼容路径
@@ -4362,7 +4460,8 @@ func (gs *GitServer) installGitHook() error {
 				gs.logger.Infof("已同步 git hook 脚本到 git-shell-commands: %s", gitShellHook)
 			}
 		}
-		return nil
+		// 确保配置文件是最新的
+		return gs.createGitHookConfig()
 	}
 
 	gs.logger.Infof("开始自动安装 git hook wrapper 脚本...")
@@ -4467,12 +4566,6 @@ func (gs *GitServer) createGitHookConfig() error {
 	configDir := "/etc/sslcat"
 	configFile := filepath.Join(configDir, "git-hook.conf")
 
-	// 检查配置文件是否已存在
-	if _, err := os.Stat(configFile); err == nil {
-		gs.logger.Infof("git hook 配置文件已存在: %s", configFile)
-		return nil
-	}
-
 	// 创建配置目录
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		gs.logger.Warnf("创建配置目录失败: %v", err)
@@ -4486,6 +4579,15 @@ func (gs *GitServer) createGitHookConfig() error {
 		apiURL = fmt.Sprintf("http://localhost:80%s", gs.config.AdminPrefix)
 	} else {
 		apiURL = fmt.Sprintf("http://localhost:%d%s", gs.config.Server.Port, gs.config.AdminPrefix)
+	}
+
+	// 确保 ReposDir 使用绝对路径
+	reposDir := gs.config.Runners.Git.ReposDir
+	if !filepath.IsAbs(reposDir) {
+		absPath, err := filepath.Abs(reposDir)
+		if err == nil {
+			reposDir = absPath
+		}
 	}
 
 	// 创建配置文件内容
@@ -4502,7 +4604,16 @@ export SSLCAT_API_URL="%s"
 export SSLCAT_REPOS_DIR="%s"
 
 # 注意：如果修改了 SSLcat 的 admin_prefix 或端口，需要同步更新此文件
-`, time.Now().Format("2006-01-02 15:04:05"), apiURL, gs.config.Runners.Git.ReposDir)
+`, time.Now().Format("2006-01-02 15:04:05"), apiURL, reposDir)
+
+	// 检查配置文件是否已存在且内容相同
+	if existingContent, err := os.ReadFile(configFile); err == nil {
+		if string(existingContent) == configContent {
+			gs.logger.Debugf("git hook 配置文件已是最新: %s", configFile)
+			return nil
+		}
+		gs.logger.Infof("检测到配置变更，更新 git hook 配置文件: %s", configFile)
+	}
 
 	// 写入配置文件
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
@@ -4510,7 +4621,9 @@ export SSLCAT_REPOS_DIR="%s"
 		return nil // 非致命错误
 	}
 
-	gs.logger.Infof("git hook 配置文件创建成功: %s", configFile)
+	gs.logger.Infof("git hook 配置文件已更新: %s", configFile)
+	gs.logger.Infof("  API URL: %s", apiURL)
+	gs.logger.Infof("  Repos Dir: %s", reposDir)
 	return nil
 }
 

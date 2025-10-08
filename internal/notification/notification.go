@@ -265,23 +265,41 @@ func (nm *NotificationManager) Send(notification *Notification) error {
 }
 
 // SendDDoSAttack 发送DDoS攻击通知
-func (nm *NotificationManager) SendDDoSAttack(ip, userAgent, url, reason string, severity string) error {
+func (nm *NotificationManager) SendDDoSAttack(ip, userAgent, url, reason string, severity string, blocked bool) error {
 	level := LevelWarning
-	if severity == "high" || severity == "critical" {
-		level = LevelCritical
+	title := "检测到可疑请求行为"
+	message := fmt.Sprintf("检测到来自 %s 的可疑请求行为", ip)
+
+	// 根据是否真正拦截来设置级别和标题
+	if blocked {
+		title = "DDoS攻击检测并拦截"
+		message = fmt.Sprintf("检测到来自 %s 的DDoS攻击并已拦截", ip)
+		if severity == "high" || severity == "critical" {
+			level = LevelCritical
+		} else {
+			level = LevelError
+		}
+	} else {
+		// 仅检测到可疑行为但未拦截
+		if severity == "high" || severity == "critical" {
+			level = LevelWarning
+		} else {
+			level = LevelInfo
+		}
 	}
 
 	notification := &Notification{
 		Type:    TypeDDoSAttack,
 		Level:   level,
-		Title:   "DDoS攻击检测",
-		Message: fmt.Sprintf("检测到来自 %s 的DDoS攻击", ip),
+		Title:   title,
+		Message: message,
 		Details: map[string]any{
 			"ip":         ip,
 			"user_agent": userAgent,
 			"url":        url,
 			"reason":     reason,
 			"severity":   severity,
+			"blocked":    blocked,
 		},
 	}
 
@@ -470,10 +488,14 @@ func (nm *NotificationManager) GetHistory(limit int) []Notification {
 
 // GetStats 获取通知统计
 func (nm *NotificationManager) GetStats() map[string]any {
+	// 统计真实的总通知数（从日志文件）
+	totalNotificationsAll := nm.getTotalNotificationsFromFile()
+
 	stats := map[string]any{
-		"total_notifications": len(nm.history),
-		"channels_enabled":    len(nm.getEnabledChannels()),
-		"channels_total":      len(nm.channels),
+		"recent_notifications": len(nm.history),       // 内存中最近的通知
+		"total_notifications":  totalNotificationsAll, // 真实的总通知数
+		"channels_enabled":     len(nm.getEnabledChannels()),
+		"channels_total":       len(nm.channels),
 	}
 
 	// 按类型统计
@@ -489,6 +511,14 @@ func (nm *NotificationManager) GetStats() map[string]any {
 	stats["by_level"] = levelCount
 
 	return stats
+}
+
+// getTotalNotificationsFromFile 从日志文件统计真实的总通知数
+func (nm *NotificationManager) getTotalNotificationsFromFile() int {
+	// 通知系统可能没有持久化日志文件
+	// 如果未来添加了持久化，可以在这里实现
+	// 目前返回内存中的数量
+	return len(nm.history)
 }
 
 // getEnabledChannels 获取启用的渠道

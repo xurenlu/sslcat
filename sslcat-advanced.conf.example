@@ -8,8 +8,8 @@
     "email": "admin@example.com",
     "staging": false,
     "auto_renew": true,
-    "cert_dir": "./data/ssl/certs",
-    "key_dir": "./data/ssl/keys"
+    "cert_dir": "/Users/rocky/Sites/sslcat/data/ssl/certs",
+    "key_dir": "/Users/rocky/Sites/sslcat/data/ssl/keys"
   },
   "proxy": {
     "rules": [
@@ -26,7 +26,7 @@
     ]
   },
   "security": {
-    "block_file": "./data/withssl.block",
+    "block_file": "/Users/rocky/Sites/sslcat/data/withssl.block",
     "failed_attempts_limit": 3,
     "failed_attempts_window": "1m",
     "block_duration": "1h"
@@ -47,7 +47,7 @@
   "access_log": {
     "enabled": true,
     "format": "nginx",
-    "path": "./logs/access.log",
+    "path": "/Users/rocky/Sites/sslcat/logs/access.log",
     "max_size": "100MB",
     "max_files": 10
   },

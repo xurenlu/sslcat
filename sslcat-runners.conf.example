@@ -5,7 +5,7 @@
     "debug": false,
     "access_log_enabled": true,
     "access_log_format": "nginx",
-    "access_log_path": "./data/access.log",
+    "access_log_path": "/Users/rocky/Sites/sslcat/data/access.log",
     "access_log_max_size": 104857600,
     "access_log_max_files": 10,
     "read_timeout_sec": 1800,
@@ -17,8 +17,8 @@
     "email": "admin@example.com",
     "staging": false,
     "domains": [],
-    "cert_dir": "./data/certs",
-    "key_dir": "./data/keys",
+    "cert_dir": "/Users/rocky/Sites/sslcat/data/certs",
+    "key_dir": "/Users/rocky/Sites/sslcat/data/keys",
     "auto_renew": true,
     "disable_self_signed": true,
     "dns_providers": [],
@@ -29,9 +29,9 @@
     "username": "admin",
     "password": "admin*9527",
     "first_run": true,
-    "password_file": "./data/admin.pass",
+    "password_file": "/Users/rocky/Sites/sslcat/data/admin.pass",
     "enable_totp": false,
-    "totp_secret_file": "./data/admin.totp"
+    "totp_secret_file": "/Users/rocky/Sites/sslcat/data/admin.totp"
   },
   "proxy": {
     "rules": [],
@@ -42,7 +42,7 @@
     "max_attempts": 900,
     "block_duration": "5s",
     "max_attempts_5min": 3000,
-    "block_file": "./data/sslcat.block",
+    "block_file": "/Users/rocky/Sites/sslcat/data/sslcat.block",
     "allowed_user_agents": [
       "Mozilla/",
       "Chrome/",
@@ -63,7 +63,7 @@
   },
   "cdn_cache": {
     "enabled": false,
-    "cache_dir": "./data/cache/static",
+    "cache_dir": "/Users/rocky/Sites/sslcat/data/cache/static",
     "max_size_bytes": 5368709120,
     "default_ttl_seconds": 3600,
     "clean_interval_seconds": 60,
@@ -101,14 +101,14 @@
   "runners": {
     "local": {
       "enabled": true,
-      "work_dir": "./data/runners/local",
+      "work_dir": "/Users/rocky/Sites/sslcat/data/runners/local",
       "max_concurrent": 10,
       "timeout": 300
     },
     "docker": {
       "enabled": true,
       "image_prefix": "sslcat-runner",
-      "work_dir": "./data/runners/docker",
+      "work_dir": "/Users/rocky/Sites/sslcat/data/runners/docker",
       "max_concurrent": 5,
       "timeout": 600,
       "auto_cleanup": true,
@@ -116,7 +116,7 @@
     },
     "git": {
       "enabled": true,
-      "repos_dir": "./data/runners/git",
+      "repos_dir": "/Users/rocky/Sites/sslcat/data/runners/git",
       "max_concurrent": 3,
       "clone_timeout": 300,
       "auto_cleanup": true,

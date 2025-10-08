@@ -328,10 +328,11 @@ func (s *StatisticsAPI) RegisterRoutes(mux *http.ServeMux, prefix string) {
 // RecordMiddleware 创建统计记录中间件
 func (s *StatisticsAPI) RecordMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// 包装ResponseWriter以捕获状态码
+		// 包装ResponseWriter以捕获状态码和字节数
 		wrapped := &responseWriter{
 			ResponseWriter: w,
 			statusCode:     200,
+			written:        0,
 		}
 
 		// 处理请求
@@ -342,10 +343,11 @@ func (s *StatisticsAPI) RecordMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// responseWriter 包装ResponseWriter以捕获状态码
+// responseWriter 包装ResponseWriter以捕获状态码和字节数
 type responseWriter struct {
 	http.ResponseWriter
 	statusCode int
+	written    int64
 }
 
 // Hijack 实现 http.Hijacker 接口，用于 WebSocket 升级
@@ -360,4 +362,10 @@ func (rw *responseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 func (rw *responseWriter) WriteHeader(statusCode int) {
 	rw.statusCode = statusCode
 	rw.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (rw *responseWriter) Write(b []byte) (int, error) {
+	n, err := rw.ResponseWriter.Write(b)
+	rw.written += int64(n)
+	return n, err
 }

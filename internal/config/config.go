@@ -39,6 +39,8 @@ type Config struct {
 	Notification NotificationConfig `json:"notification"`
 	// 上游缓存配置
 	UpstreamCache UpstreamCacheConfig `json:"upstream_cache"`
+	// AI 安全分析配置
+	AISecurity AISecurityConfig `json:"ai_security"`
 }
 
 // ServerConfig 服务器配置
@@ -1218,6 +1220,26 @@ type UpstreamCacheConfig struct {
 
 	// 可缓存的Content-Type
 	CacheableContentTypes []string `json:"cacheable_content_types"`
+}
+
+// AISecurityConfig AI 安全分析配置
+type AISecurityConfig struct {
+	Enabled       bool          `json:"enabled"`        // 是否启用 AI 安全分析
+	APIKey        string        `json:"api_key"`        // OpenAI API Key
+	APIEndpoint   string        `json:"api_endpoint"`   // API 端点（可选，默认 OpenAI）
+	Model         string        `json:"model"`          // 使用的模型（默认 gpt-4o-mini）
+	CheckInterval time.Duration `json:"check_interval"` // 检查间隔（默认 1 小时）
+	MaxTokens     int           `json:"max_tokens"`     // 最大 token 数（默认 3000）
+	Temperature   float64       `json:"temperature"`    // 温度参数（默认 0.3）
+
+	// 分析范围配置
+	AnalysisWindow time.Duration `json:"analysis_window"` // 分析时间窗口（默认 1 小时）
+	MinEvents      int           `json:"min_events"`      // 最少事件数才进行分析（默认 10）
+
+	// 通知配置
+	NotifyOnThreat   bool     `json:"notify_on_threat"`  // 检测到威胁时是否通知（默认 true）
+	MinThreatLevel   string   `json:"min_threat_level"`  // 最低通知威胁等级（low/medium/high/critical）
+	NotifyRecipients []string `json:"notify_recipients"` // 通知接收人邮箱列表
 }
 
 // migratePortConfig 迁移旧的端口配置到新的配置结构

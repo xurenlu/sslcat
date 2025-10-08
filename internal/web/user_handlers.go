@@ -45,6 +45,12 @@ func (s *Server) handleUsers(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
+	// 检查模板是否存在，如果不存在则回退到前端 SPA
+	if !s.templateRenderer.TemplateExists("users.html") {
+		s.handleSPA(w, r)
+		return
+	}
+
 	s.templateRenderer.DetectLanguageAndRender(w, r, "users.html", data)
 }
 

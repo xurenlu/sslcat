@@ -24,6 +24,12 @@ func (s *Server) handlePHPSecurity(w http.ResponseWriter, r *http.Request) {
 		"SelectedDomain": selectedDomain,
 	}
 
+	// 检查模板是否存在，如果不存在则回退到前端 SPA
+	if !s.templateRenderer.TemplateExists("php_security.html") {
+		s.handleSPA(w, r)
+		return
+	}
+
 	s.templateRenderer.DetectLanguageAndRender(w, r, "php_security.html", data)
 }
 

@@ -8,12 +8,12 @@
     "email": "your-email@example.com",
     "staging": false,
     "auto_renew": true,
-    "cert_dir": "./data/certs",
-    "key_dir": "./data/keys"
+    "cert_dir": "/Users/rocky/Sites/sslcat/data/certs",
+    "key_dir": "/Users/rocky/Sites/sslcat/data/keys"
   },
   "admin": {
     "username": "admin",
-    "password_file": "./data/admin.pass",
+    "password_file": "/Users/rocky/Sites/sslcat/data/admin.pass",
     "first_run": true
   },
   "compression": {

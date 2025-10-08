@@ -5,7 +5,7 @@
     "debug": false,
     "access_log_enabled": true,
     "access_log_format": "json",
-    "access_log_path": "./data/access.log",
+    "access_log_path": "/Users/rocky/Sites/sslcat/data/access.log",
     "access_log_max_size": 104857600,
     "access_log_max_files": 10,
     "read_timeout_sec": 30,
@@ -18,13 +18,13 @@
     "staging": false,
     "auto_renew": true,
     "disable_self_signed": false,
-    "cert_dir": "./data/certs",
-    "key_dir": "./data/keys",
+    "cert_dir": "/Users/rocky/Sites/sslcat/data/certs",
+    "key_dir": "/Users/rocky/Sites/sslcat/data/keys",
     "challenge_methods": ["http-01", "dns-01"]
   },
   "admin": {
     "username": "admin",
-    "password_file": "./data/admin.pass",
+    "password_file": "/Users/rocky/Sites/sslcat/data/admin.pass",
     "first_run": true,
     "enable_totp": false
   },
@@ -290,7 +290,7 @@
   },
   "cdn_cache": {
     "enabled": true,
-    "cache_dir": "./data/cache",
+    "cache_dir": "/Users/rocky/Sites/sslcat/data/cache",
     "max_size_bytes": 2147483648,
     "default_ttl_seconds": 3600,
     "clean_interval_seconds": 3600,
@@ -306,7 +306,7 @@
   "runners": {
     "git": {
       "enabled": false,
-      "repos_dir": "./data/repos",
+      "repos_dir": "/Users/rocky/Sites/sslcat/data/repos",
       "max_concurrent": 5
     }
   },

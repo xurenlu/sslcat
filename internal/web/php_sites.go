@@ -37,6 +37,13 @@ func (s *Server) handlePHPSites(w http.ResponseWriter, r *http.Request) {
 		"Sites":        s.config.PHPSites,
 		"SiteStatuses": siteStatuses,
 	}
+
+	// 检查模板是否存在，如果不存在则回退到前端 SPA
+	if !s.templateRenderer.TemplateExists("php_sites.html") {
+		s.handleSPA(w, r)
+		return
+	}
+
 	s.templateRenderer.DetectLanguageAndRender(w, r, "php_sites.html", data)
 }
 

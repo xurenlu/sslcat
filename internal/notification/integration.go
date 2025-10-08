@@ -43,6 +43,7 @@ type AttackInfo struct {
 	URL       string
 	Reason    string
 	Severity  string
+	Blocked   bool // 是否真正拦截了请求
 }
 
 // SendDDoSAttackNotification 发送DDoS攻击通知
@@ -58,6 +59,7 @@ func (ni *NotificationIntegrator) SendDDoSAttackNotification(attack *AttackInfo)
 		attack.URL,
 		attack.Reason,
 		severity,
+		attack.Blocked,
 	)
 
 	if err != nil {

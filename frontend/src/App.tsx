@@ -21,6 +21,8 @@ import UserManagement from './pages/UserManagement'
 import ChangePassword from './pages/ChangePassword'
 import CDNManagement from './pages/CDNManagement'
 import Statistics from './pages/Statistics'
+import AISecurityAnalysis from './pages/AISecurityAnalysis'
+import FirstTimeSetup from './pages/FirstTimeSetup'
 
 const AppRoutes: React.FC = () => {
   const { adminPrefix, isLoading, error } = useConfig()
@@ -46,8 +48,13 @@ const AppRoutes: React.FC = () => {
       {/* 根路径重定向到 admin prefix */}
       <Route path="/" element={<Navigate to={`${adminPrefix}/dashboard`} replace />} />
       
-      {/* 登录页面不需要认证 */}
+      {/* 登录和首次设置页面不需要认证 */}
       <Route path={`${adminPrefix}/login`} element={<Login />} />
+      <Route path={`${adminPrefix}/settings/first-setup`} element={
+        <AuthGuard>
+          <FirstTimeSetup />
+        </AuthGuard>
+      } />
       
       {/* 所有其他页面都需要认证 */}
       <Route path={`${adminPrefix}/`} element={
@@ -128,6 +135,11 @@ const AppRoutes: React.FC = () => {
       <Route path={`${adminPrefix}/statistics`} element={
         <AuthGuard>
           <Statistics />
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/ai-security`} element={
+        <AuthGuard>
+          <AISecurityAnalysis />
         </AuthGuard>
       } />
     </Routes>
