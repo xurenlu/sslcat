@@ -128,14 +128,28 @@ const AISecurityAnalysis: React.FC = () => {
       if (response.ok) {
         const data = await response.json()
         if (data.success && data.config) {
-          setConfig(data.config)
+          // 确保所有字段都有值
+          const loadedConfig = {
+            enabled: data.config.enabled || false,
+            api_key: data.config.api_key || '',
+            api_endpoint: data.config.api_endpoint || '',
+            model: data.config.model || 'gpt-4o-mini',
+            check_interval: data.config.check_interval || '1h',
+            max_tokens: data.config.max_tokens || 3000,
+            temperature: data.config.temperature !== undefined ? data.config.temperature : 0.3,
+            min_threat_level: data.config.min_threat_level || 'medium',
+            min_events: data.config.min_events || 10,
+            language: data.config.language || 'zh-CN',
+          }
+          setConfig(loadedConfig)
           
           // 根据 endpoint 判断 provider
-          if (data.config.api_endpoint?.includes('poe.com')) {
+          const endpoint = data.config.api_endpoint || ''
+          if (endpoint.includes('poe.com')) {
             setApiProvider('poe')
-          } else if (data.config.api_endpoint?.includes('azure')) {
+          } else if (endpoint.includes('azure')) {
             setApiProvider('azure')
-          } else if (data.config.api_endpoint && data.config.api_endpoint !== 'https://api.openai.com/v1/chat/completions') {
+          } else if (endpoint && endpoint !== '' && endpoint !== 'https://api.openai.com/v1/chat/completions') {
             setApiProvider('custom')
           } else {
             setApiProvider('openai')
