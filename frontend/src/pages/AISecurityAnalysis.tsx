@@ -62,6 +62,7 @@ interface AISecurityConfig {
   temperature: number
   min_threat_level: string
   min_events: number
+  language: string
 }
 
 interface ThreatDetection {
@@ -101,6 +102,7 @@ const AISecurityAnalysis: React.FC = () => {
     temperature: 0.3,
     min_threat_level: 'medium',
     min_events: 10,
+    language: 'zh-CN',
   })
   const [lastAnalysis, setLastAnalysis] = useState<AnalysisResult | null>(null)
   const [loading, setLoading] = useState(false)
@@ -434,6 +436,20 @@ const AISecurityAnalysis: React.FC = () => {
                       <option value="6h">6 小时</option>
                       <option value="12h">12 小时</option>
                     </Select>
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel>🌐 分析语言 / Analysis Language</FormLabel>
+                    <Select
+                      value={config.language || 'zh-CN'}
+                      onChange={(e) => setConfig({ ...config, language: e.target.value })}
+                    >
+                      <option value="zh-CN">🇨🇳 简体中文 (Chinese Simplified)</option>
+                      <option value="en-US">🇺🇸 English (英语)</option>
+                    </Select>
+                    <Text fontSize="xs" color="gray.500" mt={1}>
+                      AI 分析结果和邮件通知将使用此语言
+                    </Text>
                   </FormControl>
 
                   <FormControl>
