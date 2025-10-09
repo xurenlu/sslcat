@@ -510,8 +510,8 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/notifications/test-channels", s.handleNotificationTestChannels)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/notifications/config", s.handleNotificationConfig)
 
-	// AI 安全分析路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/ai-security", s.handleAISecurityPage)
+	// AI 安全分析路由 - 页面路由已迁移到前端SPA
+	// s.mux.HandleFunc(s.config.AdminPrefix+"/ai-security", s.handleAISecurityPage) // 已迁移到前端SPA
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ai-security/config", s.handleAISecurityConfigAPI)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ai-security/test", s.handleAISecurityTest)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ai-security/analyze-now", s.handleAISecurityAnalyzeNow)

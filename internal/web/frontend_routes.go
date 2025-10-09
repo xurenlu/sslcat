@@ -41,6 +41,7 @@ func (s *Server) setupFrontendRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/static-sites", s.handleSPA)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/php-sites", s.handleSPA)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/tokens", s.handleSPA)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/ai-security", s.handleSPA)
 }
 
 // handleFrontendAssets 处理前端静态资源
