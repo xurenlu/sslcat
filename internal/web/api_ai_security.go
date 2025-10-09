@@ -73,8 +73,24 @@ func (s *Server) handleGetAISecurityConfig(w http.ResponseWriter, r *http.Reques
 
 // handleSaveAISecurityConfig 保存 AI 安全配置
 func (s *Server) handleSaveAISecurityConfig(w http.ResponseWriter, r *http.Request) {
-	var newConfig config.AISecurityConfig
-	if err := json.NewDecoder(r.Body).Decode(&newConfig); err != nil {
+	// 使用中间结构体接收前端数据（string 类型的 duration）
+	var frontendConfig struct {
+		Enabled          bool     `json:"enabled"`
+		APIKey           string   `json:"api_key"`
+		APIEndpoint      string   `json:"api_endpoint"`
+		Model            string   `json:"model"`
+		CheckInterval    string   `json:"check_interval"`    // 前端发送字符串，如 "1h"
+		MaxTokens        int      `json:"max_tokens"`
+		Temperature      float64  `json:"temperature"`
+		Language         string   `json:"language"`
+		AnalysisWindow   string   `json:"analysis_window"`   // 前端发送字符串
+		MinEvents        int      `json:"min_events"`
+		NotifyOnThreat   bool     `json:"notify_on_threat"`
+		MinThreatLevel   string   `json:"min_threat_level"`
+		NotifyRecipients []string `json:"notify_recipients"`
+	}
+	
+	if err := json.NewDecoder(r.Body).Decode(&frontendConfig); err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
@@ -84,13 +100,48 @@ func (s *Server) handleSaveAISecurityConfig(w http.ResponseWriter, r *http.Reque
 	}
 
 	// 验证配置
-	if newConfig.Enabled && newConfig.APIKey == "" {
+	if frontendConfig.Enabled && frontendConfig.APIKey == "" {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
 			"error":   "启用 AI 分析时必须提供 API Key",
 		})
 		return
+	}
+
+	// 解析 duration 字符串
+	checkInterval, err := time.ParseDuration(frontendConfig.CheckInterval)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "无效的检查间隔格式: " + err.Error(),
+		})
+		return
+	}
+
+	analysisWindow := checkInterval // 默认与检查间隔相同
+	if frontendConfig.AnalysisWindow != "" {
+		if parsed, err := time.ParseDuration(frontendConfig.AnalysisWindow); err == nil {
+			analysisWindow = parsed
+		}
+	}
+
+	// 构建后端配置结构
+	newConfig := config.AISecurityConfig{
+		Enabled:          frontendConfig.Enabled,
+		APIKey:           frontendConfig.APIKey,
+		APIEndpoint:      frontendConfig.APIEndpoint,
+		Model:            frontendConfig.Model,
+		CheckInterval:    checkInterval,
+		MaxTokens:        frontendConfig.MaxTokens,
+		Temperature:      frontendConfig.Temperature,
+		Language:         frontendConfig.Language,
+		AnalysisWindow:   analysisWindow,
+		MinEvents:        frontendConfig.MinEvents,
+		NotifyOnThreat:   frontendConfig.NotifyOnThreat,
+		MinThreatLevel:   frontendConfig.MinThreatLevel,
+		NotifyRecipients: frontendConfig.NotifyRecipients,
 	}
 
 	// 更新配置
