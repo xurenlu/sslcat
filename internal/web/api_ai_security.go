@@ -64,10 +64,45 @@ func (s *Server) handleAISecurityConfigAPI(w http.ResponseWriter, r *http.Reques
 
 // handleGetAISecurityConfig 获取 AI 安全配置
 func (s *Server) handleGetAISecurityConfig(w http.ResponseWriter, r *http.Request) {
+	// 将配置转换为前端需要的格式（Duration 转为字符串）
+	cfg := s.config.AISecurity
+	
+	// 设置默认值
+	checkInterval := "1h"
+	if cfg.CheckInterval > 0 {
+		checkInterval = cfg.CheckInterval.String()
+	}
+	
+	analysisWindow := "1h"
+	if cfg.AnalysisWindow > 0 {
+		analysisWindow = cfg.AnalysisWindow.String()
+	}
+	
+	language := cfg.Language
+	if language == "" {
+		language = "zh-CN" // 默认中文
+	}
+	
+	frontendConfig := map[string]interface{}{
+		"enabled":           cfg.Enabled,
+		"api_key":           cfg.APIKey,
+		"api_endpoint":      cfg.APIEndpoint,
+		"model":             cfg.Model,
+		"check_interval":    checkInterval,
+		"max_tokens":        cfg.MaxTokens,
+		"temperature":       cfg.Temperature,
+		"language":          language,
+		"analysis_window":   analysisWindow,
+		"min_events":        cfg.MinEvents,
+		"notify_on_threat":  cfg.NotifyOnThreat,
+		"min_threat_level":  cfg.MinThreatLevel,
+		"notify_recipients": cfg.NotifyRecipients,
+	}
+	
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
-		"config":  s.config.AISecurity,
+		"config":  frontendConfig,
 	})
 }
 
@@ -79,17 +114,17 @@ func (s *Server) handleSaveAISecurityConfig(w http.ResponseWriter, r *http.Reque
 		APIKey           string   `json:"api_key"`
 		APIEndpoint      string   `json:"api_endpoint"`
 		Model            string   `json:"model"`
-		CheckInterval    string   `json:"check_interval"`    // 前端发送字符串，如 "1h"
+		CheckInterval    string   `json:"check_interval"` // 前端发送字符串，如 "1h"
 		MaxTokens        int      `json:"max_tokens"`
 		Temperature      float64  `json:"temperature"`
 		Language         string   `json:"language"`
-		AnalysisWindow   string   `json:"analysis_window"`   // 前端发送字符串
+		AnalysisWindow   string   `json:"analysis_window"` // 前端发送字符串
 		MinEvents        int      `json:"min_events"`
 		NotifyOnThreat   bool     `json:"notify_on_threat"`
 		MinThreatLevel   string   `json:"min_threat_level"`
 		NotifyRecipients []string `json:"notify_recipients"`
 	}
-	
+
 	if err := json.NewDecoder(r.Body).Decode(&frontendConfig); err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
