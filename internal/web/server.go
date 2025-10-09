@@ -632,8 +632,9 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/git-server/create-app", s.handleCreateApp)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/git-server/server-config", s.handleServerConfig)
 
-	// Favicon 处理
+	// Favicon 处理（同时注册根路径和AdminPrefix路径）
 	s.mux.HandleFunc("/favicon.ico", s.handleFavicon)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/favicon.ico", s.handleFavicon)
 
 	// Runner API 路由
 	s.registerRunnerRoutes()

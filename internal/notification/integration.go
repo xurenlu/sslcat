@@ -75,6 +75,14 @@ func (ni *NotificationIntegrator) SendCertExpiringNotification(domain string, da
 	}
 }
 
+// SendCertSuccessNotification 发送证书申请成功通知
+func (ni *NotificationIntegrator) SendCertSuccessNotification(domain string, attempts int, duration time.Duration) {
+	err := ni.manager.SendCertSuccess(domain, attempts, duration)
+	if err != nil {
+		ni.log.Errorf("发送证书申请成功通知失败: %v", err)
+	}
+}
+
 // SendCertFailedNotification 发送证书申请失败通知
 func (ni *NotificationIntegrator) SendCertFailedNotification(domain, reason string) {
 	err := ni.manager.SendCertFailed(domain, reason)

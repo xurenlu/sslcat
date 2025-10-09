@@ -215,9 +215,9 @@ func (m *Manager) Start() error {
 	// 周期性证书到期提醒
 	go m.expiryNotifier()
 
-	// 周期性从 acme-cache 同步证书到 certs/keys（每30秒）
+	// 周期性从 acme-cache 同步证书到 certs/keys（每5分钟，因为申请成功后会立即同步）
 	go func() {
-		ticker := time.NewTicker(30 * time.Second)
+		ticker := time.NewTicker(5 * time.Minute)
 		defer ticker.Stop()
 		for {
 			select {
@@ -671,16 +671,20 @@ func (m *Manager) EnsureDomainCert(domain string) error {
 // ensureDomainCertWithRetry 带重试机制的证书申请
 func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error {
 	var lastErr error
+	startTime := time.Now()
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
+		attemptStart := time.Now()
 		m.log.Infof("Certificate request attempt %d/%d for domain: %s", attempt, maxRetries, domain)
 
 		// 第一次尝试时检查域名解析
 		if attempt == 1 {
+			dnsCheckStart := time.Now()
 			if resolved, info, err := m.checkDomainResolution(domain); err != nil {
 				m.log.Warnf("Domain resolution check failed for %s: %v", domain, err)
 			} else {
-				m.log.Infof("Domain resolution check for %s: %s", domain, info)
+				dnsCheckDuration := time.Since(dnsCheckStart)
+				m.log.Infof("Domain resolution check for %s: %s (耗时: %v)", domain, info, dnsCheckDuration)
 				if !resolved {
 					m.log.Warnf("Domain %s may not resolve to this server, HTTP-01 validation might fail", domain)
 				}
@@ -691,27 +695,52 @@ func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error
 		m.AllowDomainTemporary(domain, 24*time.Hour)
 
 		// 尝试HTTP-01验证
+		acmeStart := time.Now()
 		_, err := m.acmeMgr.GetCertificate(&tls.ClientHelloInfo{ServerName: domain})
+		acmeDuration := time.Since(acmeStart)
+
 		if err == nil {
 			// 申请成功，同步证书
+			syncStart := time.Now()
 			if _, syncErr := m.SyncACMECertsToDisk(); syncErr != nil {
 				m.log.Debugf("ACME post-issue sync failed: %v", syncErr)
 			}
-			m.log.Infof("Certificate request successful for domain: %s (attempt %d)", domain, attempt)
+			syncDuration := time.Since(syncStart)
+
+			totalDuration := time.Since(startTime)
+			m.log.Infof("Certificate request successful for domain: %s (attempt %d, ACME耗时: %v, 同步耗时: %v, 总耗时: %v)",
+				domain, attempt, acmeDuration, syncDuration, totalDuration)
+
+			// 发送证书申请成功通知
+			if m.notificationIntegrator != nil {
+				m.notificationIntegrator.SendCertSuccessNotification(domain, attempt, totalDuration)
+			}
+
 			return nil
 		}
 
+		attemptDuration := time.Since(attemptStart)
 		lastErr = err
-		m.log.Warnf("HTTP-01 validation failed for %s (attempt %d): %v", domain, attempt, err)
+		m.log.Warnf("HTTP-01 validation failed for %s (attempt %d, 耗时: %v): %v", domain, attempt, attemptDuration, err)
 
 		// 如果HTTP-01失败且配置了DNS服务商，尝试DNS-01验证
 		if m.supportsDNSChallenge() && m.hasAvailableDNSProvider() {
+			dnsStart := time.Now()
 			m.log.Infof("Attempting DNS-01 validation for domain: %s", domain)
 			if dnsErr := m.tryDNSValidation(domain); dnsErr == nil {
-				m.log.Infof("DNS-01 validation successful for domain: %s", domain)
+				dnsDuration := time.Since(dnsStart)
+				totalDuration := time.Since(startTime)
+				m.log.Infof("DNS-01 validation successful for domain: %s (DNS耗时: %v, 总耗时: %v)", domain, dnsDuration, totalDuration)
+
+				// 发送证书申请成功通知
+				if m.notificationIntegrator != nil {
+					m.notificationIntegrator.SendCertSuccessNotification(domain, attempt, totalDuration)
+				}
+
 				return nil
 			} else {
-				m.log.Warnf("DNS-01 validation also failed for %s: %v", domain, dnsErr)
+				dnsDuration := time.Since(dnsStart)
+				m.log.Warnf("DNS-01 validation also failed for %s (耗时: %v): %v", domain, dnsDuration, dnsErr)
 			}
 		}
 
@@ -723,11 +752,12 @@ func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error
 		}
 	}
 
-	m.log.Errorf("All certificate request attempts failed for domain: %s, last error: %v", domain, lastErr)
+	totalDuration := time.Since(startTime)
+	m.log.Errorf("All certificate request attempts failed for domain: %s, last error: %v (总耗时: %v)", domain, lastErr, totalDuration)
 
 	// 发送证书申请失败通知
 	if m.notificationIntegrator != nil {
-		reason := fmt.Sprintf("申请失败，尝试了%d次，最后错误: %v", maxRetries, lastErr)
+		reason := fmt.Sprintf("申请失败，尝试了%d次，总耗时%v，最后错误: %v", maxRetries, totalDuration, lastErr)
 		m.notificationIntegrator.SendCertFailedNotification(domain, reason)
 	}
 

@@ -40,6 +40,7 @@ type NotificationType string
 const (
 	TypeDDoSAttack     NotificationType = "ddos_attack"
 	TypeCertExpiring   NotificationType = "cert_expiring"
+	TypeCertSuccess    NotificationType = "cert_success"
 	TypeCertFailed     NotificationType = "cert_failed"
 	TypeSystemError    NotificationType = "system_error"
 	TypeSecurityAlert  NotificationType = "security_alert"
@@ -321,6 +322,23 @@ func (nm *NotificationManager) SendCertExpiring(domain string, daysLeft int) err
 		Details: map[string]any{
 			"domain":    domain,
 			"days_left": daysLeft,
+		},
+	}
+
+	return nm.Send(notification)
+}
+
+// SendCertSuccess 发送证书申请成功通知
+func (nm *NotificationManager) SendCertSuccess(domain string, attempts int, duration time.Duration) error {
+	notification := &Notification{
+		Type:    TypeCertSuccess,
+		Level:   LevelInfo,
+		Title:   "SSL证书申请成功",
+		Message: fmt.Sprintf("域名 %s 的SSL证书申请成功", domain),
+		Details: map[string]any{
+			"domain":   domain,
+			"attempts": attempts,
+			"duration": duration.String(),
 		},
 	}
 
