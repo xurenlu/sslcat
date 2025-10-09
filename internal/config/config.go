@@ -1231,6 +1231,7 @@ type AISecurityConfig struct {
 	CheckInterval time.Duration `json:"check_interval"` // 检查间隔（默认 1 小时）
 	MaxTokens     int           `json:"max_tokens"`     // 最大 token 数（默认 3000）
 	Temperature   float64       `json:"temperature"`    // 温度参数（默认 0.3）
+	Language      string        `json:"language"`       // 分析和通知使用的语言（zh-CN/en-US，默认 zh-CN）
 
 	// 分析范围配置
 	AnalysisWindow time.Duration `json:"analysis_window"` // 分析时间窗口（默认 1 小时）

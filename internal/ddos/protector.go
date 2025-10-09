@@ -13,6 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/xurenlu/sslcat/internal/logger"
 	"github.com/xurenlu/sslcat/internal/notification"
+	"github.com/xurenlu/sslcat/internal/threatintel"
 )
 
 // ProtectionLevel 防护级别
@@ -97,6 +98,8 @@ type Protector struct {
 	rotator *logger.Rotator
 	// 通知集成器
 	notificationIntegrator *notification.NotificationIntegrator
+	// 威胁情报检测器
+	threatDetector *threatintel.ThreatDetector
 }
 
 // ThresholdConfig 阈值配置
@@ -111,6 +114,11 @@ type ThresholdConfig struct {
 
 // NewProtector 创建DDoS防护器
 func NewProtector(notificationIntegrator *notification.NotificationIntegrator) *Protector {
+	return NewProtectorWithThreatIntel(notificationIntegrator, nil)
+}
+
+// NewProtectorWithThreatIntel 创建带威胁情报的 DDoS防护器
+func NewProtectorWithThreatIntel(notificationIntegrator *notification.NotificationIntegrator, threatDetector *threatintel.ThreatDetector) *Protector {
 	p := &Protector{
 		enabled:                true,
 		level:                  LevelMedium,
@@ -245,6 +253,28 @@ func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
 
 	// 获取当前阈值配置
 	threshold := p.thresholds[p.level]
+
+	// 使用威胁情报检测（如果可用）
+	if p.threatDetector != nil {
+		threatResult := p.threatDetector.CheckRequest(r)
+		if threatResult.IsThreat {
+			// 根据威胁等级决定是否封禁
+			shouldBlock := threatResult.ThreatLevel >= threatintel.ThreatLevelHigh
+			severity := threatResult.ThreatLevel.String()
+
+			if shouldBlock {
+				p.blockClient(client, threshold.BlockDuration, now)
+			}
+
+			p.recordAttack(clientIP, userAgent, r.URL.String(), r.Method,
+				"threat_intel", severity, fmt.Sprintf("威胁情报检测: %s (置信度: %.2f)", threatResult.Description, threatResult.Confidence), shouldBlock)
+			client.Suspicious = true
+
+			if shouldBlock {
+				return true, fmt.Sprintf("威胁情报检测: %s", threatResult.Description)
+			}
+		}
+	}
 
 	// 检查请求频率
 	if blocked, reason := p.checkRateLimit(client, threshold, now); blocked {

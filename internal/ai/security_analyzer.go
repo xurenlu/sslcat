@@ -30,6 +30,7 @@ type SecurityAnalyzer struct {
 	maxTokens     int
 	temperature   float64
 	systemPrompt  string
+	language      string // 语言设置：zh-CN 或 en-US
 }
 
 // SecurityData 安全数据摘要
@@ -152,6 +153,7 @@ func NewSecurityAnalyzer(cfg config.AISecurityConfig, notifier *notification.Not
 		checkInterval: cfg.CheckInterval,
 		maxTokens:     cfg.MaxTokens,
 		temperature:   cfg.Temperature,
+		language:      cfg.Language,
 		notifier:      notifier,
 		analysisCache: make(map[string]*AnalysisResult),
 		log:           logrus.WithFields(logrus.Fields{"component": "ai_security"}),
@@ -173,6 +175,9 @@ func NewSecurityAnalyzer(cfg config.AISecurityConfig, notifier *notification.Not
 	if analyzer.temperature == 0 {
 		analyzer.temperature = 0.3 // 较低的温度，更加精确
 	}
+	if analyzer.language == "" {
+		analyzer.language = "zh-CN" // 默认中文
+	}
 
 	// 初始化系统提示词
 	analyzer.systemPrompt = analyzer.buildSystemPrompt()
@@ -182,6 +187,66 @@ func NewSecurityAnalyzer(cfg config.AISecurityConfig, notifier *notification.Not
 
 // buildSystemPrompt 构建系统提示词
 func (a *SecurityAnalyzer) buildSystemPrompt() string {
+	if a.language == "en-US" {
+		return a.buildEnglishSystemPrompt()
+	}
+	return a.buildChineseSystemPrompt()
+}
+
+// buildChineseSystemPrompt 构建中文系统提示词
+func (a *SecurityAnalyzer) buildChineseSystemPrompt() string {
+	return `你是一名专业的网络安全分析专家，专门分析Web服务器安全日志和攻击模式。
+
+你的任务：
+1. 分析安全数据，识别潜在威胁和异常
+2. 评估威胁等级（低、中、高、严重）
+3. 提供具体的威胁描述和风险评估
+4. 给出可执行的安全建议
+
+分析重点：
+- DDoS攻击模式：识别大规模高频请求模式
+- 扫描行为：检测常见漏洞路径探测（.env、wp-admin、phpmyadmin等）
+- 异常User-Agent：识别爬虫、扫描工具、恶意软件特征
+- 地理位置异常：识别来自高风险地区的集中攻击
+- 时间模式异常：识别异常时段的流量激增
+- IP信誉：识别已知恶意IP或云服务器IP（常被用于攻击）
+- 请求特征：识别SQL注入、XSS、路径遍历尝试
+
+输出格式要求（JSON）：
+{
+  "threat_level": "low|medium|high|critical",
+  "summary": "一句话总结当前安全态势",
+  "threats": [
+    {
+      "type": "威胁类型（如：ddos_attack、port_scan、sql_injection）",
+      "severity": "low|medium|high|critical",
+      "description": "详细描述",
+      "indicators": ["具体指标，如IP地址、UA模式等"],
+      "confidence": 0.95,
+      "action": "处理建议"
+    }
+  ],
+  "recommendations": [
+    "安全建议"
+  ],
+  "confidence": 0.90
+}
+
+分析原则：
+1. 基于数据分析，不做假设
+2. 区分误报和真实威胁
+3. 考虑正常业务流量与异常流量
+4. 提供可操作的建议，而非泛泛而谈
+5. 标注置信度供管理员判断
+
+重要提示：
+- 必须返回标准JSON格式
+- 所有内容使用中文
+- 不要添加额外的说明文字`
+}
+
+// buildEnglishSystemPrompt 构建英文系统提示词
+func (a *SecurityAnalyzer) buildEnglishSystemPrompt() string {
 	return `You are a professional cybersecurity analyst specializing in analyzing web server security logs and attack patterns.
 
 Your Tasks:
@@ -199,28 +264,22 @@ Analysis Focus:
 - IP reputation: Identify known malicious IPs or cloud server IPs (commonly used for attacks)
 - Request characteristics: Identify SQL injection, XSS, path traversal attempts
 
-Output Format Requirements (JSON with bilingual content):
+Output Format Requirements (JSON):
 {
   "threat_level": "low|medium|high|critical",
-  "summary_zh": "中文总结：一句话概括安全态势",
-  "summary_en": "English summary: One-sentence security situation overview",
+  "summary": "One-sentence security situation overview",
   "threats": [
     {
       "type": "threat type (e.g., ddos_attack, port_scan, sql_injection)",
       "severity": "low|medium|high|critical",
-      "description_zh": "中文详细描述",
-      "description_en": "Detailed description in English",
+      "description": "Detailed description",
       "indicators": ["Specific indicators like IP addresses, UA patterns"],
       "confidence": 0.95,
-      "action_zh": "中文处理建议",
-      "action_en": "Recommended action in English"
+      "action": "Recommended action"
     }
   ],
-  "recommendations_zh": [
-    "中文安全建议"
-  ],
-  "recommendations_en": [
-    "Security recommendations in English"
+  "recommendations": [
+    "Security recommendations"
   ],
   "confidence": 0.90
 }
@@ -233,12 +292,9 @@ Analysis Principles:
 5. Mark confidence levels for administrator judgment
 
 IMPORTANT: 
-- Always return bilingual content (Chinese and English) in the JSON format above
-- Use "summary_zh" and "summary_en" for bilingual summaries
-- Use "description_zh" and "description_en" for threat descriptions
-- Use "action_zh" and "action_en" for recommendations
-- Use "recommendations_zh" and "recommendations_en" for general recommendations
-- Always return standard JSON format without additional commentary`
+- Always return standard JSON format
+- All content in English
+- No additional commentary outside JSON`
 }
 
 // Start 启动定时分析
