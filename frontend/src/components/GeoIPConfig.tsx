@@ -129,7 +129,7 @@ const GeoIPConfig: React.FC = () => {
     setLoading(true)
     try {
       // 加载GeoIP配置
-      const configResponse = await fetch(buildApiPath(adminPrefix, '/api/geoip/config'), {
+      const configResponse = await fetch(buildApiPath(adminPrefix, '/api/statistics/config'), {
         credentials: 'include',
       })
       
@@ -139,7 +139,7 @@ const GeoIPConfig: React.FC = () => {
       }
 
       // 加载GeoIP统计信息
-      const statsResponse = await fetch(buildApiPath(adminPrefix, '/api/geoip/stats'), {
+      const statsResponse = await fetch(buildApiPath(adminPrefix, '/api/statistics'), {
         credentials: 'include',
       })
       
@@ -165,7 +165,7 @@ const GeoIPConfig: React.FC = () => {
   const saveConfig = async () => {
     setSaving(true)
     try {
-      const response = await fetch(buildApiPath(adminPrefix, '/api/geoip/config'), {
+      const response = await fetch(buildApiPath(adminPrefix, '/api/statistics/config'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -249,39 +249,15 @@ const GeoIPConfig: React.FC = () => {
 
   // 测试地理位置功能
   const testGeoIP = async () => {
-    try {
-      const response = await fetch(buildApiPath(adminPrefix, '/api/geoip/test'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          test_ips: ['8.8.8.8', '114.114.114.114', '1.1.1.1']
-        }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        toast({
-          title: '测试成功',
-          description: `测试了${data.results?.length || 0}个IP地址`,
-          status: 'success',
-          duration: 3000,
-          isClosable: true,
-        })
-      } else {
-        throw new Error('测试失败')
-      }
-    } catch (error) {
-      toast({
-        title: '测试失败',
-        description: '地理位置功能测试失败',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      })
-    }
+    // TODO: 后端暂未实现测试 API，暂时使用重新加载配置来验证
+    toast({
+      title: '提示',
+      description: 'GeoIP测试功能开发中，请检查统计数据来验证功能',
+      status: 'info',
+      duration: 3000,
+      isClosable: true,
+    })
+    await loadConfig()
   }
 
   useEffect(() => {

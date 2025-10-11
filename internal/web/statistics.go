@@ -16,13 +16,15 @@ import (
 // StatisticsAPI 统计API处理器
 type StatisticsAPI struct {
 	collector *statistics.Collector
+	server    *Server // 添加对 server 的引用，用于认证检查
 	log       *logrus.Entry
 }
 
 // NewStatisticsAPI 创建统计API处理器
-func NewStatisticsAPI(collector *statistics.Collector) *StatisticsAPI {
+func NewStatisticsAPI(collector *statistics.Collector, server *Server) *StatisticsAPI {
 	return &StatisticsAPI{
 		collector: collector,
+		server:    server,
 		log: logrus.WithFields(logrus.Fields{
 			"component": "statistics_api",
 		}),
@@ -60,6 +62,11 @@ type ConfigResponse struct {
 
 // handleStatistics 处理统计数据查询请求
 func (s *StatisticsAPI) handleStatistics(w http.ResponseWriter, r *http.Request) {
+	// 认证检查
+	if s.server != nil && !s.server.authorizeAPI(w, r, true) {
+		return
+	}
+
 	if r.Method != http.MethodGet && r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -145,6 +152,11 @@ func (s *StatisticsAPI) handleStatisticsConfig(w http.ResponseWriter, r *http.Re
 
 // handleGetConfig 处理获取配置请求
 func (s *StatisticsAPI) handleGetConfig(w http.ResponseWriter, r *http.Request) {
+	// 认证检查（只读）
+	if s.server != nil && !s.server.authorizeAPI(w, r, true) {
+		return
+	}
+
 	config := s.collector.GetStats()
 
 	response := ConfigResponse{
@@ -160,6 +172,11 @@ func (s *StatisticsAPI) handleGetConfig(w http.ResponseWriter, r *http.Request) 
 
 // handleUpdateConfig 处理更新配置请求
 func (s *StatisticsAPI) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
+	// 认证检查（写操作）
+	if s.server != nil && !s.server.authorizeAPI(w, r, false) {
+		return
+	}
+
 	var req ConfigRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		s.writeErrorResponse(w, "解析配置参数失败", http.StatusBadRequest)
@@ -196,6 +213,11 @@ func (s *StatisticsAPI) handleUpdateConfig(w http.ResponseWriter, r *http.Reques
 
 // handleTimeKeys 处理时间键列表请求
 func (s *StatisticsAPI) handleTimeKeys(w http.ResponseWriter, r *http.Request) {
+	// 认证检查（只读）
+	if s.server != nil && !s.server.authorizeAPI(w, r, true) {
+		return
+	}
+
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return

@@ -198,7 +198,7 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	// 初始化统计收集器
 	statsEnabled := true // 默认启用，可以通过配置控制
 	server.statisticsCollector = statistics.NewCollector("./data/statistics", statsEnabled)
-	server.statisticsAPI = NewStatisticsAPI(server.statisticsCollector)
+	server.statisticsAPI = NewStatisticsAPI(server.statisticsCollector, server)
 
 	// 初始化静态文件处理器
 	server.staticHandler = NewStaticFileHandler(cfg)
