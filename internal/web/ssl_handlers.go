@@ -115,7 +115,7 @@ func (s *Server) handleSSLUpload(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
 		fmt.Fprintf(w, `<!DOCTYPE html><html><head><meta charset="utf-8"><title>上传证书</title>
-		<link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"></head><body>
+		<link href="/static/css/bootstrap.min.css" rel="stylesheet"></head><body>
 		<div class="container mt-4"><h3>上传证书</h3>
 		<form method="POST" enctype="multipart/form-data" class="mt-3">
 			<div class="mb-3">
@@ -210,14 +210,14 @@ func (s *Server) handleSSLDownload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid type", http.StatusBadRequest)
 		return
 	}
-	
+
 	// 检查文件是否存在
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		s.log.Warnf("Certificate file not found: %s", path)
 		http.Error(w, "certificate file not found", http.StatusNotFound)
 		return
 	}
-	
+
 	w.Header().Set("Content-Disposition", "attachment; filename="+filename)
 	w.Header().Set("Content-Type", "application/octet-stream")
 	http.ServeFile(w, r, path)

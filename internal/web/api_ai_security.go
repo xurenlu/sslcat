@@ -66,39 +66,38 @@ func (s *Server) handleAISecurityConfigAPI(w http.ResponseWriter, r *http.Reques
 func (s *Server) handleGetAISecurityConfig(w http.ResponseWriter, r *http.Request) {
 	// 将配置转换为前端需要的格式（Duration 转为字符串）
 	cfg := s.config.AISecurity
-	
+
 	// 设置默认值
 	checkInterval := "1h"
 	if cfg.CheckInterval > 0 {
 		checkInterval = cfg.CheckInterval.String()
 	}
-	
+
 	analysisWindow := "1h"
 	if cfg.AnalysisWindow > 0 {
 		analysisWindow = cfg.AnalysisWindow.String()
 	}
-	
+
 	language := cfg.Language
 	if language == "" {
 		language = "zh-CN" // 默认中文
 	}
-	
+
 	frontendConfig := map[string]interface{}{
-		"enabled":           cfg.Enabled,
-		"api_key":           cfg.APIKey,
-		"api_endpoint":      cfg.APIEndpoint,
-		"model":             cfg.Model,
-		"check_interval":    checkInterval,
-		"max_tokens":        cfg.MaxTokens,
-		"temperature":       cfg.Temperature,
-		"language":          language,
-		"analysis_window":   analysisWindow,
-		"min_events":        cfg.MinEvents,
-		"notify_on_threat":  cfg.NotifyOnThreat,
-		"min_threat_level":  cfg.MinThreatLevel,
-		"notify_recipients": cfg.NotifyRecipients,
+		"enabled":          cfg.Enabled,
+		"api_key":          cfg.APIKey,
+		"api_endpoint":     cfg.APIEndpoint,
+		"model":            cfg.Model,
+		"check_interval":   checkInterval,
+		"max_tokens":       cfg.MaxTokens,
+		"temperature":      cfg.Temperature,
+		"language":         language,
+		"analysis_window":  analysisWindow,
+		"min_events":       cfg.MinEvents,
+		"notify_on_threat": cfg.NotifyOnThreat,
+		"min_threat_level": cfg.MinThreatLevel,
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
@@ -110,19 +109,18 @@ func (s *Server) handleGetAISecurityConfig(w http.ResponseWriter, r *http.Reques
 func (s *Server) handleSaveAISecurityConfig(w http.ResponseWriter, r *http.Request) {
 	// 使用中间结构体接收前端数据（string 类型的 duration）
 	var frontendConfig struct {
-		Enabled          bool     `json:"enabled"`
-		APIKey           string   `json:"api_key"`
-		APIEndpoint      string   `json:"api_endpoint"`
-		Model            string   `json:"model"`
-		CheckInterval    string   `json:"check_interval"` // 前端发送字符串，如 "1h"
-		MaxTokens        int      `json:"max_tokens"`
-		Temperature      float64  `json:"temperature"`
-		Language         string   `json:"language"`
-		AnalysisWindow   string   `json:"analysis_window"` // 前端发送字符串
-		MinEvents        int      `json:"min_events"`
-		NotifyOnThreat   bool     `json:"notify_on_threat"`
-		MinThreatLevel   string   `json:"min_threat_level"`
-		NotifyRecipients []string `json:"notify_recipients"`
+		Enabled        bool    `json:"enabled"`
+		APIKey         string  `json:"api_key"`
+		APIEndpoint    string  `json:"api_endpoint"`
+		Model          string  `json:"model"`
+		CheckInterval  string  `json:"check_interval"` // 前端发送字符串，如 "1h"
+		MaxTokens      int     `json:"max_tokens"`
+		Temperature    float64 `json:"temperature"`
+		Language       string  `json:"language"`
+		AnalysisWindow string  `json:"analysis_window"` // 前端发送字符串
+		MinEvents      int     `json:"min_events"`
+		NotifyOnThreat bool    `json:"notify_on_threat"`
+		MinThreatLevel string  `json:"min_threat_level"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&frontendConfig); err != nil {
@@ -164,19 +162,18 @@ func (s *Server) handleSaveAISecurityConfig(w http.ResponseWriter, r *http.Reque
 
 	// 构建后端配置结构
 	newConfig := config.AISecurityConfig{
-		Enabled:          frontendConfig.Enabled,
-		APIKey:           frontendConfig.APIKey,
-		APIEndpoint:      frontendConfig.APIEndpoint,
-		Model:            frontendConfig.Model,
-		CheckInterval:    checkInterval,
-		MaxTokens:        frontendConfig.MaxTokens,
-		Temperature:      frontendConfig.Temperature,
-		Language:         frontendConfig.Language,
-		AnalysisWindow:   analysisWindow,
-		MinEvents:        frontendConfig.MinEvents,
-		NotifyOnThreat:   frontendConfig.NotifyOnThreat,
-		MinThreatLevel:   frontendConfig.MinThreatLevel,
-		NotifyRecipients: frontendConfig.NotifyRecipients,
+		Enabled:        frontendConfig.Enabled,
+		APIKey:         frontendConfig.APIKey,
+		APIEndpoint:    frontendConfig.APIEndpoint,
+		Model:          frontendConfig.Model,
+		CheckInterval:  checkInterval,
+		MaxTokens:      frontendConfig.MaxTokens,
+		Temperature:    frontendConfig.Temperature,
+		Language:       frontendConfig.Language,
+		AnalysisWindow: analysisWindow,
+		MinEvents:      frontendConfig.MinEvents,
+		NotifyOnThreat: frontendConfig.NotifyOnThreat,
+		MinThreatLevel: frontendConfig.MinThreatLevel,
 	}
 
 	// 更新配置

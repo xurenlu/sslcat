@@ -76,7 +76,7 @@ SSLcat 是一个功能强大的企业级 SSL 代理服务器，支持自动证�
 ## 功能特性
 
 ### 🌏 中国大陆网络优化
-- **CDN 代理优化**: 使用 [CDNProxy](https://cdnproxy.some.im/docs) 代理服务
+- **CDN 代理优化**: 使用 [CDNProxy](https://cdnproxy.shifen.de/docs) 代理服务
 - **访问加速**: 解决中国大陆访问 jsdelivr CDN 的网络问题
 - **稳定可靠**: 通过代理确保资源加载的稳定性
 
@@ -511,11 +511,11 @@ security:
 
 ### 中国大陆用户优化
 
-SSLcat 项目已针对中国大陆网络环境进行了优化，使用了 [CDNProxy](https://cdnproxy.some.im/docs) 代理服务来解决访问 jsdelivr CDN 的网络问题。
+SSLcat 项目已针对中国大陆网络环境进行了优化，使用了 [CDNProxy](https://cdnproxy.shifen.de/docs) 代理服务来解决访问 jsdelivr CDN 的网络问题。
 
 #### 使用的 CDN 代理
 - **原始地址**: `https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css`
-- **代理地址**: `https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css`
+- **代理地址**: `https://cdnproxy.shifen.de/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css`
 
 #### 涉及的资源文件
 - Bootstrap 5.1.3 CSS

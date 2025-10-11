@@ -6,12 +6,19 @@ import (
 )
 
 // 嵌入HTML模板文件
+//
 //go:embed templates/*.html
 var TemplatesFS embed.FS
 
 // 嵌入翻译文件
+//
 //go:embed i18n/*.json
 var I18nFS embed.FS
+
+// 嵌入静态资源文件（CSS, JS, 字体）
+//
+//go:embed static/css/* static/js/* static/fonts/*
+var StaticFS embed.FS
 
 // GetTemplatesFS 获取模板文件系统
 func GetTemplatesFS() fs.FS {
@@ -47,7 +54,7 @@ func ListTemplates() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var files []string
 	for _, entry := range entries {
 		if !entry.IsDir() && entry.Name()[len(entry.Name())-5:] == ".html" {
@@ -63,7 +70,7 @@ func ListI18nFiles() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var files []string
 	for _, entry := range entries {
 		if !entry.IsDir() && entry.Name()[len(entry.Name())-5:] == ".json" {
@@ -71,4 +78,18 @@ func ListI18nFiles() ([]string, error) {
 		}
 	}
 	return files, nil
+}
+
+// GetStaticFS 获取静态资源文件系统
+func GetStaticFS() fs.FS {
+	staticFS, err := fs.Sub(StaticFS, "static")
+	if err != nil {
+		panic(err)
+	}
+	return staticFS
+}
+
+// ReadStatic 读取静态资源文件
+func ReadStatic(name string) ([]byte, error) {
+	return StaticFS.ReadFile("static/" + name)
 }

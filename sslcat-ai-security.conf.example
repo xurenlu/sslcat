@@ -1,0 +1,69 @@
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port_mode": "standard",
+    "enable_https": true,
+    "access_log_enabled": true
+  },
+  
+  "admin": {
+    "username": "admin",
+    "password_hash": "$2a$10$..."
+  },
+  
+  "security": {
+    "max_attempts": 5,
+    "block_duration": "1h"
+  },
+  
+  "ai_security": {
+    "enabled": true,
+    "api_key": "sk-proj-xxxxxxxxxxxxxxxxxxxx",
+    "api_endpoint": "https://api.openai.com/v1/chat/completions",
+    "model": "gpt-4o-mini",
+    "check_interval": "1h",
+    "analysis_window": "1h",
+    "max_tokens": 3000,
+    "temperature": 0.3,
+    "min_events": 10,
+    "notify_on_threat": true,
+    "min_threat_level": "medium"
+  },
+  
+  "notification": {
+    "enabled": true,
+    "channels": {
+      "email": {
+        "enabled": true,
+        "smtp_host": "smtp.example.com",
+        "smtp_port": 587,
+        "smtp_user": "alerts@example.com",
+        "smtp_password": "your-smtp-password",
+        "from": "SSLcat Security <alerts@example.com>",
+        "to": [
+          "admin@example.com",
+          "security@example.com"
+        ],
+        "use_tls": true
+      },
+      "webhook": {
+        "enabled": false,
+        "url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "syslog": {
+        "enabled": false,
+        "address": "localhost:514",
+        "protocol": "udp",
+        "network": "udp"
+      },
+      "console": {
+        "enabled": true
+      }
+    }
+  }
+}
+

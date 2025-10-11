@@ -219,6 +219,9 @@ func main() {
 	reloadManager.RegisterComponent(proxyManager)
 	// 注意：其他组件（如sslManager, securityManager）也需要实现ReloadableComponent接口才能注册
 
+	// 用于记录配置重载开始时间
+	var reloadStartTime time.Time
+
 	// 设置配置变化回调
 	configWatcher.OnConfigChange(func(oldConfig, newConfig *config.Config) error {
 		log.Info("Configuration changed, starting hot reload...")
@@ -227,18 +230,36 @@ func main() {
 
 	configWatcher.OnReloadStart(func() {
 		log.Info("Configuration reload started")
+		reloadStartTime = time.Now()
 	})
 
 	configWatcher.OnReloadSuccess(func(newConfig *config.Config) {
-		log.Info("Configuration reload completed successfully")
+		duration := time.Since(reloadStartTime)
+		log.Infof("Configuration reload completed successfully in %v", duration)
+
 		// 更新全局配置引用
 		cfg = newConfig
 		// 更新Web服务器的配置引用
 		webServer.UpdateConfig(newConfig)
+
+		// 发送配置重载成功通知
+		changes := []string{"配置文件已更新"}
+		if err := notificationIntegrator.SendConfigReloaded(cfg.ConfigFile, duration, changes); err != nil {
+			log.Warnf("Failed to send config reload notification: %v", err)
+		}
 	})
 
 	configWatcher.OnReloadError(func(err error) {
 		log.Errorf("Configuration reload failed: %v", err)
+
+		// 发送配置重载失败通知
+		if err := notificationIntegrator.SendConfigReloadFailed(
+			cfg.ConfigFile,
+			"配置验证或应用失败",
+			err.Error(),
+		); err != nil {
+			log.Warnf("Failed to send config reload failure notification: %v", err)
+		}
 	})
 
 	// 设置Web服务器的配置重载功能

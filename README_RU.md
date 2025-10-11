@@ -35,7 +35,7 @@ SSLcat — это мощный SSL прокси-сервер, который п�
 ## Функции
 
 ### 🌏 Оптимизация Сети для Китая
-- **Оптимизация CDN Прокси**: Использует прокси-сервис [CDNProxy](https://cdnproxy.some.im/docs)
+- **Оптимизация CDN Прокси**: Использует прокси-сервис [CDNProxy](https://cdnproxy.shifen.de/docs)
 - **Ускорение Доступа**: Решает проблемы доступа к jsdelivr CDN в континентальном Китае
 - **Стабильность**: Обеспечивает стабильную загрузку ресурсов через прокси-сервис
 
@@ -432,11 +432,11 @@ security:
 
 ### Оптимизация для Пользователей Континентального Китая
 
-Проект SSLcat был оптимизирован для сетевой среды континентального Китая, используя прокси-сервис [CDNProxy](https://cdnproxy.some.im/docs) для решения проблем доступа к jsdelivr CDN.
+Проект SSLcat был оптимизирован для сетевой среды континентального Китая, используя прокси-сервис [CDNProxy](https://cdnproxy.shifen.de/docs) для решения проблем доступа к jsdelivr CDN.
 
 #### Использование CDN Прокси
 - **Оригинальный адрес**: `https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css`
-- **Прокси адрес**: `https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css`
+- **Прокси адрес**: `https://cdnproxy.shifen.de/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css`
 
 #### Задействованные Файлы Ресурсов
 - Bootstrap 5.1.3 CSS

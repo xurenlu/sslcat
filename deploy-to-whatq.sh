@@ -15,6 +15,13 @@ echo "目标服务器: $TARGET_USER@$TARGET_HOST"
 echo "部署目录: $TARGET_DIR"
 echo ""
 
+# 0. 检查并同步远程配置文件
+if [ -f "deploy-whatq/sslcat.conf" ]; then
+    source scripts/deploy-config-check.sh
+    check_remote_config "$TARGET_HOST" "$TARGET_USER" "deploy-whatq/sslcat.conf"
+    echo ""
+fi
+
 # 1. 检查构建文件是否存在
 if [ ! -f "build/sslcat-linux-amd64" ]; then
     echo "❌ 构建文件不存在，开始构建..."

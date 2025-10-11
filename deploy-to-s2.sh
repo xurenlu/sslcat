@@ -15,6 +15,13 @@ echo "目标服务器: $TARGET_USER@$TARGET_HOST"
 echo "部署目录: $TARGET_DIR"
 echo ""
 
+# 0. 检查并同步远程配置文件
+if [ -f "deploy-s2/sslcat.conf" ]; then
+    source scripts/deploy-config-check.sh
+    check_remote_config "$TARGET_HOST" "$TARGET_USER" "deploy-s2/sslcat.conf"
+    echo ""
+fi
+
 # 1. 检查构建文件是否存在
 if [ ! -f "build/sslcat-linux-amd64" ]; then
     echo "❌ 构建文件不存在，请先运行: make docker-cgo-extract"
@@ -125,7 +132,39 @@ echo "📝 配置文件..."
 if [ ! -f /etc/sslcat/sslcat.conf ]; then
     sudo cp sslcat.conf /etc/sslcat/
     sudo chmod 600 /etc/sslcat/sslcat.conf
+    echo "✅ 配置文件已安装"
     echo "⚠️  请编辑 /etc/sslcat/sslcat.conf 配置文件"
+else
+    echo "⚠️  配置文件已存在，检查更新..."
+    
+    # 检查配置文件修改时间
+    REMOTE_CONF_TIME=$(stat -c %Y /etc/sslcat/sslcat.conf 2>/dev/null || stat -f %m /etc/sslcat/sslcat.conf 2>/dev/null)
+    LOCAL_CONF_TIME=$(stat -c %Y sslcat.conf 2>/dev/null || stat -f %m sslcat.conf 2>/dev/null)
+    
+    # 比较 MD5 或内容差异
+    REMOTE_MD5=$(md5sum /etc/sslcat/sslcat.conf 2>/dev/null | awk '{print $1}' || md5 -q /etc/sslcat/sslcat.conf 2>/dev/null)
+    LOCAL_MD5=$(md5sum sslcat.conf 2>/dev/null | awk '{print $1}' || md5 -q sslcat.conf 2>/dev/null)
+    
+    if [ "$REMOTE_MD5" = "$LOCAL_MD5" ]; then
+        echo "✅ 配置文件无变化，跳过更新"
+    elif [ "$REMOTE_CONF_TIME" -gt "$LOCAL_CONF_TIME" ]; then
+        echo "⚠️  警告：线上配置文件比本地新！"
+        echo "   线上修改时间: $(date -d @$REMOTE_CONF_TIME 2>/dev/null || date -r $REMOTE_CONF_TIME 2>/dev/null)"
+        echo "   本地修改时间: $(date -d @$LOCAL_CONF_TIME 2>/dev/null || date -r $LOCAL_CONF_TIME 2>/dev/null)"
+        echo ""
+        echo "   已将本地配置保存到: /etc/sslcat/sslcat.conf.local-upload.\$(date +%Y%m%d_%H%M%S)"
+        echo "   线上配置保持不变，请手动合并配置文件"
+        sudo cp sslcat.conf /etc/sslcat/sslcat.conf.local-upload.\$(date +%Y%m%d_%H%M%S)
+        echo "⏭️  跳过配置文件覆盖"
+    else
+        echo "📝 本地配置较新，更新线上配置..."
+        BACKUP_FILE="/etc/sslcat/sslcat.conf.backup.\$(date +%Y%m%d_%H%M%S)"
+        sudo cp /etc/sslcat/sslcat.conf "\$BACKUP_FILE"
+        sudo cp sslcat.conf /etc/sslcat/
+        sudo chmod 600 /etc/sslcat/sslcat.conf
+        echo "✅ 配置文件已更新"
+        echo "   旧配置已备份到: \$BACKUP_FILE"
+    fi
 fi
 
 echo "📜 安装 Git Hook 脚本..."

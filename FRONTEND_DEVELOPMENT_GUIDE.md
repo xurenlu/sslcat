@@ -1,4 +1,4 @@
-# WithSSL 前端开发指南
+# SSLcat 前端开发指南
 
 ## 🚨 Node.js 环境问题解决方案
 
@@ -54,7 +54,7 @@ make dev-frontend
 make dev
 
 # 或直接运行
-go run main.go --config withssl.conf --log-level debug
+go run main.go --config sslcat.conf --log-level debug
 ```
 
 ### 2. 启动前端服务
@@ -114,7 +114,7 @@ make dev-frontend-simple
 ## 📁 项目结构
 
 ```
-withssl/
+sslcat/
 ├── frontend/                 # React 前端项目
 │   ├── src/
 │   │   ├── components/       # 通用组件

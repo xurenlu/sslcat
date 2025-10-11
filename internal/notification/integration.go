@@ -178,3 +178,23 @@ func (ni *NotificationIntegrator) GetNotificationStats() map[string]any {
 func (ni *NotificationIntegrator) GetNotificationHistory(limit int) []Notification {
 	return ni.manager.GetHistory(limit)
 }
+
+// SendConfigReloaded 发送配置重载成功通知
+func (ni *NotificationIntegrator) SendConfigReloaded(configFile string, duration time.Duration, changes []string) error {
+	err := ni.manager.SendConfigReloaded(configFile, duration, changes)
+	if err != nil {
+		ni.log.Errorf("发送配置重载成功通知失败: %v", err)
+		return err
+	}
+	return nil
+}
+
+// SendConfigReloadFailed 发送配置重载失败通知
+func (ni *NotificationIntegrator) SendConfigReloadFailed(configFile, reason, errorDetails string) error {
+	err := ni.manager.SendConfigReloadFailed(configFile, reason, errorDetails)
+	if err != nil {
+		ni.log.Errorf("发送配置重载失败通知失败: %v", err)
+		return err
+	}
+	return nil
+}

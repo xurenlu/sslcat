@@ -21,9 +21,9 @@ type Notifier struct {
 
 func NewFromEnv() *Notifier {
 	n := &Notifier{
-		webhookURL: strings.TrimSpace(os.Getenv("WITHSSL_WEBHOOK_URL")),
-		syslogAddr: strings.TrimSpace(os.Getenv("WITHSSL_SYSLOG_ADDR")), // host:port (udp)
-		lokiURL:    strings.TrimSpace(os.Getenv("WITHSSL_LOKI_URL")),    // http(s)://host:3100/loki/api/v1/push
+		webhookURL: strings.TrimSpace(os.Getenv("SSLCAT_WEBHOOK_URL")),
+		syslogAddr: strings.TrimSpace(os.Getenv("SSLCAT_SYSLOG_ADDR")), // host:port (udp)
+		lokiURL:    strings.TrimSpace(os.Getenv("SSLCAT_LOKI_URL")),    // http(s)://host:3100/loki/api/v1/push
 		httpClient: &http.Client{Timeout: 5 * time.Second},
 	}
 	if h, _ := os.Hostname(); h != "" {

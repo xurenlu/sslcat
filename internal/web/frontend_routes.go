@@ -14,6 +14,9 @@ import (
 
 // setupFrontendRoutes 设置前端 SPA 路由
 func (s *Server) setupFrontendRoutes() {
+	// 内嵌静态资源路由 (Bootstrap, fonts等)
+	s.mux.HandleFunc("/static/", s.handleStaticAssets)
+
 	// 静态资源路由 (JS, CSS, 图片等)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/assets/", s.handleFrontendAssets)
 
@@ -322,7 +325,72 @@ func getContentType(filename string) string {
 		return "image/svg+xml"
 	case ".txt":
 		return "text/plain"
+	case ".woff":
+		return "font/woff"
+	case ".woff2":
+		return "font/woff2"
+	case ".ttf":
+		return "font/ttf"
+	case ".eot":
+		return "application/vnd.ms-fontobject"
 	default:
 		return "application/octet-stream"
 	}
+}
+
+// handleStaticAssets 处理内嵌静态资源（Bootstrap, fonts等）
+func (s *Server) handleStaticAssets(w http.ResponseWriter, r *http.Request) {
+	// 静态资源不需要认证，直接提供服务
+
+	// 移除前缀路径
+	prefix := "/static/"
+	if !strings.HasPrefix(r.URL.Path, prefix) {
+		http.NotFound(w, r)
+		return
+	}
+
+	// 获取相对路径
+	relativePath := strings.TrimPrefix(r.URL.Path, prefix)
+	if relativePath == "" {
+		http.NotFound(w, r)
+		return
+	}
+
+	// 设置缓存头和 MIME 类型
+	if strings.Contains(relativePath, ".") {
+		ext := filepath.Ext(relativePath)
+		switch ext {
+		case ".js":
+			w.Header().Set("Content-Type", "application/javascript")
+			w.Header().Set("Cache-Control", "public, max-age=31536000") // 1年
+		case ".css":
+			w.Header().Set("Content-Type", "text/css")
+			w.Header().Set("Cache-Control", "public, max-age=31536000") // 1年
+		case ".woff":
+			w.Header().Set("Content-Type", "font/woff")
+			w.Header().Set("Cache-Control", "public, max-age=31536000") // 1年
+		case ".woff2":
+			w.Header().Set("Content-Type", "font/woff2")
+			w.Header().Set("Cache-Control", "public, max-age=31536000") // 1年
+		case ".ttf":
+			w.Header().Set("Content-Type", "font/ttf")
+			w.Header().Set("Cache-Control", "public, max-age=31536000") // 1年
+		case ".eot":
+			w.Header().Set("Content-Type", "application/vnd.ms-fontobject")
+			w.Header().Set("Cache-Control", "public, max-age=31536000") // 1年
+		default:
+			w.Header().Set("Cache-Control", "public, max-age=3600") // 1小时
+		}
+	}
+
+	// 读取静态资源文件
+	content, err := assets.ReadStatic(relativePath)
+	if err != nil {
+		s.log.Debugf("Static asset not found: %s", relativePath)
+		http.NotFound(w, r)
+		return
+	}
+
+	// 写入内容
+	w.Write(content)
 }

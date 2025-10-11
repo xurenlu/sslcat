@@ -139,7 +139,7 @@
       {
         "name": "cdnproxy",
         "enabled": true,
-        "base_url": "https://cdnproxy.some.im",
+        "base_url": "https://cdnproxy.shifen.de",
         "priority": 1
       },
       {

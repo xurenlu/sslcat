@@ -1,4 +1,4 @@
-# WithSSL 现代化前端演示指南
+# SSLcat 现代化前端演示指南
 
 ## 🎯 快速验证
 
@@ -17,7 +17,7 @@ make build          # 构建 Go 二进制（包含嵌入的前端）
 
 ```bash
 # 使用构建的二进制
-./build/withssl --config withssl.conf
+./build/sslcat --config sslcat.conf
 
 # 或者开发模式
 make dev
@@ -129,7 +129,7 @@ make dev-frontend
 make build-all
 
 # 部署单个二进制文件
-scp build/withssl-linux-amd64 user@server:/opt/sslcat/
+scp build/sslcat-linux-amd64 user@server:/opt/sslcat/
 ```
 
 生产部署的优势：
@@ -210,7 +210,7 @@ ls -la internal/assets/frontend/assets/
 curl http://localhost:8080/admin/api/stats
 
 # 查看服务器日志
-./withssl --log-level debug
+./sslcat --log-level debug
 ```
 
 ### 调试技巧
@@ -275,7 +275,7 @@ curl -v http://localhost:8080/admin/spa/dashboard
 
 ## 🎉 总结
 
-WithSSL 的现代化前端升级成功实现了：
+SSLcat 的现代化前端升级成功实现了：
 
 1. **开发体验提升**: 现代化的开发工具链和热重载
 2. **用户体验改进**: 响应式设计和现代化界面
@@ -283,4 +283,4 @@ WithSSL 的现代化前端升级成功实现了：
 4. **技术栈现代化**: React + TypeScript + Vite
 5. **向后兼容**: 保持原有 API 和配置兼容性
 
-这为 WithSSL 项目的长期发展奠定了坚实的基础，同时保持了简单易用的特性。
+这为 SSLcat 项目的长期发展奠定了坚实的基础，同时保持了简单易用的特性。

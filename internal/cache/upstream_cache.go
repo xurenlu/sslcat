@@ -56,12 +56,7 @@ type UpstreamCacheConfig struct {
 	MaxSizeBytes    int64         `json:"max_size_bytes"`
 	DefaultTTL      time.Duration `json:"default_ttl"`
 	RespectUpstream bool          `json:"respect_upstream"`
-
-	// 可缓存的文件类型
-	CacheableTypes []string `json:"cacheable_types"`
-
-	// 可缓存的Content-Type
-	CacheableContentTypes []string `json:"cacheable_content_types"`
+	CacheableTypes  []string      `json:"cacheable_types"` // 可缓存的Content-Type列表
 
 	// 最小缓存文件大小
 	MinSize int64 `json:"min_size"`

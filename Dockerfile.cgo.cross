@@ -1,0 +1,43 @@
+# ARM64 容器内交叉编译到 AMD64 的 Dockerfile
+FROM golang:1.25-alpine AS builder
+
+# 安装 CGO 依赖和交叉编译工具
+RUN apk add --no-cache \
+    gcc \
+    musl-dev \
+    sqlite-dev \
+    git \
+    musl-dev \
+    gcc-x86_64-linux-musl
+
+# 设置 Go 代理（中国加速）
+ENV GOPROXY=https://goproxy.cn,direct
+ENV GO111MODULE=on
+
+WORKDIR /build
+
+# 复制项目文件
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+# 交叉编译到 AMD64
+# 使用 x86_64 交叉编译器
+ENV CGO_ENABLED=1
+ENV GOOS=linux
+ENV GOARCH=amd64
+ENV CC=x86_64-linux-musl-gcc
+ENV CXX=x86_64-linux-musl-g++
+
+RUN go build \
+    -ldflags "-s -w -linkmode external -extldflags '-static' -X main.version=v1.3.11-cgo -X main.build=$(date -u +%Y-%m-%d_%H:%M:%S)" \
+    -o sslcat-linux-amd64-cgo \
+    main.go
+
+# 验证构建结果
+RUN ls -lh sslcat-linux-amd64-cgo && \
+    file sslcat-linux-amd64-cgo
+
+CMD ["sh", "-c", "echo /build/sslcat-linux-amd64-cgo"]
+

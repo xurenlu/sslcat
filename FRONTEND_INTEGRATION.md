@@ -1,8 +1,8 @@
-# WithSSL 前端现代化升级
+# SSLcat 前端现代化升级
 
 ## 概述
 
-WithSSL 项目已成功集成了现代化的前端技术栈，使用 **Vite + React + TypeScript + Chakra UI** 重构了管理界面，提供了更好的用户体验和开发体验。
+SSLcat 项目已成功集成了现代化的前端技术栈，使用 **Vite + React + TypeScript + Chakra UI** 重构了管理界面，提供了更好的用户体验和开发体验。
 
 ## 技术架构
 
@@ -22,7 +22,7 @@ WithSSL 项目已成功集成了现代化的前端技术栈，使用 **Vite + Re
 ## 项目结构
 
 ```
-withssl/
+sslcat/
 ├── frontend/                   # 前端项目目录
 │   ├── src/
 │   │   ├── components/         # 通用组件
@@ -190,7 +190,7 @@ const stats = await apiService.getStats()
 make build-linux
 
 # 部署（只需要单个文件）
-scp build/withssl-linux-amd64 user@server:/opt/sslcat/
+scp build/sslcat-linux-amd64 user@server:/opt/sslcat/
 ```
 
 ### 配置文件
@@ -249,7 +249,7 @@ scp build/withssl-linux-amd64 user@server:/opt/sslcat/
 ### 调试模式
 ```bash
 # 启用调试日志
-./withssl --log-level debug
+./sslcat --log-level debug
 
 # 检查前端构建
 ls -la frontend/dist/
@@ -286,7 +286,7 @@ ls -la frontend/dist/
 
 ## 总结
 
-WithSSL 的前端现代化升级带来了以下优势：
+SSLcat 的前端现代化升级带来了以下优势：
 
 1. **开发体验**：现代化的开发工具链，热重载，类型安全
 2. **用户体验**：响应式设计，现代化界面，更好的交互
@@ -294,4 +294,4 @@ WithSSL 的前端现代化升级带来了以下优势：
 4. **部署简化**：单文件部署，无需额外的静态文件服务
 5. **扩展性**：易于添加新功能，模块化的组件设计
 
-这次升级为 WithSSL 项目的长期发展奠定了坚实的基础，同时保持了向后兼容性，确保现有用户的无缝迁移。
+这次升级为 SSLcat 项目的长期发展奠定了坚实的基础，同时保持了向后兼容性，确保现有用户的无缝迁移。

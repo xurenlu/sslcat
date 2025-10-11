@@ -39,7 +39,7 @@ SSLcat es un potente servidor proxy SSL que soporta gestión automática de cert
 ## Características
 
 ### 🌏 Optimización de Red para China
-- **Optimización de Proxy CDN**: Utiliza el servicio proxy [CDNProxy](https://cdnproxy.some.im/docs)
+- **Optimización de Proxy CDN**: Utiliza el servicio proxy [CDNProxy](https://cdnproxy.shifen.de/docs)
 - **Aceleración de Acceso**: Resuelve problemas de acceso a jsdelivr CDN en China continental
 - **Estabilidad**: Asegura carga estable de recursos a través del servicio proxy
 
@@ -458,11 +458,11 @@ security:
 
 ### Optimización para Usuarios de China Continental
 
-SSLcat ha sido optimizado para el entorno de red de China continental, usando el servicio proxy [CDNProxy](https://cdnproxy.some.im/docs) para resolver problemas de acceso a jsdelivr CDN.
+SSLcat ha sido optimizado para el entorno de red de China continental, usando el servicio proxy [CDNProxy](https://cdnproxy.shifen.de/docs) para resolver problemas de acceso a jsdelivr CDN.
 
 #### Uso de Proxy CDN
 - **Dirección original**: `https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css`
-- **Dirección proxy**: `https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css`
+- **Dirección proxy**: `https://cdnproxy.shifen.de/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css`
 
 #### Archivos de Recursos Involucrados
 - Bootstrap 5.1.3 CSS

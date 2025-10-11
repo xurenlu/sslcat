@@ -13,8 +13,8 @@ func (s *Server) generateGitServerManagementHTML(data map[string]interface{}) st
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>%s - SSLcat</title>
-    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/bootstrap-icons.css" rel="stylesheet">
     <style>
         .deploy-progress {
             height: 8px;
@@ -82,8 +82,8 @@ func (s *Server) generateGitServerManagementHTML(data map[string]interface{}) st
                         <div class="alert alert-info mt-3">
                             <h6><i class="bi bi-info-circle"></i> 使用方法</h6>
                             <p class="mb-0">1. 创建应用 → 2. 添加 Git 远程仓库 → 3. 推送代码 → 4. 自动部署</p>
-                            <code>git remote add withssl git@your-server.com:app-name.git</code><br>
-                            <code>git push withssl main</code>
+                            <code>git remote add sslcat git@your-server.com:app-name.git</code><br>
+                            <code>git push sslcat main</code>
                         </div>
                     </div>
                 </div>
@@ -331,7 +331,7 @@ func (s *Server) generateGitServerManagementHTML(data map[string]interface{}) st
         </div>
     </div>
     
-    <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/bootstrap.bundle.min.js"></script>
     <script>
     let currentAppName = null;
     let deployStatusInterval = null;

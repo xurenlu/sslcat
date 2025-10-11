@@ -194,6 +194,20 @@ docker-cgo-fast:
 	@./scripts/build-cgo-docker.sh -t sslcat-cgo:$(VERSION) -e -o $(BUILD_DIR)
 	@echo "CGO二进制文件已提取到 $(BUILD_DIR)/sslcat-linux-amd64-cgo"
 
+# 使用 Zig 交叉编译 CGO 版本（推荐：支持 ARM64 Mac 编译 AMD64）
+.PHONY: docker-cgo-zig
+docker-cgo-zig:
+	@echo "使用 Zig 交叉编译 AMD64 CGO 二进制文件..."
+	@./build-cgo-zig.sh
+	@echo "✅ CGO二进制文件已提取到 $(BUILD_DIR)/sslcat-linux-amd64-cgo"
+
+# 构建 ARM64 CGO 版本（适用于 ARM64 Linux 服务器）
+.PHONY: docker-cgo-arm64
+docker-cgo-arm64:
+	@echo "构建 ARM64 CGO 二进制文件..."
+	@./build-cgo-arm64.sh
+	@echo "✅ ARM64 CGO二进制文件已提取到 $(BUILD_DIR)/sslcat-linux-arm64-cgo"
+
 # 运行Docker容器
 .PHONY: docker-run
 docker-run:
@@ -248,6 +262,8 @@ help:
 	@echo "  docker       - 创建Docker镜像"
 	@echo "  docker-cgo   - 创建CGO Docker镜像（中国优化版）"
 	@echo "  docker-cgo-extract - 构建CGO镜像并提取二进制文件"
+	@echo "  docker-cgo-zig - 使用Zig交叉编译AMD64 CGO版本（推荐）"
+	@echo "  docker-cgo-arm64 - 构建ARM64 CGO版本"
 	@echo "  docker-run   - 运行Docker容器"
 	@echo "  docker-stop  - 停止Docker容器"
 	@echo "  check        - 代码质量检查"

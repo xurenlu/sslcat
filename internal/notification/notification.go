@@ -38,20 +38,22 @@ func (l NotificationLevel) String() string {
 type NotificationType string
 
 const (
-	TypeDDoSAttack     NotificationType = "ddos_attack"
-	TypeCertExpiring   NotificationType = "cert_expiring"
-	TypeCertSuccess    NotificationType = "cert_success"
-	TypeCertFailed     NotificationType = "cert_failed"
-	TypeSystemError    NotificationType = "system_error"
-	TypeSecurityAlert  NotificationType = "security_alert"
-	TypeUserLogin      NotificationType = "user_login"
-	TypeUserAction     NotificationType = "user_action"
-	TypeSystemStartup  NotificationType = "system_startup"
-	TypeSystemShutdown NotificationType = "system_shutdown"
-	TypeDeploySuccess  NotificationType = "deploy_success"
-	TypeDeployFailed   NotificationType = "deploy_failed"
-	TypeDeployTimeout  NotificationType = "deploy_timeout"
-	TypeDeployStuck    NotificationType = "deploy_stuck"
+	TypeDDoSAttack       NotificationType = "ddos_attack"
+	TypeCertExpiring     NotificationType = "cert_expiring"
+	TypeCertSuccess      NotificationType = "cert_success"
+	TypeCertFailed       NotificationType = "cert_failed"
+	TypeSystemError      NotificationType = "system_error"
+	TypeSecurityAlert    NotificationType = "security_alert"
+	TypeUserLogin        NotificationType = "user_login"
+	TypeUserAction       NotificationType = "user_action"
+	TypeSystemStartup    NotificationType = "system_startup"
+	TypeSystemShutdown   NotificationType = "system_shutdown"
+	TypeDeploySuccess    NotificationType = "deploy_success"
+	TypeDeployFailed     NotificationType = "deploy_failed"
+	TypeDeployTimeout    NotificationType = "deploy_timeout"
+	TypeDeployStuck      NotificationType = "deploy_stuck"
+	TypeConfigReloaded   NotificationType = "config_reloaded"
+	TypeConfigReloadFail NotificationType = "config_reload_fail"
 )
 
 // String 返回通知类型的字符串表示
@@ -473,6 +475,43 @@ func (nm *NotificationManager) SendDeployStuck(appName, commitSHA, lastLog strin
 			"idle_duration": idleDuration,
 			"last_log":      lastLog,
 			"suggestion":    "请检查构建进程是否卡住，可能需要手动介入",
+		},
+	}
+
+	return nm.Send(notification)
+}
+
+// SendConfigReloaded 发送配置重载成功通知
+func (nm *NotificationManager) SendConfigReloaded(configFile string, duration time.Duration, changes []string) error {
+	notification := &Notification{
+		Type:    TypeConfigReloaded,
+		Level:   LevelInfo,
+		Title:   "配置文件热重载成功",
+		Message: fmt.Sprintf("配置文件 %s 已成功热重载", configFile),
+		Details: map[string]any{
+			"config_file": configFile,
+			"duration":    duration.String(),
+			"changes":     changes,
+			"timestamp":   time.Now().Format("2006-01-02 15:04:05"),
+		},
+	}
+
+	return nm.Send(notification)
+}
+
+// SendConfigReloadFailed 发送配置重载失败通知
+func (nm *NotificationManager) SendConfigReloadFailed(configFile string, reason string, errorDetails string) error {
+	notification := &Notification{
+		Type:    TypeConfigReloadFail,
+		Level:   LevelError,
+		Title:   "配置文件热重载失败",
+		Message: fmt.Sprintf("配置文件 %s 重载失败: %s", configFile, reason),
+		Details: map[string]any{
+			"config_file":   configFile,
+			"reason":        reason,
+			"error_details": errorDetails,
+			"timestamp":     time.Now().Format("2006-01-02 15:04:05"),
+			"suggestion":    "请检查配置文件语法或查看日志获取更多信息",
 		},
 	}
 

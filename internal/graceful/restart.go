@@ -104,7 +104,7 @@ func (rm *RestartManager) startNewProcess() (*exec.Cmd, error) {
 	cmd.Stdin = os.Stdin
 
 	// 设置环境变量，标记为新进程
-	cmd.Env = append(os.Environ(), "WITHSSL_GRACEFUL_RESTART=1")
+	cmd.Env = append(os.Environ(), "SSLCAT_GRACEFUL_RESTART=1")
 
 	// 启动新进程
 	if err := cmd.Start(); err != nil {
@@ -140,9 +140,9 @@ func (rm *RestartManager) closeListeners() {
 // ListenTCP 监听TCP端口
 func (rm *RestartManager) ListenTCP(network, address string) (net.Listener, error) {
 	// 检查是否是从父进程继承的文件描述符
-	if os.Getenv("WITHSSL_GRACEFUL_RESTART") == "1" {
+	if os.Getenv("SSLCAT_GRACEFUL_RESTART") == "1" {
 		// 尝试从环境变量获取文件描述符
-		if fd := os.Getenv("WITHSSL_LISTENER_FD"); fd != "" {
+		if fd := os.Getenv("SSLCAT_LISTENER_FD"); fd != "" {
 			// 这里可以实现从文件描述符恢复监听器的逻辑
 			rm.log.Info("Restored listener from file descriptor")
 		}

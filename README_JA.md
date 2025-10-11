@@ -39,7 +39,7 @@ SSLcat は、自動証明書管理、ドメイン転送、セキュリティ保�
 ## 機能
 
 ### 🌏 中国向けネットワーク最適化
-- **CDN プロキシ最適化**: [CDNProxy](https://cdnproxy.some.im/docs) プロキシサービスを使用
+- **CDN プロキシ最適化**: [CDNProxy](https://cdnproxy.shifen.de/docs) プロキシサービスを使用
 - **アクセス高速化**: 中国本土でのjsdelivr CDNアクセス問題を解決
 - **安定性**: プロキシサービスによる安定したリソース読み込みを保証
 
@@ -436,11 +436,11 @@ security:
 
 ### 中国本土ユーザー最適化
 
-SSLcatプロジェクトは中国本土ネットワーク環境向けに最適化され、[CDNProxy](https://cdnproxy.some.im/docs) プロキシサービスを使用してjsdelivr CDNアクセス問題を解決しています。
+SSLcatプロジェクトは中国本土ネットワーク環境向けに最適化され、[CDNProxy](https://cdnproxy.shifen.de/docs) プロキシサービスを使用してjsdelivr CDNアクセス問題を解決しています。
 
 #### CDNプロキシ使用
 - **元のアドレス**: `https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css`
-- **プロキシアドレス**: `https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css`
+- **プロキシアドレス**: `https://cdnproxy.shifen.de/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css`
 
 #### 関係するリソースファイル
 - Bootstrap 5.1.3 CSS

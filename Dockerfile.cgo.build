@@ -1,0 +1,40 @@
+# 简化的 CGO 构建专用 Dockerfile
+# 只用于构建二进制文件，不创建运行镜像
+FROM golang:1.25-alpine AS builder
+
+# 安装 CGO 必需的依赖
+RUN apk add --no-cache \
+    gcc \
+    musl-dev \
+    sqlite-dev \
+    git
+
+# 设置 Go 代理（中国加速）
+ENV GOPROXY=https://goproxy.cn,direct
+ENV GO111MODULE=on
+ENV CGO_ENABLED=1
+ENV GOOS=linux
+ENV GOARCH=amd64
+
+WORKDIR /build
+
+# 复制项目文件
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+# 构建 CGO 版本
+RUN go build \
+    -ldflags "-s -w -X main.version=v1.3.11-cgo -X main.build=$(date -u +%Y-%m-%d_%H:%M:%S)" \
+    -o sslcat-linux-amd64-cgo \
+    main.go
+
+# 验证构建结果
+RUN ls -lh sslcat-linux-amd64-cgo && \
+    file sslcat-linux-amd64-cgo && \
+    ldd sslcat-linux-amd64-cgo || true
+
+# 设置默认命令为输出二进制文件路径
+CMD ["sh", "-c", "echo /build/sslcat-linux-amd64-cgo"]
+

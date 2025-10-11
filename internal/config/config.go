@@ -1214,12 +1214,7 @@ type UpstreamCacheConfig struct {
 	RespectUpstream bool          `json:"respect_upstream"` // 是否遵循上游的Cache-Control
 	MinFileSize     int64         `json:"min_file_size"`    // 最小缓存文件大小（字节）
 	MaxFileSize     int64         `json:"max_file_size"`    // 最大缓存文件大小（字节）
-
-	// 可缓存的文件类型
-	CacheableTypes []string `json:"cacheable_types"`
-
-	// 可缓存的Content-Type
-	CacheableContentTypes []string `json:"cacheable_content_types"`
+	CacheableTypes  []string      `json:"cacheable_types"`  // 可缓存的Content-Type列表
 }
 
 // AISecurityConfig AI 安全分析配置
@@ -1238,9 +1233,8 @@ type AISecurityConfig struct {
 	MinEvents      int           `json:"min_events"`      // 最少事件数才进行分析（默认 10）
 
 	// 通知配置
-	NotifyOnThreat   bool     `json:"notify_on_threat"`  // 检测到威胁时是否通知（默认 true）
-	MinThreatLevel   string   `json:"min_threat_level"`  // 最低通知威胁等级（low/medium/high/critical）
-	NotifyRecipients []string `json:"notify_recipients"` // 通知接收人邮箱列表
+	NotifyOnThreat bool   `json:"notify_on_threat"` // 检测到威胁时是否通知（默认 true）
+	MinThreatLevel string `json:"min_threat_level"` // 最低通知威胁等级（low/medium/high/critical）
 }
 
 // migratePortConfig 迁移旧的端口配置到新的配置结构
