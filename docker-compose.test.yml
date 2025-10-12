@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # SSLcat 测试实例
+  sslcat:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: sslcat-test
+    ports:
+      - "8080:8080"  # HTTP 端口（测试用）
+      - "2222:2222"  # SSH 端口（Git 推送测试）
+    volumes:
+      - ./test-data:/data
+      - ./test-config.json:/etc/sslcat/config.json
+    environment:
+      - SSLCAT_ADMIN_PASSWORD=TestAdmin@2024
+      - SSLCAT_ADMIN_PREFIX=/sslcat-panel
+      - SSLCAT_PORT=8080
+      - SSLCAT_DEBUG=true
+    networks:
+      - sslcat-test-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/sslcat-panel/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # 测试后端服务 A
+  backend-a:
+    image: nginx:alpine
+    container_name: backend-a
+    volumes:
+      - ./tests/fixtures/backend-a:/usr/share/nginx/html:ro
+    networks:
+      - sslcat-test-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # 测试后端服务 B
+  backend-b:
+    image: nginx:alpine
+    container_name: backend-b
+    volumes:
+      - ./tests/fixtures/backend-b:/usr/share/nginx/html:ro
+    networks:
+      - sslcat-test-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # 测试后端服务 C
+  backend-c:
+    image: nginx:alpine
+    container_name: backend-c
+    volumes:
+      - ./tests/fixtures/backend-c:/usr/share/nginx/html:ro
+    networks:
+      - sslcat-test-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+networks:
+  sslcat-test-network:
+    driver: bridge
+

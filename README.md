@@ -66,6 +66,8 @@ SSLcat 是一个功能强大的企业级 SSL 代理服务器，支持自动证�
 - ⚙️ [端口配置指南](docs/port-configuration-guide.md) - 端口配置使用指南
 - 🏗️ [静态站点 Builder](docs/static-builder-nginx.md) - 静态站点部署文档
 - 📊 [Prometheus 和请求追踪指南](PROMETHEUS_AND_TRACING_GUIDE.md) - 完整的可观测性指南
+- 🖼️ [图片优化功能指南](IMAGE_OPTIMIZATION_GUIDE.md) - 图片优化使用说明
+- 🧪 [API 自动化测试指南](tests/TESTING.md) - 完整的测试套件说明
 
 ### 🌍 多语言版本
 - 🇺🇸 [English README](README_EN.md) - English version
