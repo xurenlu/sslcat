@@ -164,6 +164,11 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	// 初始化 DDoS 防护器
 	server.ddosProtector = ddos.NewProtector(notificationIntegrator)
 
+	// 将 GeoIP 服务设置到 DDoS 防护器
+	if secMgr != nil && secMgr.GetGeoIPService() != nil {
+		server.ddosProtector.SetGeoIPService(secMgr.GetGeoIPService())
+	}
+
 	// 初始化代理访问控制管理器
 	server.proxyAuthManager = NewProxyAuthManager(server.log)
 

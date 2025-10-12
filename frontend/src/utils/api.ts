@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { ApiResponse } from '../types'
+import { addBreadcrumb, captureError } from './sentry'
 
 // 常量定义
 const FALLBACK_ADMIN_PREFIX = '/sslcat-panel' // 仅作为最后的备用选项
@@ -50,9 +51,27 @@ api.interceptors.request.use(
   (config) => {
     // 添加认证信息
     config.withCredentials = true // 包含 cookies
+    
+    // 记录 API 请求到 Sentry（用于调试）
+    addBreadcrumb(
+      `API Request: ${config.method?.toUpperCase()} ${config.url}`,
+      'http',
+      {
+        url: config.url,
+        method: config.method,
+        baseURL: config.baseURL,
+      },
+      'info'
+    )
+    
     return config
   },
   (error) => {
+    // 请求配置错误
+    captureError(error, {
+      context: 'API Request Interceptor',
+      errorType: 'request_config_error',
+    })
     return Promise.reject(error)
   }
 )
@@ -60,16 +79,57 @@ api.interceptors.request.use(
 // 响应拦截器 - 改进错误处理
 api.interceptors.response.use(
   (response: AxiosResponse) => {
+    // 记录成功的 API 响应
+    addBreadcrumb(
+      `API Response: ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status}`,
+      'http',
+      {
+        url: response.config.url,
+        method: response.config.method,
+        status: response.status,
+        statusText: response.statusText,
+      },
+      'info'
+    )
+    
     return response.data
   },
   (error) => {
     console.error('API Error:', error)
+    
+    // 准备错误上下文
+    const errorContext: Record<string, any> = {
+      url: error.config?.url,
+      method: error.config?.method,
+      baseURL: error.config?.baseURL,
+    }
     
     // 统一错误处理
     if (error.response) {
       // 服务器响应了错误状态码
       const { status, data } = error.response
       const errorMessage = data?.error || data?.message || `HTTP ${status} Error`
+      
+      errorContext.status = status
+      errorContext.statusText = error.response.statusText
+      errorContext.responseData = data
+      
+      // 只上报服务器错误（5xx）和认证错误（401, 403）
+      if (status >= 500 || status === 401 || status === 403) {
+        captureError(new Error(`API Error: ${errorMessage}`), {
+          ...errorContext,
+          errorType: 'api_server_error',
+          severity: status >= 500 ? 'error' : 'warning',
+        })
+      }
+      
+      // 添加错误面包屑
+      addBreadcrumb(
+        `API Error: ${status} ${errorMessage}`,
+        'http',
+        errorContext,
+        'error'
+      )
       
       return Promise.reject({
         status,
@@ -78,14 +138,44 @@ api.interceptors.response.use(
         isNetworkError: false
       })
     } else if (error.request) {
-      // 请求已发出但没有收到响应
+      // 请求已发出但没有收到响应（网络错误）
+      errorContext.errorType = 'network_error'
+      
+      // 网络错误也需要上报（可能是服务器宕机）
+      captureError(new Error('Network Error: No response received'), {
+        ...errorContext,
+        errorType: 'api_network_error',
+      })
+      
+      addBreadcrumb(
+        'API Network Error: No response received',
+        'http',
+        errorContext,
+        'error'
+      )
+      
       return Promise.reject({
         status: 0,
         message: '网络连接失败，请检查网络设置',
         isNetworkError: true
       })
     } else {
-      // 其他错误
+      // 其他错误（通常是请求配置问题）
+      errorContext.errorMessage = error.message
+      errorContext.errorType = 'request_setup_error'
+      
+      captureError(error, {
+        ...errorContext,
+        errorType: 'api_request_error',
+      })
+      
+      addBreadcrumb(
+        `API Request Error: ${error.message}`,
+        'http',
+        errorContext,
+        'error'
+      )
+      
       return Promise.reject({
         status: -1,
         message: error.message || '未知错误',

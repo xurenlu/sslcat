@@ -135,7 +135,15 @@ const GeoIPConfig: React.FC = () => {
       
       if (configResponse.ok) {
         const configData = await configResponse.json()
-        setConfig(configData)
+        // 确保数组字段始终存在
+        setConfig({
+          enabled: configData.enabled || false,
+          database_path: configData.database_path || './data/geoip/GeoLite2-City.mmdb',
+          update_interval: configData.update_interval || 168,
+          allow_unknown: configData.allow_unknown !== false, // 默认为 true
+          allowed_countries: Array.isArray(configData.allowed_countries) ? configData.allowed_countries : [],
+          blocked_countries: Array.isArray(configData.blocked_countries) ? configData.blocked_countries : [],
+        })
       }
 
       // 加载GeoIP统计信息

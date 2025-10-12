@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useConfig } from './ConfigContext'
+import { setSentryUser, clearSentryUser } from '../utils/sentry'
 
 interface User {
   username: string
@@ -65,6 +66,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const userData = await response.json()
           console.log('认证成功，用户数据:', userData)
           setUser(userData)
+          
+          // 设置 Sentry 用户信息
+          setSentryUser({
+            id: userData.username, // 使用 username 作为 ID
+            username: userData.username,
+            role: userData.role,
+          })
+          
           setIsLoading(false)
           loadingSet = true
           return true
@@ -115,6 +124,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (response.ok) {
         const userData = await response.json()
         setUser(userData)
+        
+        // 设置 Sentry 用户信息
+        setSentryUser({
+          id: userData.username,
+          username: userData.username,
+          role: userData.role,
+        })
+        
         // 登录成功后不要立即触发 checkAuth，避免重复检查
         console.log('登录成功，用户:', userData)
         return true
@@ -140,6 +157,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (error) {
       console.error('Logout error:', error)
     } finally {
+      // 清除 Sentry 用户信息
+      clearSentryUser()
+      
       setUser(null)
       const effectivePrefix = getEffectivePrefix()
       navigate(`${effectivePrefix}/login`)

@@ -149,3 +149,6 @@ sslcat_*.tar.gz
 # Binary files
 *.bin
 *.exe
+
+# 私有文档和脚本目录
+_mine/

@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { Box, Spinner, Center, Text } from '@chakra-ui/react'
+import { Box, Spinner, Center, Text, Button, VStack, Heading } from '@chakra-ui/react'
+import * as Sentry from '@sentry/react'
 import { LanguageProvider } from './hooks/useLanguage'
 import { ConfigProvider, useConfig } from './contexts/ConfigContext'
 import { AuthProvider } from './contexts/AuthContext'
@@ -146,19 +147,73 @@ const AppRoutes: React.FC = () => {
   )
 }
 
+// 错误回退组件
+const ErrorFallback = ({ error, resetError }: { error: unknown; resetError: () => void }) => {
+  const errorMessage = error instanceof Error ? error.message : String(error)
+  return (
+    <Center h="100vh" bg="gray.50">
+      <VStack spacing={6} maxW="600px" p={8} textAlign="center">
+        <Box fontSize="6xl">😅</Box>
+        <Heading size="lg" color="gray.700">
+          抱歉，页面出错了
+        </Heading>
+        <Text color="gray.600">
+          我们已经收到错误报告，开发团队会尽快处理。
+        </Text>
+        <Box 
+          p={4} 
+          bg="red.50" 
+          borderRadius="md" 
+          w="100%" 
+          fontSize="sm" 
+          fontFamily="mono"
+          textAlign="left"
+          color="red.700"
+        >
+          <Text fontWeight="bold" mb={2}>错误信息：</Text>
+          <Text>{errorMessage}</Text>
+        </Box>
+        <VStack spacing={3} w="100%">
+          <Button 
+            colorScheme="blue" 
+            size="lg"
+            onClick={resetError}
+            w="100%"
+          >
+            重试
+          </Button>
+          <Button 
+            variant="outline"
+            size="lg"
+            onClick={() => window.location.href = '/'}
+            w="100%"
+          >
+            返回首页
+          </Button>
+        </VStack>
+      </VStack>
+    </Center>
+  )
+}
+
 function App() {
   return (
-    <LanguageProvider>
-      <ConfigProvider>
-        <AuthProvider>
-          <Box minH="100vh">
-            <Layout>
-              <AppRoutes />
-            </Layout>
-          </Box>
-        </AuthProvider>
-      </ConfigProvider>
-    </LanguageProvider>
+    <Sentry.ErrorBoundary 
+      fallback={ErrorFallback}
+      showDialog={false}
+    >
+      <LanguageProvider>
+        <ConfigProvider>
+          <AuthProvider>
+            <Box minH="100vh">
+              <Layout>
+                <AppRoutes />
+              </Layout>
+            </Box>
+          </AuthProvider>
+        </ConfigProvider>
+      </LanguageProvider>
+    </Sentry.ErrorBoundary>
   )
 }
 

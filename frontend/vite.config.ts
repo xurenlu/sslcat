@@ -5,12 +5,22 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   base: '/',  // 使用根路径，后端会动态重写为正确的 adminPrefix
+  
+  // 定义全局变量
+  define: {
+    __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0'),
+  },
+  
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
+    // 生成 source maps（用于 Sentry 错误追踪）
+    sourcemap: true,
     rollupOptions: {
       output: {
         manualChunks: undefined,
+        // Source map 文件名（可选，方便管理）
+        sourcemapBaseUrl: undefined,
       },
     },
   },

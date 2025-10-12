@@ -13,6 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/xurenlu/sslcat/internal/logger"
 	"github.com/xurenlu/sslcat/internal/notification"
+	"github.com/xurenlu/sslcat/internal/security"
 	"github.com/xurenlu/sslcat/internal/threatintel"
 )
 
@@ -61,16 +62,19 @@ type ClientInfo struct {
 
 // Attack 攻击信息
 type Attack struct {
-	ID         string    `json:"id"`
-	ClientIP   string    `json:"client_ip"`
-	UserAgent  string    `json:"user_agent"`
-	URL        string    `json:"url"`
-	Method     string    `json:"method"`
-	AttackType string    `json:"attack_type"`
-	Severity   string    `json:"severity"`
-	Timestamp  time.Time `json:"timestamp"`
-	Blocked    bool      `json:"blocked"`
-	Reason     string    `json:"reason"`
+	ID          string    `json:"id"`
+	ClientIP    string    `json:"client_ip"`
+	UserAgent   string    `json:"user_agent"`
+	URL         string    `json:"url"`
+	Method      string    `json:"method"`
+	AttackType  string    `json:"attack_type"`
+	Severity    string    `json:"severity"`
+	Timestamp   time.Time `json:"timestamp"`
+	Blocked     bool      `json:"blocked"`
+	Reason      string    `json:"reason"`
+	Country     string    `json:"country,omitempty"`      // 国家
+	CountryCode string    `json:"country_code,omitempty"` // 国家代码
+	ISP         string    `json:"isp,omitempty"`          // ISP/组织
 }
 
 // Protector DDoS防护器
@@ -100,6 +104,8 @@ type Protector struct {
 	notificationIntegrator *notification.NotificationIntegrator
 	// 威胁情报检测器
 	threatDetector *threatintel.ThreatDetector
+	// GeoIP 服务
+	geoIPService *security.GeoIPService
 }
 
 // ThresholdConfig 阈值配置
@@ -146,7 +152,20 @@ func NewProtectorWithThreatIntel(notificationIntegrator *notification.Notificati
 		p.rotator = rot
 	}
 
+	// 设置威胁检测器（如果有）
+	if threatDetector != nil {
+		p.threatDetector = threatDetector
+	}
+
 	return p
+}
+
+// SetGeoIPService 设置 GeoIP 服务
+func (p *Protector) SetGeoIPService(geoIPService *security.GeoIPService) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	p.geoIPService = geoIPService
+	p.log.Info("已设置 GeoIP 服务到 DDoS 防护器")
 }
 
 // initThresholds 初始化阈值配置
@@ -254,6 +273,14 @@ func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
 	// 获取当前阈值配置
 	threshold := p.thresholds[p.level]
 
+	// 对静态资源路径放宽限制（提高阈值）
+	isStaticResource := p.isStaticResourcePath(r.URL.Path)
+	if isStaticResource {
+		// 对于静态资源，阈值提高5倍
+		threshold.RequestsPerMinute *= 5
+		threshold.RequestsPerHour *= 5
+	}
+
 	// 使用威胁情报检测（如果可用）
 	if p.threatDetector != nil {
 		threatResult := p.threatDetector.CheckRequest(r)
@@ -299,6 +326,47 @@ func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
 	}
 
 	return false, ""
+}
+
+// isStaticResourcePath 判断是否为静态资源路径，应该放宽限制
+func (p *Protector) isStaticResourcePath(urlPath string) bool {
+	staticPrefixes := []string{
+		"/_next/",        // Next.js 静态资源
+		"/static/",       // 通用静态资源
+		"/assets/",       // 资产文件
+		"/public/",       // 公开资源
+		"/.well-known/",  // 验证文件
+		"/favicon.ico",   // 网站图标
+		"/robots.txt",    // 爬虫文件
+		"/sitemap.xml",   // 站点地图
+		"/sw.js",         // Service Worker
+		"/manifest.json", // PWA Manifest
+	}
+
+	// 检查常见静态资源扩展名
+	staticExtensions := []string{
+		".js", ".css", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico",
+		".woff", ".woff2", ".ttf", ".eot", ".webp", ".avif",
+		".map", // source maps
+	}
+
+	urlLower := strings.ToLower(urlPath)
+
+	// 检查路径前缀
+	for _, prefix := range staticPrefixes {
+		if strings.HasPrefix(urlLower, prefix) {
+			return true
+		}
+	}
+
+	// 检查文件扩展名
+	for _, ext := range staticExtensions {
+		if strings.HasSuffix(urlLower, ext) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // checkRateLimit 检查请求频率限制
@@ -429,6 +497,15 @@ func (p *Protector) recordAttack(clientIP, userAgent, url, method, attackType, s
 		Reason:     reason,
 	}
 
+	// 查询 GeoIP 信息
+	if p.geoIPService != nil {
+		if geoLoc, err := p.geoIPService.GetLocation(clientIP); err == nil && geoLoc != nil {
+			attack.Country = geoLoc.Country
+			attack.CountryCode = geoLoc.CountryCode
+			attack.ISP = geoLoc.ISP
+		}
+	}
+
 	p.attacks = append(p.attacks, attack)
 
 	// JSON Lines 持久化（优先轮转器）
@@ -443,6 +520,17 @@ func (p *Protector) recordAttack(clientIP, userAgent, url, method, attackType, s
 		"severity": attack.Severity,
 		"blocked":  attack.Blocked,
 		"reason":   attack.Reason,
+	}
+
+	// 添加 GeoIP 信息到日志
+	if attack.Country != "" {
+		rec["country"] = attack.Country
+	}
+	if attack.CountryCode != "" {
+		rec["country_code"] = attack.CountryCode
+	}
+	if attack.ISP != "" {
+		rec["isp"] = attack.ISP
 	}
 	if b, err := json.Marshal(rec); err == nil {
 		if p.rotator != nil {

@@ -35,26 +35,32 @@ type SecurityAnalyzer struct {
 
 // SecurityData 安全数据摘要
 type SecurityData struct {
-	TimeRange       string                 `json:"time_range"`
-	TotalRequests   int64                  `json:"total_requests"`
-	BlockedIPs      int                    `json:"blocked_ips"`
-	SuspiciousIPs   int                    `json:"suspicious_ips"`
-	AttackEvents    []AttackSummary        `json:"attack_events"`
-	TopAttackers    []IPSummary            `json:"top_attackers"`
-	AnomalousUA     []UASummary            `json:"anomalous_user_agents"`
-	ErrorRate       float64                `json:"error_rate"`
-	TrafficPatterns map[string]interface{} `json:"traffic_patterns"`
+	TimeRange        string                 `json:"time_range"`
+	TotalRequests    int64                  `json:"total_requests"`
+	BlockedIPs       int                    `json:"blocked_ips"`
+	SuspiciousIPs    int                    `json:"suspicious_ips"`
+	AttackEvents     []AttackSummary        `json:"attack_events"`
+	TopAttackers     []IPSummary            `json:"top_attackers"`
+	AnomalousUA      []UASummary            `json:"anomalous_user_agents"`
+	ErrorRate        float64                `json:"error_rate"`
+	TrafficPatterns  map[string]interface{} `json:"traffic_patterns"`
+	CountryDistrib   map[string]int         `json:"country_distribution,omitempty"` // 国家分布统计
+	URLAccessPattern map[string]int         `json:"url_access_pattern,omitempty"`   // URL访问统计
+	TopTargetURLs    []URLSummary           `json:"top_target_urls,omitempty"`      // 最常被访问的URL
 }
 
 // AttackSummary 攻击事件摘要
 type AttackSummary struct {
-	Type      string    `json:"type"`
-	Count     int       `json:"count"`
-	Blocked   int       `json:"blocked"`
-	Severity  string    `json:"severity"`
-	FirstSeen time.Time `json:"first_seen"`
-	LastSeen  time.Time `json:"last_seen"`
-	TopIPs    []string  `json:"top_ips"`
+	Type         string         `json:"type"`
+	Count        int            `json:"count"`
+	Blocked      int            `json:"blocked"`
+	Severity     string         `json:"severity"`
+	FirstSeen    time.Time      `json:"first_seen"`
+	LastSeen     time.Time      `json:"last_seen"`
+	TopIPs       []string       `json:"top_ips"`
+	TopCountries []string       `json:"top_countries,omitempty"`    // 主要来源国家
+	TopURLs      []string       `json:"top_urls,omitempty"`         // 主要攻击目标URL
+	GeoDistrib   map[string]int `json:"geo_distribution,omitempty"` // 国家分布
 }
 
 // IPSummary IP 统计摘要
@@ -66,7 +72,10 @@ type IPSummary struct {
 	FirstSeen    time.Time `json:"first_seen"`
 	LastSeen     time.Time `json:"last_seen"`
 	RequestRate  float64   `json:"request_rate"`
-	GeoLocation  string    `json:"geo_location,omitempty"`
+	Country      string    `json:"country,omitempty"`      // 国家
+	CountryCode  string    `json:"country_code,omitempty"` // 国家代码
+	ISP          string    `json:"isp,omitempty"`          // ISP/组织
+	TargetURLs   []string  `json:"target_urls,omitempty"`  // 主要访问的URL
 }
 
 // UASummary User-Agent 统计摘要
@@ -76,6 +85,16 @@ type UASummary struct {
 	UniqueIPs    int    `json:"unique_ips"`
 	Suspicious   bool   `json:"suspicious"`
 	Reason       string `json:"reason,omitempty"`
+}
+
+// URLSummary URL 访问统计摘要
+type URLSummary struct {
+	URL          string   `json:"url"`
+	RequestCount int      `json:"request_count"`
+	UniqueIPs    int      `json:"unique_ips"`
+	TopIPs       []string `json:"top_ips,omitempty"`       // 主要访问IP
+	TopCountries []string `json:"top_countries,omitempty"` // 主要来源国家
+	Suspicious   bool     `json:"suspicious"`              // 是否为可疑路径
 }
 
 // AnalysisResult AI 分析结果
@@ -207,27 +226,34 @@ func (a *SecurityAnalyzer) buildChineseSystemPrompt() string {
 - DDoS攻击模式：识别大规模高频请求模式
 - 扫描行为：检测常见漏洞路径探测（.env、wp-admin、phpmyadmin等）
 - 异常User-Agent：识别爬虫、扫描工具、恶意软件特征
-- 地理位置异常：识别来自高风险地区的集中攻击
+- 地理位置分析：识别攻击来源国家分布、是否为集中式攻击、ISP信息（如云服务商、机房等）
+- 目标URL分析：识别攻击者主要试图访问的路径、是否针对特定漏洞、路径探测模式
 - 时间模式异常：识别异常时段的流量激增
 - IP信誉：识别已知恶意IP或云服务器IP（常被用于攻击）
 - 请求特征：识别SQL注入、XSS、路径遍历尝试
 
+特别注意：
+- 对于静态资源路径（如 /_next/、/static/、.js、.css 等）的大量请求属于正常现象，不应判定为攻击
+- 分析国家分布时，说明主要来源国家及其占比
+- 分析URL时，重点关注可疑路径和探测行为，区分正常业务请求和攻击尝试
+- 如果发现来自特定ISP或云服务商的集中攻击，需在分析中指出
+
 输出格式要求（JSON）：
 {
   "threat_level": "low|medium|high|critical",
-  "summary": "一句话总结当前安全态势",
+  "summary": "一句话总结当前安全态势，包括主要威胁来源国家和目标",
   "threats": [
     {
       "type": "威胁类型（如：ddos_attack、port_scan、sql_injection）",
       "severity": "low|medium|high|critical",
-      "description": "详细描述",
-      "indicators": ["具体指标，如IP地址、UA模式等"],
+      "description": "详细描述，包括来源国家、目标URL、ISP信息等",
+      "indicators": ["具体指标，如IP地址、国家、ISP、目标URL等"],
       "confidence": 0.95,
       "action": "处理建议"
     }
   ],
   "recommendations": [
-    "安全建议"
+    "安全建议，如针对特定国家或ISP的防护措施"
   ],
   "confidence": 0.90
 }
@@ -235,13 +261,15 @@ func (a *SecurityAnalyzer) buildChineseSystemPrompt() string {
 分析原则：
 1. 基于数据分析，不做假设
 2. 区分误报和真实威胁
-3. 考虑正常业务流量与异常流量
+3. 考虑正常业务流量与异常流量（特别是静态资源请求）
 4. 提供可操作的建议，而非泛泛而谈
 5. 标注置信度供管理员判断
+6. 重点分析攻击的地理来源和目标路径
 
 重要提示：
 - 必须返回标准JSON格式
 - 所有内容使用中文
+- 在描述威胁时，务必提及来源国家和目标URL（如果数据中有）
 - 不要添加额外的说明文字`
 }
 
@@ -259,27 +287,34 @@ Analysis Focus:
 - DDoS attack patterns: Identify large-scale, high-frequency request patterns
 - Scanning behavior: Detect probes for common vulnerability paths (.env, wp-admin, phpmyadmin, etc.)
 - Anomalous User-Agent: Identify crawlers, scanning tools, malware signatures
-- Geographic anomalies: Identify concentrated attacks from high-risk regions
+- Geographic analysis: Identify source countries of attacks, whether attacks are concentrated, ISP information (cloud providers, data centers, etc.)
+- Target URL analysis: Identify which paths attackers are attempting to access, whether targeting specific vulnerabilities, path probing patterns
 - Time pattern anomalies: Identify traffic surges during abnormal hours
 - IP reputation: Identify known malicious IPs or cloud server IPs (commonly used for attacks)
 - Request characteristics: Identify SQL injection, XSS, path traversal attempts
 
+Special Notes:
+- Large volumes of requests to static resource paths (like /_next/, /static/, .js, .css) are normal and should NOT be flagged as attacks
+- When analyzing country distribution, specify main source countries and their proportions
+- When analyzing URLs, focus on suspicious paths and probing behavior, distinguish normal business requests from attack attempts
+- If concentrated attacks from specific ISPs or cloud providers are detected, highlight this in the analysis
+
 Output Format Requirements (JSON):
 {
   "threat_level": "low|medium|high|critical",
-  "summary": "One-sentence security situation overview",
+  "summary": "One-sentence security situation overview including main threat source countries and targets",
   "threats": [
     {
       "type": "threat type (e.g., ddos_attack, port_scan, sql_injection)",
       "severity": "low|medium|high|critical",
-      "description": "Detailed description",
-      "indicators": ["Specific indicators like IP addresses, UA patterns"],
+      "description": "Detailed description including source countries, target URLs, ISP information, etc.",
+      "indicators": ["Specific indicators like IP addresses, countries, ISPs, target URLs, etc."],
       "confidence": 0.95,
       "action": "Recommended action"
     }
   ],
   "recommendations": [
-    "Security recommendations"
+    "Security recommendations, such as protective measures for specific countries or ISPs"
   ],
   "confidence": 0.90
 }
@@ -287,14 +322,16 @@ Output Format Requirements (JSON):
 Analysis Principles:
 1. Base analysis on data, don't make assumptions
 2. Distinguish between false positives and real threats
-3. Consider normal business traffic vs. anomalous traffic
+3. Consider normal business traffic vs. anomalous traffic (especially static resource requests)
 4. Provide actionable advice, not generic suggestions
 5. Mark confidence levels for administrator judgment
+6. Focus on analyzing geographic sources and target paths of attacks
 
 IMPORTANT: 
 - Always return standard JSON format
 - All content in English
-- No additional commentary outside JSON`
+- No additional commentary outside JSON
+- When describing threats, always mention source countries and target URLs (if available in data)`
 }
 
 // Start 启动定时分析
@@ -558,8 +595,15 @@ func (a *SecurityAnalyzer) buildUserPrompt(data *SecurityData) string {
 			if len(ip.AttackTypes) > 0 {
 				prompt.WriteString(fmt.Sprintf("   - 攻击类型: %s\n", strings.Join(ip.AttackTypes, ", ")))
 			}
-			if ip.GeoLocation != "" {
-				prompt.WriteString(fmt.Sprintf("   - 地理位置: %s\n", ip.GeoLocation))
+			if ip.Country != "" {
+				geoInfo := ip.Country
+				if ip.ISP != "" {
+					geoInfo += " (" + ip.ISP + ")"
+				}
+				prompt.WriteString(fmt.Sprintf("   - 来源: %s\n", geoInfo))
+			}
+			if len(ip.TargetURLs) > 0 {
+				prompt.WriteString(fmt.Sprintf("   - 主要访问URL: %s\n", strings.Join(ip.TargetURLs, ", ")))
 			}
 		}
 		prompt.WriteString("\n")
