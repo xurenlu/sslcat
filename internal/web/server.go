@@ -20,6 +20,7 @@ import (
 	"github.com/xurenlu/sslcat/internal/config"
 	"github.com/xurenlu/sslcat/internal/ddos"
 	"github.com/xurenlu/sslcat/internal/i18n"
+	"github.com/xurenlu/sslcat/internal/imageopt"
 	"github.com/xurenlu/sslcat/internal/logger"
 	"github.com/xurenlu/sslcat/internal/metrics"
 	"github.com/xurenlu/sslcat/internal/notification"
@@ -103,6 +104,8 @@ type Server struct {
 	staticHandler *StaticFileHandler
 	// AI 安全分析器
 	aiSecurityAnalyzer *ai.SecurityAnalyzer
+	// 图片优化器
+	imageOptimizer *imageopt.Optimizer
 }
 
 // NewServer 创建Web服务器
@@ -119,6 +122,48 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		tracing.NewRateSampler(0.1),
 		tracing.NewLogReporter(),
 	)
+
+	// 初始化图片优化器
+	imageOptConfig := &imageopt.Config{
+		Enabled:         cfg.ImageOptimization.Enabled,
+		AutoWebP:        cfg.ImageOptimization.AutoWebP,
+		WebPQuality:     cfg.ImageOptimization.WebPQuality,
+		JPEGQuality:     cfg.ImageOptimization.JPEGQuality,
+		PNGLevel:        cfg.ImageOptimization.PNGLevel,
+		StripMetadata:   cfg.ImageOptimization.StripMetadata,
+		AllowResize:     cfg.ImageOptimization.AllowResize,
+		MaxWidth:        cfg.ImageOptimization.MaxWidth,
+		MaxHeight:       cfg.ImageOptimization.MaxHeight,
+		AllowedSizes:    cfg.ImageOptimization.AllowedSizes,
+		CacheEnabled:    cfg.ImageOptimization.CacheEnabled,
+		CacheTTL:        cfg.ImageOptimization.CacheTTL,
+		MaxCacheSize:    cfg.ImageOptimization.MaxCacheSize,
+		IncludePatterns: cfg.ImageOptimization.IncludePatterns,
+		ExcludePatterns: cfg.ImageOptimization.ExcludePatterns,
+	}
+	// 设置默认值
+	if imageOptConfig.WebPQuality == 0 {
+		imageOptConfig.WebPQuality = 80
+	}
+	if imageOptConfig.JPEGQuality == 0 {
+		imageOptConfig.JPEGQuality = 85
+	}
+	if imageOptConfig.PNGLevel == 0 {
+		imageOptConfig.PNGLevel = 6
+	}
+	if imageOptConfig.MaxWidth == 0 {
+		imageOptConfig.MaxWidth = 2000
+	}
+	if imageOptConfig.MaxHeight == 0 {
+		imageOptConfig.MaxHeight = 2000
+	}
+	if imageOptConfig.CacheTTL == 0 {
+		imageOptConfig.CacheTTL = 86400
+	}
+	if imageOptConfig.MaxCacheSize == 0 {
+		imageOptConfig.MaxCacheSize = 1024 * 1024 * 1024
+	}
+	imageOptimizer := imageopt.NewOptimizer(imageOptConfig)
 
 	// 初始化WAF引擎
 	wafEngine := waf.NewAdvancedEngine()
@@ -159,6 +204,7 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		compressor:        compressor,
 		prometheusMetrics: prometheusMetrics,
 		tracer:            tracer,
+		imageOptimizer:    imageOptimizer,
 		wafEngine:         wafEngine,
 		log: logrus.WithFields(logrus.Fields{
 			"component": "web_server",
@@ -264,6 +310,12 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	}
 
 	server.setupRoutes()
+
+	// 设置图片优化器到代理管理器
+	if server.imageOptimizer != nil && server.imageOptimizer.Config.Enabled {
+		server.proxyManager.SetResponseProcessor(server.imageOptimizer)
+		server.log.Info("Image optimizer enabled and integrated with proxy manager")
+	}
 
 	// 初始化配置文件哈希并启动热加载监听（Slave 模式）
 	server.initConfigWatch()
@@ -628,6 +680,12 @@ func (s *Server) setupRoutes() {
 
 	// Prometheus 指标
 	s.mux.Handle("/metrics", s.prometheusMetrics.Handler())
+
+	// 图片优化 API
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/image-optimization/config", s.handleAPIImageOptConfig)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/image-optimization/stats", s.handleAPIImageOptStats)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/image-optimization/cache/clear", s.handleAPIImageOptCacheClear)
+
 	// 图形验证码
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/captcha/image", s.handleAPIImageCaptcha)
 	// s.mux.HandleFunc(s.config.AdminPrefix+"/api/captcha", s.handleAPICaptcha) // 关闭验证码API
@@ -725,7 +783,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// 启动追踪 Span
 	span, ctx := s.tracer.StartSpanFromHTTPRequest(r)
 	r = r.WithContext(ctx)
-	
+
 	// 将追踪信息注入响应头
 	span.InjectHTTPHeaders(w.Header())
 
@@ -739,7 +797,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// defer 记录访问日志、完成追踪、记录Prometheus指标
 	defer func() {
 		duration := time.Since(startTime)
-		
+
 		// 完成追踪 Span
 		span.SetTag("http.status_code", fmt.Sprintf("%d", wrappedWriter.statusCode))
 		span.SetTag("http.response_size", fmt.Sprintf("%d", wrappedWriter.written))
@@ -748,7 +806,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			span.ErrorMessage = fmt.Sprintf("HTTP %d", wrappedWriter.statusCode)
 		}
 		span.Finish()
-		
+
 		// 记录到 Prometheus（只记录实际的代理请求，不记录管理面板）
 		domain := r.Host
 		if !strings.HasPrefix(r.URL.Path, s.config.AdminPrefix) {
@@ -760,7 +818,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				wrappedWriter.written,
 			)
 		}
-		
+
 		// 记录访问日志
 		if s.accessLogger != nil {
 			s.accessLogger.LogRequest(r, wrappedWriter.statusCode, wrappedWriter.written,

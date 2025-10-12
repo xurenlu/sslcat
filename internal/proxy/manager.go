@@ -30,6 +30,11 @@ type loggingTransport struct {
 	log  *logrus.Entry
 }
 
+// ResponseProcessor 响应处理器接口
+type ResponseProcessor interface {
+	ProcessResponse(data []byte, contentType string, r *http.Request) ([]byte, string, error)
+}
+
 // Manager 代理管理器
 type Manager struct {
 	config          *config.Config
@@ -46,6 +51,9 @@ type Manager struct {
 	loadBalancers map[string]loadbalancer.BalancerInterface // domain -> load balancer
 	lbMutex       sync.RWMutex
 	lbFactory     *loadbalancer.BalancerFactory
+	
+	// 响应处理器（可选，用于图片优化等）
+	responseProcessor ResponseProcessor
 }
 
 // NewManager 创建代理管理器
@@ -69,6 +77,11 @@ func NewManager(cfg *config.Config, sslMgr *ssl.Manager, secMgr *security.Manage
 	manager.initializeLoadBalancers()
 
 	return manager
+}
+
+// SetResponseProcessor 设置响应处理器
+func (m *Manager) SetResponseProcessor(processor ResponseProcessor) {
+	m.responseProcessor = processor
 }
 
 // Start 启动代理管理器

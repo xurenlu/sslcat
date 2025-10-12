@@ -32,6 +32,7 @@ import {
   FiHardDrive,
   FiKey,
   FiBarChart2,
+  FiImage,
 } from 'react-icons/fi'
 import { FaRobot } from 'react-icons/fa'
 
@@ -115,6 +116,7 @@ const SidebarContent = () => {
     { name: t.navigation.gitServer, icon: FiGitBranch, path: buildPath(adminPrefix, '/git-server') },
     { name: t.navigation.notifications, icon: FiBell, path: buildPath(adminPrefix, '/notifications') },
     { name: t.navigation.aiSecurity || '🤖 AI 安全分析', icon: FaRobot, path: buildPath(adminPrefix, '/ai-security'), badge: 'AI' },
+    { name: '🖼️ 图片优化', icon: FiImage, path: buildPath(adminPrefix, '/image-optimization') },
     { name: t.navigation.userManagement, icon: FiUsers, path: buildPath(adminPrefix, '/users') },
     { name: t.navigation.changePassword, icon: FiKey, path: buildPath(adminPrefix, '/change-password') },
   ]

@@ -41,6 +41,8 @@ type Config struct {
 	UpstreamCache UpstreamCacheConfig `json:"upstream_cache"`
 	// AI 安全分析配置
 	AISecurity AISecurityConfig `json:"ai_security"`
+	// 图片优化配置
+	ImageOptimization ImageOptimizationConfig `json:"image_optimization"`
 }
 
 // ServerConfig 服务器配置
@@ -1235,6 +1237,33 @@ type AISecurityConfig struct {
 	// 通知配置
 	NotifyOnThreat bool   `json:"notify_on_threat"` // 检测到威胁时是否通知（默认 true）
 	MinThreatLevel string `json:"min_threat_level"` // 最低通知威胁等级（low/medium/high/critical）
+}
+
+// ImageOptimizationConfig 图片优化配置
+type ImageOptimizationConfig struct {
+	Enabled bool `json:"enabled"` // 是否启用图片优化
+
+	// 格式转换
+	AutoWebP      bool `json:"auto_webp"`       // 自动转换为 WebP
+	WebPQuality   int  `json:"webp_quality"`    // WebP 质量 (0-100，默认 80)
+	JPEGQuality   int  `json:"jpeg_quality"`    // JPEG 质量 (0-100，默认 85)
+	PNGLevel      int  `json:"png_level"`       // PNG 压缩级别 (0-9，默认 6)
+	StripMetadata bool `json:"strip_metadata"`  // 移除 EXIF 元数据
+
+	// 尺寸调整
+	AllowResize  bool  `json:"allow_resize"`   // 允许尺寸调整
+	MaxWidth     int   `json:"max_width"`      // 最大宽度（默认 2000）
+	MaxHeight    int   `json:"max_height"`     // 最大高度（默认 2000）
+	AllowedSizes []int `json:"allowed_sizes"`  // 允许的尺寸列表
+
+	// 缓存
+	CacheEnabled bool  `json:"cache_enabled"`  // 启用缓存
+	CacheTTL     int   `json:"cache_ttl"`      // 缓存TTL（秒，默认 86400）
+	MaxCacheSize int64 `json:"max_cache_size"` // 最大缓存大小（字节，默认 1GB）
+
+	// 过滤器
+	IncludePatterns []string `json:"include_patterns"` // 包含的路径模式
+	ExcludePatterns []string `json:"exclude_patterns"` // 排除的路径模式
 }
 
 // migratePortConfig 迁移旧的端口配置到新的配置结构

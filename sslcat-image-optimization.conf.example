@@ -1,0 +1,59 @@
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 443,
+    "debug": false
+  },
+  "admin": {
+    "username": "admin",
+    "password_file": "./data/admin_password.txt"
+  },
+  "admin_prefix": "/sslcat-panel",
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "127.0.0.1",
+        "port": 8080,
+        "enabled": true
+      }
+    ]
+  },
+  
+  "image_optimization": {
+    // 基础设置
+    "enabled": true,
+    
+    // 格式转换（自动将 JPEG/PNG 转换为 WebP）
+    "auto_webp": true,
+    "webp_quality": 80,
+    "jpeg_quality": 85,
+    "png_level": 6,
+    "strip_metadata": true,
+    
+    // 尺寸调整（支持 ?width=800 等参数）
+    "allow_resize": true,
+    "max_width": 2000,
+    "max_height": 2000,
+    "allowed_sizes": [100, 200, 400, 800, 1200, 1600],
+    
+    // 缓存设置
+    "cache_enabled": true,
+    "cache_ttl": 86400,
+    "max_cache_size": 1073741824,
+    
+    // 路径过滤
+    "include_patterns": [
+      "*.jpg",
+      "*.jpeg",
+      "*.png",
+      "*.gif"
+    ],
+    "exclude_patterns": [
+      "/admin/*",
+      "/api/*",
+      "/original/*"
+    ]
+  }
+}
+

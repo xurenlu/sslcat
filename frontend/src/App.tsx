@@ -23,6 +23,7 @@ import ChangePassword from './pages/ChangePassword'
 import CDNManagement from './pages/CDNManagement'
 import Statistics from './pages/Statistics'
 import AISecurityAnalysis from './pages/AISecurityAnalysis'
+import ImageOptimization from './pages/ImageOptimization'
 import FirstTimeSetup from './pages/FirstTimeSetup'
 
 const AppRoutes: React.FC = () => {
@@ -141,6 +142,11 @@ const AppRoutes: React.FC = () => {
       <Route path={`${adminPrefix}/ai-security`} element={
         <AuthGuard>
           <AISecurityAnalysis />
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/image-optimization`} element={
+        <AuthGuard>
+          <ImageOptimization />
         </AuthGuard>
       } />
     </Routes>

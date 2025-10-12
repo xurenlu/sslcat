@@ -1,0 +1,741 @@
+package imageopt
+
+import (
+	"bytes"
+	"fmt"
+	"image"
+	"image/gif"
+	"image/jpeg"
+	"image/png"
+	"net/http"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/chai2010/webp"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/image/draw"
+)
+
+// ImageFormat 图片格式
+type ImageFormat string
+
+const (
+	FormatJPEG ImageFormat = "jpeg"
+	FormatPNG  ImageFormat = "png"
+	FormatGIF  ImageFormat = "gif"
+	FormatWebP ImageFormat = "webp"
+	FormatAVIF ImageFormat = "avif"
+)
+
+// Config 图片优化配置
+type Config struct {
+	Enabled bool `json:"enabled"`
+
+	// 格式转换
+	AutoWebP     bool `json:"auto_webp"`      // 自动转换为 WebP
+	WebPQuality  int  `json:"webp_quality"`   // WebP 质量 (0-100)
+	JPEGQuality  int  `json:"jpeg_quality"`   // JPEG 质量 (0-100)
+	PNGLevel     int  `json:"png_level"`      // PNG 压缩级别 (0-9)
+	StripMetadata bool `json:"strip_metadata"` // 移除 EXIF 元数据
+
+	// 尺寸调整
+	AllowResize  bool  `json:"allow_resize"`   // 允许尺寸调整
+	MaxWidth     int   `json:"max_width"`      // 最大宽度
+	MaxHeight    int   `json:"max_height"`     // 最大高度
+	AllowedSizes []int `json:"allowed_sizes"`  // 允许的尺寸列表
+
+	// 缓存
+	CacheEnabled bool   `json:"cache_enabled"` // 启用缓存
+	CacheTTL     int    `json:"cache_ttl"`     // 缓存TTL（秒）
+	MaxCacheSize int64  `json:"max_cache_size"` // 最大缓存大小（字节）
+
+	// 过滤器
+	IncludePatterns []string `json:"include_patterns"` // 包含的路径模式
+	ExcludePatterns []string `json:"exclude_patterns"` // 排除的路径模式
+}
+
+// DefaultConfig 默认配置
+func DefaultConfig() *Config {
+	return &Config{
+		Enabled:      false,
+		AutoWebP:     true,
+		WebPQuality:  80,
+		JPEGQuality:  85,
+		PNGLevel:     6,
+		StripMetadata: true,
+		AllowResize:  true,
+		MaxWidth:     2000,
+		MaxHeight:    2000,
+		AllowedSizes: []int{100, 200, 400, 800, 1200, 1600},
+		CacheEnabled: true,
+		CacheTTL:     86400, // 24小时
+		MaxCacheSize: 1024 * 1024 * 1024, // 1GB
+		IncludePatterns: []string{"*.jpg", "*.jpeg", "*.png", "*.gif"},
+		ExcludePatterns: []string{"/admin/*", "/api/*"},
+	}
+}
+
+// CacheItem 缓存项
+type CacheItem struct {
+	Data        []byte
+	ContentType string
+	Size        int64
+	CreatedAt   time.Time
+	AccessCount int64
+	LastAccess  time.Time
+}
+
+// ImageOptimizer 图片优化器
+type Optimizer struct {
+	Config *Config // 导出Config字段以便外部访问
+	cache  map[string]*CacheItem
+	mu     sync.RWMutex
+	log    *logrus.Entry
+
+	// 统计
+	totalRequests    int64
+	cacheHits        int64
+	cacheMisses      int64
+	totalBytesSaved  int64
+	totalOriginalSize int64
+	totalOptimizedSize int64
+}
+
+// NewOptimizer 创建图片优化器
+func NewOptimizer(config *Config) *Optimizer {
+	if config == nil {
+		config = DefaultConfig()
+	}
+
+	opt := &Optimizer{
+		Config: config,
+		cache:  make(map[string]*CacheItem),
+		log: logrus.WithFields(logrus.Fields{
+			"component": "image_optimizer",
+		}),
+	}
+
+	// 启动缓存清理协程
+	if config.CacheEnabled {
+		go opt.cacheCleanupLoop()
+	}
+
+	return opt
+}
+
+// ShouldOptimize 判断是否应该优化这个请求
+func (o *Optimizer) ShouldOptimize(path string) bool {
+	if !o.Config.Enabled {
+		return false
+	}
+
+	// 检查排除模式
+	for _, pattern := range o.Config.ExcludePatterns {
+		if matchPattern(path, pattern) {
+			return false
+		}
+	}
+
+	// 检查包含模式
+	if len(o.Config.IncludePatterns) == 0 {
+		return isImagePath(path)
+	}
+
+	for _, pattern := range o.Config.IncludePatterns {
+		if matchPattern(path, pattern) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// matchPattern 简单的模式匹配
+func matchPattern(path, pattern string) bool {
+	// 简化实现：支持 * 通配符
+	if strings.Contains(pattern, "*") {
+		parts := strings.Split(pattern, "*")
+		if len(parts) == 2 {
+			return strings.HasPrefix(path, parts[0]) && strings.HasSuffix(path, parts[1])
+		}
+	}
+	return strings.HasPrefix(path, pattern)
+}
+
+// isImagePath 判断是否是图片路径
+func isImagePath(path string) bool {
+	lowerPath := strings.ToLower(path)
+	return strings.HasSuffix(lowerPath, ".jpg") ||
+		strings.HasSuffix(lowerPath, ".jpeg") ||
+		strings.HasSuffix(lowerPath, ".png") ||
+		strings.HasSuffix(lowerPath, ".gif") ||
+		strings.HasSuffix(lowerPath, ".webp")
+}
+
+// ProcessResponse 实现 ResponseProcessor 接口
+func (o *Optimizer) ProcessResponse(data []byte, contentType string, r *http.Request) ([]byte, string, error) {
+	return o.OptimizeResponse(data, contentType, r)
+}
+
+// OptimizeResponse 优化响应中的图片
+func (o *Optimizer) OptimizeResponse(originalData []byte, contentType string, r *http.Request) ([]byte, string, error) {
+	o.totalRequests++
+
+	// 检测图片格式
+	format := detectFormat(originalData, contentType)
+	if format == "" {
+		return originalData, contentType, nil // 不是图片，直接返回
+	}
+
+	// 构建缓存键
+	cacheKey := o.buildCacheKey(r, format)
+
+	// 检查缓存
+	if o.Config.CacheEnabled {
+		if cached := o.getFromCache(cacheKey); cached != nil {
+			o.cacheHits++
+			cached.AccessCount++
+			cached.LastAccess = time.Now()
+			o.log.Debugf("Cache hit: %s", cacheKey)
+			return cached.Data, cached.ContentType, nil
+		}
+		o.cacheMisses++
+	}
+
+	// 解析请求参数
+	params := o.parseParams(r)
+
+	// 执行优化
+	optimizedData, newContentType, err := o.optimize(originalData, format, params, r)
+	if err != nil {
+		o.log.Warnf("Image optimization failed: %v, returning original", err)
+		return originalData, contentType, nil // 失败则返回原图
+	}
+
+	// 统计
+	o.totalOriginalSize += int64(len(originalData))
+	o.totalOptimizedSize += int64(len(optimizedData))
+	o.totalBytesSaved += int64(len(originalData) - len(optimizedData))
+
+	// 缓存结果
+	if o.Config.CacheEnabled {
+		o.putToCache(cacheKey, optimizedData, newContentType)
+	}
+
+	o.log.Debugf("Image optimized: %s, original: %d bytes, optimized: %d bytes, saved: %.1f%%",
+		cacheKey, len(originalData), len(optimizedData),
+		float64(len(originalData)-len(optimizedData))/float64(len(originalData))*100)
+
+	return optimizedData, newContentType, nil
+}
+
+// OptimizeParams 优化参数
+type OptimizeParams struct {
+	Width    int
+	Height   int
+	Quality  int
+	Format   ImageFormat
+	Scale    float64
+}
+
+// parseParams 解析请求参数
+func (o *Optimizer) parseParams(r *http.Request) *OptimizeParams {
+	params := &OptimizeParams{
+		Quality: -1, // -1 表示使用默认质量
+	}
+
+	// 解析宽度
+	if w := r.URL.Query().Get("width"); w != "" {
+		if width, err := strconv.Atoi(w); err == nil && width > 0 {
+			params.Width = width
+		}
+	}
+	if w := r.URL.Query().Get("w"); w != "" {
+		if width, err := strconv.Atoi(w); err == nil && width > 0 {
+			params.Width = width
+		}
+	}
+
+	// 解析高度
+	if h := r.URL.Query().Get("height"); h != "" {
+		if height, err := strconv.Atoi(h); err == nil && height > 0 {
+			params.Height = height
+		}
+	}
+	if h := r.URL.Query().Get("h"); h != "" {
+		if height, err := strconv.Atoi(h); err == nil && height > 0 {
+			params.Height = height
+		}
+	}
+
+	// 解析缩放比例
+	if s := r.URL.Query().Get("scale"); s != "" {
+		if scale, err := strconv.ParseFloat(s, 64); err == nil && scale > 0 && scale <= 1 {
+			params.Scale = scale
+		}
+	}
+
+	// 解析质量
+	if q := r.URL.Query().Get("quality"); q != "" {
+		if quality, err := strconv.Atoi(q); err == nil && quality > 0 && quality <= 100 {
+			params.Quality = quality
+		}
+	}
+
+	// 解析格式
+	if f := r.URL.Query().Get("format"); f != "" {
+		params.Format = ImageFormat(strings.ToLower(f))
+	} else if o.Config.AutoWebP && supportsWebP(r) {
+		params.Format = FormatWebP
+	}
+
+	return params
+}
+
+// supportsWebP 检查客户端是否支持 WebP
+func supportsWebP(r *http.Request) bool {
+	accept := r.Header.Get("Accept")
+	return strings.Contains(accept, "image/webp")
+}
+
+// detectFormat 检测图片格式
+func detectFormat(data []byte, contentType string) ImageFormat {
+	if len(data) < 12 {
+		return ""
+	}
+
+	// 通过魔数检测
+	if bytes.Equal(data[0:2], []byte{0xFF, 0xD8}) {
+		return FormatJPEG
+	}
+	if bytes.Equal(data[0:8], []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}) {
+		return FormatPNG
+	}
+	if bytes.Equal(data[0:6], []byte("GIF87a")) || bytes.Equal(data[0:6], []byte("GIF89a")) {
+		return FormatGIF
+	}
+	if bytes.Equal(data[0:4], []byte("RIFF")) && bytes.Equal(data[8:12], []byte("WEBP")) {
+		return FormatWebP
+	}
+
+	// 通过 Content-Type 检测
+	if strings.Contains(contentType, "image/jpeg") {
+		return FormatJPEG
+	}
+	if strings.Contains(contentType, "image/png") {
+		return FormatPNG
+	}
+	if strings.Contains(contentType, "image/gif") {
+		return FormatGIF
+	}
+	if strings.Contains(contentType, "image/webp") {
+		return FormatWebP
+	}
+
+	return ""
+}
+
+// optimize 执行图片优化
+func (o *Optimizer) optimize(data []byte, sourceFormat ImageFormat, params *OptimizeParams, r *http.Request) ([]byte, string, error) {
+	// 解码原始图片
+	img, err := o.decodeImage(data, sourceFormat)
+	if err != nil {
+		return nil, "", fmt.Errorf("decode image: %w", err)
+	}
+
+	// 应用尺寸调整
+	if o.Config.AllowResize {
+		img = o.resizeImage(img, params)
+	}
+
+	// 确定输出格式
+	outputFormat := sourceFormat
+	if params.Format != "" {
+		outputFormat = params.Format
+	}
+
+	// 确定质量
+	quality := o.getQuality(outputFormat, params.Quality)
+
+	// 编码优化后的图片
+	optimizedData, contentType, err := o.encodeImage(img, outputFormat, quality)
+	if err != nil {
+		return nil, "", fmt.Errorf("encode image: %w", err)
+	}
+
+	// 如果优化后反而更大，返回原图
+	if len(optimizedData) >= len(data) {
+		o.log.Debugf("Optimized image is larger than original, returning original")
+		return data, contentTypeFromFormat(sourceFormat), nil
+	}
+
+	return optimizedData, contentType, nil
+}
+
+// decodeImage 解码图片
+func (o *Optimizer) decodeImage(data []byte, format ImageFormat) (image.Image, error) {
+	reader := bytes.NewReader(data)
+
+	switch format {
+	case FormatJPEG:
+		return jpeg.Decode(reader)
+	case FormatPNG:
+		return png.Decode(reader)
+	case FormatGIF:
+		return gif.Decode(reader)
+	case FormatWebP:
+		return webp.Decode(reader)
+	default:
+		return nil, fmt.Errorf("unsupported format: %s", format)
+	}
+}
+
+// resizeImage 调整图片尺寸
+func (o *Optimizer) resizeImage(img image.Image, params *OptimizeParams) image.Image {
+	bounds := img.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+
+	newWidth := width
+	newHeight := height
+
+	// 应用缩放
+	if params.Scale > 0 && params.Scale < 1 {
+		newWidth = int(float64(width) * params.Scale)
+		newHeight = int(float64(height) * params.Scale)
+	}
+
+	// 应用指定宽度
+	if params.Width > 0 && params.Width < width {
+		newWidth = params.Width
+		newHeight = int(float64(height) * float64(newWidth) / float64(width))
+	}
+
+	// 应用指定高度
+	if params.Height > 0 && params.Height < height {
+		newHeight = params.Height
+		if params.Width == 0 {
+			newWidth = int(float64(width) * float64(newHeight) / float64(height))
+		}
+	}
+
+	// 限制最大尺寸
+	if newWidth > o.Config.MaxWidth {
+		scale := float64(o.Config.MaxWidth) / float64(newWidth)
+		newWidth = o.Config.MaxWidth
+		newHeight = int(float64(newHeight) * scale)
+	}
+	if newHeight > o.Config.MaxHeight {
+		scale := float64(o.Config.MaxHeight) / float64(newHeight)
+		newHeight = o.Config.MaxHeight
+		newWidth = int(float64(newWidth) * scale)
+	}
+
+	// 检查是否在允许的尺寸列表中（如果配置了）
+	if len(o.Config.AllowedSizes) > 0 && params.Width > 0 {
+		allowed := false
+		for _, size := range o.Config.AllowedSizes {
+			if params.Width == size {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			// 不在允许列表中，使用最接近的尺寸
+			newWidth = o.findClosestSize(params.Width)
+			newHeight = int(float64(height) * float64(newWidth) / float64(width))
+		}
+	}
+
+	// 如果尺寸没有变化，直接返回原图
+	if newWidth == width && newHeight == height {
+		return img
+	}
+
+	// 执行缩放
+	dst := image.NewRGBA(image.Rect(0, 0, newWidth, newHeight))
+	draw.CatmullRom.Scale(dst, dst.Bounds(), img, bounds, draw.Over, nil)
+
+	o.log.Debugf("Resized image: %dx%d -> %dx%d", width, height, newWidth, newHeight)
+
+	return dst
+}
+
+// findClosestSize 找到最接近的允许尺寸
+func (o *Optimizer) findClosestSize(requested int) int {
+	if len(o.Config.AllowedSizes) == 0 {
+		return requested
+	}
+
+	closest := o.Config.AllowedSizes[0]
+	minDiff := abs(requested - closest)
+
+	for _, size := range o.Config.AllowedSizes {
+		diff := abs(requested - size)
+		if diff < minDiff {
+			minDiff = diff
+			closest = size
+		}
+	}
+
+	return closest
+}
+
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+// getQuality 获取质量参数
+func (o *Optimizer) getQuality(format ImageFormat, requestedQuality int) int {
+	if requestedQuality > 0 && requestedQuality <= 100 {
+		return requestedQuality
+	}
+
+	switch format {
+	case FormatWebP:
+		return o.Config.WebPQuality
+	case FormatJPEG:
+		return o.Config.JPEGQuality
+	default:
+		return 85
+	}
+}
+
+// encodeImage 编码图片
+func (o *Optimizer) encodeImage(img image.Image, format ImageFormat, quality int) ([]byte, string, error) {
+	var buf bytes.Buffer
+
+	switch format {
+	case FormatJPEG:
+		err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: quality})
+		return buf.Bytes(), "image/jpeg", err
+
+	case FormatPNG:
+		encoder := png.Encoder{CompressionLevel: png.BestCompression}
+		err := encoder.Encode(&buf, img)
+		return buf.Bytes(), "image/png", err
+
+	case FormatGIF:
+		err := gif.Encode(&buf, img, nil)
+		return buf.Bytes(), "image/gif", err
+
+	case FormatWebP:
+		err := webp.Encode(&buf, img, &webp.Options{
+			Lossless: false,
+			Quality:  float32(quality),
+		})
+		return buf.Bytes(), "image/webp", err
+
+	default:
+		return nil, "", fmt.Errorf("unsupported output format: %s", format)
+	}
+}
+
+// contentTypeFromFormat 从格式获取 Content-Type
+func contentTypeFromFormat(format ImageFormat) string {
+	switch format {
+	case FormatJPEG:
+		return "image/jpeg"
+	case FormatPNG:
+		return "image/png"
+	case FormatGIF:
+		return "image/gif"
+	case FormatWebP:
+		return "image/webp"
+	default:
+		return "application/octet-stream"
+	}
+}
+
+// buildCacheKey 构建缓存键
+func (o *Optimizer) buildCacheKey(r *http.Request, format ImageFormat) string {
+	// 使用路径和参数构建唯一键
+	key := r.URL.Path
+	if w := r.URL.Query().Get("width"); w != "" {
+		key += "_w" + w
+	}
+	if h := r.URL.Query().Get("height"); h != "" {
+		key += "_h" + h
+	}
+	if q := r.URL.Query().Get("quality"); q != "" {
+		key += "_q" + q
+	}
+	if f := r.URL.Query().Get("format"); f != "" {
+		key += "_f" + f
+	} else if o.Config.AutoWebP && supportsWebP(r) {
+		key += "_f_webp"
+	}
+	return key
+}
+
+// getFromCache 从缓存获取
+func (o *Optimizer) getFromCache(key string) *CacheItem {
+	o.mu.RLock()
+	defer o.mu.RUnlock()
+
+	item, exists := o.cache[key]
+	if !exists {
+		return nil
+	}
+
+	// 检查是否过期
+	if time.Since(item.CreatedAt) > time.Duration(o.Config.CacheTTL)*time.Second {
+		return nil
+	}
+
+	return item
+}
+
+// putToCache 放入缓存
+func (o *Optimizer) putToCache(key string, data []byte, contentType string) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	// 检查缓存大小
+	currentSize := o.getCurrentCacheSize()
+	if currentSize+int64(len(data)) > o.Config.MaxCacheSize {
+		// 缓存满了，清理最少使用的项
+		o.evictLRU(int64(len(data)))
+	}
+
+	o.cache[key] = &CacheItem{
+		Data:        data,
+		ContentType: contentType,
+		Size:        int64(len(data)),
+		CreatedAt:   time.Now(),
+		LastAccess:  time.Now(),
+		AccessCount: 0,
+	}
+}
+
+// getCurrentCacheSize 获取当前缓存大小
+func (o *Optimizer) getCurrentCacheSize() int64 {
+	var total int64
+	for _, item := range o.cache {
+		total += item.Size
+	}
+	return total
+}
+
+// evictLRU 清理最少使用的缓存项
+func (o *Optimizer) evictLRU(neededSize int64) {
+	type cacheEntry struct {
+		key  string
+		item *CacheItem
+	}
+
+	// 收集所有项
+	entries := make([]cacheEntry, 0, len(o.cache))
+	for k, v := range o.cache {
+		entries = append(entries, cacheEntry{k, v})
+	}
+
+	// 按最后访问时间排序（最旧的在前）
+	for i := 0; i < len(entries)-1; i++ {
+		for j := i + 1; j < len(entries); j++ {
+			if entries[i].item.LastAccess.After(entries[j].item.LastAccess) {
+				entries[i], entries[j] = entries[j], entries[i]
+			}
+		}
+	}
+
+	// 删除直到有足够空间
+	var freedSize int64
+	for _, entry := range entries {
+		delete(o.cache, entry.key)
+		freedSize += entry.item.Size
+		if freedSize >= neededSize {
+			break
+		}
+	}
+
+	o.log.Infof("Evicted LRU cache items, freed: %d bytes", freedSize)
+}
+
+// cacheCleanupLoop 缓存清理循环
+func (o *Optimizer) cacheCleanupLoop() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		o.cleanupExpiredCache()
+	}
+}
+
+// cleanupExpiredCache 清理过期缓存
+func (o *Optimizer) cleanupExpiredCache() {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	now := time.Now()
+	ttl := time.Duration(o.Config.CacheTTL) * time.Second
+	var removed int
+
+	for key, item := range o.cache {
+		if now.Sub(item.CreatedAt) > ttl {
+			delete(o.cache, key)
+			removed++
+		}
+	}
+
+	if removed > 0 {
+		o.log.Infof("Cleaned up %d expired cache items", removed)
+	}
+}
+
+// GetStats 获取统计信息
+func (o *Optimizer) GetStats() map[string]interface{} {
+	o.mu.RLock()
+	defer o.mu.RUnlock()
+
+	cacheSize := o.getCurrentCacheSize()
+	hitRate := float64(0)
+	if o.totalRequests > 0 {
+		hitRate = float64(o.cacheHits) / float64(o.totalRequests) * 100
+	}
+
+	compressionRate := float64(0)
+	if o.totalOriginalSize > 0 {
+		compressionRate = float64(o.totalBytesSaved) / float64(o.totalOriginalSize) * 100
+	}
+
+	return map[string]interface{}{
+		"enabled":            o.Config.Enabled,
+		"total_requests":     o.totalRequests,
+		"cache_hits":         o.cacheHits,
+		"cache_misses":       o.cacheMisses,
+		"cache_hit_rate":     hitRate,
+		"cache_items":        len(o.cache),
+		"cache_size_bytes":   cacheSize,
+		"cache_size_mb":      float64(cacheSize) / 1024 / 1024,
+		"total_bytes_saved":  o.totalBytesSaved,
+		"total_bytes_saved_mb": float64(o.totalBytesSaved) / 1024 / 1024,
+		"compression_rate":   compressionRate,
+		"original_size_mb":   float64(o.totalOriginalSize) / 1024 / 1024,
+		"optimized_size_mb":  float64(o.totalOptimizedSize) / 1024 / 1024,
+	}
+}
+
+// ClearCache 清空缓存
+func (o *Optimizer) ClearCache() {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	o.cache = make(map[string]*CacheItem)
+	o.log.Info("Image cache cleared")
+}
+
+// UpdateConfig 更新配置
+func (o *Optimizer) UpdateConfig(config *Config) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	o.Config = config
+	o.log.Info("Image optimizer config updated")
+}
+
