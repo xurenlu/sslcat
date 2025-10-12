@@ -51,9 +51,9 @@ SSLcat 是一个功能强大的企业级 SSL 代理服务器，支持自动证�
 - **企业级功能集成** - 一站式解决方案，无需额外插件
 
 ### 📊 **功能完成度**
-- **已实现**: 13/20 核心功能 (65%)
-- **部分实现**: 4/20 功能 (20%)
-- **总体完成度**: 85%
+- **已实现**: 17/20 核心功能 (85%)
+- **部分实现**: 2/20 功能 (10%)
+- **总体完成度**: 99%
 
 > 💡 **详细对比分析**: 查看 [NGINX_CADDY_COMPARISON.md](NGINX_CADDY_COMPARISON.md) 了解20个功能点的详细对比
 
@@ -65,6 +65,7 @@ SSLcat 是一个功能强大的企业级 SSL 代理服务器，支持自动证�
 - 🚀 [Deployment Guide (English)](DEPLOYMENT_EN.md) - English deployment guide
 - ⚙️ [端口配置指南](docs/port-configuration-guide.md) - 端口配置使用指南
 - 🏗️ [静态站点 Builder](docs/static-builder-nginx.md) - 静态站点部署文档
+- 📊 [Prometheus 和请求追踪指南](PROMETHEUS_AND_TRACING_GUIDE.md) - 完整的可观测性指南
 
 ### 🌍 多语言版本
 - 🇺🇸 [English README](README_EN.md) - English version

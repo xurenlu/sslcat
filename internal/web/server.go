@@ -29,6 +29,7 @@ import (
 	"github.com/xurenlu/sslcat/internal/security"
 	"github.com/xurenlu/sslcat/internal/ssl"
 	"github.com/xurenlu/sslcat/internal/statistics"
+	"github.com/xurenlu/sslcat/internal/tracing"
 	"github.com/xurenlu/sslcat/internal/waf"
 
 	"io"
@@ -62,6 +63,9 @@ type Server struct {
 
 	// Prometheus指标
 	prometheusMetrics *metrics.PrometheusMetrics
+
+	// 请求追踪
+	tracer *tracing.Tracer
 
 	// WAF引擎
 	wafEngine *waf.AdvancedEngine
@@ -109,6 +113,13 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	// 初始化Prometheus指标
 	prometheusMetrics := metrics.NewPrometheusMetrics()
 
+	// 初始化请求追踪器（10%采样率）
+	tracer := tracing.NewTracer(
+		"sslcat",
+		tracing.NewRateSampler(0.1),
+		tracing.NewLogReporter(),
+	)
+
 	// 初始化WAF引擎
 	wafEngine := waf.NewAdvancedEngine()
 
@@ -147,6 +158,7 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		gitServer:         gitServer,
 		compressor:        compressor,
 		prometheusMetrics: prometheusMetrics,
+		tracer:            tracer,
 		wafEngine:         wafEngine,
 		log: logrus.WithFields(logrus.Fields{
 			"component": "web_server",
@@ -710,6 +722,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// 记录请求开始时间（用于计算请求耗时）
 	startTime := time.Now()
 
+	// 启动追踪 Span
+	span, ctx := s.tracer.StartSpanFromHTTPRequest(r)
+	r = r.WithContext(ctx)
+	
+	// 将追踪信息注入响应头
+	span.InjectHTTPHeaders(w.Header())
+
 	// 包装 ResponseWriter 以捕获状态码和字节数（使用 statistics.go 中的类型）
 	wrappedWriter := &responseWriter{
 		ResponseWriter: w,
@@ -717,12 +736,35 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		written:        0,
 	}
 
-	// defer 记录访问日志
+	// defer 记录访问日志、完成追踪、记录Prometheus指标
 	defer func() {
+		duration := time.Since(startTime)
+		
+		// 完成追踪 Span
+		span.SetTag("http.status_code", fmt.Sprintf("%d", wrappedWriter.statusCode))
+		span.SetTag("http.response_size", fmt.Sprintf("%d", wrappedWriter.written))
+		if wrappedWriter.statusCode >= 400 {
+			span.Success = false
+			span.ErrorMessage = fmt.Sprintf("HTTP %d", wrappedWriter.statusCode)
+		}
+		span.Finish()
+		
+		// 记录到 Prometheus（只记录实际的代理请求，不记录管理面板）
+		domain := r.Host
+		if !strings.HasPrefix(r.URL.Path, s.config.AdminPrefix) {
+			s.prometheusMetrics.RecordHTTPRequest(
+				domain,
+				r.Method,
+				fmt.Sprintf("%d", wrappedWriter.statusCode),
+				duration,
+				wrappedWriter.written,
+			)
+		}
+		
+		// 记录访问日志
 		if s.accessLogger != nil {
-			requestDuration := time.Since(startTime)
 			s.accessLogger.LogRequest(r, wrappedWriter.statusCode, wrappedWriter.written,
-				requestDuration, "", 0)
+				duration, "", 0)
 		}
 	}()
 
