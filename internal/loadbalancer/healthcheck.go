@@ -70,7 +70,7 @@ func (lb *LoadBalancer) StartHealthCheck() {
 	// 设置检查间隔
 	interval := lb.config.HealthCheckInterval
 	if interval <= 0 {
-		interval = 30 * time.Second // 默认30秒
+		interval = 60 * time.Second // 从30秒改为60秒
 	}
 
 	lb.log.Infof("Starting health check with interval: %v", interval)

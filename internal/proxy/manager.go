@@ -51,7 +51,7 @@ type Manager struct {
 	loadBalancers map[string]loadbalancer.BalancerInterface // domain -> load balancer
 	lbMutex       sync.RWMutex
 	lbFactory     *loadbalancer.BalancerFactory
-	
+
 	// 响应处理器（可选，用于图片优化等）
 	responseProcessor ResponseProcessor
 }
@@ -1394,7 +1394,7 @@ func (m *Manager) writeWebSocketData(conn net.Conn, dataChan <-chan []byte, errC
 				}
 				return
 			}
-		case <-time.After(30 * time.Second):
+		case <-time.After(60 * time.Second): // 从30秒改为60秒
 			// 写入超时检查
 			if atomic.LoadInt32(closed) != 0 {
 				return
@@ -1405,7 +1405,7 @@ func (m *Manager) writeWebSocketData(conn net.Conn, dataChan <-chan []byte, errC
 
 // monitorWebSocketConnections 监控WebSocket连接状态
 func (m *Manager) monitorWebSocketConnections(clientConn, upstreamConn net.Conn, errChan chan<- error, clientClosed, upstreamClosed *int32, rule *config.ProxyRule) {
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(30 * time.Second) // 从10秒改为30秒
 	defer ticker.Stop()
 
 	for {
@@ -1419,7 +1419,7 @@ func (m *Manager) monitorWebSocketConnections(clientConn, upstreamConn net.Conn,
 
 			// 可以在这里添加心跳检测逻辑
 
-		case <-time.After(5 * time.Minute):
+		case <-time.After(10 * time.Minute): // 从5分钟改为10分钟
 			// 连接超时检查
 			m.log.Debugf("WebSocket connection timeout check for %s", rule.Target)
 		}

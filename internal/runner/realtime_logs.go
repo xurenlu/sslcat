@@ -153,7 +153,7 @@ func (ls *LogStream) watchLogs() {
 				if err != io.EOF {
 					ls.log.Errorf("Error reading log file: %v", err)
 				}
-				time.Sleep(500 * time.Millisecond)
+				time.Sleep(2 * time.Second) // 从500ms改为2秒
 				continue
 			}
 
@@ -163,7 +163,7 @@ func (ls *LogStream) watchLogs() {
 			}
 
 			if len(entries) == 0 {
-				time.Sleep(100 * time.Millisecond)
+				time.Sleep(1 * time.Second) // 从100ms改为1秒
 			}
 		}
 	}

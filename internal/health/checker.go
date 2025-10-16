@@ -61,7 +61,7 @@ func NewChecker(cfg *config.Config) *Checker {
 		config:   cfg,
 		targets:  make(map[string]*TargetHealth),
 		stopChan: make(chan struct{}),
-		interval: 30 * time.Second, // 默认30秒检测一次
+		interval: 60 * time.Second, // 从30秒改为60秒检测一次
 		timeout:  5 * time.Second,  // 默认5秒超时
 		log: logrus.WithFields(logrus.Fields{
 			"component": "health_checker",
