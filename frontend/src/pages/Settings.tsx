@@ -188,126 +188,124 @@ const Settings: React.FC = () => {
     }))
   }
 
-  const saveSettings = async () => {
+  const saveAllSettings = async () => {
     setLoading(true)
     try {
-      const response = await fetch(`${adminPrefix}/api/settings/basic`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          adminPrefix: settings.adminPrefix,
-          // 新的端口配置
-          portMode: settings.portMode,
-          customPort: settings.customPort,
-          enableHttps: settings.enableHttps,
-          autoSSL: settings.autoSSL,
-          letsEncryptEmail: settings.letsEncryptEmail,
-          sslProvider: settings.sslProvider,
-          enableDDoSProtection: settings.enableDDoSProtection,
-          maxRequestsPerMinute: settings.maxRequestsPerMinute,
-          enableRateLimit: settings.enableRateLimit,
-          enableAccessLog: settings.enableAccessLog,
-          enableErrorLog: settings.enableErrorLog,
-          logLevel: settings.logLevel,
+      // 并行保存基础设置和通知设置
+      const [basicResponse, notificationResponse] = await Promise.all([
+        // 保存基础设置
+        fetch(`${adminPrefix}/api/settings/basic`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            adminPrefix: settings.adminPrefix,
+            // 新的端口配置
+            portMode: settings.portMode,
+            customPort: settings.customPort,
+            enableHttps: settings.enableHttps,
+            autoSSL: settings.autoSSL,
+            letsEncryptEmail: settings.letsEncryptEmail,
+            sslProvider: settings.sslProvider,
+            enableDDoSProtection: settings.enableDDoSProtection,
+            maxRequestsPerMinute: settings.maxRequestsPerMinute,
+            enableRateLimit: settings.enableRateLimit,
+            enableAccessLog: settings.enableAccessLog,
+            enableErrorLog: settings.enableErrorLog,
+            logLevel: settings.logLevel,
+            // 压缩设置
+            compressionEnabled: settings.compressionEnabled,
+            compressionAlgorithms: settings.compressionAlgorithms,
+            compressionMinSize: settings.compressionMinSize,
+            compressionGzipLevel: settings.compressionGzipLevel,
+            compressionBrotliLevel: settings.compressionBrotliLevel,
+            // 上游缓存设置
+            upstreamCacheEnabled: settings.upstreamCacheEnabled,
+            upstreamCacheDir: settings.upstreamCacheDir,
+            upstreamCacheMaxSize: settings.upstreamCacheMaxSize,
+            upstreamCacheDefaultTTL: settings.upstreamCacheDefaultTTL,
+            upstreamCacheRespectUpstream: settings.upstreamCacheRespectUpstream,
+          }),
         }),
-      })
-
-      if (response.ok) {
-        toast({
-          title: t.settings.settingsSaved,
-          status: 'success',
-          duration: 3000,
-          isClosable: true,
-        })
-        
-        // 重新加载配置以显示最新保存的值
-        await loadBasicConfig()
-        
-        // 如果adminPrefix发生变化，使用新的changeAdminPrefix函数
-        if (settings.adminPrefix !== adminPrefix) {
-          await changeAdminPrefix(
-            settings.adminPrefix,
-            (newPrefix) => {
-              // 成功回调
-              toast({
-                title: 'Admin Prefix更改成功',
-                description: `管理面板前缀已更改为: ${newPrefix}，通知已发送`,
-                status: 'success',
-                duration: 5000,
-                isClosable: true,
-              })
+        // 保存通知设置
+        fetch(`${adminPrefix}/api/notifications/config`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            enabled: settings.enableNotifications,
+            channels: {
+              email: {
+                enabled: settings.smtpHost && settings.smtpUsername && settings.smtpPassword,
+                smtp_host: settings.smtpHost,
+                smtp_port: parseInt(settings.smtpPort) || 587,
+                username: settings.smtpUsername,
+                password: settings.smtpPassword,
+                from: settings.smtpFrom,
+                to: settings.smtpTo ? settings.smtpTo.split(',').map(email => email.trim()) : [],
+                use_tls: settings.smtpUseTLS,
+              },
+              webhook: {
+                enabled: settings.slackWebhook || settings.webhookUrl,
+                url: settings.slackWebhook || settings.webhookUrl,
+                headers: settings.slackWebhook ? { 'Content-Type': 'application/json' } : {},
+                timeout: 10,
+              },
             },
-            (error) => {
-              // 错误回调
-              toast({
-                title: 'Admin Prefix更改失败',
-                description: error.message,
-                status: 'error',
-                duration: 5000,
-                isClosable: true,
-              })
-            }
-          )
-        }
-      } else {
-        const errorData = await response.json()
-        throw new Error(errorData.message || '保存失败')
-      }
-    } catch (error) {
-      toast({
-        title: '保存失败',
-        description: error instanceof Error ? error.message : '未知错误',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const saveNotificationSettings = async () => {
-    setLoading(true)
-    try {
-      const notificationConfig = {
-        enabled: settings.enableNotifications,
-        channels: {
-          email: {
-            enabled: settings.smtpHost && settings.smtpUsername && settings.smtpPassword,
-            smtp_host: settings.smtpHost,
-            smtp_port: parseInt(settings.smtpPort) || 587,
-            username: settings.smtpUsername,
-            password: settings.smtpPassword,
-            from: settings.smtpFrom,
-            to: settings.smtpTo ? settings.smtpTo.split(',').map(email => email.trim()) : [],
-            use_tls: settings.smtpUseTLS,
-          },
-          webhook: {
-            enabled: settings.slackWebhook || settings.webhookUrl,
-            url: settings.slackWebhook || settings.webhookUrl,
-            headers: settings.slackWebhook ? { 'Content-Type': 'application/json' } : {},
-            timeout: 10,
-          },
-        },
-      }
-
-      const response = await fetch(`${adminPrefix}/api/notifications/config`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(notificationConfig),
-      })
-
-      if (response.ok) {
-        toast({
-          title: '通知配置保存成功',
-          status: 'success',
-          duration: 3000,
-          isClosable: true,
+          }),
         })
-      } else {
-        throw new Error('保存失败')
+      ])
+
+      // 检查基础设置保存结果
+      if (!basicResponse.ok) {
+        const errorData = await basicResponse.json()
+        throw new Error(errorData.message || '基础设置保存失败')
+      }
+
+      // 检查通知设置保存结果
+      if (!notificationResponse.ok) {
+        const errorData = await notificationResponse.json()
+        throw new Error(errorData.message || '通知设置保存失败')
+      }
+
+      toast({
+        title: '所有设置保存成功',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      })
+      
+      // 重新加载配置以显示最新保存的值
+      await Promise.all([
+        loadBasicConfig(),
+        loadNotificationConfig()
+      ])
+      
+      // 如果adminPrefix发生变化，使用新的changeAdminPrefix函数
+      if (settings.adminPrefix !== adminPrefix) {
+        await changeAdminPrefix(
+          settings.adminPrefix,
+          (newPrefix) => {
+            // 成功回调
+            toast({
+              title: 'Admin Prefix更改成功',
+              description: `管理面板前缀已更改为: ${newPrefix}，通知已发送`,
+              status: 'success',
+              duration: 5000,
+              isClosable: true,
+            })
+          },
+          (error) => {
+            // 错误回调
+            toast({
+              title: 'Admin Prefix更改失败',
+              description: error.message,
+              status: 'error',
+              duration: 5000,
+              isClosable: true,
+            })
+          }
+        )
       }
     } catch (error) {
       toast({
@@ -321,6 +319,7 @@ const Settings: React.FC = () => {
       setLoading(false)
     }
   }
+
 
   const resetSettings = () => {
     // 重置为默认值
@@ -389,14 +388,6 @@ const Settings: React.FC = () => {
             variant="outline"
           >
             {t.settings.resetSettings}
-          </Button>
-          <Button
-            leftIcon={<Icon as={FiSave} />}
-            onClick={saveSettings}
-            isLoading={loading}
-            colorScheme="blue"
-          >
-            {t.settings.saveSettings}
           </Button>
         </HStack>
       </HStack>
@@ -890,11 +881,13 @@ const Settings: React.FC = () => {
             {/* 保存按钮 */}
             <Button 
               colorScheme="blue" 
-              onClick={saveNotificationSettings}
+              onClick={saveAllSettings}
               isLoading={loading}
               loadingText={t.settings.saving}
+              size="lg"
+              leftIcon={<Icon as={FiSave} />}
             >
-              {t.settings.saveNotificationSettings}
+              保存所有设置
             </Button>
           </VStack>
         </CardBody>
