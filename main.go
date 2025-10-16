@@ -242,6 +242,12 @@ func main() {
 		// 更新Web服务器的配置引用
 		webServer.UpdateConfig(newConfig)
 
+		// 重新初始化日志系统（如果日志级别发生变化）
+		if newConfig.Server.LogLevel != "" {
+			logger.Init(newConfig.Server.LogLevel)
+			log.Infof("日志级别已更新为: %s", newConfig.Server.LogLevel)
+		}
+
 		// 发送配置重载成功通知
 		changes := []string{"配置文件已更新"}
 		if err := notificationIntegrator.SendConfigReloaded(cfg.ConfigFile, duration, changes); err != nil {

@@ -50,6 +50,7 @@ type ServerConfig struct {
 	Host  string `json:"host"`
 	Port  int    `json:"port"` // 向后兼容，保留原字段
 	Debug bool   `json:"debug"`
+	LogLevel string `json:"log_level"` // debug|info|warn|error
 
 	// 新的端口配置
 	PortMode    string `json:"port_mode"`    // "standard" | "custom" (默认 "standard")
@@ -711,6 +712,7 @@ func Load(configFile string) (*Config, error) {
 			Host:  "0.0.0.0",
 			Port:  443, // 向后兼容，保留原字段
 			Debug: false,
+			LogLevel: "info", // 默认日志级别
 			// 新的端口配置默认值
 			PortMode:          "standard", // 默认标准模式
 			CustomPort:        8080,       // 默认自定义端口

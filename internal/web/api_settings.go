@@ -270,6 +270,10 @@ func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) 
 		s.config.Server.AccessLogEnabled = *req.EnableAccessLog
 	}
 
+	if req.LogLevel != "" {
+		s.config.Server.LogLevel = req.LogLevel
+	}
+
 	// 保存配置
 	if err := s.config.Save(s.config.ConfigFile); err != nil {
 		s.log.Errorf("保存配置失败: %v", err)
