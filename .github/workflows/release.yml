@@ -236,44 +236,56 @@ jobs:
 
       # OSS 同步步骤
       - name: Install ossutil
-        if: ${{ secrets.ALIYUN_ACCESS_KEY_ID != '' }}
+        if: env.ALIYUN_ACCESS_KEY_ID != ''
+        env:
+          ALIYUN_ACCESS_KEY_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
         run: |
           wget https://gosspublic.alicdn.com/ossutil/1.7.18/ossutil64
           chmod +x ossutil64
           sudo mv ossutil64 /usr/local/bin/ossutil
 
       - name: Configure ossutil
-        if: ${{ secrets.ALIYUN_ACCESS_KEY_ID != '' }}
+        if: env.ALIYUN_ACCESS_KEY_ID != ''
+        env:
+          ALIYUN_ACCESS_KEY_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
+          ALIYUN_ACCESS_KEY_SECRET: ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
+          ALIYUN_OSS_ENDPOINT: ${{ secrets.ALIYUN_OSS_ENDPOINT }}
         run: |
-          ossutil config -e ${{ secrets.ALIYUN_OSS_ENDPOINT }} \
-                         -i ${{ secrets.ALIYUN_ACCESS_KEY_ID }} \
-                         -k ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }} \
+          ossutil config -e $ALIYUN_OSS_ENDPOINT \
+                         -i $ALIYUN_ACCESS_KEY_ID \
+                         -k $ALIYUN_ACCESS_KEY_SECRET \
                          --language EN
 
       - name: Upload to Aliyun OSS
-        if: ${{ secrets.ALIYUN_ACCESS_KEY_ID != '' }}
+        if: env.ALIYUN_ACCESS_KEY_ID != ''
+        env:
+          ALIYUN_ACCESS_KEY_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
+          ALIYUN_OSS_BUCKET: ${{ secrets.ALIYUN_OSS_BUCKET }}
         run: |
           VERSION=${{ github.ref_name }}
           echo "🚀 Uploading release $VERSION to Aliyun OSS..."
           
           # 上传所有文件到版本目录
-          ossutil cp -r artifacts/ oss://${{ secrets.ALIYUN_OSS_BUCKET }}/releases/$VERSION/ \
+          ossutil cp -r artifacts/ oss://$ALIYUN_OSS_BUCKET/releases/$VERSION/ \
                      --parallel 10 \
                      --checkpoint-dir /tmp/oss-checkpoint \
                      --retry-times 3
           
           # 创建最新版本的符号链接
-          ossutil cp oss://${{ secrets.ALIYUN_OSS_BUCKET }}/releases/$VERSION/ \
-                     oss://${{ secrets.ALIYUN_OSS_BUCKET }}/latest/ \
+          ossutil cp oss://$ALIYUN_OSS_BUCKET/releases/$VERSION/ \
+                     oss://$ALIYUN_OSS_BUCKET/latest/ \
                      --update
           
-          echo "✅ Successfully uploaded to OSS: oss://${{ secrets.ALIYUN_OSS_BUCKET }}/releases/$VERSION/"
+          echo "✅ Successfully uploaded to OSS: oss://$ALIYUN_OSS_BUCKET/releases/$VERSION/"
 
       - name: Verify OSS upload
-        if: ${{ secrets.ALIYUN_ACCESS_KEY_ID != '' }}
+        if: env.ALIYUN_ACCESS_KEY_ID != ''
+        env:
+          ALIYUN_ACCESS_KEY_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
+          ALIYUN_OSS_BUCKET: ${{ secrets.ALIYUN_OSS_BUCKET }}
         run: |
           VERSION=${{ github.ref_name }}
           echo "🔍 Verifying upload for version $VERSION..."
-          ossutil ls oss://${{ secrets.ALIYUN_OSS_BUCKET }}/releases/$VERSION/ \
+          ossutil ls oss://$ALIYUN_OSS_BUCKET/releases/$VERSION/ \
                      --output-format json | jq -r '.objects[]?.key' | head -10
           echo "✅ OSS upload verification completed"
