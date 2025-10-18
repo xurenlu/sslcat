@@ -272,13 +272,32 @@ func (s *Server) handleNotificationConfig(w http.ResponseWriter, r *http.Request
 			}
 		}
 
-		// 更新Webhook配置
+		// 更新Webhook配置（包括Slack、企业微信、飞书等）
 		if webhookConfig, exists := updateConfig.Channels["webhook"]; exists {
 			if enabled, ok := webhookConfig["enabled"].(bool); ok {
 				s.config.Notification.Channels.Webhook.Enabled = enabled
 			}
-			if url, ok := webhookConfig["url"].(string); ok {
+			// 支持多个URL
+			if urls, ok := webhookConfig["urls"].([]interface{}); ok {
+				var urlList []string
+				for _, u := range urls {
+					if str, ok := u.(string); ok && str != "" {
+						urlList = append(urlList, str)
+					}
+				}
+				s.config.Notification.Channels.Webhook.URLs = urlList
+				// 为了向后兼容，也设置单个URL（使用第一个）
+				if len(urlList) > 0 {
+					s.config.Notification.Channels.Webhook.URL = urlList[0]
+				}
+			}
+			// 向后兼容单个URL
+			if url, ok := webhookConfig["url"].(string); ok && url != "" {
 				s.config.Notification.Channels.Webhook.URL = url
+				// 如果没有URLs数组，则创建一个
+				if len(s.config.Notification.Channels.Webhook.URLs) == 0 {
+					s.config.Notification.Channels.Webhook.URLs = []string{url}
+				}
 			}
 			if headers, ok := webhookConfig["headers"].(map[string]interface{}); ok {
 				headerMap := make(map[string]string)

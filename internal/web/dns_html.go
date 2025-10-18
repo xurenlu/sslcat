@@ -13,8 +13,8 @@ func (s *Server) generateDNSManagementHTML(data map[string]interface{}) string {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DNS管理 - SSLcat</title>
-    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
-    <link href="/static/css/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://cdnproxy.shifen.de/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnproxy.shifen.de/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
 </head>
 <body>
     <div class="container-fluid">
@@ -94,7 +94,7 @@ func (s *Server) generateDNSManagementHTML(data map[string]interface{}) string {
         </div>
     </div>
     
-    <script src="/static/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnproxy.shifen.de/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
     let currentEditingProvider = null;
 
@@ -439,8 +439,8 @@ func (s *Server) generateDNSConfigHTML(data map[string]interface{}) string {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DNS配置 - SSLcat</title>
-    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
-    <link href="/static/css/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://cdnproxy.shifen.de/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnproxy.shifen.de/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
 </head>
 <body>
     <div class="container-fluid">
@@ -486,7 +486,7 @@ func (s *Server) generateDNSConfigHTML(data map[string]interface{}) string {
         </div>
     </div>
     
-    <script src="/static/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnproxy.shifen.de/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         loadDNSProviders();

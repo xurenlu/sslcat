@@ -129,7 +129,7 @@ func NewNotificationManagerFromConfig(cfg config.NotificationConfig) *Notificati
 		}
 	}
 
-	// Webhook通知
+	// Webhook通知（包括Slack、企业微信、飞书等）
 	if cfg.Channels.Webhook.Enabled {
 		webhookChannel := NewWebhookChannelFromConfig(cfg.Channels.Webhook)
 		if webhookChannel != nil {

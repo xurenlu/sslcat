@@ -83,10 +83,8 @@ const Settings: React.FC = () => {
     smtpFrom: '',
     smtpTo: '',
     smtpUseTLS: true,
-    // Slack配置
-    slackWebhook: '',
-    // 其他Webhook配置
-    webhookUrl: '',
+    // Webhook配置（包括Slack、企业微信、飞书等）
+    webhookUrls: [''],
   })
   
   const [loading, setLoading] = useState(false)
@@ -160,8 +158,7 @@ const Settings: React.FC = () => {
             smtpFrom: config.channels?.email?.from || '',
             smtpTo: config.channels?.email?.to?.join(',') || '',
             smtpUseTLS: config.channels?.email?.use_tls || true,
-            slackWebhook: config.channels?.webhook?.url || '',
-            webhookUrl: config.channels?.webhook?.url || '',
+            webhookUrls: config.channels?.webhook?.urls || [config.channels?.webhook?.url || ''].filter(url => url !== ''),
           }))
         }
       }
@@ -246,9 +243,9 @@ const Settings: React.FC = () => {
                 use_tls: settings.smtpUseTLS,
               },
               webhook: {
-                enabled: settings.slackWebhook || settings.webhookUrl,
-                url: settings.slackWebhook || settings.webhookUrl,
-                headers: settings.slackWebhook ? { 'Content-Type': 'application/json' } : {},
+                enabled: settings.webhookUrls.some(url => url.trim() !== ''),
+                urls: settings.webhookUrls.filter(url => url.trim() !== ''),
+                headers: { 'Content-Type': 'application/json' },
                 timeout: 10,
               },
             },
@@ -360,10 +357,8 @@ const Settings: React.FC = () => {
       smtpFrom: '',
       smtpTo: '',
       smtpUseTLS: true,
-      // Slack配置
-      slackWebhook: '',
-      // 其他Webhook配置
-      webhookUrl: '',
+      // Webhook配置（包括Slack、企业微信、飞书等）
+      webhookUrls: [''],
     })
     
     toast({
@@ -823,59 +818,89 @@ const Settings: React.FC = () => {
               </FormControl>
             </Box>
 
-            {/* Slack通知配置 */}
+            {/* Webhook通知配置 */}
             <Box border="1px" borderColor="gray.200" borderRadius="md" p={4}>
-              <Heading size="sm" mb={4}>{t.settings.slackNotification}</Heading>
-              <FormControl>
-                <FormLabel>{t.settings.webhookUrl}</FormLabel>
-                <Input
-                  value={settings.slackWebhook || ''}
-                  onChange={(e) => handleInputChange('slackWebhook', e.target.value)}
-                  placeholder="https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
-                />
-                <Text fontSize="sm" color="gray.500" mt={1}>
-                  {t.settings.createSlackWebhook}
+              <Heading size="sm" mb={4}>Webhook 通知渠道</Heading>
+              <Text fontSize="sm" color="gray.600" mb={4}>
+                支持多种平台的通知，包括 Slack、企业微信、飞书、钉钉、Discord、Telegram 等
+              </Text>
+              <VStack spacing={3} align="stretch">
+                {settings.webhookUrls.map((url, index) => (
+                  <HStack key={index}>
+                    <FormControl flex={1}>
+                      <FormLabel fontSize="sm" mb={1}>
+                        Webhook URL {index + 1}
+                        {url.includes('hooks.slack.com') && <Badge ml={2} colorScheme="purple" size="sm">Slack</Badge>}
+                        {url.includes('qyapi.weixin.qq.com') && <Badge ml={2} colorScheme="green" size="sm">企业微信</Badge>}
+                        {url.includes('open.feishu.cn') && <Badge ml={2} colorScheme="blue" size="sm">飞书</Badge>}
+                        {url.includes('oapi.dingtalk.com') && <Badge ml={2} colorScheme="orange" size="sm">钉钉</Badge>}
+                        {url.includes('discord.com') && <Badge ml={2} colorScheme="purple" size="sm">Discord</Badge>}
+                        {url.includes('api.telegram.org') && <Badge ml={2} colorScheme="blue" size="sm">Telegram</Badge>}
+                      </FormLabel>
+                      <Input
+                        value={url}
+                        onChange={(e) => {
+                          const newUrls = [...settings.webhookUrls]
+                          newUrls[index] = e.target.value
+                          setSettings(prev => ({ ...prev, webhookUrls: newUrls }))
+                        }}
+                        placeholder="https://hooks.slack.com/services/xxx 或 https://qyapi.weixin.qq.com/xxx"
+                      />
+                    </FormControl>
+                    {settings.webhookUrls.length > 1 && (
+                      <Button
+                        size="sm"
+                        colorScheme="red"
+                        variant="outline"
+                        onClick={() => {
+                          const newUrls = settings.webhookUrls.filter((_, i) => i !== index)
+                          setSettings(prev => ({ ...prev, webhookUrls: newUrls }))
+                        }}
+                        mt={6}
+                      >
+                        删除
+                      </Button>
+                    )}
+                  </HStack>
+                ))}
+                <Button
+                  size="sm"
+                  colorScheme="blue"
+                  variant="outline"
+                  onClick={() => {
+                    setSettings(prev => ({ ...prev, webhookUrls: [...prev.webhookUrls, ''] }))
+                  }}
+                  alignSelf="flex-start"
+                >
+                  添加更多 Webhook
+                </Button>
+                <Text fontSize="sm" color="gray.500">
+                  支持自动格式适配的平台（输入URL后会自动识别）：
                 </Text>
-              </FormControl>
-            </Box>
-
-            {/* 其他通知渠道 */}
-            <Box border="1px" borderColor="gray.200" borderRadius="md" p={4}>
-              <Heading size="sm" mb={4}>其他通知渠道 (Webhook)</Heading>
-              <FormControl>
-                <FormLabel>Webhook URL</FormLabel>
-                <Input
-                  value={settings.webhookUrl || ''}
-                  onChange={(e) => handleInputChange('webhookUrl', e.target.value)}
-                  placeholder="https://your-webhook-endpoint.com/notify"
-                />
-                <Text fontSize="sm" color="gray.500" mt={1}>
-                  支持自动格式适配的平台：
-                </Text>
-                <VStack align="start" spacing={1} mt={2}>
-                  <Text fontSize="xs" color="blue.600">
-                    • 企业微信: qyapi.weixin.qq.com
+                <VStack align="start" spacing={1}>
+                  <Text fontSize="xs" color="purple.600">
+                    • <strong>Slack</strong>: hooks.slack.com/services/xxx
+                  </Text>
+                  <Text fontSize="xs" color="green.600">
+                    • <strong>企业微信</strong>: qyapi.weixin.qq.com
                   </Text>
                   <Text fontSize="xs" color="blue.600">
-                    • 飞书: open.feishu.cn
+                    • <strong>飞书</strong>: open.feishu.cn
+                  </Text>
+                  <Text fontSize="xs" color="orange.600">
+                    • <strong>钉钉</strong>: oapi.dingtalk.com
+                  </Text>
+                  <Text fontSize="xs" color="purple.600">
+                    • <strong>Discord</strong>: discord.com
                   </Text>
                   <Text fontSize="xs" color="blue.600">
-                    • 钉钉: oapi.dingtalk.com
-                  </Text>
-                  <Text fontSize="xs" color="blue.600">
-                    • Slack: hooks.slack.com
-                  </Text>
-                  <Text fontSize="xs" color="blue.600">
-                    • Discord: discord.com
-                  </Text>
-                  <Text fontSize="xs" color="blue.600">
-                    • Telegram: api.telegram.org
+                    • <strong>Telegram</strong>: api.telegram.org
                   </Text>
                   <Text fontSize="xs" color="gray.500">
-                    • 其他: 通用JSON格式
+                    • <strong>其他</strong>: 通用JSON格式
                   </Text>
                 </VStack>
-              </FormControl>
+              </VStack>
             </Box>
             
             {/* 保存按钮 */}

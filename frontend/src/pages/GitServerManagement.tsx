@@ -31,6 +31,7 @@ import {
   FormLabel,
   Input,
   Textarea,
+  Select,
   useDisclosure,
   Tabs,
   TabList,
@@ -1771,28 +1772,23 @@ git push sslcat main`
                   </Text>
                 </FormControl>
 
-                <FormControl>
-                  <FormLabel>SSL证书邮箱</FormLabel>
-                  <Input
-                    type="email"
-                    value={config.sslEmail}
-                    onChange={(e) => setConfig({ ...config, sslEmail: e.target.value })}
-                    placeholder="admin@example.com"
-                  />
-                  <Text fontSize="sm" color="gray.500" mt={1}>
-                    用于申请Let's Encrypt SSL证书的邮箱地址
-                  </Text>
-                </FormControl>
 
                 <FormControl>
                   <FormLabel>默认部署策略</FormLabel>
-                  <Input
+                  <Select
                     value={config.defaultStrategy}
                     onChange={(e) => setConfig({ ...config, defaultStrategy: e.target.value })}
-                    placeholder="auto"
-                  />
+                  >
+                    <option value="auto">自动检测</option>
+                    <option value="docker">Docker容器</option>
+                    <option value="static">静态文件</option>
+                    <option value="nodejs">Node.js应用</option>
+                    <option value="python">Python应用</option>
+                    <option value="go">Go应用</option>
+                    <option value="php">PHP应用</option>
+                  </Select>
                   <Text fontSize="sm" color="gray.500" mt={1}>
-                    新应用的默认部署策略（auto、docker、static等）
+                    新应用的默认部署策略。选择"自动检测"会根据项目文件自动识别应用类型
                   </Text>
                 </FormControl>
 

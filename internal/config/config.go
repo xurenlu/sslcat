@@ -1172,7 +1172,7 @@ type NotificationConfig struct {
 // ChannelsConfig 通知渠道配置
 type ChannelsConfig struct {
 	Email   EmailChannelConfig   `json:"email"`   // 邮件通知配置
-	Webhook WebhookChannelConfig `json:"webhook"` // Webhook通知配置
+	Webhook WebhookChannelConfig `json:"webhook"` // Webhook通知配置（包括Slack、企业微信、飞书等）
 	Syslog  SyslogChannelConfig  `json:"syslog"`  // 系统日志通知配置
 	Console ConsoleChannelConfig `json:"console"` // 控制台通知配置
 }
@@ -1192,7 +1192,8 @@ type EmailChannelConfig struct {
 // WebhookChannelConfig Webhook通知渠道配置
 type WebhookChannelConfig struct {
 	Enabled bool              `json:"enabled"` // 是否启用
-	URL     string            `json:"url"`     // Webhook URL
+	URLs    []string          `json:"urls"`    // Webhook URL列表
+	URL     string            `json:"url"`     // 单个Webhook URL（向后兼容）
 	Headers map[string]string `json:"headers"` // 自定义HTTP头部
 	Timeout int               `json:"timeout"` // 超时时间（秒）
 }

@@ -105,9 +105,6 @@ type GitServerConfig struct {
 	// 是否启用自动 SSL
 	AutoSSL bool `json:"auto_ssl"`
 
-	// SSL 证书邮箱
-	SSLEmail string `json:"ssl_email"`
-
 	// 默认部署策略
 	DefaultStrategy string `json:"default_strategy"`
 
@@ -435,7 +432,6 @@ func NewGitServer(cfg *config.Config, translator *i18n.Translator) *GitServer {
 		PortRange:       [2]int{8000, 9000},
 		WelcomeMessage:  translator.T("git_server.welcome_message"),
 		AutoSSL:         true,
-		SSLEmail:        "",
 		DefaultStrategy: "auto",
 		BuildTimeout:    300,
 		AutoDomain:      true,
@@ -721,13 +717,13 @@ func (gs *GitServer) CreateApp(appName string, autoSSL bool) (*GitApp, error) {
 		DeployConfig: &AppDeployConfig{
 			Strategy: gs.serverConfig.DefaultStrategy,
 			SSL: SSLConfig{
-				Enabled: autoSSL, // 使用传入的参数
-				Email:   gs.serverConfig.SSLEmail,
+				Enabled: autoSSL,             // 使用传入的参数
+				Email:   gs.config.SSL.Email, // 使用系统配置中的SSL邮箱
 			},
 		},
 	}
 
-	gs.logger.Infof("  ✓ SSL 配置: Enabled=%v, Email=%s", autoSSL, gs.serverConfig.SSLEmail)
+	gs.logger.Infof("  ✓ SSL 配置: Enabled=%v, Email=%s", autoSSL, gs.config.SSL.Email)
 
 	gs.apps[appName] = app
 	gs.logger.Infof("  ✓ 应用对象已添加到内存 (当前共 %d 个应用)", len(gs.apps))
@@ -4089,7 +4085,7 @@ func (gs *GitServer) recoverAppFromRepository(appName, bareRepoPath string) (*Gi
 			Strategy: gs.serverConfig.DefaultStrategy,
 			SSL: SSLConfig{
 				Enabled: gs.serverConfig.AutoSSL,
-				Email:   gs.serverConfig.SSLEmail,
+				Email:   gs.config.SSL.Email, // 使用系统配置中的SSL邮箱
 			},
 		},
 	}

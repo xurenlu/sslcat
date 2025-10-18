@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -747,6 +748,48 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 			}
 			resp.Header.Set(trimmedKey, value)
 		}
+
+		// 图片优化处理
+		if m.responseProcessor != nil && (resp.Request.Method == "GET" || resp.Request.Method == "HEAD") {
+			// 检查是否为图片响应
+			contentType := resp.Header.Get("Content-Type")
+			if strings.HasPrefix(contentType, "image/") {
+				// 读取响应体
+				body, err := io.ReadAll(resp.Body)
+				if err != nil {
+					m.log.Warnf("Failed to read response body for image optimization: %v", err)
+				} else {
+					// 关闭原始响应体
+					resp.Body.Close()
+
+					// 应用图片优化
+					optimizedData, newContentType, err := m.responseProcessor.ProcessResponse(body, contentType, resp.Request)
+					if err != nil {
+						m.log.Warnf("Image optimization failed: %v, using original", err)
+						// 如果优化失败，使用原始数据
+						optimizedData = body
+						newContentType = contentType
+					} else {
+						// 更新响应头
+						if newContentType != contentType {
+							resp.Header.Set("Content-Type", newContentType)
+						}
+						resp.Header.Set("Content-Length", strconv.Itoa(len(optimizedData)))
+
+						// 添加优化标识
+						if len(optimizedData) < len(body) {
+							resp.Header.Set("X-Image-Optimized", "true")
+							compressionRatio := float64(len(body)-len(optimizedData)) / float64(len(body)) * 100
+							resp.Header.Set("X-Image-Compression-Ratio", fmt.Sprintf("%.1f%%", compressionRatio))
+						}
+					}
+
+					// 设置新的响应体
+					resp.Body = io.NopCloser(bytes.NewReader(optimizedData))
+				}
+			}
+		}
+
 		// CDN 缓存落盘（全局或域名启用）
 		// 使用之前定义的cdnEnabled变量
 		if m.cdnCache != nil && cdnEnabled {

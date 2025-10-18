@@ -197,7 +197,8 @@ func (ec *EmailChannel) GetName() string {
 // WebhookChannel Webhook通知渠道
 type WebhookChannel struct {
 	enabled bool
-	url     string
+	urls    []string
+	url     string // 向后兼容
 	headers map[string]string
 	client  *http.Client
 	log     *logrus.Entry
@@ -240,9 +241,16 @@ func NewWebhookChannelFromConfig(cfg config.WebhookChannelConfig) *WebhookChanne
 		timeout = 10
 	}
 
+	// 处理URLs数组和单个URL的兼容性
+	urls := cfg.URLs
+	if len(urls) == 0 && cfg.URL != "" {
+		urls = []string{cfg.URL}
+	}
+
 	whc := &WebhookChannel{
-		enabled: cfg.Enabled && cfg.URL != "",
-		url:     cfg.URL,
+		enabled: cfg.Enabled && len(urls) > 0,
+		urls:    urls,
+		url:     cfg.URL, // 向后兼容
 		headers: cfg.Headers,
 		client:  &http.Client{Timeout: time.Duration(timeout) * time.Second},
 		log:     logrus.WithFields(logrus.Fields{"component": "webhook_channel"}),
@@ -253,7 +261,7 @@ func NewWebhookChannelFromConfig(cfg config.WebhookChannelConfig) *WebhookChanne
 	}
 
 	if whc.enabled {
-		whc.log.Info("Webhook通知渠道已从配置启用")
+		whc.log.Infof("Webhook通知渠道已从配置启用，共 %d 个URL", len(urls))
 	}
 
 	return whc
@@ -265,8 +273,47 @@ func (whc *WebhookChannel) Send(notification *Notification) error {
 		return nil
 	}
 
+	// 确定要发送的URL列表
+	urls := whc.urls
+	if len(urls) == 0 && whc.url != "" {
+		urls = []string{whc.url}
+	}
+
+	var errors []string
+	successCount := 0
+
+	// 向所有URL发送通知
+	for _, url := range urls {
+		if url == "" {
+			continue
+		}
+
+		err := whc.sendToURL(url, notification)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("URL %s: %v", url, err))
+		} else {
+			successCount++
+		}
+	}
+
+	// 记录发送结果
+	if len(errors) > 0 {
+		whc.log.Warnf("Webhook通知发送部分失败: %d/%d 成功, 错误: %v",
+			successCount, len(urls), errors)
+		if successCount == 0 {
+			return fmt.Errorf("所有Webhook发送失败: %v", errors)
+		}
+	} else {
+		whc.log.Infof("Webhook通知已发送到 %d 个URL", successCount)
+	}
+
+	return nil
+}
+
+// sendToURL 向指定URL发送通知
+func (whc *WebhookChannel) sendToURL(url string, notification *Notification) error {
 	// 获取平台适配器
-	adapter := GetPlatformAdapter(whc.url)
+	adapter := GetPlatformAdapter(url)
 
 	// 使用适配器转换消息格式
 	jsonData, err := adapter.Adapt(notification)
@@ -275,7 +322,7 @@ func (whc *WebhookChannel) Send(notification *Notification) error {
 	}
 
 	// 创建HTTP请求
-	req, err := http.NewRequest("POST", whc.url, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("创建HTTP请求失败: %v", err)
 	}
@@ -305,8 +352,8 @@ func (whc *WebhookChannel) Send(notification *Notification) error {
 	}
 
 	// 检测平台类型用于日志
-	platform := DetectPlatform(whc.url)
-	whc.log.Infof("Webhook通知已发送到 %s 平台: %s", platform, whc.url)
+	platform := DetectPlatform(url)
+	whc.log.Debugf("Webhook通知已发送到 %s 平台: %s", platform, url)
 	return nil
 }
 
