@@ -41,7 +41,7 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         ws: true, // 启用 WebSocket 代理
-        rewrite: (path) => `/sslcat-panel2${path}`,
+        // 移除rewrite规则，避免重复添加前缀
       },
     },
   },

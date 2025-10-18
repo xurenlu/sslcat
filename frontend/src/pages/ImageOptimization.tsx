@@ -183,10 +183,10 @@ const ImageOptimization: React.FC = () => {
   };
 
   const addPattern = () => {
-    if (newPattern && !config.include_patterns.includes(newPattern)) {
+    if (newPattern && !(config.include_patterns || []).includes(newPattern)) {
       setConfig({
         ...config,
-        include_patterns: [...config.include_patterns, newPattern],
+        include_patterns: [...(config.include_patterns || []), newPattern],
       });
       setNewPattern('');
     }
@@ -195,15 +195,15 @@ const ImageOptimization: React.FC = () => {
   const removePattern = (pattern: string) => {
     setConfig({
       ...config,
-      include_patterns: config.include_patterns.filter((p) => p !== pattern),
+      include_patterns: (config.include_patterns || []).filter((p) => p !== pattern),
     });
   };
 
   const addExcludePattern = () => {
-    if (newExcludePattern && !config.exclude_patterns.includes(newExcludePattern)) {
+    if (newExcludePattern && !(config.exclude_patterns || []).includes(newExcludePattern)) {
       setConfig({
         ...config,
-        exclude_patterns: [...config.exclude_patterns, newExcludePattern],
+        exclude_patterns: [...(config.exclude_patterns || []), newExcludePattern],
       });
       setNewExcludePattern('');
     }
@@ -212,16 +212,16 @@ const ImageOptimization: React.FC = () => {
   const removeExcludePattern = (pattern: string) => {
     setConfig({
       ...config,
-      exclude_patterns: config.exclude_patterns.filter((p) => p !== pattern),
+      exclude_patterns: (config.exclude_patterns || []).filter((p) => p !== pattern),
     });
   };
 
   const addSize = () => {
     const size = parseInt(newSize);
-    if (size > 0 && !config.allowed_sizes.includes(size)) {
+    if (size > 0 && !(config.allowed_sizes || []).includes(size)) {
       setConfig({
         ...config,
-        allowed_sizes: [...config.allowed_sizes, size].sort((a, b) => a - b),
+        allowed_sizes: [...(config.allowed_sizes || []), size].sort((a, b) => a - b),
       });
       setNewSize('');
     }
@@ -230,7 +230,7 @@ const ImageOptimization: React.FC = () => {
   const removeSize = (size: number) => {
     setConfig({
       ...config,
-      allowed_sizes: config.allowed_sizes.filter((s) => s !== size),
+      allowed_sizes: (config.allowed_sizes || []).filter((s) => s !== size),
     });
   };
 
@@ -447,7 +447,7 @@ const ImageOptimization: React.FC = () => {
                   </Button>
                 </HStack>
                 <Wrap>
-                  {config.allowed_sizes.map((size) => (
+                  {(config.allowed_sizes || []).map((size) => (
                     <WrapItem key={size}>
                       <Tag size="lg" colorScheme="blue">
                         <TagLabel>{size}px</TagLabel>
@@ -546,7 +546,7 @@ const ImageOptimization: React.FC = () => {
                   </Button>
                 </HStack>
                 <Wrap>
-                  {config.include_patterns.map((pattern) => (
+                  {(config.include_patterns || []).map((pattern) => (
                     <WrapItem key={pattern}>
                       <Tag size="lg" colorScheme="green">
                         <TagLabel>{pattern}</TagLabel>
@@ -574,7 +574,7 @@ const ImageOptimization: React.FC = () => {
                   </Button>
                 </HStack>
                 <Wrap>
-                  {config.exclude_patterns.map((pattern) => (
+                  {(config.exclude_patterns || []).map((pattern) => (
                     <WrapItem key={pattern}>
                       <Tag size="lg" colorScheme="red">
                         <TagLabel>{pattern}</TagLabel>
