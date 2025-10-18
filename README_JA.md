@@ -162,36 +162,41 @@ sudo systemctl start sslcat
 
 ### 基本設定
 
-```yaml
-server:
-  host: "0.0.0.0"
-  port: 443
-  debug: false
-
-ssl:
-  email: "your-email@example.com"  # SSL証明書メール
-  staging: false                   # ステージング環境を使用するか
-  auto_renew: true                 # 自動更新
-
-admin:
-  username: "admin"
-  password_file: "/var/lib/sslcat/admin.pass"     # パスワードはこのファイルに保存、sslcat.confはpasswordを永続化しない
-  first_run: true
-
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "127.0.0.1"
-      port: 8080
-      enabled: true
-      ssl_only: true
-
-security:
-  max_attempts: 3                  # 1分間の最大失敗回数
-  block_duration: "1m"             # ブロック期間
-  max_attempts_5min: 10            # 5分間の最大失敗回数
-
-admin_prefix: "/sslcat-panel"     # 管理パネルパスプレフィックス
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 443,
+    "debug": false
+  },
+  "ssl": {
+    "email": "your-email@example.com",
+    "staging": false,
+    "auto_renew": true
+  },
+  "admin": {
+    "username": "admin",
+    "password_file": "./data/admin.pass",
+    "first_run": true
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "127.0.0.1",
+        "port": 8080,
+        "enabled": true,
+        "ssl_only": true
+      }
+    ]
+  },
+  "security": {
+    "max_attempts": 3,
+    "block_duration": "1m",
+    "max_attempts_5min": 10
+  },
+  "admin_prefix": "/sslcat-panel"
+}
 ```
 
 ### パスワード復旧（緊急復旧）
@@ -298,19 +303,27 @@ sudo journalctl -u sslcat -p err
    - SSL のみ: HTTPSアクセスのみ許可するか
 
 ### プロキシルール例
-```yaml
-proxy:
-  rules:
-    - domain: "api.example.com"
-      target: "127.0.0.1"
-      port: 3000
-      enabled: true
-      ssl_only: true
-    - domain: "app.example.com"
-      target: "192.168.1.100"
-      port: 8080
-      enabled: true
-      ssl_only: false
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "api.example.com",
+        "target": "127.0.0.1",
+        "port": 3000,
+        "enabled": true,
+        "ssl_only": true
+      },
+      {
+        "domain": "app.example.com",
+        "target": "192.168.1.100",
+        "port": 8080,
+        "enabled": true,
+        "ssl_only": false
+      }
+    ]
+  }
+}
 ```
 
 ## SSL証明書管理
@@ -417,19 +430,19 @@ sysctl -p
 ```
 
 ### 設定最適化
-```yaml
-server:
-  # パフォーマンス分析用にデバッグモードを有効化
-  debug: false
-  
-proxy:
-  # 適切なプロキシルール数を設定
-  rules: []
-  
-security:
-  # セキュリティパラメータを調整
-  max_attempts: 5
-  block_duration: "5m"
+```json
+{
+  "server": {
+    "debug": false
+  },
+  "proxy": {
+    "rules": []
+  },
+  "security": {
+    "max_attempts": 5,
+    "block_duration": "5m"
+  }
+}
 ```
 
 ## ネットワーク最適化

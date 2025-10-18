@@ -105,7 +105,7 @@ const ImageOptimization: React.FC = () => {
 
   const loadConfig = async () => {
     try {
-      const response: any = await api.get(`${window.location.pathname.split('/')[1]}/api/image-optimization/config`);
+      const response: any = await api.get('/image-optimization/config');
       if (response.success) {
         setConfig(response.config);
       }
@@ -122,7 +122,7 @@ const ImageOptimization: React.FC = () => {
 
   const loadStats = async () => {
     try {
-      const response: any = await api.get(`${window.location.pathname.split('/')[1]}/api/image-optimization/stats`);
+      const response: any = await api.get('/image-optimization/stats');
       if (response.success) {
         setStats(response.stats);
       }
@@ -135,7 +135,7 @@ const ImageOptimization: React.FC = () => {
     setSaving(true);
     try {
       const response: any = await api.post(
-        `${window.location.pathname.split('/')[1]}/api/image-optimization/config`,
+        '/image-optimization/config',
         { config }
       );
       if (response.success) {
@@ -161,7 +161,7 @@ const ImageOptimization: React.FC = () => {
   const clearCache = async () => {
     try {
       const response: any = await api.post(
-        `${window.location.pathname.split('/')[1]}/api/image-optimization/cache/clear`,
+        '/image-optimization/cache/clear',
         {}
       );
       if (response.success) {

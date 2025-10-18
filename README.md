@@ -207,22 +207,28 @@ sudo systemctl start sslcat
 ### 基本配置
 
 #### 标准模式（推荐）
-```yaml
-server:
-  host: "0.0.0.0"
-  port_mode: "standard"    # 标准模式
-  enable_https: true      # 启用 HTTPS
-  debug: false
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port_mode": "standard",
+    "enable_https": true,
+    "debug": false
+  }
+}
 ```
 
 #### 自定义模式
-```yaml
-server:
-  host: "0.0.0.0"
-  port_mode: "custom"     # 自定义模式
-  custom_port: 8080       # 自定义端口
-  enable_https: false     # 禁用 HTTPS
-  debug: false
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port_mode": "custom",
+    "custom_port": 8080,
+    "enable_https": false,
+    "debug": false
+  }
+}
 ```
 
 #### 命令行方式
@@ -234,30 +240,37 @@ sslcat --config sslcat.conf
 sslcat --config sslcat.conf --port 8080
 ```
 
-ssl:
-  email: "your-email@example.com"  # SSL证书邮箱
-  staging: false                   # 是否使用测试环境
-  auto_renew: true                 # 自动续期
-
-admin:
-  username: "admin"
-  password_file: "/var/lib/sslcat/admin.pass"     # 密码保存在此文件，sslcat.conf不持久化password
-  first_run: true
-
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "127.0.0.1"
-      port: 8080
-      enabled: true
-      ssl_only: true
-
-security:
-  max_attempts: 3                  # 1分钟内最大失败次数
-  block_duration: "1m"             # 封禁时长
-  max_attempts_5min: 10            # 5分钟内最大失败次数
-
-admin_prefix: "/sslcat-panel"     # 管理面板路径前缀
+#### 完整配置示例
+```json
+{
+  "ssl": {
+    "email": "your-email@example.com",
+    "staging": false,
+    "auto_renew": true
+  },
+  "admin": {
+    "username": "admin",
+    "password_file": "./data/admin.pass",
+    "first_run": true
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "127.0.0.1",
+        "port": 8080,
+        "enabled": true,
+        "ssl_only": true
+      }
+    ]
+  },
+  "security": {
+    "max_attempts": 3,
+    "block_duration": "1m",
+    "max_attempts_5min": 10
+  },
+  "admin_prefix": "/sslcat-panel"
+}
 ```
 
 ### 忘记密码（紧急恢复）
@@ -364,19 +377,27 @@ sudo journalctl -u sslcat -p err
    - SSL仅限: 是否仅允许HTTPS访问
 
 ### 代理规则示例
-```yaml
-proxy:
-  rules:
-    - domain: "api.example.com"
-      target: "127.0.0.1"
-      port: 3000
-      enabled: true
-      ssl_only: true
-    - domain: "app.example.com"
-      target: "192.168.1.100"
-      port: 8080
-      enabled: true
-      ssl_only: false
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "api.example.com",
+        "target": "127.0.0.1",
+        "port": 3000,
+        "enabled": true,
+        "ssl_only": true
+      },
+      {
+        "domain": "app.example.com",
+        "target": "192.168.1.100",
+        "port": 8080,
+        "enabled": true,
+        "ssl_only": false
+      }
+    ]
+  }
+}
 ```
 
 ## SSL 证书管理
@@ -495,19 +516,19 @@ sysctl -p
 ```
 
 ### 配置优化
-```yaml
-server:
-  # 启用调试模式进行性能分析
-  debug: false
-  
-proxy:
-  # 合理配置代理规则数量
-  rules: []
-  
-security:
-  # 调整安全参数
-  max_attempts: 5
-  block_duration: "5m"
+```json
+{
+  "server": {
+    "debug": false
+  },
+  "proxy": {
+    "rules": []
+  },
+  "security": {
+    "max_attempts": 5,
+    "block_duration": "5m"
+  }
+}
 ```
 
 ## 网络优化说明

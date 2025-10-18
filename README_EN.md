@@ -162,36 +162,41 @@ sudo systemctl start sslcat
 
 ### Basic Configuration
 
-```yaml
-server:
-  host: "0.0.0.0"
-  port: 443
-  debug: false
-
-ssl:
-  email: "your-email@example.com"  # SSL certificate email
-  staging: false                   # Whether to use staging environment
-  auto_renew: true                 # Auto renewal
-
-admin:
-  username: "admin"
-  password_file: "/var/lib/sslcat/admin.pass"     # Password saved in this file, sslcat.conf doesn't persist password
-  first_run: true
-
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "127.0.0.1"
-      port: 8080
-      enabled: true
-      ssl_only: true
-
-security:
-  max_attempts: 3                  # Max failed attempts in 1 minute
-  block_duration: "1m"             # Block duration
-  max_attempts_5min: 10            # Max failed attempts in 5 minutes
-
-admin_prefix: "/sslcat-panel"     # Management panel path prefix
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 443,
+    "debug": false
+  },
+  "ssl": {
+    "email": "your-email@example.com",
+    "staging": false,
+    "auto_renew": true
+  },
+  "admin": {
+    "username": "admin",
+    "password_file": "./data/admin.pass",
+    "first_run": true
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "127.0.0.1",
+        "port": 8080,
+        "enabled": true,
+        "ssl_only": true
+      }
+    ]
+  },
+  "security": {
+    "max_attempts": 3,
+    "block_duration": "1m",
+    "max_attempts_5min": 10
+  },
+  "admin_prefix": "/sslcat-panel"
+}
 ```
 
 ### Password Recovery (Emergency Recovery)
@@ -298,19 +303,27 @@ Since the system doesn't have SSL certificates when first installed, please use 
    - SSL Only: Whether to allow HTTPS access only
 
 ### Proxy Rule Example
-```yaml
-proxy:
-  rules:
-    - domain: "api.example.com"
-      target: "127.0.0.1"
-      port: 3000
-      enabled: true
-      ssl_only: true
-    - domain: "app.example.com"
-      target: "192.168.1.100"
-      port: 8080
-      enabled: true
-      ssl_only: false
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "api.example.com",
+        "target": "127.0.0.1",
+        "port": 3000,
+        "enabled": true,
+        "ssl_only": true
+      },
+      {
+        "domain": "app.example.com",
+        "target": "192.168.1.100",
+        "port": 8080,
+        "enabled": true,
+        "ssl_only": false
+      }
+    ]
+  }
+}
 ```
 
 ## SSL Certificate Management
@@ -417,19 +430,19 @@ sysctl -p
 ```
 
 ### Configuration Optimization
-```yaml
-server:
-  # Enable debug mode for performance analysis
-  debug: false
-  
-proxy:
-  # Configure reasonable number of proxy rules
-  rules: []
-  
-security:
-  # Adjust security parameters
-  max_attempts: 5
-  block_duration: "5m"
+```json
+{
+  "server": {
+    "debug": false
+  },
+  "proxy": {
+    "rules": []
+  },
+  "security": {
+    "max_attempts": 5,
+    "block_duration": "5m"
+  }
+}
 ```
 
 ## Network Optimization

@@ -158,36 +158,41 @@ sudo systemctl start sslcat
 
 ### Базовая Конфигурация
 
-```yaml
-server:
-  host: "0.0.0.0"
-  port: 443
-  debug: false
-
-ssl:
-  email: "your-email@example.com"  # Email для SSL сертификата
-  staging: false                   # Использовать ли staging окружение
-  auto_renew: true                 # Автообновление
-
-admin:
-  username: "admin"
-  password_file: "/var/lib/sslcat/admin.pass"     # Пароль сохранен в этом файле, sslcat.conf не сохраняет password
-  first_run: true
-
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "127.0.0.1"
-      port: 8080
-      enabled: true
-      ssl_only: true
-
-security:
-  max_attempts: 3                  # Макс. неудачных попыток за 1 минуту
-  block_duration: "1m"             # Длительность блокировки
-  max_attempts_5min: 10            # Макс. неудачных попыток за 5 минут
-
-admin_prefix: "/sslcat-panel"     # Префикс пути панели управления
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 443,
+    "debug": false
+  },
+  "ssl": {
+    "email": "your-email@example.com",
+    "staging": false,
+    "auto_renew": true
+  },
+  "admin": {
+    "username": "admin",
+    "password_file": "./data/admin.pass",
+    "first_run": true
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "127.0.0.1",
+        "port": 8080,
+        "enabled": true,
+        "ssl_only": true
+      }
+    ]
+  },
+  "security": {
+    "max_attempts": 3,
+    "block_duration": "1m",
+    "max_attempts_5min": 10
+  },
+  "admin_prefix": "/sslcat-panel"
+}
 ```
 
 ### Восстановление Пароля (Экстренное Восстановление)
@@ -294,19 +299,27 @@ sudo journalctl -u sslcat -p err
    - Только SSL: Разрешить ли только HTTPS доступ
 
 ### Пример Правила Прокси
-```yaml
-proxy:
-  rules:
-    - domain: "api.example.com"
-      target: "127.0.0.1"
-      port: 3000
-      enabled: true
-      ssl_only: true
-    - domain: "app.example.com"
-      target: "192.168.1.100"
-      port: 8080
-      enabled: true
-      ssl_only: false
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "api.example.com",
+        "target": "127.0.0.1",
+        "port": 3000,
+        "enabled": true,
+        "ssl_only": true
+      },
+      {
+        "domain": "app.example.com",
+        "target": "192.168.1.100",
+        "port": 8080,
+        "enabled": true,
+        "ssl_only": false
+      }
+    ]
+  }
+}
 ```
 
 ## Управление SSL Сертификатами
@@ -413,19 +426,19 @@ sysctl -p
 ```
 
 ### Оптимизация Конфигурации
-```yaml
-server:
-  # Включить debug режим для анализа производительности
-  debug: false
-  
-proxy:
-  # Настроить разумное количество правил прокси
-  rules: []
-  
-security:
-  # Настроить параметры безопасности
-  max_attempts: 5
-  block_duration: "5m"
+```json
+{
+  "server": {
+    "debug": false
+  },
+  "proxy": {
+    "rules": []
+  },
+  "security": {
+    "max_attempts": 5,
+    "block_duration": "5m"
+  }
+}
 ```
 
 ## Оптимизация Сети
