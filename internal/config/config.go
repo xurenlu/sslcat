@@ -47,9 +47,9 @@ type Config struct {
 
 // ServerConfig 服务器配置
 type ServerConfig struct {
-	Host  string `json:"host"`
-	Port  int    `json:"port"` // 向后兼容，保留原字段
-	Debug bool   `json:"debug"`
+	Host     string `json:"host"`
+	Port     int    `json:"port"` // 向后兼容，保留原字段
+	Debug    bool   `json:"debug"`
 	LogLevel string `json:"log_level"` // debug|info|warn|error
 
 	// 新的端口配置
@@ -709,9 +709,9 @@ func Load(configFile string) (*Config, error) {
 	// 设置默认值
 	config := &Config{
 		Server: ServerConfig{
-			Host:  "0.0.0.0",
-			Port:  443, // 向后兼容，保留原字段
-			Debug: false,
+			Host:     "0.0.0.0",
+			Port:     443, // 向后兼容，保留原字段
+			Debug:    false,
 			LogLevel: "info", // 默认日志级别
 			// 新的端口配置默认值
 			PortMode:          "standard", // 默认标准模式
@@ -1246,17 +1246,17 @@ type ImageOptimizationConfig struct {
 	Enabled bool `json:"enabled"` // 是否启用图片优化
 
 	// 格式转换
-	AutoWebP      bool `json:"auto_webp"`       // 自动转换为 WebP
-	WebPQuality   int  `json:"webp_quality"`    // WebP 质量 (0-100，默认 80)
-	JPEGQuality   int  `json:"jpeg_quality"`    // JPEG 质量 (0-100，默认 85)
-	PNGLevel      int  `json:"png_level"`       // PNG 压缩级别 (0-9，默认 6)
-	StripMetadata bool `json:"strip_metadata"`  // 移除 EXIF 元数据
+	AutoWebP      bool `json:"auto_webp"`      // 自动转换为 WebP
+	WebPQuality   int  `json:"webp_quality"`   // WebP 质量 (0-100，默认 80)
+	JPEGQuality   int  `json:"jpeg_quality"`   // JPEG 质量 (0-100，默认 85)
+	PNGLevel      int  `json:"png_level"`      // PNG 压缩级别 (0-9，默认 6)
+	StripMetadata bool `json:"strip_metadata"` // 移除 EXIF 元数据
 
 	// 尺寸调整
-	AllowResize  bool  `json:"allow_resize"`   // 允许尺寸调整
-	MaxWidth     int   `json:"max_width"`      // 最大宽度（默认 2000）
-	MaxHeight    int   `json:"max_height"`     // 最大高度（默认 2000）
-	AllowedSizes []int `json:"allowed_sizes"`  // 允许的尺寸列表
+	AllowResize  bool  `json:"allow_resize"`  // 允许尺寸调整
+	MaxWidth     int   `json:"max_width"`     // 最大宽度（默认 2000）
+	MaxHeight    int   `json:"max_height"`    // 最大高度（默认 2000）
+	AllowedSizes []int `json:"allowed_sizes"` // 允许的尺寸列表
 
 	// 缓存
 	CacheEnabled bool  `json:"cache_enabled"`  // 启用缓存

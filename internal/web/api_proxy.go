@@ -400,12 +400,25 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 			AuthUsers          []config.ProxyAuthUser `json:"auth_users"`
 			AuthSessionTimeout int                    `json:"auth_session_timeout"`
 			AuthCookieDomain   string                 `json:"auth_cookie_domain"`
+
+			// 代理超时配置
+			ConnectTimeoutSec        int               `json:"connect_timeout_sec"`
+			KeepAliveTimeoutSec      int               `json:"keep_alive_timeout_sec"`
+			IdleTimeoutSec           int               `json:"idle_timeout_sec"`
+			TLSHandshakeTimeoutSec   int               `json:"tls_handshake_timeout_sec"`
+			ExpectContinueTimeoutSec int               `json:"expect_continue_timeout_sec"`
+			HealthCheckTimeoutSec    int               `json:"health_check_timeout_sec"`
+			UpstreamRequestHeaders   map[string]string `json:"upstream_request_headers"`
+			ResponseHeaders          map[string]string `json:"response_headers"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "invalid JSON", http.StatusBadRequest)
 			return
 		}
+
+		req.UpstreamRequestHeaders = sanitizeHeaderMap(req.UpstreamRequestHeaders)
+		req.ResponseHeaders = sanitizeHeaderMap(req.ResponseHeaders)
 
 		if req.Domain == "" || req.Target == "" {
 			http.Error(w, "domain and target are required", http.StatusBadRequest)
@@ -436,6 +449,16 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 				s.config.Proxy.Rules[i].AuthUsers = req.AuthUsers
 				s.config.Proxy.Rules[i].AuthSessionTimeout = req.AuthSessionTimeout
 				s.config.Proxy.Rules[i].AuthCookieDomain = req.AuthCookieDomain
+
+				// 代理超时配置
+				s.config.Proxy.Rules[i].ConnectTimeoutSec = req.ConnectTimeoutSec
+				s.config.Proxy.Rules[i].KeepAliveTimeoutSec = req.KeepAliveTimeoutSec
+				s.config.Proxy.Rules[i].IdleTimeoutSec = req.IdleTimeoutSec
+				s.config.Proxy.Rules[i].TLSHandshakeTimeoutSec = req.TLSHandshakeTimeoutSec
+				s.config.Proxy.Rules[i].ExpectContinueTimeoutSec = req.ExpectContinueTimeoutSec
+				s.config.Proxy.Rules[i].HealthCheckTimeoutSec = req.HealthCheckTimeoutSec
+				s.config.Proxy.Rules[i].UpstreamRequestHeaders = req.UpstreamRequestHeaders
+				s.config.Proxy.Rules[i].ResponseHeaders = req.ResponseHeaders
 
 				// 保存配置
 				if err := s.config.Save(s.config.ConfigFile); err != nil {
