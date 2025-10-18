@@ -93,6 +93,7 @@ func (s *Server) handleAPISettings(w http.ResponseWriter, r *http.Request) {
 			"port":               s.config.Server.Port,
 			"access_log_enabled": s.config.Server.AccessLogEnabled,
 			"debug":              s.config.Server.Debug,
+			"log_level":          s.config.Server.LogLevel,
 		},
 		"ssl": map[string]interface{}{
 			"email":               s.config.SSL.Email,

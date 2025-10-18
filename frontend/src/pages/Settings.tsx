@@ -130,7 +130,7 @@ const Settings: React.FC = () => {
               
               // 日志设置
               enableAccessLog: config.server?.access_log_enabled || false,
-              logLevel: 'info', // 可以从配置中获取
+              logLevel: config.server?.log_level || 'info',
             }))
           }
         }
