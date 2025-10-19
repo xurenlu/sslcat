@@ -336,6 +336,42 @@ export interface Translation {
     createSlackWebhook: string
     supportDingtalk: string
     saving: string
+    portMode: string
+    standardMode: string
+    customMode: string
+    standardModeDesc: string
+    customModeDesc: string
+    standardModeFeatures: string
+    customModeFeatures: string
+    standardModeConfig: string
+    customModeConfig: string
+    httpPortLabel: string
+    httpsPortLabel: string
+    enableHttps: string
+    customPort: string
+    customPortLabel: string
+    customPortDesc: string
+    sslProvider: string
+    sslProviderLetsEncrypt: string
+    sslProviderCustom: string
+    sslProviderDesc: string
+    compressionSettings: string
+    compressionEnabled: string
+    compressionAlgorithms: string
+    compressionMinSize: string
+    compressionGzipLevel: string
+    compressionBrotliLevel: string
+    upstreamCacheSettings: string
+    upstreamCacheEnabled: string
+    upstreamCacheDir: string
+    upstreamCacheMaxSize: string
+    upstreamCacheDefaultTTL: string
+    upstreamCacheRespectUpstream: string
+    minNotificationLevel: string
+    notificationLevelInfo: string
+    notificationLevelWarning: string
+    notificationLevelError: string
+    notificationLevelCritical: string
   }
   
   // 侧边栏
@@ -2742,6 +2778,42 @@ export const jaJP: Translation = {
     createSlackWebhook: 'SlackでIncoming Webhookを作成してURLを取得',
     supportDingtalk: 'DingTalk、WeChat Workなどのwebhook通知をサポート',
     saving: '保存中...',
+    portMode: 'ポートモード',
+    standardMode: '標準モード（推奨）',
+    customMode: 'カスタムポート',
+    standardModeDesc: 'ポート80と443でリッスン、完全なHTTP/HTTPS機能をサポート',
+    customModeDesc: '単一のカスタムポートでリッスン、HTTPのみ',
+    standardModeFeatures: '✓ 自動SSL証明書申請と管理<br/>✓ HTTPからHTTPSへの自動リダイレクト<br/>✓ 本番環境に適している',
+    customModeFeatures: '⚠️ 自動SSL証明書申請なし<br/>⚠️ HTTPS機能なし<br/>⚠️ 開発環境またはイントラネット展開に適している',
+    standardModeConfig: '標準モード設定',
+    customModeConfig: 'カスタムポート設定',
+    httpPortLabel: 'HTTPポート：',
+    httpsPortLabel: 'HTTPSポート：',
+    enableHttps: 'HTTPSを有効にする',
+    customPort: 'カスタムポート',
+    customPortLabel: 'ポート番号',
+    customPortDesc: 'カスタムポートの説明',
+    sslProvider: 'SSLプロバイダー',
+    sslProviderLetsEncrypt: 'Let\'s Encrypt',
+    sslProviderCustom: 'カスタム',
+    sslProviderDesc: 'SSLプロバイダーの説明',
+    compressionSettings: '圧縮設定',
+    compressionEnabled: '圧縮を有効にする',
+    compressionAlgorithms: '圧縮アルゴリズム',
+    compressionMinSize: '最小圧縮サイズ',
+    compressionGzipLevel: 'Gzip圧縮レベル',
+    compressionBrotliLevel: 'Brotli圧縮レベル',
+    upstreamCacheSettings: 'アップストリームキャッシュ設定',
+    upstreamCacheEnabled: 'アップストリームキャッシュを有効にする',
+    upstreamCacheDir: 'キャッシュディレクトリ',
+    upstreamCacheMaxSize: '最大キャッシュサイズ',
+    upstreamCacheDefaultTTL: 'デフォルトTTL',
+    upstreamCacheRespectUpstream: 'アップストリームキャッシュヘッダーを尊重',
+    minNotificationLevel: '最小通知レベル',
+    notificationLevelInfo: '情報',
+    notificationLevelWarning: '警告',
+    notificationLevelError: 'エラー',
+    notificationLevelCritical: '重要',
   },
   sidebar: {
     sslProxyServer: 'AI強化セキュリティゲートウェイ',
@@ -3476,6 +3548,42 @@ export const esES: Translation = {
     createSlackWebhook: 'Crear Incoming Webhook en Slack para obtener URL',
     supportDingtalk: 'Soporte para DingTalk, WeChat Work y otras notificaciones webhook',
     saving: 'Guardando...',
+    portMode: 'Modo de Puerto',
+    standardMode: 'Modo Estándar (Recomendado)',
+    customMode: 'Puerto Personalizado',
+    standardModeDesc: 'Escuchar en puertos 80 y 443, soporte completo HTTP/HTTPS',
+    customModeDesc: 'Escuchar en un puerto personalizado único, solo HTTP',
+    standardModeFeatures: '✓ Aplicación y gestión automática de certificados SSL<br/>✓ Redirección automática HTTP a HTTPS<br/>✓ Adecuado para entorno de producción',
+    customModeFeatures: '⚠️ Sin aplicación automática de certificados SSL<br/>⚠️ Sin funcionalidad HTTPS<br/>⚠️ Adecuado para desarrollo o despliegue de intranet',
+    standardModeConfig: 'Configuración de Modo Estándar',
+    customModeConfig: 'Configuración de Puerto Personalizado',
+    httpPortLabel: 'Puerto HTTP:',
+    httpsPortLabel: 'Puerto HTTPS:',
+    enableHttps: 'Habilitar HTTPS',
+    customPort: 'Puerto Personalizado',
+    customPortLabel: 'Número de Puerto',
+    customPortDesc: 'Descripción del Puerto Personalizado',
+    sslProvider: 'Proveedor SSL',
+    sslProviderLetsEncrypt: 'Let\'s Encrypt',
+    sslProviderCustom: 'Personalizado',
+    sslProviderDesc: 'Descripción del Proveedor SSL',
+    compressionSettings: 'Configuración de Compresión',
+    compressionEnabled: 'Habilitar Compresión',
+    compressionAlgorithms: 'Algoritmos de Compresión',
+    compressionMinSize: 'Tamaño Mínimo de Compresión',
+    compressionGzipLevel: 'Nivel de Compresión Gzip',
+    compressionBrotliLevel: 'Nivel de Compresión Brotli',
+    upstreamCacheSettings: 'Configuración de Caché Upstream',
+    upstreamCacheEnabled: 'Habilitar Caché Upstream',
+    upstreamCacheDir: 'Directorio de Caché',
+    upstreamCacheMaxSize: 'Tamaño Máximo de Caché',
+    upstreamCacheDefaultTTL: 'TTL Predeterminado',
+    upstreamCacheRespectUpstream: 'Respetar Cabeceras de Caché Upstream',
+    minNotificationLevel: 'Nivel Mínimo de Notificación',
+    notificationLevelInfo: 'Información',
+    notificationLevelWarning: 'Advertencia',
+    notificationLevelError: 'Error',
+    notificationLevelCritical: 'Crítico',
   },
   sidebar: {
     sslProxyServer: 'Puerta de Enlace de Seguridad Mejorada con IA',
