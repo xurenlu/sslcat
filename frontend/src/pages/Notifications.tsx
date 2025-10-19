@@ -41,6 +41,7 @@ import {
   FiSend,
 } from 'react-icons/fi'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
+import { useTranslation } from '../hooks/useLanguage'
 
 interface NotificationItem {
   id: string
@@ -72,6 +73,7 @@ const Notifications: React.FC = () => {
   const { isOpen, onOpen, onClose } = useDisclosure()
   const toast = useToast()
   const { adminPrefix } = useConfig()
+  const t = useTranslation()
 
   const [testForm, setTestForm] = useState({
     type: 'ddos_attack',
