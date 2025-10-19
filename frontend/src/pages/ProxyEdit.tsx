@@ -848,6 +848,8 @@ const ProxyEdit: React.FC = () => {
                   </VStack>
                 </Box>
 
+                <Divider />
+
                 {/* 代理超时配置 */}
                 <Box>
                   <Heading size="md" mb={4}>
