@@ -34,22 +34,22 @@ type Config struct {
 	Enabled bool `json:"enabled"`
 
 	// 格式转换
-	AutoWebP     bool `json:"auto_webp"`      // 自动转换为 WebP
-	WebPQuality  int  `json:"webp_quality"`   // WebP 质量 (0-100)
-	JPEGQuality  int  `json:"jpeg_quality"`   // JPEG 质量 (0-100)
-	PNGLevel     int  `json:"png_level"`      // PNG 压缩级别 (0-9)
+	AutoWebP      bool `json:"auto_webp"`      // 自动转换为 WebP
+	WebPQuality   int  `json:"webp_quality"`   // WebP 质量 (0-100)
+	JPEGQuality   int  `json:"jpeg_quality"`   // JPEG 质量 (0-100)
+	PNGLevel      int  `json:"png_level"`      // PNG 压缩级别 (0-9)
 	StripMetadata bool `json:"strip_metadata"` // 移除 EXIF 元数据
 
 	// 尺寸调整
-	AllowResize  bool  `json:"allow_resize"`   // 允许尺寸调整
-	MaxWidth     int   `json:"max_width"`      // 最大宽度
-	MaxHeight    int   `json:"max_height"`     // 最大高度
-	AllowedSizes []int `json:"allowed_sizes"`  // 允许的尺寸列表
+	AllowResize  bool  `json:"allow_resize"`  // 允许尺寸调整
+	MaxWidth     int   `json:"max_width"`     // 最大宽度
+	MaxHeight    int   `json:"max_height"`    // 最大高度
+	AllowedSizes []int `json:"allowed_sizes"` // 允许的尺寸列表
 
 	// 缓存
-	CacheEnabled bool   `json:"cache_enabled"` // 启用缓存
-	CacheTTL     int    `json:"cache_ttl"`     // 缓存TTL（秒）
-	MaxCacheSize int64  `json:"max_cache_size"` // 最大缓存大小（字节）
+	CacheEnabled bool  `json:"cache_enabled"`  // 启用缓存
+	CacheTTL     int   `json:"cache_ttl"`      // 缓存TTL（秒）
+	MaxCacheSize int64 `json:"max_cache_size"` // 最大缓存大小（字节）
 
 	// 过滤器
 	IncludePatterns []string `json:"include_patterns"` // 包含的路径模式
@@ -59,19 +59,19 @@ type Config struct {
 // DefaultConfig 默认配置
 func DefaultConfig() *Config {
 	return &Config{
-		Enabled:      false,
-		AutoWebP:     true,
-		WebPQuality:  80,
-		JPEGQuality:  85,
-		PNGLevel:     6,
-		StripMetadata: true,
-		AllowResize:  true,
-		MaxWidth:     2000,
-		MaxHeight:    2000,
-		AllowedSizes: []int{100, 200, 400, 800, 1200, 1600},
-		CacheEnabled: true,
-		CacheTTL:     86400, // 24小时
-		MaxCacheSize: 1024 * 1024 * 1024, // 1GB
+		Enabled:         false,
+		AutoWebP:        true,
+		WebPQuality:     80,
+		JPEGQuality:     85,
+		PNGLevel:        6,
+		StripMetadata:   true,
+		AllowResize:     true,
+		MaxWidth:        2000,
+		MaxHeight:       2000,
+		AllowedSizes:    []int{100, 200, 400, 800, 1200, 1600},
+		CacheEnabled:    true,
+		CacheTTL:        86400,              // 24小时
+		MaxCacheSize:    1024 * 1024 * 1024, // 1GB
 		IncludePatterns: []string{"*.jpg", "*.jpeg", "*.png", "*.gif"},
 		ExcludePatterns: []string{"/admin/*", "/api/*"},
 	}
@@ -95,11 +95,11 @@ type Optimizer struct {
 	log    *logrus.Entry
 
 	// 统计
-	totalRequests    int64
-	cacheHits        int64
-	cacheMisses      int64
-	totalBytesSaved  int64
-	totalOriginalSize int64
+	totalRequests      int64
+	cacheHits          int64
+	cacheMisses        int64
+	totalBytesSaved    int64
+	totalOriginalSize  int64
 	totalOptimizedSize int64
 }
 
@@ -233,11 +233,11 @@ func (o *Optimizer) OptimizeResponse(originalData []byte, contentType string, r 
 
 // OptimizeParams 优化参数
 type OptimizeParams struct {
-	Width    int
-	Height   int
-	Quality  int
-	Format   ImageFormat
-	Scale    float64
+	Width   int
+	Height  int
+	Quality int
+	Format  ImageFormat
+	Scale   float64
 }
 
 // parseParams 解析请求参数
@@ -287,17 +287,79 @@ func (o *Optimizer) parseParams(r *http.Request) *OptimizeParams {
 	// 解析格式
 	if f := r.URL.Query().Get("format"); f != "" {
 		params.Format = ImageFormat(strings.ToLower(f))
-	} else if o.Config.AutoWebP && supportsWebP(r) {
-		params.Format = FormatWebP
+	} else if o.Config.AutoWebP {
+		// 智能WebP转换：检测浏览器支持，不支持的保持原格式
+		if o.supportsWebP(r) {
+			params.Format = FormatWebP
+		}
+		// 如果不支持WebP，params.Format保持为空，使用原格式
 	}
 
 	return params
 }
 
 // supportsWebP 检查客户端是否支持 WebP
-func supportsWebP(r *http.Request) bool {
+func (o *Optimizer) supportsWebP(r *http.Request) bool {
+	// 1. 检查Accept头是否明确支持WebP
 	accept := r.Header.Get("Accept")
-	return strings.Contains(accept, "image/webp")
+	if strings.Contains(accept, "image/webp") {
+		return true
+	}
+
+	// 2. 检查User-Agent，识别已知支持WebP的浏览器
+	userAgent := r.Header.Get("User-Agent")
+	if userAgent == "" {
+		// 没有User-Agent，可能是API调用，默认支持
+		return true
+	}
+
+	userAgentLower := strings.ToLower(userAgent)
+
+	// Chrome 32+ (2014年)
+	if strings.Contains(userAgentLower, "chrome/") && !strings.Contains(userAgentLower, "edg/") {
+		return true
+	}
+
+	// Firefox 65+ (2019年)
+	if strings.Contains(userAgentLower, "firefox/") {
+		return true
+	}
+
+	// Safari 14+ (2020年) - 需要更精确的版本检测
+	if strings.Contains(userAgentLower, "safari/") && !strings.Contains(userAgentLower, "chrome/") {
+		// Safari 14+ 支持WebP，但版本检测比较复杂
+		// 简化处理：假设现代Safari都支持
+		return true
+	}
+
+	// Edge 18+ (2018年)
+	if strings.Contains(userAgentLower, "edg/") {
+		return true
+	}
+
+	// Opera 19+ (2014年)
+	if strings.Contains(userAgentLower, "opera/") || strings.Contains(userAgentLower, "opr/") {
+		return true
+	}
+
+	// 移动端浏览器
+	if strings.Contains(userAgentLower, "android") && strings.Contains(userAgentLower, "chrome/") {
+		return true
+	}
+
+	// 如果Accept头包含*/*，且是已知的现代浏览器，默认支持
+	if strings.Contains(accept, "*/*") {
+		// 检查是否是现代浏览器
+		if strings.Contains(userAgentLower, "chrome/") ||
+			strings.Contains(userAgentLower, "firefox/") ||
+			strings.Contains(userAgentLower, "safari/") ||
+			strings.Contains(userAgentLower, "edg/") {
+			return true
+		}
+	}
+
+	// 默认不支持（保守策略）
+	return false
 }
 
 // detectFormat 检测图片格式
@@ -567,7 +629,7 @@ func (o *Optimizer) buildCacheKey(r *http.Request, format ImageFormat) string {
 	}
 	if f := r.URL.Query().Get("format"); f != "" {
 		key += "_f" + f
-	} else if o.Config.AutoWebP && supportsWebP(r) {
+	} else if o.Config.AutoWebP && o.supportsWebP(r) {
 		key += "_f_webp"
 	}
 	return key
@@ -705,19 +767,19 @@ func (o *Optimizer) GetStats() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"enabled":            o.Config.Enabled,
-		"total_requests":     o.totalRequests,
-		"cache_hits":         o.cacheHits,
-		"cache_misses":       o.cacheMisses,
-		"cache_hit_rate":     hitRate,
-		"cache_items":        len(o.cache),
-		"cache_size_bytes":   cacheSize,
-		"cache_size_mb":      float64(cacheSize) / 1024 / 1024,
-		"total_bytes_saved":  o.totalBytesSaved,
+		"enabled":              o.Config.Enabled,
+		"total_requests":       o.totalRequests,
+		"cache_hits":           o.cacheHits,
+		"cache_misses":         o.cacheMisses,
+		"cache_hit_rate":       hitRate,
+		"cache_items":          len(o.cache),
+		"cache_size_bytes":     cacheSize,
+		"cache_size_mb":        float64(cacheSize) / 1024 / 1024,
+		"total_bytes_saved":    o.totalBytesSaved,
 		"total_bytes_saved_mb": float64(o.totalBytesSaved) / 1024 / 1024,
-		"compression_rate":   compressionRate,
-		"original_size_mb":   float64(o.totalOriginalSize) / 1024 / 1024,
-		"optimized_size_mb":  float64(o.totalOptimizedSize) / 1024 / 1024,
+		"compression_rate":     compressionRate,
+		"original_size_mb":     float64(o.totalOriginalSize) / 1024 / 1024,
+		"optimized_size_mb":    float64(o.totalOptimizedSize) / 1024 / 1024,
 	}
 }
 
@@ -738,4 +800,3 @@ func (o *Optimizer) UpdateConfig(config *Config) {
 	o.Config = config
 	o.log.Info("Image optimizer config updated")
 }
-
