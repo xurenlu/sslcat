@@ -30,8 +30,8 @@ RUN apk --no-cache add ca-certificates tzdata certbot
 # 创建用户和目录
 RUN addgroup -g 1000 sslcat && \
     adduser -D -s /bin/false -u 1000 -G sslcat sslcat && \
-    mkdir -p /etc/sslcat /var/lib/sslcat/{certs,keys,logs} && \
-    chown -R sslcat:sslcat /var/lib/sslcat
+    mkdir -p /etc/sslcat /opt/sslcat/{certs,keys,logs} && \
+    chown -R sslcat:sslcat /opt/sslcat
 
 # 设置时区
 ENV TZ=Asia/Shanghai

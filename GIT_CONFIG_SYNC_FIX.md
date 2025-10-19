@@ -127,7 +127,7 @@ sudo journalctl -u sslcat -f | grep git
   "runners": {
     "git": {
       "enabled": true,  // ← 这个值现在会被同步更新
-      "repos_dir": "/var/lib/sslcat/repos",
+      "repos_dir": "/opt/sslcat/repos",
       "max_concurrent": 5,
       "clone_timeout": 300,
       "auto_cleanup": true,

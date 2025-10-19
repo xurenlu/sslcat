@@ -104,8 +104,8 @@ GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o withssl main.go
 ```bash
 # 创建用户和目录
 sudo useradd -r -s /bin/false withssl
-sudo mkdir -p /etc/sslcat /var/lib/sslcat/{certs,keys,logs}
-sudo chown -R withssl:withssl /var/lib/sslcat
+sudo mkdir -p /etc/sslcat /opt/sslcat/{certs,keys,logs}
+sudo chown -R withssl:withssl /opt/sslcat
 ```
 
 ### 步骤 3: 上传文件
@@ -193,11 +193,11 @@ file /opt/sslcat/withssl
 
 ```bash
 # 检查目录权限
-ls -la /var/lib/sslcat
+ls -la /opt/sslcat
 ls -la /etc/sslcat
 
 # 修复权限
-sudo chown -R withssl:withssl /var/lib/sslcat
+sudo chown -R withssl:withssl /opt/sslcat
 sudo chown withssl:withssl /etc/sslcat/withssl.conf
 ```
 
@@ -271,7 +271,7 @@ sysctl -p
 ```bash
 # 设置日志轮转
 cat > /etc/logrotate.d/withssl << 'EOF'
-/var/lib/sslcat/logs/*.log {
+/opt/sslcat/logs/*.log {
     daily
     rotate 30
     compress
@@ -289,8 +289,8 @@ EOF
 # 备份配置和证书
 tar -czf withssl-backup-$(date +%Y%m%d).tar.gz \
     /etc/sslcat/ \
-    /var/lib/sslcat/certs/ \
-    /var/lib/sslcat/keys/
+    /opt/sslcat/certs/ \
+    /opt/sslcat/keys/
 ```
 
 ## 🎯 总结

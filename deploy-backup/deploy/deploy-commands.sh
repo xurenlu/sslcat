@@ -6,8 +6,8 @@ set -e
 
 echo "📁 创建目录和用户..."
 useradd -r -s /bin/false sslcat || true
-mkdir -p /etc/sslcat /var/lib/sslcat/{certs,keys,logs,data}
-chown -R sslcat:sslcat /var/lib/sslcat
+mkdir -p /etc/sslcat /opt/sslcat/{certs,keys,logs,data}
+chown -R sslcat:sslcat /opt/sslcat
 
 echo "🛑 停止旧服务..."
 systemctl stop sslcat || true

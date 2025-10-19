@@ -143,13 +143,13 @@ create_user_and_dirs() {
     
     # 创建目录
     mkdir -p /etc/sslcat
-    mkdir -p /var/lib/sslcat/{certs,keys,logs}
+    mkdir -p /opt/sslcat/{certs,keys,logs}
     mkdir -p /opt/sslcat
     
     # 设置权限
-    chown -R sslcat:sslcat /var/lib/sslcat
+    chown -R sslcat:sslcat /opt/sslcat
     chmod 755 /etc/sslcat
-    chmod 700 /var/lib/sslcat
+    chmod 700 /opt/sslcat
     
     log_success "目录创建完成"
 }
@@ -208,7 +208,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/sslcat /etc/sslcat /opt/sslcat
+ReadWritePaths=/opt/sslcat /etc/sslcat /opt/sslcat
 
 # 环境变量
 Environment=GOPATH=/opt/go
@@ -238,8 +238,8 @@ ssl:
   email: ""
   staging: false
   domains: []
-  cert_dir: "/var/lib/sslcat/certs"
-  key_dir: "/var/lib/sslcat/keys"
+  cert_dir: "/opt/sslcat/certs"
+  key_dir: "/opt/sslcat/keys"
   auto_renew: true
 
 admin:
@@ -254,7 +254,7 @@ security:
   max_attempts: 3
   block_duration: "1m"
   max_attempts_5min: 10
-  block_file: "/var/lib/sslcat/withssl.block"
+  block_file: "/opt/sslcat/withssl.block"
   allowed_user_agents:
     - "Mozilla/"
     - "Chrome/"
@@ -336,8 +336,8 @@ show_install_info() {
     echo "默认密码: admin*9527"
     echo
     echo "配置文件: /etc/sslcat/sslcat.conf"
-    echo "证书目录: /var/lib/sslcat/certs"
-    echo "密钥目录: /var/lib/sslcat/keys"
+    echo "证书目录: /opt/sslcat/certs"
+    echo "密钥目录: /opt/sslcat/keys"
     echo
     echo "首次登录后请立即修改默认密码！"
     echo "=========================================="

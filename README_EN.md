@@ -139,8 +139,8 @@ go build -o sslcat main.go
 4. **Create User and Directories**
 ```bash
 sudo useradd -r -s /bin/false sslcat
-sudo mkdir -p /etc/sslcat /var/lib/sslcat/{certs,keys,logs}
-sudo chown -R sslcat:sslcat /var/lib/sslcat
+sudo mkdir -p /etc/sslcat /opt/sslcat/{certs,keys,logs}
+sudo chown -R sslcat:sslcat /opt/sslcat
 ```
 
 5. **Configure and Start**
@@ -156,9 +156,9 @@ sudo systemctl start sslcat
 
 ### Configuration File Location
 - Main config file: `/etc/sslcat/sslcat.conf`
-- Certificate directory: `/var/lib/sslcat/certs`
-- Key directory: `/var/lib/sslcat/keys`
-- Log directory: `/var/lib/sslcat/logs`
+- Certificate directory: `/opt/sslcat/certs`
+- Key directory: `/opt/sslcat/keys`
+- Log directory: `/opt/sslcat/logs`
 
 ### Basic Configuration
 
@@ -335,8 +335,8 @@ SSLcat automatically obtains SSL certificates for configured domains without man
 Certificates are automatically renewed 30 days before expiration, or can be manually triggered.
 
 ### Certificate Storage
-- Certificate file: `/var/lib/sslcat/certs/domain.crt`
-- Private key file: `/var/lib/sslcat/keys/domain.key`
+- Certificate file: `/opt/sslcat/certs/domain.crt`
+- Private key file: `/opt/sslcat/keys/domain.key`
 
 ## Security Features
 
@@ -354,7 +354,7 @@ Certificates are automatically renewed 30 days before expiration, or can be manu
 ### Unblock IPs
 ```bash
 # Delete blocking file and restart service
-sudo rm /var/lib/sslcat/sslcat.block
+sudo rm /opt/sslcat/sslcat.block
 sudo systemctl restart sslcat
 ```
 

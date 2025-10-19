@@ -135,8 +135,8 @@ go build -o sslcat main.go
 4. **Создать Пользователя и Директории**
 ```bash
 sudo useradd -r -s /bin/false sslcat
-sudo mkdir -p /etc/sslcat /var/lib/sslcat/{certs,keys,logs}
-sudo chown -R sslcat:sslcat /var/lib/sslcat
+sudo mkdir -p /etc/sslcat /opt/sslcat/{certs,keys,logs}
+sudo chown -R sslcat:sslcat /opt/sslcat
 ```
 
 5. **Настроить и Запустить**
@@ -152,9 +152,9 @@ sudo systemctl start sslcat
 
 ### Расположение Файла Конфигурации
 - Основной файл конфигурации: `/etc/sslcat/sslcat.conf`
-- Директория сертификатов: `/var/lib/sslcat/certs`
-- Директория ключей: `/var/lib/sslcat/keys`
-- Директория логов: `/var/lib/sslcat/logs`
+- Директория сертификатов: `/opt/sslcat/certs`
+- Директория ключей: `/opt/sslcat/keys`
+- Директория логов: `/opt/sslcat/logs`
 
 ### Базовая Конфигурация
 
@@ -331,8 +331,8 @@ SSLcat автоматически получает SSL сертификаты д
 Сертификаты автоматически обновляются за 30 дней до истечения срока, или могут быть запущены вручную.
 
 ### Хранение Сертификатов
-- Файл сертификата: `/var/lib/sslcat/certs/domain.crt`
-- Файл приватного ключа: `/var/lib/sslcat/keys/domain.key`
+- Файл сертификата: `/opt/sslcat/certs/domain.crt`
+- Файл приватного ключа: `/opt/sslcat/keys/domain.key`
 
 ## Функции Безопасности
 
@@ -350,7 +350,7 @@ SSLcat автоматически получает SSL сертификаты д
 ### Разблокировка IP
 ```bash
 # Удалить файл блокировки и перезапустить сервис
-sudo rm /var/lib/sslcat/sslcat.block
+sudo rm /opt/sslcat/sslcat.block
 sudo systemctl restart sslcat
 ```
 

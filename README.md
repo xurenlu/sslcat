@@ -183,8 +183,8 @@ go build -o sslcat main.go
 4. **创建用户和目录**
 ```bash
 sudo useradd -r -s /bin/false sslcat
-sudo mkdir -p /etc/sslcat /var/lib/sslcat/{certs,keys,logs}
-sudo chown -R sslcat:sslcat /var/lib/sslcat
+sudo mkdir -p /etc/sslcat /opt/sslcat/{certs,keys,logs}
+sudo chown -R sslcat:sslcat /opt/sslcat
 ```
 
 5. **配置和启动**
@@ -200,9 +200,9 @@ sudo systemctl start sslcat
 
 ### 配置文件位置
 - 主配置文件: `/etc/sslcat/sslcat.conf`
-- 证书目录: `/var/lib/sslcat/certs`
-- 密钥目录: `/var/lib/sslcat/keys`
-- 日志目录: `/var/lib/sslcat/logs`
+- 证书目录: `/opt/sslcat/certs`
+- 密钥目录: `/opt/sslcat/keys`
+- 日志目录: `/opt/sslcat/logs`
 
 ### 基本配置
 
@@ -409,8 +409,8 @@ SSLcat 会自动为配置的域名获取 SSL 证书，无需手动操作。
 证书会在到期前30天自动续期，也可以手动触发续期。
 
 ### 证书存储
-- 证书文件: `/var/lib/sslcat/certs/domain.crt`
-- 私钥文件: `/var/lib/sslcat/keys/domain.key`
+- 证书文件: `/opt/sslcat/certs/domain.crt`
+- 私钥文件: `/opt/sslcat/keys/domain.key`
 
 ## 安全功能
 
@@ -428,7 +428,7 @@ SSLcat 会自动为配置的域名获取 SSL 证书，无需手动操作。
 ### 解除封禁
 ```bash
 # 删除封禁文件重启服务
-sudo rm /var/lib/sslcat/sslcat.block
+sudo rm /opt/sslcat/sslcat.block
 sudo systemctl restart sslcat
 ```
 

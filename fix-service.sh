@@ -80,7 +80,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/sslcat /etc/sslcat /opt/sslcat
+ReadWritePaths=/opt/sslcat /etc/sslcat /opt/sslcat
 
 # 环境变量
 Environment=GOPATH=/opt/go
@@ -124,13 +124,13 @@ fi
 
 # 检查目录权限
 log_info "检查和修复目录权限..."
-mkdir -p /var/lib/sslcat
-chown -R withssl:withssl /var/lib/sslcat
+mkdir -p /opt/sslcat
+chown -R withssl:withssl /opt/sslcat
 chown -R withssl:withssl /etc/sslcat
 chown -R withssl:withssl /opt/sslcat
 chmod 755 /opt/sslcat
 chmod 755 /etc/sslcat
-chmod 755 /var/lib/sslcat
+chmod 755 /opt/sslcat
 
 # 启动服务
 log_info "启动SSLcat服务..."
@@ -153,7 +153,7 @@ if systemctl is-active --quiet withssl; then
     echo "✅ 修复了systemd服务文件路径问题"
     echo "✅ 配置文件路径: /etc/sslcat/withssl.conf"
     echo "✅ 二进制文件路径: /opt/sslcat/withssl"
-    echo "✅ 数据目录: /var/lib/sslcat"
+    echo "✅ 数据目录: /opt/sslcat"
     echo "✅ 修复了文件权限"
     echo ""
     echo "🔍 服务状态："

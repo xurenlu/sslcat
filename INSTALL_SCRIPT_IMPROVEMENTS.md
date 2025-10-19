@@ -81,7 +81,7 @@ curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/scripts/install
   "runners": {
     "git": {
       "enabled": true,
-      "repos_dir": "/var/lib/sslcat/runners/git",
+      "repos_dir": "/opt/sslcat/runners/git",
       "max_concurrent": 3,
       "clone_timeout": 300,
       "auto_cleanup": true,

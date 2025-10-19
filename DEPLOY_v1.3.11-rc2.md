@@ -107,7 +107,7 @@ go build -tags="netgo,sqlite_omit_load_extension" \
 - **用户**: rocky
 - **部署目录**: /opt/sslcat
 - **配置文件**: /etc/sslcat/sslcat.conf
-- **数据目录**: /var/lib/sslcat
+- **数据目录**: /opt/sslcat
 - **日志**: journalctl -u sslcat
 
 ### 文件位置
@@ -127,7 +127,7 @@ go build -tags="netgo,sqlite_omit_load_extension" \
 /etc/sslcat/
 └── sslcat.conf         # 主配置文件
 
-/var/lib/sslcat/
+/opt/sslcat/
 ├── certs/              # SSL 证书
 ├── keys/               # SSL 私钥
 ├── acme-cache/         # ACME 缓存
@@ -181,7 +181,7 @@ ssh rocky@shifen.de 'sudo journalctl -u sslcat -n 100'
 ssh rocky@shifen.de 'sudo journalctl -u sslcat -p err -n 50'
 
 # 查看访问日志
-ssh rocky@shifen.de 'sudo tail -f /var/lib/sslcat/data/access.log'
+ssh rocky@shifen.de 'sudo tail -f /opt/sslcat/data/access.log'
 ```
 
 ---
@@ -262,7 +262,7 @@ curl -X POST https://shifen.de/sslcat-panel/api/threatintel/iocs/add \
 
 #### 3. 查看攻击日志
 ```bash
-ssh rocky@shifen.de 'sudo tail -f /var/lib/sslcat/ddos/attacks.jsonl'
+ssh rocky@shifen.de 'sudo tail -f /opt/sslcat/ddos/attacks.jsonl'
 ```
 
 ---

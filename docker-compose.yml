@@ -15,7 +15,7 @@ services:
       TZ: Asia/Shanghai
     volumes:
       - ./docker/config/sslcat.conf:/etc/sslcat/sslcat.conf:ro
-      - ./docker/data:/var/lib/sslcat
+      - ./docker/data:/opt/sslcat
     networks:
       - sslcat-network
     healthcheck:

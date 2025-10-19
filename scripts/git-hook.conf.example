@@ -20,5 +20,5 @@ export SSLCAT_REPOS_DIR="/opt/sslcat/data/runners/git"
 # export SSLCAT_API_URL="http://localhost:9942/sslcat-panel2"
 
 # 如果您的仓库目录在其他位置：
-# export SSLCAT_REPOS_DIR="/var/lib/sslcat/git"
+# export SSLCAT_REPOS_DIR="/opt/sslcat/git"
 

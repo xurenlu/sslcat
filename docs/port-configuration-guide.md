@@ -196,8 +196,8 @@ sslcat --config sslcat.conf --port 8080
 #### 3. SSL 证书问题
 ```bash
 # 检查证书目录
-ls -la /var/lib/sslcat/certs/
-ls -la /var/lib/sslcat/keys/
+ls -la /opt/sslcat/certs/
+ls -la /opt/sslcat/keys/
 
 # 查看证书状态
 sslcat --config sslcat.conf --test

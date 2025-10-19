@@ -135,8 +135,8 @@ go build -o sslcat main.go
 4. **Créer Utilisateur et Répertoires**
 ```bash
 sudo useradd -r -s /bin/false sslcat
-sudo mkdir -p /etc/sslcat /var/lib/sslcat/{certs,keys,logs}
-sudo chown -R sslcat:sslcat /var/lib/sslcat
+sudo mkdir -p /etc/sslcat /opt/sslcat/{certs,keys,logs}
+sudo chown -R sslcat:sslcat /opt/sslcat
 ```
 
 5. **Configurer et Démarrer**
@@ -152,9 +152,9 @@ sudo systemctl start sslcat
 
 ### Emplacement du Fichier de Configuration
 - Fichier de configuration principal : `/etc/sslcat/sslcat.conf`
-- Répertoire des certificats : `/var/lib/sslcat/certs`
-- Répertoire des clés : `/var/lib/sslcat/keys`
-- Répertoire des logs : `/var/lib/sslcat/logs`
+- Répertoire des certificats : `/opt/sslcat/certs`
+- Répertoire des clés : `/opt/sslcat/keys`
+- Répertoire des logs : `/opt/sslcat/logs`
 
 ### Configuration de Base
 
@@ -331,8 +331,8 @@ SSLcat obtient automatiquement les certificats SSL pour les domaines configurés
 Les certificats sont automatiquement renouvelés 30 jours avant l'expiration, ou peuvent être déclenchés manuellement.
 
 ### Stockage de Certificats
-- Fichier de certificat : `/var/lib/sslcat/certs/domain.crt`
-- Fichier de clé privée : `/var/lib/sslcat/keys/domain.key`
+- Fichier de certificat : `/opt/sslcat/certs/domain.crt`
+- Fichier de clé privée : `/opt/sslcat/keys/domain.key`
 
 ## Fonctions de Sécurité
 
@@ -350,7 +350,7 @@ Les certificats sont automatiquement renouvelés 30 jours avant l'expiration, ou
 ### Débloquer les IPs
 ```bash
 # Supprimer le fichier de blocage et redémarrer le service
-sudo rm /var/lib/sslcat/sslcat.block
+sudo rm /opt/sslcat/sslcat.block
 sudo systemctl restart sslcat
 ```
 

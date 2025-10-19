@@ -300,7 +300,7 @@ curl -H "X-Forwarded-For: 192.168.1.100" \
 
 ```bash
 # 查看 DDoS 日志
-tail -f /var/lib/sslcat/ddos/attacks.jsonl
+tail -f /opt/sslcat/ddos/attacks.jsonl
 
 # 应该看到类似的记录：
 {

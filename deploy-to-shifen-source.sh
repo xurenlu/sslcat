@@ -313,7 +313,7 @@ StandardError=journal
 # 安全设置
 PrivateTmp=true
 ProtectHome=false
-ReadWritePaths=/var/lib/sslcat /etc/sslcat /opt/sslcat /home/git/
+ReadWritePaths=/opt/sslcat /etc/sslcat /opt/sslcat /home/git/
 
 # 资源限制
 LimitNOFILE=65536

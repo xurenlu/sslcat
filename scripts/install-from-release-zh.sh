@@ -345,7 +345,7 @@ install_git_hook() {
 export SSLCAT_API_URL="http://localhost:80/sslcat-panel"
 
 # Git 仓库存储目录
-export SSLCAT_REPOS_DIR="/var/lib/sslcat/runners/git"
+export SSLCAT_REPOS_DIR="/opt/sslcat/runners/git"
 EOF
   
   echo "[sslcat] git hook wrapper 脚本安装成功"
@@ -356,7 +356,7 @@ EOF
 install_git_hook
 
 # Linux: 安装到 /opt/sslcat 并写入 systemd 与默认配置
-sudo mkdir -p "$DEST_LINUX" /var/lib/sslcat/{certs,keys,logs} /etc/sslcat
+sudo mkdir -p "$DEST_LINUX" /opt/sslcat/{certs,keys,logs} /etc/sslcat
 tar -xzf "$TMP/pkg${EXT}" -C "$TMP"
 sudo install -m 0755 "$TMP/sslcat" "$DEST_LINUX/sslcat"
 
@@ -369,7 +369,7 @@ if [[ ! -f "$CONF_LINUX" ]]; then
     "debug": false,
     "access_log_enabled": true,
     "access_log_format": "nginx",
-    "access_log_path": "/var/lib/sslcat/logs/access.log",
+    "access_log_path": "/opt/sslcat/logs/access.log",
     "access_log_max_size": 104857600,
     "access_log_max_files": 10,
     "read_timeout_sec": 1800,
@@ -381,17 +381,17 @@ if [[ ! -f "$CONF_LINUX" ]]; then
     "email": "",
     "staging": false,
     "domains": [],
-    "cert_dir": "/var/lib/sslcat/certs",
-    "key_dir": "/var/lib/sslcat/keys",
+    "cert_dir": "/opt/sslcat/certs",
+    "key_dir": "/opt/sslcat/keys",
     "auto_renew": true,
     "disable_self_signed": false
   },
   "admin": {
     "username": "admin",
     "first_run": true,
-    "password_file": "/var/lib/sslcat/admin.pass",
+    "password_file": "/opt/sslcat/admin.pass",
     "enable_totp": false,
-    "totp_secret_file": "/var/lib/sslcat/admin.totp"
+    "totp_secret_file": "/opt/sslcat/admin.totp"
   },
   "proxy": {
     "rules": [],
@@ -402,7 +402,7 @@ if [[ ! -f "$CONF_LINUX" ]]; then
     "max_attempts": 3,
     "block_duration": "0s",
     "max_attempts_5min": 10,
-    "block_file": "/var/lib/sslcat/withssl.block",
+    "block_file": "/opt/sslcat/withssl.block",
     "allowed_user_agents": [
       "Mozilla/",
       "Chrome/",
@@ -423,7 +423,7 @@ if [[ ! -f "$CONF_LINUX" ]]; then
   },
   "cdn_cache": {
     "enabled": false,
-    "cache_dir": "/var/lib/sslcat/cache/static",
+    "cache_dir": "/opt/sslcat/cache/static",
     "max_size_bytes": 5368709120,
     "default_ttl_seconds": 3600,
     "clean_interval_seconds": 60,
@@ -474,7 +474,7 @@ if [[ ! -f "$CONF_LINUX" ]]; then
   "runners": {
     "git": {
       "enabled": true,
-      "repos_dir": "/var/lib/sslcat/runners/git",
+      "repos_dir": "/opt/sslcat/runners/git",
       "max_concurrent": 3,
       "clone_timeout": 300,
       "auto_cleanup": true,
@@ -498,7 +498,7 @@ Restart=always
 RestartSec=3
 User=root
 ProtectHome=false
-ReadWritePaths=/var/lib/sslcat /etc/sslcat /opt/sslcat /home/git/
+ReadWritePaths=/opt/sslcat /etc/sslcat /opt/sslcat /home/git/
 
 [Install]
 WantedBy=multi-user.target

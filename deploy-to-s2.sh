@@ -62,7 +62,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=false
-ReadWritePaths=/var/lib/sslcat /etc/sslcat $TARGET_DIR /home/git
+ReadWritePaths=/opt/sslcat /etc/sslcat $TARGET_DIR /home/git
 
 [Install]
 WantedBy=multi-user.target
@@ -78,8 +78,8 @@ set -e
 
 echo "📁 创建目录和用户..."
 sudo useradd -r -s /bin/false sslcat 2>/dev/null || true
-sudo mkdir -p /etc/sslcat /var/lib/sslcat/{certs,keys,logs,data,repos} /opt/sslcat
-sudo chown -R sslcat:sslcat /var/lib/sslcat
+sudo mkdir -p /etc/sslcat /opt/sslcat/{certs,keys,logs,data,repos} /opt/sslcat
+sudo chown -R sslcat:sslcat /opt/sslcat
 
 echo "📁 创建 Git 用户..."
 # 查找 git-shell 路径

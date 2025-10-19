@@ -161,8 +161,8 @@ go build -o sslcat main.go
 4. **Crear Usuario y Directorios**
 ```bash
 sudo useradd -r -s /bin/false sslcat
-sudo mkdir -p /etc/sslcat /var/lib/sslcat/{certs,keys,logs}
-sudo chown -R sslcat:sslcat /var/lib/sslcat
+sudo mkdir -p /etc/sslcat /opt/sslcat/{certs,keys,logs}
+sudo chown -R sslcat:sslcat /opt/sslcat
 ```
 
 5. **Configurar e Iniciar**
@@ -178,9 +178,9 @@ sudo systemctl start sslcat
 
 ### Ubicación del Archivo de Configuración
 - Archivo de configuración principal: `/etc/sslcat/sslcat.conf`
-- Directorio de certificados: `/var/lib/sslcat/certs`
-- Directorio de claves: `/var/lib/sslcat/keys`
-- Directorio de logs: `/var/lib/sslcat/logs`
+- Directorio de certificados: `/opt/sslcat/certs`
+- Directorio de claves: `/opt/sslcat/keys`
+- Directorio de logs: `/opt/sslcat/logs`
 
 ### Configuración Básica
 
@@ -357,8 +357,8 @@ SSLcat obtiene automáticamente certificados SSL para dominios configurados sin 
 Los certificados se renuevan automáticamente 30 días antes del vencimiento, o pueden ser activados manualmente.
 
 ### Almacenamiento de Certificados
-- Archivo de certificado: `/var/lib/sslcat/certs/domain.crt`
-- Archivo de clave privada: `/var/lib/sslcat/keys/domain.key`
+- Archivo de certificado: `/opt/sslcat/certs/domain.crt`
+- Archivo de clave privada: `/opt/sslcat/keys/domain.key`
 
 ## Funciones de Seguridad
 
@@ -376,7 +376,7 @@ Los certificados se renuevan automáticamente 30 días antes del vencimiento, o 
 ### Desbloquear IPs
 ```bash
 # Eliminar archivo de bloqueo y reiniciar servicio
-sudo rm /var/lib/sslcat/sslcat.block
+sudo rm /opt/sslcat/sslcat.block
 sudo systemctl restart sslcat
 ```
 

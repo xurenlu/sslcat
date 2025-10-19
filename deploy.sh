@@ -60,7 +60,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/sslcat /etc/sslcat $TARGET_DIR
+ReadWritePaths=/opt/sslcat /etc/sslcat $TARGET_DIR
 
 [Install]
 WantedBy=multi-user.target
@@ -76,8 +76,8 @@ set -e
 
 echo "📁 创建目录和用户..."
 useradd -r -s /bin/false withssl || true
-mkdir -p /etc/sslcat /var/lib/sslcat/{certs,keys,logs}
-chown -R withssl:withssl /var/lib/sslcat
+mkdir -p /etc/sslcat /opt/sslcat/{certs,keys,logs}
+chown -R withssl:withssl /opt/sslcat
 
 echo "📋 复制文件..."
 mkdir -p /opt/sslcat

@@ -185,7 +185,7 @@ func main() {
 	if err := os.MkdirAll("/etc/sslcat", 0755); err != nil {
 		log.Warnf("failed to create system config dir, falling back to CWD: %v", err)
 	}
-	if err := os.MkdirAll("/var/lib/sslcat", 0755); err != nil {
+	if err := os.MkdirAll("/opt/sslcat", 0755); err != nil {
 		log.Warnf("failed to create system data dir, falling back to CWD: %v", err)
 	}
 

@@ -59,7 +59,7 @@
 - `password_file`: `./data/admin.pass` → `/Users/rocky/Sites/sslcat/data/admin.pass`
 
 ### 7. sslcat.conf.example ℹ️
-**说明：** 此文件已使用绝对路径（`/var/lib/sslcat/`），无需修改。这是生产环境的标准路径。
+**说明：** 此文件已使用绝对路径（`/opt/sslcat/`），无需修改。这是生产环境的标准路径。
 
 ## 路径映射表
 
@@ -94,7 +94,7 @@
 ### 注意事项：
 - 如果在不同机器上部署，需要根据实际安装路径修改这些绝对路径
 - 或者使用环境变量来动态设置基础路径
-- 生产环境建议使用标准路径如 `/var/lib/sslcat/`、`/etc/sslcat/` 等
+- 生产环境建议使用标准路径如 `/opt/sslcat/`、`/etc/sslcat/` 等
 
 ## 使用示例
 
@@ -108,7 +108,7 @@ cd /Users/rocky/Sites/sslcat
 如果部署到其他服务器，需要修改配置文件中的路径：
 ```bash
 # 方法 1: 使用 sed 批量替换
-sed -i 's|/Users/rocky/Sites/sslcat|/var/lib/sslcat|g' sslcat.conf
+sed -i 's|/Users/rocky/Sites/sslcat|/opt/sslcat|g' sslcat.conf
 
 # 方法 2: 手动编辑配置文件
 vim sslcat.conf

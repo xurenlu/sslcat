@@ -139,8 +139,8 @@ go build -o sslcat main.go
 4. **ユーザーとディレクトリの作成**
 ```bash
 sudo useradd -r -s /bin/false sslcat
-sudo mkdir -p /etc/sslcat /var/lib/sslcat/{certs,keys,logs}
-sudo chown -R sslcat:sslcat /var/lib/sslcat
+sudo mkdir -p /etc/sslcat /opt/sslcat/{certs,keys,logs}
+sudo chown -R sslcat:sslcat /opt/sslcat
 ```
 
 5. **設定と起動**
@@ -156,9 +156,9 @@ sudo systemctl start sslcat
 
 ### 設定ファイルの場所
 - メイン設定ファイル: `/etc/sslcat/sslcat.conf`
-- 証明書ディレクトリ: `/var/lib/sslcat/certs`
-- キーディレクトリ: `/var/lib/sslcat/keys`
-- ログディレクトリ: `/var/lib/sslcat/logs`
+- 証明書ディレクトリ: `/opt/sslcat/certs`
+- キーディレクトリ: `/opt/sslcat/keys`
+- ログディレクトリ: `/opt/sslcat/logs`
 
 ### 基本設定
 
@@ -335,8 +335,8 @@ SSLcatは設定されたドメインのSSL証明書を手動介入なしに自�
 証明書は期限切れの30日前に自動更新、または手動でトリガー可能。
 
 ### 証明書保存
-- 証明書ファイル: `/var/lib/sslcat/certs/domain.crt`
-- 秘密鍵ファイル: `/var/lib/sslcat/keys/domain.key`
+- 証明書ファイル: `/opt/sslcat/certs/domain.crt`
+- 秘密鍵ファイル: `/opt/sslcat/keys/domain.key`
 
 ## セキュリティ機能
 
@@ -354,7 +354,7 @@ SSLcatは設定されたドメインのSSL証明書を手動介入なしに自�
 ### IPブロック解除
 ```bash
 # ブロックファイルを削除してサービス再起動
-sudo rm /var/lib/sslcat/sslcat.block
+sudo rm /opt/sslcat/sslcat.block
 sudo systemctl restart sslcat
 ```
 

@@ -104,8 +104,8 @@ On target server:
 ```bash
 # Create user and directories
 sudo useradd -r -s /bin/false withssl
-sudo mkdir -p /etc/sslcat /var/lib/sslcat/{certs,keys,logs}
-sudo chown -R withssl:withssl /var/lib/sslcat
+sudo mkdir -p /etc/sslcat /opt/sslcat/{certs,keys,logs}
+sudo chown -R withssl:withssl /opt/sslcat
 ```
 
 ### Step 3: Upload Files
@@ -193,11 +193,11 @@ file /opt/sslcat/withssl
 
 ```bash
 # Check directory permissions
-ls -la /var/lib/sslcat
+ls -la /opt/sslcat
 ls -la /etc/sslcat
 
 # Fix permissions
-sudo chown -R withssl:withssl /var/lib/sslcat
+sudo chown -R withssl:withssl /opt/sslcat
 sudo chown withssl:withssl /etc/sslcat/withssl.conf
 ```
 
@@ -271,7 +271,7 @@ sysctl -p
 ```bash
 # Setup log rotation
 cat > /etc/logrotate.d/withssl << 'EOF'
-/var/lib/sslcat/logs/*.log {
+/opt/sslcat/logs/*.log {
     daily
     rotate 30
     compress
@@ -289,8 +289,8 @@ EOF
 # Backup configuration and certificates
 tar -czf withssl-backup-$(date +%Y%m%d).tar.gz \
     /etc/sslcat/ \
-    /var/lib/sslcat/certs/ \
-    /var/lib/sslcat/keys/
+    /opt/sslcat/certs/ \
+    /opt/sslcat/keys/
 ```
 
 ## 🎯 Summary

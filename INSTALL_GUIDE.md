@@ -95,7 +95,7 @@ cd withssl
 go build -o withssl main.go
 
 # 3. 手动配置
-sudo mkdir -p /opt/sslcat /etc/sslcat /var/lib/sslcat
+sudo mkdir -p /opt/sslcat /etc/sslcat
 sudo cp withssl /opt/sslcat/
 sudo cp withssl.conf.example /etc/sslcat/withssl.conf
 # ... 更多手动步骤
@@ -182,7 +182,7 @@ sudo journalctl -u withssl -n 50
 sudo /opt/sslcat/withssl --config /etc/sslcat/withssl.conf --check
 
 # 修复权限
-sudo chown -R withssl:withssl /opt/sslcat /etc/sslcat /var/lib/sslcat
+sudo chown -R withssl:withssl /opt/sslcat /etc/sslcat
 ```
 
 ### 端口被占用

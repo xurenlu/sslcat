@@ -217,7 +217,7 @@ docker-run:
 		-p 80:80 \
 		-p 443:443 \
 		-v /etc/sslcat:/etc/sslcat \
-		-v /var/lib/sslcat:/var/lib/sslcat \
+		-v /opt/sslcat:/opt/sslcat \
 		sslcat:latest
 
 # 停止Docker容器

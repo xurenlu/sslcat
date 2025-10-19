@@ -8,10 +8,10 @@ SSLcat 项目所有安装脚本和部署工具现在使用统一的路径配置�
 |---------|------|------|--------|
 | 二进制文件 | `/opt/sslcat/withssl` | 755 | withssl:withssl |
 | 配置文件 | `/etc/sslcat/withssl.conf` | 600 | withssl:withssl |
-| SSL证书目录 | `/var/lib/sslcat/certs/` | 755 | withssl:withssl |
-| SSL密钥目录 | `/var/lib/sslcat/keys/` | 700 | withssl:withssl |
-| 日志目录 | `/var/lib/sslcat/logs/` | 755 | withssl:withssl |
-| 封禁文件 | `/var/lib/sslcat/withssl.block` | 644 | withssl:withssl |
+| SSL证书目录 | `/opt/sslcat/certs/` | 755 | withssl:withssl |
+| SSL密钥目录 | `/opt/sslcat/keys/` | 700 | withssl:withssl |
+| 日志目录 | `/opt/sslcat/logs/` | 755 | withssl:withssl |
+| 封禁文件 | `/opt/sslcat/withssl.block` | 644 | withssl:withssl |
 | systemd服务 | `/etc/systemd/system/withssl.service` | 644 | root:root |
 
 ## 🔧 各脚本路径使用情况
@@ -20,7 +20,7 @@ SSLcat 项目所有安装脚本和部署工具现在使用统一的路径配置�
 ```bash
 二进制文件: /opt/sslcat/withssl
 配置文件: /etc/sslcat/withssl.conf
-数据目录: /var/lib/sslcat/
+数据目录: /opt/sslcat/
 用户: withssl (系统用户)
 ```
 
@@ -28,7 +28,7 @@ SSLcat 项目所有安装脚本和部署工具现在使用统一的路径配置�
 ```bash
 二进制文件: /opt/sslcat/withssl
 配置文件: /etc/sslcat/withssl.conf
-数据目录: /var/lib/sslcat/
+数据目录: /opt/sslcat/
 用户: withssl (系统用户)
 ```
 
@@ -36,7 +36,7 @@ SSLcat 项目所有安装脚本和部署工具现在使用统一的路径配置�
 ```bash
 二进制文件: /opt/sslcat/withssl
 配置文件: /etc/sslcat/withssl.conf
-数据目录: /var/lib/sslcat/
+数据目录: /opt/sslcat/
 用户: withssl (系统用户)
 ```
 
@@ -74,7 +74,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/sslcat /etc/sslcat /opt/sslcat
+ReadWritePaths=/opt/sslcat /etc/sslcat
 ```
 
 ## 🚨 常见路径错误
