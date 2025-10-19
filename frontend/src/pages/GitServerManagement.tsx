@@ -73,6 +73,7 @@ import {
   FiGlobe,
 } from 'react-icons/fi'
 import { useConfig, buildPath, buildApiPath } from '../contexts/ConfigContext'
+import { useTranslation } from '../hooks/useLanguage'
 import RealtimeLogs from '../components/RealtimeLogs'
 import DockerImageManager from '../components/DockerImageManager'
 import DeployHistory from '../components/DeployHistory'
@@ -120,18 +121,7 @@ interface GitServerConfig {
 
 const GitServerManagement: React.FC = () => {
   const { adminPrefix } = useConfig()
-  
-  // 简单的翻译函数（fallback）
-  const t = (key: string) => {
-    const translations: Record<string, string> = {
-      'frontend.delete_app_confirm': '确认删除应用',
-      'frontend.delete_app_warning': '这是一个危险操作，无法撤销。此应用的所有数据、代码、日志和配置将被永久删除。',
-      'frontend.delete_app_instruction': '请输入应用名称 "{appName}" 来确认删除：',
-      'frontend.delete_app_name_mismatch': '应用名称不匹配',
-      'frontend.copy_command': '复制命令',
-    }
-    return translations[key] || key
-  }
+  const t = useTranslation()
   const [apps, setApps] = useState<GitApp[]>([])
   const [sshKeys, setSSHKeys] = useState<SSHKey[]>([])
   const [config, setConfig] = useState<GitServerConfig>({
@@ -521,7 +511,7 @@ git push sslcat main`
                     {gitCommands}
                   </Code>
                   <IconButton
-                    aria-label={t('frontend.copy_command')}
+                    aria-label={t.frontend.copy_command}
                     icon={<Icon as={FiCopy} />}
                     size="sm"
                     onClick={() => {
@@ -576,7 +566,7 @@ git push sslcat main`
     // 验证输入的应用名称
     if (deleteConfirmInput !== deleteAppTarget.name) {
       toast({
-        title: t('frontend.delete_app_name_mismatch'),
+        title: t.frontend.delete_app_name_mismatch,
         status: 'error',
         duration: 3000,
         isClosable: true,
@@ -905,7 +895,7 @@ git push sslcat main`
                     <FormControl>
                       <FormLabel fontSize="sm">变量名</FormLabel>
                       <Input
-                        placeholder={t('frontend.env_var_name')}
+                        placeholder={t.frontend.env_var_name}
                         value={item.key}
                         onChange={(e) => updateEnvRow(index, 'key', e.target.value)}
                         isDisabled={savingEnv}
@@ -914,14 +904,14 @@ git push sslcat main`
                     <FormControl>
                       <FormLabel fontSize="sm">变量值</FormLabel>
                       <Input
-                        placeholder={t('frontend.env_var_value')}
+                        placeholder={t.frontend.env_var_value}
                         value={item.value}
                         onChange={(e) => updateEnvRow(index, 'value', e.target.value)}
                         isDisabled={savingEnv}
                       />
                     </FormControl>
                     <IconButton
-                      aria-label={t('frontend.delete')}
+                      aria-label={t.frontend.delete}
                       icon={<Icon as={FiTrash2} />}
                       variant="ghost"
                       colorScheme="red"
@@ -991,7 +981,7 @@ git push sslcat main`
                   onChange={(_, value) => setRoutingPort(value)}
                   isDisabled={savingRouting}
                 >
-                  <NumberInputField placeholder={t('frontend.port_placeholder')} />
+                  <NumberInputField placeholder={t.frontend.port_placeholder} />
                   <NumberInputStepper>
                     <NumberIncrementStepper />
                     <NumberDecrementStepper />
@@ -1232,7 +1222,7 @@ git push sslcat main`
                                       {app.git_url}
                                     </Code>
                                     <IconButton
-                                      aria-label={t('frontend.copy_git_url')}
+                                      aria-label={t.frontend.copy_git_url}
                                       icon={<FiCopy />}
                                       size="xs"
                                       variant="ghost"
@@ -1281,16 +1271,16 @@ git push sslcat main`
                             <Td>
                               <HStack spacing={1}>
                                 <IconButton
-                                  aria-label={t('frontend.redeploy')}
+                                  aria-label={t.frontend.redeploy}
                                   icon={<FiUpload />}
                                   size="sm"
                                   variant="ghost"
                                   colorScheme="green"
                                   onClick={() => handleDeployApp(app.name)}
-                                  title={t('frontend.trigger_redeploy')}
+                                  title={t.frontend.trigger_redeploy}
                                 />
                                 <IconButton
-                                  aria-label={t('frontend.delete_app')}
+                                  aria-label={t.frontend.delete_app}
                                   icon={<FiTrash2 />}
                                   size="sm"
                                   variant="ghost"
@@ -1362,14 +1352,14 @@ git push sslcat main`
                               <Td>
                                 <HStack spacing={2}>
                                   <IconButton
-                                    aria-label={t('frontend.copy_fingerprint')}
+                                    aria-label={t.frontend.copy_fingerprint}
                                     icon={<FiCopy />}
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => copyToClipboard(key.fingerprint)}
                                   />
                                   <IconButton
-                                    aria-label={t('frontend.delete')}
+                                    aria-label={t.frontend.delete}
                                     icon={<FiTrash2 />}
                                     size="sm"
                                     variant="ghost"
@@ -1591,7 +1581,7 @@ git push sslcat main`
         <Modal isOpen={isDeleteModalOpen} onClose={closeDeleteModal} size="md">
           <ModalOverlay />
           <ModalContent>
-            <ModalHeader>{t('frontend.delete_app_confirm')}</ModalHeader>
+            <ModalHeader>{t.frontend.delete_app_confirm}</ModalHeader>
             <ModalCloseButton isDisabled={isDeleting} />
             <ModalBody>
               <VStack spacing={4} align="stretch">
@@ -1600,7 +1590,7 @@ git push sslcat main`
                   <Box>
                     <AlertTitle fontSize="sm">危险操作</AlertTitle>
                     <AlertDescription fontSize="sm">
-                      {t('frontend.delete_app_warning')}
+                      {t.frontend.delete_app_warning}
                     </AlertDescription>
                   </Box>
                 </Alert>
@@ -1609,7 +1599,7 @@ git push sslcat main`
                   <>
                     <Box>
                       <Text fontSize="sm" mb={2}>
-                        {t('frontend.delete_app_instruction').replace('{appName}', deleteAppTarget.name)}
+                        {t.frontend.delete_app_instruction.replace('{appName}', deleteAppTarget.name)}
                       </Text>
                       <Input
                         value={deleteConfirmInput}
@@ -1734,7 +1724,7 @@ git push sslcat main`
                       value={config.portRange[0]}
                       onChange={(_, value) => setConfig({ ...config, portRange: [value, config.portRange[1]] })}
                     >
-                      <NumberInputField placeholder={t('frontend.start_port')} />
+                      <NumberInputField placeholder={t.frontend.start_port} />
                       <NumberInputStepper>
                         <NumberIncrementStepper />
                         <NumberDecrementStepper />
@@ -1747,7 +1737,7 @@ git push sslcat main`
                       value={config.portRange[1]}
                       onChange={(_, value) => setConfig({ ...config, portRange: [config.portRange[0], value] })}
                     >
-                      <NumberInputField placeholder={t('frontend.end_port')} />
+                      <NumberInputField placeholder={t.frontend.end_port} />
                       <NumberInputStepper>
                         <NumberIncrementStepper />
                         <NumberDecrementStepper />
@@ -1764,7 +1754,7 @@ git push sslcat main`
                   <Textarea
                     value={config.welcomeMessage}
                     onChange={(e) => setConfig({ ...config, welcomeMessage: e.target.value })}
-                    placeholder={t('frontend.welcome_message')}
+                    placeholder={t.frontend.welcome_message}
                     rows={3}
                   />
                   <Text fontSize="sm" color="gray.500" mt={1}>

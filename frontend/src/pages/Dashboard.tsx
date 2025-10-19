@@ -40,6 +40,9 @@ interface DashboardStats {
   publicIP: string
   goVersion: string
   version: string
+  sslCertificates: number
+  uptime: number
+  uptimeString: string
 }
 
 const Dashboard: React.FC = () => {
@@ -49,6 +52,9 @@ const Dashboard: React.FC = () => {
     publicIP: '未知',
     goVersion: 'go1.21.0',
     version: 'v1.0.0',
+    sslCertificates: 0,
+    uptime: 0,
+    uptimeString: '计算中...',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -82,6 +88,9 @@ const Dashboard: React.FC = () => {
         publicIP: data.publicIP || data.PublicIP || '未知',
         goVersion: data.goVersion || 'go1.21.0',
         version: data.version || data.Version || 'v1.0.0',
+        sslCertificates: data.sslCertificates || data.SSLCertificates || 0,
+        uptime: data.uptime || data.Uptime || 0,
+        uptimeString: data.uptimeString || data.UptimeString || '计算中...',
       }
       
       console.log('Dashboard processed stats:', processedStats)
@@ -216,6 +225,24 @@ const Dashboard: React.FC = () => {
             <Stat>
               <HStack justify="space-between">
                 <Box>
+                  <StatLabel color="blue.500" fontWeight="bold" textTransform="uppercase" fontSize="xs">
+                    {t.dashboard.sslCertificates}
+                  </StatLabel>
+                  <StatNumber fontSize="2xl" fontWeight="bold">
+                    {stats.sslCertificates}
+                  </StatNumber>
+                </Box>
+                <Icon as={FiShield} boxSize={8} color="gray.300" />
+              </HStack>
+            </Stat>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardBody>
+            <Stat>
+              <HStack justify="space-between">
+                <Box>
                   <StatLabel color="purple.500" fontWeight="bold" textTransform="uppercase" fontSize="xs">
                     {t.dashboard.publicIP}
                   </StatLabel>
@@ -277,7 +304,7 @@ const Dashboard: React.FC = () => {
               <VStack align="stretch" spacing={3}>
                 <HStack justify="space-between">
                   <Text fontWeight="medium">运行时间:</Text>
-                  <Text>计算中...</Text>
+                  <Text>{stats.uptimeString}</Text>
                 </HStack>
                 <HStack justify="space-between">
                   <Text fontWeight="medium">公网IP:</Text>

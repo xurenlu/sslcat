@@ -79,6 +79,7 @@ export interface Translation {
     cachedProxies: string
     totalRequests: string
     publicIP: string
+    sslCertificates: string
     goVersion: string
     systemStatus: string
     sslStatus: string
@@ -514,6 +515,27 @@ export interface Translation {
       macau: string
     }
   }
+  
+  // 前端相关翻译
+  frontend: {
+    copy_command: string
+    delete_app_confirm: string
+    delete_app_warning: string
+    delete_app_instruction: string
+    delete_app_name_mismatch: string
+    env_var_name: string
+    env_var_value: string
+    delete: string
+    port_placeholder: string
+    copy_git_url: string
+    redeploy: string
+    trigger_redeploy: string
+    delete_app: string
+    copy_fingerprint: string
+    start_port: string
+    end_port: string
+    welcome_message: string
+  }
 }
 
 // 中文翻译
@@ -592,6 +614,7 @@ export const zhCN: Translation = {
     cachedProxies: '缓存代理',
     totalRequests: '总请求数',
     publicIP: '公网IP',
+    sslCertificates: 'SSL证书',
     goVersion: 'Go版本',
     systemStatus: '系统状态',
     sslStatus: 'SSL证书状态良好',
@@ -1007,6 +1030,25 @@ export const zhCN: Translation = {
       macau: '澳门',
     },
   },
+  frontend: {
+    copy_command: '复制命令',
+    delete_app_confirm: '确认删除应用',
+    delete_app_warning: '这是一个危险操作，无法撤销。此应用的所有数据、代码、日志和配置将被永久删除。',
+    delete_app_instruction: '请输入应用名称 "{appName}" 来确认删除：',
+    delete_app_name_mismatch: '应用名称不匹配',
+    env_var_name: '环境变量名称',
+    env_var_value: '环境变量值',
+    delete: '删除',
+    port_placeholder: '端口号',
+    copy_git_url: '复制Git URL',
+    redeploy: '重新部署',
+    trigger_redeploy: '触发重新部署',
+    delete_app: '删除应用',
+    copy_fingerprint: '复制指纹',
+    start_port: '起始端口',
+    end_port: '结束端口',
+    welcome_message: '欢迎消息',
+  },
 }
 
 // 英文翻译
@@ -1085,6 +1127,7 @@ export const enUS: Translation = {
     cachedProxies: 'Cached Proxies',
     totalRequests: 'Total Requests',
     publicIP: 'Public IP',
+    sslCertificates: 'SSL Certificates',
     goVersion: 'Go Version',
     systemStatus: 'System Status',
     sslStatus: 'SSL certificates are in good condition',
@@ -1500,6 +1543,25 @@ export const enUS: Translation = {
       macau: 'Macau',
     },
   },
+  frontend: {
+    copy_command: 'Copy Command',
+    delete_app_confirm: 'Confirm Delete App',
+    delete_app_warning: 'This is a dangerous operation that cannot be undone. All data, code, logs, and configuration for this app will be permanently deleted.',
+    delete_app_instruction: 'Please enter the app name "{appName}" to confirm deletion:',
+    delete_app_name_mismatch: 'App name mismatch',
+    env_var_name: 'Environment Variable Name',
+    env_var_value: 'Environment Variable Value',
+    delete: 'Delete',
+    port_placeholder: 'Port Number',
+    copy_git_url: 'Copy Git URL',
+    redeploy: 'Redeploy',
+    trigger_redeploy: 'Trigger Redeploy',
+    delete_app: 'Delete App',
+    copy_fingerprint: 'Copy Fingerprint',
+    start_port: 'Start Port',
+    end_port: 'End Port',
+    welcome_message: 'Welcome Message',
+  },
 }
 
 // 日语翻译
@@ -1578,6 +1640,7 @@ export const jaJP: Translation = {
     cachedProxies: 'キャッシュされたプロキシ',
     totalRequests: '総リクエスト数',
     publicIP: 'パブリックIP',
+    sslCertificates: 'SSL証明書',
     goVersion: 'Goバージョン',
     systemStatus: 'システム状態',
     sslStatus: 'SSL証明書の状態は良好です',
@@ -1987,6 +2050,25 @@ export const jaJP: Translation = {
       macau: 'マカオ',
     },
   },
+  frontend: {
+    copy_command: 'コマンドをコピー',
+    delete_app_confirm: 'アプリの削除を確認',
+    delete_app_warning: 'これは元に戻せない危険な操作です。このアプリのすべてのデータ、コード、ログ、設定が永久に削除されます。',
+    delete_app_instruction: '削除を確認するためにアプリ名 "{appName}" を入力してください：',
+    delete_app_name_mismatch: 'アプリ名が一致しません',
+    env_var_name: '環境変数名',
+    env_var_value: '環境変数値',
+    delete: '削除',
+    port_placeholder: 'ポート番号',
+    copy_git_url: 'Git URLをコピー',
+    redeploy: '再デプロイ',
+    trigger_redeploy: '再デプロイをトリガー',
+    delete_app: 'アプリを削除',
+    copy_fingerprint: 'フィンガープリントをコピー',
+    start_port: '開始ポート',
+    end_port: '終了ポート',
+    welcome_message: 'ウェルカムメッセージ',
+  },
 }
 
 // 西班牙语翻译
@@ -2065,6 +2147,7 @@ export const esES: Translation = {
     cachedProxies: 'Proxies en Caché',
     totalRequests: 'Total de Solicitudes',
     publicIP: 'IP Pública',
+    sslCertificates: 'Certificados SSL',
     goVersion: 'Versión de Go',
     systemStatus: 'Estado del Sistema',
     sslStatus: 'Los certificados SSL están en buenas condiciones',
@@ -2474,6 +2557,25 @@ export const esES: Translation = {
       macau: 'Macao',
     },
   },
+  frontend: {
+    copy_command: 'Copiar Comando',
+    delete_app_confirm: 'Confirmar Eliminar App',
+    delete_app_warning: 'Esta es una operación peligrosa que no se puede deshacer. Todos los datos, código, logs y configuración de esta app serán eliminados permanentemente.',
+    delete_app_instruction: 'Por favor ingrese el nombre de la app "{appName}" para confirmar la eliminación:',
+    delete_app_name_mismatch: 'El nombre de la app no coincide',
+    env_var_name: 'Nombre de Variable de Entorno',
+    env_var_value: 'Valor de Variable de Entorno',
+    delete: 'Eliminar',
+    port_placeholder: 'Número de Puerto',
+    copy_git_url: 'Copiar URL de Git',
+    redeploy: 'Redesplegar',
+    trigger_redeploy: 'Activar Redespliegue',
+    delete_app: 'Eliminar App',
+    copy_fingerprint: 'Copiar Huella Digital',
+    start_port: 'Puerto de Inicio',
+    end_port: 'Puerto Final',
+    welcome_message: 'Mensaje de Bienvenida',
+  },
 }
 
 // 法语翻译
@@ -2552,6 +2654,7 @@ export const frFR: Translation = {
     cachedProxies: 'Proxies en Cache',
     totalRequests: 'Total des Requêtes',
     publicIP: 'IP Publique',
+    sslCertificates: 'Certificats SSL',
     goVersion: 'Version Go',
     systemStatus: 'État du Système',
     sslStatus: 'Les certificats SSL sont en bon état',
@@ -2961,6 +3064,25 @@ export const frFR: Translation = {
       macau: 'Macao',
     },
   },
+  frontend: {
+    copy_command: 'Copier la Commande',
+    delete_app_confirm: 'Confirmer la Suppression de l\'App',
+    delete_app_warning: 'Ceci est une opération dangereuse qui ne peut pas être annulée. Toutes les données, le code, les logs et la configuration de cette app seront définitivement supprimés.',
+    delete_app_instruction: 'Veuillez entrer le nom de l\'app "{appName}" pour confirmer la suppression :',
+    delete_app_name_mismatch: 'Le nom de l\'app ne correspond pas',
+    env_var_name: 'Nom de Variable d\'Environnement',
+    env_var_value: 'Valeur de Variable d\'Environnement',
+    delete: 'Supprimer',
+    port_placeholder: 'Numéro de Port',
+    copy_git_url: 'Copier l\'URL Git',
+    redeploy: 'Redéployer',
+    trigger_redeploy: 'Déclencher le Redéploiement',
+    delete_app: 'Supprimer l\'App',
+    copy_fingerprint: 'Copier l\'Empreinte',
+    start_port: 'Port de Début',
+    end_port: 'Port de Fin',
+    welcome_message: 'Message de Bienvenue',
+  },
 }
 
 // 韩语翻译
@@ -3039,6 +3161,7 @@ export const koKR: Translation = {
     cachedProxies: '캐시된 프록시',
     totalRequests: '총 요청 수',
     publicIP: '공용 IP',
+    sslCertificates: 'SSL 인증서',
     goVersion: 'Go 버전',
     systemStatus: '시스템 상태',
     sslStatus: 'SSL 인증서가 양호한 상태입니다',
@@ -3448,6 +3571,25 @@ export const koKR: Translation = {
       macau: '마카오',
     },
   },
+  frontend: {
+    copy_command: '명령어 복사',
+    delete_app_confirm: '앱 삭제 확인',
+    delete_app_warning: '이는 되돌릴 수 없는 위험한 작업입니다. 이 앱의 모든 데이터, 코드, 로그 및 설정이 영구적으로 삭제됩니다.',
+    delete_app_instruction: '삭제를 확인하려면 앱 이름 "{appName}"을 입력하세요:',
+    delete_app_name_mismatch: '앱 이름이 일치하지 않습니다',
+    env_var_name: '환경 변수 이름',
+    env_var_value: '환경 변수 값',
+    delete: '삭제',
+    port_placeholder: '포트 번호',
+    copy_git_url: 'Git URL 복사',
+    redeploy: '재배포',
+    trigger_redeploy: '재배포 트리거',
+    delete_app: '앱 삭제',
+    copy_fingerprint: '지문 복사',
+    start_port: '시작 포트',
+    end_port: '종료 포트',
+    welcome_message: '환영 메시지',
+  },
 }
 
 // 德语翻译
@@ -3526,6 +3668,7 @@ export const deDE: Translation = {
     cachedProxies: 'Zwischengespeicherte Proxies',
     totalRequests: 'Gesamtanfragen',
     publicIP: 'Öffentliche IP',
+    sslCertificates: 'SSL-Zertifikate',
     goVersion: 'Go-Version',
     systemStatus: 'Systemstatus',
     sslStatus: 'SSL-Zertifikate sind in gutem Zustand',
@@ -3935,6 +4078,25 @@ export const deDE: Translation = {
       macau: 'Macau',
     },
   },
+  frontend: {
+    copy_command: 'Befehl kopieren',
+    delete_app_confirm: 'App-Löschung bestätigen',
+    delete_app_warning: 'Dies ist ein gefährlicher Vorgang, der nicht rückgängig gemacht werden kann. Alle Daten, Code, Logs und Konfigurationen für diese App werden dauerhaft gelöscht.',
+    delete_app_instruction: 'Bitte geben Sie den App-Namen "{appName}" ein, um die Löschung zu bestätigen:',
+    delete_app_name_mismatch: 'App-Name stimmt nicht überein',
+    env_var_name: 'Umgebungsvariablen-Name',
+    env_var_value: 'Umgebungsvariablen-Wert',
+    delete: 'Löschen',
+    port_placeholder: 'Portnummer',
+    copy_git_url: 'Git-URL kopieren',
+    redeploy: 'Neu bereitstellen',
+    trigger_redeploy: 'Neubereitstellung auslösen',
+    delete_app: 'App löschen',
+    copy_fingerprint: 'Fingerabdruck kopieren',
+    start_port: 'Startport',
+    end_port: 'Endport',
+    welcome_message: 'Willkommensnachricht',
+  },
 }
 
 // 俄语翻译
@@ -4013,6 +4175,7 @@ export const ruRU: Translation = {
     cachedProxies: 'Кешированные прокси',
     totalRequests: 'Общее количество запросов',
     publicIP: 'Публичный IP',
+    sslCertificates: 'SSL-сертификаты',
     goVersion: 'Версия Go',
     systemStatus: 'Состояние системы',
     sslStatus: 'SSL-сертификаты в хорошем состоянии',
@@ -4422,6 +4585,25 @@ export const ruRU: Translation = {
       macau: 'Макао',
     },
   },
+  frontend: {
+    copy_command: 'Копировать команду',
+    delete_app_confirm: 'Подтвердить удаление приложения',
+    delete_app_warning: 'Это опасная операция, которую нельзя отменить. Все данные, код, логи и конфигурация этого приложения будут безвозвратно удалены.',
+    delete_app_instruction: 'Пожалуйста, введите название приложения "{appName}" для подтверждения удаления:',
+    delete_app_name_mismatch: 'Название приложения не совпадает',
+    env_var_name: 'Имя переменной окружения',
+    env_var_value: 'Значение переменной окружения',
+    delete: 'Удалить',
+    port_placeholder: 'Номер порта',
+    copy_git_url: 'Копировать Git URL',
+    redeploy: 'Переразвернуть',
+    trigger_redeploy: 'Запустить переразвертывание',
+    delete_app: 'Удалить приложение',
+    copy_fingerprint: 'Копировать отпечаток',
+    start_port: 'Начальный порт',
+    end_port: 'Конечный порт',
+    welcome_message: 'Приветственное сообщение',
+  },
 }
 
 // 繁体中文翻译
@@ -4500,6 +4682,7 @@ export const zhTW: Translation = {
     cachedProxies: '快取代理',
     totalRequests: '總請求數',
     publicIP: '公網IP',
+    sslCertificates: 'SSL憑證',
     goVersion: 'Go版本',
     systemStatus: '系統狀態',
     sslStatus: 'SSL憑證狀態良好',
@@ -4908,6 +5091,25 @@ export const zhTW: Translation = {
       taiwan: '台灣',
       macau: '澳門',
     },
+  },
+  frontend: {
+    copy_command: '複製命令',
+    delete_app_confirm: '確認刪除應用程式',
+    delete_app_warning: '這是一個危險操作，無法撤銷。此應用程式的所有資料、程式碼、日誌和設定將被永久刪除。',
+    delete_app_instruction: '請輸入應用程式名稱 "{appName}" 來確認刪除：',
+    delete_app_name_mismatch: '應用程式名稱不匹配',
+    env_var_name: '環境變數名稱',
+    env_var_value: '環境變數值',
+    delete: '刪除',
+    port_placeholder: '埠號',
+    copy_git_url: '複製 Git URL',
+    redeploy: '重新部署',
+    trigger_redeploy: '觸發重新部署',
+    delete_app: '刪除應用程式',
+    copy_fingerprint: '複製指紋',
+    start_port: '起始埠',
+    end_port: '結束埠',
+    welcome_message: '歡迎訊息',
   },
 }
 
