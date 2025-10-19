@@ -397,6 +397,8 @@ export interface Translation {
     staticSites: string
     phpSites: string
     refresh: string
+    updateSite: string
+    createSite: string
   }
 
   // CDN管理

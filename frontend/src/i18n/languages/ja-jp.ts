@@ -353,6 +353,8 @@ export const jaJP: Translation = {
     staticSites: '静的サイト',
     phpSites: 'PHPサイト',
     refresh: '更新',
+    updateSite: 'サイト更新',
+    createSite: 'サイト作成',
   },
   cdn: {
     title: 'CDNキャッシュ管理',

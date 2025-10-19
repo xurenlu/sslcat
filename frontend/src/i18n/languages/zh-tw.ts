@@ -353,6 +353,8 @@ export const zhTW: Translation = {
     staticSites: '靜態網站',
     phpSites: 'PHP 網站',
     refresh: '重新整理',
+    updateSite: '更新網站',
+    createSite: '創建網站',
   },
   cdn: {
     title: '類CDN快取管理',

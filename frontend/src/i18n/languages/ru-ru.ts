@@ -353,6 +353,8 @@ export const ruRU: Translation = {
     staticSites: 'Статические сайты',
     phpSites: 'PHP-сайты',
     refresh: 'Обновить',
+    updateSite: 'Обновить сайт',
+    createSite: 'Создать сайт',
   },
   cdn: {
     title: 'Управление CDN-кешем',

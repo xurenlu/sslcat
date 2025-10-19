@@ -353,6 +353,8 @@ export const frFR: Translation = {
     staticSites: 'Sites Statiques',
     phpSites: 'Sites PHP',
     refresh: 'Actualiser',
+    updateSite: 'Mettre à jour le Site',
+    createSite: 'Créer un Site',
   },
   cdn: {
     title: 'Gestion du Cache CDN',

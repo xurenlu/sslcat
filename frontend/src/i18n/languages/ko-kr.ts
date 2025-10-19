@@ -353,6 +353,8 @@ export const koKR: Translation = {
     staticSites: '정적 사이트',
     phpSites: 'PHP 사이트',
     refresh: '새로고침',
+    updateSite: '사이트 업데이트',
+    createSite: '사이트 생성',
   },
   cdn: {
     title: 'CDN 캐시 관리',

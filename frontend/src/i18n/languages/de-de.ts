@@ -353,6 +353,8 @@ export const deDE: Translation = {
     staticSites: 'Statische Websites',
     phpSites: 'PHP-Websites',
     refresh: 'Aktualisieren',
+    updateSite: 'Website Aktualisieren',
+    createSite: 'Website Erstellen',
   },
   cdn: {
     title: 'CDN-Cache-Verwaltung',
