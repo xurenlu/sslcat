@@ -140,7 +140,6 @@ export interface Translation {
     wildcardSupport: string
     updateCertificate: string
     downloadCertificate: string
-    deleteCertificate: string
     daysUntilExpiry: string
     expiredDays: string
     syncACMECertificates: string
@@ -710,7 +709,6 @@ export interface Translation {
     domainsCount: string
     lastSync: string
     settings: string
-    delete: string
     cloudflare: string
     aliyun: string
     tencent: string
@@ -988,7 +986,6 @@ export const zhCN: Translation = {
     wildcardSupport: '支持单个域名或通配符域名（如 *.example.com）',
     updateCertificate: '更新证书',
     downloadCertificate: '下载证书',
-    deleteCertificate: '删除证书',
     daysUntilExpiry: '天后过期',
     expiredDays: '天',
     syncACMECertificates: '同步 ACME 证书',
@@ -1518,7 +1515,6 @@ export const zhCN: Translation = {
     domainsCount: '个域名',
     lastSync: '最后同步',
     settings: '设置',
-    delete: '删除',
     cloudflare: 'Cloudflare',
     aliyun: '阿里云 DNS',
     tencent: '腾讯云 DNS',
@@ -1809,7 +1805,6 @@ export const enUS: Translation = {
     wildcardSupport: 'Supports single domain or wildcard domain (e.g. *.example.com)',
     updateCertificate: 'Update Certificate',
     downloadCertificate: 'Download Certificate',
-    deleteCertificate: 'Delete Certificate',
     daysUntilExpiry: 'days until expiry',
     expiredDays: 'days',
     syncACMECertificates: 'Sync ACME Certificates',
@@ -2339,7 +2334,6 @@ export const enUS: Translation = {
     domainsCount: 'domains',
     lastSync: 'Last Sync',
     settings: 'Settings',
-    delete: 'Delete',
     cloudflare: 'Cloudflare',
     aliyun: 'Alibaba Cloud DNS',
     tencent: 'Tencent Cloud DNS',
@@ -2630,7 +2624,6 @@ export const jaJP: Translation = {
     wildcardSupport: '単一ドメインまたはワイルドカードドメインをサポート（例：*.example.com）',
     updateCertificate: '証明書更新',
     downloadCertificate: '証明書ダウンロード',
-    deleteCertificate: '証明書削除',
     daysUntilExpiry: '日後に期限切れ',
     expiredDays: '日',
     syncACMECertificates: 'ACME証明書同期',
@@ -3444,7 +3437,6 @@ export const esES: Translation = {
     wildcardSupport: 'Soporta dominio único o comodín (ej. *.example.com)',
     updateCertificate: 'Actualizar Certificado',
     downloadCertificate: 'Descargar Certificado',
-    deleteCertificate: 'Eliminar Certificado',
     daysUntilExpiry: 'días hasta expirar',
     expiredDays: 'días',
     syncACMECertificates: 'Sincronizar Certificados ACME',
@@ -4258,7 +4250,6 @@ export const frFR: Translation = {
     wildcardSupport: 'Supporte domaine unique ou joker (ex. *.example.com)',
     updateCertificate: 'Mettre à jour le Certificat',
     downloadCertificate: 'Télécharger le Certificat',
-    deleteCertificate: 'Supprimer le Certificat',
     daysUntilExpiry: 'jours avant expiration',
     expiredDays: 'jours',
     syncACMECertificates: 'Synchroniser les Certificats ACME',
@@ -5072,7 +5063,6 @@ export const koKR: Translation = {
     wildcardSupport: '단일 도메인 또는 와일드카드 도메인 지원 (예: *.example.com)',
     updateCertificate: '인증서 갱신',
     downloadCertificate: '인증서 다운로드',
-    deleteCertificate: '인증서 삭제',
     daysUntilExpiry: '일 후 만료',
     expiredDays: '일',
     syncACMECertificates: 'ACME 인증서 동기화',
@@ -5886,7 +5876,6 @@ export const deDE: Translation = {
     wildcardSupport: 'Unterstützt einzelne Domain oder Platzhalter (z.B. *.example.com)',
     updateCertificate: 'Zertifikat Aktualisieren',
     downloadCertificate: 'Zertifikat Herunterladen',
-    deleteCertificate: 'Zertifikat Löschen',
     daysUntilExpiry: 'Tage bis Ablauf',
     expiredDays: 'Tage',
     syncACMECertificates: 'ACME-Zertifikate Synchronisieren',
@@ -6700,7 +6689,6 @@ export const ruRU: Translation = {
     wildcardSupport: 'Поддерживает одиночный домен или подстановочный (напр. *.example.com)',
     updateCertificate: 'Обновить Сертификат',
     downloadCertificate: 'Скачать Сертификат',
-    deleteCertificate: 'Удалить Сертификат',
     daysUntilExpiry: 'дней до истечения',
     expiredDays: 'дней',
     syncACMECertificates: 'Синхронизировать ACME Сертификаты',
@@ -7514,7 +7502,6 @@ export const zhTW: Translation = {
     wildcardSupport: '支援單一域名或通配符域名（如 *.example.com）',
     updateCertificate: '更新憑證',
     downloadCertificate: '下載憑證',
-    deleteCertificate: '刪除憑證',
     daysUntilExpiry: '天後過期',
     expiredDays: '天',
     syncACMECertificates: '同步 ACME 憑證',
