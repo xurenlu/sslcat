@@ -226,8 +226,9 @@ func (s *Server) handleNotificationConfig(w http.ResponseWriter, r *http.Request
 	} else if r.Method == "POST" {
 		// 更新通知配置
 		var updateConfig struct {
-			Enabled  bool                              `json:"enabled"`
-			Channels map[string]map[string]interface{} `json:"channels"`
+			Enabled               bool                              `json:"enabled"`
+			MinNotificationLevel string                            `json:"min_notification_level"`
+			Channels             map[string]map[string]interface{} `json:"channels"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&updateConfig); err != nil {
@@ -237,6 +238,11 @@ func (s *Server) handleNotificationConfig(w http.ResponseWriter, r *http.Request
 
 		// 更新配置
 		s.config.Notification.Enabled = updateConfig.Enabled
+		
+		// 更新最小通知级别
+		if updateConfig.MinNotificationLevel != "" {
+			s.config.Notification.MinNotificationLevel = updateConfig.MinNotificationLevel
+		}
 
 		// 更新邮件配置
 		if emailConfig, exists := updateConfig.Channels["email"]; exists {

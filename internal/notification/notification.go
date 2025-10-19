@@ -34,6 +34,22 @@ func (l NotificationLevel) String() string {
 	}
 }
 
+// parseNotificationLevel 解析通知级别字符串
+func parseNotificationLevel(level string) NotificationLevel {
+	switch strings.ToLower(level) {
+	case "info":
+		return LevelInfo
+	case "warning", "warn":
+		return LevelWarning
+	case "error":
+		return LevelError
+	case "critical":
+		return LevelCritical
+	default:
+		return LevelInfo // 默认级别
+	}
+}
+
 // NotificationType 通知类型
 type NotificationType string
 
@@ -91,6 +107,7 @@ type NotificationManager struct {
 	rateLimiter *RateLimiter
 	history     []Notification
 	maxHistory  int
+	minLevel    NotificationLevel // 最小通知级别
 }
 
 // NewNotificationManager 创建通知管理器
@@ -101,6 +118,7 @@ func NewNotificationManager() *NotificationManager {
 		rateLimiter: NewRateLimiter(),
 		history:     make([]Notification, 0),
 		maxHistory:  1000,
+		minLevel:    LevelInfo, // 默认最小级别为info
 	}
 
 	// 初始化默认渠道
@@ -117,6 +135,7 @@ func NewNotificationManagerFromConfig(cfg config.NotificationConfig) *Notificati
 		rateLimiter: NewRateLimiter(),
 		history:     make([]Notification, 0),
 		maxHistory:  1000,
+		minLevel:    parseNotificationLevel(cfg.MinNotificationLevel),
 	}
 
 	// 从配置文件初始化各个渠道
@@ -233,6 +252,13 @@ func (nm *NotificationManager) Send(notification *Notification) error {
 	}
 	if notification.Source == "" {
 		notification.Source = "sslcat"
+	}
+
+	// 级别过滤检查
+	if notification.Level < nm.minLevel {
+		nm.log.Debugf("通知级别 %s 低于最小级别 %s，跳过发送: %s",
+			notification.Level.String(), nm.minLevel.String(), notification.Type)
+		return nil
 	}
 
 	// 速率限制检查

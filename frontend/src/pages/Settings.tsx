@@ -75,6 +75,7 @@ const Settings: React.FC = () => {
     // 通知设置
     enableNotifications: true,
     notificationChannels: 'email,webhook',
+    minNotificationLevel: 'info', // 最小通知级别
     // 邮件通知配置
     smtpHost: '',
     smtpPort: '587',
@@ -349,6 +350,7 @@ const Settings: React.FC = () => {
       upstreamCacheRespectUpstream: true,
       enableNotifications: true,
       notificationChannels: 'email,webhook',
+      minNotificationLevel: 'info', // 最小通知级别
       // 邮件通知配置
       smtpHost: '',
       smtpPort: '587',
@@ -752,6 +754,24 @@ const Settings: React.FC = () => {
                 isChecked={settings.enableNotifications}
                 onChange={(e) => handleInputChange('enableNotifications', e.target.checked)}
               />
+            </FormControl>
+            
+            {/* 最小通知级别设置 */}
+            <FormControl>
+              <FormLabel>最小通知级别</FormLabel>
+              <Select
+                value={settings.minNotificationLevel}
+                onChange={(e) => handleInputChange('minNotificationLevel', e.target.value)}
+                placeholder="选择最小通知级别"
+              >
+                <option value="info">信息 (info) - 所有通知</option>
+                <option value="warning">警告 (warning) - 警告及以上</option>
+                <option value="error">错误 (error) - 错误及以上</option>
+                <option value="critical">严重 (critical) - 仅严重通知</option>
+              </Select>
+              <Text fontSize="sm" color="gray.600" mt={1}>
+                设置最小通知级别，低于此级别的通知将不会发送邮件或推送
+              </Text>
             </FormControl>
             
             {/* 邮件通知配置 */}

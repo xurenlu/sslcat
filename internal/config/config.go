@@ -128,13 +128,13 @@ type ProxyConfig struct {
 // ProxyRule 代理规则
 type ProxyRule struct {
 	Domain  string `json:"domain"`
-	Target  string `json:"target,omitempty"`  // 旧字段：单后端目标（兼容保留）
-	Port    int    `json:"port,omitempty"`    // 旧字段：单后端端口（兼容保留）
+	Target  string `json:"target,omitempty"` // 旧字段：单后端目标（兼容保留）
+	Port    int    `json:"port,omitempty"`   // 旧字段：单后端端口（兼容保留）
 	Enabled bool   `json:"enabled"`
 	SSLOnly bool   `json:"ssl_only"`
 
 	// 新字段：统一后端配置
-	Backends []ProxyBackend `json:"backends,omitempty"`  // 统一后端服务器列表
+	Backends []ProxyBackend `json:"backends,omitempty"` // 统一后端服务器列表
 
 	// 保留字段：负载均衡配置（向后兼容）
 	LoadBalancerEnabled   bool           `json:"load_balancer_enabled,omitempty"`   // 是否启用负载均衡（兼容保留）
@@ -911,7 +911,7 @@ func Load(configFile string) (*Config, error) {
 
 	// 保存配置文件路径
 	config.ConfigFile = configFile
-	
+
 	// 执行代理规则迁移
 	config.migrateProxyRules()
 
@@ -1034,7 +1034,7 @@ func (c *Config) Save(configFile string) error {
 
 	// 执行代理规则静默升级
 	c.prepareProxyRulesForSave()
-	
+
 	// 验证配置完整性
 	if err := c.Validate(); err != nil {
 		return fmt.Errorf("配置验证失败: %w", err)
@@ -1174,8 +1174,9 @@ func (c *Config) RemoveProxyRule(domain string) {
 
 // NotificationConfig 通知配置
 type NotificationConfig struct {
-	Enabled  bool           `json:"enabled"`  // 是否启用通知系统
-	Channels ChannelsConfig `json:"channels"` // 通知渠道配置
+	Enabled              bool           `json:"enabled"`                // 是否启用通知系统
+	MinNotificationLevel string         `json:"min_notification_level"` // 最小通知级别 (info|warning|error|critical)
+	Channels             ChannelsConfig `json:"channels"`               // 通知渠道配置
 }
 
 // ChannelsConfig 通知渠道配置
@@ -1353,7 +1354,7 @@ func (rule *ProxyRule) GetEffectiveBackends() []ProxyBackend {
 	if len(rule.Backends) > 0 {
 		return rule.Backends
 	}
-	
+
 	// 如果没有新字段，尝试迁移
 	rule.MigrateToUnifiedBackends()
 	return rule.Backends
