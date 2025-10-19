@@ -41,6 +41,7 @@ import {
   FiX,
 } from 'react-icons/fi'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
+import { useTranslation } from '../hooks/useLanguage'
 
 interface SSLCertificate {
   domain: string
@@ -61,6 +62,7 @@ const SSLManagement: React.FC = () => {
   const { isOpen, onOpen, onClose } = useDisclosure()
   const toast = useToast()
   const { adminPrefix } = useConfig()
+  const t = useTranslation()
 
   const refreshCertificates = async () => {
     setLoading(true)
