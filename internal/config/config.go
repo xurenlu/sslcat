@@ -128,15 +128,18 @@ type ProxyConfig struct {
 // ProxyRule 代理规则
 type ProxyRule struct {
 	Domain  string `json:"domain"`
-	Target  string `json:"target"`
-	Port    int    `json:"port"`
+	Target  string `json:"target,omitempty"`  // 旧字段：单后端目标（兼容保留）
+	Port    int    `json:"port,omitempty"`    // 旧字段：单后端端口（兼容保留）
 	Enabled bool   `json:"enabled"`
 	SSLOnly bool   `json:"ssl_only"`
 
-	// 负载均衡配置
-	LoadBalancerEnabled   bool           `json:"load_balancer_enabled"`   // 是否启用负载均衡
-	LoadBalancerAlgorithm string         `json:"load_balancer_algorithm"` // 负载均衡算法: round_robin, least_conn, ip_hash, random, weighted_round_robin
-	LoadBalancerBackends  []ProxyBackend `json:"load_balancer_backends"`  // 后端服务器列表
+	// 新字段：统一后端配置
+	Backends []ProxyBackend `json:"backends,omitempty"`  // 统一后端服务器列表
+
+	// 保留字段：负载均衡配置（向后兼容）
+	LoadBalancerEnabled   bool           `json:"load_balancer_enabled,omitempty"`   // 是否启用负载均衡（兼容保留）
+	LoadBalancerAlgorithm string         `json:"load_balancer_algorithm,omitempty"` // 负载均衡算法（兼容保留）
+	LoadBalancerBackends  []ProxyBackend `json:"load_balancer_backends,omitempty"`  // 后端服务器列表（兼容保留）
 
 	// 会话保持配置
 	SessionAffinityEnabled bool   `json:"session_affinity_enabled"` // 是否启用会话保持
@@ -908,6 +911,9 @@ func Load(configFile string) (*Config, error) {
 
 	// 保存配置文件路径
 	config.ConfigFile = configFile
+	
+	// 执行代理规则迁移
+	config.migrateProxyRules()
 
 	return config, nil
 }
@@ -1026,6 +1032,9 @@ func (c *Config) Save(configFile string) error {
 		return fmt.Errorf("创建配置目录失败 (%s): %w", configDir, err)
 	}
 
+	// 执行代理规则静默升级
+	c.prepareProxyRulesForSave()
+	
 	// 验证配置完整性
 	if err := c.Validate(); err != nil {
 		return fmt.Errorf("配置验证失败: %w", err)
@@ -1283,5 +1292,90 @@ func migratePortConfig(config *Config) {
 			config.Server.CustomPort = config.Server.Port
 			config.Server.EnableHTTPS = false
 		}
+	}
+}
+
+// MigrateToUnifiedBackends 迁移到统一后端配置
+// 从旧的单后端或负载均衡配置迁移到新的统一后端数组
+func (rule *ProxyRule) MigrateToUnifiedBackends() {
+	// 如果已经有新的 backends 字段，直接返回
+	if len(rule.Backends) > 0 {
+		return
+	}
+
+	// 迁移逻辑：从旧字段到新字段
+	if rule.LoadBalancerEnabled && len(rule.LoadBalancerBackends) > 0 {
+		// 从负载均衡配置迁移
+		rule.Backends = rule.LoadBalancerBackends
+	} else if rule.Target != "" {
+		// 从单后端配置迁移
+		rule.Backends = []ProxyBackend{
+			{
+				ID:      fmt.Sprintf("%s_backend_1", rule.Domain),
+				Host:    rule.Target,
+				Port:    rule.Port,
+				Weight:  1,
+				Enabled: true,
+			},
+		}
+	}
+}
+
+// PrepareForSave 准备保存配置时的静默升级
+// 确保使用新的统一后端格式，同时保持向后兼容
+func (rule *ProxyRule) PrepareForSave() {
+	// 确保 backends 字段有值
+	if len(rule.Backends) == 0 {
+		rule.MigrateToUnifiedBackends()
+	}
+
+	// 根据 backends 数量设置负载均衡状态（保持兼容性）
+	if len(rule.Backends) > 1 {
+		rule.LoadBalancerEnabled = true
+		if rule.LoadBalancerAlgorithm == "" {
+			rule.LoadBalancerAlgorithm = "round_robin"
+		}
+		// 同步到旧字段以保持兼容性
+		rule.LoadBalancerBackends = rule.Backends
+	} else {
+		rule.LoadBalancerEnabled = false
+		// 同步到旧字段以保持兼容性
+		if len(rule.Backends) == 1 {
+			rule.Target = rule.Backends[0].Host
+			rule.Port = rule.Backends[0].Port
+		}
+	}
+}
+
+// GetEffectiveBackends 获取有效的后端列表
+// 优先使用新的 backends 字段，如果没有则从旧字段迁移
+func (rule *ProxyRule) GetEffectiveBackends() []ProxyBackend {
+	if len(rule.Backends) > 0 {
+		return rule.Backends
+	}
+	
+	// 如果没有新字段，尝试迁移
+	rule.MigrateToUnifiedBackends()
+	return rule.Backends
+}
+
+// IsLoadBalanced 判断是否启用负载均衡
+// 基于后端数量自动判断
+func (rule *ProxyRule) IsLoadBalanced() bool {
+	backends := rule.GetEffectiveBackends()
+	return len(backends) > 1
+}
+
+// migrateProxyRules 迁移所有代理规则到统一后端格式
+func (c *Config) migrateProxyRules() {
+	for i := range c.Proxy.Rules {
+		c.Proxy.Rules[i].MigrateToUnifiedBackends()
+	}
+}
+
+// prepareProxyRulesForSave 准备保存配置时的静默升级
+func (c *Config) prepareProxyRulesForSave() {
+	for i := range c.Proxy.Rules {
+		c.Proxy.Rules[i].PrepareForSave()
 	}
 }

@@ -123,9 +123,12 @@ func (m *Manager) initializeLoadBalancers() {
 
 // createLoadBalancer 为指定域名创建负载均衡器
 func (m *Manager) createLoadBalancer(rule *config.ProxyRule) error {
+	// 使用统一的后端配置
+	effectiveBackends := rule.GetEffectiveBackends()
+	
 	// 转换配置格式
 	var backends []loadbalancer.Backend
-	for i, proxyBackend := range rule.LoadBalancerBackends {
+	for i, proxyBackend := range effectiveBackends {
 		if !proxyBackend.Enabled {
 			continue
 		}
@@ -607,8 +610,8 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 	// 记录原始请求信息
 	m.logRequestDetails(r, "INCOMING_REQUEST", rule)
 
-	// 检查是否启用负载均衡
-	if rule.LoadBalancerEnabled {
+	// 检查是否启用负载均衡（基于后端数量自动判断）
+	if rule.IsLoadBalanced() {
 		m.handleLoadBalancedRequest(w, r, rule)
 		return
 	}
@@ -1601,36 +1604,27 @@ func (m *Manager) Validate(newConfig *config.Config) error {
 			return fmt.Errorf("proxy rule %d: domain is required", i)
 		}
 
-		if !rule.LoadBalancerEnabled {
-			// 单后端模式验证
-			if rule.Target == "" {
-				return fmt.Errorf("proxy rule %d: target is required", i)
-			}
-			if rule.Port <= 0 {
-				return fmt.Errorf("proxy rule %d: invalid port: %d", i, rule.Port)
-			}
-		} else {
-			// 负载均衡模式验证
-			if len(rule.LoadBalancerBackends) == 0 {
-				return fmt.Errorf("proxy rule %d: load balancer backends are required", i)
-			}
+		// 使用统一的后端验证
+		effectiveBackends := rule.GetEffectiveBackends()
+		if len(effectiveBackends) == 0 {
+			return fmt.Errorf("proxy rule %d: at least one backend is required", i)
+		}
 
-			enabledBackends := 0
-			for j, backend := range rule.LoadBalancerBackends {
-				if backend.Host == "" {
-					return fmt.Errorf("proxy rule %d, backend %d: host is required", i, j)
-				}
-				if backend.Port <= 0 {
-					return fmt.Errorf("proxy rule %d, backend %d: invalid port: %d", i, j, backend.Port)
-				}
-				if backend.Enabled {
-					enabledBackends++
-				}
+		enabledBackends := 0
+		for j, backend := range effectiveBackends {
+			if backend.Host == "" {
+				return fmt.Errorf("proxy rule %d, backend %d: host is required", i, j)
 			}
+			if backend.Port <= 0 {
+				return fmt.Errorf("proxy rule %d, backend %d: invalid port: %d", i, j, backend.Port)
+			}
+			if backend.Enabled {
+				enabledBackends++
+			}
+		}
 
-			if enabledBackends == 0 {
-				return fmt.Errorf("proxy rule %d: at least one backend must be enabled", i)
-			}
+		if enabledBackends == 0 {
+			return fmt.Errorf("proxy rule %d: at least one backend must be enabled", i)
 		}
 	}
 

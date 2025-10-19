@@ -203,45 +203,31 @@ func (v *ConfigValidator) validateProxyRule(rule *ProxyRule, index int) {
 		v.addError(prefix+".domain", "域名不能为空", rule.Domain)
 	}
 
-	if !rule.LoadBalancerEnabled {
-		// 单后端模式验证
-		if rule.Target == "" {
-			v.addError(prefix+".target", "目标地址不能为空", rule.Target)
-		}
+	// 使用统一的后端验证
+	effectiveBackends := rule.GetEffectiveBackends()
+	if len(effectiveBackends) == 0 {
+		v.addError(prefix+".backends", "至少需要一个后端服务器", "0")
+		return
+	}
 
-		if rule.Port <= 0 || rule.Port > 65535 {
-			v.addError(prefix+".port", "端口必须在1-65535之间", strconv.Itoa(rule.Port))
+	// 验证后端服务器
+	enabledBackends := 0
+	for j, backend := range effectiveBackends {
+		v.validateBackend(&backend, prefix, j)
+		if backend.Enabled {
+			enabledBackends++
 		}
+	}
 
-		// 检查目标地址是否可达（警告级别）
-		if rule.Target != "" && rule.Port > 0 {
-			if !v.isValidHostOrIP(rule.Target) {
-				v.addWarning(prefix+".target", "目标地址格式可能不正确", rule.Target)
-			}
-		}
-	} else {
-		// 负载均衡模式验证
-		if len(rule.LoadBalancerBackends) == 0 {
-			v.addError(prefix+".load_balancer_backends", "负载均衡模式下必须配置后端服务器", "0")
-		}
+	if enabledBackends == 0 {
+		v.addError(prefix+".backends", "至少需要一个启用的后端服务器", strconv.Itoa(enabledBackends))
+	}
 
-		// 验证算法
+	// 验证负载均衡算法（多后端时）
+	if len(effectiveBackends) > 1 {
 		validAlgorithms := []string{"round_robin", "weighted_round_robin", "least_conn", "ip_hash", "random", "consistent_hash"}
 		if !v.contains(validAlgorithms, rule.LoadBalancerAlgorithm) {
 			v.addError(prefix+".load_balancer_algorithm", "不支持的负载均衡算法", rule.LoadBalancerAlgorithm)
-		}
-
-		// 验证后端服务器
-		enabledBackends := 0
-		for j, backend := range rule.LoadBalancerBackends {
-			v.validateBackend(&backend, prefix, j)
-			if backend.Enabled {
-				enabledBackends++
-			}
-		}
-
-		if enabledBackends == 0 {
-			v.addError(prefix+".load_balancer_backends", "至少需要一个启用的后端服务器", strconv.Itoa(enabledBackends))
 		}
 
 		// 会话保持配置验证
