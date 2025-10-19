@@ -216,7 +216,41 @@ jobs:
             ### 📥 下载地址
             
             - **GitHub Releases**: https://github.com/xurenlu/sslcat/releases/tag/${{ github.ref_name }}
-            - **阿里云OSS镜像**: https://sslcat-releases.oss-cn-hangzhou.aliyuncs.com/releases/${{ github.ref_name }}/
+            - **CDN镜像**: https://cdn.wxside.com/sslcat/releases/${{ github.ref_name }}/
+            
+            #### 🖥️ 各平台详细下载地址
+            
+            **Linux AMD64 (x86_64 服务器)**
+            ```bash
+            # GitHub
+            https://github.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-amd64.tar.gz
+            # CDN镜像
+            https://cdn.wxside.com/sslcat/releases/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-amd64.tar.gz
+            ```
+            
+            **Linux ARM64 (树莓派、ARM服务器)**
+            ```bash
+            # GitHub
+            https://github.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-arm64.tar.gz
+            # CDN镜像
+            https://cdn.wxside.com/sslcat/releases/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-arm64.tar.gz
+            ```
+            
+            **macOS Intel (Intel芯片Mac)**
+            ```bash
+            # GitHub
+            https://github.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_darwin-amd64.tar.gz
+            # CDN镜像
+            https://cdn.wxside.com/sslcat/releases/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_darwin-amd64.tar.gz
+            ```
+            
+            **macOS Apple Silicon (M1/M2/M3芯片Mac)**
+            ```bash
+            # GitHub
+            https://github.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_darwin-arm64.tar.gz
+            # CDN镜像
+            https://cdn.wxside.com/sslcat/releases/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_darwin-arm64.tar.gz
+            ```
             
             ### 📝 更新日志
             
@@ -229,12 +263,12 @@ jobs:
             - ✅ 自动 SSL 证书申请
             - ✅ Docker 构建优化
             - ✅ 前端配置和翻译修复
-            - ✅ 阿里云OSS镜像同步
+            - ✅ CDN镜像同步 (cdn.wxside.com)
           files: artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # OSS 同步步骤
+      # CDN镜像同步步骤 (OSS -> CDN)
       - name: Install ossutil
         if: env.ALIYUN_ACCESS_KEY_ID != ''
         env:
@@ -256,7 +290,7 @@ jobs:
                          -k $ALIYUN_ACCESS_KEY_SECRET \
                          --language EN
 
-      - name: Upload to Aliyun OSS
+      - name: Upload to CDN Mirror (OSS)
         if: env.ALIYUN_ACCESS_KEY_ID != ''
         env:
           ALIYUN_ACCESS_KEY_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
@@ -278,7 +312,7 @@ jobs:
           
           echo "✅ Successfully uploaded to OSS: oss://$ALIYUN_OSS_BUCKET/releases/$VERSION/"
 
-      - name: Verify OSS upload
+      - name: Verify CDN Mirror upload
         if: env.ALIYUN_ACCESS_KEY_ID != ''
         env:
           ALIYUN_ACCESS_KEY_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
