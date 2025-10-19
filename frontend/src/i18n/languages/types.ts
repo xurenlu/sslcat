@@ -51,7 +51,7 @@ export interface Translation {
     completed: string
     failed: string
     unknown: string
-    unknownError: string
+    unknownError?: string
   }
   
   // 导航菜单
