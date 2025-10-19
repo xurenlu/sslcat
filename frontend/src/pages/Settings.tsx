@@ -77,6 +77,7 @@ const Settings: React.FC = () => {
     notificationChannels: 'email,webhook',
     minNotificationLevel: 'info', // 最小通知级别
     // 邮件通知配置
+    emailMethod: 'smtp', // 'smtp' | 'sendmail' | 'resend' | 'mailgun' | 'sendgrid'
     smtpHost: '',
     smtpPort: '587',
     smtpUsername: '',
@@ -84,6 +85,22 @@ const Settings: React.FC = () => {
     smtpFrom: '',
     smtpTo: '',
     smtpUseTLS: true,
+    // Sendmail 配置
+    sendmailCommand: '/usr/sbin/sendmail',
+    sendmailArgs: '-t',
+    // Resend 配置
+    resendApiKey: '',
+    resendFrom: '',
+    resendTo: '',
+    // Mailgun 配置
+    mailgunApiKey: '',
+    mailgunDomain: '',
+    mailgunFrom: '',
+    mailgunTo: '',
+    // SendGrid 配置
+    sendgridApiKey: '',
+    sendgridFrom: '',
+    sendgridTo: '',
     // Webhook配置（包括Slack、企业微信、飞书等）
     webhookUrls: [''],
   })
@@ -354,6 +371,7 @@ const Settings: React.FC = () => {
       notificationChannels: 'email,webhook',
       minNotificationLevel: 'info', // 最小通知级别
       // 邮件通知配置
+      emailMethod: 'smtp',
       smtpHost: '',
       smtpPort: '587',
       smtpUsername: '',
@@ -361,6 +379,22 @@ const Settings: React.FC = () => {
       smtpFrom: '',
       smtpTo: '',
       smtpUseTLS: true,
+      // Sendmail 配置
+      sendmailCommand: '/usr/sbin/sendmail',
+      sendmailArgs: '-t',
+      // Resend 配置
+      resendApiKey: '',
+      resendFrom: '',
+      resendTo: '',
+      // Mailgun 配置
+      mailgunApiKey: '',
+      mailgunDomain: '',
+      mailgunFrom: '',
+      mailgunTo: '',
+      // SendGrid 配置
+      sendgridApiKey: '',
+      sendgridFrom: '',
+      sendgridTo: '',
       // Webhook配置（包括Slack、企业微信、飞书等）
       webhookUrls: [''],
     })
@@ -779,65 +813,223 @@ const Settings: React.FC = () => {
             {/* 邮件通知配置 */}
             <Box border="1px" borderColor="gray.200" borderRadius="md" p={4}>
               <Heading size="sm" mb={4}>{t.settings.emailNotification}</Heading>
-              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
-                <FormControl>
-                  <FormLabel>{t.settings.smtpServer}</FormLabel>
-                  <Input
-                    value={settings.smtpHost || ''}
-                    onChange={(e) => handleInputChange('smtpHost', e.target.value)}
-                    placeholder="smtp.gmail.com"
-                  />
-                </FormControl>
-                <FormControl>
-                  <FormLabel>{t.settings.port}</FormLabel>
-                  <Input
-                    value={settings.smtpPort || ''}
-                    onChange={(e) => handleInputChange('smtpPort', e.target.value)}
-                    placeholder="587"
-                    type="number"
-                  />
-                </FormControl>
-                <FormControl>
-                  <FormLabel>{t.settings.username}</FormLabel>
-                  <Input
-                    value={settings.smtpUsername || ''}
-                    onChange={(e) => handleInputChange('smtpUsername', e.target.value)}
-                    placeholder="your-email@gmail.com"
-                  />
-                </FormControl>
-                <FormControl>
-                  <FormLabel>{t.settings.password}</FormLabel>
-                  <Input
-                    value={settings.smtpPassword || ''}
-                    onChange={(e) => handleInputChange('smtpPassword', e.target.value)}
-                    placeholder="your-app-password"
-                    type="password"
-                  />
-                </FormControl>
-                <FormControl>
-                  <FormLabel>{t.settings.sender}</FormLabel>
-                  <Input
-                    value={settings.smtpFrom || ''}
-                    onChange={(e) => handleInputChange('smtpFrom', e.target.value)}
-                    placeholder="your-email@gmail.com"
-                  />
-                </FormControl>
-                <FormControl>
-                  <FormLabel>{t.settings.recipient}</FormLabel>
-                  <Input
-                    value={settings.smtpTo || ''}
-                    onChange={(e) => handleInputChange('smtpTo', e.target.value)}
-                    placeholder="admin@example.com,support@example.com"
-                  />
-                </FormControl>
-              </SimpleGrid>
-              <FormControl display="flex" alignItems="center" mt={4}>
-                <FormLabel mb="0">{t.settings.enableTLS}</FormLabel>
-                <Switch
-                  isChecked={settings.smtpUseTLS || false}
-                  onChange={(e) => handleInputChange('smtpUseTLS', e.target.checked)}
-                />
+              
+              {/* 邮件发送方式选择 */}
+              <FormControl mb={4}>
+                <FormLabel>{t.settings.emailMethod}</FormLabel>
+                <Select
+                  value={settings.emailMethod || 'smtp'}
+                  onChange={(e) => handleInputChange('emailMethod', e.target.value)}
+                >
+                  <option value="smtp">SMTP 服务器</option>
+                  <option value="sendmail">系统 Sendmail</option>
+                  <option value="resend">Resend 服务</option>
+                  <option value="mailgun">Mailgun 服务</option>
+                  <option value="sendgrid">SendGrid 服务</option>
+                </Select>
               </FormControl>
+
+              {/* SMTP 配置 */}
+              {settings.emailMethod === 'smtp' && (
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                  <FormControl>
+                    <FormLabel>{t.settings.smtpServer}</FormLabel>
+                    <Input
+                      value={settings.smtpHost || ''}
+                      onChange={(e) => handleInputChange('smtpHost', e.target.value)}
+                      placeholder="smtp.gmail.com"
+                    />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel>{t.settings.port}</FormLabel>
+                    <Input
+                      value={settings.smtpPort || ''}
+                      onChange={(e) => handleInputChange('smtpPort', e.target.value)}
+                      placeholder="587"
+                      type="number"
+                    />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel>{t.settings.username}</FormLabel>
+                    <Input
+                      value={settings.smtpUsername || ''}
+                      onChange={(e) => handleInputChange('smtpUsername', e.target.value)}
+                      placeholder="your-email@gmail.com"
+                    />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel>{t.settings.password}</FormLabel>
+                    <Input
+                      value={settings.smtpPassword || ''}
+                      onChange={(e) => handleInputChange('smtpPassword', e.target.value)}
+                      placeholder="your-app-password"
+                      type="password"
+                    />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel>{t.settings.sender}</FormLabel>
+                    <Input
+                      value={settings.smtpFrom || ''}
+                      onChange={(e) => handleInputChange('smtpFrom', e.target.value)}
+                      placeholder="your-email@gmail.com"
+                    />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel>{t.settings.recipient}</FormLabel>
+                    <Input
+                      value={settings.smtpTo || ''}
+                      onChange={(e) => handleInputChange('smtpTo', e.target.value)}
+                      placeholder="admin@example.com,support@example.com"
+                    />
+                  </FormControl>
+                  <FormControl display="flex" alignItems="center" mt={4}>
+                    <FormLabel mb="0">{t.settings.enableTLS}</FormLabel>
+                    <Switch
+                      isChecked={settings.smtpUseTLS || false}
+                      onChange={(e) => handleInputChange('smtpUseTLS', e.target.checked)}
+                    />
+                  </FormControl>
+                </SimpleGrid>
+              )}
+
+              {/* Sendmail 配置 */}
+              {settings.emailMethod === 'sendmail' && (
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                  <FormControl>
+                    <FormLabel>Sendmail 命令</FormLabel>
+                    <Input
+                      value={settings.sendmailCommand || ''}
+                      onChange={(e) => handleInputChange('sendmailCommand', e.target.value)}
+                      placeholder="/usr/sbin/sendmail"
+                    />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel>命令参数</FormLabel>
+                    <Input
+                      value={settings.sendmailArgs || ''}
+                      onChange={(e) => handleInputChange('sendmailArgs', e.target.value)}
+                      placeholder="-t"
+                    />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel>发件人</FormLabel>
+                    <Input
+                      value={settings.smtpFrom || ''}
+                      onChange={(e) => handleInputChange('smtpFrom', e.target.value)}
+                      placeholder="noreply@example.com"
+                    />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel>收件人</FormLabel>
+                    <Input
+                      value={settings.smtpTo || ''}
+                      onChange={(e) => handleInputChange('smtpTo', e.target.value)}
+                      placeholder="admin@example.com,support@example.com"
+                    />
+                  </FormControl>
+                </SimpleGrid>
+              )}
+
+              {/* Resend 配置 */}
+              {settings.emailMethod === 'resend' && (
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                  <FormControl>
+                    <FormLabel>Resend API Key</FormLabel>
+                    <Input
+                      value={settings.resendApiKey || ''}
+                      onChange={(e) => handleInputChange('resendApiKey', e.target.value)}
+                      placeholder="re_xxxxxxxxxx"
+                      type="password"
+                    />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel>发件人</FormLabel>
+                    <Input
+                      value={settings.resendFrom || ''}
+                      onChange={(e) => handleInputChange('resendFrom', e.target.value)}
+                      placeholder="noreply@example.com"
+                    />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel>收件人</FormLabel>
+                    <Input
+                      value={settings.resendTo || ''}
+                      onChange={(e) => handleInputChange('resendTo', e.target.value)}
+                      placeholder="admin@example.com,support@example.com"
+                    />
+                  </FormControl>
+                </SimpleGrid>
+              )}
+
+              {/* Mailgun 配置 */}
+              {settings.emailMethod === 'mailgun' && (
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                  <FormControl>
+                    <FormLabel>Mailgun API Key</FormLabel>
+                    <Input
+                      value={settings.mailgunApiKey || ''}
+                      onChange={(e) => handleInputChange('mailgunApiKey', e.target.value)}
+                      placeholder="key-xxxxxxxxxx"
+                      type="password"
+                    />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel>Mailgun Domain</FormLabel>
+                    <Input
+                      value={settings.mailgunDomain || ''}
+                      onChange={(e) => handleInputChange('mailgunDomain', e.target.value)}
+                      placeholder="mg.example.com"
+                    />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel>发件人</FormLabel>
+                    <Input
+                      value={settings.mailgunFrom || ''}
+                      onChange={(e) => handleInputChange('mailgunFrom', e.target.value)}
+                      placeholder="noreply@example.com"
+                    />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel>收件人</FormLabel>
+                    <Input
+                      value={settings.mailgunTo || ''}
+                      onChange={(e) => handleInputChange('mailgunTo', e.target.value)}
+                      placeholder="admin@example.com,support@example.com"
+                    />
+                  </FormControl>
+                </SimpleGrid>
+              )}
+
+              {/* SendGrid 配置 */}
+              {settings.emailMethod === 'sendgrid' && (
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                  <FormControl>
+                    <FormLabel>SendGrid API Key</FormLabel>
+                    <Input
+                      value={settings.sendgridApiKey || ''}
+                      onChange={(e) => handleInputChange('sendgridApiKey', e.target.value)}
+                      placeholder="SG.xxxxxxxxxx"
+                      type="password"
+                    />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel>发件人</FormLabel>
+                    <Input
+                      value={settings.sendgridFrom || ''}
+                      onChange={(e) => handleInputChange('sendgridFrom', e.target.value)}
+                      placeholder="noreply@example.com"
+                    />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel>收件人</FormLabel>
+                    <Input
+                      value={settings.sendgridTo || ''}
+                      onChange={(e) => handleInputChange('sendgridTo', e.target.value)}
+                      placeholder="admin@example.com,support@example.com"
+                    />
+                  </FormControl>
+                </SimpleGrid>
+              )}
             </Box>
 
             {/* Webhook通知配置 */}

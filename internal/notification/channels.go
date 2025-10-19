@@ -3,11 +3,15 @@ package notification
 import (
 	"bytes"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/smtp"
+	"net/url"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -18,6 +22,9 @@ import (
 // EmailChannel 邮件通知渠道
 type EmailChannel struct {
 	enabled  bool
+	method   string // smtp, sendmail, resend, mailgun, sendgrid
+	
+	// SMTP 配置
 	smtpHost string
 	smtpPort string
 	username string
@@ -26,7 +33,28 @@ type EmailChannel struct {
 	to       []string
 	useTLS   bool
 	client   *smtp.Client
-	log      *logrus.Entry
+	
+	// Sendmail 配置
+	sendmailCommand string
+	sendmailArgs    string
+	
+	// Resend 配置
+	resendAPIKey string
+	resendFrom   string
+	resendTo     string
+	
+	// Mailgun 配置
+	mailgunAPIKey string
+	mailgunDomain string
+	mailgunFrom   string
+	mailgunTo     string
+	
+	// SendGrid 配置
+	sendgridAPIKey string
+	sendgridFrom   string
+	sendgridTo     string
+	
+	log *logrus.Entry
 }
 
 // NewEmailChannel 创建邮件通知渠道
@@ -58,7 +86,10 @@ func NewEmailChannel() *EmailChannel {
 // NewEmailChannelFromConfig 从配置创建邮件通知渠道
 func NewEmailChannelFromConfig(cfg config.EmailChannelConfig) *EmailChannel {
 	ec := &EmailChannel{
-		enabled:  cfg.Enabled,
+		enabled: cfg.Enabled,
+		method:  cfg.Method,
+		
+		// SMTP 配置
 		smtpHost: cfg.SMTPHost,
 		smtpPort: fmt.Sprintf("%d", cfg.SMTPPort),
 		username: cfg.Username,
@@ -66,17 +97,72 @@ func NewEmailChannelFromConfig(cfg config.EmailChannelConfig) *EmailChannel {
 		from:     cfg.From,
 		to:       cfg.To,
 		useTLS:   cfg.UseTLS,
-		log:      logrus.WithFields(logrus.Fields{"component": "email_channel"}),
+		
+		// Sendmail 配置
+		sendmailCommand: cfg.SendmailCommand,
+		sendmailArgs:    cfg.SendmailArgs,
+		
+		// Resend 配置
+		resendAPIKey: cfg.ResendAPIKey,
+		resendFrom:   cfg.ResendFrom,
+		resendTo:     cfg.ResendTo,
+		
+		// Mailgun 配置
+		mailgunAPIKey: cfg.MailgunAPIKey,
+		mailgunDomain: cfg.MailgunDomain,
+		mailgunFrom:   cfg.MailgunFrom,
+		mailgunTo:     cfg.MailgunTo,
+		
+		// SendGrid 配置
+		sendgridAPIKey: cfg.SendGridAPIKey,
+		sendgridFrom:   cfg.SendGridFrom,
+		sendgridTo:     cfg.SendGridTo,
+		
+		log: logrus.WithFields(logrus.Fields{"component": "email_channel"}),
 	}
 
 	// 验证配置完整性
 	if ec.enabled {
-		if ec.smtpHost == "" || ec.smtpPort == "" || ec.username == "" ||
-			ec.password == "" || ec.from == "" || len(ec.to) == 0 {
+		switch ec.method {
+		case "smtp":
+			if ec.smtpHost == "" || ec.smtpPort == "" || ec.username == "" ||
+				ec.password == "" || ec.from == "" || len(ec.to) == 0 {
+				ec.enabled = false
+				ec.log.Warn("SMTP邮件通知配置不完整，已禁用")
+			} else {
+				ec.log.Info("SMTP邮件通知渠道已从配置启用")
+			}
+		case "sendmail":
+			if ec.sendmailCommand == "" || ec.from == "" || len(ec.to) == 0 {
+				ec.enabled = false
+				ec.log.Warn("Sendmail邮件通知配置不完整，已禁用")
+			} else {
+				ec.log.Info("Sendmail邮件通知渠道已从配置启用")
+			}
+		case "resend":
+			if ec.resendAPIKey == "" || ec.resendFrom == "" || ec.resendTo == "" {
+				ec.enabled = false
+				ec.log.Warn("Resend邮件通知配置不完整，已禁用")
+			} else {
+				ec.log.Info("Resend邮件通知渠道已从配置启用")
+			}
+		case "mailgun":
+			if ec.mailgunAPIKey == "" || ec.mailgunDomain == "" || ec.mailgunFrom == "" || ec.mailgunTo == "" {
+				ec.enabled = false
+				ec.log.Warn("Mailgun邮件通知配置不完整，已禁用")
+			} else {
+				ec.log.Info("Mailgun邮件通知渠道已从配置启用")
+			}
+		case "sendgrid":
+			if ec.sendgridAPIKey == "" || ec.sendgridFrom == "" || ec.sendgridTo == "" {
+				ec.enabled = false
+				ec.log.Warn("SendGrid邮件通知配置不完整，已禁用")
+			} else {
+				ec.log.Info("SendGrid邮件通知渠道已从配置启用")
+			}
+		default:
 			ec.enabled = false
-			ec.log.Warn("邮件通知配置不完整，已禁用")
-		} else {
-			ec.log.Info("邮件通知渠道已从配置启用")
+			ec.log.Warnf("不支持的邮件发送方式: %s", ec.method)
 		}
 	}
 
@@ -93,8 +179,21 @@ func (ec *EmailChannel) Send(notification *Notification) error {
 	subject := fmt.Sprintf("[%s] %s", strings.ToUpper(notification.Level.String()), notification.Title)
 	body := ec.buildEmailBody(notification)
 
-	// 发送邮件
-	return ec.sendEmail(ec.to, subject, body)
+	// 根据配置的发送方式发送邮件
+	switch ec.method {
+	case "smtp":
+		return ec.sendEmailSMTP(ec.to, subject, body)
+	case "sendmail":
+		return ec.sendEmailSendmail(ec.to, subject, body)
+	case "resend":
+		return ec.sendEmailResend(ec.resendTo, subject, body)
+	case "mailgun":
+		return ec.sendEmailMailgun(ec.mailgunTo, subject, body)
+	case "sendgrid":
+		return ec.sendEmailSendGrid(ec.sendgridTo, subject, body)
+	default:
+		return fmt.Errorf("不支持的邮件发送方式: %s", ec.method)
+	}
 }
 
 // buildEmailBody 构建邮件正文
@@ -120,8 +219,8 @@ func (ec *EmailChannel) buildEmailBody(notification *Notification) string {
 	return buffer.String()
 }
 
-// sendEmail 发送邮件
-func (ec *EmailChannel) sendEmail(to []string, subject, body string) error {
+// sendEmailSMTP 通过SMTP发送邮件
+func (ec *EmailChannel) sendEmailSMTP(to []string, subject, body string) error {
 	addr := ec.smtpHost + ":" + ec.smtpPort
 
 	// 创建SMTP客户端
@@ -192,6 +291,152 @@ func (ec *EmailChannel) IsEnabled() bool {
 // GetName 获取渠道名称
 func (ec *EmailChannel) GetName() string {
 	return "email"
+}
+
+// sendEmailSendmail 通过系统sendmail发送邮件
+func (ec *EmailChannel) sendEmailSendmail(to []string, subject, body string) error {
+	// 构建邮件内容
+	message := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n%s",
+		ec.from, strings.Join(to, ","), subject, body)
+
+	// 执行sendmail命令
+	cmd := exec.Command(ec.sendmailCommand, strings.Fields(ec.sendmailArgs)...)
+	cmd.Stdin = strings.NewReader(message)
+	
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("sendmail执行失败: %v, 输出: %s", err, string(output))
+	}
+
+	ec.log.Infof("邮件已通过sendmail发送到: %s", strings.Join(to, ","))
+	return nil
+}
+
+// sendEmailResend 通过Resend API发送邮件
+func (ec *EmailChannel) sendEmailResend(to, subject, body string) error {
+	// 构建请求数据
+	data := map[string]interface{}{
+		"from":    ec.resendFrom,
+		"to":      []string{to},
+		"subject": subject,
+		"text":    body,
+	}
+
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("JSON序列化失败: %v", err)
+	}
+
+	// 发送HTTP请求
+	req, err := http.NewRequest("POST", "https://api.resend.com/emails", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("创建请求失败: %v", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+ec.resendAPIKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("发送请求失败: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("Resend API错误: %d, %s", resp.StatusCode, string(body))
+	}
+
+	ec.log.Infof("邮件已通过Resend发送到: %s", to)
+	return nil
+}
+
+// sendEmailMailgun 通过Mailgun API发送邮件
+func (ec *EmailChannel) sendEmailMailgun(to, subject, body string) error {
+	// 构建表单数据
+	data := url.Values{}
+	data.Set("from", ec.mailgunFrom)
+	data.Set("to", to)
+	data.Set("subject", subject)
+	data.Set("text", body)
+
+	// 发送HTTP请求
+	req, err := http.NewRequest("POST", fmt.Sprintf("https://api.mailgun.net/v3/%s/messages", ec.mailgunDomain), strings.NewReader(data.Encode()))
+	if err != nil {
+		return fmt.Errorf("创建请求失败: %v", err)
+	}
+
+	req.SetBasicAuth("api", ec.mailgunAPIKey)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("发送请求失败: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("Mailgun API错误: %d, %s", resp.StatusCode, string(body))
+	}
+
+	ec.log.Infof("邮件已通过Mailgun发送到: %s", to)
+	return nil
+}
+
+// sendEmailSendGrid 通过SendGrid API发送邮件
+func (ec *EmailChannel) sendEmailSendGrid(to, subject, body string) error {
+	// 构建请求数据
+	data := map[string]interface{}{
+		"personalizations": []map[string]interface{}{
+			{
+				"to": []map[string]string{
+					{"email": to},
+				},
+			},
+		},
+		"from": map[string]string{
+			"email": ec.sendgridFrom,
+		},
+		"subject": subject,
+		"content": []map[string]string{
+			{
+				"type":  "text/plain",
+				"value": body,
+			},
+		},
+	}
+
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("JSON序列化失败: %v", err)
+	}
+
+	// 发送HTTP请求
+	req, err := http.NewRequest("POST", "https://api.sendgrid.com/v3/mail/send", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("创建请求失败: %v", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+ec.sendgridAPIKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("发送请求失败: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusAccepted {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("SendGrid API错误: %d, %s", resp.StatusCode, string(body))
+	}
+
+	ec.log.Infof("邮件已通过SendGrid发送到: %s", to)
+	return nil
 }
 
 // WebhookChannel Webhook通知渠道

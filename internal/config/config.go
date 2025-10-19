@@ -1190,6 +1190,9 @@ type ChannelsConfig struct {
 // EmailChannelConfig 邮件通知渠道配置
 type EmailChannelConfig struct {
 	Enabled  bool     `json:"enabled"`   // 是否启用
+	Method   string   `json:"method"`    // 邮件发送方式: smtp, sendmail, resend, mailgun, sendgrid
+	
+	// SMTP 配置
 	SMTPHost string   `json:"smtp_host"` // SMTP服务器地址
 	SMTPPort int      `json:"smtp_port"` // SMTP端口
 	Username string   `json:"username"`  // 用户名
@@ -1197,6 +1200,26 @@ type EmailChannelConfig struct {
 	From     string   `json:"from"`      // 发件人地址
 	To       []string `json:"to"`        // 收件人地址列表
 	UseTLS   bool     `json:"use_tls"`   // 是否使用TLS
+	
+	// Sendmail 配置
+	SendmailCommand string `json:"sendmail_command"` // Sendmail 命令路径
+	SendmailArgs    string `json:"sendmail_args"`    // Sendmail 参数
+	
+	// Resend 配置
+	ResendAPIKey string `json:"resend_api_key"` // Resend API Key
+	ResendFrom   string `json:"resend_from"`   // Resend 发件人
+	ResendTo     string `json:"resend_to"`      // Resend 收件人
+	
+	// Mailgun 配置
+	MailgunAPIKey string `json:"mailgun_api_key"` // Mailgun API Key
+	MailgunDomain string `json:"mailgun_domain"` // Mailgun 域名
+	MailgunFrom   string `json:"mailgun_from"`     // Mailgun 发件人
+	MailgunTo     string `json:"mailgun_to"`      // Mailgun 收件人
+	
+	// SendGrid 配置
+	SendGridAPIKey string `json:"sendgrid_api_key"` // SendGrid API Key
+	SendGridFrom   string `json:"sendgrid_from"`   // SendGrid 发件人
+	SendGridTo     string `json:"sendgrid_to"`     // SendGrid 收件人
 }
 
 // WebhookChannelConfig Webhook通知渠道配置
