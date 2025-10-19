@@ -25,7 +25,7 @@ import { useNavigate } from 'react-router-dom'
 import { useConfig, buildPath, buildApiPath } from '../contexts/ConfigContext'
 import HeaderEditor from '../components/HeaderEditor'
 import { CORS_PRESET } from '../constants/cors'
-import LoadBalancerConfig from '../components/LoadBalancerConfig'
+import BackendConfig from '../components/BackendConfig'
 import WebSocketConfig from '../components/WebSocketConfig'
 
 interface ProxyAuthUser {
@@ -50,14 +50,14 @@ interface ProxyBackend {
 
 interface ProxyRuleForm {
   domain: string
-  target: string
   enabled: boolean
   ssl_only: boolean
   
-  // 负载均衡配置
-  load_balancer_enabled: boolean
+  // 统一后端配置
+  backends: ProxyBackend[]
+  
+  // 负载均衡配置（自动启用）
   load_balancer_algorithm: string
-  load_balancer_backends: ProxyBackend[]
   
   // 会话保持配置
   session_affinity_enabled: boolean
@@ -117,14 +117,40 @@ const ProxyAdd: React.FC = () => {
   const { adminPrefix } = useConfig()
   const [formData, setFormData] = useState<ProxyRuleForm>({
     domain: '',
-    target: '',
     enabled: true,
     ssl_only: true,
     
-    // 负载均衡配置
-    load_balancer_enabled: false,
+    // 统一后端配置（至少一个后端）
+    backends: [
+      {
+        id: '',
+        host: '',
+        port: 80,
+        weight: 1,
+        priority: 0,
+        enabled: true,
+        health_check_enabled: false,
+        health_check_path: '/health',
+        health_check_interval: 30,
+        health_check_timeout: 5,
+        health_check_method: 'GET',
+        expected_status_code: 200,
+        max_retries: 3,
+        retry_interval: 1,
+        failure_threshold: 3,
+        recovery_threshold: 2,
+        connect_timeout: 30,
+        read_timeout: 30,
+        write_timeout: 30,
+        keep_alive_timeout: 30,
+        max_connections: 100,
+        tls_enabled: false,
+        tls_insecure: false
+      }
+    ],
+    
+    // 负载均衡配置（自动启用）
     load_balancer_algorithm: 'round_robin',
-    load_balancer_backends: [],
     
     // 会话保持配置
     session_affinity_enabled: false,
@@ -369,23 +395,6 @@ const ProxyAdd: React.FC = () => {
                     </Text>
                   </FormControl>
 
-                  <FormControl isRequired>
-                    <FormLabel>目标地址</FormLabel>
-                    <Input
-                      value={formData.target}
-                      onChange={(e) => handleInputChange('target', e.target.value)}
-                      placeholder="http://localhost:3000"
-                      size="lg"
-                    />
-                    <Text fontSize="sm" color="gray.500" mt={1}>
-                      代理转发的完整目标地址，包含协议、主机和端口
-                      {formData.load_balancer_enabled && (
-                        <Text as="span" color="orange.500" fontWeight="medium">
-                          （注意：启用负载均衡后，此字段将被忽略，系统将使用下方配置的后端服务器）
-                        </Text>
-                      )}
-                    </Text>
-                  </FormControl>
                 </VStack>
               </Box>
 
@@ -421,11 +430,10 @@ const ProxyAdd: React.FC = () => {
                 </VStack>
               </Box>
 
-              {/* 负载均衡配置 */}
-              <LoadBalancerConfig
-                load_balancer_enabled={formData.load_balancer_enabled}
+              {/* 后端服务器配置 */}
+              <BackendConfig
+                backends={formData.backends}
                 load_balancer_algorithm={formData.load_balancer_algorithm}
-                load_balancer_backends={formData.load_balancer_backends}
                 session_affinity_enabled={formData.session_affinity_enabled}
                 session_affinity_method={formData.session_affinity_method}
                 session_affinity_cookie={formData.session_affinity_cookie}
