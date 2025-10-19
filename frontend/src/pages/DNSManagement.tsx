@@ -39,6 +39,7 @@ import {
   FiSettings,
 } from 'react-icons/fi'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
+import { useTranslation } from '../hooks/useLanguage'
 
 
 interface DNSProvider {
@@ -66,6 +67,7 @@ const DNSManagement: React.FC = () => {
   } = useDisclosure()
   const toast = useToast()
   const { adminPrefix } = useConfig()
+  const t = useTranslation()
 
   const [newProvider, setNewProvider] = useState({
     name: '',
