@@ -101,7 +101,7 @@ const ImageOptimization: React.FC = () => {
   useEffect(() => {
     loadConfig();
     loadStats();
-    const interval = setInterval(loadStats, 10000); // 每10秒更新统计
+    const interval = setInterval(loadStats, 10000); // Update stats every 10 seconds
     return () => clearInterval(interval);
   }, []);
 
@@ -113,7 +113,7 @@ const ImageOptimization: React.FC = () => {
       }
     } catch (error) {
       toast({
-        title: '加载配置失败',
+        title: t.imageOptimization.loadConfigFailed,
         status: 'error',
         duration: 3000,
       });
@@ -129,7 +129,7 @@ const ImageOptimization: React.FC = () => {
         setStats(response.stats);
       }
     } catch (error) {
-      // 静默失败，不显示错误
+      // Silent failure, no error display
     }
   };
 
@@ -142,7 +142,7 @@ const ImageOptimization: React.FC = () => {
       );
       if (response.success) {
         toast({
-          title: '保存成功',
+          title: t.imageOptimization.saveSuccess,
           description: response.message,
           status: 'success',
           duration: 3000,
@@ -150,8 +150,8 @@ const ImageOptimization: React.FC = () => {
       }
     } catch (error: any) {
       toast({
-        title: '保存失败',
-        description: error.message || '未知错误',
+        title: t.imageOptimization.saveFailed,
+        description: error.message || t.common.unknownError,
         status: 'error',
         duration: 3000,
       });
@@ -168,7 +168,7 @@ const ImageOptimization: React.FC = () => {
       );
       if (response.success) {
         toast({
-          title: '缓存已清空',
+          title: t.imageOptimization.cacheCleared,
           status: 'success',
           duration: 3000,
         });
@@ -176,8 +176,8 @@ const ImageOptimization: React.FC = () => {
       }
     } catch (error: any) {
       toast({
-        title: '清空失败',
-        description: error.message || '未知错误',
+          title: t.imageOptimization.clearFailed,
+          description: error.message || t.common.unknownError,
         status: 'error',
         duration: 3000,
       });
@@ -258,41 +258,41 @@ const ImageOptimization: React.FC = () => {
         </Box>
       </Alert>
 
-      {/* 统计信息 */}
+      {/* Statistics */}
       {stats && (
         <StatGroup mb={6}>
           <Stat>
-            <StatLabel>总请求数</StatLabel>
+            <StatLabel>{t.imageOptimization.totalRequests}</StatLabel>
             <StatNumber>{stats.total_requests.toLocaleString()}</StatNumber>
           </Stat>
           <Stat>
-            <StatLabel>缓存命中率</StatLabel>
+            <StatLabel>{t.imageOptimization.cacheHitRate}</StatLabel>
             <StatNumber>{stats.cache_hit_rate.toFixed(1)}%</StatNumber>
             <StatHelpText>{stats.cache_hits} / {stats.cache_hits + stats.cache_misses}</StatHelpText>
           </Stat>
           <Stat>
-            <StatLabel>节省带宽</StatLabel>
+            <StatLabel>{t.imageOptimization.bandwidthSaved}</StatLabel>
             <StatNumber>{stats.total_bytes_saved_mb.toFixed(1)} MB</StatNumber>
-            <StatHelpText>压缩率 {stats.compression_rate.toFixed(1)}%</StatHelpText>
+            <StatHelpText>{t.imageOptimization.compressionRate} {stats.compression_rate.toFixed(1)}%</StatHelpText>
           </Stat>
           <Stat>
-            <StatLabel>缓存大小</StatLabel>
+            <StatLabel>{t.imageOptimization.cacheSize}</StatLabel>
             <StatNumber>{stats.cache_size_mb.toFixed(1)} MB</StatNumber>
-            <StatHelpText>{stats.cache_items} 个项目</StatHelpText>
+            <StatHelpText>{stats.cache_items} {t.imageOptimization.items}</StatHelpText>
           </Stat>
         </StatGroup>
       )}
 
       <VStack spacing={6} align="stretch">
-        {/* 基础设置 */}
+        {/* Basic Settings */}
         <Card>
           <CardHeader>
-            <Heading size="md">基础设置</Heading>
+            <Heading size="md">{t.imageOptimization.basicSettings}</Heading>
           </CardHeader>
           <CardBody>
             <VStack spacing={4} align="stretch">
               <FormControl display="flex" alignItems="center">
-                <FormLabel mb="0">启用图片优化</FormLabel>
+                <FormLabel mb="0">{t.imageOptimization.enableImageOptimization}</FormLabel>
                 <Switch
                   isChecked={config.enabled}
                   onChange={(e) => setConfig({ ...config, enabled: e.target.checked })}
@@ -300,7 +300,7 @@ const ImageOptimization: React.FC = () => {
               </FormControl>
 
               <FormControl display="flex" alignItems="center">
-                <FormLabel mb="0">自动转换为 WebP</FormLabel>
+                <FormLabel mb="0">{t.imageOptimization.autoConvertWebP}</FormLabel>
                 <Switch
                   isChecked={config.auto_webp}
                   onChange={(e) => setConfig({ ...config, auto_webp: e.target.checked })}
@@ -309,7 +309,7 @@ const ImageOptimization: React.FC = () => {
               </FormControl>
 
               <FormControl display="flex" alignItems="center">
-                <FormLabel mb="0">移除图片元数据（EXIF）</FormLabel>
+                <FormLabel mb="0">{t.imageOptimization.removeMetadata}</FormLabel>
                 <Switch
                   isChecked={config.strip_metadata}
                   onChange={(e) => setConfig({ ...config, strip_metadata: e.target.checked })}
@@ -320,15 +320,15 @@ const ImageOptimization: React.FC = () => {
           </CardBody>
         </Card>
 
-        {/* 质量设置 */}
+        {/* Quality Settings */}
         <Card>
           <CardHeader>
-            <Heading size="md">压缩质量</Heading>
+            <Heading size="md">{t.imageOptimization.compressionQuality}</Heading>
           </CardHeader>
           <CardBody>
             <VStack spacing={4} align="stretch">
               <FormControl>
-                <FormLabel>WebP 质量 (0-100)</FormLabel>
+                <FormLabel>{t.imageOptimization.webpQuality}</FormLabel>
                 <NumberInput
                   value={config.webp_quality}
                   min={0}
@@ -343,12 +343,12 @@ const ImageOptimization: React.FC = () => {
                   </NumberInputStepper>
                 </NumberInput>
                 <Text fontSize="sm" color="gray.500" mt={1}>
-                  推荐值：80（质量与大小的最佳平衡）
+                  {t.imageOptimization.webpQualityRecommendation}
                 </Text>
               </FormControl>
 
               <FormControl>
-                <FormLabel>JPEG 质量 (0-100)</FormLabel>
+                <FormLabel>{t.imageOptimization.jpegQuality}</FormLabel>
                 <NumberInput
                   value={config.jpeg_quality}
                   min={0}
@@ -363,12 +363,12 @@ const ImageOptimization: React.FC = () => {
                   </NumberInputStepper>
                 </NumberInput>
                 <Text fontSize="sm" color="gray.500" mt={1}>
-                  推荐值：85（视觉无损）
+                  {t.imageOptimization.jpegQualityRecommendation}
                 </Text>
               </FormControl>
 
               <FormControl>
-                <FormLabel>PNG 压缩级别 (0-9)</FormLabel>
+                <FormLabel>{t.imageOptimization.pngCompressionLevel}</FormLabel>
                 <NumberInput
                   value={config.png_level}
                   min={0}
@@ -383,22 +383,22 @@ const ImageOptimization: React.FC = () => {
                   </NumberInputStepper>
                 </NumberInput>
                 <Text fontSize="sm" color="gray.500" mt={1}>
-                  推荐值：6（平衡压缩率和速度）
+                  {t.imageOptimization.pngCompressionRecommendation}
                 </Text>
               </FormControl>
             </VStack>
           </CardBody>
         </Card>
 
-        {/* 尺寸调整 */}
+        {/* Size Adjustment */}
         <Card>
           <CardHeader>
-            <Heading size="md">尺寸调整</Heading>
+            <Heading size="md">{t.imageOptimization.sizeAdjustment}</Heading>
           </CardHeader>
           <CardBody>
             <VStack spacing={4} align="stretch">
               <FormControl display="flex" alignItems="center">
-                <FormLabel mb="0">允许尺寸调整</FormLabel>
+                <FormLabel mb="0">{t.imageOptimization.allowResize}</FormLabel>
                 <Switch
                   isChecked={config.allow_resize}
                   onChange={(e) => setConfig({ ...config, allow_resize: e.target.checked })}
@@ -408,7 +408,7 @@ const ImageOptimization: React.FC = () => {
 
               <HStack>
                 <FormControl>
-                  <FormLabel>最大宽度 (px)</FormLabel>
+                  <FormLabel>{t.imageOptimization.maxWidth}</FormLabel>
                   <NumberInput
                     value={config.max_width}
                     min={100}
@@ -421,7 +421,7 @@ const ImageOptimization: React.FC = () => {
                 </FormControl>
 
                 <FormControl>
-                  <FormLabel>最大高度 (px)</FormLabel>
+                  <FormLabel>{t.imageOptimization.maxHeight}</FormLabel>
                   <NumberInput
                     value={config.max_height}
                     min={100}
@@ -435,17 +435,17 @@ const ImageOptimization: React.FC = () => {
               </HStack>
 
               <FormControl>
-                <FormLabel>允许的尺寸列表</FormLabel>
+                <FormLabel>{t.imageOptimization.allowedSizes}</FormLabel>
                 <HStack mb={2}>
                   <Input
-                    placeholder="输入尺寸，如 800"
+                    placeholder={t.imageOptimization.sizeInputPlaceholder}
                     value={newSize}
                     onChange={(e) => setNewSize(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && addSize()}
                     isDisabled={!config.enabled || !config.allow_resize}
                   />
                   <Button onClick={addSize} isDisabled={!config.enabled || !config.allow_resize}>
-                    添加
+                    {t.common.add}
                   </Button>
                 </HStack>
                 <Wrap>
@@ -459,22 +459,22 @@ const ImageOptimization: React.FC = () => {
                   ))}
                 </Wrap>
                 <Text fontSize="sm" color="gray.500" mt={2}>
-                  用户只能请求这些尺寸，防止滥用。如：/image.jpg?width=800
+                  {t.imageOptimization.allowedSizesDescription}
                 </Text>
               </FormControl>
             </VStack>
           </CardBody>
         </Card>
 
-        {/* 缓存设置 */}
+        {/* Cache Settings */}
         <Card>
           <CardHeader>
-            <Heading size="md">缓存设置</Heading>
+            <Heading size="md">{t.imageOptimization.cacheSettings}</Heading>
           </CardHeader>
           <CardBody>
             <VStack spacing={4} align="stretch">
               <FormControl display="flex" alignItems="center">
-                <FormLabel mb="0">启用缓存</FormLabel>
+                <FormLabel mb="0">{t.imageOptimization.enableCache}</FormLabel>
                 <Switch
                   isChecked={config.cache_enabled}
                   onChange={(e) => setConfig({ ...config, cache_enabled: e.target.checked })}
@@ -483,7 +483,7 @@ const ImageOptimization: React.FC = () => {
               </FormControl>
 
               <FormControl>
-                <FormLabel>缓存 TTL（秒）</FormLabel>
+                <FormLabel>{t.imageOptimization.cacheTTL}</FormLabel>
                 <NumberInput
                   value={config.cache_ttl}
                   min={60}
@@ -494,12 +494,12 @@ const ImageOptimization: React.FC = () => {
                   <NumberInputField />
                 </NumberInput>
                 <Text fontSize="sm" color="gray.500" mt={1}>
-                  推荐值：86400（24小时）
+                  {t.imageOptimization.cacheTTLRecommendation}
                 </Text>
               </FormControl>
 
               <FormControl>
-                <FormLabel>最大缓存大小 (MB)</FormLabel>
+                <FormLabel>{t.imageOptimization.maxCacheSize}</FormLabel>
                 <NumberInput
                   value={config.max_cache_size / 1024 / 1024}
                   min={100}
@@ -510,7 +510,7 @@ const ImageOptimization: React.FC = () => {
                   <NumberInputField />
                 </NumberInput>
                 <Text fontSize="sm" color="gray.500" mt={1}>
-                  推荐值：1024（1GB）
+                  {t.imageOptimization.maxCacheSizeRecommendation}
                 </Text>
               </FormControl>
 
@@ -520,31 +520,31 @@ const ImageOptimization: React.FC = () => {
                 onClick={clearCache}
                 isDisabled={!config.enabled || !config.cache_enabled}
               >
-                清空图片缓存
+                {t.imageOptimization.clearImageCache}
               </Button>
             </VStack>
           </CardBody>
         </Card>
 
-        {/* 路径过滤 */}
+        {/* Path Filtering */}
         <Card>
           <CardHeader>
-            <Heading size="md">路径过滤</Heading>
+            <Heading size="md">{t.imageOptimization.pathFiltering}</Heading>
           </CardHeader>
           <CardBody>
             <VStack spacing={4} align="stretch">
               <FormControl>
-                <FormLabel>包含的路径模式</FormLabel>
+                <FormLabel>{t.imageOptimization.includePatterns}</FormLabel>
                 <HStack mb={2}>
                   <Input
-                    placeholder="如: *.jpg 或 /images/*"
+                    placeholder={t.imageOptimization.includePatternPlaceholder}
                     value={newPattern}
                     onChange={(e) => setNewPattern(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && addPattern()}
                     isDisabled={!config.enabled}
                   />
                   <Button onClick={addPattern} isDisabled={!config.enabled}>
-                    添加
+                    {t.common.add}
                   </Button>
                 </HStack>
                 <Wrap>
@@ -562,17 +562,17 @@ const ImageOptimization: React.FC = () => {
               <Divider />
 
               <FormControl>
-                <FormLabel>排除的路径模式</FormLabel>
+                <FormLabel>{t.imageOptimization.excludePatterns}</FormLabel>
                 <HStack mb={2}>
                   <Input
-                    placeholder="如: /admin/* 或 /api/*"
+                    placeholder={t.imageOptimization.excludePatternPlaceholder}
                     value={newExcludePattern}
                     onChange={(e) => setNewExcludePattern(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && addExcludePattern()}
                     isDisabled={!config.enabled}
                   />
                   <Button onClick={addExcludePattern} isDisabled={!config.enabled}>
-                    添加
+                    {t.common.add}
                   </Button>
                 </HStack>
                 <Wrap>
@@ -590,27 +590,27 @@ const ImageOptimization: React.FC = () => {
           </CardBody>
         </Card>
 
-        {/* 使用说明 */}
+        {/* Usage Instructions */}
         <Card>
           <CardHeader>
             <Heading size="md">{t.imageOptimization.instructions}</Heading>
           </CardHeader>
           <CardBody>
             <VStack spacing={2} align="stretch" fontSize="sm">
-              <Text fontWeight="bold">URL 参数：</Text>
-              <Text>• <code>?width=800</code> - 调整宽度为 800px</Text>
-              <Text>• <code>?height=600</code> - 调整高度为 600px</Text>
-              <Text>• <code>?quality=90</code> - 指定质量</Text>
-              <Text>• <code>?format=webp</code> - 指定输出格式</Text>
+              <Text fontWeight="bold">{t.imageOptimization.urlParameters}:</Text>
+              <Text>• <code>?width=800</code> - {t.imageOptimization.adjustWidth}</Text>
+              <Text>• <code>?height=600</code> - {t.imageOptimization.adjustHeight}</Text>
+              <Text>• <code>?quality=90</code> - {t.imageOptimization.specifyQuality}</Text>
+              <Text>• <code>?format=webp</code> - {t.imageOptimization.specifyFormat}</Text>
               <Divider my={2} />
-              <Text fontWeight="bold">示例：</Text>
+              <Text fontWeight="bold">{t.imageOptimization.examples}:</Text>
               <Text><code>https://example.com/photo.jpg?width=800</code></Text>
               <Text><code>https://example.com/photo.jpg?width=400&quality=90</code></Text>
               <Divider my={2} />
-              <Text fontWeight="bold">效果：</Text>
-              <Text>• JPEG → WebP：节省 30-50% 带宽</Text>
-              <Text>• PNG → WebP：节省 40-70% 带宽</Text>
-              <Text>• 尺寸调整：节省 80-95% 带宽（移动端）</Text>
+              <Text fontWeight="bold">{t.imageOptimization.effects}:</Text>
+              <Text>• JPEG → WebP: {t.imageOptimization.bandwidthSavedJPEG}</Text>
+              <Text>• PNG → WebP: {t.imageOptimization.bandwidthSavedPNG}</Text>
+              <Text>• {t.imageOptimization.sizeAdjustment}: {t.imageOptimization.bandwidthSavedMobile}</Text>
             </VStack>
           </CardBody>
         </Card>

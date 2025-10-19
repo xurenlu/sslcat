@@ -67,13 +67,13 @@ const ChangePassword: React.FC = () => {
 
   const validatePassword = (password: string) => {
     if (password.length < 6) {
-      return '密码长度至少6位'
+      return t.users.passwordMinLength
     }
     if (!/(?=.*[a-zA-Z])/.test(password)) {
-      return '密码必须包含至少一个字母'
+      return t.users.passwordMustContainLetter
     }
     if (!/(?=.*\d)/.test(password)) {
-      return '密码必须包含至少一个数字'
+      return t.users.passwordMustContainNumber
     }
     return null
   }
@@ -84,7 +84,7 @@ const ChangePassword: React.FC = () => {
     // 验证输入
     if (!formData.currentPassword || !formData.newPassword || !formData.confirmPassword) {
       toast({
-        title: '请填写所有字段',
+        title: t.common.required,
         status: 'error',
         duration: 3000,
         isClosable: true,
@@ -311,7 +311,7 @@ const ChangePassword: React.FC = () => {
                 <Alert status="info" size="sm">
                   <AlertIcon />
                   <Text fontSize="sm">
-                    密码要求：至少6位，包含字母和数字
+                    {t.users.passwordRequirements}
                   </Text>
                 </Alert>
 
@@ -324,7 +324,7 @@ const ChangePassword: React.FC = () => {
                     flex={1}
                     isDisabled={loading}
                   >
-                    重置
+                    {t.common.reset}
                   </Button>
                   <Button
                     type="submit"
@@ -332,9 +332,9 @@ const ChangePassword: React.FC = () => {
                     leftIcon={<Icon as={FiSave} />}
                     flex={1}
                     isLoading={loading}
-                    loadingText="修改中..."
+                    loadingText={t.users.changingPassword}
                   >
-                    修改密码
+                    {t.users.changePassword}
                   </Button>
                 </HStack>
               </VStack>
@@ -346,15 +346,15 @@ const ChangePassword: React.FC = () => {
         <Alert status="warning">
           <AlertIcon />
           <VStack align="start" spacing={1}>
-            <Text fontWeight="medium">安全提示</Text>
+            <Text fontWeight="medium">{t.users.securityTips}</Text>
             <Text fontSize="sm">
-              • 修改密码后需要重新登录
+              • {t.users.reLoginAfterChange}
             </Text>
             <Text fontSize="sm">
-              • 建议使用强密码并定期更换
+              • {t.users.useStrongPassword}
             </Text>
             <Text fontSize="sm">
-              • 不要在多个账户间使用相同密码
+              • {t.users.dontReusePassword}
             </Text>
           </VStack>
         </Alert>

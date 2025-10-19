@@ -242,7 +242,7 @@ const UserManagement: React.FC = () => {
 
       if (response.ok) {
         toast({
-          title: '用户创建成功',
+          title: t.users.userCreated,
           status: 'success',
           duration: 3000,
           isClosable: true,
@@ -259,8 +259,8 @@ const UserManagement: React.FC = () => {
       } else {
         const error = await response.json()
         toast({
-          title: '创建用户失败',
-          description: error.error || '未知错误',
+          title: t.users.userCreateFailed,
+          description: error.error || t.common.unknownError,
           status: 'error',
           duration: 3000,
           isClosable: true,
@@ -269,7 +269,7 @@ const UserManagement: React.FC = () => {
     } catch (error) {
       console.error('创建用户失败:', error)
       toast({
-        title: '创建用户失败',
+        title: t.users.userCreateFailed,
         status: 'error',
         duration: 3000,
         isClosable: true,
@@ -558,71 +558,71 @@ const UserManagement: React.FC = () => {
         <Modal isOpen={isAddOpen} onClose={onAddClose} size="md">
           <ModalOverlay />
           <ModalContent>
-            <ModalHeader>添加用户</ModalHeader>
+            <ModalHeader>{t.users.addUser}</ModalHeader>
             <ModalCloseButton />
             <ModalBody>
               <VStack spacing={4}>
                 <FormControl isRequired>
-                  <FormLabel>用户名</FormLabel>
+                  <FormLabel>{t.users.username}</FormLabel>
                   <Input
                     value={addForm.username}
                     onChange={(e) => setAddForm({ ...addForm, username: e.target.value })}
-                    placeholder="输入用户名（至少3个字符）"
+                    placeholder={t.users.usernamePlaceholder}
                   />
                 </FormControl>
                 <FormControl isRequired>
-                  <FormLabel>密码</FormLabel>
+                  <FormLabel>{t.users.password}</FormLabel>
                   <Input
                     type="password"
                     value={addForm.password}
                     onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
-                    placeholder="输入密码（至少6个字符）"
+                    placeholder={t.users.passwordPlaceholder}
                   />
                 </FormControl>
                 <FormControl isRequired>
-                  <FormLabel>确认密码</FormLabel>
+                  <FormLabel>{t.users.confirmPassword}</FormLabel>
                   <Input
                     type="password"
                     value={addForm.confirmPassword}
                     onChange={(e) => setAddForm({ ...addForm, confirmPassword: e.target.value })}
-                    placeholder="再次输入密码"
+                    placeholder={t.users.confirmPasswordPlaceholder}
                   />
                 </FormControl>
                 <FormControl isRequired>
-                  <FormLabel>角色</FormLabel>
+                  <FormLabel>{t.users.role}</FormLabel>
                   <Select
                     value={addForm.role}
                     onChange={(e) => setAddForm({ ...addForm, role: e.target.value })}
                   >
-                    <option value="viewer">只读用户</option>
-                    <option value="operator">操作员</option>
-                    <option value="admin">管理员</option>
+                    <option value="viewer">{t.users.readOnly}</option>
+                    <option value="operator">{t.users.operator}</option>
+                    <option value="admin">{t.users.admin}</option>
                     {user?.role === 'super_admin' && (
-                      <option value="super_admin">超级管理员</option>
+                      <option value="super_admin">{t.users.superAdmin}</option>
                     )}
                   </Select>
                 </FormControl>
                 <FormControl>
-                  <FormLabel>邮箱</FormLabel>
+                  <FormLabel>{t.users.email}</FormLabel>
                   <Input
                     type="email"
                     value={addForm.email}
                     onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
-                    placeholder="输入邮箱地址"
+                    placeholder={t.users.emailPlaceholder}
                   />
                 </FormControl>
               </VStack>
             </ModalBody>
             <ModalFooter>
               <Button variant="ghost" mr={3} onClick={onAddClose}>
-                取消
+                {t.common.cancel}
               </Button>
               <Button
                 colorScheme="brand"
                 onClick={handleAddUser}
                 isLoading={actionLoading}
               >
-                创建用户
+                {t.users.createUser}
               </Button>
             </ModalFooter>
           </ModalContent>
