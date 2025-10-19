@@ -298,10 +298,14 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 		// 创建新的代理规则
 		var req struct {
 			Domain  string `json:"domain"`
-			Target  string `json:"target"`
-			Port    int    `json:"port"`
+			Target  string `json:"target"`  // 兼容旧字段
+			Port    int    `json:"port"`   // 兼容旧字段
 			Enabled bool   `json:"enabled"`
 			SSLOnly bool   `json:"ssl_only"`
+			
+			// 统一后端配置
+			Backends []config.ProxyBackend `json:"backends"`
+			
 			// 类CDN设置
 			CDNModeEnabled       bool   `json:"cdn_mode_enabled"`
 			CDNEnabled           bool   `json:"cdn_enabled"`
@@ -325,9 +329,27 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if req.Domain == "" || req.Target == "" {
-			http.Error(w, "domain and target are required", http.StatusBadRequest)
+		if req.Domain == "" {
+			http.Error(w, "domain is required", http.StatusBadRequest)
 			return
+		}
+		
+		// 验证后端配置
+		if len(req.Backends) == 0 {
+			http.Error(w, "at least one backend is required", http.StatusBadRequest)
+			return
+		}
+		
+		// 验证后端配置的有效性
+		for i, backend := range req.Backends {
+			if backend.Host == "" {
+				http.Error(w, fmt.Sprintf("backend %d: host is required", i), http.StatusBadRequest)
+				return
+			}
+			if backend.Port <= 0 || backend.Port > 65535 {
+				http.Error(w, fmt.Sprintf("backend %d: invalid port: %d", i, backend.Port), http.StatusBadRequest)
+				return
+			}
 		}
 
 		// 检查是否已存在
@@ -338,18 +360,20 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// 自动解析端口号
-		port := req.Port
-		if port == 0 {
-			port = parsePortFromTarget(req.Target)
-		}
-
+		// 创建新规则
 		newRule := config.ProxyRule{
-			Domain:               req.Domain,
-			Target:               req.Target,
-			Port:                 port,
-			Enabled:              req.Enabled,
-			SSLOnly:              req.SSLOnly,
+			Domain:  req.Domain,
+			Enabled: req.Enabled,
+			SSLOnly: req.SSLOnly,
+			
+			// 统一后端配置
+			Backends: req.Backends,
+			
+			// 为了向后兼容，同步到旧字段
+			Target: req.Backends[0].Host,
+			Port:   req.Backends[0].Port,
+			
+			// 类CDN设置
 			CDNEnabled:           req.CDNEnabled,
 			CDNPreset:            req.CDNPreset,
 			CDNDefaultTTLSeconds: req.CDNDefaultTTLSeconds,
@@ -362,6 +386,8 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 			TLSHandshakeTimeoutSec:   req.TLSHandshakeTimeoutSec,
 			ExpectContinueTimeoutSec: req.ExpectContinueTimeoutSec,
 			HealthCheckTimeoutSec:    req.HealthCheckTimeoutSec,
+			UpstreamRequestHeaders:   req.UpstreamRequestHeaders,
+			ResponseHeaders:          req.ResponseHeaders,
 		}
 
 		s.config.Proxy.Rules = append(s.config.Proxy.Rules, newRule)
@@ -383,10 +409,14 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 		// 更新代理规则
 		var req struct {
 			Domain  string `json:"domain"`
-			Target  string `json:"target"`
-			Port    int    `json:"port"`
+			Target  string `json:"target"`  // 兼容旧字段
+			Port    int    `json:"port"`   // 兼容旧字段
 			Enabled bool   `json:"enabled"`
 			SSLOnly bool   `json:"ssl_only"`
+			
+			// 统一后端配置
+			Backends []config.ProxyBackend `json:"backends"`
+			
 			// 类CDN设置
 			CDNModeEnabled       bool   `json:"cdn_mode_enabled"`
 			CDNEnabled           bool   `json:"cdn_enabled"`
@@ -420,24 +450,46 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 		req.UpstreamRequestHeaders = sanitizeHeaderMap(req.UpstreamRequestHeaders)
 		req.ResponseHeaders = sanitizeHeaderMap(req.ResponseHeaders)
 
-		if req.Domain == "" || req.Target == "" {
-			http.Error(w, "domain and target are required", http.StatusBadRequest)
+		if req.Domain == "" {
+			http.Error(w, "domain is required", http.StatusBadRequest)
 			return
+		}
+		
+		// 验证后端配置
+		if len(req.Backends) == 0 {
+			http.Error(w, "at least one backend is required", http.StatusBadRequest)
+			return
+		}
+		
+		// 验证后端配置的有效性
+		for i, backend := range req.Backends {
+			if backend.Host == "" {
+				http.Error(w, fmt.Sprintf("backend %d: host is required", i), http.StatusBadRequest)
+				return
+			}
+			if backend.Port <= 0 || backend.Port > 65535 {
+				http.Error(w, fmt.Sprintf("backend %d: invalid port: %d", i, backend.Port), http.StatusBadRequest)
+				return
+			}
 		}
 
 		// 查找并更新规则
 		for i, rule := range s.config.Proxy.Rules {
 			if rule.Domain == domain {
-				// 自动解析端口号
-				port := req.Port
-				if port == 0 {
-					port = parsePortFromTarget(req.Target)
-				}
-
-				s.config.Proxy.Rules[i].Target = req.Target
-				s.config.Proxy.Rules[i].Port = port
+				// 更新基本字段
 				s.config.Proxy.Rules[i].Enabled = req.Enabled
 				s.config.Proxy.Rules[i].SSLOnly = req.SSLOnly
+				
+				// 更新统一后端配置
+				s.config.Proxy.Rules[i].Backends = req.Backends
+				
+				// 为了向后兼容，同步到旧字段
+				if len(req.Backends) > 0 {
+					s.config.Proxy.Rules[i].Target = req.Backends[0].Host
+					s.config.Proxy.Rules[i].Port = req.Backends[0].Port
+				}
+				
+				// 类CDN设置
 				s.config.Proxy.Rules[i].CDNEnabled = req.CDNEnabled
 				s.config.Proxy.Rules[i].CDNPreset = req.CDNPreset
 				s.config.Proxy.Rules[i].CDNDefaultTTLSeconds = req.CDNDefaultTTLSeconds
