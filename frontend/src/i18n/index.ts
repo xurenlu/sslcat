@@ -640,6 +640,45 @@ export interface Translation {
     cancel: string
     deleteConfirm: string
     deleteMessage: string
+    providerName: string
+    providerNamePlaceholder: string
+    apiSecret: string
+    email: string
+    emailPlaceholder: string
+    zoneId: string
+    zoneIdPlaceholder: string
+    apiEndpoint: string
+    apiEndpointPlaceholder: string
+    connectProvider: string
+    editProvider: string
+    editProviderModal: string
+    updateProvider: string
+    updateSuccess: string
+    updateFailed: string
+    deleteSuccess: string
+    deleteFailed: string
+    unknownError: string
+    confirmDelete: string
+    confirmDeleteMessage: string
+    dnsStats: string
+    totalRecords: string
+    activeRecords: string
+    providerCount: string
+    domainCount: string
+    domainsCount: string
+    lastSync: string
+    settings: string
+    delete: string
+    cloudflare: string
+    aliyun: string
+    tencent: string
+    aws: string
+    godaddy: string
+    custom: string
+    apiKeyPlaceholder: string
+    apiSecretPlaceholder: string
+    apiKeyUpdatePlaceholder: string
+    apiSecretUpdatePlaceholder: string
   }
 
   // Git服务器管理
@@ -1403,6 +1442,45 @@ export const zhCN: Translation = {
     cancel: '取消',
     deleteConfirm: '确认删除',
     deleteMessage: '确定要删除此提供商吗？',
+    providerName: '提供商名称',
+    providerNamePlaceholder: '我的 Cloudflare',
+    apiSecret: 'API Secret',
+    email: '邮箱地址',
+    emailPlaceholder: 'user@example.com',
+    zoneId: 'Zone ID',
+    zoneIdPlaceholder: 'Zone ID (Cloudflare等需要)',
+    apiEndpoint: 'API 端点',
+    apiEndpointPlaceholder: 'https://api.example.com',
+    connectProvider: '连接提供商',
+    editProvider: '编辑',
+    editProviderModal: '编辑 DNS 提供商',
+    updateProvider: '更新提供商',
+    updateSuccess: 'DNS提供商更新成功',
+    updateFailed: '更新失败',
+    deleteSuccess: 'DNS提供商删除成功',
+    deleteFailed: '删除失败',
+    unknownError: '未知错误',
+    confirmDelete: '确定要删除DNS提供商',
+    confirmDeleteMessage: '确定要删除DNS提供商 "{name}" 吗？此操作不可撤销。',
+    dnsStats: 'DNS 统计',
+    totalRecords: '总记录数',
+    activeRecords: '活跃记录',
+    providerCount: '提供商数',
+    domainCount: '域名数',
+    domainsCount: '个域名',
+    lastSync: '最后同步',
+    settings: '设置',
+    delete: '删除',
+    cloudflare: 'Cloudflare',
+    aliyun: '阿里云 DNS',
+    tencent: '腾讯云 DNS',
+    aws: 'AWS Route53',
+    godaddy: 'GoDaddy',
+    custom: '自定义 API',
+    apiKeyPlaceholder: 'API 密钥',
+    apiSecretPlaceholder: 'API 密钥',
+    apiKeyUpdatePlaceholder: 'API 密钥（留空则不更新）',
+    apiSecretUpdatePlaceholder: 'API 密钥（留空则不更新）',
   },
   gitServer: {
     title: 'Git 部署服务',
@@ -2179,6 +2257,45 @@ export const enUS: Translation = {
     cancel: 'Cancel',
     deleteConfirm: 'Confirm Delete',
     deleteMessage: 'Are you sure you want to delete this provider?',
+    providerName: 'Provider Name',
+    providerNamePlaceholder: 'My Cloudflare',
+    apiSecret: 'API Secret',
+    email: 'Email Address',
+    emailPlaceholder: 'user@example.com',
+    zoneId: 'Zone ID',
+    zoneIdPlaceholder: 'Zone ID (required for Cloudflare, etc.)',
+    apiEndpoint: 'API Endpoint',
+    apiEndpointPlaceholder: 'https://api.example.com',
+    connectProvider: 'Connect Provider',
+    editProvider: 'Edit',
+    editProviderModal: 'Edit DNS Provider',
+    updateProvider: 'Update Provider',
+    updateSuccess: 'DNS provider updated successfully',
+    updateFailed: 'Update failed',
+    deleteSuccess: 'DNS provider deleted successfully',
+    deleteFailed: 'Delete failed',
+    unknownError: 'Unknown error',
+    confirmDelete: 'Are you sure you want to delete DNS provider',
+    confirmDeleteMessage: 'Are you sure you want to delete DNS provider "{name}"? This action cannot be undone.',
+    dnsStats: 'DNS Statistics',
+    totalRecords: 'Total Records',
+    activeRecords: 'Active Records',
+    providerCount: 'Provider Count',
+    domainCount: 'Domain Count',
+    domainsCount: 'domains',
+    lastSync: 'Last Sync',
+    settings: 'Settings',
+    delete: 'Delete',
+    cloudflare: 'Cloudflare',
+    aliyun: 'Alibaba Cloud DNS',
+    tencent: 'Tencent Cloud DNS',
+    aws: 'AWS Route53',
+    godaddy: 'GoDaddy',
+    custom: 'Custom API',
+    apiKeyPlaceholder: 'API Key',
+    apiSecretPlaceholder: 'API Secret',
+    apiKeyUpdatePlaceholder: 'API Key (leave empty to not update)',
+    apiSecretUpdatePlaceholder: 'API Secret (leave empty to not update)',
   },
   gitServer: {
     title: 'Git Deployment Service',

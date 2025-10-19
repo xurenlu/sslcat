@@ -249,12 +249,12 @@ const DNSManagement: React.FC = () => {
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || '更新DNS提供商失败')
+        throw new Error(errorData.error || t.dns.updateFailed)
       }
 
       toast({
-        title: 'DNS提供商更新成功',
-        description: 'DNS提供商信息已成功更新',
+        title: t.dns.updateSuccess,
+        description: t.dns.updateSuccess,
         status: 'success',
         duration: 3000,
         isClosable: true,
@@ -266,8 +266,8 @@ const DNSManagement: React.FC = () => {
       setEditingProvider(null)
     } catch (error) {
       toast({
-        title: '更新失败',
-        description: error instanceof Error ? error.message : '未知错误',
+        title: t.dns.updateFailed,
+        description: error instanceof Error ? error.message : t.dns.unknownError,
         status: 'error',
         duration: 3000,
         isClosable: true,
@@ -278,7 +278,7 @@ const DNSManagement: React.FC = () => {
   }
 
   const handleDeleteProvider = async (provider: DNSProvider) => {
-    if (!confirm(`确定要删除DNS提供商 "${provider.name}" 吗？此操作不可撤销。`)) {
+    if (!confirm(t.dns.confirmDeleteMessage.replace('{name}', provider.name))) {
       return
     }
 
@@ -292,11 +292,11 @@ const DNSManagement: React.FC = () => {
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || '删除DNS提供商失败')
+        throw new Error(errorData.error || t.dns.deleteFailed)
       }
 
       toast({
-        title: 'DNS提供商删除成功',
+        title: t.dns.deleteSuccess,
         description: `DNS提供商 "${provider.name}" 已成功删除`,
         status: 'success',
         duration: 3000,
@@ -306,8 +306,8 @@ const DNSManagement: React.FC = () => {
       refreshData()
     } catch (error) {
       toast({
-        title: '删除失败',
-        description: error instanceof Error ? error.message : '未知错误',
+        title: t.dns.deleteFailed,
+        description: error instanceof Error ? error.message : t.dns.unknownError,
         status: 'error',
         duration: 3000,
         isClosable: true,
@@ -329,9 +329,9 @@ const DNSManagement: React.FC = () => {
 
   const getProviderStatusText = (status: string) => {
     switch (status) {
-      case 'connected': return '已连接'
-      case 'error': return '错误'
-      case 'disabled': return '已禁用'
+      case 'connected': return t.dns.connected
+      case 'error': return t.dns.error
+      case 'disabled': return t.dns.disabled
       default: return status
     }
   }
@@ -345,7 +345,7 @@ const DNSManagement: React.FC = () => {
       <Flex justify="space-between" align="center" mb={6}>
         <HStack>
           <Icon as={FiGlobe} boxSize={6} />
-          <Heading size="lg">DNS 配置</Heading>
+          <Heading size="lg">{t.dns.title}</Heading>
         </HStack>
         <HStack>
           <Button
@@ -354,7 +354,7 @@ const DNSManagement: React.FC = () => {
             isLoading={loading}
             variant="outline"
           >
-            刷新
+            {t.dns.refresh}
           </Button>
         </HStack>
       </Flex>
@@ -364,9 +364,9 @@ const DNSManagement: React.FC = () => {
         <Card>
           <CardHeader>
             <HStack justify="space-between">
-              <Heading size="md">DNS 提供商</Heading>
+              <Heading size="md">{t.dns.providers}</Heading>
               <Button size="sm" variant="outline" onClick={onProviderOpen}>
-                添加提供商
+                {t.dns.addProvider}
               </Button>
             </HStack>
           </CardHeader>
@@ -389,19 +389,19 @@ const DNSManagement: React.FC = () => {
                         </Badge>
                       </HStack>
                       <Text fontSize="sm" color="gray.600">
-                        {provider.domains} 个域名 · 最后同步: {provider.lastSync}
+                        {provider.domains} {t.dns.domainsCount} · {t.dns.lastSync}: {provider.lastSync}
                       </Text>
                     </VStack>
                     <HStack>
                       <IconButton
-                        aria-label="设置"
+                        aria-label={t.dns.settings}
                         icon={<FiSettings />}
                         size="sm"
                         variant="ghost"
                         onClick={() => handleEditProvider(provider)}
                       />
                       <IconButton
-                        aria-label="删除"
+                        aria-label={t.dns.delete}
                         icon={<FiTrash2 />}
                         size="sm"
                         variant="ghost"
@@ -418,24 +418,24 @@ const DNSManagement: React.FC = () => {
 
         <Card>
           <CardHeader>
-            <Heading size="md">DNS 统计</Heading>
+            <Heading size="md">{t.dns.dnsStats}</Heading>
           </CardHeader>
           <CardBody>
             <SimpleGrid columns={2} spacing={4}>
               <Stat>
-                <StatLabel>总记录数</StatLabel>
+                <StatLabel>{t.dns.totalRecords}</StatLabel>
                 <StatNumber>0</StatNumber>
               </Stat>
               <Stat>
-                <StatLabel>活跃记录</StatLabel>
+                <StatLabel>{t.dns.activeRecords}</StatLabel>
                 <StatNumber>0</StatNumber>
               </Stat>
               <Stat>
-                <StatLabel>提供商数</StatLabel>
+                <StatLabel>{t.dns.providerCount}</StatLabel>
                 <StatNumber>{providers.length}</StatNumber>
               </Stat>
               <Stat>
-                <StatLabel>域名数</StatLabel>
+                <StatLabel>{t.dns.domainCount}</StatLabel>
                 <StatNumber>{providers.reduce((sum, p) => sum + p.domains, 0)}</StatNumber>
               </Stat>
             </SimpleGrid>
@@ -449,7 +449,7 @@ const DNSManagement: React.FC = () => {
       <Modal isOpen={isProviderOpen} onClose={onProviderClose}>
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>添加 DNS 提供商</ModalHeader>
+          <ModalHeader>{t.dns.addProviderModal}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             <VStack spacing={4}>
@@ -537,10 +537,10 @@ const DNSManagement: React.FC = () => {
 
           <ModalFooter>
             <Button variant="ghost" mr={3} onClick={onProviderClose}>
-              取消
+              {t.dns.cancel}
             </Button>
             <Button colorScheme="blue" onClick={handleConnectProvider}>
-              连接提供商
+              {t.dns.connectProvider}
             </Button>
           </ModalFooter>
         </ModalContent>
@@ -550,7 +550,7 @@ const DNSManagement: React.FC = () => {
       <Modal isOpen={isEditOpen} onClose={onEditClose}>
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>编辑 DNS 提供商</ModalHeader>
+          <ModalHeader>{t.dns.editProviderModal}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             <VStack spacing={4}>
