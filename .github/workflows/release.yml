@@ -216,7 +216,7 @@ jobs:
             ### 📥 下载地址
             
             - **GitHub Releases**: https://github.com/xurenlu/sslcat/releases/tag/${{ github.ref_name }}
-            - **CDN镜像**: https://cdn.wxside.com/sslcat/releases/${{ github.ref_name }}/
+            - **CDN镜像**: https://cdn.wxside.com/releases/${{ github.ref_name }}/
             
             #### 🖥️ 各平台详细下载地址
             
@@ -225,7 +225,7 @@ jobs:
             # GitHub
             https://github.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-amd64.tar.gz
             # CDN镜像
-            https://cdn.wxside.com/sslcat/releases/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-amd64.tar.gz
+            https://cdn.wxside.com/releases/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-amd64.tar.gz
             ```
             
             **Linux ARM64 (树莓派、ARM服务器)**
@@ -233,7 +233,7 @@ jobs:
             # GitHub
             https://github.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-arm64.tar.gz
             # CDN镜像
-            https://cdn.wxside.com/sslcat/releases/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-arm64.tar.gz
+            https://cdn.wxside.com/releases/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-arm64.tar.gz
             ```
             
             **macOS Intel (Intel芯片Mac)**
@@ -241,7 +241,7 @@ jobs:
             # GitHub
             https://github.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_darwin-amd64.tar.gz
             # CDN镜像
-            https://cdn.wxside.com/sslcat/releases/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_darwin-amd64.tar.gz
+            https://cdn.wxside.com/releases/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_darwin-amd64.tar.gz
             ```
             
             **macOS Apple Silicon (M1/M2/M3芯片Mac)**
@@ -249,7 +249,7 @@ jobs:
             # GitHub
             https://github.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_darwin-arm64.tar.gz
             # CDN镜像
-            https://cdn.wxside.com/sslcat/releases/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_darwin-arm64.tar.gz
+            https://cdn.wxside.com/releases/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_darwin-arm64.tar.gz
             ```
             
             ### 📝 更新日志
