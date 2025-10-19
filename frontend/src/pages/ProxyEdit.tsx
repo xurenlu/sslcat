@@ -38,11 +38,22 @@ interface ProxyBackend {
   host: string
   port: number
   weight: number
+  priority: number
   enabled: boolean
   health_check_enabled: boolean
   health_check_path: string
+  health_check_interval: number
+  health_check_timeout: number
   health_check_method: string
   expected_status_code: number
+  max_retries: number
+  retry_interval: number
+  failure_threshold: number
+  recovery_threshold: number
+  connect_timeout: number
+  read_timeout: number
+  write_timeout: number
+  keep_alive_timeout: number
   max_connections: number
   tls_enabled: boolean
   tls_insecure: boolean
@@ -390,7 +401,7 @@ const ProxyEdit: React.FC = () => {
   const handleBackendChange = (index: number, field: string, value: any) => {
     setFormData(prev => ({
       ...prev,
-      load_balancer_backends: prev.load_balancer_backends.map((backend, i) => 
+      backends: prev.backends.map((backend, i) => 
         i === index ? { ...backend, [field]: value } : backend
       )
     }))
@@ -402,26 +413,37 @@ const ProxyEdit: React.FC = () => {
       host: '',
       port: 8080,
       weight: 1,
+      priority: 0,
       enabled: true,
-      health_check_enabled: true,
+      health_check_enabled: false,
       health_check_path: '/health',
+      health_check_interval: 30,
+      health_check_timeout: 5,
       health_check_method: 'GET',
       expected_status_code: 200,
+      max_retries: 3,
+      retry_interval: 1,
+      failure_threshold: 3,
+      recovery_threshold: 2,
+      connect_timeout: 30,
+      read_timeout: 30,
+      write_timeout: 30,
+      keep_alive_timeout: 30,
       max_connections: 100,
       tls_enabled: false,
       tls_insecure: false
     }
     setFormData(prev => ({
       ...prev,
-      load_balancer_backends: [...prev.load_balancer_backends, newBackend]
+      backends: [...prev.backends, newBackend]
     }))
   }
 
   const removeBackend = (index: number) => {
-    if (formData.load_balancer_backends.length > 1) {
+    if (formData.backends.length > 1) {
       setFormData(prev => ({
         ...prev,
-        load_balancer_backends: prev.load_balancer_backends.filter((_, i) => i !== index)
+        backends: prev.backends.filter((_, i) => i !== index)
       }))
     }
   }
@@ -449,7 +471,7 @@ const ProxyEdit: React.FC = () => {
         credentials: 'include',
         body: JSON.stringify({
           domain: formData.domain,
-          target: formData.target,
+          backends: formData.backends,
           enabled: formData.enabled,
           ssl_only: formData.ssl_only,
           // 类CDN设置
