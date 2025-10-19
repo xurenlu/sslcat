@@ -101,10 +101,10 @@ const UserManagement: React.FC = () => {
   })
 
   const roleLabels = {
-    super_admin: '超级管理员',
-    admin: '管理员',
-    operator: '操作员',
-    viewer: '只读用户',
+    super_admin: t.userManagement.superAdmin,
+    admin: t.userManagement.admin,
+    operator: t.userManagement.operator,
+    viewer: t.userManagement.readOnly,
   }
 
   const roleColors = {
@@ -450,7 +450,7 @@ const UserManagement: React.FC = () => {
         <HStack justify="space-between">
           <Heading size="lg" display="flex" alignItems="center" gap={2}>
             <Icon as={FiUsers} />
-            用户管理
+            {t.userManagement.title}
           </Heading>
           <HStack>
             <Button
@@ -458,7 +458,7 @@ const UserManagement: React.FC = () => {
               variant="outline"
               onClick={fetchUsers}
             >
-              刷新
+              {t.userManagement.refresh}
             </Button>
             {canManageUsers && (
               <Button
@@ -466,7 +466,7 @@ const UserManagement: React.FC = () => {
                 colorScheme="brand"
                 onClick={onAddOpen}
               >
-                添加用户
+                {t.userManagement.addUser}
               </Button>
             )}
           </HStack>
@@ -476,20 +476,20 @@ const UserManagement: React.FC = () => {
         <Card>
           <CardHeader>
             <Text fontSize="lg" fontWeight="medium">
-              用户列表 ({users.length})
+              {t.userManagement.title} ({users.length})
             </Text>
           </CardHeader>
           <CardBody>
             <Table variant="simple">
               <Thead>
                 <Tr>
-                  <Th>用户名</Th>
-                  <Th>角色</Th>
-                  <Th>邮箱</Th>
-                  <Th>状态</Th>
-                  <Th>创建时间</Th>
+                  <Th>{t.userManagement.username}</Th>
+                  <Th>{t.userManagement.role}</Th>
+                  <Th>{t.userManagement.email}</Th>
+                  <Th>{t.userManagement.status}</Th>
+                  <Th>{t.userManagement.created}</Th>
                   <Th>最后登录</Th>
-                  <Th>操作</Th>
+                  <Th>{t.userManagement.actions}</Th>
                 </Tr>
               </Thead>
               <Tbody>

@@ -239,7 +239,7 @@ const ChangePassword: React.FC = () => {
           <CardHeader>
             <HStack>
               <Icon as={FiShield} />
-              <Text fontWeight="medium">修改密码</Text>
+              <Text fontWeight="medium">{t.users.changePassword}</Text>
             </HStack>
           </CardHeader>
           <CardBody>
@@ -247,13 +247,13 @@ const ChangePassword: React.FC = () => {
               <VStack spacing={4}>
                 {/* 当前密码 */}
                 <FormControl isRequired>
-                  <FormLabel>当前密码</FormLabel>
+                  <FormLabel>{t.users.currentPassword}</FormLabel>
                   <HStack>
                     <Input
                       type={showPasswords.current ? 'text' : 'password'}
                       value={formData.currentPassword}
                       onChange={(e) => handleInputChange('currentPassword', e.target.value)}
-                      placeholder="请输入当前密码"
+                      placeholder={t.users.currentPasswordPlaceholder}
                     />
                     <Button
                       size="sm"
@@ -269,13 +269,13 @@ const ChangePassword: React.FC = () => {
 
                 {/* 新密码 */}
                 <FormControl isRequired>
-                  <FormLabel>新密码</FormLabel>
+                  <FormLabel>{t.users.newPassword}</FormLabel>
                   <HStack>
                     <Input
                       type={showPasswords.new ? 'text' : 'password'}
                       value={formData.newPassword}
                       onChange={(e) => handleInputChange('newPassword', e.target.value)}
-                      placeholder="请输入新密码"
+                      placeholder={t.users.newPasswordPlaceholder}
                     />
                     <Button
                       size="sm"
@@ -289,13 +289,13 @@ const ChangePassword: React.FC = () => {
 
                 {/* 确认新密码 */}
                 <FormControl isRequired>
-                  <FormLabel>确认新密码</FormLabel>
+                  <FormLabel>{t.users.confirmPassword}</FormLabel>
                   <HStack>
                     <Input
                       type={showPasswords.confirm ? 'text' : 'password'}
                       value={formData.confirmPassword}
                       onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                      placeholder="请再次输入新密码"
+                      placeholder={t.users.confirmPasswordPlaceholder}
                     />
                     <Button
                       size="sm"
