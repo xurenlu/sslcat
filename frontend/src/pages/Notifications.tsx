@@ -275,10 +275,10 @@ const Notifications: React.FC = () => {
 
   const getLevelText = (level: string) => {
     switch (level) {
-      case 'info': return '信息'
-      case 'warning': return '警告'
-      case 'error': return '错误'
-      case 'critical': return '严重'
+      case 'info': return t.notifications.info
+      case 'warning': return t.notifications.warning
+      case 'error': return t.notifications.error
+      case 'critical': return t.notifications.critical
       default: return level
     }
   }
@@ -288,7 +288,7 @@ const Notifications: React.FC = () => {
       <Flex justify="space-between" align="center" mb={6}>
         <HStack>
           <Icon as={FiBell} boxSize={6} />
-          <Heading size="lg">通知管理</Heading>
+          <Heading size="lg">{t.notifications.title}</Heading>
         </HStack>
         <HStack>
           <Button
@@ -297,21 +297,21 @@ const Notifications: React.FC = () => {
             isLoading={loading}
             variant="outline"
           >
-            刷新
+            {t.notifications.refresh}
           </Button>
           <Button
             leftIcon={<Icon as={FiSettings} />}
             onClick={testNotificationChannels}
             colorScheme="green"
           >
-            测试渠道
+            {t.notifications.testChannels}
           </Button>
           <Button
             leftIcon={<Icon as={FiSend} />}
             onClick={onOpen}
             colorScheme="blue"
           >
-            测试通知
+            {t.notifications.testNotification}
           </Button>
         </HStack>
       </Flex>
@@ -323,7 +323,7 @@ const Notifications: React.FC = () => {
             <Stat>
               <HStack justify="space-between">
                 <Box>
-                  <StatLabel color="blue.100">总通知数</StatLabel>
+                  <StatLabel color="blue.100">{t.notifications.totalNotifications}</StatLabel>
                   <StatNumber>{stats.totalNotifications}</StatNumber>
                 </Box>
                 <Icon as={FiBell} boxSize={8} color="blue.200" />
@@ -337,7 +337,7 @@ const Notifications: React.FC = () => {
             <Stat>
               <HStack justify="space-between">
                 <Box>
-                  <StatLabel color="green.100">启用渠道</StatLabel>
+                  <StatLabel color="green.100">{t.notifications.channelsEnabled}</StatLabel>
                   <StatNumber>{stats.channelsEnabled}</StatNumber>
                 </Box>
                 <Icon as={FiCheckCircle} boxSize={8} color="green.200" />
@@ -351,7 +351,7 @@ const Notifications: React.FC = () => {
             <Stat>
               <HStack justify="space-between">
                 <Box>
-                  <StatLabel color="orange.100">总渠道数</StatLabel>
+                  <StatLabel color="orange.100">{t.notifications.channelsTotal}</StatLabel>
                   <StatNumber>{stats.channelsTotal}</StatNumber>
                 </Box>
                 <Icon as={FiSettings} boxSize={8} color="orange.200" />
@@ -378,7 +378,7 @@ const Notifications: React.FC = () => {
       {/* 通知列表 */}
       <Card>
         <CardHeader>
-          <Heading size="md">通知历史</Heading>
+          <Heading size="md">{t.notifications.title}</Heading>
         </CardHeader>
         <CardBody>
           {notifications.length > 0 ? (
