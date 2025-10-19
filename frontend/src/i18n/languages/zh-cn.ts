@@ -51,6 +51,7 @@ export const zhCN: Translation = {
     completed: '已完成',
     failed: '失败',
     unknown: '未知',
+    unknownError: '未知错误',
   },
   navigation: {
     dashboard: '仪表板',
@@ -455,6 +456,8 @@ export const zhCN: Translation = {
     userUpdateFailed: '用户更新失败',
     userDeleted: '用户删除成功',
     userDeleteFailed: '用户删除失败',
+    password: '密码',
+    email: '邮箱',
   },
 
   roles: {
@@ -802,7 +805,6 @@ export const zhCN: Translation = {
     jpegQualityRecommendation: '推荐值：85（视觉无损）',
     pngCompressionRecommendation: '推荐值：6（平衡压缩率和速度）',
     sizeAdjustment: '尺寸调整',
-    allowResize: '允许尺寸调整',
     sizeInputPlaceholder: '输入尺寸，如 800',
     allowedSizesDescription: '用户只能请求这些尺寸，防止滥用。如：/image.jpg?width=800',
     cacheSettings: '缓存设置',
@@ -822,8 +824,6 @@ export const zhCN: Translation = {
     bandwidthSavedJPEG: '节省 30-50% 带宽',
     bandwidthSavedPNG: '节省 40-70% 带宽',
     bandwidthSavedMobile: '节省 80-95% 带宽（移动端）',
-    examples: '示例',
-    effects: '效果',
     saving: '保存中...',
   },
   userManagement: {

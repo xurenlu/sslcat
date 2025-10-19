@@ -368,7 +368,7 @@ const ImageOptimization: React.FC = () => {
               </FormControl>
 
               <FormControl>
-                <FormLabel>{t.imageOptimization.pngCompressionLevel}</FormLabel>
+                <FormLabel>{t.imageOptimization.pngLevel}</FormLabel>
                 <NumberInput
                   value={config.png_level}
                   min={0}
@@ -597,7 +597,7 @@ const ImageOptimization: React.FC = () => {
           </CardHeader>
           <CardBody>
             <VStack spacing={2} align="stretch" fontSize="sm">
-              <Text fontWeight="bold">{t.imageOptimization.urlParameters}:</Text>
+              <Text fontWeight="bold">{t.imageOptimization.urlParams}:</Text>
               <Text>• <code>?width=800</code> - {t.imageOptimization.adjustWidth}</Text>
               <Text>• <code>?height=600</code> - {t.imageOptimization.adjustHeight}</Text>
               <Text>• <code>?quality=90</code> - {t.imageOptimization.specifyQuality}</Text>

@@ -51,6 +51,7 @@ export interface Translation {
     completed: string
     failed: string
     unknown: string
+    unknownError: string
   }
   
   // 导航菜单
@@ -479,6 +480,28 @@ export interface Translation {
     currentPasswordPlaceholder: string
     newPasswordPlaceholder: string
     confirmPasswordPlaceholder: string
+    passwordMinLength: string
+    passwordMustContainLetter: string
+    passwordMustContainNumber: string
+    passwordRequirements: string
+    changingPassword: string
+    securityTips: string
+    reLoginAfterChange: string
+    useStrongPassword: string
+    dontReusePassword: string
+    addUser: string
+    createUser: string
+    usernamePlaceholder: string
+    password: string
+    passwordPlaceholder: string
+    email: string
+    emailPlaceholder: string
+    userCreated: string
+    userCreateFailed: string
+    userUpdated: string
+    userUpdateFailed: string
+    userDeleted: string
+    userDeleteFailed: string
   }
 
   // 角色和权限
@@ -798,6 +821,41 @@ export interface Translation {
     examples: string
     effects: string
     saving: string
+    loadConfigFailed: string
+    saveSuccess: string
+    saveFailed: string
+    cacheCleared: string
+    clearFailed: string
+    cacheHitRate: string
+    bandwidthSaved: string
+    cacheSize: string
+    items: string
+    basicSettings: string
+    enableImageOptimization: string
+    autoConvertWebP: string
+    removeMetadata: string
+    compressionQuality: string
+    webpQualityRecommendation: string
+    jpegQualityRecommendation: string
+    pngCompressionRecommendation: string
+    sizeAdjustment: string
+    sizeInputPlaceholder: string
+    allowedSizesDescription: string
+    cacheSettings: string
+    enableCache: string
+    cacheTTLRecommendation: string
+    maxCacheSizeRecommendation: string
+    clearImageCache: string
+    pathFiltering: string
+    includePatternPlaceholder: string
+    excludePatternPlaceholder: string
+    adjustWidth: string
+    adjustHeight: string
+    specifyQuality: string
+    specifyFormat: string
+    bandwidthSavedJPEG: string
+    bandwidthSavedPNG: string
+    bandwidthSavedMobile: string
   }
 
   // 用户管理

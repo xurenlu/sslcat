@@ -51,6 +51,7 @@ export const enUS: Translation = {
     completed: 'Completed',
     failed: 'Failed',
     unknown: 'Unknown',
+    unknownError: 'Unknown error',
   },
   navigation: {
     dashboard: 'Dashboard',
@@ -455,6 +456,8 @@ export const enUS: Translation = {
     userUpdateFailed: 'Failed to update user',
     userDeleted: 'User deleted successfully',
     userDeleteFailed: 'Failed to delete user',
+    password: 'Password',
+    email: 'Email',
   },
 
   roles: {
@@ -805,7 +808,6 @@ export const enUS: Translation = {
     jpegQualityRecommendation: 'Recommended: 85 (visually lossless)',
     pngCompressionRecommendation: 'Recommended: 6 (balance of compression and speed)',
     sizeAdjustment: 'Size Adjustment',
-    allowResize: 'Allow Size Adjustment',
     sizeInputPlaceholder: 'Enter size, e.g. 800',
     allowedSizesDescription: 'Users can only request these sizes to prevent abuse. E.g.: /image.jpg?width=800',
     cacheSettings: 'Cache Settings',
