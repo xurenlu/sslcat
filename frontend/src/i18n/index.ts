@@ -472,6 +472,12 @@ export interface Translation {
     disabled: string
     passwordChangeForm: string
     securityNotice: string
+    currentPassword: string
+    newPassword: string
+    confirmPassword: string
+    currentPasswordPlaceholder: string
+    newPasswordPlaceholder: string
+    confirmPasswordPlaceholder: string
   }
 
   // 角色和权限
@@ -1278,6 +1284,12 @@ export const zhCN: Translation = {
     disabled: '禁用',
     passwordChangeForm: '密码修改表单',
     securityNotice: '为了您的账户安全，请定期更新密码',
+    currentPassword: '当前密码',
+    newPassword: '新密码',
+    confirmPassword: '确认新密码',
+    currentPasswordPlaceholder: '请输入当前密码',
+    newPasswordPlaceholder: '请输入新密码',
+    confirmPasswordPlaceholder: '请再次输入新密码',
   },
 
   roles: {
@@ -2093,6 +2105,12 @@ export const enUS: Translation = {
     disabled: 'Disabled',
     passwordChangeForm: 'Password Change Form',
     securityNotice: 'For your account security, please update your password regularly',
+    currentPassword: 'Current Password',
+    newPassword: 'New Password',
+    confirmPassword: 'Confirm New Password',
+    currentPasswordPlaceholder: 'Please enter current password',
+    newPasswordPlaceholder: 'Please enter new password',
+    confirmPasswordPlaceholder: 'Please enter new password again',
   },
 
   roles: {
