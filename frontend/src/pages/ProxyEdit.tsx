@@ -23,6 +23,7 @@ import {
 import { FiArrowLeft, FiZap, FiGlobe, FiShield, FiSave, FiPlus, FiClock, FiSettings } from 'react-icons/fi'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useConfig, buildPath, buildApiPath } from '../contexts/ConfigContext'
+import { useTranslation } from '../hooks/useLanguage'
 import HeaderEditor from '../components/HeaderEditor'
 import { CORS_PRESET } from '../constants/cors'
 import BackendConfig from '../components/BackendConfig'
@@ -128,6 +129,7 @@ const ProxyEdit: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
   const { adminPrefix } = useConfig()
+  const t = useTranslation()
   
   const domain = searchParams.get('domain') || ''
   
@@ -543,9 +545,9 @@ const ProxyEdit: React.FC = () => {
               variant="ghost"
               onClick={() => navigate(buildPath(adminPrefix, '/proxy'))}
             >
-              返回
+{t.common.back}
             </Button>
-            <Heading size="lg">编辑代理规则</Heading>
+            <Heading size="lg">{t.proxy.editRule}</Heading>
           </HStack>
         </Flex>
 

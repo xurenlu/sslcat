@@ -355,6 +355,8 @@ export const zhCN: Translation = {
     staticSites: '静态站点',
     phpSites: 'PHP 站点',
     refresh: '刷新',
+    updateSite: '更新站点',
+    createSite: '创建站点',
   },
 
   cdn: {

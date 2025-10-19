@@ -37,6 +37,7 @@ import {
   Spinner,
 } from '@chakra-ui/react';
 import api from '../utils/api';
+import { useTranslation } from '../hooks/useLanguage';
 
 interface ImageOptConfig {
   enabled: boolean;
@@ -69,6 +70,7 @@ interface ImageOptStats {
 }
 
 const ImageOptimization: React.FC = () => {
+  const t = useTranslation();
   const [config, setConfig] = useState<ImageOptConfig>({
     enabled: false,
     auto_webp: true,
@@ -244,14 +246,14 @@ const ImageOptimization: React.FC = () => {
 
   return (
     <Box p={6}>
-      <Heading mb={6}>🖼️ 图片优化</Heading>
+      <Heading mb={6}>{t.imageOptimization.title}</Heading>
 
       <Alert status="info" mb={6}>
         <AlertIcon />
         <Box>
-          <AlertTitle>图片优化功能</AlertTitle>
+          <AlertTitle>{t.imageOptimization.title}</AlertTitle>
           <AlertDescription>
-            自动将图片转换为 WebP 格式、调整尺寸、智能压缩，减少带宽消耗 30-70%
+            {t.imageOptimization.description}
           </AlertDescription>
         </Box>
       </Alert>
@@ -591,7 +593,7 @@ const ImageOptimization: React.FC = () => {
         {/* 使用说明 */}
         <Card>
           <CardHeader>
-            <Heading size="md">使用说明</Heading>
+            <Heading size="md">{t.imageOptimization.instructions}</Heading>
           </CardHeader>
           <CardBody>
             <VStack spacing={2} align="stretch" fontSize="sm">
@@ -619,9 +621,9 @@ const ImageOptimization: React.FC = () => {
           size="lg"
           onClick={saveConfig}
           isLoading={saving}
-          loadingText="保存中..."
+          loadingText={t.imageOptimization.saving}
         >
-          保存配置
+{t.imageOptimization.save}
         </Button>
       </VStack>
     </Box>

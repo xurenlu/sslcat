@@ -1004,7 +1004,7 @@ git push sslcat main`
         <Flex justify="space-between" align="center" mb={6}>
           <HStack>
             <Icon as={FiGitBranch} boxSize={6} />
-            <Heading size="lg">Git部署服务器</Heading>
+            <Heading size="lg">{t.gitServer.title}</Heading>
           </HStack>
           <HStack>
             <Button
@@ -1013,21 +1013,21 @@ git push sslcat main`
               isLoading={loading}
               variant="outline"
             >
-              刷新
+{t.common.refresh}
             </Button>
             <Button
               leftIcon={<Icon as={FiSettings} />}
               onClick={onConfigOpen}
               variant="outline"
             >
-              服务器配置
+{t.gitServer.config}
             </Button>
             <Button
               leftIcon={<Icon as={FiPlus} />}
               colorScheme="blue"
               onClick={onOpen}
             >
-              创建应用
+{t.gitServer.addApp}
             </Button>
           </HStack>
         </Flex>

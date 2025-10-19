@@ -692,10 +692,10 @@ const SitesManagement: React.FC = () => {
 
           <ModalFooter>
             <Button variant="ghost" mr={3} onClick={onClose}>
-              取消
+{t.common.cancel}
             </Button>
             <Button colorScheme="blue" onClick={handleSaveSite}>
-              {editingSite ? '更新站点' : '创建站点'}
+              {editingSite ? t.sites.updateSite : t.sites.createSite}
             </Button>
           </ModalFooter>
         </ModalContent>

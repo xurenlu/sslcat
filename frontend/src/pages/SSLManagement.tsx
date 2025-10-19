@@ -344,7 +344,7 @@ const SSLManagement: React.FC = () => {
             mr={2}
             onClick={onOpen}
           >
-            申请证书
+{t.ssl.applyCertificate}
           </Button>
           <Button
             leftIcon={<Icon as={FiRefreshCw} />}

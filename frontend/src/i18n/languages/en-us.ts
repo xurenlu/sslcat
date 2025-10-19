@@ -355,6 +355,8 @@ export const enUS: Translation = {
     staticSites: 'Static Sites',
     phpSites: 'PHP Sites',
     refresh: 'Refresh',
+    updateSite: 'Update Site',
+    createSite: 'Create Site',
   },
 
   cdn: {

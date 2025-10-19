@@ -32,6 +32,7 @@ import {
 } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
 import { useConfig, buildPath, buildApiPath } from '../contexts/ConfigContext'
+import { useTranslation } from '../hooks/useLanguage'
 
 interface ProxyRule {
   domain: string
@@ -59,6 +60,7 @@ const ProxyList: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const toast = useToast()
   const { adminPrefix } = useConfig()
+  const t = useTranslation()
 
   // 格式化目标地址和端口显示
   const formatTargetWithPort = (target: string, port: number): string => {
@@ -198,7 +200,7 @@ const ProxyList: React.FC = () => {
       <Flex justify="space-between" align="center" mb={6}>
         <HStack>
           <Icon as={FiZap} boxSize={6} />
-          <Heading size="lg">代理配置</Heading>
+          <Heading size="lg">{t.proxy.title}</Heading>
         </HStack>
         <HStack>
           <Button
@@ -207,14 +209,14 @@ const ProxyList: React.FC = () => {
             isLoading={loading}
             variant="outline"
           >
-            刷新
+{t.common.refresh}
           </Button>
           <Button
             leftIcon={<Icon as={FiPlus} />}
             colorScheme="blue"
             onClick={() => navigate(buildPath(adminPrefix, '/proxy/add'))}
           >
-            新增规则
+{t.proxy.addRule}
           </Button>
         </HStack>
       </Flex>
@@ -225,12 +227,12 @@ const ProxyList: React.FC = () => {
             <Table variant="simple">
               <Thead>
                 <Tr>
-                  <Th>域名</Th>
+                  <Th>{t.ssl.domain}</Th>
                   <Th>目标地址</Th>
-                  <Th>状态</Th>
+                  <Th>{t.ssl.status}</Th>
                   <Th>SSL</Th>
                   <Th>功能</Th>
-                  <Th>操作</Th>
+                  <Th>{t.ssl.actions}</Th>
                 </Tr>
               </Thead>
               <Tbody>

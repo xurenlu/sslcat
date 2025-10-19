@@ -1122,7 +1122,7 @@ const Settings: React.FC = () => {
               size="lg"
               leftIcon={<Icon as={FiSave} />}
             >
-              保存所有设置
+{t.settings.saveSettings}
             </Button>
           </VStack>
         </CardBody>
