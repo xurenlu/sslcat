@@ -116,7 +116,7 @@ const CDNManagement: React.FC = () => {
         setStats(data)
       } else {
         toast({
-          title: '获取CDN统计失败',
+          title: t.cdn.getStatsFailed,
           status: 'error',
           duration: 3000,
           isClosable: true,
@@ -145,7 +145,7 @@ const CDNManagement: React.FC = () => {
         setObjects(data.objects || [])
       } else {
         toast({
-          title: '获取缓存对象失败',
+          title: t.cdn.getObjectsFailed,
           status: 'error',
           duration: 3000,
           isClosable: true,
@@ -177,7 +177,7 @@ const CDNManagement: React.FC = () => {
       
       if (response.ok) {
         toast({
-          title: pattern ? '缓存清理成功' : '全部缓存清理成功',
+          title: pattern ? t.cdn.clearCacheSuccess : t.cdn.clearAllCacheSuccess,
           status: 'success',
           duration: 3000,
           isClosable: true,
@@ -187,8 +187,8 @@ const CDNManagement: React.FC = () => {
       } else {
         const error = await response.json()
         toast({
-          title: '缓存清理失败',
-          description: error.error || '未知错误',
+          title: t.cdn.clearCacheFailed,
+          description: error.error || t.cdn.unknownError,
           status: 'error',
           duration: 3000,
           isClosable: true,
@@ -222,7 +222,7 @@ const CDNManagement: React.FC = () => {
       
       if (response.ok) {
         toast({
-          title: '缓存规则添加成功',
+          title: t.cdn.addRuleSuccess,
           status: 'success',
           duration: 3000,
           isClosable: true,
@@ -238,8 +238,8 @@ const CDNManagement: React.FC = () => {
       } else {
         const error = await response.json()
         toast({
-          title: '添加缓存规则失败',
-          description: error.error || '未知错误',
+          title: t.cdn.addRuleFailed,
+          description: error.error || t.cdn.unknownError,
           status: 'error',
           duration: 3000,
           isClosable: true,
@@ -335,11 +335,11 @@ const CDNManagement: React.FC = () => {
                 <Stat>
                   <StatLabel display="flex" alignItems="center" gap={2}>
                     <Icon as={FiDatabase} />
-                    存储使用
+                    {t.cdn.storageUsage}
                   </StatLabel>
                   <StatNumber>{formatBytes(stats.current_size_bytes)}</StatNumber>
                   <StatHelpText>
-                    总容量: {formatBytes(stats.max_size_bytes)}
+                    {t.cdn.totalCapacity}: {formatBytes(stats.max_size_bytes)}
                   </StatHelpText>
                   <Progress 
                     value={usagePercentage} 
@@ -356,10 +356,10 @@ const CDNManagement: React.FC = () => {
                 <Stat>
                   <StatLabel display="flex" alignItems="center" gap={2}>
                     <Icon as={FiDownload} />
-                    缓存对象
+                    {t.cdn.cachedObjects}
                   </StatLabel>
                   <StatNumber>{stats.total_objects}</StatNumber>
-                  <StatHelpText>已缓存文件数量</StatHelpText>
+                  <StatHelpText>{t.cdn.cachedFilesCount}</StatHelpText>
                 </Stat>
               </CardBody>
             </Card>
@@ -369,10 +369,10 @@ const CDNManagement: React.FC = () => {
                 <Stat>
                   <StatLabel display="flex" alignItems="center" gap={2}>
                     <Icon as={FiActivity} />
-                    命中率
+                    {t.cdn.hitRate}
                   </StatLabel>
                   <StatNumber>{stats.hit_rate.toFixed(1)}%</StatNumber>
-                  <StatHelpText>缓存命中率</StatHelpText>
+                  <StatHelpText>{t.cdn.cacheHitRate}</StatHelpText>
                 </Stat>
               </CardBody>
             </Card>
@@ -382,10 +382,10 @@ const CDNManagement: React.FC = () => {
                 <Stat>
                   <StatLabel display="flex" alignItems="center" gap={2}>
                     <Icon as={FiClock} />
-                    缓存规则
+                    {t.cdn.cacheRules}
                   </StatLabel>
                   <StatNumber>{stats.cache_rules.length}</StatNumber>
-                  <StatHelpText>活跃规则数量</StatHelpText>
+                  <StatHelpText>{t.cdn.activeRulesCount}</StatHelpText>
                 </Stat>
               </CardBody>
             </Card>
@@ -395,17 +395,17 @@ const CDNManagement: React.FC = () => {
         {/* 缓存规则 */}
         <Card>
           <CardHeader>
-            <Heading size="md">缓存规则</Heading>
+            <Heading size="md">{t.cdn.cacheRules}</Heading>
           </CardHeader>
           <CardBody>
             {stats?.cache_rules.length ? (
               <Table variant="simple">
                 <Thead>
                   <Tr>
-                    <Th>匹配类型</Th>
-                    <Th>模式</Th>
-                    <Th>媒体类型</Th>
-                    <Th>TTL</Th>
+                    <Th>{t.cdn.matchType}</Th>
+                    <Th>{t.cdn.pattern}</Th>
+                    <Th>{t.cdn.mediaType}</Th>
+                    <Th>{t.cdn.ttl}</Th>
                   </Tr>
                 </Thead>
                 <Tbody>
@@ -413,8 +413,8 @@ const CDNManagement: React.FC = () => {
                     <Tr key={rule.id}>
                       <Td>
                         <Badge colorScheme="blue">
-                          {rule.match_type === 'prefix' ? '前缀' : 
-                           rule.match_type === 'suffix' ? '后缀' : '媒体类型'}
+                          {rule.match_type === 'prefix' ? t.cdn.prefix : 
+                           rule.match_type === 'suffix' ? t.cdn.suffix : t.cdn.media}
                         </Badge>
                       </Td>
                       <Td fontFamily="mono">{rule.pattern || '*'}</Td>
@@ -429,7 +429,7 @@ const CDNManagement: React.FC = () => {
             ) : (
               <Alert status="info">
                 <AlertIcon />
-                暂无缓存规则，缓存将使用域名级配置
+                {t.cdn.noCacheRules}
               </Alert>
             )}
           </CardBody>
@@ -438,20 +438,20 @@ const CDNManagement: React.FC = () => {
         {/* 缓存对象 */}
         <Card>
           <CardHeader>
-            <Heading size="md">缓存对象</Heading>
+            <Heading size="md">{t.cdn.cachedObjects}</Heading>
           </CardHeader>
           <CardBody>
             {objects.length ? (
               <Table variant="simple">
                 <Thead>
                   <Tr>
-                    <Th>路径</Th>
-                    <Th>主机</Th>
-                    <Th>类型</Th>
-                    <Th>大小</Th>
-                    <Th>过期时间</Th>
-                    <Th>最后访问</Th>
-                    <Th>命中次数</Th>
+                    <Th>{t.cdn.path}</Th>
+                    <Th>{t.cdn.host}</Th>
+                    <Th>{t.cdn.type}</Th>
+                    <Th>{t.cdn.size}</Th>
+                    <Th>{t.cdn.expiresAt}</Th>
+                    <Th>{t.cdn.lastAccess}</Th>
+                    <Th>{t.cdn.hitCount}</Th>
                   </Tr>
                 </Thead>
                 <Tbody>
@@ -471,7 +471,7 @@ const CDNManagement: React.FC = () => {
             ) : (
               <Alert status="info">
                 <AlertIcon />
-                暂无缓存对象
+                {t.cdn.noCacheObjects}
               </Alert>
             )}
           </CardBody>
@@ -482,49 +482,49 @@ const CDNManagement: React.FC = () => {
       <Modal isOpen={isAddRuleOpen} onClose={onAddRuleClose}>
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>添加缓存规则</ModalHeader>
+          <ModalHeader>{t.cdn.addRuleModal}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             <VStack spacing={4}>
               <FormControl>
-                <FormLabel>匹配类型</FormLabel>
+                <FormLabel>{t.cdn.matchType}</FormLabel>
                 <Select
                   value={ruleForm.match_type}
                   onChange={(e) => setRuleForm(prev => ({ ...prev, match_type: e.target.value }))}
                 >
-                  <option value="prefix">前缀匹配</option>
-                  <option value="suffix">后缀匹配</option>
-                  <option value="media">媒体类型匹配</option>
+                  <option value="prefix">{t.cdn.prefixMatch}</option>
+                  <option value="suffix">{t.cdn.suffixMatch}</option>
+                  <option value="media">{t.cdn.mediaTypeMatch}</option>
                 </Select>
               </FormControl>
               
               {(ruleForm.match_type === 'prefix' || ruleForm.match_type === 'suffix') && (
                 <FormControl>
-                  <FormLabel>路径模式</FormLabel>
+                  <FormLabel>{t.cdn.pathPattern}</FormLabel>
                   <Input
                     value={ruleForm.pattern}
                     onChange={(e) => setRuleForm(prev => ({ ...prev, pattern: e.target.value }))}
-                    placeholder="例如: /images/, .js, .css"
+                    placeholder={t.cdn.pathPatternPlaceholder}
                   />
                 </FormControl>
               )}
               
               {ruleForm.match_type === 'media' && (
                 <FormControl>
-                  <FormLabel>媒体类型（逗号分隔）</FormLabel>
+                  <FormLabel>{t.cdn.mediaTypes}</FormLabel>
                   <Input
                     value={ruleForm.media_types.join(', ')}
                     onChange={(e) => setRuleForm(prev => ({ 
                       ...prev, 
                       media_types: e.target.value.split(',').map(s => s.trim()).filter(s => s) 
                     }))}
-                    placeholder="例如: image/, text/css, application/javascript"
+                    placeholder={t.cdn.mediaTypesPlaceholder}
                   />
                 </FormControl>
               )}
               
               <FormControl>
-                <FormLabel>缓存时间（秒）</FormLabel>
+                <FormLabel>{t.cdn.cacheTimeSeconds}</FormLabel>
                 <Input
                   type="number"
                   value={ruleForm.ttl_seconds}
@@ -535,14 +535,14 @@ const CDNManagement: React.FC = () => {
           </ModalBody>
           <ModalFooter>
             <Button variant="ghost" mr={3} onClick={onAddRuleClose}>
-              取消
+              {t.cdn.cancel}
             </Button>
             <Button 
               colorScheme="blue" 
               onClick={addRule}
               isLoading={actionLoading}
             >
-              添加
+              {t.cdn.add}
             </Button>
           </ModalFooter>
         </ModalContent>

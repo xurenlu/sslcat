@@ -444,7 +444,7 @@ const Settings: React.FC = () => {
               
               {/* 端口模式选择 */}
               <FormControl>
-                <FormLabel>端口模式</FormLabel>
+                <FormLabel>{t.settings.portMode}</FormLabel>
                 <RadioGroup 
                   value={settings.portMode} 
                   onChange={(value) => handleInputChange('portMode', value)}
@@ -452,27 +452,23 @@ const Settings: React.FC = () => {
                   <VStack align="start" spacing={3}>
                     <Radio value="standard">
                       <VStack align="start" spacing={1}>
-                        <Text fontWeight="bold">标准模式（推荐）</Text>
+                        <Text fontWeight="bold">{t.settings.standardMode}</Text>
                         <Text fontSize="sm" color="gray.600">
-                          监听 80 和 443 端口，支持完整的 HTTP/HTTPS 功能
+                          {t.settings.standardModeDesc}
                         </Text>
                         <Text fontSize="sm" color="green.600">
-                          ✓ 自动 SSL 证书申请和管理<br/>
-                          ✓ HTTP 到 HTTPS 自动重定向<br/>
-                          ✓ 适合生产环境
+                          <div dangerouslySetInnerHTML={{ __html: t.settings.standardModeFeatures }} />
                         </Text>
                       </VStack>
                     </Radio>
                     <Radio value="custom">
                       <VStack align="start" spacing={1}>
-                        <Text fontWeight="bold">自定义端口</Text>
+                        <Text fontWeight="bold">{t.settings.customMode}</Text>
                         <Text fontSize="sm" color="gray.600">
-                          监听单个自定义端口，仅支持 HTTP
+                          {t.settings.customModeDesc}
                         </Text>
                         <Text fontSize="sm" color="orange.600">
-                          ⚠️ 不支持 SSL 证书自动申请<br/>
-                          ⚠️ 不支持 HTTPS 功能<br/>
-                          ⚠️ 适合开发环境或内网部署
+                          <div dangerouslySetInnerHTML={{ __html: t.settings.customModeFeatures }} />
                         </Text>
                       </VStack>
                     </Radio>
@@ -485,18 +481,18 @@ const Settings: React.FC = () => {
                 <Box p={4} bg="green.50" borderRadius="md">
                   <VStack spacing={3} align="stretch">
                     <Text fontWeight="bold" color="green.700">
-                      标准模式配置
+                      {t.settings.standardModeConfig}
                     </Text>
                     <HStack>
-                      <Text>HTTP 端口：</Text>
+                      <Text>{t.settings.httpPortLabel}</Text>
                       <Badge colorScheme="blue">80</Badge>
                     </HStack>
                     <HStack>
-                      <Text>HTTPS 端口：</Text>
+                      <Text>{t.settings.httpsPortLabel}</Text>
                       <Badge colorScheme="green">443</Badge>
                     </HStack>
                     <FormControl>
-                      <FormLabel>启用 HTTPS</FormLabel>
+                      <FormLabel>{t.settings.enableHttps}</FormLabel>
                       <Switch
                         isChecked={settings.enableHttps}
                         onChange={(e) => handleInputChange('enableHttps', e.target.checked)}

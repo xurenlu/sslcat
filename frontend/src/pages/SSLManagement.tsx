@@ -325,7 +325,7 @@ const SSLManagement: React.FC = () => {
       <Flex justify="space-between" align="center" mb={6}>
         <HStack>
           <Icon as={FiShield} boxSize={6} />
-          <Heading size="lg">SSL证书管理</Heading>
+          <Heading size="lg">{t.ssl.title}</Heading>
         </HStack>
         <HStack>
           <Button
@@ -334,7 +334,7 @@ const SSLManagement: React.FC = () => {
             isLoading={loading}
             variant="outline"
           >
-            刷新
+            {t.ssl.refresh}
           </Button>
           <Button
             leftIcon={<Icon as={FiShield} />}
@@ -351,7 +351,7 @@ const SSLManagement: React.FC = () => {
             onClick={syncACMECertificates}
             isLoading={syncing}
           >
-            同步 ACME 证书
+            {t.ssl.syncACMECertificates}
           </Button>
         </HStack>
       </Flex>
@@ -362,13 +362,13 @@ const SSLManagement: React.FC = () => {
             <Table variant="simple">
               <Thead>
                 <Tr>
-                  <Th>域名</Th>
-                  <Th>颁发机构</Th>
-                  <Th>状态</Th>
-                  <Th>过期时间</Th>
-                  <Th>自动续签</Th>
-                  <Th>创建时间</Th>
-                  <Th>操作</Th>
+                  <Th>{t.ssl.domain}</Th>
+                  <Th>{t.ssl.issuer}</Th>
+                  <Th>{t.ssl.status}</Th>
+                  <Th>{t.ssl.expiresAt}</Th>
+                  <Th>{t.ssl.autoRenew}</Th>
+                  <Th>{t.ssl.createdAt}</Th>
+                  <Th>{t.ssl.actions}</Th>
                 </Tr>
               </Thead>
               <Tbody>
@@ -380,7 +380,7 @@ const SSLManagement: React.FC = () => {
                         <VStack align="start" spacing={1}>
                           <Text fontFamily="mono">{cert.domain}</Text>
                           {cert.is_wildcard && (
-                            <Badge size="sm" colorScheme="blue">通配符</Badge>
+                            <Badge size="sm" colorScheme="blue">{t.ssl.wildcard}</Badge>
                           )}
                         </VStack>
                       </Td>
@@ -394,12 +394,12 @@ const SSLManagement: React.FC = () => {
                           </Badge>
                           {cert.status === '即将过期' && (
                             <Text fontSize="xs" color="orange.600">
-                              {daysLeft} 天后过期
+                              {daysLeft} {t.ssl.daysUntilExpiry}
                             </Text>
                           )}
                           {cert.status === '过期' && (
                             <Text fontSize="xs" color="red.600">
-                              已过期 {Math.abs(daysLeft)} 天
+                              {t.ssl.expired} {Math.abs(daysLeft)} {t.ssl.expiredDays}
                             </Text>
                           )}
                         </VStack>
@@ -431,7 +431,7 @@ const SSLManagement: React.FC = () => {
                       <Td>
                         <HStack spacing={2}>
                           <IconButton
-                            aria-label="更新证书"
+                            aria-label={t.ssl.updateCertificate}
                             icon={<FiRefreshCw />}
                             size="sm"
                             variant="ghost"
@@ -439,7 +439,7 @@ const SSLManagement: React.FC = () => {
                             onClick={() => renewCertificate(cert.domain)}
                           />
                           <IconButton
-                            aria-label="下载证书"
+                            aria-label={t.ssl.downloadCertificate}
                             icon={<FiDownload />}
                             size="sm"
                             variant="ghost"
@@ -447,7 +447,7 @@ const SSLManagement: React.FC = () => {
                             onClick={() => downloadCertificate(cert.domain)}
                           />
                           <IconButton
-                            aria-label="删除证书"
+                            aria-label={t.ssl.deleteCertificate}
                             icon={<FiTrash2 />}
                             size="sm"
                             variant="ghost"
@@ -464,9 +464,9 @@ const SSLManagement: React.FC = () => {
           ) : (
             <Box textAlign="center" py={8}>
               <Icon as={FiShield} boxSize={12} color="gray.300" mb={4} />
-              <Text color="gray.500" mb={4}>暂无SSL证书</Text>
+              <Text color="gray.500" mb={4}>{t.ssl.noCertificates}</Text>
               <Button leftIcon={<Icon as={FiShield} />} colorScheme="blue" onClick={onOpen}>
-                申请第一个证书
+                {t.ssl.createFirst}
               </Button>
             </Box>
           )}
@@ -477,13 +477,13 @@ const SSLManagement: React.FC = () => {
       <Modal isOpen={isOpen} onClose={onClose}>
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>申请SSL证书</ModalHeader>
+          <ModalHeader>{t.ssl.applyCertificate}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             <FormControl>
-              <FormLabel>域名</FormLabel>
+              <FormLabel>{t.ssl.domain}</FormLabel>
               <Input
-                placeholder="例如: example.com 或 *.example.com"
+                placeholder={t.ssl.domainPlaceholder}
                 value={newDomain}
                 onChange={(e) => setNewDomain(e.target.value)}
                 onKeyPress={(e) => {
@@ -493,21 +493,21 @@ const SSLManagement: React.FC = () => {
                 }}
               />
               <Text fontSize="sm" color="gray.500" mt={2}>
-                支持单个域名或通配符域名（如 *.example.com）
+                {t.ssl.wildcardSupport}
               </Text>
             </FormControl>
           </ModalBody>
           <ModalFooter>
             <Button variant="ghost" mr={3} onClick={onClose}>
-              取消
+              {t.ssl.cancel}
             </Button>
             <Button
               colorScheme="blue"
               onClick={applyCertificate}
               isLoading={applying}
-              loadingText="申请中..."
+              loadingText={t.ssl.applying}
             >
-              申请证书
+              {t.ssl.applyCertificate}
             </Button>
           </ModalFooter>
         </ModalContent>

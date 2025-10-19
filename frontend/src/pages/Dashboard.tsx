@@ -277,7 +277,7 @@ const Dashboard: React.FC = () => {
 
       {/* 快捷操作 */}
       <Box mb={8}>
-        <Heading size="md" mb={4}>快捷操作</Heading>
+        <Heading size="md" mb={4}>{t.dashboard.quickActions}</Heading>
         <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={4}>
           {quickActions.map((action) => (
             <Button
@@ -300,22 +300,22 @@ const Dashboard: React.FC = () => {
         <Card>
           <CardBody>
             <VStack align="stretch" spacing={4}>
-              <Heading size="md">系统状态</Heading>
+              <Heading size="md">{t.dashboard.systemStatus}</Heading>
               <VStack align="stretch" spacing={3}>
                 <HStack justify="space-between">
-                  <Text fontWeight="medium">运行时间:</Text>
+                  <Text fontWeight="medium">{t.dashboard.uptime}:</Text>
                   <Text>{stats.uptimeString}</Text>
                 </HStack>
                 <HStack justify="space-between">
-                  <Text fontWeight="medium">公网IP:</Text>
+                  <Text fontWeight="medium">{t.dashboard.publicIP}:</Text>
                   <Text>{stats.publicIP}</Text>
                 </HStack>
                 <HStack justify="space-between">
-                  <Text fontWeight="medium">版本:</Text>
+                  <Text fontWeight="medium">{t.dashboard.version}:</Text>
                   <Text>SSLcat v{stats.version}</Text>
                 </HStack>
                 <HStack justify="space-between">
-                  <Text fontWeight="medium">Go版本:</Text>
+                  <Text fontWeight="medium">{t.dashboard.goVersion}:</Text>
                   <Text>{stats.goVersion}</Text>
                 </HStack>
               </VStack>
@@ -326,19 +326,19 @@ const Dashboard: React.FC = () => {
         <Card>
           <CardBody>
             <VStack align="stretch" spacing={4}>
-              <Heading size="md">最近活动</Heading>
+              <Heading size="md">{t.dashboard.recentActivity}</Heading>
               <VStack align="stretch" spacing={3}>
                 <HStack>
                   <Icon as={FiCheckCircle} color="green.500" />
-                  <Text>服务正常运行中</Text>
+                  <Text>{t.dashboard.serviceRunning}</Text>
                 </HStack>
                 <HStack>
                   <Icon as={FiShield} color="blue.500" />
-                  <Text>SSL证书状态良好</Text>
+                  <Text>{t.dashboard.sslStatusGood}</Text>
                 </HStack>
                 <HStack>
                   <Icon as={FiZap} color="purple.500" />
-                  <Text>代理服务正常</Text>
+                  <Text>{t.dashboard.proxyServiceNormal}</Text>
                 </HStack>
               </VStack>
             </VStack>
