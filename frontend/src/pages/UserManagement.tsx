@@ -56,6 +56,7 @@ import {
 } from 'react-icons/fi'
 import { useConfig } from '../contexts/ConfigContext'
 import { useAuth } from '../contexts/AuthContext'
+import { useTranslation } from '../hooks/useLanguage'
 
 interface User {
   id: number
@@ -72,6 +73,7 @@ const UserManagement: React.FC = () => {
   const { adminPrefix } = useConfig()
   const { user } = useAuth()
   const toast = useToast()
+  const t = useTranslation()
   const { isOpen: isAddOpen, onOpen: onAddOpen, onClose: onAddClose } = useDisclosure()
   const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure()
   const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure()
