@@ -152,6 +152,7 @@ const Settings: React.FC = () => {
           setSettings(prev => ({
             ...prev,
             enableNotifications: config.enabled || false,
+            minNotificationLevel: config.min_notification_level || 'info', // 加载最小通知级别
             smtpHost: config.channels?.email?.smtp_host || '',
             smtpPort: config.channels?.email?.smtp_port?.toString() || '587',
             smtpUsername: config.channels?.email?.username || '',
@@ -232,6 +233,7 @@ const Settings: React.FC = () => {
           credentials: 'include',
           body: JSON.stringify({
             enabled: settings.enableNotifications,
+            min_notification_level: settings.minNotificationLevel,
             channels: {
               email: {
                 enabled: settings.smtpHost && settings.smtpUsername && settings.smtpPassword,
