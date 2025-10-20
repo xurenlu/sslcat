@@ -61,8 +61,15 @@ func (h *StaticFileHandler) ServeFile(w http.ResponseWriter, r *http.Request, fi
 
 	// 智能检测Content-Type
 	contentType := h.detectContentType(filePath, file)
+	h.log.Debugf("StaticFileHandler: detected Content-Type for %s: %s", filePath, contentType)
 	if contentType != "" {
 		w.Header().Set("Content-Type", contentType)
+	} else {
+		// 如果检测失败，使用系统默认MIME类型
+		if mimeType := mime.TypeByExtension(filepath.Ext(filePath)); mimeType != "" {
+			h.log.Debugf("StaticFileHandler: using system MIME type for %s: %s", filePath, mimeType)
+			w.Header().Set("Content-Type", mimeType)
+		}
 	}
 
 	// 设置缓存策略

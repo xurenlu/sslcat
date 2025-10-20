@@ -27,7 +27,7 @@ echo "=== 启动 sslcat 测试服务器 ==="
 cat > /tmp/sslcat-mime-test.conf << EOF
 {
   "admin_prefix": "/sslcat-panel2",
-  "admin_port": 9942,
+  "admin_port": 9943,
   "static_sites": [
     {
       "domain": "my.localhost",
@@ -46,7 +46,7 @@ echo "配置文件已创建: /tmp/sslcat-mime-test.conf"
 
 echo ""
 echo "=== 启动服务器（后台运行）==="
-./sslcat-test --config /tmp/sslcat-mime-test.conf --port 9942 &
+./sslcat-test --config /tmp/sslcat-mime-test.conf --port 9943 &
 SERVER_PID=$!
 
 # 等待服务器启动
@@ -68,7 +68,7 @@ test_mime() {
     echo "期望类型: $expected_type"
     
     # 获取 Content-Type
-    content_type=$(curl -s -I "http://my.localhost:9942$url" | grep -i "content-type" | cut -d' ' -f2- | tr -d '\r\n')
+    content_type=$(curl -s -I "http://my.localhost:9943$url" | grep -i "content-type" | cut -d' ' -f2- | tr -d '\r\n')
     
     if [ "$content_type" = "$expected_type" ]; then
         echo "✅ 通过: Content-Type = $content_type"
