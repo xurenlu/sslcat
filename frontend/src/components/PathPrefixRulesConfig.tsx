@@ -515,6 +515,98 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
                             />
                             <Text>启用此后端</Text>
                           </HStack>
+
+                          {/* 后端级 健康检查配置 */}
+                          <Divider mt={4} mb={3} />
+                          <Heading size="xs" mb={2} color="gray.700">后端健康检查</Heading>
+                          <VStack spacing={3} align="stretch">
+                            <FormControl display="flex" alignItems="center">
+                              <FormLabel htmlFor={`backend-health-enabled-${index}`} mb="0">启用健康检查</FormLabel>
+                              <Switch
+                                id={`backend-health-enabled-${index}`}
+                                isChecked={backend.health_check_enabled}
+                                onChange={(e) => updateBackend(index, 'health_check_enabled', e.target.checked)}
+                              />
+                            </FormControl>
+
+                            {backend.health_check_enabled && (
+                              <SimpleGrid columns={2} spacing={3}>
+                                <FormControl>
+                                  <FormLabel>检查路径</FormLabel>
+                                  <Input
+                                    value={backend.health_check_path}
+                                    onChange={(e) => updateBackend(index, 'health_check_path', e.target.value)}
+                                    placeholder="/health"
+                                    size="sm"
+                                  />
+                                </FormControl>
+
+                                <FormControl>
+                                  <FormLabel>检查方法</FormLabel>
+                                  <Select
+                                    value={backend.health_check_method}
+                                    onChange={(e) => updateBackend(index, 'health_check_method', e.target.value as any)}
+                                    size="sm"
+                                  >
+                                    <option value="GET">GET</option>
+                                    <option value="HEAD">HEAD</option>
+                                    <option value="POST">POST</option>
+                                  </Select>
+                                </FormControl>
+
+                                <FormControl>
+                                  <FormLabel>检查间隔（秒）</FormLabel>
+                                  <NumberInput
+                                    value={backend.health_check_interval}
+                                    onChange={(_, value) => updateBackend(index, 'health_check_interval', value)}
+                                    min={5}
+                                    max={300}
+                                    size="sm"
+                                  >
+                                    <NumberInputField />
+                                    <NumberInputStepper>
+                                      <NumberIncrementStepper />
+                                      <NumberDecrementStepper />
+                                    </NumberInputStepper>
+                                  </NumberInput>
+                                </FormControl>
+
+                                <FormControl>
+                                  <FormLabel>超时时间（秒）</FormLabel>
+                                  <NumberInput
+                                    value={backend.health_check_timeout}
+                                    onChange={(_, value) => updateBackend(index, 'health_check_timeout', value)}
+                                    min={1}
+                                    max={30}
+                                    size="sm"
+                                  >
+                                    <NumberInputField />
+                                    <NumberInputStepper>
+                                      <NumberIncrementStepper />
+                                      <NumberDecrementStepper />
+                                    </NumberInputStepper>
+                                  </NumberInput>
+                                </FormControl>
+
+                                <FormControl>
+                                  <FormLabel>期望状态码</FormLabel>
+                                  <NumberInput
+                                    value={backend.expected_status_code}
+                                    onChange={(_, value) => updateBackend(index, 'expected_status_code', value)}
+                                    min={200}
+                                    max={599}
+                                    size="sm"
+                                  >
+                                    <NumberInputField />
+                                    <NumberInputStepper>
+                                      <NumberIncrementStepper />
+                                      <NumberDecrementStepper />
+                                    </NumberInputStepper>
+                                  </NumberInput>
+                                </FormControl>
+                              </SimpleGrid>
+                            )}
+                          </VStack>
                         </CardBody>
                       </Card>
                     ))}
@@ -570,6 +662,101 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
                     />
                     <Text>启用会话保持</Text>
                   </HStack>
+                </Box>
+
+                <Divider />
+
+                {/* 规则级 健康检查配置 */}
+                <Box>
+                  <Heading size="sm" mb={3} color="gray.700">规则级健康检查</Heading>
+                  <VStack spacing={4} align="stretch">
+                    <FormControl display="flex" alignItems="center">
+                      <FormLabel htmlFor="rule-health-check" mb="0">启用健康检查</FormLabel>
+                      <Switch
+                        id="rule-health-check"
+                        isChecked={editingRule.health_check_enabled}
+                        onChange={(e) => updateRuleField('health_check_enabled', e.target.checked)}
+                      />
+                    </FormControl>
+
+                    {editingRule.health_check_enabled && (
+                      <SimpleGrid columns={2} spacing={4}>
+                        <FormControl>
+                          <FormLabel>检查路径</FormLabel>
+                          <Input
+                            value={editingRule.health_check_path}
+                            onChange={(e) => updateRuleField('health_check_path', e.target.value)}
+                            placeholder="/health"
+                            size="sm"
+                          />
+                        </FormControl>
+
+                        <FormControl>
+                          <FormLabel>检查方法</FormLabel>
+                          <Select
+                            value={editingRule.health_check_method}
+                            onChange={(e) => updateRuleField('health_check_method', e.target.value)}
+                            size="sm"
+                          >
+                            <option value="GET">GET</option>
+                            <option value="HEAD">HEAD</option>
+                            <option value="POST">POST</option>
+                          </Select>
+                        </FormControl>
+
+                        <FormControl>
+                          <FormLabel>检查间隔（秒）</FormLabel>
+                          <NumberInput
+                            value={editingRule.health_check_interval}
+                            onChange={(_, value) => updateRuleField('health_check_interval', value)}
+                            min={5}
+                            max={300}
+                            size="sm"
+                          >
+                            <NumberInputField />
+                            <NumberInputStepper>
+                              <NumberIncrementStepper />
+                              <NumberDecrementStepper />
+                            </NumberInputStepper>
+                          </NumberInput>
+                        </FormControl>
+
+                        <FormControl>
+                          <FormLabel>超时时间（秒）</FormLabel>
+                          <NumberInput
+                            value={editingRule.health_check_timeout}
+                            onChange={(_, value) => updateRuleField('health_check_timeout', value)}
+                            min={1}
+                            max={30}
+                            size="sm"
+                          >
+                            <NumberInputField />
+                            <NumberInputStepper>
+                              <NumberIncrementStepper />
+                              <NumberDecrementStepper />
+                            </NumberInputStepper>
+                          </NumberInput>
+                        </FormControl>
+
+                        <FormControl>
+                          <FormLabel>期望状态码</FormLabel>
+                          <NumberInput
+                            value={editingRule.expected_status_code}
+                            onChange={(_, value) => updateRuleField('expected_status_code', value)}
+                            min={200}
+                            max={599}
+                            size="sm"
+                          >
+                            <NumberInputField />
+                            <NumberInputStepper>
+                              <NumberIncrementStepper />
+                              <NumberDecrementStepper />
+                            </NumberInputStepper>
+                          </NumberInput>
+                        </FormControl>
+                      </SimpleGrid>
+                    )}
+                  </VStack>
                 </Box>
               </VStack>
             )}
