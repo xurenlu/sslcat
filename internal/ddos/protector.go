@@ -341,6 +341,14 @@ func (p *Protector) isStaticResourcePath(urlPath string) bool {
 		"/sitemap.xml",   // 站点地图
 		"/sw.js",         // Service Worker
 		"/manifest.json", // PWA Manifest
+		"/api/chrome/",   // Chrome 开发工具相关
+		"/devtools/",     // 开发工具
+		"/bootstrap/",    // Bootstrap CSS 库
+		"/jquery/",       // jQuery 库
+		"/fontawesome/",  // Font Awesome 图标库
+		"/cdn/",          // CDN 资源
+		"/lib/",          // 库文件
+		"/vendor/",       // 第三方库
 	}
 
 	// 检查常见静态资源扩展名
@@ -348,6 +356,32 @@ func (p *Protector) isStaticResourcePath(urlPath string) bool {
 		".js", ".css", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico",
 		".woff", ".woff2", ".ttf", ".eot", ".webp", ".avif",
 		".map", // source maps
+	}
+
+	// 检查常见的静态资源文件名
+	staticFiles := []string{
+		"favicon.ico",
+		"apple-touch-icon.png",
+		"apple-touch-icon-57x57.png",
+		"apple-touch-icon-72x72.png",
+		"apple-touch-icon-76x76.png",
+		"apple-touch-icon-114x114.png",
+		"apple-touch-icon-120x120.png",
+		"apple-touch-icon-144x144.png",
+		"apple-touch-icon-152x152.png",
+		"apple-touch-icon-180x180.png",
+		"apple-touch-icon-precomposed.png",
+		"browserconfig.xml",
+		"crossdomain.xml",
+		"humans.txt",
+		"robots.txt",
+		"sitemap.xml",
+		"sw.js",
+		"manifest.json",
+		"service-worker.js",
+		"offline.html",
+		"404.html",
+		"500.html",
 	}
 
 	urlLower := strings.ToLower(urlPath)
@@ -362,6 +396,39 @@ func (p *Protector) isStaticResourcePath(urlPath string) bool {
 	// 检查文件扩展名
 	for _, ext := range staticExtensions {
 		if strings.HasSuffix(urlLower, ext) {
+			return true
+		}
+	}
+
+	// 检查常见静态文件名
+	for _, file := range staticFiles {
+		if urlLower == "/"+file || strings.HasSuffix(urlLower, "/"+file) {
+			return true
+		}
+	}
+
+	// 检查 Chrome 开发工具相关的 JSON 文件
+	if strings.Contains(urlLower, "chrome-devtools") ||
+		strings.Contains(urlLower, "devtools") ||
+		strings.Contains(urlLower, "source-map") ||
+		strings.Contains(urlLower, "hot-update") {
+		return true
+	}
+
+	// 检查常见的 CSS 库文件路径
+	cssLibraryPaths := []string{
+		"bootstrap.min.css",
+		"bootstrap.css",
+		"jquery-ui.css",
+		"font-awesome.css",
+		"fontawesome.css",
+		"animate.css",
+		"normalize.css",
+		"reset.css",
+	}
+
+	for _, cssFile := range cssLibraryPaths {
+		if strings.Contains(urlLower, cssFile) {
 			return true
 		}
 	}
@@ -455,6 +522,12 @@ func (p *Protector) isSuspiciousUserAgent(userAgent string) bool {
 // isSuspiciousPattern 检查是否为可疑请求模式
 func (p *Protector) isSuspiciousPattern(r *http.Request, client *ClientInfo) bool {
 	url := r.URL.String()
+	urlPath := r.URL.Path
+
+	// 对于静态资源，不进行可疑模式检测
+	if p.isStaticResourcePath(urlPath) {
+		return false
+	}
 
 	// 检查路径遍历攻击
 	if strings.Contains(url, "../") || strings.Contains(url, "..\\") {
