@@ -55,11 +55,35 @@ i18n() {
     es:prefer_download) echo "[sslcat] Descarga preferida: %s";;
     ja:prefer_download) echo "[sslcat] 優先してダウンロード: %s";;
 
+    zh:select_download_source) echo "[sslcat] 请选择下载源:";;
+    en:select_download_source) echo "[sslcat] Please select download source:";;
+    fr:select_download_source) echo "[sslcat] Veuillez sélectionner la source de téléchargement :";;
+    es:select_download_source) echo "[sslcat] Por favor selecciona la fuente de descarga:";;
+    ja:select_download_source) echo "[sslcat] ダウンロードソースを選択してください:";;
+
+    zh:download_option_github) echo "1) GitHub (推荐)";;
+    en:download_option_github) echo "1) GitHub (Recommended)";;
+    fr:download_option_github) echo "1) GitHub (Recommandé)";;
+    es:download_option_github) echo "1) GitHub (Recomendado)";;
+    ja:download_option_github) echo "1) GitHub (推奨)";;
+
+    zh:download_option_mirror) echo "2) 中国大陆镜像";;
+    en:download_option_mirror) echo "2) China Mirror";;
+    fr:download_option_mirror) echo "2) Miroir Chine";;
+    es:download_option_mirror) echo "2) Espejo de China";;
+    ja:download_option_mirror) echo "2) 中国ミラー";;
+
     zh:github_failed_fallback_mirror) echo "[sslcat] GitHub下载失败，尝试中国大陆镜像: %s";;
     en:github_failed_fallback_mirror) echo "[sslcat] GitHub download failed, trying China mirror: %s";;
     fr:github_failed_fallback_mirror) echo "[sslcat] Échec du téléchargement GitHub, tentative via miroir Chine : %s";;
     es:github_failed_fallback_mirror) echo "[sslcat] Falló la descarga desde GitHub, intentando espejo de China: %s";;
     ja:github_failed_fallback_mirror) echo "[sslcat] GitHub のダウンロードに失敗。中国ミラーを試します: %s";;
+
+    zh:mirror_failed_fallback_github) echo "[sslcat] 镜像下载失败，改用 GitHub 原地址: %s";;
+    en:mirror_failed_fallback_github) echo "[sslcat] Mirror download failed, falling back to GitHub: %s";;
+    fr:mirror_failed_fallback_github) echo "[sslcat] Échec du miroir, utilisation de GitHub : %s";;
+    es:mirror_failed_fallback_github) echo "[sslcat] Falló el espejo, usando GitHub: %s";;
+    ja:mirror_failed_fallback_github) echo "[sslcat] ミラーのダウンロードに失敗。GitHub にフォールバック: %s";;
 
     zh:installed_path) echo "[sslcat] 安装完成: %s";;
     en:installed_path) echo "[sslcat] Installed: %s";;
@@ -284,12 +308,40 @@ EXT=".tar.gz"
 if [[ "$OS" == "windows" ]]; then EXT=".zip"; fi
 TMP="$(mktemp -d)"
 URL_GH="https://github.com/xurenlu/sslcat/releases/download/v${VER}/sslcat_v${VER}_${OS}-${ARCH}${EXT}"
-URL_CN="https://cdn.wxside.com/xurenlu/sslcat/releases/download/v${VER}/sslcat_v${VER}_${OS}-${ARCH}${EXT}"
-msg prefer_download "$URL_GH"
-if ! curl -fsSL "$URL_GH" -o "$TMP/pkg${EXT}"; then
-  msg github_failed_fallback_mirror "$URL_CN"
-  curl -fsSL "$URL_CN" -o "$TMP/pkg${EXT}"
-fi
+URL_CN="https://cdn.wxside.com/sslcat/releases/download/v${VER}/sslcat_v${VER}_${OS}-${ARCH}${EXT}"
+
+# 用户选择下载源
+msg select_download_source
+msg download_option_github
+msg download_option_mirror
+echo -n "请选择 (1-2, 默认 1): "
+read -r choice
+choice=${choice:-1}
+
+case "$choice" in
+  1)
+    msg prefer_download "$URL_GH"
+    if ! curl -fsSL "$URL_GH" -o "$TMP/pkg${EXT}"; then
+      msg github_failed_fallback_mirror "$URL_CN"
+      curl -fsSL "$URL_CN" -o "$TMP/pkg${EXT}"
+    fi
+    ;;
+  2)
+    msg prefer_download "$URL_CN"
+    if ! curl -fsSL "$URL_CN" -o "$TMP/pkg${EXT}"; then
+      msg mirror_failed_fallback_github "$URL_GH"
+      curl -fsSL "$URL_GH" -o "$TMP/pkg${EXT}"
+    fi
+    ;;
+  *)
+    echo "无效选择，使用默认 GitHub 源"
+    msg prefer_download "$URL_GH"
+    if ! curl -fsSL "$URL_GH" -o "$TMP/pkg${EXT}"; then
+      msg github_failed_fallback_mirror "$URL_CN"
+      curl -fsSL "$URL_CN" -o "$TMP/pkg${EXT}"
+    fi
+    ;;
+esac
 
 if [[ "$OS" == "darwin" ]]; then
   tar -xzf "$TMP/pkg${EXT}" -C "$TMP"

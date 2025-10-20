@@ -41,19 +41,19 @@ jobs:
           echo "Uploading release $VERSION to OSS..."
           
           # 上传所有文件到版本目录
-          ossutil cp -r artifacts/ oss://${{ secrets.ALIYUN_OSS_BUCKET }}/releases/$VERSION/ \
+          ossutil cp -r artifacts/ oss://${{ secrets.ALIYUN_OSS_BUCKET }}/xurenlu/sslcat/releases/$VERSION/ \
                      --parallel 10 \
                      --checkpoint-dir /tmp/oss-checkpoint \
                      --retry-times 3
           
           # 创建最新版本的符号链接（可选）
-          ossutil cp oss://${{ secrets.ALIYUN_OSS_BUCKET }}/releases/$VERSION/ \
-                     oss://${{ secrets.ALIYUN_OSS_BUCKET }}/latest/ \
+          ossutil cp oss://${{ secrets.ALIYUN_OSS_BUCKET }}/xurenlu/sslcat/releases/$VERSION/ \
+                     oss://${{ secrets.ALIYUN_OSS_BUCKET }}/xurenlu/sslcat/latest/ \
                      --update
 
       - name: Verify upload
         run: |
           VERSION=${{ github.event.release.tag_name }}
           echo "Verifying upload for version $VERSION..."
-          ossutil ls oss://${{ secrets.ALIYUN_OSS_BUCKET }}/releases/$VERSION/ \
+          ossutil ls oss://${{ secrets.ALIYUN_OSS_BUCKET }}/xurenlu/sslcat/releases/$VERSION/ \
                      --output-format json | jq -r '.objects[]?.key' | head -10
