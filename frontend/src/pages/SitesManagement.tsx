@@ -52,26 +52,33 @@ import PathPrefixRulesConfig from '../components/PathPrefixRulesConfig'
 import { PathPrefixRule } from '../types/config'
 
 interface StaticSite {
-  id: string
+  id?: string
   domain: string
-  rootPath: string
+  root: string
+  rootPath?: string  // 兼容旧字段名
+  index: string
+  indexFile?: string  // 兼容旧字段名
   enabled: boolean
-  indexFile: string
-  created: string
-  size: string
+  created?: string
+  size?: string
   path_prefix_rules?: PathPrefixRule[]
 }
 
 interface PHPSite {
-  id: string
+  id?: string
   domain: string
-  rootPath: string
-  phpVersion: string
+  root: string
+  rootPath?: string  // 兼容旧字段名
+  index: string
+  indexFile?: string  // 兼容旧字段名
   enabled: boolean
-  memoryLimit: string
-  maxExecutionTime: string
-  fcgiAddr: string
-  created: string
+  fcgi_addr: string
+  fcgiAddr?: string  // 兼容旧字段名
+  vars: Record<string, string>
+  phpVersion?: string  // 兼容旧字段名
+  memoryLimit?: string  // 兼容旧字段名
+  maxExecutionTime?: string  // 兼容旧字段名
+  created?: string
   path_prefix_rules?: PathPrefixRule[]
 }
 
@@ -318,9 +325,9 @@ const SitesManagement: React.FC = () => {
       const staticSite = site as StaticSite
       setNewSite({
         domain: staticSite.domain,
-        rootPath: staticSite.rootPath,
+        rootPath: staticSite.root || staticSite.rootPath || '',
         enabled: staticSite.enabled,
-        indexFile: staticSite.indexFile,
+        indexFile: staticSite.index || staticSite.indexFile || 'index.html',
         phpVersion: '8.1',
         memoryLimit: '128M',
         maxExecutionTime: '30',
@@ -332,13 +339,13 @@ const SitesManagement: React.FC = () => {
       const phpSite = site as PHPSite
       setNewSite({
         domain: phpSite.domain,
-        rootPath: phpSite.rootPath,
+        rootPath: phpSite.root || phpSite.rootPath || '',
         enabled: phpSite.enabled,
-        indexFile: 'index.php',
-        phpVersion: phpSite.phpVersion,
-        memoryLimit: phpSite.memoryLimit,
-        maxExecutionTime: phpSite.maxExecutionTime,
-        fcgiAddr: phpSite.fcgiAddr,
+        indexFile: phpSite.index || phpSite.indexFile || 'index.php',
+        phpVersion: phpSite.vars?.PHP_VERSION || phpSite.phpVersion || '8.1',
+        memoryLimit: phpSite.vars?.MEMORY_LIMIT || phpSite.memoryLimit || '128M',
+        maxExecutionTime: phpSite.vars?.MAX_EXECUTION_TIME || phpSite.maxExecutionTime || '30',
+        fcgiAddr: phpSite.fcgi_addr || phpSite.fcgiAddr || 'unix:/var/run/php-fpm.sock',
         headers: {},
         path_prefix_rules: phpSite.path_prefix_rules || [],
       })
@@ -477,7 +484,7 @@ const SitesManagement: React.FC = () => {
                                   size="sm"
                                   variant="ghost"
                                   colorScheme="red"
-                                  onClick={() => handleDeleteSite(site.id, 'static')}
+                                  onClick={() => handleDeleteSite(site.id || site.domain, 'static')}
                                 />
                               </HStack>
                             </Td>
@@ -579,7 +586,7 @@ const SitesManagement: React.FC = () => {
                                   size="sm"
                                   variant="ghost"
                                   colorScheme="red"
-                                  onClick={() => handleDeleteSite(site.id, 'php')}
+                                  onClick={() => handleDeleteSite(site.id || site.domain, 'php')}
                                 />
                               </HStack>
                             </Td>
