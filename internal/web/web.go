@@ -135,42 +135,28 @@ func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request) bool {
 			if fi, err := os.Stat(full); err == nil && fi.IsDir() {
 				idxFile := filepath.Join(full, site.Index)
 				if _, err := os.Stat(idxFile); err == nil {
-					// 暂时禁用智能静态文件处理器，使用简单的 MIME 类型设置
-					// if s.staticHandler != nil {
-					// 	if err := s.staticHandler.ServeFile(w, r, idxFile); err != nil {
-					// 		s.log.Errorf("Failed to serve static file: %v", err)
-					// 	}
-					// 	return true
-					// }
-					http.ServeFile(w, r, idxFile)
-					// 在 http.ServeFile 之后重新设置正确的 MIME 类型
+					// 在 http.ServeFile 之前先设置正确的 MIME 类型
 					if contentType := mime.TypeByExtension(filepath.Ext(idxFile)); contentType != "" {
 						s.log.Debugf("Setting Content-Type for index file %s: %s", idxFile, contentType)
 						w.Header().Set("Content-Type", contentType)
 					} else {
 						s.log.Debugf("No MIME type found for index file extension: %s", filepath.Ext(idxFile))
 					}
+					http.ServeFile(w, r, idxFile)
 					return true
 				}
 				http.NotFound(w, r)
 				return true
 			}
-			// 暂时禁用智能静态文件处理器，使用简单的 MIME 类型设置
-			// if s.staticHandler != nil {
-			// 	if err := s.staticHandler.ServeFile(w, r, full); err != nil {
-			// 		s.log.Errorf("Failed to serve static file: %v", err)
-			// 	}
-			// 	return true
-			// }
-			s.applyCustomSiteHeaders(w, site.ResponseHeaders)
-			http.ServeFile(w, r, full)
-			// 在 http.ServeFile 之后重新设置正确的 MIME 类型
+			// 在 http.ServeFile 之前先设置正确的 MIME 类型
 			if contentType := mime.TypeByExtension(filepath.Ext(full)); contentType != "" {
 				s.log.Debugf("Setting Content-Type for %s: %s", full, contentType)
 				w.Header().Set("Content-Type", contentType)
 			} else {
 				s.log.Debugf("No MIME type found for extension: %s", filepath.Ext(full))
 			}
+			s.applyCustomSiteHeaders(w, site.ResponseHeaders)
+			http.ServeFile(w, r, full)
 			return true
 		}
 	}
