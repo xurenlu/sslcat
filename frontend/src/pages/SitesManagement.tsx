@@ -19,18 +19,6 @@ import {
   Td,
   IconButton,
   useToast,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalFooter,
-  ModalBody,
-  ModalCloseButton,
-  FormControl,
-  FormLabel,
-  Input,
-  Select,
-  useDisclosure,
   Tabs,
   TabList,
   TabPanels,
@@ -46,9 +34,9 @@ import {
   FiFolder,
   FiCode,
 } from 'react-icons/fi'
-import { useConfig, buildApiPath } from '../contexts/ConfigContext'
+import { useConfig, buildApiPath, buildPath } from '../contexts/ConfigContext'
 import { useTranslation } from '../hooks/useLanguage'
-import PathPrefixRulesConfig from '../components/PathPrefixRulesConfig'
+import { useNavigate } from 'react-router-dom'
 import { PathPrefixRule } from '../types/config'
 
 interface StaticSite {
@@ -87,24 +75,10 @@ const SitesManagement: React.FC = () => {
   const [phpSites, setPHPSites] = useState<PHPSite[]>([])
   const [loading, setLoading] = useState(false)
   const t = useTranslation()
-  const { isOpen, onOpen, onClose } = useDisclosure()
-  const [modalType, setModalType] = useState<'static' | 'php'>('static')
-  const [editingSite, setEditingSite] = useState<StaticSite | PHPSite | null>(null)
   const toast = useToast()
   const { adminPrefix } = useConfig()
+  const navigate = useNavigate()
 
-  const [newSite, setNewSite] = useState({
-    domain: '',
-    rootPath: '',
-    enabled: true,
-    indexFile: 'index.html',
-    phpVersion: '8.1',
-    memoryLimit: '128M',
-    maxExecutionTime: '30',
-    fcgiAddr: 'unix:/var/run/php-fpm.sock',
-    headers: {} as Record<string, string>,
-    path_prefix_rules: [] as PathPrefixRule[],
-  })
 
   const refreshData = async () => {
     setLoading(true)
@@ -187,104 +161,6 @@ const SitesManagement: React.FC = () => {
     return tcpPattern.test(addr)
   }
 
-  const handleSaveSite = async () => {
-    try {
-      setLoading(true)
-      
-      // 验证 PHP 站点的 FCGI 地址
-      if (modalType === 'php' && !validateFCGIAddress(newSite.fcgiAddr)) {
-        toast({
-          title: '连接地址格式错误',
-          description: '请输入有效的连接地址，如 unix:/var/run/php-fpm.sock 或 127.0.0.1:9000',
-          status: 'error',
-          duration: 5000,
-          isClosable: true,
-        })
-        return
-      }
-      
-      const isEditing = editingSite !== null
-      const method = isEditing ? 'PUT' : 'POST'
-      const endpoint = modalType === 'static' 
-        ? '/api/static-sites' 
-        : '/api/php-sites'
-      
-      if (modalType === 'static') {
-        // 创建或更新静态站点
-        const response = await fetch(buildApiPath(adminPrefix, endpoint), {
-          method,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            domain: newSite.domain,
-            root: newSite.rootPath,
-            index: newSite.indexFile,
-            enabled: newSite.enabled,
-            headers: newSite.headers,
-            path_prefix_rules: newSite.path_prefix_rules,
-          }),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || `${isEditing ? '更新' : '创建'}静态站点失败`)
-        }
-      } else {
-        // 创建或更新 PHP 站点
-        const response = await fetch(buildApiPath(adminPrefix, endpoint), {
-          method,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            domain: newSite.domain,
-            root: newSite.rootPath,
-            index: 'index.php',
-            enabled: newSite.enabled,
-            fcgi_addr: newSite.fcgiAddr,
-            vars: {
-              PHP_VERSION: newSite.phpVersion,
-              MEMORY_LIMIT: newSite.memoryLimit,
-              MAX_EXECUTION_TIME: newSite.maxExecutionTime,
-            },
-            headers: newSite.headers,
-            path_prefix_rules: newSite.path_prefix_rules,
-          }),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || `${isEditing ? '更新' : '创建'} PHP 站点失败`)
-        }
-      }
-
-      toast({
-        title: `站点${isEditing ? '更新' : '创建'}成功`,
-        description: `${modalType === 'static' ? '静态' : 'PHP'} 站点已成功${isEditing ? '更新' : '创建'}`,
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      })
-      
-      onClose()
-      refreshData()
-      resetForm()
-      setEditingSite(null)
-    } catch (error) {
-      toast({
-        title: `${editingSite ? '更新' : '创建'}失败`,
-        description: error instanceof Error ? error.message : '未知错误',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleDeleteSite = async (id: string, type: 'static' | 'php') => {
     try {
@@ -313,63 +189,19 @@ const SitesManagement: React.FC = () => {
   }
 
   const handleEditSite = (site: StaticSite | PHPSite, type: 'static' | 'php') => {
-    setEditingSite(site)
-    setModalType(type)
-    
-    // 填充表单数据
     if (type === 'static') {
-      const staticSite = site as StaticSite
-      setNewSite({
-        domain: staticSite.domain,
-        rootPath: staticSite.root || staticSite.rootPath || '',
-        enabled: staticSite.enabled,
-        indexFile: staticSite.index || staticSite.indexFile || 'index.html',
-        phpVersion: '8.1',
-        memoryLimit: '128M',
-        maxExecutionTime: '30',
-        fcgiAddr: 'unix:/var/run/php-fpm.sock',
-        headers: {},
-        path_prefix_rules: staticSite.path_prefix_rules || [],
-      })
+      navigate(buildPath(adminPrefix, `/static-site-edit?domain=${encodeURIComponent(site.domain)}`))
     } else {
-      const phpSite = site as PHPSite
-      setNewSite({
-        domain: phpSite.domain,
-        rootPath: phpSite.root || phpSite.rootPath || '',
-        enabled: phpSite.enabled,
-        indexFile: phpSite.index || phpSite.indexFile || 'index.php',
-        phpVersion: phpSite.vars?.PHP_VERSION || phpSite.phpVersion || '8.1',
-        memoryLimit: phpSite.vars?.MEMORY_LIMIT || phpSite.memoryLimit || '128M',
-        maxExecutionTime: phpSite.vars?.MAX_EXECUTION_TIME || phpSite.maxExecutionTime || '30',
-        fcgiAddr: phpSite.fcgi_addr || phpSite.fcgiAddr || 'unix:/var/run/php-fpm.sock',
-        headers: {},
-        path_prefix_rules: phpSite.path_prefix_rules || [],
-      })
+      navigate(buildPath(adminPrefix, `/php-site-edit?domain=${encodeURIComponent(site.domain)}`))
     }
-    
-    onOpen()
-  }
-
-  const resetForm = () => {
-    setNewSite({
-      domain: '',
-      rootPath: '',
-      enabled: true,
-      indexFile: 'index.html',
-      phpVersion: '8.1',
-      memoryLimit: '128M',
-      maxExecutionTime: '30',
-      fcgiAddr: 'unix:/var/run/php-fpm.sock',
-      headers: {} as Record<string, string>,
-      path_prefix_rules: [] as PathPrefixRule[],
-    })
-    setEditingSite(null)
   }
 
   const openCreateModal = (type: 'static' | 'php') => {
-    setModalType(type)
-    resetForm()
-    onOpen()
+    if (type === 'static') {
+      navigate(buildPath(adminPrefix, '/static-site-add'))
+    } else {
+      navigate(buildPath(adminPrefix, '/php-site-add'))
+    }
   }
 
   useEffect(() => {
@@ -610,121 +442,6 @@ const SitesManagement: React.FC = () => {
         </TabPanels>
       </Tabs>
 
-      {/* 添加站点模态框 */}
-      <Modal isOpen={isOpen} onClose={onClose} size="lg">
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>
-            {editingSite 
-              ? (modalType === 'static' ? '编辑静态站点' : '编辑 PHP 站点')
-              : (modalType === 'static' ? '添加静态站点' : '添加 PHP 站点')
-            }
-          </ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <VStack spacing={4}>
-              <FormControl>
-                <FormLabel>域名</FormLabel>
-                <Input
-                  value={newSite.domain}
-                  onChange={(e) => setNewSite({ ...newSite, domain: e.target.value })}
-                  placeholder="example.com"
-                />
-              </FormControl>
-
-              <FormControl>
-                <FormLabel>根目录路径</FormLabel>
-                <Input
-                  value={newSite.rootPath}
-                  onChange={(e) => setNewSite({ ...newSite, rootPath: e.target.value })}
-                  placeholder="/var/www/example.com"
-                />
-              </FormControl>
-
-              {modalType === 'static' ? (
-                <FormControl>
-                  <FormLabel>入口文件</FormLabel>
-                  <Input
-                    value={newSite.indexFile}
-                    onChange={(e) => setNewSite({ ...newSite, indexFile: e.target.value })}
-                    placeholder="index.html"
-                  />
-                </FormControl>
-              ) : (
-                <>
-                  <FormControl>
-                    <FormLabel>PHP 版本</FormLabel>
-                    <Select
-                      value={newSite.phpVersion}
-                      onChange={(e) => setNewSite({ ...newSite, phpVersion: e.target.value })}
-                    >
-                      <option value="7.4">PHP 7.4</option>
-                      <option value="8.0">PHP 8.0</option>
-                      <option value="8.1">PHP 8.1</option>
-                      <option value="8.2">PHP 8.2</option>
-                    </Select>
-                  </FormControl>
-
-                  <FormControl>
-                    <FormLabel>内存限制</FormLabel>
-                    <Select
-                      value={newSite.memoryLimit}
-                      onChange={(e) => setNewSite({ ...newSite, memoryLimit: e.target.value })}
-                    >
-                      <option value="128M">128M</option>
-                      <option value="256M">256M</option>
-                      <option value="512M">512M</option>
-                      <option value="1G">1G</option>
-                    </Select>
-                  </FormControl>
-
-                  <FormControl>
-                    <FormLabel>最大执行时间（秒）</FormLabel>
-                    <Input
-                      type="number"
-                      value={newSite.maxExecutionTime}
-                      onChange={(e) => setNewSite({ ...newSite, maxExecutionTime: e.target.value })}
-                    />
-                  </FormControl>
-
-                  <FormControl>
-                    <FormLabel>PHP-FPM 连接地址</FormLabel>
-                    <Input
-                      value={newSite.fcgiAddr}
-                      onChange={(e) => setNewSite({ ...newSite, fcgiAddr: e.target.value })}
-                      placeholder="unix:/var/run/php-fpm.sock 或 127.0.0.1:9000"
-                    />
-                    <Text fontSize="sm" color="gray.500" mt={1}>
-                      支持 Unix Socket (unix:/path/to/sock) 或 TCP 连接 (host:port)
-                    </Text>
-                  </FormControl>
-                </>
-              )}
-
-              {/* 路径前缀规则配置 */}
-              <FormControl>
-                <FormLabel>路径前缀规则配置</FormLabel>
-                <Text fontSize="sm" color="gray.500" mb={3}>
-                  配置特定路径前缀的负载均衡转发规则
-                </Text>
-                <PathPrefixRulesConfig
-                  pathPrefixRules={newSite.path_prefix_rules}
-                  onChange={(rules) => setNewSite({ ...newSite, path_prefix_rules: rules })}
-                />
-              </FormControl>
-            </VStack>
-          </ModalBody>
-
-          <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={onClose}>
-{t.common.cancel}
-            </Button>
-            <Button colorScheme="blue" onClick={handleSaveSite}>
-              {editingSite ? t.sites.updateSite : t.sites.createSite}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
     </Box>
   )
 }
