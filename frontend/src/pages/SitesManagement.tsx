@@ -48,6 +48,8 @@ import {
 } from 'react-icons/fi'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
 import { useTranslation } from '../hooks/useLanguage'
+import PathPrefixRulesConfig from '../components/PathPrefixRulesConfig'
+import { PathPrefixRule } from '../types/config'
 
 interface StaticSite {
   id: string
@@ -57,6 +59,7 @@ interface StaticSite {
   indexFile: string
   created: string
   size: string
+  path_prefix_rules?: PathPrefixRule[]
 }
 
 interface PHPSite {
@@ -69,6 +72,7 @@ interface PHPSite {
   maxExecutionTime: string
   fcgiAddr: string
   created: string
+  path_prefix_rules?: PathPrefixRule[]
 }
 
 const SitesManagement: React.FC = () => {
@@ -92,6 +96,7 @@ const SitesManagement: React.FC = () => {
     maxExecutionTime: '30',
     fcgiAddr: 'unix:/var/run/php-fpm.sock',
     headers: {} as Record<string, string>,
+    path_prefix_rules: [] as PathPrefixRule[],
   })
 
   const refreshData = async () => {
@@ -215,6 +220,7 @@ const SitesManagement: React.FC = () => {
             index: newSite.indexFile,
             enabled: newSite.enabled,
             headers: newSite.headers,
+            path_prefix_rules: newSite.path_prefix_rules,
           }),
         })
 
@@ -242,6 +248,7 @@ const SitesManagement: React.FC = () => {
               MAX_EXECUTION_TIME: newSite.maxExecutionTime,
             },
             headers: newSite.headers,
+            path_prefix_rules: newSite.path_prefix_rules,
           }),
         })
 
@@ -319,6 +326,7 @@ const SitesManagement: React.FC = () => {
         maxExecutionTime: '30',
         fcgiAddr: 'unix:/var/run/php-fpm.sock',
         headers: {},
+        path_prefix_rules: staticSite.path_prefix_rules || [],
       })
     } else {
       const phpSite = site as PHPSite
@@ -332,6 +340,7 @@ const SitesManagement: React.FC = () => {
         maxExecutionTime: phpSite.maxExecutionTime,
         fcgiAddr: phpSite.fcgiAddr,
         headers: {},
+        path_prefix_rules: phpSite.path_prefix_rules || [],
       })
     }
     
@@ -349,6 +358,7 @@ const SitesManagement: React.FC = () => {
       maxExecutionTime: '30',
       fcgiAddr: 'unix:/var/run/php-fpm.sock',
       headers: {} as Record<string, string>,
+      path_prefix_rules: [] as PathPrefixRule[],
     })
     setEditingSite(null)
   }
@@ -687,6 +697,18 @@ const SitesManagement: React.FC = () => {
                   </FormControl>
                 </>
               )}
+
+              {/* 路径前缀规则配置 */}
+              <FormControl>
+                <FormLabel>路径前缀规则配置</FormLabel>
+                <Text fontSize="sm" color="gray.500" mb={3}>
+                  配置特定路径前缀的负载均衡转发规则
+                </Text>
+                <PathPrefixRulesConfig
+                  pathPrefixRules={newSite.path_prefix_rules}
+                  onChange={(rules) => setNewSite({ ...newSite, path_prefix_rules: rules })}
+                />
+              </FormControl>
             </VStack>
           </ModalBody>
 

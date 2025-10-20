@@ -522,7 +522,7 @@ const ProxyAdd: React.FC = () => {
               {/* 路径前缀规则配置 */}
               <PathPrefixRulesConfig
                 pathPrefixRules={formData.path_prefix_rules}
-                onRulesChange={(rules) => handleInputChange('path_prefix_rules', rules)}
+                onChange={(rules) => handleInputChange('path_prefix_rules', rules)}
               />
 
               <Divider />

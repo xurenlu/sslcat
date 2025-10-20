@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { PathPrefixRule, ProxyBackend } from '../types/config'
 import {
   Box,
   Heading,
@@ -53,66 +54,15 @@ import {
   FiChevronUp
 } from 'react-icons/fi'
 
-interface ProxyBackend {
-  id: string
-  host: string
-  port: number
-  weight: number
-  priority: number
-  enabled: boolean
-  health_check_enabled: boolean
-  health_check_path: string
-  health_check_interval: number
-  health_check_timeout: number
-  health_check_method: string
-  expected_status_code: number
-  max_retries: number
-  retry_interval: number
-  failure_threshold: number
-  recovery_threshold: number
-  connect_timeout: number
-  read_timeout: number
-  write_timeout: number
-  keep_alive_timeout: number
-  max_connections: number
-  tls_enabled: boolean
-  tls_insecure: boolean
-}
-
-interface PathPrefixRule {
-  name: string
-  description: string
-  enabled: boolean
-  prefixes: string[]
-  exact: boolean
-  backends: ProxyBackend[]
-  load_balancer_algorithm: string
-  session_affinity_enabled: boolean
-  session_affinity_method: string
-  session_affinity_cookie: string
-  session_affinity_header: string
-  session_affinity_ttl: number
-  health_check_enabled: boolean
-  health_check_path: string
-  health_check_interval: number
-  health_check_timeout: number
-  health_check_method: string
-  expected_status_code: number
-  failover_enabled: boolean
-  max_retries: number
-  retry_interval: number
-  failure_threshold: number
-  recovery_threshold: number
-}
 
 interface PathPrefixRulesConfigProps {
   pathPrefixRules: PathPrefixRule[]
-  onRulesChange: (rules: PathPrefixRule[]) => void
+  onChange: (rules: PathPrefixRule[]) => void
 }
 
 const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
   pathPrefixRules,
-  onRulesChange
+  onChange
 }) => {
   const [editingRule, setEditingRule] = useState<PathPrefixRule | null>(null)
   const [editingIndex, setEditingIndex] = useState<number>(-1)
@@ -187,7 +137,7 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
   // 删除规则
   const deleteRule = (index: number) => {
     const newRules = pathPrefixRules.filter((_, i) => i !== index)
-    onRulesChange(newRules)
+    onChange(newRules)
   }
 
   // 保存规则
@@ -203,7 +153,7 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
       newRules[editingIndex] = editingRule
     }
     
-    onRulesChange(newRules)
+    onChange(newRules)
     onClose()
   }
 
