@@ -1,0 +1,117 @@
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8080,
+    "port_mode": "custom",
+    "custom_port": 8080,
+    "enable_https": false,
+    "debug": true,
+    "data_dir": "/data",
+    "access_log_enabled": true,
+    "access_log_format": "json",
+    "access_log_path": "/data/logs/access.log"
+  },
+  "admin": {
+    "username": "admin",
+    "password_file": "/data/admin_password.txt",
+    "first_run": false
+  },
+  "admin_prefix": "/sslcat-panel",
+  "proxy": {
+    "rules": [
+      {
+        "domain": "test-a.local",
+        "target": "backend-a",
+        "port": 80,
+        "enabled": true,
+        "ssl_only": false
+      },
+      {
+        "domain": "test-lb.local",
+        "target": "",
+        "enabled": true,
+        "load_balancer_enabled": true,
+        "load_balancer_algorithm": "round_robin",
+        "load_balancer_backends": [
+          {
+            "id": "backend-a",
+            "address": "backend-a:80",
+            "weight": 1,
+            "enabled": true
+          },
+          {
+            "id": "backend-b",
+            "address": "backend-b:80",
+            "weight": 1,
+            "enabled": true
+          },
+          {
+            "id": "backend-c",
+            "address": "backend-c:80",
+            "weight": 1,
+            "enabled": true
+          }
+        ],
+        "health_check_enabled": true,
+        "health_check_path": "/health",
+        "health_check_interval": 5,
+        "health_check_timeout": 3,
+        "session_affinity_enabled": true,
+        "session_affinity_method": "cookie",
+        "session_affinity_cookie": "SSLCAT_BACKEND"
+      }
+    ]
+  },
+  "security": {
+    "enable_captcha": false,
+    "enable_ddos": true,
+    "enable_waf": true,
+    "enable_ua_filter": true,
+    "max_attempts": 10,
+    "block_duration": "5m",
+    "allowed_user_agents": [
+      "Mozilla/",
+      "Chrome/",
+      "curl/",
+      "test-agent"
+    ]
+  },
+  "compression": {
+    "enabled": true,
+    "algorithms": ["gzip", "brotli"],
+    "level": 6,
+    "min_size": 1024
+  },
+  "cdn_cache": {
+    "enabled": true,
+    "default_ttl": 3600,
+    "max_size": 104857600,
+    "cache_dir": "/data/cdn-cache"
+  },
+  "upstream_cache": {
+    "enabled": true,
+    "ttl": 300,
+    "max_size": 52428800
+  },
+  "image_optimization": {
+    "enabled": true,
+    "auto_webp": true,
+    "webp_quality": 80,
+    "jpeg_quality": 85,
+    "allow_resize": true,
+    "max_width": 2000,
+    "max_height": 2000,
+    "allowed_sizes": [100, 200, 400, 800],
+    "cache_enabled": true,
+    "cache_ttl": 3600,
+    "include_patterns": ["*.jpg", "*.jpeg", "*.png"],
+    "exclude_patterns": ["/admin/*", "/api/*"]
+  },
+  "notification": {
+    "enabled": false
+  },
+  "ai_security": {
+    "enabled": false
+  }
+}
+

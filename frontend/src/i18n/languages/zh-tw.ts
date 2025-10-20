@@ -912,7 +912,207 @@ export const zhTW: Translation = {
     masterLastReachable: 'Master 最近可達時間',
     lastError: '最近錯誤',
   },
-}
 
-// 翻译映射
-;
+  // 路徑前綴規則配置
+  pathPrefixRules: {
+    title: '路徑前綴規則配置',
+    addRule: '新增規則',
+    editRule: '編輯規則',
+    deleteRule: '刪除規則',
+    noRules: '暫無規則',
+    noRulesMessage: '暫無路徑前綴規則，點擊「新增規則」開始配置',
+    basicInfo: '基本資訊',
+    ruleName: '規則名稱',
+    ruleNamePlaceholder: 'API v1 規則',
+    description: '描述',
+    descriptionPlaceholder: 'API v1 路徑前綴規則',
+    enableRule: '啟用此規則',
+    pathPrefixConfig: '路徑前綴配置',
+    pathPrefix: '路徑前綴',
+    pathPrefixPlaceholder: '/api/v1/',
+    addPrefix: '新增前綴',
+    exactMatch: '精確匹配路徑前綴',
+    backendConfig: '後端伺服器配置',
+    backendServer: '後端伺服器',
+    backendServerNumber: '後端伺服器 {number}',
+    hostAddress: '主機位址',
+    hostAddressPlaceholder: 'api-server.example.com',
+    port: '埠號',
+    weight: '權重',
+    priority: '優先級',
+    enableBackend: '啟用此後端',
+    backendHealthCheck: '後端健康檢查',
+    enableHealthCheck: '啟用健康檢查',
+    checkPath: '檢查路徑',
+    checkPathPlaceholder: '/health',
+    checkMethod: '檢查方法',
+    checkInterval: '檢查間隔（秒）',
+    checkIntervalUnit: '秒',
+    timeout: '逾時時間（秒）',
+    timeoutUnit: '秒',
+    expectedStatusCode: '期望狀態碼',
+    addBackendServer: '新增後端伺服器',
+    loadBalancerConfig: '負載平衡器配置',
+    loadBalancerAlgorithm: '負載平衡器演算法',
+    sessionAffinityMethod: '會話親和性方法',
+    enableSessionAffinity: '啟用會話親和性',
+    ruleHealthCheck: '規則級健康檢查',
+    ruleHealthCheckTitle: '規則級健康檢查',
+    algorithm: '演算法',
+    sessionAffinity: '會話親和性',
+    healthCheck: '健康檢查',
+    weightLabel: '權重',
+    enabled: '啟用',
+    disabled: '停用',
+    roundRobin: '輪詢',
+    weightedRoundRobin: '加權輪詢',
+    leastConn: '最少連線',
+    ipHash: 'IP 雜湊',
+    random: '隨機',
+    consistentHash: '一致性雜湊',
+    ipAddress: 'IP 位址',
+    cookie: 'Cookie',
+    header: '標頭',
+    get: 'GET',
+    head: 'HEAD',
+    post: 'POST',
+    seconds: '秒',
+    minutes: '分鐘',
+    hours: '小時',
+    days: '天',
+    weeks: '週',
+    months: '月',
+    years: '年',
+  },
+
+  // Toast 訊息
+  toast: {
+    // 通用訊息
+    success: '成功',
+    error: '錯誤',
+    warning: '警告',
+    info: '資訊',
+    loading: '載入中',
+    saved: '儲存成功',
+    deleted: '刪除成功',
+    updated: '更新成功',
+    created: '建立成功',
+    failed: '失敗',
+    cancelled: '已取消',
+    confirmed: '已確認',
+    
+    // 網站管理
+    siteDeleteSuccess: '網站刪除成功',
+    siteDeleteFailed: '網站刪除失敗',
+    siteCreateSuccess: '網站建立成功',
+    siteCreateFailed: '網站建立失敗',
+    siteUpdateSuccess: '網站更新成功',
+    siteUpdateFailed: '網站更新失敗',
+    siteDataLoadFailed: '網站資料載入失敗',
+    siteDataLoadPartialFailed: '部分資料載入失敗',
+    siteDataLoadPartialFailedDesc: '某些網站資料可能無法載入，請檢查網路連線',
+    
+    // 代理管理
+    proxyDeleteSuccess: '代理刪除成功',
+    proxyDeleteFailed: '代理刪除失敗',
+    proxyCreateSuccess: '代理建立成功',
+    proxyCreateFailed: '代理建立失敗',
+    proxyUpdateSuccess: '代理更新成功',
+    proxyUpdateFailed: '代理更新失敗',
+    
+    // SSL 管理
+    sslCertRenewSuccess: 'SSL 憑證續期成功',
+    sslCertRenewFailed: 'SSL 憑證續期失敗',
+    sslCertDeleteSuccess: 'SSL 憑證刪除成功',
+    sslCertDeleteFailed: 'SSL 憑證刪除失敗',
+    sslCertSyncSuccess: 'SSL 憑證同步成功',
+    sslCertSyncFailed: 'SSL 憑證同步失敗',
+    
+    // 使用者管理
+    userCreateSuccess: '使用者建立成功',
+    userCreateFailed: '使用者建立失敗',
+    userUpdateSuccess: '使用者更新成功',
+    userUpdateFailed: '使用者更新失敗',
+    userDeleteSuccess: '使用者刪除成功',
+    userDeleteFailed: '使用者刪除失敗',
+    userPasswordChangeSuccess: '密碼修改成功',
+    userPasswordChangeFailed: '密碼修改失敗',
+    
+    // 系統設定
+    settingsSaveSuccess: '設定儲存成功',
+    settingsSaveFailed: '設定儲存失敗',
+    passwordChangeSuccess: '密碼修改成功',
+    passwordChangeFailed: '密碼修改失敗',
+    
+    // 叢集管理
+    clusterSyncSuccess: '叢集同步成功',
+    clusterSyncFailed: '叢集同步失敗',
+    clusterMasterReachable: 'Master 節點可達',
+    clusterMasterUnreachable: 'Master 節點不可達',
+    
+    // DNS 管理
+    dnsRecordCreateSuccess: 'DNS 記錄建立成功',
+    dnsRecordCreateFailed: 'DNS 記錄建立失敗',
+    dnsRecordUpdateSuccess: 'DNS 記錄更新成功',
+    dnsRecordUpdateFailed: 'DNS 記錄更新失敗',
+    dnsRecordDeleteSuccess: 'DNS 記錄刪除成功',
+    dnsRecordDeleteFailed: 'DNS 記錄刪除失敗',
+    
+    // 通知管理
+    notificationCreateSuccess: '通知建立成功',
+    notificationCreateFailed: '通知建立失敗',
+    notificationUpdateSuccess: '通知更新成功',
+    notificationUpdateFailed: '通知更新失敗',
+    notificationDeleteSuccess: '通知刪除成功',
+    notificationDeleteFailed: '通知刪除失敗',
+    notificationTestSuccess: '通知測試成功',
+    notificationTestFailed: '通知測試失敗',
+    
+    // 安全設定
+    securitySettingsUpdateSuccess: '安全設定更新成功',
+    securitySettingsUpdateFailed: '安全設定更新失敗',
+    ipBlockSuccess: 'IP 封鎖成功',
+    ipBlockFailed: 'IP 封鎖失敗',
+    ipUnblockSuccess: 'IP 解封成功',
+    ipUnblockFailed: 'IP 解封失敗',
+    
+    // 圖片最佳化
+    imageOptimizationSuccess: '圖片最佳化成功',
+    imageOptimizationFailed: '圖片最佳化失敗',
+    imageOptimizationSettingsUpdateSuccess: '圖片最佳化設定更新成功',
+    imageOptimizationSettingsUpdateFailed: '圖片最佳化設定更新失敗',
+    
+    // Git 伺服器
+    gitServerStartSuccess: 'Git 伺服器啟動成功',
+    gitServerStartFailed: 'Git 伺服器啟動失敗',
+    gitServerStopSuccess: 'Git 伺服器停止成功',
+    gitServerStopFailed: 'Git 伺服器停止失敗',
+    gitAppCreateSuccess: '應用程式建立成功',
+    gitAppCreateFailed: '應用程式建立失敗',
+    gitAppDeleteSuccess: '應用程式刪除成功',
+    gitAppDeleteFailed: '應用程式刪除失敗',
+    gitAppRedeploySuccess: '應用程式重新部署成功',
+    gitAppRedeployFailed: '應用程式重新部署失敗',
+    
+    // 統計資訊
+    statisticsLoadSuccess: '統計資料載入成功',
+    statisticsLoadFailed: '統計資料載入失敗',
+    
+    // 日誌管理
+    logLoadSuccess: '日誌載入成功',
+    logLoadFailed: '日誌載入失敗',
+    logClearSuccess: '日誌清空成功',
+    logClearFailed: '日誌清空失敗',
+    
+    // 設定測試
+    configTestSuccess: '設定測試成功',
+    configTestFailed: '設定測試失敗',
+    configTestWarning: '設定測試警告',
+    
+    // 網路錯誤
+    networkError: '網路連線錯誤',
+    networkTimeout: '網路請求逾時',
+    serverError: '伺服器內部錯誤',
+    unknownError: '未知錯誤',
+  },
+}

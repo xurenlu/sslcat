@@ -912,7 +912,207 @@ export const koKR: Translation = {
     masterLastReachable: '마스터 최근 연결 시간',
     lastError: '최근 오류',
   },
-}
 
-// 德语翻译
-;
+  // 경로 접두사 규칙 설정
+  pathPrefixRules: {
+    title: '경로 접두사 규칙 설정',
+    addRule: '규칙 추가',
+    editRule: '규칙 편집',
+    deleteRule: '규칙 삭제',
+    noRules: '규칙 없음',
+    noRulesMessage: '경로 접두사 규칙이 설정되지 않았습니다. "규칙 추가"를 클릭하여 설정을 시작하세요.',
+    basicInfo: '기본 정보',
+    ruleName: '규칙 이름',
+    ruleNamePlaceholder: 'API v1 규칙',
+    description: '설명',
+    descriptionPlaceholder: 'API v1 경로 접두사 규칙',
+    enableRule: '이 규칙 활성화',
+    pathPrefixConfig: '경로 접두사 설정',
+    pathPrefix: '경로 접두사',
+    pathPrefixPlaceholder: '/api/v1/',
+    addPrefix: '접두사 추가',
+    exactMatch: '경로 접두사 정확히 일치',
+    backendConfig: '백엔드 서버 설정',
+    backendServer: '백엔드 서버',
+    backendServerNumber: '백엔드 서버 {number}',
+    hostAddress: '호스트 주소',
+    hostAddressPlaceholder: 'api-server.example.com',
+    port: '포트',
+    weight: '가중치',
+    priority: '우선순위',
+    enableBackend: '이 백엔드 활성화',
+    backendHealthCheck: '백엔드 헬스 체크',
+    enableHealthCheck: '헬스 체크 활성화',
+    checkPath: '체크 경로',
+    checkPathPlaceholder: '/health',
+    checkMethod: '체크 방법',
+    checkInterval: '체크 간격(초)',
+    checkIntervalUnit: '초',
+    timeout: '타임아웃(초)',
+    timeoutUnit: '초',
+    expectedStatusCode: '예상 상태 코드',
+    addBackendServer: '백엔드 서버 추가',
+    loadBalancerConfig: '로드 밸런서 설정',
+    loadBalancerAlgorithm: '로드 밸런서 알고리즘',
+    sessionAffinityMethod: '세션 어피니티 방법',
+    enableSessionAffinity: '세션 어피니티 활성화',
+    ruleHealthCheck: '규칙 레벨 헬스 체크',
+    ruleHealthCheckTitle: '규칙 레벨 헬스 체크',
+    algorithm: '알고리즘',
+    sessionAffinity: '세션 어피니티',
+    healthCheck: '헬스 체크',
+    weightLabel: '가중치',
+    enabled: '활성화',
+    disabled: '비활성화',
+    roundRobin: '라운드 로빈',
+    weightedRoundRobin: '가중 라운드 로빈',
+    leastConn: '최소 연결',
+    ipHash: 'IP 해시',
+    random: '랜덤',
+    consistentHash: '일관성 해시',
+    ipAddress: 'IP 주소',
+    cookie: '쿠키',
+    header: '헤더',
+    get: 'GET',
+    head: 'HEAD',
+    post: 'POST',
+    seconds: '초',
+    minutes: '분',
+    hours: '시간',
+    days: '일',
+    weeks: '주',
+    months: '월',
+    years: '년',
+  },
+
+  // Toast 메시지
+  toast: {
+    // 일반 메시지
+    success: '성공',
+    error: '오류',
+    warning: '경고',
+    info: '정보',
+    loading: '로딩 중',
+    saved: '저장 성공',
+    deleted: '삭제 성공',
+    updated: '업데이트 성공',
+    created: '생성 성공',
+    failed: '실패',
+    cancelled: '취소됨',
+    confirmed: '확인됨',
+    
+    // 사이트 관리
+    siteDeleteSuccess: '사이트 삭제 성공',
+    siteDeleteFailed: '사이트 삭제 실패',
+    siteCreateSuccess: '사이트 생성 성공',
+    siteCreateFailed: '사이트 생성 실패',
+    siteUpdateSuccess: '사이트 업데이트 성공',
+    siteUpdateFailed: '사이트 업데이트 실패',
+    siteDataLoadFailed: '사이트 데이터 로드 실패',
+    siteDataLoadPartialFailed: '부분 데이터 로드 실패',
+    siteDataLoadPartialFailedDesc: '일부 사이트 데이터가 로드되지 않을 수 있습니다. 네트워크 연결을 확인하세요',
+    
+    // 프록시 관리
+    proxyDeleteSuccess: '프록시 삭제 성공',
+    proxyDeleteFailed: '프록시 삭제 실패',
+    proxyCreateSuccess: '프록시 생성 성공',
+    proxyCreateFailed: '프록시 생성 실패',
+    proxyUpdateSuccess: '프록시 업데이트 성공',
+    proxyUpdateFailed: '프록시 업데이트 실패',
+    
+    // SSL 관리
+    sslCertRenewSuccess: 'SSL 인증서 갱신 성공',
+    sslCertRenewFailed: 'SSL 인증서 갱신 실패',
+    sslCertDeleteSuccess: 'SSL 인증서 삭제 성공',
+    sslCertDeleteFailed: 'SSL 인증서 삭제 실패',
+    sslCertSyncSuccess: 'SSL 인증서 동기화 성공',
+    sslCertSyncFailed: 'SSL 인증서 동기화 실패',
+    
+    // 사용자 관리
+    userCreateSuccess: '사용자 생성 성공',
+    userCreateFailed: '사용자 생성 실패',
+    userUpdateSuccess: '사용자 업데이트 성공',
+    userUpdateFailed: '사용자 업데이트 실패',
+    userDeleteSuccess: '사용자 삭제 성공',
+    userDeleteFailed: '사용자 삭제 실패',
+    userPasswordChangeSuccess: '비밀번호 변경 성공',
+    userPasswordChangeFailed: '비밀번호 변경 실패',
+    
+    // 시스템 설정
+    settingsSaveSuccess: '설정 저장 성공',
+    settingsSaveFailed: '설정 저장 실패',
+    passwordChangeSuccess: '비밀번호 변경 성공',
+    passwordChangeFailed: '비밀번호 변경 실패',
+    
+    // 클러스터 관리
+    clusterSyncSuccess: '클러스터 동기화 성공',
+    clusterSyncFailed: '클러스터 동기화 실패',
+    clusterMasterReachable: '마스터 노드 도달 가능',
+    clusterMasterUnreachable: '마스터 노드 도달 불가',
+    
+    // DNS 관리
+    dnsRecordCreateSuccess: 'DNS 레코드 생성 성공',
+    dnsRecordCreateFailed: 'DNS 레코드 생성 실패',
+    dnsRecordUpdateSuccess: 'DNS 레코드 업데이트 성공',
+    dnsRecordUpdateFailed: 'DNS 레코드 업데이트 실패',
+    dnsRecordDeleteSuccess: 'DNS 레코드 삭제 성공',
+    dnsRecordDeleteFailed: 'DNS 레코드 삭제 실패',
+    
+    // 알림 관리
+    notificationCreateSuccess: '알림 생성 성공',
+    notificationCreateFailed: '알림 생성 실패',
+    notificationUpdateSuccess: '알림 업데이트 성공',
+    notificationUpdateFailed: '알림 업데이트 실패',
+    notificationDeleteSuccess: '알림 삭제 성공',
+    notificationDeleteFailed: '알림 삭제 실패',
+    notificationTestSuccess: '알림 테스트 성공',
+    notificationTestFailed: '알림 테스트 실패',
+    
+    // 보안 설정
+    securitySettingsUpdateSuccess: '보안 설정 업데이트 성공',
+    securitySettingsUpdateFailed: '보안 설정 업데이트 실패',
+    ipBlockSuccess: 'IP 차단 성공',
+    ipBlockFailed: 'IP 차단 실패',
+    ipUnblockSuccess: 'IP 차단 해제 성공',
+    ipUnblockFailed: 'IP 차단 해제 실패',
+    
+    // 이미지 최적화
+    imageOptimizationSuccess: '이미지 최적화 성공',
+    imageOptimizationFailed: '이미지 최적화 실패',
+    imageOptimizationSettingsUpdateSuccess: '이미지 최적화 설정 업데이트 성공',
+    imageOptimizationSettingsUpdateFailed: '이미지 최적화 설정 업데이트 실패',
+    
+    // Git 서버
+    gitServerStartSuccess: 'Git 서버 시작 성공',
+    gitServerStartFailed: 'Git 서버 시작 실패',
+    gitServerStopSuccess: 'Git 서버 중지 성공',
+    gitServerStopFailed: 'Git 서버 중지 실패',
+    gitAppCreateSuccess: '애플리케이션 생성 성공',
+    gitAppCreateFailed: '애플리케이션 생성 실패',
+    gitAppDeleteSuccess: '애플리케이션 삭제 성공',
+    gitAppDeleteFailed: '애플리케이션 삭제 실패',
+    gitAppRedeploySuccess: '애플리케이션 재배포 성공',
+    gitAppRedeployFailed: '애플리케이션 재배포 실패',
+    
+    // 통계 정보
+    statisticsLoadSuccess: '통계 데이터 로드 성공',
+    statisticsLoadFailed: '통계 데이터 로드 실패',
+    
+    // 로그 관리
+    logLoadSuccess: '로그 로드 성공',
+    logLoadFailed: '로그 로드 실패',
+    logClearSuccess: '로그 삭제 성공',
+    logClearFailed: '로그 삭제 실패',
+    
+    // 설정 테스트
+    configTestSuccess: '설정 테스트 성공',
+    configTestFailed: '설정 테스트 실패',
+    configTestWarning: '설정 테스트 경고',
+    
+    // 네트워크 오류
+    networkError: '네트워크 연결 오류',
+    networkTimeout: '네트워크 요청 시간 초과',
+    serverError: '서버 내부 오류',
+    unknownError: '알 수 없는 오류',
+  },
+}

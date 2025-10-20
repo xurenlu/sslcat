@@ -918,7 +918,207 @@ export const zhCN: Translation = {
     syncCertsSuccess: '证书同步成功',
     slaveNotice: '当前为 Slave 模式：部分功能只读。可修改密码、面板路径、解除 Slave 模式。',
   },
-}
 
-// 英文翻译
-;
+  // 路径前缀规则配置
+  pathPrefixRules: {
+    title: '路径前缀规则配置',
+    addRule: '添加规则',
+    editRule: '编辑规则',
+    deleteRule: '删除规则',
+    noRules: '暂无规则',
+    noRulesMessage: '暂无路径前缀规则，点击"添加规则"开始配置',
+    basicInfo: '基本信息',
+    ruleName: '规则名称',
+    ruleNamePlaceholder: 'API v1 规则',
+    description: '描述',
+    descriptionPlaceholder: 'API v1 路径前缀规则',
+    enableRule: '启用此规则',
+    pathPrefixConfig: '路径前缀配置',
+    pathPrefix: '路径前缀',
+    pathPrefixPlaceholder: '/api/v1/',
+    addPrefix: '添加前缀',
+    exactMatch: '精确匹配路径前缀',
+    backendConfig: '后端服务器配置',
+    backendServer: '后端服务器',
+    backendServerNumber: '后端服务器 {number}',
+    hostAddress: '主机地址',
+    hostAddressPlaceholder: 'api-server.example.com',
+    port: '端口',
+    weight: '权重',
+    priority: '优先级',
+    enableBackend: '启用此后端',
+    backendHealthCheck: '后端健康检查',
+    enableHealthCheck: '启用健康检查',
+    checkPath: '检查路径',
+    checkPathPlaceholder: '/health',
+    checkMethod: '检查方法',
+    checkInterval: '检查间隔（秒）',
+    checkIntervalUnit: '秒',
+    timeout: '超时时间（秒）',
+    timeoutUnit: '秒',
+    expectedStatusCode: '期望状态码',
+    addBackendServer: '添加后端服务器',
+    loadBalancerConfig: '负载均衡配置',
+    loadBalancerAlgorithm: '负载均衡算法',
+    sessionAffinityMethod: '会话保持方法',
+    enableSessionAffinity: '启用会话保持',
+    ruleHealthCheck: '规则级健康检查',
+    ruleHealthCheckTitle: '规则级健康检查',
+    algorithm: '算法',
+    sessionAffinity: '会话保持',
+    healthCheck: '健康检查',
+    weightLabel: '权重',
+    enabled: '启用',
+    disabled: '禁用',
+    roundRobin: '轮询',
+    weightedRoundRobin: '加权轮询',
+    leastConn: '最少连接',
+    ipHash: 'IP哈希',
+    random: '随机',
+    consistentHash: '一致性哈希',
+    ipAddress: 'IP地址',
+    cookie: 'Cookie',
+    header: 'Header',
+    get: 'GET',
+    head: 'HEAD',
+    post: 'POST',
+    seconds: '秒',
+    minutes: '分钟',
+    hours: '小时',
+    days: '天',
+    weeks: '周',
+    months: '月',
+    years: '年',
+  },
+
+  // Toast 消息
+  toast: {
+    // 通用消息
+    success: '成功',
+    error: '错误',
+    warning: '警告',
+    info: '信息',
+    loading: '加载中',
+    saved: '保存成功',
+    deleted: '删除成功',
+    updated: '更新成功',
+    created: '创建成功',
+    failed: '失败',
+    cancelled: '已取消',
+    confirmed: '已确认',
+    
+    // 站点管理
+    siteDeleteSuccess: '站点删除成功',
+    siteDeleteFailed: '站点删除失败',
+    siteCreateSuccess: '站点创建成功',
+    siteCreateFailed: '站点创建失败',
+    siteUpdateSuccess: '站点更新成功',
+    siteUpdateFailed: '站点更新失败',
+    siteDataLoadFailed: '获取站点数据失败',
+    siteDataLoadPartialFailed: '部分数据获取失败',
+    siteDataLoadPartialFailedDesc: '某些站点数据可能无法加载，请检查网络连接',
+    
+    // 代理管理
+    proxyDeleteSuccess: '代理删除成功',
+    proxyDeleteFailed: '代理删除失败',
+    proxyCreateSuccess: '代理创建成功',
+    proxyCreateFailed: '代理创建失败',
+    proxyUpdateSuccess: '代理更新成功',
+    proxyUpdateFailed: '代理更新失败',
+    
+    // SSL 管理
+    sslCertRenewSuccess: 'SSL证书续期成功',
+    sslCertRenewFailed: 'SSL证书续期失败',
+    sslCertDeleteSuccess: 'SSL证书删除成功',
+    sslCertDeleteFailed: 'SSL证书删除失败',
+    sslCertSyncSuccess: 'SSL证书同步成功',
+    sslCertSyncFailed: 'SSL证书同步失败',
+    
+    // 用户管理
+    userCreateSuccess: '用户创建成功',
+    userCreateFailed: '用户创建失败',
+    userUpdateSuccess: '用户更新成功',
+    userUpdateFailed: '用户更新失败',
+    userDeleteSuccess: '用户删除成功',
+    userDeleteFailed: '用户删除失败',
+    userPasswordChangeSuccess: '密码修改成功',
+    userPasswordChangeFailed: '密码修改失败',
+    
+    // 系统设置
+    settingsSaveSuccess: '设置保存成功',
+    settingsSaveFailed: '设置保存失败',
+    passwordChangeSuccess: '密码修改成功',
+    passwordChangeFailed: '密码修改失败',
+    
+    // 集群管理
+    clusterSyncSuccess: '集群同步成功',
+    clusterSyncFailed: '集群同步失败',
+    clusterMasterReachable: 'Master节点可达',
+    clusterMasterUnreachable: 'Master节点不可达',
+    
+    // DNS 管理
+    dnsRecordCreateSuccess: 'DNS记录创建成功',
+    dnsRecordCreateFailed: 'DNS记录创建失败',
+    dnsRecordUpdateSuccess: 'DNS记录更新成功',
+    dnsRecordUpdateFailed: 'DNS记录更新失败',
+    dnsRecordDeleteSuccess: 'DNS记录删除成功',
+    dnsRecordDeleteFailed: 'DNS记录删除失败',
+    
+    // 通知管理
+    notificationCreateSuccess: '通知创建成功',
+    notificationCreateFailed: '通知创建失败',
+    notificationUpdateSuccess: '通知更新成功',
+    notificationUpdateFailed: '通知更新失败',
+    notificationDeleteSuccess: '通知删除成功',
+    notificationDeleteFailed: '通知删除失败',
+    notificationTestSuccess: '通知测试成功',
+    notificationTestFailed: '通知测试失败',
+    
+    // 安全设置
+    securitySettingsUpdateSuccess: '安全设置更新成功',
+    securitySettingsUpdateFailed: '安全设置更新失败',
+    ipBlockSuccess: 'IP封禁成功',
+    ipBlockFailed: 'IP封禁失败',
+    ipUnblockSuccess: 'IP解封成功',
+    ipUnblockFailed: 'IP解封失败',
+    
+    // 图片优化
+    imageOptimizationSuccess: '图片优化成功',
+    imageOptimizationFailed: '图片优化失败',
+    imageOptimizationSettingsUpdateSuccess: '图片优化设置更新成功',
+    imageOptimizationSettingsUpdateFailed: '图片优化设置更新失败',
+    
+    // Git 服务器
+    gitServerStartSuccess: 'Git服务器启动成功',
+    gitServerStartFailed: 'Git服务器启动失败',
+    gitServerStopSuccess: 'Git服务器停止成功',
+    gitServerStopFailed: 'Git服务器停止失败',
+    gitAppCreateSuccess: '应用创建成功',
+    gitAppCreateFailed: '应用创建失败',
+    gitAppDeleteSuccess: '应用删除成功',
+    gitAppDeleteFailed: '应用删除失败',
+    gitAppRedeploySuccess: '应用重新部署成功',
+    gitAppRedeployFailed: '应用重新部署失败',
+    
+    // 统计信息
+    statisticsLoadSuccess: '统计数据加载成功',
+    statisticsLoadFailed: '统计数据加载失败',
+    
+    // 日志管理
+    logLoadSuccess: '日志加载成功',
+    logLoadFailed: '日志加载失败',
+    logClearSuccess: '日志清空成功',
+    logClearFailed: '日志清空失败',
+    
+    // 配置测试
+    configTestSuccess: '配置测试成功',
+    configTestFailed: '配置测试失败',
+    configTestWarning: '配置测试警告',
+    
+    // 网络错误
+    networkError: '网络连接错误',
+    networkTimeout: '网络请求超时',
+    serverError: '服务器内部错误',
+    unknownError: '未知错误',
+  },
+}

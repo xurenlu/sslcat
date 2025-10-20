@@ -912,7 +912,207 @@ export const frFR: Translation = {
     masterLastReachable: 'Dernière accessibilité du Master',
     lastError: 'Dernière erreur',
   },
-}
 
-// 韩语翻译
-;
+  // Configuration des règles de préfixe de chemin
+  pathPrefixRules: {
+    title: 'Configuration des règles de préfixe de chemin',
+    addRule: 'Ajouter une règle',
+    editRule: 'Modifier la règle',
+    deleteRule: 'Supprimer la règle',
+    noRules: 'Aucune règle',
+    noRulesMessage: 'Aucune règle de préfixe de chemin configurée. Cliquez sur "Ajouter une règle" pour commencer la configuration.',
+    basicInfo: 'Informations de base',
+    ruleName: 'Nom de la règle',
+    ruleNamePlaceholder: 'Règle API v1',
+    description: 'Description',
+    descriptionPlaceholder: 'Règle de préfixe de chemin API v1',
+    enableRule: 'Activer cette règle',
+    pathPrefixConfig: 'Configuration du préfixe de chemin',
+    pathPrefix: 'Préfixe de chemin',
+    pathPrefixPlaceholder: '/api/v1/',
+    addPrefix: 'Ajouter un préfixe',
+    exactMatch: 'Correspondance exacte du préfixe de chemin',
+    backendConfig: 'Configuration du serveur backend',
+    backendServer: 'Serveur backend',
+    backendServerNumber: 'Serveur backend {number}',
+    hostAddress: 'Adresse hôte',
+    hostAddressPlaceholder: 'api-server.example.com',
+    port: 'Port',
+    weight: 'Poids',
+    priority: 'Priorité',
+    enableBackend: 'Activer ce backend',
+    backendHealthCheck: 'Vérification de santé du backend',
+    enableHealthCheck: 'Activer la vérification de santé',
+    checkPath: 'Chemin de vérification',
+    checkPathPlaceholder: '/health',
+    checkMethod: 'Méthode de vérification',
+    checkInterval: 'Intervalle de vérification (secondes)',
+    checkIntervalUnit: 'secondes',
+    timeout: 'Délai d\'attente (secondes)',
+    timeoutUnit: 'secondes',
+    expectedStatusCode: 'Code de statut attendu',
+    addBackendServer: 'Ajouter un serveur backend',
+    loadBalancerConfig: 'Configuration du répartiteur de charge',
+    loadBalancerAlgorithm: 'Algorithme du répartiteur de charge',
+    sessionAffinityMethod: 'Méthode d\'affinité de session',
+    enableSessionAffinity: 'Activer l\'affinité de session',
+    ruleHealthCheck: 'Vérification de santé au niveau de la règle',
+    ruleHealthCheckTitle: 'Vérification de santé au niveau de la règle',
+    algorithm: 'Algorithme',
+    sessionAffinity: 'Affinité de session',
+    healthCheck: 'Vérification de santé',
+    weightLabel: 'Poids',
+    enabled: 'Activé',
+    disabled: 'Désactivé',
+    roundRobin: 'Round Robin',
+    weightedRoundRobin: 'Round Robin pondéré',
+    leastConn: 'Moins de connexions',
+    ipHash: 'Hash IP',
+    random: 'Aléatoire',
+    consistentHash: 'Hash cohérent',
+    ipAddress: 'Adresse IP',
+    cookie: 'Cookie',
+    header: 'En-tête',
+    get: 'GET',
+    head: 'HEAD',
+    post: 'POST',
+    seconds: 'secondes',
+    minutes: 'minutes',
+    hours: 'heures',
+    days: 'jours',
+    weeks: 'semaines',
+    months: 'mois',
+    years: 'années',
+  },
+
+  // Messages Toast
+  toast: {
+    // Messages généraux
+    success: 'Succès',
+    error: 'Erreur',
+    warning: 'Avertissement',
+    info: 'Information',
+    loading: 'Chargement',
+    saved: 'Sauvegardé avec succès',
+    deleted: 'Supprimé avec succès',
+    updated: 'Mis à jour avec succès',
+    created: 'Créé avec succès',
+    failed: 'Échec',
+    cancelled: 'Annulé',
+    confirmed: 'Confirmé',
+    
+    // Gestion des sites
+    siteDeleteSuccess: 'Site supprimé avec succès',
+    siteDeleteFailed: 'Échec de la suppression du site',
+    siteCreateSuccess: 'Site créé avec succès',
+    siteCreateFailed: 'Échec de la création du site',
+    siteUpdateSuccess: 'Site mis à jour avec succès',
+    siteUpdateFailed: 'Échec de la mise à jour du site',
+    siteDataLoadFailed: 'Échec du chargement des données du site',
+    siteDataLoadPartialFailed: 'Échec du chargement partiel des données',
+    siteDataLoadPartialFailedDesc: 'Certaines données du site peuvent ne pas être chargées, veuillez vérifier la connexion réseau',
+    
+    // Gestion des proxies
+    proxyDeleteSuccess: 'Proxy supprimé avec succès',
+    proxyDeleteFailed: 'Échec de la suppression du proxy',
+    proxyCreateSuccess: 'Proxy créé avec succès',
+    proxyCreateFailed: 'Échec de la création du proxy',
+    proxyUpdateSuccess: 'Proxy mis à jour avec succès',
+    proxyUpdateFailed: 'Échec de la mise à jour du proxy',
+    
+    // Gestion SSL
+    sslCertRenewSuccess: 'Certificat SSL renouvelé avec succès',
+    sslCertRenewFailed: 'Échec du renouvellement du certificat SSL',
+    sslCertDeleteSuccess: 'Certificat SSL supprimé avec succès',
+    sslCertDeleteFailed: 'Échec de la suppression du certificat SSL',
+    sslCertSyncSuccess: 'Synchronisation du certificat SSL réussie',
+    sslCertSyncFailed: 'Échec de la synchronisation du certificat SSL',
+    
+    // Gestion des utilisateurs
+    userCreateSuccess: 'Utilisateur créé avec succès',
+    userCreateFailed: 'Échec de la création de l\'utilisateur',
+    userUpdateSuccess: 'Utilisateur mis à jour avec succès',
+    userUpdateFailed: 'Échec de la mise à jour de l\'utilisateur',
+    userDeleteSuccess: 'Utilisateur supprimé avec succès',
+    userDeleteFailed: 'Échec de la suppression de l\'utilisateur',
+    userPasswordChangeSuccess: 'Mot de passe modifié avec succès',
+    userPasswordChangeFailed: 'Échec de la modification du mot de passe',
+    
+    // Paramètres système
+    settingsSaveSuccess: 'Paramètres sauvegardés avec succès',
+    settingsSaveFailed: 'Échec de la sauvegarde des paramètres',
+    passwordChangeSuccess: 'Mot de passe modifié avec succès',
+    passwordChangeFailed: 'Échec de la modification du mot de passe',
+    
+    // Gestion du cluster
+    clusterSyncSuccess: 'Synchronisation du cluster réussie',
+    clusterSyncFailed: 'Échec de la synchronisation du cluster',
+    clusterMasterReachable: 'Nœud maître accessible',
+    clusterMasterUnreachable: 'Nœud maître inaccessible',
+    
+    // Gestion DNS
+    dnsRecordCreateSuccess: 'Enregistrement DNS créé avec succès',
+    dnsRecordCreateFailed: 'Échec de la création de l\'enregistrement DNS',
+    dnsRecordUpdateSuccess: 'Enregistrement DNS mis à jour avec succès',
+    dnsRecordUpdateFailed: 'Échec de la mise à jour de l\'enregistrement DNS',
+    dnsRecordDeleteSuccess: 'Enregistrement DNS supprimé avec succès',
+    dnsRecordDeleteFailed: 'Échec de la suppression de l\'enregistrement DNS',
+    
+    // Gestion des notifications
+    notificationCreateSuccess: 'Notification créée avec succès',
+    notificationCreateFailed: 'Échec de la création de la notification',
+    notificationUpdateSuccess: 'Notification mise à jour avec succès',
+    notificationUpdateFailed: 'Échec de la mise à jour de la notification',
+    notificationDeleteSuccess: 'Notification supprimée avec succès',
+    notificationDeleteFailed: 'Échec de la suppression de la notification',
+    notificationTestSuccess: 'Test de notification réussi',
+    notificationTestFailed: 'Échec du test de notification',
+    
+    // Paramètres de sécurité
+    securitySettingsUpdateSuccess: 'Paramètres de sécurité mis à jour avec succès',
+    securitySettingsUpdateFailed: 'Échec de la mise à jour des paramètres de sécurité',
+    ipBlockSuccess: 'IP bloquée avec succès',
+    ipBlockFailed: 'Échec du blocage de l\'IP',
+    ipUnblockSuccess: 'Blocage de l\'IP levé avec succès',
+    ipUnblockFailed: 'Échec de la levée du blocage de l\'IP',
+    
+    // Optimisation d'images
+    imageOptimizationSuccess: 'Optimisation d\'image réussie',
+    imageOptimizationFailed: 'Échec de l\'optimisation d\'image',
+    imageOptimizationSettingsUpdateSuccess: 'Paramètres d\'optimisation d\'image mis à jour avec succès',
+    imageOptimizationSettingsUpdateFailed: 'Échec de la mise à jour des paramètres d\'optimisation d\'image',
+    
+    // Serveur Git
+    gitServerStartSuccess: 'Serveur Git démarré avec succès',
+    gitServerStartFailed: 'Échec du démarrage du serveur Git',
+    gitServerStopSuccess: 'Serveur Git arrêté avec succès',
+    gitServerStopFailed: 'Échec de l\'arrêt du serveur Git',
+    gitAppCreateSuccess: 'Application créée avec succès',
+    gitAppCreateFailed: 'Échec de la création de l\'application',
+    gitAppDeleteSuccess: 'Application supprimée avec succès',
+    gitAppDeleteFailed: 'Échec de la suppression de l\'application',
+    gitAppRedeploySuccess: 'Application redéployée avec succès',
+    gitAppRedeployFailed: 'Échec du redéploiement de l\'application',
+    
+    // Statistiques
+    statisticsLoadSuccess: 'Statistiques chargées avec succès',
+    statisticsLoadFailed: 'Échec du chargement des statistiques',
+    
+    // Gestion des logs
+    logLoadSuccess: 'Logs chargés avec succès',
+    logLoadFailed: 'Échec du chargement des logs',
+    logClearSuccess: 'Logs effacés avec succès',
+    logClearFailed: 'Échec de l\'effacement des logs',
+    
+    // Test de configuration
+    configTestSuccess: 'Test de configuration réussi',
+    configTestFailed: 'Échec du test de configuration',
+    configTestWarning: 'Avertissement du test de configuration',
+    
+    // Erreurs réseau
+    networkError: 'Erreur de connexion réseau',
+    networkTimeout: 'Délai d\'attente de la requête réseau',
+    serverError: 'Erreur interne du serveur',
+    unknownError: 'Erreur inconnue',
+  },
+}

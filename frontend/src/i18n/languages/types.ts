@@ -957,4 +957,207 @@ export interface Translation {
     end_port: string
     welcome_message: string
   }
+
+  // 路径前缀规则配置
+  pathPrefixRules: {
+    title: string
+    addRule: string
+    editRule: string
+    deleteRule: string
+    noRules: string
+    noRulesMessage: string
+    basicInfo: string
+    ruleName: string
+    ruleNamePlaceholder: string
+    description: string
+    descriptionPlaceholder: string
+    enableRule: string
+    pathPrefixConfig: string
+    pathPrefix: string
+    pathPrefixPlaceholder: string
+    addPrefix: string
+    exactMatch: string
+    backendConfig: string
+    backendServer: string
+    backendServerNumber: string
+    hostAddress: string
+    hostAddressPlaceholder: string
+    port: string
+    weight: string
+    priority: string
+    enableBackend: string
+    backendHealthCheck: string
+    enableHealthCheck: string
+    checkPath: string
+    checkPathPlaceholder: string
+    checkMethod: string
+    checkInterval: string
+    checkIntervalUnit: string
+    timeout: string
+    timeoutUnit: string
+    expectedStatusCode: string
+    addBackendServer: string
+    loadBalancerConfig: string
+    loadBalancerAlgorithm: string
+    sessionAffinityMethod: string
+    enableSessionAffinity: string
+    ruleHealthCheck: string
+    ruleHealthCheckTitle: string
+    algorithm: string
+    sessionAffinity: string
+    healthCheck: string
+    weightLabel: string
+    enabled: string
+    disabled: string
+    roundRobin: string
+    weightedRoundRobin: string
+    leastConn: string
+    ipHash: string
+    random: string
+    consistentHash: string
+    ipAddress: string
+    cookie: string
+    header: string
+    get: string
+    head: string
+    post: string
+    seconds: string
+    minutes: string
+    hours: string
+    days: string
+    weeks: string
+    months: string
+    years: string
+  }
+
+  // Toast 消息
+  toast: {
+    // 通用消息
+    success: string
+    error: string
+    warning: string
+    info: string
+    loading: string
+    saved: string
+    deleted: string
+    updated: string
+    created: string
+    failed: string
+    cancelled: string
+    confirmed: string
+    
+    // 站点管理
+    siteDeleteSuccess: string
+    siteDeleteFailed: string
+    siteCreateSuccess: string
+    siteCreateFailed: string
+    siteUpdateSuccess: string
+    siteUpdateFailed: string
+    siteDataLoadFailed: string
+    siteDataLoadPartialFailed: string
+    siteDataLoadPartialFailedDesc: string
+    
+    // 代理管理
+    proxyDeleteSuccess: string
+    proxyDeleteFailed: string
+    proxyCreateSuccess: string
+    proxyCreateFailed: string
+    proxyUpdateSuccess: string
+    proxyUpdateFailed: string
+    
+    // SSL 管理
+    sslCertRenewSuccess: string
+    sslCertRenewFailed: string
+    sslCertDeleteSuccess: string
+    sslCertDeleteFailed: string
+    sslCertSyncSuccess: string
+    sslCertSyncFailed: string
+    
+    // 用户管理
+    userCreateSuccess: string
+    userCreateFailed: string
+    userUpdateSuccess: string
+    userUpdateFailed: string
+    userDeleteSuccess: string
+    userDeleteFailed: string
+    userPasswordChangeSuccess: string
+    userPasswordChangeFailed: string
+    
+    // 系统设置
+    settingsSaveSuccess: string
+    settingsSaveFailed: string
+    passwordChangeSuccess: string
+    passwordChangeFailed: string
+    
+    // 集群管理
+    clusterSyncSuccess: string
+    clusterSyncFailed: string
+    clusterMasterReachable: string
+    clusterMasterUnreachable: string
+    
+    // DNS 管理
+    dnsRecordCreateSuccess: string
+    dnsRecordCreateFailed: string
+    dnsRecordUpdateSuccess: string
+    dnsRecordUpdateFailed: string
+    dnsRecordDeleteSuccess: string
+    dnsRecordDeleteFailed: string
+    
+    // 通知管理
+    notificationCreateSuccess: string
+    notificationCreateFailed: string
+    notificationUpdateSuccess: string
+    notificationUpdateFailed: string
+    notificationDeleteSuccess: string
+    notificationDeleteFailed: string
+    notificationTestSuccess: string
+    notificationTestFailed: string
+    
+    // 安全设置
+    securitySettingsUpdateSuccess: string
+    securitySettingsUpdateFailed: string
+    ipBlockSuccess: string
+    ipBlockFailed: string
+    ipUnblockSuccess: string
+    ipUnblockFailed: string
+    
+    // 图片优化
+    imageOptimizationSuccess: string
+    imageOptimizationFailed: string
+    imageOptimizationSettingsUpdateSuccess: string
+    imageOptimizationSettingsUpdateFailed: string
+    
+    // Git 服务器
+    gitServerStartSuccess: string
+    gitServerStartFailed: string
+    gitServerStopSuccess: string
+    gitServerStopFailed: string
+    gitAppCreateSuccess: string
+    gitAppCreateFailed: string
+    gitAppDeleteSuccess: string
+    gitAppDeleteFailed: string
+    gitAppRedeploySuccess: string
+    gitAppRedeployFailed: string
+    
+    // 统计信息
+    statisticsLoadSuccess: string
+    statisticsLoadFailed: string
+    
+    // 日志管理
+    logLoadSuccess: string
+    logLoadFailed: string
+    logClearSuccess: string
+    logClearFailed: string
+    
+    // 配置测试
+    configTestSuccess: string
+    configTestFailed: string
+    configTestWarning: string
+    
+    // 网络错误
+    networkError: string
+    networkTimeout: string
+    serverError: string
+    unknownError: string
+  }
 }

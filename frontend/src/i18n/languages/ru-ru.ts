@@ -912,7 +912,207 @@ export const ruRU: Translation = {
     masterLastReachable: 'Последнее время доступности мастера',
     lastError: 'Последняя ошибка',
   },
-}
 
-// 繁体中文翻译
-;
+  // Конфигурация правил префикса пути
+  pathPrefixRules: {
+    title: 'Конфигурация правил префикса пути',
+    addRule: 'Добавить правило',
+    editRule: 'Редактировать правило',
+    deleteRule: 'Удалить правило',
+    noRules: 'Нет правил',
+    noRulesMessage: 'Правила префикса пути не настроены. Нажмите "Добавить правило", чтобы начать настройку.',
+    basicInfo: 'Основная информация',
+    ruleName: 'Название правила',
+    ruleNamePlaceholder: 'Правило API v1',
+    description: 'Описание',
+    descriptionPlaceholder: 'Правило префикса пути API v1',
+    enableRule: 'Включить это правило',
+    pathPrefixConfig: 'Конфигурация префикса пути',
+    pathPrefix: 'Префикс пути',
+    pathPrefixPlaceholder: '/api/v1/',
+    addPrefix: 'Добавить префикс',
+    exactMatch: 'Точное совпадение префикса пути',
+    backendConfig: 'Конфигурация сервера бэкенда',
+    backendServer: 'Сервер бэкенда',
+    backendServerNumber: 'Сервер бэкенда {number}',
+    hostAddress: 'Адрес хоста',
+    hostAddressPlaceholder: 'api-server.example.com',
+    port: 'Порт',
+    weight: 'Вес',
+    priority: 'Приоритет',
+    enableBackend: 'Включить этот бэкенд',
+    backendHealthCheck: 'Проверка здоровья бэкенда',
+    enableHealthCheck: 'Включить проверку здоровья',
+    checkPath: 'Путь проверки',
+    checkPathPlaceholder: '/health',
+    checkMethod: 'Метод проверки',
+    checkInterval: 'Интервал проверки (секунды)',
+    checkIntervalUnit: 'секунды',
+    timeout: 'Таймаут (секунды)',
+    timeoutUnit: 'секунды',
+    expectedStatusCode: 'Ожидаемый код состояния',
+    addBackendServer: 'Добавить сервер бэкенда',
+    loadBalancerConfig: 'Конфигурация балансировщика нагрузки',
+    loadBalancerAlgorithm: 'Алгоритм балансировщика нагрузки',
+    sessionAffinityMethod: 'Метод привязки сессии',
+    enableSessionAffinity: 'Включить привязку сессии',
+    ruleHealthCheck: 'Проверка здоровья на уровне правила',
+    ruleHealthCheckTitle: 'Проверка здоровья на уровне правила',
+    algorithm: 'Алгоритм',
+    sessionAffinity: 'Привязка сессии',
+    healthCheck: 'Проверка здоровья',
+    weightLabel: 'Вес',
+    enabled: 'Включено',
+    disabled: 'Отключено',
+    roundRobin: 'Round Robin',
+    weightedRoundRobin: 'Взвешенный Round Robin',
+    leastConn: 'Наименьшее количество соединений',
+    ipHash: 'IP хеш',
+    random: 'Случайный',
+    consistentHash: 'Консистентный хеш',
+    ipAddress: 'IP адрес',
+    cookie: 'Cookie',
+    header: 'Заголовок',
+    get: 'GET',
+    head: 'HEAD',
+    post: 'POST',
+    seconds: 'секунды',
+    minutes: 'минуты',
+    hours: 'часы',
+    days: 'дни',
+    weeks: 'недели',
+    months: 'месяцы',
+    years: 'годы',
+  },
+
+  // Toast сообщения
+  toast: {
+    // Общие сообщения
+    success: 'Успех',
+    error: 'Ошибка',
+    warning: 'Предупреждение',
+    info: 'Информация',
+    loading: 'Загрузка',
+    saved: 'Сохранено успешно',
+    deleted: 'Удалено успешно',
+    updated: 'Обновлено успешно',
+    created: 'Создано успешно',
+    failed: 'Не удалось',
+    cancelled: 'Отменено',
+    confirmed: 'Подтверждено',
+    
+    // Управление сайтами
+    siteDeleteSuccess: 'Сайт удален успешно',
+    siteDeleteFailed: 'Не удалось удалить сайт',
+    siteCreateSuccess: 'Сайт создан успешно',
+    siteCreateFailed: 'Не удалось создать сайт',
+    siteUpdateSuccess: 'Сайт обновлен успешно',
+    siteUpdateFailed: 'Не удалось обновить сайт',
+    siteDataLoadFailed: 'Не удалось загрузить данные сайта',
+    siteDataLoadPartialFailed: 'Частичная загрузка данных не удалась',
+    siteDataLoadPartialFailedDesc: 'Некоторые данные сайта могут не загрузиться, проверьте сетевое соединение',
+    
+    // Управление прокси
+    proxyDeleteSuccess: 'Прокси удален успешно',
+    proxyDeleteFailed: 'Не удалось удалить прокси',
+    proxyCreateSuccess: 'Прокси создан успешно',
+    proxyCreateFailed: 'Не удалось создать прокси',
+    proxyUpdateSuccess: 'Прокси обновлен успешно',
+    proxyUpdateFailed: 'Не удалось обновить прокси',
+    
+    // Управление SSL
+    sslCertRenewSuccess: 'SSL сертификат обновлен успешно',
+    sslCertRenewFailed: 'Не удалось обновить SSL сертификат',
+    sslCertDeleteSuccess: 'SSL сертификат удален успешно',
+    sslCertDeleteFailed: 'Не удалось удалить SSL сертификат',
+    sslCertSyncSuccess: 'Синхронизация SSL сертификата успешна',
+    sslCertSyncFailed: 'Не удалось синхронизировать SSL сертификат',
+    
+    // Управление пользователями
+    userCreateSuccess: 'Пользователь создан успешно',
+    userCreateFailed: 'Не удалось создать пользователя',
+    userUpdateSuccess: 'Пользователь обновлен успешно',
+    userUpdateFailed: 'Не удалось обновить пользователя',
+    userDeleteSuccess: 'Пользователь удален успешно',
+    userDeleteFailed: 'Не удалось удалить пользователя',
+    userPasswordChangeSuccess: 'Пароль изменен успешно',
+    userPasswordChangeFailed: 'Не удалось изменить пароль',
+    
+    // Системные настройки
+    settingsSaveSuccess: 'Настройки сохранены успешно',
+    settingsSaveFailed: 'Не удалось сохранить настройки',
+    passwordChangeSuccess: 'Пароль изменен успешно',
+    passwordChangeFailed: 'Не удалось изменить пароль',
+    
+    // Управление кластером
+    clusterSyncSuccess: 'Синхронизация кластера успешна',
+    clusterSyncFailed: 'Не удалось синхронизировать кластер',
+    clusterMasterReachable: 'Мастер-узел доступен',
+    clusterMasterUnreachable: 'Мастер-узел недоступен',
+    
+    // Управление DNS
+    dnsRecordCreateSuccess: 'DNS запись создана успешно',
+    dnsRecordCreateFailed: 'Не удалось создать DNS запись',
+    dnsRecordUpdateSuccess: 'DNS запись обновлена успешно',
+    dnsRecordUpdateFailed: 'Не удалось обновить DNS запись',
+    dnsRecordDeleteSuccess: 'DNS запись удалена успешно',
+    dnsRecordDeleteFailed: 'Не удалось удалить DNS запись',
+    
+    // Управление уведомлениями
+    notificationCreateSuccess: 'Уведомление создано успешно',
+    notificationCreateFailed: 'Не удалось создать уведомление',
+    notificationUpdateSuccess: 'Уведомление обновлено успешно',
+    notificationUpdateFailed: 'Не удалось обновить уведомление',
+    notificationDeleteSuccess: 'Уведомление удалено успешно',
+    notificationDeleteFailed: 'Не удалось удалить уведомление',
+    notificationTestSuccess: 'Тест уведомления успешен',
+    notificationTestFailed: 'Тест уведомления не удался',
+    
+    // Настройки безопасности
+    securitySettingsUpdateSuccess: 'Настройки безопасности обновлены успешно',
+    securitySettingsUpdateFailed: 'Не удалось обновить настройки безопасности',
+    ipBlockSuccess: 'IP заблокирован успешно',
+    ipBlockFailed: 'Не удалось заблокировать IP',
+    ipUnblockSuccess: 'Блокировка IP снята успешно',
+    ipUnblockFailed: 'Не удалось снять блокировку IP',
+    
+    // Оптимизация изображений
+    imageOptimizationSuccess: 'Оптимизация изображения успешна',
+    imageOptimizationFailed: 'Не удалось оптимизировать изображение',
+    imageOptimizationSettingsUpdateSuccess: 'Настройки оптимизации изображений обновлены успешно',
+    imageOptimizationSettingsUpdateFailed: 'Не удалось обновить настройки оптимизации изображений',
+    
+    // Git сервер
+    gitServerStartSuccess: 'Git сервер запущен успешно',
+    gitServerStartFailed: 'Не удалось запустить Git сервер',
+    gitServerStopSuccess: 'Git сервер остановлен успешно',
+    gitServerStopFailed: 'Не удалось остановить Git сервер',
+    gitAppCreateSuccess: 'Приложение создано успешно',
+    gitAppCreateFailed: 'Не удалось создать приложение',
+    gitAppDeleteSuccess: 'Приложение удалено успешно',
+    gitAppDeleteFailed: 'Не удалось удалить приложение',
+    gitAppRedeploySuccess: 'Приложение переразвернуто успешно',
+    gitAppRedeployFailed: 'Не удалось переразвернуть приложение',
+    
+    // Статистика
+    statisticsLoadSuccess: 'Статистика загружена успешно',
+    statisticsLoadFailed: 'Не удалось загрузить статистику',
+    
+    // Управление логами
+    logLoadSuccess: 'Логи загружены успешно',
+    logLoadFailed: 'Не удалось загрузить логи',
+    logClearSuccess: 'Логи очищены успешно',
+    logClearFailed: 'Не удалось очистить логи',
+    
+    // Тест конфигурации
+    configTestSuccess: 'Тест конфигурации успешен',
+    configTestFailed: 'Тест конфигурации не удался',
+    configTestWarning: 'Предупреждение теста конфигурации',
+    
+    // Сетевые ошибки
+    networkError: 'Ошибка сетевого соединения',
+    networkTimeout: 'Таймаут сетевого запроса',
+    serverError: 'Внутренняя ошибка сервера',
+    unknownError: 'Неизвестная ошибка',
+  },
+}

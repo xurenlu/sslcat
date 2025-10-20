@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { PathPrefixRule, ProxyBackend } from '../types/config'
+import { useTranslation } from '../hooks/useLanguage'
 import {
   Box,
   Heading,
@@ -64,6 +65,7 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
   pathPrefixRules,
   onChange
 }) => {
+  const t = useTranslation()
   const [editingRule, setEditingRule] = useState<PathPrefixRule | null>(null)
   const [editingIndex, setEditingIndex] = useState<number>(-1)
   const { isOpen, onOpen, onClose } = useDisclosure()
@@ -235,7 +237,7 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
       <HStack justify="space-between" align="center" mb={4}>
         <Heading size="md" color="gray.700">
           <Icon as={FiServer} mr={2} />
-          路径前缀规则配置
+          {t.pathPrefixRules.title}
         </Heading>
         <Button
           leftIcon={<Icon as={FiPlus} />}
@@ -243,14 +245,14 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
           size="sm"
           onClick={addRule}
         >
-          添加规则
+          {t.pathPrefixRules.addRule}
         </Button>
       </HStack>
 
       {pathPrefixRules.length === 0 ? (
         <Alert status="info">
           <AlertIcon />
-          暂无路径前缀规则，点击"添加规则"开始配置
+          {t.pathPrefixRules.noRulesMessage}
         </Alert>
       ) : (
         <VStack spacing={4} align="stretch">
@@ -262,7 +264,7 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
                     <HStack>
                       <Text fontWeight="bold" fontSize="lg">{rule.name}</Text>
                       <Badge colorScheme={rule.enabled ? 'green' : 'gray'}>
-                        {rule.enabled ? '启用' : '禁用'}
+                        {rule.enabled ? t.pathPrefixRules.enabled : t.pathPrefixRules.disabled}
                       </Badge>
                     </HStack>
                     {rule.description && (
@@ -290,7 +292,7 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
 
                 <SimpleGrid columns={2} spacing={4} mb={3}>
                   <Box>
-                    <Text fontSize="sm" fontWeight="medium" mb={1}>路径前缀</Text>
+                    <Text fontSize="sm" fontWeight="medium" mb={1}>{t.pathPrefixRules.pathPrefix}</Text>
                     <VStack spacing={1} align="stretch">
                       {rule.prefixes.map((prefix, prefixIndex) => (
                         <HStack key={prefixIndex}>
@@ -302,7 +304,7 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
                     </VStack>
                   </Box>
                   <Box>
-                    <Text fontSize="sm" fontWeight="medium" mb={1}>后端服务器</Text>
+                    <Text fontSize="sm" fontWeight="medium" mb={1}>{t.pathPrefixRules.backendServer}</Text>
                     <VStack spacing={1} align="stretch">
                       {rule.backends.map((backend, backendIndex) => (
                         <HStack key={backendIndex}>
@@ -310,7 +312,7 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
                             {backend.host}:{backend.port}
                           </Text>
                           <Badge size="sm" colorScheme="blue">
-                            权重: {backend.weight}
+                            {t.pathPrefixRules.weightLabel}: {backend.weight}
                           </Badge>
                         </HStack>
                       ))}
@@ -321,18 +323,18 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
                 <HStack spacing={4} fontSize="sm" color="gray.600">
                   <HStack>
                     <Icon as={FiActivity} />
-                    <Text>算法: {rule.load_balancer_algorithm}</Text>
+                    <Text>{t.pathPrefixRules.algorithm}: {rule.load_balancer_algorithm}</Text>
                   </HStack>
                   {rule.session_affinity_enabled && (
                     <HStack>
                       <Icon as={FiShield} />
-                      <Text>会话保持: {rule.session_affinity_method}</Text>
+                      <Text>{t.pathPrefixRules.sessionAffinity}: {rule.session_affinity_method}</Text>
                     </HStack>
                   )}
                   {rule.health_check_enabled && (
                     <HStack>
                       <Icon as={FiClock} />
-                      <Text>健康检查: {rule.health_check_path}</Text>
+                      <Text>{t.pathPrefixRules.healthCheck}: {rule.health_check_path}</Text>
                     </HStack>
                   )}
                 </HStack>
@@ -347,7 +349,7 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
         <ModalOverlay />
         <ModalContent maxH="90vh" overflowY="auto">
           <ModalHeader>
-            {editingIndex === -1 ? '添加路径前缀规则' : '编辑路径前缀规则'}
+            {editingIndex === -1 ? t.pathPrefixRules.addRule : t.pathPrefixRules.editRule}
           </ModalHeader>
           <ModalCloseButton />
           <ModalBody>
@@ -355,22 +357,22 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
               <VStack spacing={6} align="stretch">
                 {/* 基本信息 */}
                 <Box>
-                  <Heading size="sm" mb={3} color="gray.700">基本信息</Heading>
+                  <Heading size="sm" mb={3} color="gray.700">{t.pathPrefixRules.basicInfo}</Heading>
                   <SimpleGrid columns={2} spacing={4}>
                     <FormControl>
-                      <FormLabel>规则名称</FormLabel>
+                      <FormLabel>{t.pathPrefixRules.ruleName}</FormLabel>
                       <Input
                         value={editingRule.name}
                         onChange={(e) => updateRuleField('name', e.target.value)}
-                        placeholder="API v1 规则"
+                        placeholder={t.pathPrefixRules.ruleNamePlaceholder}
                       />
                     </FormControl>
                     <FormControl>
-                      <FormLabel>描述</FormLabel>
+                      <FormLabel>{t.pathPrefixRules.description}</FormLabel>
                       <Input
                         value={editingRule.description}
                         onChange={(e) => updateRuleField('description', e.target.value)}
-                        placeholder="API v1 路径前缀规则"
+                        placeholder={t.pathPrefixRules.descriptionPlaceholder}
                       />
                     </FormControl>
                   </SimpleGrid>
@@ -379,7 +381,7 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
                       isChecked={editingRule.enabled}
                       onChange={(e) => updateRuleField('enabled', e.target.checked)}
                     />
-                    <Text>启用此规则</Text>
+                    <Text>{t.pathPrefixRules.enableRule}</Text>
                   </HStack>
                 </Box>
 
@@ -387,19 +389,19 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
 
                 {/* 路径前缀配置 */}
                 <Box>
-                  <Heading size="sm" mb={3} color="gray.700">路径前缀配置</Heading>
+                  <Heading size="sm" mb={3} color="gray.700">{t.pathPrefixRules.pathPrefixConfig}</Heading>
                   <VStack spacing={3} align="stretch">
                     {editingRule.prefixes.map((prefix, index) => (
                       <HStack key={index}>
                         <Input
                           value={prefix}
                           onChange={(e) => updatePrefixes(index, e.target.value)}
-                          placeholder="/api/v1/"
+                          placeholder={t.pathPrefixRules.pathPrefixPlaceholder}
                           size="sm"
                         />
                         {editingRule.prefixes.length > 1 && (
                           <IconButton
-                            aria-label="删除前缀"
+                            aria-label={t.pathPrefixRules.deleteRule}
                             icon={<Icon as={FiTrash2} />}
                             size="sm"
                             variant="outline"
@@ -415,7 +417,7 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
                       variant="outline"
                       onClick={addPrefix}
                     >
-                      添加前缀
+                      {t.pathPrefixRules.addPrefix}
                     </Button>
                   </VStack>
                   <HStack mt={3}>
@@ -423,7 +425,7 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
                       isChecked={editingRule.exact}
                       onChange={(e) => updateRuleField('exact', e.target.checked)}
                     />
-                    <Text>精确匹配路径前缀</Text>
+                    <Text>{t.pathPrefixRules.exactMatch}</Text>
                   </HStack>
                 </Box>
 
@@ -431,16 +433,16 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
 
                 {/* 后端服务器配置 */}
                 <Box>
-                  <Heading size="sm" mb={3} color="gray.700">后端服务器配置</Heading>
+                  <Heading size="sm" mb={3} color="gray.700">{t.pathPrefixRules.backendConfig}</Heading>
                   <VStack spacing={4} align="stretch">
                     {editingRule.backends.map((backend, index) => (
                       <Card key={index}>
                         <CardBody>
                           <HStack justify="space-between" align="center" mb={3}>
-                            <Text fontWeight="medium">后端服务器 {index + 1}</Text>
+                            <Text fontWeight="medium">{t.pathPrefixRules.backendServerNumber.replace('{number}', (index + 1).toString())}</Text>
                             {editingRule.backends.length > 1 && (
                               <IconButton
-                                aria-label="删除后端"
+                                aria-label={t.pathPrefixRules.deleteRule}
                                 icon={<Icon as={FiTrash2} />}
                                 size="sm"
                                 variant="outline"
@@ -451,16 +453,16 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
                           </HStack>
                           <SimpleGrid columns={2} spacing={3}>
                             <FormControl>
-                              <FormLabel>主机地址</FormLabel>
+                              <FormLabel>{t.pathPrefixRules.hostAddress}</FormLabel>
                               <Input
                                 value={backend.host}
                                 onChange={(e) => updateBackend(index, 'host', e.target.value)}
-                                placeholder="api-server.example.com"
+                                placeholder={t.pathPrefixRules.hostAddressPlaceholder}
                                 size="sm"
                               />
                             </FormControl>
                             <FormControl>
-                              <FormLabel>端口</FormLabel>
+                              <FormLabel>{t.pathPrefixRules.port}</FormLabel>
                               <NumberInput
                                 value={backend.port}
                                 onChange={(_, value) => updateBackend(index, 'port', value)}
@@ -476,7 +478,7 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
                               </NumberInput>
                             </FormControl>
                             <FormControl>
-                              <FormLabel>权重</FormLabel>
+                              <FormLabel>{t.pathPrefixRules.weight}</FormLabel>
                               <NumberInput
                                 value={backend.weight}
                                 onChange={(_, value) => updateBackend(index, 'weight', value)}
@@ -492,7 +494,7 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
                               </NumberInput>
                             </FormControl>
                             <FormControl>
-                              <FormLabel>优先级</FormLabel>
+                              <FormLabel>{t.pathPrefixRules.priority}</FormLabel>
                               <NumberInput
                                 value={backend.priority}
                                 onChange={(_, value) => updateBackend(index, 'priority', value)}
@@ -513,15 +515,15 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
                               isChecked={backend.enabled}
                               onChange={(e) => updateBackend(index, 'enabled', e.target.checked)}
                             />
-                            <Text>启用此后端</Text>
+                            <Text>{t.pathPrefixRules.enableBackend}</Text>
                           </HStack>
 
                           {/* 后端级 健康检查配置 */}
                           <Divider mt={4} mb={3} />
-                          <Heading size="xs" mb={2} color="gray.700">后端健康检查</Heading>
+                          <Heading size="xs" mb={2} color="gray.700">{t.pathPrefixRules.backendHealthCheck}</Heading>
                           <VStack spacing={3} align="stretch">
                             <FormControl display="flex" alignItems="center">
-                              <FormLabel htmlFor={`backend-health-enabled-${index}`} mb="0">启用健康检查</FormLabel>
+                              <FormLabel htmlFor={`backend-health-enabled-${index}`} mb="0">{t.pathPrefixRules.enableHealthCheck}</FormLabel>
                               <Switch
                                 id={`backend-health-enabled-${index}`}
                                 isChecked={backend.health_check_enabled}
@@ -532,30 +534,30 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
                             {backend.health_check_enabled && (
                               <SimpleGrid columns={2} spacing={3}>
                                 <FormControl>
-                                  <FormLabel>检查路径</FormLabel>
+                                  <FormLabel>{t.pathPrefixRules.checkPath}</FormLabel>
                                   <Input
                                     value={backend.health_check_path}
                                     onChange={(e) => updateBackend(index, 'health_check_path', e.target.value)}
-                                    placeholder="/health"
+                                    placeholder={t.pathPrefixRules.checkPathPlaceholder}
                                     size="sm"
                                   />
                                 </FormControl>
 
                                 <FormControl>
-                                  <FormLabel>检查方法</FormLabel>
+                                  <FormLabel>{t.pathPrefixRules.checkMethod}</FormLabel>
                                   <Select
                                     value={backend.health_check_method}
                                     onChange={(e) => updateBackend(index, 'health_check_method', e.target.value as any)}
                                     size="sm"
                                   >
-                                    <option value="GET">GET</option>
-                                    <option value="HEAD">HEAD</option>
-                                    <option value="POST">POST</option>
+                                    <option value="GET">{t.pathPrefixRules.get}</option>
+                                    <option value="HEAD">{t.pathPrefixRules.head}</option>
+                                    <option value="POST">{t.pathPrefixRules.post}</option>
                                   </Select>
                                 </FormControl>
 
                                 <FormControl>
-                                  <FormLabel>检查间隔（秒）</FormLabel>
+                                  <FormLabel>{t.pathPrefixRules.checkInterval}</FormLabel>
                                   <NumberInput
                                     value={backend.health_check_interval}
                                     onChange={(_, value) => updateBackend(index, 'health_check_interval', value)}
@@ -572,7 +574,7 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
                                 </FormControl>
 
                                 <FormControl>
-                                  <FormLabel>超时时间（秒）</FormLabel>
+                                  <FormLabel>{t.pathPrefixRules.timeout}</FormLabel>
                                   <NumberInput
                                     value={backend.health_check_timeout}
                                     onChange={(_, value) => updateBackend(index, 'health_check_timeout', value)}
@@ -589,7 +591,7 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
                                 </FormControl>
 
                                 <FormControl>
-                                  <FormLabel>期望状态码</FormLabel>
+                                  <FormLabel>{t.pathPrefixRules.expectedStatusCode}</FormLabel>
                                   <NumberInput
                                     value={backend.expected_status_code}
                                     onChange={(_, value) => updateBackend(index, 'expected_status_code', value)}
@@ -616,7 +618,7 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
                       variant="outline"
                       onClick={addBackend}
                     >
-                      添加后端服务器
+                      {t.pathPrefixRules.addBackendServer}
                     </Button>
                   </VStack>
                 </Box>
@@ -625,33 +627,33 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
 
                 {/* 负载均衡配置 */}
                 <Box>
-                  <Heading size="sm" mb={3} color="gray.700">负载均衡配置</Heading>
+                  <Heading size="sm" mb={3} color="gray.700">{t.pathPrefixRules.loadBalancerConfig}</Heading>
                   <SimpleGrid columns={2} spacing={4}>
                     <FormControl>
-                      <FormLabel>负载均衡算法</FormLabel>
+                      <FormLabel>{t.pathPrefixRules.loadBalancerAlgorithm}</FormLabel>
                       <Select
                         value={editingRule.load_balancer_algorithm}
                         onChange={(e) => updateRuleField('load_balancer_algorithm', e.target.value)}
                         size="sm"
                       >
-                        <option value="round_robin">轮询</option>
-                        <option value="weighted_round_robin">加权轮询</option>
-                        <option value="least_conn">最少连接</option>
-                        <option value="ip_hash">IP哈希</option>
-                        <option value="random">随机</option>
-                        <option value="consistent_hash">一致性哈希</option>
+                        <option value="round_robin">{t.pathPrefixRules.roundRobin}</option>
+                        <option value="weighted_round_robin">{t.pathPrefixRules.weightedRoundRobin}</option>
+                        <option value="least_conn">{t.pathPrefixRules.leastConn}</option>
+                        <option value="ip_hash">{t.pathPrefixRules.ipHash}</option>
+                        <option value="random">{t.pathPrefixRules.random}</option>
+                        <option value="consistent_hash">{t.pathPrefixRules.consistentHash}</option>
                       </Select>
                     </FormControl>
                     <FormControl>
-                      <FormLabel>会话保持方法</FormLabel>
+                      <FormLabel>{t.pathPrefixRules.sessionAffinityMethod}</FormLabel>
                       <Select
                         value={editingRule.session_affinity_method}
                         onChange={(e) => updateRuleField('session_affinity_method', e.target.value)}
                         size="sm"
                       >
-                        <option value="ip">IP地址</option>
-                        <option value="cookie">Cookie</option>
-                        <option value="header">Header</option>
+                        <option value="ip">{t.pathPrefixRules.ipAddress}</option>
+                        <option value="cookie">{t.pathPrefixRules.cookie}</option>
+                        <option value="header">{t.pathPrefixRules.header}</option>
                       </Select>
                     </FormControl>
                   </SimpleGrid>
@@ -660,7 +662,7 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
                       isChecked={editingRule.session_affinity_enabled}
                       onChange={(e) => updateRuleField('session_affinity_enabled', e.target.checked)}
                     />
-                    <Text>启用会话保持</Text>
+                    <Text>{t.pathPrefixRules.enableSessionAffinity}</Text>
                   </HStack>
                 </Box>
 
@@ -668,10 +670,10 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
 
                 {/* 规则级 健康检查配置 */}
                 <Box>
-                  <Heading size="sm" mb={3} color="gray.700">规则级健康检查</Heading>
+                  <Heading size="sm" mb={3} color="gray.700">{t.pathPrefixRules.ruleHealthCheckTitle}</Heading>
                   <VStack spacing={4} align="stretch">
                     <FormControl display="flex" alignItems="center">
-                      <FormLabel htmlFor="rule-health-check" mb="0">启用健康检查</FormLabel>
+                      <FormLabel htmlFor="rule-health-check" mb="0">{t.pathPrefixRules.enableHealthCheck}</FormLabel>
                       <Switch
                         id="rule-health-check"
                         isChecked={editingRule.health_check_enabled}
@@ -682,30 +684,30 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
                     {editingRule.health_check_enabled && (
                       <SimpleGrid columns={2} spacing={4}>
                         <FormControl>
-                          <FormLabel>检查路径</FormLabel>
+                          <FormLabel>{t.pathPrefixRules.checkPath}</FormLabel>
                           <Input
                             value={editingRule.health_check_path}
                             onChange={(e) => updateRuleField('health_check_path', e.target.value)}
-                            placeholder="/health"
+                            placeholder={t.pathPrefixRules.checkPathPlaceholder}
                             size="sm"
                           />
                         </FormControl>
 
                         <FormControl>
-                          <FormLabel>检查方法</FormLabel>
+                          <FormLabel>{t.pathPrefixRules.checkMethod}</FormLabel>
                           <Select
                             value={editingRule.health_check_method}
                             onChange={(e) => updateRuleField('health_check_method', e.target.value)}
                             size="sm"
                           >
-                            <option value="GET">GET</option>
-                            <option value="HEAD">HEAD</option>
-                            <option value="POST">POST</option>
+                            <option value="GET">{t.pathPrefixRules.get}</option>
+                            <option value="HEAD">{t.pathPrefixRules.head}</option>
+                            <option value="POST">{t.pathPrefixRules.post}</option>
                           </Select>
                         </FormControl>
 
                         <FormControl>
-                          <FormLabel>检查间隔（秒）</FormLabel>
+                          <FormLabel>{t.pathPrefixRules.checkInterval}</FormLabel>
                           <NumberInput
                             value={editingRule.health_check_interval}
                             onChange={(_, value) => updateRuleField('health_check_interval', value)}
@@ -722,7 +724,7 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
                         </FormControl>
 
                         <FormControl>
-                          <FormLabel>超时时间（秒）</FormLabel>
+                          <FormLabel>{t.pathPrefixRules.timeout}</FormLabel>
                           <NumberInput
                             value={editingRule.health_check_timeout}
                             onChange={(_, value) => updateRuleField('health_check_timeout', value)}
@@ -739,7 +741,7 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
                         </FormControl>
 
                         <FormControl>
-                          <FormLabel>期望状态码</FormLabel>
+                          <FormLabel>{t.pathPrefixRules.expectedStatusCode}</FormLabel>
                           <NumberInput
                             value={editingRule.expected_status_code}
                             onChange={(_, value) => updateRuleField('expected_status_code', value)}
@@ -763,10 +765,10 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
           </ModalBody>
           <ModalFooter>
             <Button variant="outline" mr={3} onClick={onClose}>
-              取消
+              {t.common.cancel}
             </Button>
             <Button colorScheme="blue" onClick={saveRule}>
-              保存
+              {t.common.save}
             </Button>
           </ModalFooter>
         </ModalContent>

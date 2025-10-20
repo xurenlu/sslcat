@@ -918,7 +918,207 @@ export const enUS: Translation = {
     syncCertsSuccess: 'Certificates synced successfully',
     slaveNotice: 'Slave mode: some features are read-only. You may change password, panel prefix, or detach slave mode.',
   },
-}
 
-// 日语翻译
-;
+  // Path Prefix Rules Configuration
+  pathPrefixRules: {
+    title: 'Path Prefix Rules Configuration',
+    addRule: 'Add Rule',
+    editRule: 'Edit Rule',
+    deleteRule: 'Delete Rule',
+    noRules: 'No Rules',
+    noRulesMessage: 'No path prefix rules configured. Click "Add Rule" to start configuration.',
+    basicInfo: 'Basic Information',
+    ruleName: 'Rule Name',
+    ruleNamePlaceholder: 'API v1 Rule',
+    description: 'Description',
+    descriptionPlaceholder: 'API v1 path prefix rule',
+    enableRule: 'Enable this rule',
+    pathPrefixConfig: 'Path Prefix Configuration',
+    pathPrefix: 'Path Prefix',
+    pathPrefixPlaceholder: '/api/v1/',
+    addPrefix: 'Add Prefix',
+    exactMatch: 'Exact match path prefix',
+    backendConfig: 'Backend Server Configuration',
+    backendServer: 'Backend Server',
+    backendServerNumber: 'Backend Server {number}',
+    hostAddress: 'Host Address',
+    hostAddressPlaceholder: 'api-server.example.com',
+    port: 'Port',
+    weight: 'Weight',
+    priority: 'Priority',
+    enableBackend: 'Enable this backend',
+    backendHealthCheck: 'Backend Health Check',
+    enableHealthCheck: 'Enable Health Check',
+    checkPath: 'Check Path',
+    checkPathPlaceholder: '/health',
+    checkMethod: 'Check Method',
+    checkInterval: 'Check Interval (seconds)',
+    checkIntervalUnit: 'seconds',
+    timeout: 'Timeout (seconds)',
+    timeoutUnit: 'seconds',
+    expectedStatusCode: 'Expected Status Code',
+    addBackendServer: 'Add Backend Server',
+    loadBalancerConfig: 'Load Balancer Configuration',
+    loadBalancerAlgorithm: 'Load Balancer Algorithm',
+    sessionAffinityMethod: 'Session Affinity Method',
+    enableSessionAffinity: 'Enable Session Affinity',
+    ruleHealthCheck: 'Rule-level Health Check',
+    ruleHealthCheckTitle: 'Rule-level Health Check',
+    algorithm: 'Algorithm',
+    sessionAffinity: 'Session Affinity',
+    healthCheck: 'Health Check',
+    weightLabel: 'Weight',
+    enabled: 'Enabled',
+    disabled: 'Disabled',
+    roundRobin: 'Round Robin',
+    weightedRoundRobin: 'Weighted Round Robin',
+    leastConn: 'Least Connections',
+    ipHash: 'IP Hash',
+    random: 'Random',
+    consistentHash: 'Consistent Hash',
+    ipAddress: 'IP Address',
+    cookie: 'Cookie',
+    header: 'Header',
+    get: 'GET',
+    head: 'HEAD',
+    post: 'POST',
+    seconds: 'seconds',
+    minutes: 'minutes',
+    hours: 'hours',
+    days: 'days',
+    weeks: 'weeks',
+    months: 'months',
+    years: 'years',
+  },
+
+  // Toast Messages
+  toast: {
+    // General messages
+    success: 'Success',
+    error: 'Error',
+    warning: 'Warning',
+    info: 'Information',
+    loading: 'Loading',
+    saved: 'Saved successfully',
+    deleted: 'Deleted successfully',
+    updated: 'Updated successfully',
+    created: 'Created successfully',
+    failed: 'Failed',
+    cancelled: 'Cancelled',
+    confirmed: 'Confirmed',
+    
+    // Site Management
+    siteDeleteSuccess: 'Site deleted successfully',
+    siteDeleteFailed: 'Site deletion failed',
+    siteCreateSuccess: 'Site created successfully',
+    siteCreateFailed: 'Site creation failed',
+    siteUpdateSuccess: 'Site updated successfully',
+    siteUpdateFailed: 'Site update failed',
+    siteDataLoadFailed: 'Failed to load site data',
+    siteDataLoadPartialFailed: 'Partial data loading failed',
+    siteDataLoadPartialFailedDesc: 'Some site data may not be loaded, please check network connection',
+    
+    // Proxy Management
+    proxyDeleteSuccess: 'Proxy deleted successfully',
+    proxyDeleteFailed: 'Proxy deletion failed',
+    proxyCreateSuccess: 'Proxy created successfully',
+    proxyCreateFailed: 'Proxy creation failed',
+    proxyUpdateSuccess: 'Proxy updated successfully',
+    proxyUpdateFailed: 'Proxy update failed',
+    
+    // SSL Management
+    sslCertRenewSuccess: 'SSL certificate renewed successfully',
+    sslCertRenewFailed: 'SSL certificate renewal failed',
+    sslCertDeleteSuccess: 'SSL certificate deleted successfully',
+    sslCertDeleteFailed: 'SSL certificate deletion failed',
+    sslCertSyncSuccess: 'SSL certificate sync successful',
+    sslCertSyncFailed: 'SSL certificate sync failed',
+    
+    // User Management
+    userCreateSuccess: 'User created successfully',
+    userCreateFailed: 'User creation failed',
+    userUpdateSuccess: 'User updated successfully',
+    userUpdateFailed: 'User update failed',
+    userDeleteSuccess: 'User deleted successfully',
+    userDeleteFailed: 'User deletion failed',
+    userPasswordChangeSuccess: 'Password changed successfully',
+    userPasswordChangeFailed: 'Password change failed',
+    
+    // System Settings
+    settingsSaveSuccess: 'Settings saved successfully',
+    settingsSaveFailed: 'Settings save failed',
+    passwordChangeSuccess: 'Password changed successfully',
+    passwordChangeFailed: 'Password change failed',
+    
+    // Cluster Management
+    clusterSyncSuccess: 'Cluster sync successful',
+    clusterSyncFailed: 'Cluster sync failed',
+    clusterMasterReachable: 'Master node reachable',
+    clusterMasterUnreachable: 'Master node unreachable',
+    
+    // DNS Management
+    dnsRecordCreateSuccess: 'DNS record created successfully',
+    dnsRecordCreateFailed: 'DNS record creation failed',
+    dnsRecordUpdateSuccess: 'DNS record updated successfully',
+    dnsRecordUpdateFailed: 'DNS record update failed',
+    dnsRecordDeleteSuccess: 'DNS record deleted successfully',
+    dnsRecordDeleteFailed: 'DNS record deletion failed',
+    
+    // Notification Management
+    notificationCreateSuccess: 'Notification created successfully',
+    notificationCreateFailed: 'Notification creation failed',
+    notificationUpdateSuccess: 'Notification updated successfully',
+    notificationUpdateFailed: 'Notification update failed',
+    notificationDeleteSuccess: 'Notification deleted successfully',
+    notificationDeleteFailed: 'Notification deletion failed',
+    notificationTestSuccess: 'Notification test successful',
+    notificationTestFailed: 'Notification test failed',
+    
+    // Security Settings
+    securitySettingsUpdateSuccess: 'Security settings updated successfully',
+    securitySettingsUpdateFailed: 'Security settings update failed',
+    ipBlockSuccess: 'IP blocked successfully',
+    ipBlockFailed: 'IP blocking failed',
+    ipUnblockSuccess: 'IP unblocked successfully',
+    ipUnblockFailed: 'IP unblocking failed',
+    
+    // Image Optimization
+    imageOptimizationSuccess: 'Image optimization successful',
+    imageOptimizationFailed: 'Image optimization failed',
+    imageOptimizationSettingsUpdateSuccess: 'Image optimization settings updated successfully',
+    imageOptimizationSettingsUpdateFailed: 'Image optimization settings update failed',
+    
+    // Git Server
+    gitServerStartSuccess: 'Git server started successfully',
+    gitServerStartFailed: 'Git server start failed',
+    gitServerStopSuccess: 'Git server stopped successfully',
+    gitServerStopFailed: 'Git server stop failed',
+    gitAppCreateSuccess: 'Application created successfully',
+    gitAppCreateFailed: 'Application creation failed',
+    gitAppDeleteSuccess: 'Application deleted successfully',
+    gitAppDeleteFailed: 'Application deletion failed',
+    gitAppRedeploySuccess: 'Application redeployed successfully',
+    gitAppRedeployFailed: 'Application redeploy failed',
+    
+    // Statistics
+    statisticsLoadSuccess: 'Statistics loaded successfully',
+    statisticsLoadFailed: 'Statistics loading failed',
+    
+    // Log Management
+    logLoadSuccess: 'Logs loaded successfully',
+    logLoadFailed: 'Log loading failed',
+    logClearSuccess: 'Logs cleared successfully',
+    logClearFailed: 'Log clearing failed',
+    
+    // Configuration Test
+    configTestSuccess: 'Configuration test successful',
+    configTestFailed: 'Configuration test failed',
+    configTestWarning: 'Configuration test warning',
+    
+    // Network Errors
+    networkError: 'Network connection error',
+    networkTimeout: 'Network request timeout',
+    serverError: 'Internal server error',
+    unknownError: 'Unknown error',
+  },
+}

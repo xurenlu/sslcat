@@ -18,7 +18,6 @@ import {
   Th,
   Td,
   IconButton,
-  useToast,
   Tabs,
   TabList,
   TabPanels,
@@ -36,6 +35,7 @@ import {
 } from 'react-icons/fi'
 import { useConfig, buildApiPath, buildPath } from '../contexts/ConfigContext'
 import { useTranslation } from '../hooks/useLanguage'
+import { useToastMessages } from '../hooks/useToastMessages'
 import { useNavigate } from 'react-router-dom'
 import { PathPrefixRule } from '../types/config'
 
@@ -72,7 +72,7 @@ const SitesManagement: React.FC = () => {
   const [phpSites, setPHPSites] = useState<PHPSite[]>([])
   const [loading, setLoading] = useState(false)
   const t = useTranslation()
-  const toast = useToast()
+  const toastMessages = useToastMessages()
   const { adminPrefix } = useConfig()
   const navigate = useNavigate()
 
@@ -122,23 +122,11 @@ const SitesManagement: React.FC = () => {
 
       // 如果两个API都失败，才显示错误
       if (hasError) {
-        toast({
-          title: '部分数据获取失败',
-          description: '某些站点数据可能无法加载，请检查网络连接',
-          status: 'warning',
-          duration: 3000,
-          isClosable: true,
-        })
+        toastMessages.siteDataLoadPartialFailed()
       }
     } catch (error) {
       console.error('获取站点数据失败:', error)
-      toast({
-        title: '获取失败',
-        description: error instanceof Error ? error.message : '未知错误',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      })
+      toastMessages.siteDataLoadFailed(error instanceof Error ? error.message : undefined)
     } finally {
       setLoading(false)
     }
@@ -168,20 +156,9 @@ const SitesManagement: React.FC = () => {
         setPHPSites(phpSites.filter(site => site.id !== id))
       }
       
-      toast({
-        title: '站点删除成功',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      })
+      toastMessages.siteDeleteSuccess()
     } catch (error) {
-      toast({
-        title: '删除失败',
-        description: error instanceof Error ? error.message : '未知错误',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      })
+      toastMessages.siteDeleteFailed(error instanceof Error ? error.message : undefined)
     }
   }
 

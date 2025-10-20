@@ -3,7 +3,7 @@ set -euo pipefail
 
 # sslcat 一键安装脚本（通过 sslcat.com 代理亦可）
 # 用法：
-#   curl -fsSL https://sslcat.com/xurenlu/sslcat/main/scripts/install-from-release-zh.sh | sudo bash -s -- -v 1.3.2
+#   curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/scripts/install-from-release-zh.sh | sudo bash -s -- -v 1.3.2
 
 VER=""
 DEST_LINUX="/opt/sslcat"
@@ -326,7 +326,7 @@ install_git_hook() {
   sudo mkdir -p /opt/sslcat/scripts
   
   # 下载 sslcat-git-hook 脚本
-  if ! curl -fsSL "https://sslcat.com/xurenlu/sslcat/main/scripts/sslcat-git-hook" -o /tmp/sslcat-git-hook; then
+  if ! curl -fsSL "https://raw.githubusercontent.com/xurenlu/sslcat/main/scripts/sslcat-git-hook" -o /tmp/sslcat-git-hook; then
     echo "[sslcat] 下载 sslcat-git-hook 脚本失败，跳过安装"
     return 1
   fi

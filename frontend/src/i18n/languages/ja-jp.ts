@@ -912,7 +912,207 @@ export const jaJP: Translation = {
     masterLastReachable: 'マスター最終到達時刻',
     lastError: '直近のエラー',
   },
-}
 
-// 西班牙语翻译
-;
+  // パスプレフィックスルール設定
+  pathPrefixRules: {
+    title: 'パスプレフィックスルール設定',
+    addRule: 'ルール追加',
+    editRule: 'ルール編集',
+    deleteRule: 'ルール削除',
+    noRules: 'ルールなし',
+    noRulesMessage: 'パスプレフィックスルールが設定されていません。「ルール追加」をクリックして設定を開始してください。',
+    basicInfo: '基本情報',
+    ruleName: 'ルール名',
+    ruleNamePlaceholder: 'API v1 ルール',
+    description: '説明',
+    descriptionPlaceholder: 'API v1 パスプレフィックスルール',
+    enableRule: 'このルールを有効にする',
+    pathPrefixConfig: 'パスプレフィックス設定',
+    pathPrefix: 'パスプレフィックス',
+    pathPrefixPlaceholder: '/api/v1/',
+    addPrefix: 'プレフィックス追加',
+    exactMatch: 'パスプレフィックスの完全一致',
+    backendConfig: 'バックエンドサーバー設定',
+    backendServer: 'バックエンドサーバー',
+    backendServerNumber: 'バックエンドサーバー {number}',
+    hostAddress: 'ホストアドレス',
+    hostAddressPlaceholder: 'api-server.example.com',
+    port: 'ポート',
+    weight: '重み',
+    priority: '優先度',
+    enableBackend: 'このバックエンドを有効にする',
+    backendHealthCheck: 'バックエンドヘルスチェック',
+    enableHealthCheck: 'ヘルスチェックを有効にする',
+    checkPath: 'チェックパス',
+    checkPathPlaceholder: '/health',
+    checkMethod: 'チェック方法',
+    checkInterval: 'チェック間隔（秒）',
+    checkIntervalUnit: '秒',
+    timeout: 'タイムアウト（秒）',
+    timeoutUnit: '秒',
+    expectedStatusCode: '期待ステータスコード',
+    addBackendServer: 'バックエンドサーバー追加',
+    loadBalancerConfig: 'ロードバランサー設定',
+    loadBalancerAlgorithm: 'ロードバランサーアルゴリズム',
+    sessionAffinityMethod: 'セッションアフィニティ方法',
+    enableSessionAffinity: 'セッションアフィニティを有効にする',
+    ruleHealthCheck: 'ルールレベルヘルスチェック',
+    ruleHealthCheckTitle: 'ルールレベルヘルスチェック',
+    algorithm: 'アルゴリズム',
+    sessionAffinity: 'セッションアフィニティ',
+    healthCheck: 'ヘルスチェック',
+    weightLabel: '重み',
+    enabled: '有効',
+    disabled: '無効',
+    roundRobin: 'ラウンドロビン',
+    weightedRoundRobin: '重み付きラウンドロビン',
+    leastConn: '最少接続',
+    ipHash: 'IPハッシュ',
+    random: 'ランダム',
+    consistentHash: '一貫性ハッシュ',
+    ipAddress: 'IPアドレス',
+    cookie: 'Cookie',
+    header: 'ヘッダー',
+    get: 'GET',
+    head: 'HEAD',
+    post: 'POST',
+    seconds: '秒',
+    minutes: '分',
+    hours: '時間',
+    days: '日',
+    weeks: '週',
+    months: '月',
+    years: '年',
+  },
+
+  // Toast メッセージ
+  toast: {
+    // 汎用メッセージ
+    success: '成功',
+    error: 'エラー',
+    warning: '警告',
+    info: '情報',
+    loading: '読み込み中',
+    saved: '保存成功',
+    deleted: '削除成功',
+    updated: '更新成功',
+    created: '作成成功',
+    failed: '失敗',
+    cancelled: 'キャンセル',
+    confirmed: '確認済み',
+    
+    // サイト管理
+    siteDeleteSuccess: 'サイト削除成功',
+    siteDeleteFailed: 'サイト削除失敗',
+    siteCreateSuccess: 'サイト作成成功',
+    siteCreateFailed: 'サイト作成失敗',
+    siteUpdateSuccess: 'サイト更新成功',
+    siteUpdateFailed: 'サイト更新失敗',
+    siteDataLoadFailed: 'サイトデータ取得失敗',
+    siteDataLoadPartialFailed: '部分データ取得失敗',
+    siteDataLoadPartialFailedDesc: '一部のサイトデータが読み込めない可能性があります。ネットワーク接続を確認してください',
+    
+    // プロキシ管理
+    proxyDeleteSuccess: 'プロキシ削除成功',
+    proxyDeleteFailed: 'プロキシ削除失敗',
+    proxyCreateSuccess: 'プロキシ作成成功',
+    proxyCreateFailed: 'プロキシ作成失敗',
+    proxyUpdateSuccess: 'プロキシ更新成功',
+    proxyUpdateFailed: 'プロキシ更新失敗',
+    
+    // SSL管理
+    sslCertRenewSuccess: 'SSL証明書更新成功',
+    sslCertRenewFailed: 'SSL証明書更新失敗',
+    sslCertDeleteSuccess: 'SSL証明書削除成功',
+    sslCertDeleteFailed: 'SSL証明書削除失敗',
+    sslCertSyncSuccess: 'SSL証明書同期成功',
+    sslCertSyncFailed: 'SSL証明書同期失敗',
+    
+    // ユーザー管理
+    userCreateSuccess: 'ユーザー作成成功',
+    userCreateFailed: 'ユーザー作成失敗',
+    userUpdateSuccess: 'ユーザー更新成功',
+    userUpdateFailed: 'ユーザー更新失敗',
+    userDeleteSuccess: 'ユーザー削除成功',
+    userDeleteFailed: 'ユーザー削除失敗',
+    userPasswordChangeSuccess: 'パスワード変更成功',
+    userPasswordChangeFailed: 'パスワード変更失敗',
+    
+    // システム設定
+    settingsSaveSuccess: '設定保存成功',
+    settingsSaveFailed: '設定保存失敗',
+    passwordChangeSuccess: 'パスワード変更成功',
+    passwordChangeFailed: 'パスワード変更失敗',
+    
+    // クラスター管理
+    clusterSyncSuccess: 'クラスター同期成功',
+    clusterSyncFailed: 'クラスター同期失敗',
+    clusterMasterReachable: 'マスターノード到達可能',
+    clusterMasterUnreachable: 'マスターノード到達不可',
+    
+    // DNS管理
+    dnsRecordCreateSuccess: 'DNSレコード作成成功',
+    dnsRecordCreateFailed: 'DNSレコード作成失敗',
+    dnsRecordUpdateSuccess: 'DNSレコード更新成功',
+    dnsRecordUpdateFailed: 'DNSレコード更新失敗',
+    dnsRecordDeleteSuccess: 'DNSレコード削除成功',
+    dnsRecordDeleteFailed: 'DNSレコード削除失敗',
+    
+    // 通知管理
+    notificationCreateSuccess: '通知作成成功',
+    notificationCreateFailed: '通知作成失敗',
+    notificationUpdateSuccess: '通知更新成功',
+    notificationUpdateFailed: '通知更新失敗',
+    notificationDeleteSuccess: '通知削除成功',
+    notificationDeleteFailed: '通知削除失敗',
+    notificationTestSuccess: '通知テスト成功',
+    notificationTestFailed: '通知テスト失敗',
+    
+    // セキュリティ設定
+    securitySettingsUpdateSuccess: 'セキュリティ設定更新成功',
+    securitySettingsUpdateFailed: 'セキュリティ設定更新失敗',
+    ipBlockSuccess: 'IPブロック成功',
+    ipBlockFailed: 'IPブロック失敗',
+    ipUnblockSuccess: 'IPブロック解除成功',
+    ipUnblockFailed: 'IPブロック解除失敗',
+    
+    // 画像最適化
+    imageOptimizationSuccess: '画像最適化成功',
+    imageOptimizationFailed: '画像最適化失敗',
+    imageOptimizationSettingsUpdateSuccess: '画像最適化設定更新成功',
+    imageOptimizationSettingsUpdateFailed: '画像最適化設定更新失敗',
+    
+    // Gitサーバー
+    gitServerStartSuccess: 'Gitサーバー起動成功',
+    gitServerStartFailed: 'Gitサーバー起動失敗',
+    gitServerStopSuccess: 'Gitサーバー停止成功',
+    gitServerStopFailed: 'Gitサーバー停止失敗',
+    gitAppCreateSuccess: 'アプリケーション作成成功',
+    gitAppCreateFailed: 'アプリケーション作成失敗',
+    gitAppDeleteSuccess: 'アプリケーション削除成功',
+    gitAppDeleteFailed: 'アプリケーション削除失敗',
+    gitAppRedeploySuccess: 'アプリケーション再デプロイ成功',
+    gitAppRedeployFailed: 'アプリケーション再デプロイ失敗',
+    
+    // 統計情報
+    statisticsLoadSuccess: '統計データ読み込み成功',
+    statisticsLoadFailed: '統計データ読み込み失敗',
+    
+    // ログ管理
+    logLoadSuccess: 'ログ読み込み成功',
+    logLoadFailed: 'ログ読み込み失敗',
+    logClearSuccess: 'ログクリア成功',
+    logClearFailed: 'ログクリア失敗',
+    
+    // 設定テスト
+    configTestSuccess: '設定テスト成功',
+    configTestFailed: '設定テスト失敗',
+    configTestWarning: '設定テスト警告',
+    
+    // ネットワークエラー
+    networkError: 'ネットワーク接続エラー',
+    networkTimeout: 'ネットワークリクエストタイムアウト',
+    serverError: 'サーバー内部エラー',
+    unknownError: '不明なエラー',
+  },
+}

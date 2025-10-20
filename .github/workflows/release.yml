@@ -84,7 +84,41 @@ jobs:
           VERSION="${GITHUB_REF_NAME}"
           if [ -z "$VERSION" ]; then VERSION="dev"; fi
           NAME="${BIN_NAME}_${VERSION}_${{ matrix.arch_tag }}"
-          tar -C build -czf artifacts/${NAME}.tar.gz ${BIN_NAME}
+          
+          # 创建发布包目录
+          mkdir -p release-package
+          
+          # 复制二进制文件
+          cp build/${BIN_NAME} release-package/${BIN_NAME}
+          
+          # 复制配置文件
+          cp sslcat.conf release-package/sslcat.conf
+          
+          # 复制 systemd 服务文件
+          cp sslcat.service release-package/sslcat.service
+          
+          # 复制安装脚本
+          cp install-sslcat.sh release-package/install-sslcat.sh
+          chmod +x release-package/install-sslcat.sh
+          
+          # 创建 README
+          echo "# SSLcat Release Package" > release-package/README.md
+          echo "" >> release-package/README.md
+          echo "## Quick Install" >> release-package/README.md
+          echo "" >> release-package/README.md
+          echo "1. Extract files: tar -xzf sslcat_*.tar.gz" >> release-package/README.md
+          echo "2. Enter directory: cd sslcat_*/" >> release-package/README.md
+          echo "3. Run install: sudo ./install-sslcat.sh" >> release-package/README.md
+          echo "" >> release-package/README.md
+          echo "## Files" >> release-package/README.md
+          echo "- sslcat - SSLcat binary" >> release-package/README.md
+          echo "- sslcat.conf - Default config" >> release-package/README.md
+          echo "- sslcat.service - systemd service" >> release-package/README.md
+          echo "- install-sslcat.sh - Install script" >> release-package/README.md
+          echo "- README.md - This file" >> release-package/README.md
+          
+          # 打包
+          tar -C release-package -czf artifacts/${NAME}.tar.gz .
           ls -lh artifacts
 
       - name: Upload Linux artifact
@@ -155,7 +189,47 @@ jobs:
           VERSION="${GITHUB_REF_NAME}"
           if [ -z "$VERSION" ]; then VERSION="dev"; fi
           NAME="${BIN_NAME}_${VERSION}_${{ matrix.arch_tag }}"
-          tar -C build -czf artifacts/${NAME}.tar.gz ${BIN_NAME}
+          
+          # 创建发布包目录
+          mkdir -p release-package
+          
+          # 复制二进制文件
+          cp build/${BIN_NAME} release-package/${BIN_NAME}
+          
+          # 复制配置文件
+          cp sslcat.conf release-package/sslcat.conf
+          
+          # 复制 systemd 服务文件（macOS 不需要，但保留用于参考）
+          cp sslcat.service release-package/sslcat.service
+          
+          # 复制安装脚本
+          cp install-sslcat.sh release-package/install-sslcat.sh
+          chmod +x release-package/install-sslcat.sh
+          
+          # 创建 macOS 专用 README
+          echo "# SSLcat Release Package (macOS)" > release-package/README.md
+          echo "" >> release-package/README.md
+          echo "## Quick Install" >> release-package/README.md
+          echo "" >> release-package/README.md
+          echo "1. Extract files: tar -xzf sslcat_*.tar.gz" >> release-package/README.md
+          echo "2. Enter directory: cd sslcat_*/" >> release-package/README.md
+          echo "3. Run install: sudo ./install-sslcat.sh" >> release-package/README.md
+          echo "" >> release-package/README.md
+          echo "## Files" >> release-package/README.md
+          echo "- sslcat - SSLcat binary" >> release-package/README.md
+          echo "- sslcat.conf - Default config" >> release-package/README.md
+          echo "- sslcat.service - systemd service (Linux only)" >> release-package/README.md
+          echo "- install-sslcat.sh - Install script" >> release-package/README.md
+          echo "- README.md - This file" >> release-package/README.md
+          echo "" >> release-package/README.md
+          echo "## Manual Start" >> release-package/README.md
+          echo "sslcat --config /usr/local/etc/sslcat/sslcat.conf" >> release-package/README.md
+          echo "" >> release-package/README.md
+          echo "## Access Panel" >> release-package/README.md
+          echo "http://localhost:8080/sslcat-panel" >> release-package/README.md
+          
+          # 打包
+          tar -C release-package -czf artifacts/${NAME}.tar.gz .
           ls -lh artifacts
 
       - name: Upload macOS artifact

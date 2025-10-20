@@ -1,0 +1,265 @@
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 443,
+    "debug": false,
+    "access_log_enabled": true,
+    "access_log_format": "json",
+    "access_log_path": "/Users/rocky/Sites/sslcat/data/access.log",
+    "read_timeout_sec": 30,
+    "write_timeout_sec": 30,
+    "idle_timeout_sec": 120,
+    "max_upload_bytes": 104857600
+  },
+  "ssl": {
+    "email": "your-email@example.com",
+    "staging": false,
+    "auto_renew": true,
+    "cert_dir": "/Users/rocky/Sites/sslcat/data/certs",
+    "key_dir": "/Users/rocky/Sites/sslcat/data/keys",
+    "challenge_methods": ["http-01", "dns-01"]
+  },
+  "admin": {
+    "username": "admin",
+    "password_file": "/Users/rocky/Sites/sslcat/data/admin.pass",
+    "first_run": true
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "api.example.com",
+        "enabled": true,
+        "ssl_only": true,
+        
+        "load_balancer_enabled": true,
+        "load_balancer_algorithm": "round_robin",
+        "load_balancer_backends": [
+          {
+            "id": "api-server-1",
+            "host": "192.168.1.10",
+            "port": 8080,
+            "weight": 1,
+            "enabled": true,
+            "health_check_enabled": true,
+            "health_check_path": "/health",
+            "health_check_method": "GET",
+            "expected_status_code": 200,
+            "max_connections": 100,
+            "connect_timeout": 30,
+            "read_timeout": 30,
+            "write_timeout": 30
+          },
+          {
+            "id": "api-server-2",
+            "host": "192.168.1.11",
+            "port": 8080,
+            "weight": 1,
+            "enabled": true,
+            "health_check_enabled": true,
+            "health_check_path": "/health",
+            "health_check_method": "GET",
+            "expected_status_code": 200,
+            "max_connections": 100,
+            "connect_timeout": 30,
+            "read_timeout": 30,
+            "write_timeout": 30
+          },
+          {
+            "id": "api-server-3",
+            "host": "192.168.1.12",
+            "port": 8080,
+            "weight": 2,
+            "enabled": true,
+            "health_check_enabled": true,
+            "health_check_path": "/health",
+            "health_check_method": "GET",
+            "expected_status_code": 200,
+            "max_connections": 150,
+            "connect_timeout": 30,
+            "read_timeout": 30,
+            "write_timeout": 30
+          }
+        ],
+        
+        "health_check_enabled": true,
+        "health_check_path": "/health",
+        "health_check_interval": 30,
+        "health_check_timeout": 5,
+        "health_check_method": "GET",
+        "expected_status_code": 200,
+        
+        "failover_enabled": true,
+        "max_retries": 3,
+        "retry_interval": 1,
+        "failure_threshold": 3,
+        "recovery_threshold": 2,
+        
+        "session_affinity_enabled": false
+      },
+      {
+        "domain": "web.example.com",
+        "enabled": true,
+        "ssl_only": true,
+        
+        "load_balancer_enabled": true,
+        "load_balancer_algorithm": "weighted_round_robin",
+        "load_balancer_backends": [
+          {
+            "id": "web-server-1",
+            "host": "192.168.1.20",
+            "port": 80,
+            "weight": 3,
+            "enabled": true,
+            "health_check_enabled": true,
+            "health_check_path": "/",
+            "health_check_method": "HEAD",
+            "expected_status_code": 200
+          },
+          {
+            "id": "web-server-2",
+            "host": "192.168.1.21",
+            "port": 80,
+            "weight": 2,
+            "enabled": true,
+            "health_check_enabled": true,
+            "health_check_path": "/",
+            "health_check_method": "HEAD",
+            "expected_status_code": 200
+          }
+        ],
+        
+        "health_check_enabled": true,
+        "health_check_interval": 15,
+        "health_check_timeout": 3,
+        
+        "session_affinity_enabled": true,
+        "session_affinity_method": "ip",
+        "session_affinity_ttl": 3600
+      },
+      {
+        "domain": "app.example.com",
+        "enabled": true,
+        "ssl_only": true,
+        
+        "load_balancer_enabled": true,
+        "load_balancer_algorithm": "least_conn",
+        "load_balancer_backends": [
+          {
+            "id": "app-server-1",
+            "host": "192.168.1.30",
+            "port": 3000,
+            "weight": 1,
+            "enabled": true,
+            "health_check_enabled": true,
+            "health_check_path": "/api/health",
+            "health_check_method": "GET",
+            "expected_status_code": 200,
+            "tls_enabled": true,
+            "tls_insecure": true
+          },
+          {
+            "id": "app-server-2",
+            "host": "192.168.1.31",
+            "port": 3000,
+            "weight": 1,
+            "enabled": true,
+            "health_check_enabled": true,
+            "health_check_path": "/api/health",
+            "health_check_method": "GET",
+            "expected_status_code": 200,
+            "tls_enabled": true,
+            "tls_insecure": true
+          }
+        ],
+        
+        "health_check_enabled": true,
+        "health_check_interval": 20,
+        "health_check_timeout": 8,
+        
+        "session_affinity_enabled": true,
+        "session_affinity_method": "cookie",
+        "session_affinity_cookie": "JSESSIONID",
+        "session_affinity_ttl": 7200
+      },
+      {
+        "domain": "static.example.com",
+        "enabled": true,
+        "ssl_only": true,
+        
+        "load_balancer_enabled": true,
+        "load_balancer_algorithm": "ip_hash",
+        "load_balancer_backends": [
+          {
+            "id": "static-server-1",
+            "host": "192.168.1.40",
+            "port": 80,
+            "weight": 1,
+            "enabled": true,
+            "health_check_enabled": true,
+            "health_check_path": "/status",
+            "health_check_method": "GET",
+            "expected_status_code": 200
+          },
+          {
+            "id": "static-server-2",
+            "host": "192.168.1.41",
+            "port": 80,
+            "weight": 1,
+            "enabled": true,
+            "health_check_enabled": true,
+            "health_check_path": "/status",
+            "health_check_method": "GET",
+            "expected_status_code": 200
+          }
+        ],
+        
+        "health_check_enabled": true,
+        "health_check_interval": 60,
+        "health_check_timeout": 5,
+        
+        "cdn_enabled": true,
+        "cdn_preset": "static",
+        "cdn_ttl_seconds": 86400
+      },
+      {
+        "domain": "legacy.example.com",
+        "target": "192.168.1.100",
+        "port": 8080,
+        "enabled": true,
+        "ssl_only": false,
+        "load_balancer_enabled": false
+      }
+    ],
+    "unmatched_behavior": "404"
+  },
+  "security": {
+    "max_attempts": 5,
+    "block_duration": "5m",
+    "max_attempts_5min": 15,
+    "enable_ua_filter": true,
+    "enable_waf": false,
+    "enable_ddos": true
+  },
+  "cdn_cache": {
+    "enabled": true,
+    "max_size_mb": 1024,
+    "default_ttl_seconds": 3600,
+    "static_extensions": [".js", ".css", ".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg", ".woff", ".woff2", ".ttf", ".eot"],
+    "static_ttl_seconds": 86400
+  },
+  "admin_prefix": "/sslcat-panel",
+  "cluster": {
+    "mode": "standalone"
+  },
+  "static_sites": [],
+  "php_sites": [],
+  "runners": {
+    "enabled": false
+  },
+  "threat_intel": {
+    "enabled": false
+  },
+  "notification": {
+    "enabled": false
+  }
+}
