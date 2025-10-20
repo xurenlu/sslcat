@@ -96,7 +96,17 @@ const AppRoutes: React.FC = () => {
           <StaticSiteEdit />
         </AuthGuard>
       } />
+      <Route path={`${adminPrefix}/static-site-add`} element={
+        <AuthGuard>
+          <StaticSiteEdit />
+        </AuthGuard>
+      } />
       <Route path={`${adminPrefix}/php-site-edit`} element={
+        <AuthGuard>
+          <PHPSiteEdit />
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/php-site-add`} element={
         <AuthGuard>
           <PHPSiteEdit />
         </AuthGuard>
