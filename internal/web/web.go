@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -141,6 +142,10 @@ func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request) bool {
 						}
 						return true
 					}
+					// 手动设置 MIME 类型
+					if contentType := mime.TypeByExtension(filepath.Ext(idxFile)); contentType != "" {
+						w.Header().Set("Content-Type", contentType)
+					}
 					http.ServeFile(w, r, idxFile)
 					return true
 				}
@@ -153,6 +158,10 @@ func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request) bool {
 					s.log.Errorf("Failed to serve static file: %v", err)
 				}
 				return true
+			}
+			// 手动设置 MIME 类型
+			if contentType := mime.TypeByExtension(filepath.Ext(full)); contentType != "" {
+				w.Header().Set("Content-Type", contentType)
 			}
 			s.applyCustomSiteHeaders(w, site.ResponseHeaders)
 			http.ServeFile(w, r, full)
