@@ -24,9 +24,10 @@ jobs:
           - goarch: amd64
             arch_tag: linux-amd64
             cc: gcc
-          - goarch: arm64
-            arch_tag: linux-arm64
-            cc: aarch64-linux-gnu-gcc
+          # 临时禁用 ARM64 编译
+          # - goarch: arm64
+          #   arch_tag: linux-arm64
+          #   cc: aarch64-linux-gnu-gcc
     
     steps:
       - name: Checkout
@@ -369,17 +370,17 @@ jobs:
           echo "🚀 Uploading release $VERSION to Aliyun OSS..."
           
           # 上传所有文件到版本目录
-          ossutil cp --recursive artifacts/ oss://$ALIYUN_OSS_BUCKET/releases/$VERSION/ \
+          ossutil cp --recursive artifacts/ oss://$ALIYUN_OSS_BUCKET/xurenlu/sslcat/releases/$VERSION/ \
                      --parallel 10 \
                      --checkpoint-dir /tmp/oss-checkpoint \
                      --retry-times 3
           
           # 创建最新版本的符号链接（复制整个目录）
-          ossutil cp --recursive oss://$ALIYUN_OSS_BUCKET/releases/$VERSION/ \
+          ossutil cp --recursive oss://$ALIYUN_OSS_BUCKET/xurenlu/sslcat/releases/$VERSION/ \
                      oss://$ALIYUN_OSS_BUCKET/latest/ \
                      --update
           
-          echo "✅ Successfully uploaded to OSS: oss://$ALIYUN_OSS_BUCKET/releases/$VERSION/"
+          echo "✅ Successfully uploaded to OSS: oss://$ALIYUN_OSS_BUCKET/xurenlu/sslcat/releases/$VERSION/"
 
       - name: Verify CDN Mirror upload
         if: env.ALIYUN_ACCESS_KEY_ID != ''
@@ -389,6 +390,6 @@ jobs:
         run: |
           VERSION=${{ github.ref_name }}
           echo "🔍 Verifying upload for version $VERSION..."
-          ossutil ls oss://$ALIYUN_OSS_BUCKET/releases/$VERSION/ \
+          ossutil ls oss://$ALIYUN_OSS_BUCKET/xurenlu/sslcat/releases/$VERSION/ \
                      --output-format json | jq -r '.objects[]?.key' | head -10
           echo "✅ OSS upload verification completed"
