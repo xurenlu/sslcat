@@ -16,6 +16,8 @@ import Settings from './pages/Settings'
 import Notifications from './pages/Notifications'
 import Security from './pages/Security'
 import SitesManagement from './pages/SitesManagement'
+import StaticSiteEdit from './pages/StaticSiteEdit'
+import PHPSiteEdit from './pages/PHPSiteEdit'
 import DNSManagement from './pages/DNSManagement'
 import GitServerManagement from './pages/GitServerManagement'
 import UserManagement from './pages/UserManagement'
@@ -87,6 +89,16 @@ const AppRoutes: React.FC = () => {
       <Route path={`${adminPrefix}/sites`} element={
         <AuthGuard>
           <SitesManagement />
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/static-site-edit`} element={
+        <AuthGuard>
+          <StaticSiteEdit />
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/php-site-edit`} element={
+        <AuthGuard>
+          <PHPSiteEdit />
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/ssl`} element={
