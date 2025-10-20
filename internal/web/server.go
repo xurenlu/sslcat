@@ -1057,26 +1057,34 @@ func (s *Server) proxyMiddleware(w http.ResponseWriter, r *http.Request) bool {
 	// 查找代理配置
 	rule := s.proxyManager.GetProxyConfig(host)
 	if rule != nil && rule.Enabled {
-		// 若仅允许HTTPS且当前为HTTP，需要检查是否有有效证书
-		if rule.SSLOnly && r.TLS == nil {
-			// 检查是否为本地IP或localhost，这些不需要强制HTTPS
-			if net.ParseIP(host) != nil || host == "localhost" || strings.HasPrefix(host, "127.") || strings.HasPrefix(host, "::1") {
-				s.log.Debugf("SSL-only rule ignored for local IP/hostname: %s", host)
-			} else {
-				// 检查是否有有效的非自签名证书
-				if s.hasValidCertificate(host) {
-					target := "https://" + host + r.URL.RequestURI()
-					s.log.Warnf("SSL-only rule, redirecting http->https for host=%s", host)
-					http.Redirect(w, r, target, http.StatusMovedPermanently)
-					return true
+		// 检查路径前缀匹配
+		if !rule.MatchesPath(r.URL.Path) {
+			s.log.Debugf("Request path %s does not match any prefix for domain %s", r.URL.Path, host)
+			// 路径不匹配，继续查找其他规则或处理未匹配行为
+		} else {
+			s.log.Debugf("Request path %s matches prefix for domain %s", r.URL.Path, host)
+			
+			// 若仅允许HTTPS且当前为HTTP，需要检查是否有有效证书
+			if rule.SSLOnly && r.TLS == nil {
+				// 检查是否为本地IP或localhost，这些不需要强制HTTPS
+				if net.ParseIP(host) != nil || host == "localhost" || strings.HasPrefix(host, "127.") || strings.HasPrefix(host, "::1") {
+					s.log.Debugf("SSL-only rule ignored for local IP/hostname: %s", host)
 				} else {
-					s.log.Debugf("SSL-only rule ignored for %s: no valid certificate found", host)
+					// 检查是否有有效的非自签名证书
+					if s.hasValidCertificate(host) {
+						target := "https://" + host + r.URL.RequestURI()
+						s.log.Warnf("SSL-only rule, redirecting http->https for host=%s", host)
+						http.Redirect(w, r, target, http.StatusMovedPermanently)
+						return true
+					} else {
+						s.log.Debugf("SSL-only rule ignored for %s: no valid certificate found", host)
+					}
 				}
 			}
+			// 执行代理（带访问控制）
+			s.ProxyRequestWithAuth(w, r, rule)
+			return true
 		}
-		// 执行代理（带访问控制）
-		s.ProxyRequestWithAuth(w, r, rule)
-		return true
 	}
 
 	// 没有找到（或规则未启用）代理配置，依据配置项处理

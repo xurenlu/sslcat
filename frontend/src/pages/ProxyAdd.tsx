@@ -64,6 +64,10 @@ interface ProxyRuleForm {
   enabled: boolean
   ssl_only: boolean
   
+  // 路径前缀匹配配置
+  path_prefixes: string[]
+  path_exact: boolean
+  
   // 统一后端配置
   backends: ProxyBackend[]
   
@@ -130,6 +134,10 @@ const ProxyAdd: React.FC = () => {
     domain: '',
     enabled: true,
     ssl_only: true,
+    
+    // 路径前缀匹配配置
+    path_prefixes: [],
+    path_exact: false,
     
     // 统一后端配置（至少一个后端）
     backends: [
@@ -415,6 +423,34 @@ const ProxyAdd: React.FC = () => {
                     <Text fontSize="sm" color="gray.500" mt={1}>
                       输入要代理的域名，支持通配符如 *.example.com
                     </Text>
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel>路径前缀匹配（可选）</FormLabel>
+                    <VStack spacing={3} align="stretch">
+                      <Text fontSize="sm" color="gray.500">
+                        指定哪些路径前缀需要走负载均衡转发，如 /api/v1/、/api/v2/ 等
+                      </Text>
+                      <Input
+                        value={formData.path_prefixes.join(', ')}
+                        onChange={(e) => {
+                          const prefixes = e.target.value.split(',').map(p => p.trim()).filter(p => p)
+                          handleInputChange('path_prefixes', prefixes)
+                        }}
+                        placeholder="/api/v1/, /api/v2/, /admin/"
+                        size="lg"
+                      />
+                      <HStack>
+                        <Switch
+                          isChecked={formData.path_exact}
+                          onChange={(e) => handleInputChange('path_exact', e.target.checked)}
+                        />
+                        <Text fontSize="sm">精确匹配路径前缀</Text>
+                      </HStack>
+                      <Text fontSize="xs" color="gray.400">
+                        精确匹配：路径必须完全等于前缀；前缀匹配：路径必须以指定前缀开头
+                      </Text>
+                    </VStack>
                   </FormControl>
 
                 </VStack>

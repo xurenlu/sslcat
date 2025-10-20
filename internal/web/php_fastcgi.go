@@ -27,6 +27,13 @@ func (s *Server) servePHP(w http.ResponseWriter, r *http.Request) bool {
 			continue
 		}
 
+		// 检查路径前缀匹配
+		if !site.MatchesPath(r.URL.Path) {
+			s.log.Debugf("Request path %s does not match any prefix for PHP site %s", r.URL.Path, host)
+			continue
+		}
+		s.log.Debugf("Request path %s matches prefix for PHP site %s", r.URL.Path, host)
+
 		// 检测远程环境并应用相应限制
 		remoteDetector := NewPHPRemoteDetector(s.config)
 		envInfo, err := remoteDetector.DetectRemoteEnvironment(&site)
@@ -148,9 +155,7 @@ func dialFCGI(addr string, timeout time.Duration) (net.Conn, error) {
 		p := strings.TrimPrefix(addr, "unix:")
 		return net.DialTimeout("unix", p, timeout)
 	}
-	if strings.HasPrefix(addr, "tcp:") {
-		addr = strings.TrimPrefix(addr, "tcp:")
-	}
+	addr = strings.TrimPrefix(addr, "tcp:")
 	if addr == "" {
 		return nil, errors.New("empty fcgi addr")
 	}

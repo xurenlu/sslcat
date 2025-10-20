@@ -113,6 +113,12 @@ func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request) bool {
 			continue
 		}
 		if strings.EqualFold(site.Domain, host) {
+			// 检查路径前缀匹配
+			if !site.MatchesPath(r.URL.Path) {
+				s.log.Debugf("Request path %s does not match any prefix for static site %s", r.URL.Path, host)
+				continue
+			}
+			s.log.Debugf("Request path %s matches prefix for static site %s", r.URL.Path, host)
 			// 规范化请求路径，禁止目录列出与越权
 			reqPath := r.URL.Path
 			if reqPath == "/" || reqPath == "" {

@@ -65,6 +65,10 @@ interface ProxyRuleForm {
   enabled: boolean
   ssl_only: boolean
   
+  // 路径前缀匹配配置
+  path_prefixes: string[]
+  path_exact: boolean
+  
   // 统一后端配置
   backends: ProxyBackend[]
   

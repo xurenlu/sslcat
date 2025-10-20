@@ -133,6 +133,10 @@ type ProxyRule struct {
 	Enabled bool   `json:"enabled"`
 	SSLOnly bool   `json:"ssl_only"`
 
+	// 路径前缀匹配配置
+	PathPrefixes []string `json:"path_prefixes,omitempty"` // 路径前缀列表，如 ["/api/v1/", "/api/v2/"]
+	PathExact    bool     `json:"path_exact"`              // 是否精确匹配路径前缀
+
 	// 新字段：统一后端配置
 	Backends []ProxyBackend `json:"backends,omitempty"` // 统一后端服务器列表
 
@@ -509,6 +513,10 @@ type StaticSite struct {
 	Index   string `json:"index"`
 	Enabled bool   `json:"enabled"`
 
+	// 路径前缀匹配配置
+	PathPrefixes []string `json:"path_prefixes,omitempty"` // 路径前缀列表，如 ["/api/v1/", "/api/v2/"]
+	PathExact    bool     `json:"path_exact"`              // 是否精确匹配路径前缀
+
 	// 自定义响应头
 	ResponseHeaders map[string]string `json:"response_headers,omitempty"`
 }
@@ -521,6 +529,10 @@ type PHPSite struct {
 	Enabled  bool              `json:"enabled"`
 	FCGIAddr string            `json:"fcgi_addr"` // unix:/path/php-fpm.sock 或 127.0.0.1:9000
 	Vars     map[string]string `json:"vars"`
+
+	// 路径前缀匹配配置
+	PathPrefixes []string `json:"path_prefixes,omitempty"` // 路径前缀列表，如 ["/api/v1/", "/api/v2/"]
+	PathExact    bool     `json:"path_exact"`              // 是否精确匹配路径前缀
 
 	// 自定义响应头
 	ResponseHeaders map[string]string `json:"response_headers,omitempty"`
@@ -1388,6 +1400,104 @@ func (rule *ProxyRule) GetEffectiveBackends() []ProxyBackend {
 func (rule *ProxyRule) IsLoadBalanced() bool {
 	backends := rule.GetEffectiveBackends()
 	return len(backends) > 1
+}
+
+// MatchesPath 检查请求路径是否匹配规则
+// 支持路径前缀匹配，用于静态站点、PHP站点和代理转发
+func (rule *ProxyRule) MatchesPath(requestPath string) bool {
+	// 如果没有配置路径前缀，匹配所有路径
+	if len(rule.PathPrefixes) == 0 {
+		return true
+	}
+
+	// 检查请求路径是否匹配任何一个前缀
+	for _, prefix := range rule.PathPrefixes {
+		if rule.PathExact {
+			// 精确匹配：路径必须完全等于前缀
+			if requestPath == prefix {
+				return true
+			}
+		} else {
+			// 前缀匹配：路径必须以指定前缀开头
+			if strings.HasPrefix(requestPath, prefix) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// GetMatchedPrefix 获取匹配的路径前缀
+// 返回第一个匹配的前缀，如果没有匹配则返回空字符串
+func (rule *ProxyRule) GetMatchedPrefix(requestPath string) string {
+	if len(rule.PathPrefixes) == 0 {
+		return ""
+	}
+
+	for _, prefix := range rule.PathPrefixes {
+		if rule.PathExact {
+			if requestPath == prefix {
+				return prefix
+			}
+		} else {
+			if strings.HasPrefix(requestPath, prefix) {
+				return prefix
+			}
+		}
+	}
+
+	return ""
+}
+
+// MatchesPath 检查请求路径是否匹配静态站点规则
+func (site *StaticSite) MatchesPath(requestPath string) bool {
+	// 如果没有配置路径前缀，匹配所有路径
+	if len(site.PathPrefixes) == 0 {
+		return true
+	}
+
+	// 检查请求路径是否匹配任何一个前缀
+	for _, prefix := range site.PathPrefixes {
+		if site.PathExact {
+			// 精确匹配：路径必须完全等于前缀
+			if requestPath == prefix {
+				return true
+			}
+		} else {
+			// 前缀匹配：路径必须以指定前缀开头
+			if strings.HasPrefix(requestPath, prefix) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// MatchesPath 检查请求路径是否匹配PHP站点规则
+func (site *PHPSite) MatchesPath(requestPath string) bool {
+	// 如果没有配置路径前缀，匹配所有路径
+	if len(site.PathPrefixes) == 0 {
+		return true
+	}
+
+	// 检查请求路径是否匹配任何一个前缀
+	for _, prefix := range site.PathPrefixes {
+		if site.PathExact {
+			// 精确匹配：路径必须完全等于前缀
+			if requestPath == prefix {
+				return true
+			}
+		} else {
+			// 前缀匹配：路径必须以指定前缀开头
+			if strings.HasPrefix(requestPath, prefix) {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // migrateProxyRules 迁移所有代理规则到统一后端格式
