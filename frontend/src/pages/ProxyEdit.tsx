@@ -170,6 +170,13 @@ const ProxyEdit: React.FC = () => {
     enabled: true,
     ssl_only: true,
     
+    // 路径前缀匹配配置
+    path_prefixes: [],
+    path_exact: false,
+    
+    // 路径前缀规则配置
+    path_prefix_rules: [],
+    
     // 统一后端配置（至少一个后端）
     backends: [
       {
@@ -323,6 +330,13 @@ const ProxyEdit: React.FC = () => {
             domain: rule.domain || '',
             enabled: rule.enabled ?? true,
             ssl_only: rule.ssl_only ?? true,
+            
+            // 路径前缀匹配配置
+            path_prefixes: rule.path_prefixes || [],
+            path_exact: rule.path_exact ?? false,
+            
+            // 路径前缀规则配置
+            path_prefix_rules: rule.path_prefix_rules || [],
             
             // 统一后端配置
             backends: backends,
