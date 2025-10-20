@@ -275,15 +275,15 @@ jobs:
             
             ```bash
             # macOS (自动选择架构)
-            curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_darwin-$(uname -m).tar.gz -o sslcat.tgz
+            curl -fsSL https://github.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_darwin-$(uname -m).tar.gz -o sslcat.tgz
             tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
             
             # Linux AMD64
-            curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-amd64.tar.gz -o sslcat.tgz
+            curl -fsSL https://github.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-amd64.tar.gz -o sslcat.tgz
             tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
             
             # Linux ARM64 (树莓派等)
-            curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-arm64.tar.gz -o sslcat.tgz
+            curl -fsSL https://github.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-arm64.tar.gz -o sslcat.tgz
             tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
             ```
             
