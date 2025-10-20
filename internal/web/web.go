@@ -113,64 +113,81 @@ func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request) bool {
 		if !site.Enabled {
 			continue
 		}
-        if strings.EqualFold(site.Domain, host) {
-            // 优先检查并应用路径前缀代理规则（最长前缀优先）
-            if len(site.PathPrefixRules) > 0 {
-                var (
-                    matchedRule *config.PathPrefixRule
-                    matchedPrefix string
-                )
-                // 选择最长匹配前缀的规则
-                for i := range site.PathPrefixRules {
-                    rule := &site.PathPrefixRules[i]
-                    if !rule.Enabled {
-                        continue
-                    }
-                    // 遍历所有前缀，找出匹配且最长的前缀
-                    for _, prefix := range rule.Prefixes {
-                        if (rule.Exact && r.URL.Path == prefix) || (!rule.Exact && strings.HasPrefix(r.URL.Path, prefix)) {
-                            if len(prefix) > len(matchedPrefix) {
-                                matchedPrefix = prefix
-                                matchedRule = rule
-                            }
+		if strings.EqualFold(site.Domain, host) {
+			// 优先检查并应用路径前缀代理规则（最长前缀优先）
+			if len(site.PathPrefixRules) > 0 {
+				var (
+					matchedRule   *config.PathPrefixRule
+					matchedPrefix string
+				)
+				// 选择最长匹配前缀的规则
+				for i := range site.PathPrefixRules {
+					rule := &site.PathPrefixRules[i]
+					if !rule.Enabled {
+						continue
+					}
+					// 遍历所有前缀，找出匹配且最长的前缀
+					for _, prefix := range rule.Prefixes {
+						if (rule.Exact && r.URL.Path == prefix) || (!rule.Exact && strings.HasPrefix(r.URL.Path, prefix)) {
+							if len(prefix) > len(matchedPrefix) {
+								matchedPrefix = prefix
+								matchedRule = rule
+							}
+						}
+					}
+				}
+
+				// 命中路径前缀规则则走代理逻辑
+                if matchedRule != nil {
+					s.log.Debugf("Static site %s matched path-prefix rule (prefix=%s), proxying to backends", host, matchedPrefix)
+                    // 选择一个可用后端（当前采用第一个启用的后端）
+                    var selectedBackend *config.ProxyBackend
+                    for i := range matchedRule.Backends {
+                        if matchedRule.Backends[i].Enabled {
+                            selectedBackend = &matchedRule.Backends[i]
+                            break
                         }
                     }
-                }
-
-                // 命中路径前缀规则则走代理逻辑
-                if matchedRule != nil {
-                    s.log.Debugf("Static site %s matched path-prefix rule (prefix=%s), proxying to backends", host, matchedPrefix)
-                    // 构造临时 ProxyRule 并交给代理管理器处理
-                    tempRule := &config.ProxyRule{
-                        Domain:                 host,
-                        Enabled:                true,
-                        PathPrefixes:           matchedRule.Prefixes,
-                        PathExact:              matchedRule.Exact,
-                        Backends:               matchedRule.Backends,
-                        LoadBalancerAlgorithm:  matchedRule.LoadBalancerAlgorithm,
-                        SessionAffinityEnabled: matchedRule.SessionAffinityEnabled,
-                        SessionAffinityMethod:  matchedRule.SessionAffinityMethod,
-                        SessionAffinityCookie:  matchedRule.SessionAffinityCookie,
-                        SessionAffinityHeader:  matchedRule.SessionAffinityHeader,
-                        SessionAffinityTTL:     matchedRule.SessionAffinityTTL,
-                        HealthCheckEnabled:     matchedRule.HealthCheckEnabled,
-                        HealthCheckPath:        matchedRule.HealthCheckPath,
-                        HealthCheckInterval:    matchedRule.HealthCheckInterval,
-                        HealthCheckTimeout:     matchedRule.HealthCheckTimeout,
-                        HealthCheckMethod:      matchedRule.HealthCheckMethod,
-                        ExpectedStatusCode:     matchedRule.ExpectedStatusCode,
-                        FailoverEnabled:        matchedRule.FailoverEnabled,
-                        MaxRetries:             matchedRule.MaxRetries,
-                        RetryInterval:          matchedRule.RetryInterval,
-                        FailureThreshold:       matchedRule.FailureThreshold,
-                        RecoveryThreshold:      matchedRule.RecoveryThreshold,
+                    if selectedBackend == nil {
+                        s.log.Warnf("No enabled backend for matched static path-prefix rule on %s (prefix=%s)", host, matchedPrefix)
+                        http.Error(w, "Service Unavailable", http.StatusServiceUnavailable)
+                        return true
                     }
 
-                    // 通过带鉴权的代理入口执行
-                    s.ProxyRequestWithAuth(w, r, tempRule)
-                    return true
-                }
-            }
+                    // 构造临时 ProxyRule（单后端，避免走全局LB缓存）
+					tempRule := &config.ProxyRule{
+						Domain:                 host,
+						Enabled:                true,
+                        PathPrefixes:           matchedRule.Prefixes,
+                        PathExact:              matchedRule.Exact,
+                        // 同步一份单后端（并设置 Target/Port 以走传统代理路径）
+                        Backends:               []config.ProxyBackend{*selectedBackend},
+                        Target:                 selectedBackend.Host,
+                        Port:                   selectedBackend.Port,
+						LoadBalancerAlgorithm:  matchedRule.LoadBalancerAlgorithm,
+						SessionAffinityEnabled: matchedRule.SessionAffinityEnabled,
+						SessionAffinityMethod:  matchedRule.SessionAffinityMethod,
+						SessionAffinityCookie:  matchedRule.SessionAffinityCookie,
+						SessionAffinityHeader:  matchedRule.SessionAffinityHeader,
+						SessionAffinityTTL:     matchedRule.SessionAffinityTTL,
+						HealthCheckEnabled:     matchedRule.HealthCheckEnabled,
+						HealthCheckPath:        matchedRule.HealthCheckPath,
+						HealthCheckInterval:    matchedRule.HealthCheckInterval,
+						HealthCheckTimeout:     matchedRule.HealthCheckTimeout,
+						HealthCheckMethod:      matchedRule.HealthCheckMethod,
+						ExpectedStatusCode:     matchedRule.ExpectedStatusCode,
+						FailoverEnabled:        matchedRule.FailoverEnabled,
+						MaxRetries:             matchedRule.MaxRetries,
+						RetryInterval:          matchedRule.RetryInterval,
+						FailureThreshold:       matchedRule.FailureThreshold,
+						RecoveryThreshold:      matchedRule.RecoveryThreshold,
+					}
+
+					// 通过带鉴权的代理入口执行
+					s.ProxyRequestWithAuth(w, r, tempRule)
+					return true
+				}
+			}
 			// 检查路径前缀匹配
 			if !site.MatchesPath(r.URL.Path) {
 				s.log.Debugf("Request path %s does not match any prefix for static site %s", r.URL.Path, host)
