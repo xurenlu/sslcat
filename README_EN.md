@@ -8,7 +8,7 @@
 
 ```bash
 # 1) macOS local quick test (or download darwin package manually)
-curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.3.9/sslcat_v1.3.9_darwin-arm64.tar.gz -o sslcat.tgz
+curl -fsSL https://cdn.wxside.com/xurenlu/sslcat/releases/download/v1.3.9/sslcat_v1.3.9_darwin-arm64.tar.gz -o sslcat.tgz
 tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
 sslcat --config sslcat.conf --port 8080
 # Browser access: http://localhost:8080/sslcat-panel/

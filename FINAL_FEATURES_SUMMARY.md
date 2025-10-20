@@ -261,7 +261,7 @@ CDN缓存       >90%      <5ms         60-90%
 ### 快速开始
 ```bash
 # 1. 下载最新版本
-curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.3.2/sslcat_v1.3.2_linux-amd64.tar.gz -o sslcat.tgz
+curl -fsSL https://cdn.wxside.com/xurenlu/sslcat/releases/download/v1.3.2/sslcat_v1.3.2_linux-amd64.tar.gz -o sslcat.tgz
 tar -xzf sslcat.tgz
 
 # 2. 验证配置

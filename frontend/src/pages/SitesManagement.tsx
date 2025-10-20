@@ -47,8 +47,6 @@ interface StaticSite {
   index: string
   indexFile?: string  // 兼容旧字段名
   enabled: boolean
-  created?: string
-  size?: string
   path_prefix_rules?: PathPrefixRule[]
 }
 
@@ -66,7 +64,6 @@ interface PHPSite {
   phpVersion?: string  // 兼容旧字段名
   memoryLimit?: string  // 兼容旧字段名
   maxExecutionTime?: string  // 兼容旧字段名
-  created?: string
   path_prefix_rules?: PathPrefixRule[]
 }
 
@@ -270,8 +267,7 @@ const SitesManagement: React.FC = () => {
                           <Th>根目录</Th>
                           <Th>状态</Th>
                           <Th>入口文件</Th>
-                          <Th>大小</Th>
-                          <Th>创建时间</Th>
+                          <Th>路径前缀规则</Th>
                           <Th>操作</Th>
                         </Tr>
                       </Thead>
@@ -295,8 +291,11 @@ const SitesManagement: React.FC = () => {
                               </Badge>
                             </Td>
                             <Td>{site.indexFile}</Td>
-                            <Td>{site.size}</Td>
-                            <Td>{site.created}</Td>
+                            <Td>
+                              <Badge colorScheme="blue">
+                                {site.path_prefix_rules?.length || 0} 个规则
+                              </Badge>
+                            </Td>
                             <Td>
                               <HStack spacing={2}>
                                 <IconButton
@@ -365,7 +364,7 @@ const SitesManagement: React.FC = () => {
                           <Th>状态</Th>
                           <Th>内存限制</Th>
                           <Th>执行时间</Th>
-                          <Th>创建时间</Th>
+                          <Th>路径前缀规则</Th>
                           <Th>操作</Th>
                         </Tr>
                       </Thead>
@@ -398,7 +397,11 @@ const SitesManagement: React.FC = () => {
                             </Td>
                             <Td>{site.memoryLimit}</Td>
                             <Td>{site.maxExecutionTime}s</Td>
-                            <Td>{site.created}</Td>
+                            <Td>
+                              <Badge colorScheme="green">
+                                {site.path_prefix_rules?.length || 0} 个规则
+                              </Badge>
+                            </Td>
                             <Td>
                               <HStack spacing={2}>
                                 <IconButton

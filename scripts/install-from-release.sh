@@ -284,7 +284,7 @@ EXT=".tar.gz"
 if [[ "$OS" == "windows" ]]; then EXT=".zip"; fi
 TMP="$(mktemp -d)"
 URL_GH="https://github.com/xurenlu/sslcat/releases/download/v${VER}/sslcat_v${VER}_${OS}-${ARCH}${EXT}"
-URL_CN="https://sslcat.com/xurenlu/sslcat/releases/download/v${VER}/sslcat_v${VER}_${OS}-${ARCH}${EXT}"
+URL_CN="https://cdn.wxside.com/xurenlu/sslcat/releases/download/v${VER}/sslcat_v${VER}_${OS}-${ARCH}${EXT}"
 msg prefer_download "$URL_GH"
 if ! curl -fsSL "$URL_GH" -o "$TMP/pkg${EXT}"; then
   msg github_failed_fallback_mirror "$URL_CN"

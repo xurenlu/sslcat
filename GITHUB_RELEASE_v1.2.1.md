@@ -34,11 +34,11 @@ SSLcat v1.2.1 引入了**智能重试机制**，大幅提升SSL证书申请成�
 ### 下载安装
 ```bash
 # macOS
-curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.2.1/sslcat_v1.2.1_darwin-arm64.tar.gz -o sslcat.tgz
+curl -fsSL https://cdn.wxside.com/xurenlu/sslcat/releases/download/v1.2.1/sslcat_v1.2.1_darwin-arm64.tar.gz -o sslcat.tgz
 tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
 
 # Linux
-curl -fsSL https://sslcat.com/xurenlu/sslcat/releases/download/v1.2.1/sslcat_v1.2.1_linux-amd64.tar.gz -o sslcat.tgz
+curl -fsSL https://cdn.wxside.com/xurenlu/sslcat/releases/download/v1.2.1/sslcat_v1.2.1_linux-amd64.tar.gz -o sslcat.tgz
 tar -xzf sslcat.tgz && sudo install -m 0755 sslcat /usr/local/bin/sslcat
 ```
 

@@ -281,9 +281,9 @@ PREFERRED="sslcat_v${VER}_${OS}-${ARCH}"
 EXT=.tar.gz
 [[ "$OS" == "windows" ]] && EXT=.zip
 
-# 使用 sslcat.com 代理加速 GitHub Releases（仅新命名）
+# 使用 cdn.wxside.com 代理加速 GitHub Releases（仅新命名）
 TMP=$(mktemp -d)
-URL_CN="https://sslcat.com/xurenlu/sslcat/releases/download/v${VER}/sslcat_v${VER}_${OS}-${ARCH}${EXT}"
+URL_CN="https://cdn.wxside.com/xurenlu/sslcat/releases/download/v${VER}/sslcat_v${VER}_${OS}-${ARCH}${EXT}"
 URL_GH="https://github.com/xurenlu/sslcat/releases/download/v${VER}/sslcat_v${VER}_${OS}-${ARCH}${EXT}"
 msg prefer_download "$URL_CN"
 if ! curl -fsSL "$URL_CN" -o "$TMP/pkg${EXT}"; then

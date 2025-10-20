@@ -1230,7 +1230,7 @@ IDLE_TIMEOUT=30       # 无新日志超时时间（秒），默认30秒
 - 404/502 未命中代理响应改为简洁纯文本
 - 安装脚本下载地址切换至新命名：
   - GitHub: https://github.com/xurenlu/sslcat/releases/download/v${VER}/sslcat_v${VER}_${OS}-${ARCH}${EXT}
-  - 中国大陆镜像: https://sslcat.com/xurenlu/sslcat/releases/download/v${VER}/sslcat_v${VER}_${OS}-${ARCH}${EXT}
+  - 中国大陆镜像: https://cdn.wxside.com/xurenlu/sslcat/releases/download/v${VER}/sslcat_v${VER}_${OS}-${ARCH}${EXT}
   （失败自动切换主/备）
 - 代理转发参数修正：若 Target 已含协议则直接使用，避免重复协议造成崩溃
 
