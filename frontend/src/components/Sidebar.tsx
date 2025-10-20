@@ -33,6 +33,7 @@ import {
   FiKey,
   FiBarChart2,
   FiImage,
+  FiServer,
 } from 'react-icons/fi'
 import { FaRobot } from 'react-icons/fa'
 
@@ -115,6 +116,8 @@ const SidebarContent = () => {
     { name: t.navigation.security, icon: FiShield, path: buildPath(adminPrefix, '/security') },
     { name: t.navigation.gitServer, icon: FiGitBranch, path: buildPath(adminPrefix, '/git-server') },
     { name: t.navigation.notifications, icon: FiBell, path: buildPath(adminPrefix, '/notifications') },
+    { name: t.navigation.cluster || '集群设置', icon: FiServer, path: buildPath(adminPrefix, '/cluster') },
+    { name: t.navigation.clusterStatus || '集群状态', icon: FiServer, path: buildPath(adminPrefix, '/cluster/status') },
     { name: t.navigation.aiSecurity || '🤖 AI 安全分析', icon: FaRobot, path: buildPath(adminPrefix, '/ai-security'), badge: 'AI' },
     { name: t.navigation.imageOptimization, icon: FiImage, path: buildPath(adminPrefix, '/image-optimization') },
     { name: t.navigation.userManagement, icon: FiUsers, path: buildPath(adminPrefix, '/users') },

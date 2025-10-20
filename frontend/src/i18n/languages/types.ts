@@ -73,6 +73,8 @@ export interface Translation {
     changePassword: string
     statistics: string
     imageOptimization: string
+    cluster?: string
+    clusterStatus?: string
   }
   
   // 仪表板
@@ -94,6 +96,50 @@ export interface Translation {
     serviceRunning: string
     sslStatusGood: string
     proxyServiceNormal: string
+  }
+
+  // 集群设置
+  cluster: {
+    title: string
+    basic: string
+    mode: string
+    modeStandalone: string
+    modeMaster: string
+    modeSlave: string
+    nodeName: string
+    clusterPort: string
+    clusterKey: string
+    masterConfig: string
+    masterHost: string
+    masterPort: string
+    masterKey: string
+    timeout: string
+    retryInterval: string
+    sync: string
+    syncConfig: string
+    syncCerts: string
+    syncInterval: string
+    syncTimeout: string
+    syncCertsFromMaster: string
+    syncCertsSuccess: string
+    slaveNotice: string
+  }
+
+  // 集群状态
+  clusterStatus: {
+    title: string
+    nodeInfo: string
+    masterInfo: string
+    service: string
+    httpPort: string
+    testMaster: string
+    masterReachable: string
+    masterUnreachable: string
+    certCount: string
+    lastCertSync: string
+    lastConfigSync: string
+    masterLastReachable: string
+    lastError: string
   }
   
   // 代理管理

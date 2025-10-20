@@ -106,6 +106,12 @@ type Server struct {
 	aiSecurityAnalyzer *ai.SecurityAnalyzer
 	// 图片优化器
 	imageOptimizer *imageopt.Optimizer
+
+	// Cluster runtime status
+	clusterLastConfigSyncAt      time.Time
+	clusterLastCertSyncAt        time.Time
+	clusterMasterLastReachableAt time.Time
+	clusterLastSyncError         string
 }
 
 // NewServer 创建Web服务器
@@ -713,6 +719,13 @@ func (s *Server) setupRoutes() {
 
 	// Runner API 路由
 	s.registerRunnerRoutes()
+
+	// 集群 API
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/cluster/settings", s.handleAPIClusterSettings)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/cluster/export-certs", s.handleAPIClusterExportCerts)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/cluster/sync-certs", s.handleAPIClusterSyncCerts)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/cluster/status", s.handleAPIClusterStatus)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/cluster/test-master", s.handleAPIClusterTestMaster)
 
 	// 前端 SPA 路由 - 必须放在最后，作为 fallback
 	s.setupFrontendRoutes()

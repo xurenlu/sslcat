@@ -27,6 +27,8 @@ import Statistics from './pages/Statistics'
 import AISecurityAnalysis from './pages/AISecurityAnalysis'
 import ImageOptimization from './pages/ImageOptimization'
 import FirstTimeSetup from './pages/FirstTimeSetup'
+import ClusterSettings from './pages/ClusterSettings'
+import ClusterStatus from './pages/ClusterStatus'
 
 const AppRoutes: React.FC = () => {
   const { adminPrefix, isLoading, error } = useConfig()
@@ -159,6 +161,16 @@ const AppRoutes: React.FC = () => {
       <Route path={`${adminPrefix}/statistics`} element={
         <AuthGuard>
           <Statistics />
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/cluster`} element={
+        <AuthGuard>
+          <ClusterSettings />
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/cluster/status`} element={
+        <AuthGuard>
+          <ClusterStatus />
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/ai-security`} element={

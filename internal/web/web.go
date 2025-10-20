@@ -138,32 +138,32 @@ func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request) bool {
 				}
 
 				// 命中路径前缀规则则走代理逻辑
-                if matchedRule != nil {
+				if matchedRule != nil {
 					s.log.Debugf("Static site %s matched path-prefix rule (prefix=%s), proxying to backends", host, matchedPrefix)
-                    // 选择一个可用后端（当前采用第一个启用的后端）
-                    var selectedBackend *config.ProxyBackend
-                    for i := range matchedRule.Backends {
-                        if matchedRule.Backends[i].Enabled {
-                            selectedBackend = &matchedRule.Backends[i]
-                            break
-                        }
-                    }
-                    if selectedBackend == nil {
-                        s.log.Warnf("No enabled backend for matched static path-prefix rule on %s (prefix=%s)", host, matchedPrefix)
-                        http.Error(w, "Service Unavailable", http.StatusServiceUnavailable)
-                        return true
-                    }
+					// 选择一个可用后端（当前采用第一个启用的后端）
+					var selectedBackend *config.ProxyBackend
+					for i := range matchedRule.Backends {
+						if matchedRule.Backends[i].Enabled {
+							selectedBackend = &matchedRule.Backends[i]
+							break
+						}
+					}
+					if selectedBackend == nil {
+						s.log.Warnf("No enabled backend for matched static path-prefix rule on %s (prefix=%s)", host, matchedPrefix)
+						http.Error(w, "Service Unavailable", http.StatusServiceUnavailable)
+						return true
+					}
 
-                    // 构造临时 ProxyRule（单后端，避免走全局LB缓存）
+					// 构造临时 ProxyRule（单后端，避免走全局LB缓存）
 					tempRule := &config.ProxyRule{
-						Domain:                 host,
-						Enabled:                true,
-                        PathPrefixes:           matchedRule.Prefixes,
-                        PathExact:              matchedRule.Exact,
-                        // 同步一份单后端（并设置 Target/Port 以走传统代理路径）
-                        Backends:               []config.ProxyBackend{*selectedBackend},
-                        Target:                 selectedBackend.Host,
-                        Port:                   selectedBackend.Port,
+						Domain:       host,
+						Enabled:      true,
+						PathPrefixes: matchedRule.Prefixes,
+						PathExact:    matchedRule.Exact,
+						// 同步一份单后端（并设置 Target/Port 以走传统代理路径）
+						Backends:               []config.ProxyBackend{*selectedBackend},
+						Target:                 selectedBackend.Host,
+						Port:                   selectedBackend.Port,
 						LoadBalancerAlgorithm:  matchedRule.LoadBalancerAlgorithm,
 						SessionAffinityEnabled: matchedRule.SessionAffinityEnabled,
 						SessionAffinityMethod:  matchedRule.SessionAffinityMethod,
