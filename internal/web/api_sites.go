@@ -29,11 +29,12 @@ func (s *Server) handleAPIStaticSites(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var req struct {
-			Domain  string            `json:"domain"`
-			Root    string            `json:"root"`
-			Index   string            `json:"index"`
-			Enabled bool              `json:"enabled"`
-			Headers map[string]string `json:"headers"`
+			Domain           string                    `json:"domain"`
+			Root             string                    `json:"root"`
+			Index            string                    `json:"index"`
+			Enabled          bool                      `json:"enabled"`
+			Headers          map[string]string          `json:"headers"`
+			PathPrefixRules  []config.PathPrefixRule   `json:"path_prefix_rules"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -62,11 +63,12 @@ func (s *Server) handleAPIStaticSites(w http.ResponseWriter, r *http.Request) {
 		}
 
 		newSite := config.StaticSite{
-			Domain:          req.Domain,
-			Root:            req.Root,
-			Index:           req.Index,
-			Enabled:         req.Enabled,
-			ResponseHeaders: sanitizeHeaderMap(req.Headers),
+			Domain:           req.Domain,
+			Root:             req.Root,
+			Index:            req.Index,
+			Enabled:          req.Enabled,
+			ResponseHeaders:  sanitizeHeaderMap(req.Headers),
+			PathPrefixRules:  req.PathPrefixRules,
 		}
 
 		if existingIndex >= 0 {
@@ -86,6 +88,76 @@ func (s *Server) handleAPIStaticSites(w http.ResponseWriter, r *http.Request) {
 			"success": true,
 			"site":    newSite,
 			"action":  map[bool]string{true: "updated", false: "created"}[existingIndex >= 0],
+		})
+		return
+	}
+
+	if r.Method == "PUT" {
+		if !s.authorizeAPI(w, r, false) { // 需要写权限
+			return
+		}
+
+		var req struct {
+			Domain           string                    `json:"domain"`
+			Root             string                    `json:"root"`
+			Index            string                    `json:"index"`
+			Enabled          bool                      `json:"enabled"`
+			Headers          map[string]string          `json:"headers"`
+			PathPrefixRules  []config.PathPrefixRule   `json:"path_prefix_rules"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
+			return
+		}
+
+		if req.Domain == "" || req.Root == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "domain and root are required"})
+			return
+		}
+
+		if req.Index == "" {
+			req.Index = "index.html"
+		}
+
+		// 查找现有站点
+		existingIndex := -1
+		for i, site := range s.config.StaticSites {
+			if site.Domain == req.Domain {
+				existingIndex = i
+				break
+			}
+		}
+
+		if existingIndex < 0 {
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"error": "site not found"})
+			return
+		}
+
+		// 更新站点
+		s.config.StaticSites[existingIndex] = config.StaticSite{
+			Domain:           req.Domain,
+			Root:             req.Root,
+			Index:            req.Index,
+			Enabled:          req.Enabled,
+			ResponseHeaders:  sanitizeHeaderMap(req.Headers),
+			PathPrefixRules:  req.PathPrefixRules,
+		}
+
+		if err := s.config.Save(s.config.ConfigFile); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "failed to save config"})
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"site":    s.config.StaticSites[existingIndex],
+			"action":  "updated",
 		})
 		return
 	}
@@ -114,13 +186,14 @@ func (s *Server) handleAPIPHPSites(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var req struct {
-			Domain   string            `json:"domain"`
-			Root     string            `json:"root"`
-			Index    string            `json:"index"`
-			Enabled  bool              `json:"enabled"`
-			FCGIAddr string            `json:"fcgi_addr"`
-			Vars     map[string]string `json:"vars"`
-			Headers  map[string]string `json:"headers"`
+			Domain           string                    `json:"domain"`
+			Root             string                    `json:"root"`
+			Index            string                    `json:"index"`
+			Enabled          bool                      `json:"enabled"`
+			FCGIAddr         string                    `json:"fcgi_addr"`
+			Vars             map[string]string          `json:"vars"`
+			Headers          map[string]string          `json:"headers"`
+			PathPrefixRules  []config.PathPrefixRule   `json:"path_prefix_rules"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -155,13 +228,14 @@ func (s *Server) handleAPIPHPSites(w http.ResponseWriter, r *http.Request) {
 		}
 
 		newSite := config.PHPSite{
-			Domain:          req.Domain,
-			Root:            req.Root,
-			Index:           req.Index,
-			Enabled:         req.Enabled,
-			FCGIAddr:        req.FCGIAddr,
-			Vars:            req.Vars,
-			ResponseHeaders: sanitizeHeaderMap(req.Headers),
+			Domain:           req.Domain,
+			Root:             req.Root,
+			Index:            req.Index,
+			Enabled:          req.Enabled,
+			FCGIAddr:         req.FCGIAddr,
+			Vars:             req.Vars,
+			ResponseHeaders:  sanitizeHeaderMap(req.Headers),
+			PathPrefixRules:  req.PathPrefixRules,
 		}
 
 		if existingIndex >= 0 {
@@ -181,6 +255,86 @@ func (s *Server) handleAPIPHPSites(w http.ResponseWriter, r *http.Request) {
 			"success": true,
 			"site":    newSite,
 			"action":  map[bool]string{true: "updated", false: "created"}[existingIndex >= 0],
+		})
+		return
+	}
+
+	if r.Method == "PUT" {
+		if !s.authorizeAPI(w, r, false) { // 需要写权限
+			return
+		}
+
+		var req struct {
+			Domain           string                    `json:"domain"`
+			Root             string                    `json:"root"`
+			Index            string                    `json:"index"`
+			Enabled          bool                      `json:"enabled"`
+			FCGIAddr         string                    `json:"fcgi_addr"`
+			Vars             map[string]string          `json:"vars"`
+			Headers          map[string]string          `json:"headers"`
+			PathPrefixRules  []config.PathPrefixRule   `json:"path_prefix_rules"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
+			return
+		}
+
+		if req.Domain == "" || req.Root == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "domain and root are required"})
+			return
+		}
+
+		if req.Index == "" {
+			req.Index = "index.php"
+		}
+		if req.FCGIAddr == "" {
+			req.FCGIAddr = "127.0.0.1:9000"
+		}
+		if req.Vars == nil {
+			req.Vars = make(map[string]string)
+		}
+
+		// 查找现有站点
+		existingIndex := -1
+		for i, site := range s.config.PHPSites {
+			if site.Domain == req.Domain {
+				existingIndex = i
+				break
+			}
+		}
+
+		if existingIndex < 0 {
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"error": "site not found"})
+			return
+		}
+
+		// 更新站点
+		s.config.PHPSites[existingIndex] = config.PHPSite{
+			Domain:           req.Domain,
+			Root:             req.Root,
+			Index:            req.Index,
+			Enabled:          req.Enabled,
+			FCGIAddr:         req.FCGIAddr,
+			Vars:             req.Vars,
+			ResponseHeaders:  sanitizeHeaderMap(req.Headers),
+			PathPrefixRules:  req.PathPrefixRules,
+		}
+
+		if err := s.config.Save(s.config.ConfigFile); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "failed to save config"})
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"site":    s.config.PHPSites[existingIndex],
+			"action":  "updated",
 		})
 		return
 	}
