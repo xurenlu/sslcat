@@ -27,6 +27,7 @@ import { useTranslation } from '../hooks/useLanguage'
 import HeaderEditor from '../components/HeaderEditor'
 import PathPrefixRulesConfig from '../components/PathPrefixRulesConfig'
 import { PathPrefixRule } from '../types/config'
+import { CORS_PRESET } from '../constants/cors'
 
 interface StaticSiteForm {
   domain: string
@@ -107,6 +108,16 @@ const StaticSiteEdit: React.FC = () => {
     setFormData(prev => ({
       ...prev,
       [field]: value
+    }))
+  }
+
+  const applyCorsPreset = () => {
+    setFormData(prev => ({
+      ...prev,
+      headers: {
+        ...prev.headers,
+        ...CORS_PRESET.response,
+      },
     }))
   }
 
@@ -266,10 +277,17 @@ const StaticSiteEdit: React.FC = () => {
         <Card>
           <CardBody>
             <VStack spacing={4} align="stretch">
-              <Heading size="md">响应头配置</Heading>
+              <Flex justify="space-between" align="center">
+                <Heading size="md">响应头配置</Heading>
+                <Button size="sm" variant="outline" onClick={applyCorsPreset}>
+                  一键填充 CORS 预设
+                </Button>
+              </Flex>
               <HeaderEditor
                 value={formData.headers}
                 onChange={(headers) => handleInputChange('headers', headers)}
+                placeholderKey="Access-Control-Allow-Origin"
+                placeholderValue="*"
               />
             </VStack>
           </CardBody>
