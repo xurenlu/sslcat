@@ -205,13 +205,9 @@ const SitesManagement: React.FC = () => {
       
       const isEditing = editingSite !== null
       const method = isEditing ? 'PUT' : 'POST'
-      const endpoint = isEditing 
-        ? (modalType === 'static' 
-            ? `/api/static-sites/${editingSite.id}` 
-            : `/api/php-sites/${editingSite.id}`)
-        : (modalType === 'static' 
-            ? '/api/static-sites' 
-            : '/api/php-sites')
+      const endpoint = modalType === 'static' 
+        ? '/api/static-sites' 
+        : '/api/php-sites'
       
       if (modalType === 'static') {
         // 创建或更新静态站点
