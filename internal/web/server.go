@@ -1063,7 +1063,7 @@ func (s *Server) proxyMiddleware(w http.ResponseWriter, r *http.Request) bool {
 			// 路径不匹配，继续查找其他规则或处理未匹配行为
 		} else {
 			s.log.Debugf("Request path %s matches prefix for domain %s", r.URL.Path, host)
-			
+
 			// 若仅允许HTTPS且当前为HTTP，需要检查是否有有效证书
 			if rule.SSLOnly && r.TLS == nil {
 				// 检查是否为本地IP或localhost，这些不需要强制HTTPS

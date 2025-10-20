@@ -137,6 +137,9 @@ type ProxyRule struct {
 	PathPrefixes []string `json:"path_prefixes,omitempty"` // 路径前缀列表，如 ["/api/v1/", "/api/v2/"]
 	PathExact    bool     `json:"path_exact"`              // 是否精确匹配路径前缀
 
+	// 路径前缀规则配置（支持多组配置）
+	PathPrefixRules []PathPrefixRule `json:"path_prefix_rules,omitempty"` // 路径前缀规则列表
+
 	// 新字段：统一后端配置
 	Backends []ProxyBackend `json:"backends,omitempty"` // 统一后端服务器列表
 
@@ -211,6 +214,46 @@ type ProxyRule struct {
 	ManagedByGitDeploy bool   `json:"managed_by_git_deploy"` // 是否由Git部署服务管理
 	GitDeployAppName   string `json:"git_deploy_app_name"`   // 关联的Git应用名称
 	GitDeployAppID     string `json:"git_deploy_app_id"`     // 关联的Git应用ID
+}
+
+// PathPrefixRule 路径前缀规则
+type PathPrefixRule struct {
+	// 路径前缀配置
+	Prefixes []string `json:"prefixes"` // 路径前缀列表，如 ["/api/v1/", "/api/v2/"]
+	Exact    bool     `json:"exact"`    // 是否精确匹配路径前缀
+
+	// 后端服务器配置
+	Backends []ProxyBackend `json:"backends"` // 该规则对应的后端服务器列表
+
+	// 负载均衡配置
+	LoadBalancerAlgorithm string `json:"load_balancer_algorithm,omitempty"` // 负载均衡算法
+
+	// 会话保持配置
+	SessionAffinityEnabled bool   `json:"session_affinity_enabled"` // 是否启用会话保持
+	SessionAffinityMethod  string `json:"session_affinity_method"`  // 会话保持方法
+	SessionAffinityCookie  string `json:"session_affinity_cookie"`  // Cookie名称
+	SessionAffinityHeader  string `json:"session_affinity_header"`  // Header名称
+	SessionAffinityTTL     int    `json:"session_affinity_ttl"`     // 会话保持时间（秒）
+
+	// 健康检查配置
+	HealthCheckEnabled  bool   `json:"health_check_enabled"`  // 是否启用健康检查
+	HealthCheckPath     string `json:"health_check_path"`     // 健康检查路径
+	HealthCheckInterval int    `json:"health_check_interval"` // 健康检查间隔（秒）
+	HealthCheckTimeout  int    `json:"health_check_timeout"`  // 健康检查超时（秒）
+	HealthCheckMethod   string `json:"health_check_method"`   // 健康检查HTTP方法
+	ExpectedStatusCode  int    `json:"expected_status_code"`  // 期望的状态码
+
+	// 故障转移配置
+	FailoverEnabled   bool `json:"failover_enabled"`   // 是否启用故障转移
+	MaxRetries        int  `json:"max_retries"`        // 最大重试次数
+	RetryInterval     int  `json:"retry_interval"`     // 重试间隔（秒）
+	FailureThreshold  int  `json:"failure_threshold"`  // 故障阈值
+	RecoveryThreshold int  `json:"recovery_threshold"` // 恢复阈值
+
+	// 规则名称和描述
+	Name        string `json:"name,omitempty"`        // 规则名称
+	Description string `json:"description,omitempty"` // 规则描述
+	Enabled     bool   `json:"enabled"`               // 是否启用该规则
 }
 
 // ProxyBackend 代理后端服务器
@@ -517,6 +560,9 @@ type StaticSite struct {
 	PathPrefixes []string `json:"path_prefixes,omitempty"` // 路径前缀列表，如 ["/api/v1/", "/api/v2/"]
 	PathExact    bool     `json:"path_exact"`              // 是否精确匹配路径前缀
 
+	// 路径前缀规则配置（支持多组配置）
+	PathPrefixRules []PathPrefixRule `json:"path_prefix_rules,omitempty"` // 路径前缀规则列表
+
 	// 自定义响应头
 	ResponseHeaders map[string]string `json:"response_headers,omitempty"`
 }
@@ -533,6 +579,9 @@ type PHPSite struct {
 	// 路径前缀匹配配置
 	PathPrefixes []string `json:"path_prefixes,omitempty"` // 路径前缀列表，如 ["/api/v1/", "/api/v2/"]
 	PathExact    bool     `json:"path_exact"`              // 是否精确匹配路径前缀
+
+	// 路径前缀规则配置（支持多组配置）
+	PathPrefixRules []PathPrefixRule `json:"path_prefix_rules,omitempty"` // 路径前缀规则列表
 
 	// 自定义响应头
 	ResponseHeaders map[string]string `json:"response_headers,omitempty"`
@@ -1201,9 +1250,9 @@ type ChannelsConfig struct {
 
 // EmailChannelConfig 邮件通知渠道配置
 type EmailChannelConfig struct {
-	Enabled  bool     `json:"enabled"`   // 是否启用
-	Method   string   `json:"method"`    // 邮件发送方式: smtp, sendmail, resend, mailgun, sendgrid
-	
+	Enabled bool   `json:"enabled"` // 是否启用
+	Method  string `json:"method"`  // 邮件发送方式: smtp, sendmail, resend, mailgun, sendgrid
+
 	// SMTP 配置
 	SMTPHost string   `json:"smtp_host"` // SMTP服务器地址
 	SMTPPort int      `json:"smtp_port"` // SMTP端口
@@ -1212,26 +1261,26 @@ type EmailChannelConfig struct {
 	From     string   `json:"from"`      // 发件人地址
 	To       []string `json:"to"`        // 收件人地址列表
 	UseTLS   bool     `json:"use_tls"`   // 是否使用TLS
-	
+
 	// Sendmail 配置
 	SendmailCommand string `json:"sendmail_command"` // Sendmail 命令路径
 	SendmailArgs    string `json:"sendmail_args"`    // Sendmail 参数
-	
+
 	// Resend 配置
 	ResendAPIKey string `json:"resend_api_key"` // Resend API Key
-	ResendFrom   string `json:"resend_from"`   // Resend 发件人
+	ResendFrom   string `json:"resend_from"`    // Resend 发件人
 	ResendTo     string `json:"resend_to"`      // Resend 收件人
-	
+
 	// Mailgun 配置
 	MailgunAPIKey string `json:"mailgun_api_key"` // Mailgun API Key
-	MailgunDomain string `json:"mailgun_domain"` // Mailgun 域名
-	MailgunFrom   string `json:"mailgun_from"`     // Mailgun 发件人
+	MailgunDomain string `json:"mailgun_domain"`  // Mailgun 域名
+	MailgunFrom   string `json:"mailgun_from"`    // Mailgun 发件人
 	MailgunTo     string `json:"mailgun_to"`      // Mailgun 收件人
-	
+
 	// SendGrid 配置
 	SendGridAPIKey string `json:"sendgrid_api_key"` // SendGrid API Key
-	SendGridFrom   string `json:"sendgrid_from"`   // SendGrid 发件人
-	SendGridTo     string `json:"sendgrid_to"`     // SendGrid 收件人
+	SendGridFrom   string `json:"sendgrid_from"`    // SendGrid 发件人
+	SendGridTo     string `json:"sendgrid_to"`      // SendGrid 收件人
 }
 
 // WebhookChannelConfig Webhook通知渠道配置
@@ -1512,4 +1561,49 @@ func (c *Config) prepareProxyRulesForSave() {
 	for i := range c.Proxy.Rules {
 		c.Proxy.Rules[i].PrepareForSave()
 	}
+}
+
+// MatchesPath 检查请求路径是否匹配路径前缀规则
+func (rule *PathPrefixRule) MatchesPath(requestPath string) bool {
+	if !rule.Enabled {
+		return false
+	}
+
+	// 检查请求路径是否匹配任何一个前缀
+	for _, prefix := range rule.Prefixes {
+		if rule.Exact {
+			// 精确匹配：路径必须完全等于前缀
+			if requestPath == prefix {
+				return true
+			}
+		} else {
+			// 前缀匹配：路径必须以指定前缀开头
+			if strings.HasPrefix(requestPath, prefix) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// GetMatchedPrefix 获取匹配的路径前缀
+func (rule *PathPrefixRule) GetMatchedPrefix(requestPath string) string {
+	if !rule.Enabled {
+		return ""
+	}
+
+	for _, prefix := range rule.Prefixes {
+		if rule.Exact {
+			if requestPath == prefix {
+				return prefix
+			}
+		} else {
+			if strings.HasPrefix(requestPath, prefix) {
+				return prefix
+			}
+		}
+	}
+
+	return ""
 }

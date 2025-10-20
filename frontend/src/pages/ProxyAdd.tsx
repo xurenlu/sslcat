@@ -27,6 +27,7 @@ import HeaderEditor from '../components/HeaderEditor'
 import { CORS_PRESET } from '../constants/cors'
 import BackendConfig from '../components/BackendConfig'
 import WebSocketConfig from '../components/WebSocketConfig'
+import PathPrefixRulesConfig from '../components/PathPrefixRulesConfig'
 
 interface ProxyAuthUser {
   username: string
@@ -67,6 +68,33 @@ interface ProxyRuleForm {
   // 路径前缀匹配配置
   path_prefixes: string[]
   path_exact: boolean
+  
+  // 路径前缀规则配置（支持多组配置）
+  path_prefix_rules: Array<{
+    name: string
+    description: string
+    enabled: boolean
+    prefixes: string[]
+    exact: boolean
+    backends: ProxyBackend[]
+    load_balancer_algorithm: string
+    session_affinity_enabled: boolean
+    session_affinity_method: string
+    session_affinity_cookie: string
+    session_affinity_header: string
+    session_affinity_ttl: number
+    health_check_enabled: boolean
+    health_check_path: string
+    health_check_interval: number
+    health_check_timeout: number
+    health_check_method: string
+    expected_status_code: number
+    failover_enabled: boolean
+    max_retries: number
+    retry_interval: number
+    failure_threshold: number
+    recovery_threshold: number
+  }>
   
   // 统一后端配置
   backends: ProxyBackend[]
@@ -138,6 +166,9 @@ const ProxyAdd: React.FC = () => {
     // 路径前缀匹配配置
     path_prefixes: [],
     path_exact: false,
+    
+    // 路径前缀规则配置
+    path_prefix_rules: [],
     
     // 统一后端配置（至少一个后端）
     backends: [
@@ -487,6 +518,14 @@ const ProxyAdd: React.FC = () => {
                   </Box>
                 </VStack>
               </Box>
+
+              {/* 路径前缀规则配置 */}
+              <PathPrefixRulesConfig
+                pathPrefixRules={formData.path_prefix_rules}
+                onRulesChange={(rules) => handleInputChange('path_prefix_rules', rules)}
+              />
+
+              <Divider />
 
               {/* 后端服务器配置 */}
               <BackendConfig
