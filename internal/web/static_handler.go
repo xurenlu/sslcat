@@ -1,6 +1,7 @@
 package web
 
 import (
+	"compress/gzip"
 	"crypto/md5"
 	"fmt"
 	"io"
@@ -318,24 +319,39 @@ func (h *StaticFileHandler) shouldCompress(filePath string, fileSize int64, cont
 
 // serveWithCompression 使用压缩方式服务文件
 func (h *StaticFileHandler) serveWithCompression(w http.ResponseWriter, r *http.Request, file *os.File, fileInfo os.FileInfo) error {
-	// 读取文件内容
-	content, err := io.ReadAll(file)
-	if err != nil {
-		return err
+	// 检查是否有压缩器可用
+	if h.config.Compression.Enabled {
+		// 使用配置的压缩器进行流式压缩
+		acceptEncoding := r.Header.Get("Accept-Encoding")
+		contentType := w.Header().Get("Content-Type")
+
+		// 简单的压缩实现（可以后续集成完整的压缩器）
+		if strings.Contains(acceptEncoding, "gzip") && h.shouldCompress(file.Name(), fileInfo.Size(), contentType) {
+			w.Header().Set("Content-Encoding", "gzip")
+			w.Header().Set("Vary", "Accept-Encoding")
+			w.Header().Del("Content-Length")
+
+			// 使用流式 gzip 压缩
+			return h.compressWithGzip(w, file)
+		}
 	}
 
-	// 简单的gzip压缩实现
-	// 注意：这里可以使用更高级的压缩器，如Brotli
-	acceptEncoding := r.Header.Get("Accept-Encoding")
-	if strings.Contains(acceptEncoding, "gzip") {
-		// 这里应该使用实际的压缩器
-		// 为了简化，我们直接返回原内容
-		w.Header().Set("Content-Encoding", "gzip")
-		w.Header().Set("Vary", "Accept-Encoding")
-	}
+	// 不压缩或压缩失败，直接复制文件内容
+	_, err := io.Copy(w, file)
+	return err
+}
 
-	// 写入内容
-	_, err = w.Write(content)
+// compressWithGzip 使用 gzip 压缩文件流
+func (h *StaticFileHandler) compressWithGzip(w http.ResponseWriter, file *os.File) error {
+	// 重置文件指针到开始
+	file.Seek(0, 0)
+
+	// 创建 gzip writer
+	gzWriter := gzip.NewWriter(w)
+	defer gzWriter.Close()
+
+	// 流式复制文件内容到 gzip writer
+	_, err := io.Copy(gzWriter, file)
 	return err
 }
 

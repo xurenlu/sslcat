@@ -1087,12 +1087,6 @@ func (c *Config) Save(configFile string) error {
 	// 智能选择配置文件路径
 	actualConfigFile := c.getWritableConfigPath(configFile)
 
-	// 确保配置目录存在
-	configDir := filepath.Dir(actualConfigFile)
-	if err := os.MkdirAll(configDir, 0755); err != nil {
-		return fmt.Errorf("创建配置目录失败 (%s): %w", configDir, err)
-	}
-
 	// 执行代理规则静默升级
 	c.prepareProxyRulesForSave()
 
@@ -1112,19 +1106,84 @@ func (c *Config) Save(configFile string) error {
 		return fmt.Errorf("序列化配置失败: %w", err)
 	}
 
+	// 尝试保存到主要路径
+	if err := c.saveToPath(actualConfigFile, data); err != nil {
+		// 如果主要路径失败，尝试备用路径
+		fallbackPaths := c.getFallbackPaths(configFile)
+		for _, fallbackPath := range fallbackPaths {
+			if fallbackPath == actualConfigFile {
+				continue // 跳过已经尝试过的路径
+			}
+
+			if err := c.saveToPath(fallbackPath, data); err == nil {
+				// 成功保存到备用路径，更新配置文件的路径记录
+				c.ConfigFile = fallbackPath
+				return nil
+			}
+		}
+
+		// 所有路径都失败了，返回详细错误信息
+		return fmt.Errorf("配置文件保存失败: 尝试了多个路径均失败。主要路径: %s, 错误: %w", actualConfigFile, err)
+	}
+
+	return nil
+}
+
+// saveToPath 保存配置到指定路径
+func (c *Config) saveToPath(configPath string, data []byte) error {
+	// 确保配置目录存在
+	configDir := filepath.Dir(configPath)
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return fmt.Errorf("创建配置目录失败 (%s): %w", configDir, err)
+	}
+
 	// 创建临时文件，然后原子性重命名
-	tempFile := actualConfigFile + ".tmp"
+	tempFile := configPath + ".tmp"
 	if err := os.WriteFile(tempFile, data, 0644); err != nil {
 		return fmt.Errorf("写入临时配置文件失败 (%s): %w", tempFile, err)
 	}
 
 	// 原子性重命名
-	if err := os.Rename(tempFile, actualConfigFile); err != nil {
+	if err := os.Rename(tempFile, configPath); err != nil {
 		os.Remove(tempFile) // 清理临时文件
-		return fmt.Errorf("重命名配置文件失败 (%s -> %s): %w", tempFile, actualConfigFile, err)
+
+		// 提供更详细的错误信息和建议
+		if os.IsNotExist(err) {
+			return fmt.Errorf("重命名配置文件失败: 目标目录不存在 (%s -> %s)。请检查目录权限或使用备用路径", tempFile, configPath)
+		} else if os.IsPermission(err) {
+			return fmt.Errorf("重命名配置文件失败: 权限不足 (%s -> %s)。请检查文件权限或使用 sudo 运行", tempFile, configPath)
+		} else {
+			return fmt.Errorf("重命名配置文件失败 (%s -> %s): %w。建议检查文件系统权限或使用备用配置路径", tempFile, configPath, err)
+		}
 	}
 
 	return nil
+}
+
+// getFallbackPaths 获取备用配置文件路径列表
+func (c *Config) getFallbackPaths(originalPath string) []string {
+	paths := []string{}
+
+	// 运行时目录
+	runtimeDir := "./data"
+	if err := os.MkdirAll(runtimeDir, 0755); err == nil {
+		paths = append(paths, filepath.Join(runtimeDir, "sslcat.conf"))
+	}
+
+	// 用户主目录
+	if homeDir, err := os.UserHomeDir(); err == nil {
+		paths = append(paths, filepath.Join(homeDir, ".sslcat", "sslcat.conf"))
+	}
+
+	// 临时目录
+	if tempDir := os.TempDir(); tempDir != "" {
+		paths = append(paths, filepath.Join(tempDir, "sslcat.conf"))
+	}
+
+	// 当前目录
+	paths = append(paths, "./sslcat.conf")
+
+	return paths
 }
 
 // getWritableConfigPath 智能选择可写的配置文件路径
@@ -1140,6 +1199,22 @@ func (c *Config) getWritableConfigPath(originalPath string) string {
 		runtimePath := filepath.Join(runtimeDir, "sslcat.conf")
 		if c.canWriteToPath(runtimePath) {
 			return runtimePath
+		}
+	}
+
+	// 尝试用户主目录
+	if homeDir, err := os.UserHomeDir(); err == nil {
+		homeConfigPath := filepath.Join(homeDir, ".sslcat", "sslcat.conf")
+		if c.canWriteToPath(homeConfigPath) {
+			return homeConfigPath
+		}
+	}
+
+	// 尝试临时目录
+	if tempDir := os.TempDir(); tempDir != "" {
+		tempConfigPath := filepath.Join(tempDir, "sslcat.conf")
+		if c.canWriteToPath(tempConfigPath) {
+			return tempConfigPath
 		}
 	}
 

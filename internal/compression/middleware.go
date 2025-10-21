@@ -56,7 +56,7 @@ func (m *Middleware) shouldCompressRequest(r *http.Request) bool {
 	}
 
 	// 检查是否支持压缩算法
-	algorithm := m.compressor.selectAlgorithm(acceptEncoding)
+	algorithm := m.compressor.SelectAlgorithm(acceptEncoding)
 	return algorithm != None
 }
 

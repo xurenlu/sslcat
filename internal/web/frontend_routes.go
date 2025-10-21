@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/xurenlu/sslcat/internal/assets"
+	"github.com/xurenlu/sslcat/internal/compression"
 )
 
 // setupFrontendRoutes 设置前端 SPA 路由
@@ -289,21 +290,31 @@ func shouldCompress(filePath string, fileSize int64) bool {
 
 // serveWithCompression 使用压缩方式服务文件
 func (s *Server) serveWithCompression(w http.ResponseWriter, r *http.Request, file io.Reader, fileInfo os.FileInfo) {
-	// 读取文件内容
-	content, err := io.ReadAll(file)
-	if err != nil {
-		http.Error(w, "Failed to read file", http.StatusInternalServerError)
-		return
-	}
-
 	// 使用压缩器压缩内容
 	if s.compressor != nil {
 		// 根据文件扩展名确定Content-Type
 		contentType := getContentType(fileInfo.Name())
-		s.compressor.CompressResponse(w, r, content, contentType)
+
+		// 直接使用压缩器处理流式压缩，避免一次性读取大文件到内存
+		if s.compressor.ShouldCompress(fileInfo.Name(), fileInfo.Size(), contentType) {
+			// 设置压缩相关头部
+			acceptEncoding := r.Header.Get("Accept-Encoding")
+			algorithm := s.compressor.SelectAlgorithm(acceptEncoding)
+			if algorithm != compression.None {
+				w.Header().Set("Content-Encoding", string(algorithm))
+				w.Header().Set("Vary", "Accept-Encoding")
+				w.Header().Del("Content-Length")
+			}
+
+			// 使用流式压缩
+			s.compressor.CompressStream(w, file, algorithm)
+		} else {
+			// 不适合压缩，直接复制
+			io.Copy(w, file)
+		}
 	} else {
 		// 如果压缩器未初始化，直接返回原内容
-		w.Write(content)
+		io.Copy(w, file)
 	}
 }
 

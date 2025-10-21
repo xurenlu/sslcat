@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
+	"io"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -140,7 +141,7 @@ func (c *Compressor) Compress(data []byte, acceptEncoding string) (*Result, erro
 	}
 
 	// 根据客户端支持的编码选择压缩算法
-	algorithm := c.selectAlgorithm(acceptEncoding)
+	algorithm := c.SelectAlgorithm(acceptEncoding)
 	if algorithm == None {
 		return &Result{
 			Algorithm:      None,
@@ -257,8 +258,8 @@ func (c *Compressor) ShouldCompress(filePath string, fileSize int64, contentType
 	return false
 }
 
-// selectAlgorithm 根据Accept-Encoding选择压缩算法
-func (c *Compressor) selectAlgorithm(acceptEncoding string) Algorithm {
+// SelectAlgorithm 根据Accept-Encoding选择压缩算法
+func (c *Compressor) SelectAlgorithm(acceptEncoding string) Algorithm {
 	acceptEncoding = strings.ToLower(acceptEncoding)
 
 	// 按优先级检查支持的算法
@@ -319,6 +320,26 @@ func (c *Compressor) compressWithAlgorithm(data []byte, algorithm Algorithm) ([]
 	}
 
 	return buf.Bytes(), nil
+}
+
+// CompressStream 流式压缩数据
+func (c *Compressor) CompressStream(w io.Writer, r io.Reader, algorithm Algorithm) error {
+	switch algorithm {
+	case Gzip:
+		gzWriter := gzip.NewWriter(w)
+		defer gzWriter.Close()
+		_, err := io.Copy(gzWriter, r)
+		return err
+	case Brotli:
+		brWriter := brotli.NewWriterLevel(w, c.config.Level.Brotli)
+		defer brWriter.Close()
+		_, err := io.Copy(brWriter, r)
+		return err
+	default:
+		// 不压缩，直接复制
+		_, err := io.Copy(w, r)
+		return err
+	}
 }
 
 // isCompressibleContentType 检查Content-Type是否可压缩
