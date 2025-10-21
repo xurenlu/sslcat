@@ -67,10 +67,15 @@ func (lb *LoadBalancer) StartHealthCheck() {
 
 	checker := NewHealthChecker(lb)
 
-	// 设置检查间隔
+	// 设置检查间隔，强制最小间隔为 30 秒，避免过于频繁的健康检查
 	interval := lb.config.HealthCheckInterval
+	minInterval := 30 * time.Second
+
 	if interval <= 0 {
-		interval = 60 * time.Second // 从30秒改为60秒
+		interval = 60 * time.Second // 默认 60 秒
+	} else if interval < minInterval {
+		lb.log.Warnf("Health check interval %v is too short, using minimum: %v", interval, minInterval)
+		interval = minInterval
 	}
 
 	lb.log.Infof("Starting health check with interval: %v", interval)
@@ -121,11 +126,23 @@ func (hc *HealthChecker) checkAllBackends() {
 
 	hc.log.Debugf("Checking health of %d backends", len(backends))
 
+	// 限制并发数量，避免一次性启动过多 goroutine 导致 CPU 峰值
+	// 最多同时检查 20 个后端
+	maxConcurrent := 20
+	if len(backends) < maxConcurrent {
+		maxConcurrent = len(backends)
+	}
+
+	semaphore := make(chan struct{}, maxConcurrent)
 	var wg sync.WaitGroup
+
 	for i := range backends {
 		wg.Add(1)
+		semaphore <- struct{}{} // 获取信号量
+
 		go func(backend *Backend) {
 			defer wg.Done()
+			defer func() { <-semaphore }() // 释放信号量
 			hc.checkBackendHealth(backend)
 		}(&backends[i])
 	}

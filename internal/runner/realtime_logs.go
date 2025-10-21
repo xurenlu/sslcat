@@ -142,28 +142,27 @@ func (ls *LogStream) broadcastLog(entry LogEntry) {
 func (ls *LogStream) watchLogs() {
 	defer ls.watcher.Close()
 
+	// 使用 ticker 替代 default 分支，避免忙等待导致高 CPU 占用
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ls.ctx.Done():
 			return
-		default:
+		case <-ticker.C:
 			// 读取新的日志行
 			entries, err := ls.watcher.ReadNewLines()
 			if err != nil {
 				if err != io.EOF {
 					ls.log.Errorf("Error reading log file: %v", err)
 				}
-				time.Sleep(2 * time.Second) // 从500ms改为2秒
 				continue
 			}
 
 			// 解析并广播日志
 			for _, entry := range entries {
 				ls.broadcastLog(entry)
-			}
-
-			if len(entries) == 0 {
-				time.Sleep(1 * time.Second) // 从100ms改为1秒
 			}
 		}
 	}

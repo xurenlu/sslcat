@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/sirupsen/logrus"
 	"github.com/xurenlu/sslcat/internal/config"
 	"github.com/xurenlu/sslcat/internal/i18n"
@@ -66,6 +67,9 @@ type GitServer struct {
 
 	// SSL Manager（用于自动申请证书）
 	sslManager SSLManagerInterface
+
+	// 停止信号通道
+	stopChan chan struct{}
 }
 
 // SSLManagerInterface SSL Manager 接口
@@ -504,6 +508,7 @@ func NewGitServer(cfg *config.Config, translator *i18n.Translator) *GitServer {
 		dockerRegistry:      dockerRegistry,
 		deployDB:            deployDB,
 		notificationManager: notificationMgr,
+		stopChan:            make(chan struct{}),
 	}
 
 	// 初始化 Builder Registry
@@ -597,6 +602,13 @@ func (gs *GitServer) Start() error {
 
 // Stop 停止 Git 服务器
 func (gs *GitServer) Stop() {
+	// 关闭停止信号通道，通知所有 goroutine 停止
+	select {
+	case <-gs.stopChan:
+		// 已经关闭
+	default:
+		close(gs.stopChan)
+	}
 	gs.logger.Info(gs.translator.T("git_server.stopped"))
 }
 
@@ -4133,53 +4145,107 @@ func (gs *GitServer) processGitPushWithRecord(app *GitApp, pushID string, pushRe
 
 // WatchDeployTriggers 监听部署触发文件
 func (gs *GitServer) WatchDeployTriggers() {
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
+	// 使用 fsnotify 监听 /tmp 目录，避免轮询导致的 CPU 消耗
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		gs.logger.Errorf("Failed to create deploy trigger watcher: %v", err)
+		return
+	}
+	defer watcher.Close()
 
-	for range ticker.C {
-		// 扫描 /tmp 目录下的部署触发文件
-		pattern := "/tmp/sslcat-deploy-*"
-		matches, err := filepath.Glob(pattern)
-		if err != nil {
-			continue
-		}
+	// 监听 /tmp 目录
+	err = watcher.Add("/tmp")
+	if err != nil {
+		gs.logger.Errorf("Failed to watch /tmp directory: %v", err)
+		return
+	}
 
-		for _, triggerFile := range matches {
-			// 读取触发文件
-			data, err := os.ReadFile(triggerFile)
-			if err != nil {
-				continue
+	gs.logger.Info("Started watching for deploy triggers in /tmp")
+
+	// 先处理已存在的触发文件
+	gs.processExistingTriggers()
+
+	for {
+		select {
+		case event, ok := <-watcher.Events:
+			if !ok {
+				return
 			}
 
-			// 解析触发信息
-			parts := strings.Split(string(data), "|")
-			if len(parts) < 2 {
-				os.Remove(triggerFile)
-				continue
+			// 只处理创建事件，且文件名匹配 sslcat-deploy-* 模式
+			if event.Op&fsnotify.Create == fsnotify.Create {
+				filename := filepath.Base(event.Name)
+				if strings.HasPrefix(filename, "sslcat-deploy-") {
+					// 稍微延迟一下，确保文件写入完成
+					time.Sleep(100 * time.Millisecond)
+					gs.handleDeployTrigger(event.Name)
+				}
 			}
 
-			// 提取应用名称
-			filename := filepath.Base(triggerFile)
-			appName := strings.TrimPrefix(filename, "sslcat-deploy-")
-			appName = appName[:strings.LastIndex(appName, "-")]
-
-			newRev := parts[0]
-			refName := parts[1]
-			commitMsg := ""
-			if len(parts) > 2 {
-				commitMsg = parts[2]
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return
 			}
+			gs.logger.Errorf("Deploy trigger watcher error: %v", err)
 
-			// 触发部署
-			go gs.ProcessGitPush(appName, "system", refName, "", newRev)
-
-			// 删除触发文件
-			os.Remove(triggerFile)
-
-			gs.logger.Infof("检测到部署触发: 应用=%s, 提交=%s, 分支=%s, 消息=%s",
-				appName, newRev, refName, commitMsg)
+		case <-gs.stopChan:
+			gs.logger.Info("Stopped watching for deploy triggers")
+			return
 		}
 	}
+}
+
+// processExistingTriggers 处理已存在的触发文件
+func (gs *GitServer) processExistingTriggers() {
+	pattern := "/tmp/sslcat-deploy-*"
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return
+	}
+
+	for _, triggerFile := range matches {
+		gs.handleDeployTrigger(triggerFile)
+	}
+}
+
+// handleDeployTrigger 处理单个部署触发文件
+func (gs *GitServer) handleDeployTrigger(triggerFile string) {
+	// 读取触发文件
+	data, err := os.ReadFile(triggerFile)
+	if err != nil {
+		gs.logger.Warnf("Failed to read deploy trigger file %s: %v", triggerFile, err)
+		return
+	}
+
+	// 解析触发信息
+	parts := strings.Split(string(data), "|")
+	if len(parts) < 2 {
+		os.Remove(triggerFile)
+		return
+	}
+
+	// 提取应用名称
+	filename := filepath.Base(triggerFile)
+	appName := strings.TrimPrefix(filename, "sslcat-deploy-")
+	if idx := strings.LastIndex(appName, "-"); idx > 0 {
+		appName = appName[:idx]
+	}
+
+	newRev := parts[0]
+	refName := parts[1]
+	commitMsg := ""
+	if len(parts) > 2 {
+		commitMsg = parts[2]
+	}
+
+	// 触发部署
+	go gs.ProcessGitPush(appName, "system", refName, "", newRev)
+
+	// 删除触发文件
+	os.Remove(triggerFile)
+
+	gs.logger.Infof("检测到部署触发: 应用=%s, 提交=%s, 分支=%s, 消息=%s",
+		appName, newRev, refName, commitMsg)
 }
 
 // ==================== 蓝绿部署功能 ====================
