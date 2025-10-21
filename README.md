@@ -37,6 +37,8 @@ sslcat --port 8080
 # Default login: admin / admin*9527
 ```
 
+> **📝 Configuration Format**: SSLcat uses **JSON** configuration files (not YAML). All examples below use JSON syntax.
+
 ### Docker Compose
 
 ```yaml
@@ -81,28 +83,37 @@ Recent optimizations achieved **97% CPU reduction**:
 ## 🛠️ Core Capabilities
 
 ### 🔒 SSL Certificate Management
-```yaml
-ssl:
-  enabled: true
-  auto_cert: true
-  staging: false
-  domains:
-    - example.com
-    - api.example.com
+```json
+{
+  "ssl": {
+    "email": "admin@example.com",
+    "staging": false,
+    "auto_renew": true,
+    "domains": ["example.com", "api.example.com"]
+  }
+}
 ```
 
 ### 🔄 Load Balancing & Proxy
-```yaml
-proxy:
-  rules:
-    - domain: "api.example.com"
-      target: "localhost:3000"
-      load_balancer:
-        algorithm: "round_robin"
-        health_check: true
-        backends:
-          - "10.0.1.10:3000"
-          - "10.0.1.11:3000"
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "api.example.com",
+        "target": "localhost",
+        "port": 3000,
+        "load_balancer_enabled": true,
+        "load_balancer_algorithm": "round_robin",
+        "health_check_enabled": true,
+        "load_balancer_backends": [
+          {"host": "10.0.1.10", "port": 3000},
+          {"host": "10.0.1.11", "port": 3000}
+        ]
+      }
+    ]
+  }
+}
 ```
 
 ### 🚀 GitOps Deployment
