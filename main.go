@@ -25,6 +25,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	_ "github.com/xurenlu/sslcat/internal/database"
+	"golang.org/x/net/http2"
 )
 
 var (
@@ -368,8 +369,16 @@ func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *s
 			IdleTimeout:  idleTimeout,
 			TLSConfig:    sslManager.GetTLSConfig(),
 		}
+
+		// 配置 HTTP/2 支持
+		http2.ConfigureServer(httpsServer, &http2.Server{
+			MaxConcurrentStreams: 1000,
+			MaxReadFrameSize:     1048576, // 1MB
+			IdleTimeout:          120 * time.Second,
+		})
+
 		go func() {
-			logrus.Infof("HTTPS server listening on %s:443 (multi-domain SSL supported)", cfg.Server.Host)
+			logrus.Infof("HTTPS server listening on %s:443 (HTTP/2 enabled, multi-domain SSL supported)", cfg.Server.Host)
 			if err := httpsServer.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
 				logrus.Fatalf("failed to start HTTPS server: %v", err)
 			}

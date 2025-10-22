@@ -586,6 +586,7 @@ func (m *Manager) GetTLSConfig() *tls.Config {
 			},
 			NextProtos: []string{"h2", "http/1.1", "acme-tls/1"},
 			MinVersion: tls.VersionTLS12,
+			MaxVersion: tls.VersionTLS13,
 		}
 	}
 
@@ -609,6 +610,7 @@ func (m *Manager) GetTLSConfig() *tls.Config {
 		},
 		NextProtos: []string{"h2", "http/1.1"},
 		MinVersion: tls.VersionTLS12,
+		MaxVersion: tls.VersionTLS13,
 	}
 }
 
