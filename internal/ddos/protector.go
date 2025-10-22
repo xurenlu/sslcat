@@ -622,8 +622,8 @@ func (p *Protector) recordAttack(clientIP, userAgent, url, method, attackType, s
 		p.attacks = p.attacks[1:]
 	}
 
-	// 发送攻击通知
-	if p.notificationIntegrator != nil {
+	// 只对实际被阻止的攻击发送通知，避免可疑请求的垃圾通知
+	if p.notificationIntegrator != nil && blocked {
 		attackInfo := &notification.AttackInfo{
 			ClientIP:  clientIP,
 			UserAgent: userAgent,
