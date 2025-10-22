@@ -1,22 +1,22 @@
-# SSLcat 端口配置指南
+# SSLcat Port Configuration
 
-## 📋 概述
+## 📋 Overview
 
-SSLcat v1.3.10-rc1 引入了全新的端口配置系统，支持两种模式：**标准模式**和**自定义模式**。这个设计让用户可以根据不同的使用场景选择合适的端口配置。
+SSLcat v1.3.10-rc1 introduces a new port configuration system that supports two modes: **Standard Mode** and **Custom Mode**. This design allows users to choose the appropriate port configuration for different use cases.
 
-## 🎯 端口模式说明
+## 🎯 Port Mode Description
 
-### 标准模式（推荐）
+### Standard Mode (Recommended)
 
-**适用场景**：生产环境、需要 HTTPS 支持
+**Use Cases**: Production environments, HTTPS support required
 
-**特性**：
-- 监听 80 和 443 端口
-- 自动 SSL 证书申请和管理
-- HTTP 到 HTTPS 自动重定向
-- 完整的 HTTPS 功能支持
+**Features**:
+- Listen on ports 80 and 443
+- Automatic SSL certificate application and management
+- HTTP to HTTPS automatic redirection
+- Full HTTPS functionality support
 
-**配置示例**：
+**Configuration Example**:
 ```json
 {
   "server": {
@@ -26,17 +26,17 @@ SSLcat v1.3.10-rc1 引入了全新的端口配置系统，支持两种模式：*
 }
 ```
 
-### 自定义模式
+### Custom Mode
 
-**适用场景**：开发环境、内网部署、反向代理后端
+**Use Cases**: Development environments, internal network deployment, reverse proxy backend
 
-**特性**：
-- 监听单个自定义端口
-- 仅支持 HTTP 协议
-- 不支持 SSL 证书自动申请
-- 适合开发测试
+**Features**:
+- Listen on a single custom port
+- HTTP protocol only
+- No automatic SSL certificate application
+- Suitable for development and testing
 
-**配置示例**：
+**Configuration Example**:
 ```json
 {
   "server": {
@@ -47,239 +47,197 @@ SSLcat v1.3.10-rc1 引入了全新的端口配置系统，支持两种模式：*
 }
 ```
 
-## 🚀 使用方法
+## 🚀 Usage
 
-### 1. 命令行方式
+### 1. Standard Mode Configuration
 
-#### 标准模式（默认）
-```bash
-# 启动标准模式，监听 80 和 443
-sslcat --config sslcat.conf
-```
+For production environments, use standard mode:
 
-#### 自定义模式
-```bash
-# 使用 --port 参数自动启用自定义模式
-sslcat --config sslcat.conf --port 8080
-```
-
-### 2. 配置文件方式
-
-#### 标准模式配置
 ```json
 {
   "server": {
     "host": "0.0.0.0",
     "port_mode": "standard",
     "enable_https": true,
-    "debug": false
+    "ssl": {
+      "email": "admin@example.com",
+      "staging": false,
+      "auto_renew": true
+    }
   }
 }
 ```
 
-#### 自定义模式配置
+**Features**:
+- Automatic SSL certificate application via Let's Encrypt
+- HTTP to HTTPS redirection
+- Full SSL/TLS support
+- Production-ready configuration
+
+### 2. Custom Mode Configuration
+
+For development or internal use:
+
 ```json
 {
   "server": {
     "host": "0.0.0.0",
     "port_mode": "custom",
     "custom_port": 8080,
-    "enable_https": false,
-    "debug": false
+    "enable_https": false
   }
 }
 ```
 
-### 3. 前端界面配置
+**Features**:
+- Single port configuration
+- HTTP only
+- Suitable for development
+- No SSL certificate management
 
-1. 访问管理面板：`http://your-domain/sslcat-panel/`
-2. 进入 **设置** 页面
-3. 在 **基础设置** 部分选择端口模式：
-   - **标准模式**：显示 80/443 端口，HTTPS 开关
-   - **自定义模式**：端口输入框，功能限制警告
-4. 配置相应参数
-5. 点击 **保存设置**
+## 🔧 Configuration Options
 
-## 📊 使用场景对比
+### Server Configuration
 
-| 场景 | 推荐模式 | 端口 | 协议 | SSL 证书 | 适用环境 |
-|------|----------|------|------|----------|----------|
-| 生产环境 | 标准模式 | 80 + 443 | HTTP + HTTPS | 自动申请 | 公网部署 |
-| 开发环境 | 自定义模式 | 8080 | HTTP | 不支持 | 本地开发 |
-| 内网部署 | 自定义模式 | 3000 | HTTP | 不支持 | 内网环境 |
-| 反向代理 | 自定义模式 | 8080 | HTTP | 由代理处理 | 容器化部署 |
+| Option | Type | Description | Default |
+|--------|------|-------------|---------|
+| `port_mode` | string | Port mode: "standard" or "custom" | "standard" |
+| `enable_https` | boolean | Enable HTTPS support | true |
+| `custom_port` | integer | Custom port number (custom mode only) | 8080 |
 
-## 🔧 配置迁移
+### SSL Configuration (Standard Mode)
 
-### 自动迁移
+| Option | Type | Description | Default |
+|--------|------|-------------|---------|
+| `email` | string | Email for SSL certificate | Required |
+| `staging` | boolean | Use Let's Encrypt staging | false |
+| `auto_renew` | boolean | Auto-renew certificates | true |
 
-SSLcat 会自动将旧配置迁移到新格式：
+## 📝 Examples
 
-- **443 端口** → 标准模式（启用 HTTPS）
-- **其他端口** → 自定义模式（禁用 HTTPS）
-
-### 手动迁移
-
-如果需要手动调整配置：
+### Production Configuration
 
 ```json
-// 旧配置
 {
   "server": {
-    "port": 443
-  }
-}
-
-// 新配置（自动迁移后）
-{
-  "server": {
-    "port": 443,  // 保留向后兼容
+    "host": "0.0.0.0",
     "port_mode": "standard",
     "enable_https": true
-  }
-}
-```
-
-## ⚙️ 高级配置
-
-### 标准模式高级选项
-
-```json
-{
-  "server": {
-    "port_mode": "standard",
-    "enable_https": true,
-    "host": "0.0.0.0"
   },
   "ssl": {
     "email": "admin@example.com",
     "staging": false,
     "auto_renew": true
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:3000",
+        "ssl": true
+      }
+    ]
   }
 }
 ```
 
-### 自定义模式高级选项
+### Development Configuration
 
 ```json
 {
   "server": {
-    "port_mode": "custom",
-    "custom_port": 8080,
-    "enable_https": false,
-    "host": "0.0.0.0"
-  }
-}
-```
-
-## 🔍 故障排查
-
-### 常见问题
-
-#### 1. 端口被占用
-```bash
-# 检查端口占用
-sudo netstat -tlnp | grep :80
-sudo netstat -tlnp | grep :443
-sudo netstat -tlnp | grep :8080
-```
-
-#### 2. 权限不足
-```bash
-# 标准模式需要 root 权限（80/443 端口）
-sudo sslcat --config sslcat.conf
-
-# 自定义模式可以使用普通用户
-sslcat --config sslcat.conf --port 8080
-```
-
-#### 3. SSL 证书问题
-```bash
-# 检查证书目录
-ls -la /opt/sslcat/certs/
-ls -la /opt/sslcat/keys/
-
-# 查看证书状态
-sslcat --config sslcat.conf --test
-```
-
-### 日志查看
-
-```bash
-# 查看服务日志
-sudo journalctl -u sslcat -f
-
-# 查看启动日志
-sudo journalctl -u sslcat --since "1 hour ago"
-```
-
-## 📝 最佳实践
-
-### 生产环境
-1. 使用标准模式
-2. 确保 80 和 443 端口可用
-3. 配置正确的 SSL 邮箱
-4. 启用自动证书续期
-
-### 开发环境
-1. 使用自定义模式
-2. 选择非特权端口（8080、3000、8000）
-3. 通过反向代理提供 HTTPS（如需要）
-
-### 容器化部署
-1. 使用自定义模式
-2. 通过 Nginx 等反向代理提供 HTTPS
-3. 使用环境变量配置端口
-
-## 🔄 配置切换
-
-### 从标准模式切换到自定义模式
-
-1. 修改配置文件：
-```json
-{
-  "server": {
+    "host": "0.0.0.0",
     "port_mode": "custom",
     "custom_port": 8080,
     "enable_https": false
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "localhost",
+        "target": "http://localhost:3000",
+        "ssl": false
+      }
+    ]
   }
 }
 ```
 
-2. 重启服务：
-```bash
-sudo systemctl restart sslcat
-```
+### Reverse Proxy Backend
 
-### 从自定义模式切换到标准模式
-
-1. 修改配置文件：
 ```json
 {
   "server": {
-    "port_mode": "standard",
-    "enable_https": true
+    "host": "0.0.0.0",
+    "port_mode": "custom",
+    "custom_port": 8080,
+    "enable_https": false
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "api.example.com",
+        "target": "http://backend:3000",
+        "ssl": false
+      }
+    ]
   }
 }
 ```
 
-2. 重启服务：
+## ⚠️ Important Notes
+
+### Standard Mode
+- Requires root privileges to bind to ports 80 and 443
+- Automatic SSL certificate management
+- HTTP traffic automatically redirected to HTTPS
+- Suitable for production environments
+
+### Custom Mode
+- No root privileges required
+- HTTP protocol only
+- No SSL certificate management
+- Suitable for development and internal use
+
+## 🔍 Troubleshooting
+
+### Port Binding Issues
+
+**Error**: `bind: address already in use`
+
+**Solution**:
+1. Check if another service is using the port:
+   ```bash
+   sudo netstat -tlnp | grep :80
+   sudo netstat -tlnp | grep :443
+   ```
+
+2. Stop conflicting services or change ports
+
+### SSL Certificate Issues
+
+**Error**: `failed to obtain certificate`
+
+**Solutions**:
+1. Check domain DNS resolution
+2. Ensure port 80 is accessible
+3. Verify email address is valid
+4. Check Let's Encrypt rate limits
+
+### Configuration Validation
+
 ```bash
-sudo systemctl restart sslcat
+# Validate configuration
+sslcat -config sslcat.conf -validate
+
+# Test configuration
+sslcat -config sslcat.conf -test
 ```
 
-## 📚 相关文档
+## 📚 Related Documentation
 
-- [静态站点 Builder 文档](static-builder-nginx.md)
-- [端口配置设计文档](port-configuration-design.md)
-- [部署指南](../DEPLOYMENT.md)
-- [配置参考](../sslcat.conf.example)
-
-## 🆘 获取帮助
-
-如果遇到问题，可以：
-
-1. 查看日志：`sudo journalctl -u sslcat -f`
-2. 测试配置：`sslcat --config sslcat.conf --test`
-3. 检查端口：`sudo netstat -tlnp | grep sslcat`
-4. 查看文档：访问管理面板的帮助页面
+- [Basic Configuration](basic.md) - Basic SSLcat configuration
+- [Advanced Configuration](advanced.md) - Advanced configuration options
+- [Port Configuration Design](port-configuration-design.md) - Port configuration design
+- [SSL Certificates](ssl-certificates.md) - SSL certificate management
+- [Troubleshooting](../troubleshooting/common-issues.md) - Common issues and solutions
