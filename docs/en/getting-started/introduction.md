@@ -1,160 +1,145 @@
 # Introduction to SSLcat
 
-SSLcat is a powerful, high-performance SSL proxy server designed to simplify SSL certificate management and provide intelligent domain forwarding capabilities. Built with Go, SSLcat offers enterprise-grade features with a user-friendly web interface.
+## What is SSLcat?
 
-## 🌟 Key Features
+SSLcat is an enterprise-grade SSL proxy server designed for modern web applications and microservices architectures. It provides automatic SSL certificate management, intelligent domain forwarding, load balancing, caching, and a modern web management interface.
 
-### 🔒 Automatic SSL Certificate Management
-- **Let's Encrypt Integration**: Automatic SSL certificate acquisition and renewal
-- **Multi-Domain Support**: Handle multiple domains with a single configuration
-- **Certificate Caching**: Optimized certificate storage and retrieval
-- **Staging Environment**: Safe testing with Let's Encrypt staging certificates
+## Key Features
 
-### 🔄 Intelligent Domain Forwarding
-- **Smart Proxy Routing**: Domain-based intelligent proxy forwarding
-- **HTTP/HTTPS Support**: Full protocol support with automatic SSL termination
-- **WebSocket Proxy**: Real-time communication support
-- **Load Balancing**: Multiple backend server support with health checks
+### 🔒 SSL/TLS Termination
+- **Automatic Certificate Management**: Let's Encrypt integration with automatic renewal
+- **Multi-Domain Support**: Handle multiple domains with a single instance
+- **SSL/TLS Optimization**: Modern cipher suites and security best practices
+- **Certificate Monitoring**: Real-time certificate status and expiration alerts
 
-### 🛡️ Advanced Security Features
-- **IP Blocking**: Automatic IP blocking with configurable thresholds
-- **Brute Force Protection**: Advanced protection against brute force attacks
-- **User-Agent Validation**: Request filtering based on user agents
-- **TLS Client Fingerprinting**: Client identification based on TLS characteristics
-- **Access Logging**: Comprehensive access and security logging
+### 🌐 Reverse Proxy
+- **Intelligent Routing**: Smart domain-based request forwarding
+- **Protocol Support**: HTTP/1.1, HTTP/2, and WebSocket support
+- **Header Management**: Automatic proxy headers and custom header injection
+- **Request/Response Modification**: Flexible request and response processing
 
-### 🎛️ Web Management Interface
-- **Intuitive Dashboard**: Real-time system monitoring and statistics
-- **Certificate Management**: Visual certificate status and management
-- **Proxy Rule Configuration**: Easy-to-use proxy rule setup
-- **Security Monitoring**: Real-time security event monitoring
-- **API Token Management**: Granular API access control
+### ⚖️ Load Balancing
+- **Multiple Algorithms**: Round-robin, least connections, IP hash, and weighted
+- **Health Checks**: Automatic backend health monitoring
+- **Failover**: Automatic failover to healthy backends
+- **Session Persistence**: Sticky sessions for stateful applications
 
-### ⚡ High Performance
-- **HTTP/2 Support**: Modern protocol support with automatic negotiation
-- **HTTP/3 (QUIC) Support**: Next-generation protocol support
+### 🚀 Performance Features
+- **Intelligent Caching**: Multi-layer caching system with CDN support
+- **Compression**: Gzip/Brotli compression with smart caching
+- **HTTP/2 Support**: Full HTTP/2 server and client support
 - **Connection Pooling**: Optimized connection management
-- **Graceful Restart**: Zero-downtime service updates
-- **Resource Optimization**: Efficient memory and CPU usage
 
-## 🏗️ Architecture Overview
+### 📊 Monitoring & Observability
+- **Distributed Tracing**: Full support for OpenTelemetry, Jaeger, and Zipkin
+- **Metrics**: Prometheus-compatible metrics
+- **Logging**: Structured logging with multiple outputs
+- **Real-time Monitoring**: Web-based monitoring dashboard
 
-SSLcat follows a modular architecture designed for scalability and maintainability:
+### 🛡️ Security
+- **DDoS Protection**: Built-in DDoS protection and rate limiting
+- **Access Control**: User authentication and authorization
+- **Security Headers**: Automatic security header injection
+- **IP Filtering**: Whitelist/blacklist IP management
+
+## Use Cases
+
+### 1. **Microservices Gateway**
+- Route traffic to multiple backend services
+- Handle SSL termination for all services
+- Provide unified authentication and authorization
+- Implement service discovery and load balancing
+
+### 2. **Legacy Application Modernization**
+- Add SSL/TLS to legacy HTTP applications
+- Implement modern security practices
+- Add caching and compression
+- Enable HTTP/2 support
+
+### 3. **Development Environment**
+- Local SSL development with automatic certificates
+- Multiple domain support for complex applications
+- Easy backend switching and testing
+- Development-friendly configuration
+
+### 4. **Production Load Balancer**
+- High-performance load balancing
+- Health monitoring and failover
+- SSL termination and optimization
+- Monitoring and alerting
+
+## Architecture Overview
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Web Client    │    │   API Client    │    │   Proxy Client │
-└─────────┬───────┘    └─────────┬───────┘    └─────────┬───────┘
-          │                      │                      │
-          └──────────────────────┼──────────────────────┘
-                                 │
-                    ┌─────────────▼─────────────┐
-                    │      SSLcat Server       │
-                    │  ┌─────────────────────┐  │
-                    │  │   Web Interface     │  │
-                    │  │   (Dashboard)      │  │
-                    │  └─────────────────────┘  │
-                    │  ┌─────────────────────┐  │
-                    │  │   SSL Manager      │  │
-                    │  │   (Certificates)   │  │
-                    │  └─────────────────────┘  │
-                    │  ┌─────────────────────┐  │
-                    │  │   Proxy Engine     │  │
-                    │  │   (Forwarding)     │  │
-                    │  └─────────────────────┘  │
-                    │  ┌─────────────────────┐  │
-                    │  │   Security Layer   │  │
-                    │  │   (Protection)     │  │
-                    │  └─────────────────────┘  │
-                    └─────────────┬─────────────┘
-                                  │
-                    ┌─────────────▼─────────────┐
-                    │     Backend Services     │
-                    │  ┌─────────────────────┐ │
-                    │  │   Web Applications  │ │
-                    │  │   API Services      │ │
-                    │  │   Other Services    │ │
-                    │  └─────────────────────┘ │
-                    └─────────────────────────┘
+│   Client        │    │   SSLcat        │    │   Backend       │
+│   (Browser)     │◄──►│   Proxy         │◄──►│   Services      │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                              │
+                              ▼
+                       ┌─────────────────┐
+                       │   Management    │
+                       │   Interface     │
+                       └─────────────────┘
 ```
 
-## 🎯 Use Cases
+### Core Components
 
-### Enterprise SSL Management
-- Centralized SSL certificate management for multiple domains
-- Automated certificate renewal and deployment
-- Compliance with security standards and policies
+1. **SSL Termination Layer**: Handles SSL/TLS encryption/decryption
+2. **Proxy Engine**: Routes requests to backend services
+3. **Load Balancer**: Distributes traffic across multiple backends
+4. **Cache Manager**: Manages content caching and compression
+5. **Monitoring System**: Collects metrics and traces
+6. **Management Interface**: Web-based administration
 
-### Development and Testing
-- SSL termination for development environments
-- Staging environment SSL certificate management
-- Local development with HTTPS support
+## Why Choose SSLcat?
 
-### Microservices Architecture
-- SSL termination for microservices
-- Service discovery and load balancing
-- API gateway functionality
+### ✅ **Easy to Use**
+- Simple configuration with YAML files
+- Web-based management interface
+- Comprehensive documentation
+- Quick start in minutes
 
-### High Availability
-- Load balancing across multiple backend servers
-- Health monitoring and failover
-- Zero-downtime deployments
+### ✅ **Production Ready**
+- High performance and scalability
+- Built-in monitoring and alerting
+- Security best practices
+- Enterprise-grade reliability
 
-## 🚀 Getting Started
+### ✅ **Modern Features**
+- HTTP/2 and WebSocket support
+- Distributed tracing
+- Container and cloud ready
+- Microservices friendly
 
-Ready to get started with SSLcat? Here are the next steps:
+### ✅ **Open Source**
+- MIT licensed
+- Active community
+- Regular updates
+- Transparent development
 
-1. **[System Requirements](installation/requirements.md)** - Check if your system meets the requirements
-2. **[Quick Installation](getting-started/quick-start.md)** - Get SSLcat running in minutes
-3. **[Basic Configuration](configuration/basic.md)** - Configure your first proxy rules
-4. **[Web Interface](administration/web-panel.md)** - Access the management dashboard
+## Getting Started
 
-## 📊 Performance Characteristics
+Ready to start using SSLcat? Here's what you need to know:
 
-SSLcat is designed for high performance and scalability:
+1. **System Requirements**: Modern Linux, macOS, or Windows
+2. **Installation**: Multiple installation methods available
+3. **Configuration**: Simple YAML-based configuration
+4. **Management**: Web interface or CLI tools
 
-- **Concurrent Connections**: Supports thousands of concurrent connections
-- **Certificate Caching**: Optimized certificate storage and retrieval
-- **Memory Efficiency**: Low memory footprint with efficient resource usage
-- **CPU Optimization**: Multi-core support with optimized processing
-- **Network Performance**: High-throughput proxy with minimal latency
+## Next Steps
 
-## 🔧 System Requirements
+- [Quick Start Guide](quick-start.md) - Get SSLcat running in 5 minutes
+- [Architecture Overview](architecture.md) - Understand the system design
+- [Installation](installation/) - Choose your installation method
 
-### Minimum Requirements
-- **CPU**: 1 core, 1 GHz
-- **Memory**: 512 MB RAM
-- **Storage**: 1 GB available space
-- **Network**: 100 Mbps connection
-- **OS**: Linux (Ubuntu 18.04+, CentOS 7+), macOS 10.14+, Windows 10+
+## Community and Support
 
-### Recommended Requirements
-- **CPU**: 2+ cores, 2+ GHz
-- **Memory**: 2+ GB RAM
-- **Storage**: 10+ GB available space
-- **Network**: 1+ Gbps connection
-- **OS**: Linux (Ubuntu 20.04+, CentOS 8+), macOS 11+, Windows 11+
-
-## 📈 Monitoring and Observability
-
-SSLcat provides comprehensive monitoring capabilities:
-
-- **Real-time Metrics**: Connection counts, request rates, error rates
-- **Certificate Status**: Certificate expiration monitoring
-- **Security Events**: Failed login attempts, blocked IPs
-- **Performance Metrics**: Response times, throughput, resource usage
-- **Health Checks**: Service availability and backend health
-
-## 🔒 Security Considerations
-
-SSLcat implements multiple layers of security:
-
-- **Transport Security**: TLS 1.2+ with modern cipher suites
-- **Access Control**: Role-based access control (RBAC)
-- **Audit Logging**: Comprehensive security event logging
-- **Input Validation**: Strict input validation and sanitization
-- **Rate Limiting**: Protection against abuse and DoS attacks
+- **GitHub**: [xurenlu/sslcat](https://github.com/xurenlu/sslcat)
+- **Issues**: [Report bugs or request features](https://github.com/xurenlu/sslcat/issues)
+- **Discussions**: [Community discussions](https://github.com/xurenlu/sslcat/discussions)
+- **Documentation**: This comprehensive guide
 
 ---
 
-*Ready to dive deeper? Check out our [Quick Start Guide](quick-start.md) to get SSLcat running in minutes!*
+*SSLcat is continuously evolving. Check our [changelog](../reference/changelog.md) for the latest updates and features.*
