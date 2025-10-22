@@ -1,526 +1,490 @@
 # 基础配置
 
-本指南涵盖了 SSLcat 的基本配置选项，包括服务器设置、SSL 证书管理、代理规则和安全设置。
+本指南介绍 SSLcat 的基础配置，包括服务器设置、代理规则、SSL 证书和基本功能。
 
-## 📋 配置文件结构
+## 服务器配置
 
-SSLcat 使用位于 `/etc/sslcat/sslcat.conf` 的 JSON 配置文件。配置分为几个部分：
-
-```json
-{
-  "server": { ... },
-  "ssl": { ... },
-  "admin": { ... },
-  "proxy": { ... },
-  "security": { ... },
-  "logging": { ... }
-}
+### 基本设置
+```yaml
+# sslcat.conf
+server:
+  host: "0.0.0.0"        # 监听地址
+  port: 80               # HTTP 端口
+  ssl_port: 443         # HTTPS 端口
+  debug: false          # 调试模式
 ```
-
-## 🖥️ 服务器配置
-
-### 基本服务器设置
-
-```json
-{
-  "server": {
-    "host": "0.0.0.0",
-    "port": 443,
-    "debug": false,
-    "max_connections": 1000,
-    "read_timeout_sec": 30,
-    "write_timeout_sec": 30,
-    "idle_timeout_sec": 120
-  }
-}
-```
-
-**配置选项：**
-
-| 选项 | 类型 | 默认值 | 描述 |
-|------|------|--------|------|
-| `host` | string | "0.0.0.0" | 服务器绑定地址 |
-| `port` | integer | 443 | HTTPS 端口号 |
-| `debug` | boolean | false | 启用调试日志 |
-| `max_connections` | integer | 1000 | 最大并发连接数 |
-| `read_timeout_sec` | integer | 30 | 请求读取超时 |
-| `write_timeout_sec` | integer | 30 | 响应写入超时 |
-| `idle_timeout_sec` | integer | 120 | 连接空闲超时 |
 
 ### 高级服务器设置
-
-```json
-{
-  "server": {
-    "host": "0.0.0.0",
-    "port": 443,
-    "debug": false,
-    "max_connections": 1000,
-    "read_timeout_sec": 30,
-    "write_timeout_sec": 30,
-    "idle_timeout_sec": 120,
-    "keep_alive": true,
-    "keep_alive_timeout": "60s",
-    "max_header_bytes": 1048576,
-    "max_upload_bytes": 1073741824
-  }
-}
+```yaml
+server:
+  host: "0.0.0.0"
+  port: 80
+  ssl_port: 443
+  debug: false
+  
+  # 性能设置
+  workers: 4             # 工作进程数
+  max_connections: 1000  # 最大连接数
+  keep_alive_timeout: 30s
+  read_timeout: 30s
+  write_timeout: 30s
+  
+  # 日志设置
+  log_level: "info"     # debug, info, warn, error
+  log_format: "json"    # json, text
 ```
 
-**其他选项：**
-
-| 选项 | 类型 | 默认值 | 描述 |
-|------|------|--------|------|
-| `keep_alive` | boolean | true | 启用 HTTP keep-alive |
-| `keep_alive_timeout` | string | "60s" | Keep-alive 超时 |
-| `max_header_bytes` | integer | 1048576 | 最大头部大小 (1MB) |
-| `max_upload_bytes` | integer | 1073741824 | 最大上传大小 (1GB) |
-
-## 🔒 SSL 证书配置
-
-### 基本 SSL 设置
-
-```json
-{
-  "ssl": {
-    "email": "your-email@example.com",
-    "staging": false,
-    "auto_renew": true,
-    "certificate_dir": "/opt/sslcat/certs",
-    "key_dir": "/opt/sslcat/keys"
-  }
-}
-```
-
-**SSL 配置选项：**
-
-| 选项 | 类型 | 默认值 | 描述 |
-|------|------|--------|------|
-| `email` | string | 必需 | Let's Encrypt 通知邮箱 |
-| `staging` | boolean | false | 使用 Let's Encrypt 测试环境 |
-| `auto_renew` | boolean | true | 启用自动证书续期 |
-| `certificate_dir` | string | "/opt/sslcat/certs" | 证书存储目录 |
-| `key_dir` | string | "/opt/sslcat/keys" | 私钥存储目录 |
-
-### 高级 SSL 设置
-
-```json
-{
-  "ssl": {
-    "email": "your-email@example.com",
-    "staging": false,
-    "auto_renew": true,
-    "certificate_dir": "/opt/sslcat/certs",
-    "key_dir": "/opt/sslcat/keys",
-    "min_tls_version": "1.2",
-    "cipher_suites": [
-      "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
-      "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
-    ],
-    "hsts": {
-      "enabled": true,
-      "max_age": 31536000,
-      "include_subdomains": true
-    },
-    "renewal_threshold": 30,
-    "renewal_check_interval": "24h"
-  }
-}
-```
-
-**高级 SSL 选项：**
-
-| 选项 | 类型 | 默认值 | 描述 |
-|------|------|--------|------|
-| `min_tls_version` | string | "1.2" | 最小 TLS 版本 |
-| `cipher_suites` | array | [] | 允许的密码套件 |
-| `hsts` | object | {} | HTTP 严格传输安全 |
-| `renewal_threshold` | integer | 30 | 过期前续期的天数 |
-| `renewal_check_interval` | string | "24h" | 证书检查间隔 |
-
-## 👤 管理员配置
-
-### 基本管理员设置
-
-```json
-{
-  "admin": {
-    "username": "admin",
-    "password_file": "/opt/sslcat/data/admin.pass",
-    "first_run": false,
-    "session_timeout": "24h"
-  }
-}
-```
-
-**管理员配置选项：**
-
-| 选项 | 类型 | 默认值 | 描述 |
-|------|------|--------|------|
-| `username` | string | "admin" | 管理员用户名 |
-| `password_file` | string | "/opt/sslcat/data/admin.pass" | 密码文件路径 |
-| `first_run` | boolean | true | 首次运行标志 |
-| `session_timeout` | string | "24h" | 会话超时持续时间 |
-
-### 高级管理员设置
-
-```json
-{
-  "admin": {
-    "username": "admin",
-    "password_file": "/opt/sslcat/data/admin.pass",
-    "first_run": false,
-    "session_timeout": "24h",
-    "max_login_attempts": 3,
-    "lockout_duration": "15m",
-    "password_policy": {
-      "min_length": 8,
-      "require_uppercase": true,
-      "require_lowercase": true,
-      "require_numbers": true,
-      "require_symbols": true
-    }
-  }
-}
-```
-
-**高级管理员选项：**
-
-| 选项 | 类型 | 默认值 | 描述 |
-|------|------|--------|------|
-| `max_login_attempts` | integer | 3 | 最大失败登录尝试次数 |
-| `lockout_duration` | string | "15m" | 账户锁定持续时间 |
-| `password_policy` | object | {} | 密码复杂性要求 |
-
-## 🌐 代理配置
+## 代理规则配置
 
 ### 基本代理规则
-
-```json
-{
-  "proxy": {
-    "rules": [
-      {
-        "domain": "example.com",
-        "target": "127.0.0.1",
-        "port": 8080,
-        "enabled": true,
-        "ssl_only": true
-      }
-    ]
-  }
-}
+```yaml
+# sslcat.conf
+proxy:
+  rules:
+    - domain: "example.com"
+      target: "http://localhost:8080"
+      ssl: true
 ```
-
-**基本代理规则选项：**
-
-| 选项 | 类型 | 必需 | 描述 |
-|------|------|------|------|
-| `domain` | string | 是 | 要代理的域名 |
-| `target` | string | 是 | 后端服务器 IP 或主机名 |
-| `port` | integer | 是 | 后端服务器端口 |
-| `enabled` | boolean | 否 | 启用/禁用规则 |
-| `ssl_only` | boolean | 否 | 要求 HTTPS 连接 |
 
 ### 高级代理规则
-
-```json
-{
-  "proxy": {
-    "rules": [
-      {
-        "domain": "api.example.com",
-        "target": "127.0.0.1",
-        "port": 8080,
-        "enabled": true,
-        "ssl_only": true,
-        "path_prefix": "/api",
-        "websocket": false,
-        "health_check": {
-          "enabled": true,
-          "path": "/health",
-          "interval": "30s",
-          "timeout": "5s"
-        },
-        "load_balancing": {
-          "method": "round_robin",
-          "targets": [
-            {"host": "127.0.0.1", "port": 8080, "weight": 1},
-            {"host": "127.0.0.1", "port": 8081, "weight": 1}
-          ]
-        }
-      }
-    ]
-  }
-}
+```yaml
+proxy:
+  rules:
+    - domain: "api.example.com"
+      target: "http://localhost:8080"
+      ssl: true
+      path: "/api"       # 路径匹配
+      path_rewrite: "/v1" # 路径重写
+      
+      # 头部设置
+      headers:
+        pass_through: true
+        add:
+          X-Forwarded-Proto: "https"
+          X-Real-IP: "$remote_addr"
+        remove: ["X-Forwarded-For"]
 ```
 
-**高级代理选项：**
+### 多域名配置
+```yaml
+proxy:
+  rules:
+    - domain: "example.com"
+      target: "http://localhost:8080"
+      ssl: true
+    
+    - domain: "api.example.com"
+      target: "http://localhost:3000"
+      ssl: true
+    
+    - domain: "admin.example.com"
+      target: "http://localhost:4000"
+      ssl: true
+```
 
-| 选项 | 类型 | 默认值 | 描述 |
-|------|------|--------|------|
-| `path_prefix` | string | "" | URL 路径前缀 |
-| `websocket` | boolean | false | 启用 WebSocket 支持 |
-| `health_check` | object | {} | 后端健康监控 |
-| `load_balancing` | object | {} | 负载均衡配置 |
+## SSL 证书配置
 
-## 🛡️ 安全配置
+### Let's Encrypt 自动证书
+```yaml
+# sslcat.conf
+ssl:
+  certificates:
+    - domain: "example.com"
+      provider: "letsencrypt"
+      email: "admin@example.com"
+      auto_renew: true
+```
+
+### 自定义证书
+```yaml
+ssl:
+  certificates:
+    - domain: "example.com"
+      cert_file: "/path/to/cert.pem"
+      key_file: "/path/to/key.pem"
+      chain_file: "/path/to/chain.pem"
+```
+
+### 多域名证书
+```yaml
+ssl:
+  certificates:
+    - domain: "example.com"
+      provider: "letsencrypt"
+      email: "admin@example.com"
+      auto_renew: true
+      subdomains: ["www", "api", "admin"]
+```
+
+## 负载均衡配置
+
+### 基本负载均衡
+```yaml
+proxy:
+  rules:
+    - domain: "api.example.com"
+      target: "http://localhost:8080"
+      ssl: true
+      load_balancing:
+        enabled: true
+        algorithm: "round_robin"
+        backends:
+          - "http://localhost:8080"
+          - "http://localhost:8081"
+          - "http://localhost:8082"
+```
+
+### 高级负载均衡
+```yaml
+proxy:
+  rules:
+    - domain: "api.example.com"
+      target: "http://localhost:8080"
+      ssl: true
+      load_balancing:
+        enabled: true
+        algorithm: "least_connections"
+        backends:
+          - url: "http://localhost:8080"
+            weight: 3
+            max_connections: 100
+          - url: "http://localhost:8081"
+            weight: 2
+            max_connections: 50
+          - url: "http://localhost:8082"
+            weight: 1
+            max_connections: 25
+        
+        # 健康检查
+        health_check:
+          enabled: true
+          path: "/health"
+          interval: 30s
+          timeout: 5s
+          retries: 3
+```
+
+## 缓存配置
+
+### 基本缓存
+```yaml
+proxy:
+  rules:
+    - domain: "example.com"
+      target: "http://localhost:8080"
+      ssl: true
+      caching:
+        enabled: true
+        ttl: 3600  # 1小时
+        max_size: "100MB"
+```
+
+### 高级缓存
+```yaml
+proxy:
+  rules:
+    - domain: "example.com"
+      target: "http://localhost:8080"
+      ssl: true
+      caching:
+        enabled: true
+        ttl: 3600
+        max_size: "100MB"
+        max_entries: 10000
+        
+        # 缓存策略
+        policies:
+          - path: "/static/*"
+            ttl: 86400  # 24小时
+          - path: "/api/cacheable/*"
+            ttl: 300   # 5分钟
+          - path: "/api/dynamic/*"
+            ttl: 0     # 不缓存
+```
+
+## 压缩配置
+
+### 基本压缩
+```yaml
+proxy:
+  rules:
+    - domain: "example.com"
+      target: "http://localhost:8080"
+      ssl: true
+      compression:
+        enabled: true
+        types: ["text/html", "text/css", "application/javascript"]
+```
+
+### 高级压缩
+```yaml
+proxy:
+  rules:
+    - domain: "example.com"
+      target: "http://localhost:8080"
+      ssl: true
+      compression:
+        enabled: true
+        algorithm: "gzip"
+        min_size: 1024
+        max_size: 10485760  # 10MB
+        types: ["text/html", "text/css", "application/javascript", "application/json"]
+```
+
+## 监控配置
+
+### 基本监控
+```yaml
+# sslcat.conf
+monitoring:
+  metrics:
+    enabled: true
+    endpoint: "/metrics"
+    port: 8080
+```
+
+### 高级监控
+```yaml
+monitoring:
+  metrics:
+    enabled: true
+    endpoint: "/metrics"
+    port: 8080
+    
+    # Prometheus 指标
+    prometheus:
+      enabled: true
+      path: "/metrics"
+      format: "prometheus"
+  
+  # 分布式追踪
+  tracing:
+    enabled: true
+    service_name: "sslcat-proxy"
+    sample_rate: 0.1  # 10%采样
+    
+    # 追踪导出器
+    exporters:
+      jaeger:
+        endpoint: "http://jaeger:14268/api/traces"
+      zipkin:
+        endpoint: "http://zipkin:9411/api/v2/spans"
+```
+
+## 安全配置
 
 ### 基本安全设置
-
-```json
-{
-  "security": {
-    "max_attempts": 3,
-    "block_duration": "5m",
-    "max_attempts_5min": 10,
-    "ip_whitelist": [],
-    "ip_blacklist": []
-  }
-}
+```yaml
+# sslcat.conf
+security:
+  # DDoS 防护
+  ddos_protection:
+    enabled: true
+    rate_limit: 100  # 每秒请求数
+    burst_size: 200  # 突发请求数
+  
+  # 访问控制
+  access_control:
+    enabled: true
+    whitelist: ["192.168.1.0/24"]
+    blacklist: ["192.168.1.100"]
 ```
-
-**基本安全选项：**
-
-| 选项 | 类型 | 默认值 | 描述 |
-|------|------|--------|------|
-| `max_attempts` | integer | 3 | 阻止前的失败登录尝试次数 |
-| `block_duration` | string | "5m" | IP 阻止持续时间 |
-| `max_attempts_5min` | integer | 10 | 5 分钟内的最大尝试次数 |
-| `ip_whitelist` | array | [] | 受信任 IP 地址列表 |
-| `ip_blacklist` | array | [] | 被阻止 IP 地址列表 |
 
 ### 高级安全设置
-
-```json
-{
-  "security": {
-    "max_attempts": 3,
-    "block_duration": "5m",
-    "max_attempts_5min": 10,
-    "ip_whitelist": [],
-    "ip_blacklist": [],
-    "user_agent_validation": true,
-    "rate_limiting": {
-      "enabled": true,
-      "requests_per_minute": 60,
-      "burst_size": 10
-    },
-    "ddos_protection": {
-      "enabled": true,
-      "max_requests_per_second": 100,
-      "block_duration": "1h"
-    }
-  }
-}
+```yaml
+security:
+  # DDoS 防护
+  ddos_protection:
+    enabled: true
+    rate_limiting:
+      global:
+        requests_per_second: 1000
+        burst_size: 2000
+      per_ip:
+        requests_per_second: 10
+        burst_size: 20
+  
+  # 访问控制
+  access_control:
+    enabled: true
+    ip_filtering:
+      whitelist: ["192.168.1.0/24", "10.0.0.0/8"]
+      blacklist: ["192.168.1.100"]
+      default_policy: "deny"
+  
+  # 安全头部
+  security_headers:
+    enabled: true
+    hsts: true
+    xss_protection: true
+    content_type_options: true
+    frame_options: "DENY"
 ```
 
-**高级安全选项：**
-
-| 选项 | 类型 | 默认值 | 描述 |
-|------|------|--------|------|
-| `user_agent_validation` | boolean | true | 验证用户代理 |
-| `rate_limiting` | object | {} | 速率限制配置 |
-| `ddos_protection` | object | {} | DDoS 保护设置 |
-
-## 📊 日志配置
+## 日志配置
 
 ### 基本日志设置
-
-```json
-{
-  "logging": {
-    "level": "info",
-    "access_log": "/opt/sslcat/logs/access.log",
-    "error_log": "/opt/sslcat/logs/error.log"
-  }
-}
+```yaml
+# sslcat.conf
+logging:
+  level: "info"
+  format: "json"
+  output: "stdout"
 ```
-
-**基本日志选项：**
-
-| 选项 | 类型 | 默认值 | 描述 |
-|------|------|--------|------|
-| `level` | string | "info" | 日志级别 (debug, info, warn, error) |
-| `access_log` | string | "/opt/sslcat/logs/access.log" | 访问日志文件路径 |
-| `error_log` | string | "/opt/sslcat/logs/error.log" | 错误日志文件路径 |
 
 ### 高级日志设置
-
-```json
-{
-  "logging": {
-    "level": "info",
-    "access_log": "/opt/sslcat/logs/access.log",
-    "error_log": "/opt/sslcat/logs/error.log",
-    "security_log": "/opt/sslcat/logs/security.log",
-    "log_rotation": {
-      "enabled": true,
-      "max_size": "100MB",
-      "max_files": 10,
-      "compress": true
-    },
-    "log_format": "json",
-    "include_headers": true,
-    "include_body": false
-  }
-}
+```yaml
+logging:
+  level: "info"
+  format: "json"
+  
+  # 日志输出
+  outputs:
+    - type: "file"
+      path: "/var/log/sslcat/sslcat.log"
+      max_size: "100MB"
+      max_files: 5
+      compress: true
+    
+    - type: "syslog"
+      host: "localhost"
+      port: 514
+      facility: "local0"
+  
+  # 结构化日志
+  structured:
+    enabled: true
+    fields:
+      timestamp: true
+      level: true
+      message: true
+      request_id: true
+      trace_id: true
+      span_id: true
 ```
 
-**高级日志选项：**
+## 完整配置示例
 
-| 选项 | 类型 | 默认值 | 描述 |
-|------|------|--------|------|
-| `security_log` | string | "" | 安全日志文件路径 |
-| `log_rotation` | object | {} | 日志轮转设置 |
-| `log_format` | string | "text" | 日志格式 (text, json) |
-| `include_headers` | boolean | false | 包含请求头 |
-| `include_body` | boolean | false | 包含请求体 |
+### 生产环境配置
+```yaml
+# sslcat.conf
+server:
+  host: "0.0.0.0"
+  port: 80
+  ssl_port: 443
+  debug: false
+  workers: 4
+  max_connections: 1000
 
-## 🔧 配置示例
+proxy:
+  rules:
+    - domain: "example.com"
+      target: "http://localhost:8080"
+      ssl: true
+      load_balancing:
+        enabled: true
+        algorithm: "round_robin"
+        backends:
+          - "http://localhost:8080"
+          - "http://localhost:8081"
+          - "http://localhost:8082"
+        health_check:
+          enabled: true
+          path: "/health"
+          interval: 30s
+      caching:
+        enabled: true
+        ttl: 3600
+        max_size: "100MB"
+      compression:
+        enabled: true
+        types: ["text/html", "text/css", "application/javascript"]
 
-### 开发环境
+ssl:
+  certificates:
+    - domain: "example.com"
+      provider: "letsencrypt"
+      email: "admin@example.com"
+      auto_renew: true
 
-```json
-{
-  "server": {
-    "host": "0.0.0.0",
-    "port": 8080,
-    "debug": true
-  },
-  "ssl": {
-    "email": "dev@example.com",
-    "staging": true,
-    "auto_renew": false
-  },
-  "admin": {
-    "username": "admin",
-    "password_file": "./data/admin.pass",
-    "first_run": true
-  },
-  "proxy": {
-    "rules": [
-      {
-        "domain": "localhost",
-        "target": "127.0.0.1",
-        "port": 3000,
-        "enabled": true,
-        "ssl_only": false
-      }
-    ]
-  }
-}
+monitoring:
+  metrics:
+    enabled: true
+    endpoint: "/metrics"
+  tracing:
+    enabled: true
+    sample_rate: 0.1
+
+security:
+  ddos_protection:
+    enabled: true
+    rate_limit: 100
+  access_control:
+    enabled: true
+    whitelist: ["192.168.1.0/24"]
+
+logging:
+  level: "info"
+  format: "json"
 ```
 
-### 生产环境
-
-```json
-{
-  "server": {
-    "host": "0.0.0.0",
-    "port": 443,
-    "debug": false,
-    "max_connections": 1000
-  },
-  "ssl": {
-    "email": "admin@example.com",
-    "staging": false,
-    "auto_renew": true
-  },
-  "admin": {
-    "username": "admin",
-    "password_file": "/opt/sslcat/data/admin.pass",
-    "first_run": false
-  },
-  "proxy": {
-    "rules": [
-      {
-        "domain": "example.com",
-        "target": "127.0.0.1",
-        "port": 8080,
-        "enabled": true,
-        "ssl_only": true
-      }
-    ]
-  },
-  "security": {
-    "max_attempts": 3,
-    "block_duration": "5m",
-    "rate_limiting": {
-      "enabled": true,
-      "requests_per_minute": 60
-    }
-  }
-}
-```
-
-## 🔄 配置管理
-
-### 重新加载配置
-
-```bash
-# 重新加载配置而不重启
-sudo systemctl reload sslcat
-
-# 或发送 SIGHUP 信号
-sudo kill -HUP $(pgrep sslcat)
-```
+## 配置验证
 
 ### 验证配置
-
 ```bash
 # 验证配置文件
-sslcat --config /etc/sslcat/sslcat.conf --validate
+sslcat -config sslcat.conf -validate
 
-# 测试配置而不启动
-sslcat --config /etc/sslcat/sslcat.conf --dry-run
+# 测试配置
+sslcat -config sslcat.conf -test
+
+# 显示配置
+sslcat -config sslcat.conf -show-config
 ```
 
-### 备份配置
-
+### 启动服务
 ```bash
-# 备份当前配置
-sudo cp /etc/sslcat/sslcat.conf /etc/sslcat/sslcat.conf.backup
+# 启动 SSLcat
+sslcat -config sslcat.conf
 
-# 从备份恢复
-sudo cp /etc/sslcat/sslcat.conf.backup /etc/sslcat/sslcat.conf
-sudo systemctl reload sslcat
+# 后台运行
+sslcat -config sslcat.conf -daemon
+
+# 调试模式
+sslcat -config sslcat.conf -debug
 ```
 
-## 🚨 故障排除
+## 最佳实践
 
-### 常见配置问题
+### 配置管理
+1. **使用版本控制**: 将配置文件纳入版本控制
+2. **环境分离**: 为不同环境使用不同的配置文件
+3. **配置验证**: 部署前验证配置文件
+4. **备份配置**: 定期备份配置文件
+5. **文档化**: 记录配置变更和原因
 
-**无效的 JSON 语法：**
-```bash
-# 检查 JSON 语法
-python -m json.tool /etc/sslcat/sslcat.conf
-```
+### 性能优化
+1. **调整工作进程**: 根据 CPU 核心数调整 workers
+2. **优化连接数**: 根据负载调整 max_connections
+3. **启用缓存**: 为静态内容启用缓存
+4. **启用压缩**: 减少传输数据量
+5. **监控性能**: 使用监控工具跟踪性能
 
-**端口已被使用：**
-```bash
-# 检查端口使用情况
-sudo netstat -tlnp | grep :443
-sudo lsof -i :443
-```
+### 安全考虑
+1. **使用 HTTPS**: 为所有通信启用 SSL/TLS
+2. **配置访问控制**: 限制访问来源
+3. **启用 DDoS 防护**: 防止恶意攻击
+4. **定期更新**: 保持 SSLcat 和证书更新
+5. **监控安全事件**: 设置安全告警
 
-**权限问题：**
-```bash
-# 检查文件权限
-ls -la /etc/sslcat/sslcat.conf
-sudo chown sslcat:sslcat /etc/sslcat/sslcat.conf
-```
+## 相关文档
 
-### 配置验证
-
-```bash
-# 使用调试日志启动
-sslcat --config /etc/sslcat/sslcat.conf --log-level debug
-
-# 检查配置错误
-sudo journalctl -u sslcat -f | grep -i error
-```
+- [高级配置](advanced.md)
+- [SSL 证书管理](ssl-certificates.md)
+- [负载均衡](load-balancing.md)
+- [缓存配置](caching.md)
+- [安全设置](security.md)
 
 ---
 
-*基础配置完成？查看我们的[高级配置指南](advanced.md)了解更多详细设置。*
+*基础配置提供了 SSLcat 的核心功能。根据你的需求，可以进一步配置高级功能。*

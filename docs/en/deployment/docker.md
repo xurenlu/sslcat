@@ -1,541 +1,649 @@
-# Docker Compose 部署指南
+# Docker Deployment
 
-SSLcat Git 部署功能现在支持 Docker Compose，让你可以轻松部署包含多个容器的复杂应用。
+This guide covers deploying SSLcat using Docker and Docker Compose for development, testing, and production environments.
 
-## 功能特性
+## Quick Start
 
-✅ **自动检测** - 自动识别 `docker-compose.yml` 或 `docker-compose.yaml`  
-✅ **完整构建** - 自动拉取镜像、构建自定义镜像  
-✅ **蓝绿部署** - 自动停止旧容器、启动新容器  
-✅ **环境变量** - 支持 `.env` 文件和自定义环境变量  
-✅ **实时日志** - 完整的部署日志和容器状态  
-✅ **项目隔离** - 每个应用使用独立的项目名称  
-
-## 快速开始
-
-### 1. 准备你的项目
-
-在你的项目根目录创建 `docker-compose.yml`：
-
-```yaml
-version: '3.8'
-
-services:
-  web:
-    build: .
-    ports:
-      - "8080:8080"
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=${DATABASE_URL}
-    depends_on:
-      - db
-      - redis
-
-  db:
-    image: postgres:15
-    environment:
-      - POSTGRES_DB=myapp
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-    volumes:
-      - db-data:/var/lib/postgresql/data
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-
-volumes:
-  db-data:
-```
-
-### 2. 推送到 SSLcat
-
+### Basic Docker Run
 ```bash
-# 添加 git remote
-git remote add sslcat ssh://git@your-server:2222/myapp
+# Pull the latest image
+docker pull xurenlu/sslcat:latest
 
-# 推送代码
-git push sslcat main
+# Run SSLcat with basic configuration
+docker run -d --name sslcat \
+  -p 80:80 -p 443:443 \
+  -v $(pwd)/sslcat.conf:/app/sslcat.conf \
+  xurenlu/sslcat:latest
 ```
 
-### 3. 自动部署
-
-SSLcat 会自动：
-1. 检测到 `docker-compose.yml` 文件
-2. 验证配置文件
-3. 拉取所需的 Docker 镜像
-4. 构建自定义镜像（如果有 `build` 指令）
-5. 停止旧版本容器
-6. 启动新版本容器
-7. 显示部署状态和管理命令
-
-## 支持的配置文件
-
-SSLcat 会按以下优先级查找配置文件：
-
-1. `docker-compose.yml`
-2. `docker-compose.yaml`
-3. `compose.yml`
-4. `compose.yaml`
-
-## 环境变量
-
-### 使用 .env 文件
-
-在项目根目录创建 `.env` 文件：
-
-```env
-DATABASE_URL=postgresql://user:password@db:5432/myapp
-REDIS_URL=redis://redis:6379
-API_KEY=your-secret-key
-```
-
-SSLcat 会自动加载这个文件。
-
-### 在 SSLcat 中设置环境变量
-
-通过 SSLcat Web 管理面板为应用设置环境变量，这些变量会自动注入到容器中。
-
-SSLcat 还会自动添加以下环境变量：
-
-- `SSLCAT_APP_NAME` - 应用名称
-- `SSLCAT_APP_PORT` - 应用端口
-- `SSLCAT_APP_DOMAIN` - 应用域名
-
-## 端口映射
-
-### 自动端口分配
-
-SSLcat 会为每个应用分配一个唯一的端口。你可以在 docker-compose.yml 中使用这个端口：
-
+### Docker Compose
 ```yaml
-services:
-  web:
-    ports:
-      - "${SSLCAT_APP_PORT}:8080"
-```
-
-### 固定端口
-
-你也可以使用固定端口，但要确保不会冲突：
-
-```yaml
-services:
-  web:
-    ports:
-      - "8080:8080"  # 容器内部端口
-```
-
-SSLcat 会通过反向代理将外部请求转发到你的应用。
-
-## 常见场景
-
-### 场景 1: Node.js + PostgreSQL + Redis
-
-```yaml
+# docker-compose.yml
 version: '3.8'
 
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  sslcat:
+    image: xurenlu/sslcat:latest
     ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgresql://postgres:password@db:5432/myapp
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      - db
-      - redis
-    restart: unless-stopped
-
-  db:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_DB: myapp
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      - "80:80"
+      - "443:443"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - ./sslcat.conf:/app/sslcat.conf
+      - ./data:/app/data
+    environment:
+      - SSLCAT_LOG_LEVEL=info
     restart: unless-stopped
+```
+
+## Production Deployment
+
+### Multi-Service Setup
+```yaml
+# docker-compose.prod.yml
+version: '3.8'
+
+services:
+  sslcat:
+    image: xurenlu/sslcat:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./sslcat.conf:/app/sslcat.conf
+      - ./data:/app/data
+      - ./logs:/app/logs
+    environment:
+      - SSLCAT_LOG_LEVEL=info
+      - SSLCAT_DEBUG=false
+    restart: unless-stopped
+    networks:
+      - sslcat-network
+    depends_on:
+      - redis
+      - prometheus
 
   redis:
     image: redis:7-alpine
     volumes:
       - redis-data:/data
+    networks:
+      - sslcat-network
     restart: unless-stopped
 
-volumes:
-  postgres-data:
-  redis-data:
-```
-
-### 场景 2: Python Django + PostgreSQL
-
-```yaml
-version: '3.8'
-
-services:
-  web:
-    build: .
-    command: gunicorn myproject.wsgi:application --bind 0.0.0.0:8000
+  prometheus:
+    image: prom/prometheus:latest
     ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_URL=postgresql://postgres:password@db:5432/django_db
-      - SECRET_KEY=${SECRET_KEY}
-      - DEBUG=False
-    depends_on:
-      - db
-    restart: unless-stopped
-
-  db:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_DB: django_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      - "9090:9090"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - sslcat-network
     restart: unless-stopped
 
-volumes:
-  postgres-data:
-```
-
-### 场景 3: Go API + MySQL + Redis
-
-```yaml
-version: '3.8'
-
-services:
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "8080:8080"
-    environment:
-      - MYSQL_DSN=user:password@tcp(mysql:3306)/myapp?parseTime=true
-      - REDIS_ADDR=redis:6379
-      - ENV=production
-    depends_on:
-      - mysql
-      - redis
-    restart: unless-stopped
-
-  mysql:
-    image: mysql:8
-    environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: myapp
-      MYSQL_USER: user
-      MYSQL_PASSWORD: password
-    volumes:
-      - mysql-data:/var/lib/mysql
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-
-volumes:
-  mysql-data:
-```
-
-### 场景 4: 微服务架构
-
-```yaml
-version: '3.8'
-
-services:
-  # 前端服务
-  frontend:
-    build: ./frontend
+  grafana:
+    image: grafana/grafana:latest
     ports:
       - "3000:3000"
-    environment:
-      - API_URL=http://api:8080
-    depends_on:
-      - api
-    restart: unless-stopped
-
-  # API 服务
-  api:
-    build: ./api
-    ports:
-      - "8080:8080"
-    environment:
-      - DATABASE_URL=postgresql://postgres:password@db:5432/api_db
-      - REDIS_URL=redis://redis:6379
-      - AUTH_SERVICE_URL=http://auth:8081
-    depends_on:
-      - db
-      - redis
-      - auth
-    restart: unless-stopped
-
-  # 认证服务
-  auth:
-    build: ./auth-service
-    ports:
-      - "8081:8081"
-    environment:
-      - DATABASE_URL=postgresql://postgres:password@db:5432/auth_db
-      - JWT_SECRET=${JWT_SECRET}
-    depends_on:
-      - db
-    restart: unless-stopped
-
-  # 共享数据库
-  db:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
     volumes:
-      - postgres-data:/var/lib/postgresql/data
-    restart: unless-stopped
-
-  # 共享缓存
-  redis:
-    image: redis:7-alpine
+      - grafana-data:/var/lib/grafana
+    networks:
+      - sslcat-network
     restart: unless-stopped
 
 volumes:
-  postgres-data:
+  redis-data:
+  grafana-data:
+
+networks:
+  sslcat-network:
+    driver: bridge
 ```
 
-## 管理命令
-
-部署成功后，SSLcat 会显示管理命令。你也可以手动执行：
-
-### 查看日志
-```bash
-docker-compose -f docker-compose.yml -p sslcat-myapp logs -f
-```
-
-### 查看特定服务的日志
-```bash
-docker-compose -f docker-compose.yml -p sslcat-myapp logs -f web
-```
-
-### 停止服务
-```bash
-docker-compose -f docker-compose.yml -p sslcat-myapp stop
-```
-
-### 重启服务
-```bash
-docker-compose -f docker-compose.yml -p sslcat-myapp restart
-```
-
-### 停止并删除容器
-```bash
-docker-compose -f docker-compose.yml -p sslcat-myapp down
-```
-
-### 查看容器状态
-```bash
-docker-compose -f docker-compose.yml -p sslcat-myapp ps
-```
-
-## 最佳实践
-
-### 1. 使用健康检查
-
+### SSLcat Configuration
 ```yaml
+# sslcat.conf
+server:
+  host: "0.0.0.0"
+  port: 80
+  ssl_port: 443
+  debug: false
+
+proxy:
+  rules:
+    - domain: "api.example.com"
+      target: "http://backend:8080"
+      ssl: true
+      load_balancing:
+        enabled: true
+        algorithm: "round_robin"
+        backends:
+          - "http://backend-1:8080"
+          - "http://backend-2:8080"
+          - "http://backend-3:8080"
+
+ssl:
+  certificates:
+    - domain: "api.example.com"
+      provider: "letsencrypt"
+      email: "admin@example.com"
+      auto_renew: true
+
+monitoring:
+  metrics:
+    enabled: true
+    endpoint: "/metrics"
+  tracing:
+    enabled: true
+    sample_rate: 0.1
+```
+
+## Development Environment
+
+### Development Setup
+```yaml
+# docker-compose.dev.yml
+version: '3.8'
+
 services:
-  web:
-    build: .
+  sslcat:
+    image: xurenlu/sslcat:latest
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Admin interface
+    volumes:
+      - ./sslcat.conf:/app/sslcat.conf
+      - ./data:/app/data
+      - ./logs:/app/logs
+    environment:
+      - SSLCAT_LOG_LEVEL=debug
+      - SSLCAT_DEBUG=true
+    restart: unless-stopped
+    networks:
+      - dev-network
+
+  backend:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+    ports:
+      - "3000:3000"
+    command: npm start
+    networks:
+      - dev-network
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - dev-network
+
+networks:
+  dev-network:
+    driver: bridge
+```
+
+### Development Configuration
+```yaml
+# sslcat.conf (development)
+server:
+  host: "0.0.0.0"
+  port: 80
+  ssl_port: 443
+  debug: true
+
+proxy:
+  rules:
+    - domain: "localhost"
+      target: "http://backend:3000"
+      ssl: false  # Disable SSL for development
+
+monitoring:
+  metrics:
+    enabled: true
+    endpoint: "/metrics"
+  tracing:
+    enabled: true
+    sample_rate: 1.0  # 100% sampling for development
+    exporters:
+      jaeger:
+        endpoint: "http://jaeger:14268/api/traces"
+```
+
+## Kubernetes Deployment
+
+### SSLcat Deployment
+```yaml
+# sslcat-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sslcat
+  labels:
+    app: sslcat
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: sslcat
+  template:
+    metadata:
+      labels:
+        app: sslcat
+    spec:
+      containers:
+      - name: sslcat
+        image: xurenlu/sslcat:latest
+        ports:
+        - containerPort: 80
+        - containerPort: 443
+        - containerPort: 8080
+        env:
+        - name: SSLCAT_LOG_LEVEL
+          value: "info"
+        volumeMounts:
+        - name: config
+          mountPath: /app/sslcat.conf
+          subPath: sslcat.conf
+        - name: data
+          mountPath: /app/data
+        - name: logs
+          mountPath: /app/logs
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: config
+        configMap:
+          name: sslcat-config
+      - name: data
+        persistentVolumeClaim:
+          claimName: sslcat-data
+      - name: logs
+        emptyDir: {}
+```
+
+### SSLcat Service
+```yaml
+# sslcat-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: sslcat
+  labels:
+    app: sslcat
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  - port: 443
+    targetPort: 443
+    protocol: TCP
+    name: https
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: admin
+  selector:
+    app: sslcat
+```
+
+### SSLcat ConfigMap
+```yaml
+# sslcat-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sslcat-config
+data:
+  sslcat.conf: |
+    server:
+      host: "0.0.0.0"
+      port: 80
+      ssl_port: 443
+      debug: false
+
+    proxy:
+      rules:
+        - domain: "api.example.com"
+          target: "http://backend-service:8080"
+          ssl: true
+
+    ssl:
+      certificates:
+        - domain: "api.example.com"
+          provider: "letsencrypt"
+          email: "admin@example.com"
+          auto_renew: true
+
+    monitoring:
+      metrics:
+        enabled: true
+        endpoint: "/metrics"
+      tracing:
+        enabled: true
+        sample_rate: 0.1
+```
+
+## Environment Variables
+
+### Configuration Variables
+```bash
+# SSLcat configuration
+SSLCAT_CONFIG=/app/sslcat.conf
+SSLCAT_LOG_LEVEL=info
+SSLCAT_DEBUG=false
+
+# SSL/TLS settings
+SSLCAT_SSL_ENABLED=true
+SSLCAT_SSL_CERT_PATH=/app/certs
+SSLCAT_SSL_KEY_PATH=/app/keys
+
+# Monitoring
+SSLCAT_METRICS_ENABLED=true
+SSLCAT_METRICS_PORT=8080
+SSLCAT_TRACING_ENABLED=true
+SSLCAT_TRACING_SAMPLE_RATE=0.1
+
+# Cache settings
+SSLCAT_CACHE_ENABLED=true
+SSLCAT_CACHE_TYPE=memory
+SSLCAT_CACHE_SIZE=100MB
+SSLCAT_CACHE_TTL=3600
+```
+
+### Docker Environment File
+```bash
+# .env
+SSLCAT_LOG_LEVEL=info
+SSLCAT_DEBUG=false
+SSLCAT_METRICS_ENABLED=true
+SSLCAT_TRACING_ENABLED=true
+REDIS_URL=redis://redis:6379
+PROMETHEUS_URL=http://prometheus:9090
+```
+
+## Volume Management
+
+### Data Persistence
+```yaml
+# docker-compose.yml
+services:
+  sslcat:
+    image: xurenlu/sslcat:latest
+    volumes:
+      # Configuration
+      - ./sslcat.conf:/app/sslcat.conf:ro
+      
+      # Data persistence
+      - sslcat-data:/app/data
+      - sslcat-logs:/app/logs
+      - sslcat-certs:/app/certs
+      - sslcat-keys:/app/keys
+      
+      # Cache data
+      - sslcat-cache:/app/cache
+
+volumes:
+  sslcat-data:
+    driver: local
+  sslcat-logs:
+    driver: local
+  sslcat-certs:
+    driver: local
+  sslcat-keys:
+    driver: local
+  sslcat-cache:
+    driver: local
+```
+
+### External Volume Mounts
+```bash
+# Create named volumes
+docker volume create sslcat-data
+docker volume create sslcat-logs
+docker volume create sslcat-certs
+
+# Run with external volumes
+docker run -d --name sslcat \
+  -p 80:80 -p 443:443 \
+  -v sslcat-data:/app/data \
+  -v sslcat-logs:/app/logs \
+  -v sslcat-certs:/app/certs \
+  xurenlu/sslcat:latest
+```
+
+## Networking
+
+### Custom Networks
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  sslcat:
+    image: xurenlu/sslcat:latest
+    networks:
+      - frontend
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+
+  backend:
+    image: nginx:alpine
+    networks:
+      - backend
+    ports:
+      - "8080:80"
+
+  redis:
+    image: redis:7-alpine
+    networks:
+      - backend
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+```
+
+### Network Security
+```yaml
+# docker-compose.yml
+services:
+  sslcat:
+    image: xurenlu/sslcat:latest
+    networks:
+      - sslcat-network
+    ports:
+      - "80:80"
+      - "443:443"
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/run
+
+networks:
+  sslcat-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+```
+
+## Health Checks
+
+### Container Health Checks
+```yaml
+# docker-compose.yml
+services:
+  sslcat:
+    image: xurenlu/sslcat:latest
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "sslcat", "health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
 ```
 
-### 2. 设置资源限制
+### Application Health Checks
+```bash
+# Check SSLcat health
+docker exec sslcat sslcat health
 
-```yaml
-services:
-  web:
-    build: .
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
-        reservations:
-          cpus: '0.5'
-          memory: 256M
+# Check specific components
+docker exec sslcat sslcat health -component proxy
+docker exec sslcat sslcat health -component ssl
+
+# Get metrics
+docker exec sslcat sslcat metrics
 ```
 
-### 3. 使用命名卷
+## Monitoring and Logging
 
+### Log Management
 ```yaml
-volumes:
-  postgres-data:
-    name: myapp-postgres-data
-  redis-data:
-    name: myapp-redis-data
+# docker-compose.yml
+services:
+  sslcat:
+    image: xurenlu/sslcat:latest
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    volumes:
+      - ./logs:/app/logs
 ```
 
-### 4. 配置重启策略
-
+### Prometheus Integration
 ```yaml
+# docker-compose.yml
 services:
-  web:
-    restart: unless-stopped  # 推荐
-    # 或
-    restart: always
-    # 或
-    restart: on-failure:3
+  sslcat:
+    image: xurenlu/sslcat:latest
+    environment:
+      - SSLCAT_METRICS_ENABLED=true
+      - SSLCAT_METRICS_PORT=8080
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
 ```
 
-### 5. 使用网络隔离
+## Security Best Practices
 
+### Container Security
 ```yaml
+# docker-compose.yml
 services:
-  web:
+  sslcat:
+    image: xurenlu/sslcat:latest
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/run
+    user: "1000:1000"
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+```
+
+### Network Security
+```yaml
+# docker-compose.yml
+services:
+  sslcat:
+    image: xurenlu/sslcat:latest
     networks:
-      - frontend
-      - backend
-  
-  db:
-    networks:
-      - backend
+      - sslcat-network
+    ports:
+      - "80:80"
+      - "443:443"
 
 networks:
-  frontend:
-  backend:
+  sslcat-network:
+    driver: bridge
+    internal: true
 ```
 
-### 6. 敏感信息使用 secrets
+## Troubleshooting
 
-```yaml
-services:
-  web:
-    secrets:
-      - db_password
-      - api_key
-
-secrets:
-  db_password:
-    file: ./secrets/db_password.txt
-  api_key:
-    file: ./secrets/api_key.txt
-```
-
-### 7. 数据持久化
-
-确保重要数据使用 volumes：
-
-```yaml
-services:
-  db:
-    volumes:
-      - db-data:/var/lib/postgresql/data  # 数据持久化
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql  # 初始化脚本
-
-volumes:
-  db-data:
-```
-
-## 故障排查
-
-### 1. 容器启动失败
-
-查看完整日志：
+### Common Issues
 ```bash
-docker-compose -f docker-compose.yml -p sslcat-myapp logs
+# Check container logs
+docker logs sslcat
+
+# Follow logs in real-time
+docker logs -f sslcat
+
+# Check container status
+docker ps -a
+
+# Check container resources
+docker stats sslcat
+
+# Execute commands in container
+docker exec -it sslcat /bin/sh
 ```
 
-### 2. 端口冲突
-
-修改 docker-compose.yml 中的端口映射，避免与其他应用冲突。
-
-### 3. 镜像拉取失败
-
-检查网络连接，或使用国内镜像源：
-```yaml
-services:
-  db:
-    image: registry.cn-hangzhou.aliyuncs.com/library/postgres:15
-```
-
-### 4. 构建失败
-
-检查 Dockerfile 和构建上下文：
+### Debug Mode
 ```bash
-docker-compose -f docker-compose.yml build --no-cache
+# Run in debug mode
+docker run -d --name sslcat-debug \
+  -p 80:80 -p 443:443 \
+  -e SSLCAT_DEBUG=true \
+  -e SSLCAT_LOG_LEVEL=debug \
+  xurenlu/sslcat:latest
 ```
 
-### 5. 数据库连接失败
+## Related Documentation
 
-确保：
-- 服务启动顺序正确（使用 `depends_on` 和 `healthcheck`）
-- 数据库连接字符串正确
-- 网络配置正确
-
-### 6. 环境变量未生效
-
-检查：
-- `.env` 文件是否在正确位置
-- 变量名是否正确
-- 是否需要重启容器
-
-## 注意事项
-
-1. **项目名称**: SSLcat 会自动为每个应用生成唯一的项目名称 `sslcat-<appname>`
-2. **端口映射**: 容器端口会映射到主机，确保不会冲突
-3. **数据持久化**: 使用 volumes 确保数据不会在容器重启时丢失
-4. **资源限制**: 建议设置资源限制，避免单个应用占用过多资源
-5. **健康检查**: 添加健康检查可以确保容器正常运行
-6. **日志管理**: 配置日志驱动和日志轮转，避免日志占用过多磁盘空间
-
-## 与单纯 Dockerfile 部署的区别
-
-| 特性 | Dockerfile | Docker Compose |
-|------|-----------|----------------|
-| 容器数量 | 单个容器 | 多个容器 |
-| 依赖服务 | 需要外部配置 | 内置支持 |
-| 网络配置 | 手动配置 | 自动配置 |
-| 数据卷 | 手动管理 | 声明式管理 |
-| 环境变量 | 启动时传入 | 配置文件管理 |
-| 适用场景 | 简单应用 | 复杂应用 |
-
-## 示例项目
-
-你可以参考以下示例项目：
-
-1. **Node.js + PostgreSQL**: [examples/nodejs-postgres](../examples/nodejs-postgres)
-2. **Python Django**: [examples/django-app](../examples/django-app)
-3. **Go + MySQL**: [examples/go-mysql](../examples/go-mysql)
-4. **微服务**: [examples/microservices](../examples/microservices)
-
-## 相关文档
-
-- [Git 部署 SSH 实现](./git-deploy-ssh-implementation.md)
-- [Git 部署计划](./git-deploy-ssh-plan.md)
-- [Docker 部署指南](../DOCKER_CGO_BUILD.md)
-- [部署指南](../DEPLOYMENT.md)
-
-## 获取帮助
-
-如果遇到问题，可以：
-
-1. 查看部署日志
-2. 检查容器状态
-3. 查看 SSLcat 系统日志
-4. 在 GitHub 提交 issue
+- [Kubernetes Deployment](kubernetes.md)
+- [Production Deployment](production.md)
+- [Configuration Guide](../configuration/basic.md)
+- [Monitoring](../features/monitoring.md)
 
 ---
 
-现在你可以使用 Docker Compose 轻松部署复杂的多容器应用了！🚀
-
+*Docker deployment provides a flexible and scalable way to run SSLcat in any environment.*
