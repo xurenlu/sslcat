@@ -4,49 +4,56 @@
 
 ## 配置文件格式
 
-SSLcat 使用 YAML 格式的配置文件，默认文件名为 `sslcat.conf`。
+SSLcat 使用 JSON 格式的配置文件，默认文件名为 `sslcat.conf`。
 
-```yaml
-# sslcat.conf
-server:
-  host: "0.0.0.0"
-  port: 80
-  ssl_port: 443
-
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:8080"
-      ssl: true
-
-ssl:
-  certificates:
-    - domain: "example.com"
-      provider: "letsencrypt"
-      email: "admin@example.com"
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 80,
+    "ssl_port": 443
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:8080",
+        "ssl": true
+      }
+    ]
+  },
+  "ssl": {
+    "email": "admin@example.com",
+    "staging": false,
+    "auto_renew": true
+  }
+}
 ```
 
 ## 服务器配置
 
 ### 基本设置
-```yaml
-server:
-  host: "0.0.0.0"        # 监听地址
-  port: 80              # HTTP 端口
-  ssl_port: 443        # HTTPS 端口
-  debug: false          # 调试模式
-  workers: 4            # 工作进程数
-  max_connections: 1000 # 最大连接数
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 80,
+    "ssl_port": 443,
+    "debug": false,
+    "workers": 4,
+    "max_connections": 1000
+  }
+}
 ```
 
 ### 高级设置
-```yaml
-server:
-  # 基本设置
-  host: "0.0.0.0"
-  port: 80
-  ssl_port: 443
-  debug: false
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 80,
+    "ssl_port": 443,
+    "debug": false
   
   # 性能设置
   workers: 4

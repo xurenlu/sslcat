@@ -316,8 +316,8 @@ curl -H "Host: example.com" http://your-server-ip/
 # 验证配置
 sslcat -config sslcat.conf -validate
 
-# 检查 YAML 语法
-python -c "import yaml; yaml.safe_load(open('sslcat.conf'))"
+# 检查 JSON 语法
+python -c "import json; json.load(open('sslcat.conf'))"
 
 # 测试配置
 sslcat -config sslcat.conf -test

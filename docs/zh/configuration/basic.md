@@ -5,45 +5,51 @@
 ## 服务器配置
 
 ### 基本设置
-```yaml
-# sslcat.conf
-server:
-  host: "0.0.0.0"        # 监听地址
-  port: 80               # HTTP 端口
-  ssl_port: 443         # HTTPS 端口
-  debug: false          # 调试模式
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 80,
+    "ssl_port": 443,
+    "debug": false
+  }
+}
 ```
 
 ### 高级服务器设置
-```yaml
-server:
-  host: "0.0.0.0"
-  port: 80
-  ssl_port: 443
-  debug: false
-  
-  # 性能设置
-  workers: 4             # 工作进程数
-  max_connections: 1000  # 最大连接数
-  keep_alive_timeout: 30s
-  read_timeout: 30s
-  write_timeout: 30s
-  
-  # 日志设置
-  log_level: "info"     # debug, info, warn, error
-  log_format: "json"    # json, text
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 80,
+    "ssl_port": 443,
+    "debug": false,
+    "workers": 4,
+    "max_connections": 1000,
+    "keep_alive_timeout": "30s",
+    "read_timeout": "30s",
+    "write_timeout": "30s",
+    "log_level": "info",
+    "log_format": "json"
+  }
+}
 ```
 
 ## 代理规则配置
 
 ### 基本代理规则
-```yaml
-# sslcat.conf
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:8080"
-      ssl: true
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:8080",
+        "ssl": true
+      }
+    ]
+  }
+}
 ```
 
 ### 高级代理规则

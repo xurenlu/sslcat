@@ -102,6 +102,14 @@ jobs:
           cp install-sslcat.sh release-package/install-sslcat.sh
           chmod +x release-package/install-sslcat.sh
           
+          # 复制 Git Hook 脚本
+          cp scripts/sslcat-git-hook release-package/sslcat-git-hook
+          chmod +x release-package/sslcat-git-hook
+          
+          # 复制 Git Hook 安装脚本
+          cp scripts/install-git-hook.sh release-package/install-git-hook.sh
+          chmod +x release-package/install-git-hook.sh
+          
           # 创建 README
           echo "# SSLcat Release Package" > release-package/README.md
           echo "" >> release-package/README.md
@@ -116,6 +124,8 @@ jobs:
           echo "- sslcat.conf - Default config" >> release-package/README.md
           echo "- sslcat.service - systemd service" >> release-package/README.md
           echo "- install-sslcat.sh - Install script" >> release-package/README.md
+          echo "- sslcat-git-hook - Git Hook script for Dokku-style deployment" >> release-package/README.md
+          echo "- install-git-hook.sh - Git Hook installation script" >> release-package/README.md
           echo "- README.md - This file" >> release-package/README.md
           
           # 打包
@@ -207,6 +217,14 @@ jobs:
           cp install-sslcat.sh release-package/install-sslcat.sh
           chmod +x release-package/install-sslcat.sh
           
+          # 复制 Git Hook 脚本
+          cp scripts/sslcat-git-hook release-package/sslcat-git-hook
+          chmod +x release-package/sslcat-git-hook
+          
+          # 复制 Git Hook 安装脚本
+          cp scripts/install-git-hook.sh release-package/install-git-hook.sh
+          chmod +x release-package/install-git-hook.sh
+          
           # 创建 macOS 专用 README
           echo "# SSLcat Release Package (macOS)" > release-package/README.md
           echo "" >> release-package/README.md
@@ -221,6 +239,8 @@ jobs:
           echo "- sslcat.conf - Default config" >> release-package/README.md
           echo "- sslcat.service - systemd service (Linux only)" >> release-package/README.md
           echo "- install-sslcat.sh - Install script" >> release-package/README.md
+          echo "- sslcat-git-hook - Git Hook script for Dokku-style deployment" >> release-package/README.md
+          echo "- install-git-hook.sh - Git Hook installation script" >> release-package/README.md
           echo "- README.md - This file" >> release-package/README.md
           echo "" >> release-package/README.md
           echo "## Manual Start" >> release-package/README.md
