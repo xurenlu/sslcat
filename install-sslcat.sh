@@ -186,36 +186,186 @@ install_binary() {
     log_success "SSLcat 二进制文件安装完成"
 }
 
+# 安装 sslcat-git-hook
+install_git_hook() {
+    log_info "安装 sslcat-git-hook..."
+    
+    # 检查是否有 sslcat-git-hook 脚本
+    if [[ ! -f "./scripts/sslcat-git-hook" ]]; then
+        log_warning "未找到 sslcat-git-hook 脚本，跳过安装"
+        return 0
+    fi
+    
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        # Linux 系统安装
+        cp scripts/sslcat-git-hook /usr/local/bin/sslcat-git-hook
+        chmod +x /usr/local/bin/sslcat-git-hook
+        chown root:root /usr/local/bin/sslcat-git-hook
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS 系统安装
+        cp scripts/sslcat-git-hook /usr/local/bin/sslcat-git-hook
+        chmod +x /usr/local/bin/sslcat-git-hook
+        chown root:wheel /usr/local/bin/sslcat-git-hook
+    fi
+    
+    # 创建配置文件
+    create_git_hook_config
+    
+    log_success "sslcat-git-hook 安装完成"
+}
+
+# 创建 git hook 配置文件
+create_git_hook_config() {
+    log_info "创建 git hook 配置文件..."
+    
+    # 检测配置
+    local admin_prefix="/sslcat-panel"
+    local server_port="443"
+    local repos_dir="/opt/sslcat/data/runners/git"
+    
+    # 尝试从主配置文件读取配置
+    local config_file=""
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        config_file="/etc/sslcat/sslcat.conf"
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        config_file="/usr/local/etc/sslcat/sslcat.conf"
+    fi
+    
+    if [[ -f "$config_file" ]]; then
+        # 尝试提取配置（使用 grep 作为降级方案）
+        local detected_port=$(grep -o '"port"[[:space:]]*:[[:space:]]*[0-9]*' "$config_file" | grep -o '[0-9]*' | head -1 || echo "")
+        local detected_prefix=$(grep -o '"admin_prefix"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_file" | sed 's/.*"\([^"]*\)".*/\1/' | head -1 || echo "")
+        local detected_repos=$(grep -o '"repos_dir"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_file" | sed 's/.*"\([^"]*\)".*/\1/' | head -1 || echo "")
+        
+        if [[ -n "$detected_port" ]]; then
+            server_port="$detected_port"
+        fi
+        if [[ -n "$detected_prefix" ]]; then
+            admin_prefix="$detected_prefix"
+        fi
+        if [[ -n "$detected_repos" ]]; then
+            repos_dir="$detected_repos"
+        fi
+    fi
+    
+    # 构建 API URL
+    local api_url
+    if [[ "$server_port" == "443" ]]; then
+        api_url="http://localhost:80${admin_prefix}"
+    else
+        api_url="http://localhost:${server_port}${admin_prefix}"
+    fi
+    
+    # 创建配置文件
+    local hook_config_file=""
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        hook_config_file="/etc/sslcat/git-hook.conf"
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        hook_config_file="/usr/local/etc/sslcat/git-hook.conf"
+    fi
+    
+    cat > "$hook_config_file" << EOF
+# SSLcat Git Hook 配置文件
+# 自动生成于: $(date)
+
+# SSLcat API 地址
+export SSLCAT_API_URL="$api_url"
+
+# Git 仓库存储目录
+export SSLCAT_REPOS_DIR="$repos_dir"
+EOF
+    
+    chmod 644 "$hook_config_file"
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        chown root:root "$hook_config_file"
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        chown root:wheel "$hook_config_file"
+    fi
+    
+    log_success "git hook 配置文件创建完成: $hook_config_file"
+}
+
+# 检查配置文件差异
+check_config_difference() {
+    local new_config="$1"
+    local existing_config="$2"
+    
+    if [[ ! -f "$existing_config" ]]; then
+        return 1  # 现有配置文件不存在，需要安装
+    fi
+    
+    # 使用 diff 比较配置文件（忽略空白和注释差异）
+    if diff -q -I '^[[:space:]]*#' -I '^[[:space:]]*$' "$new_config" "$existing_config" >/dev/null 2>&1; then
+        return 0  # 配置文件相同
+    else
+        return 1  # 配置文件不同
+    fi
+}
+
+# 显示配置文件差异
+show_config_diff() {
+    local new_config="$1"
+    local existing_config="$2"
+    
+    log_info "配置文件差异对比："
+    echo "--- 新配置文件"
+    echo "+++ 现有配置文件"
+    diff -u "$existing_config" "$new_config" | head -20 || true
+    if [[ $(diff -u "$existing_config" "$new_config" | wc -l) -gt 20 ]]; then
+        echo "... (更多差异，请查看完整对比)"
+    fi
+}
+
 # 安装配置文件
 install_config() {
     log_info "安装配置文件..."
     
     # 检查是否有配置文件
     if [[ -f "./sslcat.conf" ]]; then
+        local target_config=""
+        local backup_config=""
+        
         if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-            # Linux 系统配置
-            # 备份现有配置（如果存在）
-            if [[ -f "/etc/sslcat/sslcat.conf" ]]; then
-                cp /etc/sslcat/sslcat.conf /etc/sslcat/sslcat.conf.backup.$(date +%Y%m%d_%H%M%S)
-                log_info "已备份现有配置文件"
-            fi
-            
-            # 复制新配置
-            cp sslcat.conf /etc/sslcat/sslcat.conf
-            chmod 644 /etc/sslcat/sslcat.conf
-            chown root:root /etc/sslcat/sslcat.conf
+            target_config="/etc/sslcat/sslcat.conf"
+            backup_config="/etc/sslcat/sslcat.conf.backup.$(date +%Y%m%d_%H%M%S)"
         elif [[ "$OSTYPE" == "darwin"* ]]; then
-            # macOS 系统配置
-            # 备份现有配置（如果存在）
-            if [[ -f "/usr/local/etc/sslcat/sslcat.conf" ]]; then
-                cp /usr/local/etc/sslcat/sslcat.conf /usr/local/etc/sslcat/sslcat.conf.backup.$(date +%Y%m%d_%H%M%S)
-                log_info "已备份现有配置文件"
+            target_config="/usr/local/etc/sslcat/sslcat.conf"
+            backup_config="/usr/local/etc/sslcat/sslcat.conf.backup.$(date +%Y%m%d_%H%M%S)"
+        fi
+        
+        # 检查配置文件差异
+        if check_config_difference "./sslcat.conf" "$target_config"; then
+            log_info "配置文件内容相同，跳过覆盖"
+            log_success "配置文件安装完成（无需更新）"
+            return 0
+        fi
+        
+        # 如果存在现有配置，显示差异并询问用户
+        if [[ -f "$target_config" ]]; then
+            log_warning "检测到现有配置文件与安装包中的配置文件不同"
+            show_config_diff "./sslcat.conf" "$target_config"
+            echo
+            read -p "是否要覆盖现有配置文件？(y/N): " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                log_info "保留现有配置文件，跳过配置文件安装"
+                return 0
             fi
             
-            # 复制新配置
-            cp sslcat.conf /usr/local/etc/sslcat/sslcat.conf
-            chmod 644 /usr/local/etc/sslcat/sslcat.conf
-            chown root:wheel /usr/local/etc/sslcat/sslcat.conf
+            # 备份现有配置
+            cp "$target_config" "$backup_config"
+            log_info "已备份现有配置文件到: $backup_config"
+            log_info "如需恢复原配置，请运行: cp $backup_config $target_config"
+        fi
+        
+        # 复制新配置
+        cp sslcat.conf "$target_config"
+        chmod 644 "$target_config"
+        
+        if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+            chown root:root "$target_config"
+        elif [[ "$OSTYPE" == "darwin"* ]]; then
+            chown root:wheel "$target_config"
         fi
         
         log_success "配置文件安装完成"
@@ -412,6 +562,8 @@ show_installation_info() {
         echo "  - 二进制文件: /opt/sslcat/sslcat"
         echo "  - 配置文件: /etc/sslcat/sslcat.conf"
         echo "  - 服务文件: /etc/systemd/system/sslcat.service"
+        echo "  - Git Hook: /usr/local/bin/sslcat-git-hook"
+        echo "  - Git Hook 配置: /etc/sslcat/git-hook.conf"
         echo "  - 日志目录: /var/log/sslcat"
         echo "  - Git 用户: /home/git"
         echo "  - Web 目录: /var/www"
@@ -432,9 +584,13 @@ show_installation_info() {
         echo "  1. 请编辑 /etc/sslcat/sslcat.conf 配置您的设置"
         echo "  2. 首次登录后请立即修改管理员密码"
         echo "  3. 确保防火墙开放 80 和 443 端口"
+        echo "  4. Git Hook 已安装，支持 Dokku 风格的 git push 部署"
+        echo "  5. 在 authorized_keys 中使用: command=\"/usr/local/bin/sslcat-git-hook KEY_NAME\""
     elif [[ "$OSTYPE" == "darwin"* ]]; then
         echo "  - 二进制文件: /usr/local/bin/sslcat"
         echo "  - 配置文件: /usr/local/etc/sslcat/sslcat.conf"
+        echo "  - Git Hook: /usr/local/bin/sslcat-git-hook"
+        echo "  - Git Hook 配置: /usr/local/etc/sslcat/git-hook.conf"
         echo "  - 日志目录: /usr/local/var/sslcat/logs"
         echo "  - Git 用户: /usr/local/var/git"
         echo "  - Web 目录: /usr/local/var/www"
@@ -453,6 +609,8 @@ show_installation_info() {
         echo "  1. 请编辑 /usr/local/etc/sslcat/sslcat.conf 配置您的设置"
         echo "  2. 首次登录后请立即修改管理员密码"
         echo "  3. macOS 版本主要用于开发和测试"
+        echo "  4. Git Hook 已安装，支持 Dokku 风格的 git push 部署"
+        echo "  5. 在 authorized_keys 中使用: command=\"/usr/local/bin/sslcat-git-hook KEY_NAME\""
     fi
     echo
 }
@@ -469,6 +627,7 @@ main() {
     create_git_user
     install_binary
     install_config
+    install_git_hook
     install_systemd_service
     set_permissions
     start_service
