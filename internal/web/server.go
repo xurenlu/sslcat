@@ -56,6 +56,7 @@ type Server struct {
 	lastLECheck      time.Time
 	lastConfigHash   string
 	compressor       *compression.Compressor
+	compressionCache *CompressionCache
 
 	// 配置热重载
 	configWatcher   *config.ConfigWatcher
@@ -118,6 +119,9 @@ type Server struct {
 func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Manager, sslMgr *ssl.Manager, gitServer *runner.GitServer, notificationIntegrator *notification.NotificationIntegrator, version string) *Server {
 	// 初始化压缩器
 	compressor := compression.NewCompressor(compression.FromConfig(cfg))
+
+	// 初始化压缩缓存（最多100个条目，单个最大5MB，总大小最大100MB）
+	compressionCache := NewCompressionCache(100, 5, 100)
 
 	// 初始化Prometheus指标
 	prometheusMetrics := metrics.NewPrometheusMetrics()
@@ -208,6 +212,7 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		version:           version,
 		gitServer:         gitServer,
 		compressor:        compressor,
+		compressionCache:  compressionCache,
 		prometheusMetrics: prometheusMetrics,
 		tracer:            tracer,
 		imageOptimizer:    imageOptimizer,
@@ -679,6 +684,10 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/cdn/purge", s.handleAPICDNPurge)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/cdn/rules", s.handleAPICDNRules)
 
+	// 内存缓存统计API（统一的缓存管理）
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/cache/stats", s.handleCacheStats)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/cache/clear", s.handleCacheClear)
+
 	// 统计API
 	if s.statisticsAPI != nil {
 		s.statisticsAPI.RegisterRoutes(s.mux, s.config.AdminPrefix+"/api")
@@ -839,8 +848,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	// 使用Info级别确保能看到日志
-	s.log.Infof("=== ServeHTTP: %s %s from %s ===", r.Method, r.URL.Path, s.getClientIP(r))
+	// 只在调试模式下记录详细日志
+	if s.config.Server.Debug {
+		s.log.Debugf("=== ServeHTTP: %s %s from %s ===", r.Method, r.URL.Path, s.getClientIP(r))
+	}
 	// 若通过IP访问且存在可用的LE域名，强制跳转到 https://域名 + AdminPrefix（仅限管理面板路径或根）
 	// 但排除 localhost/127.0.0.1，这些用于内部 API 调用
 	host := r.Host

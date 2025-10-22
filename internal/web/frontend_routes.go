@@ -107,7 +107,7 @@ func (s *Server) handleFrontendAssets(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 尝试打开并服务文件
+	// 打开文件
 	file, err := fsys.Open(filePath)
 	if err != nil {
 		s.log.Debugf("Frontend asset not found: %s", filePath)
@@ -134,9 +134,9 @@ func (s *Server) handleFrontendAssets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 智能压缩处理
+	// 智能压缩处理（带缓存）
 	if shouldCompress(filePath, fileInfo.Size()) {
-		s.serveWithCompression(w, r, file, fileInfo)
+		s.serveWithCachedCompression(w, r, file, fileInfo, filePath)
 	} else {
 		// 直接复制文件内容
 		io.Copy(w, file)
@@ -288,7 +288,7 @@ func shouldCompress(filePath string, fileSize int64) bool {
 	return compressibleTypes[ext] && fileSize >= 1024
 }
 
-// serveWithCompression 使用压缩方式服务文件
+// serveWithCompression 使用压缩方式服务文件（传统方式，不带缓存）
 func (s *Server) serveWithCompression(w http.ResponseWriter, r *http.Request, file io.Reader, fileInfo os.FileInfo) {
 	// 使用压缩器压缩内容
 	if s.compressor != nil {
@@ -316,6 +316,84 @@ func (s *Server) serveWithCompression(w http.ResponseWriter, r *http.Request, fi
 		// 如果压缩器未初始化，直接返回原内容
 		io.Copy(w, file)
 	}
+}
+
+// serveWithCachedCompression 使用压缩方式服务文件（带缓存优化）
+func (s *Server) serveWithCachedCompression(w http.ResponseWriter, r *http.Request, file io.Reader, fileInfo os.FileInfo, filePath string) {
+	// 如果压缩缓存未初始化，回退到传统压缩
+	if s.compressionCache == nil {
+		s.serveWithCompression(w, r, file, fileInfo)
+		return
+	}
+
+	acceptEncoding := r.Header.Get("Accept-Encoding")
+
+	// 确定最佳压缩算法
+	var algorithm CompressionAlgorithm
+	if strings.Contains(acceptEncoding, "br") {
+		algorithm = AlgorithmBrotli
+	} else if strings.Contains(acceptEncoding, "gzip") {
+		algorithm = AlgorithmGzip
+	} else {
+		algorithm = AlgorithmNone
+	}
+
+	// 如果不需要压缩，直接返回
+	if algorithm == AlgorithmNone {
+		io.Copy(w, file)
+		return
+	}
+
+	// 尝试从缓存获取
+	etag := generateETag(fileInfo)
+	if cachedData, cachedETag, ok := s.compressionCache.Get(filePath, algorithm); ok {
+		// 检查 ETag 是否匹配（确保缓存有效）
+		if cachedETag == etag {
+			w.Header().Set("Content-Encoding", string(algorithm))
+			w.Header().Set("Vary", "Accept-Encoding")
+			w.Header().Del("Content-Length")
+			w.Write(cachedData)
+			return
+		}
+		// ETag 不匹配，缓存失效
+	}
+
+	// 缓存未命中，需要压缩
+	// 读取文件内容
+	data, err := io.ReadAll(file)
+	if err != nil {
+		s.log.Errorf("Failed to read file for compression: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	// 压缩数据
+	var compressed []byte
+	level := 6 // 默认压缩级别
+	if s.config.Compression.Enabled {
+		if algorithm == AlgorithmGzip && s.config.Compression.Level.Gzip > 0 {
+			level = s.config.Compression.Level.Gzip
+		} else if algorithm == AlgorithmBrotli && s.config.Compression.Level.Brotli > 0 {
+			level = s.config.Compression.Level.Brotli
+		}
+	}
+
+	compressed, err = CompressData(data, algorithm, level)
+	if err != nil {
+		s.log.Errorf("Failed to compress data: %v", err)
+		// 压缩失败，返回原始数据
+		w.Write(data)
+		return
+	}
+
+	// 存入缓存（异步，避免阻塞）
+	go s.compressionCache.Set(filePath, algorithm, compressed, fileInfo.Size(), etag)
+
+	// 返回压缩数据
+	w.Header().Set("Content-Encoding", string(algorithm))
+	w.Header().Set("Vary", "Accept-Encoding")
+	w.Header().Del("Content-Length")
+	w.Write(compressed)
 }
 
 // getContentType 根据文件名获取Content-Type

@@ -135,8 +135,10 @@ const StaticSiteEdit: React.FC = () => {
 
     setSaving(true)
     try {
+      // 如果没有 domain 参数，说明是新增站点，使用 POST；否则使用 PUT 更新
+      const isNewSite = !domain
       const response = await fetch(buildApiPath(adminPrefix, '/api/static-sites'), {
-        method: 'PUT',
+        method: isNewSite ? 'POST' : 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -158,7 +160,7 @@ const StaticSiteEdit: React.FC = () => {
 
       toast({
         title: '保存成功',
-        description: '静态站点配置已更新',
+        description: isNewSite ? '静态站点已创建' : '静态站点配置已更新',
         status: 'success',
         duration: 3000,
         isClosable: true,
@@ -198,7 +200,7 @@ const StaticSiteEdit: React.FC = () => {
         >
           返回站点管理
         </Button>
-        <Heading size="lg">编辑静态站点</Heading>
+        <Heading size="lg">{domain ? '编辑静态站点' : '添加静态站点'}</Heading>
       </Flex>
 
       <VStack spacing={6} align="stretch">

@@ -10,11 +10,11 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/chai2010/webp"
 	"github.com/sirupsen/logrus"
+	"github.com/xurenlu/sslcat/internal/cache"
 	"golang.org/x/image/draw"
 )
 
@@ -39,6 +39,10 @@ type Config struct {
 	JPEGQuality   int  `json:"jpeg_quality"`   // JPEG 质量 (0-100)
 	PNGLevel      int  `json:"png_level"`      // PNG 压缩级别 (0-9)
 	StripMetadata bool `json:"strip_metadata"` // 移除 EXIF 元数据
+
+	// 文件大小限制（优化 CPU 使用）
+	MinSizeBytes int64 `json:"min_size_bytes"` // 最小文件大小（字节），小于此值不转换
+	MaxSizeBytes int64 `json:"max_size_bytes"` // 最大文件大小（字节），大于此值不转换
 
 	// 尺寸调整
 	AllowResize  bool  `json:"allow_resize"`  // 允许尺寸调整
@@ -65,6 +69,8 @@ func DefaultConfig() *Config {
 		JPEGQuality:     85,
 		PNGLevel:        6,
 		StripMetadata:   true,
+		MinSizeBytes:    60 * 1024,       // 60KB - 跳过小图标
+		MaxSizeBytes:    5 * 1024 * 1024, // 5MB - 跳过超大图
 		AllowResize:     true,
 		MaxWidth:        2000,
 		MaxHeight:       2000,
@@ -77,22 +83,11 @@ func DefaultConfig() *Config {
 	}
 }
 
-// CacheItem 缓存项
-type CacheItem struct {
-	Data        []byte
-	ContentType string
-	Size        int64
-	CreatedAt   time.Time
-	AccessCount int64
-	LastAccess  time.Time
-}
-
-// ImageOptimizer 图片优化器
+// ImageOptimizer 图片优化器（使用统一的内存缓存管理器）
 type Optimizer struct {
-	Config *Config // 导出Config字段以便外部访问
-	cache  map[string]*CacheItem
-	mu     sync.RWMutex
-	log    *logrus.Entry
+	Config   *Config // 导出Config字段以便外部访问
+	memCache *cache.MemoryCache
+	log      *logrus.Entry
 
 	// 统计
 	totalRequests      int64
@@ -111,15 +106,21 @@ func NewOptimizer(config *Config) *Optimizer {
 
 	opt := &Optimizer{
 		Config: config,
-		cache:  make(map[string]*CacheItem),
 		log: logrus.WithFields(logrus.Fields{
 			"component": "image_optimizer",
 		}),
 	}
 
-	// 启动缓存清理协程
+	// 初始化统一缓存管理器
 	if config.CacheEnabled {
-		go opt.cacheCleanupLoop()
+		opt.memCache = cache.NewMemoryCache(&cache.MemoryCacheConfig{
+			Name:            "image_optimization",
+			MaxEntries:      500,                                          // 图片数量多
+			MaxSizeBytes:    config.MaxCacheSize,                          // 使用配置的最大缓存大小
+			MaxItemSize:     10 * 1024 * 1024,                             // 单个最大 10MB
+			DefaultTTL:      time.Duration(config.CacheTTL) * time.Second, // 使用配置的 TTL
+			CleanupInterval: 10 * time.Minute,                             // 10 分钟清理一次
+		})
 	}
 
 	return opt
@@ -183,6 +184,23 @@ func (o *Optimizer) ProcessResponse(data []byte, contentType string, r *http.Req
 func (o *Optimizer) OptimizeResponse(originalData []byte, contentType string, r *http.Request) ([]byte, string, error) {
 	o.totalRequests++
 
+	// 检查文件大小（优化 CPU 使用）
+	originalSize := int64(len(originalData))
+
+	// 太小，不值得转换（通常是图标、小图片）
+	if o.Config.MinSizeBytes > 0 && originalSize < o.Config.MinSizeBytes {
+		o.log.Debugf("Image too small to optimize: %d bytes (min: %d), skipping",
+			originalSize, o.Config.MinSizeBytes)
+		return originalData, contentType, nil
+	}
+
+	// 太大，避免阻塞请求
+	if o.Config.MaxSizeBytes > 0 && originalSize > o.Config.MaxSizeBytes {
+		o.log.Warnf("Image too large to optimize: %d bytes (max: %d), skipping",
+			originalSize, o.Config.MaxSizeBytes)
+		return originalData, contentType, nil
+	}
+
 	// 检测图片格式
 	format := detectFormat(originalData, contentType)
 	if format == "" {
@@ -193,13 +211,18 @@ func (o *Optimizer) OptimizeResponse(originalData []byte, contentType string, r 
 	cacheKey := o.buildCacheKey(r, format)
 
 	// 检查缓存
-	if o.Config.CacheEnabled {
-		if cached := o.getFromCache(cacheKey); cached != nil {
+	if o.Config.CacheEnabled && o.memCache != nil {
+		if item, ok := o.memCache.Get(cacheKey); ok {
 			o.cacheHits++
-			cached.AccessCount++
-			cached.LastAccess = time.Now()
 			o.log.Debugf("Cache hit: %s", cacheKey)
-			return cached.Data, cached.ContentType, nil
+			// 从元数据恢复 ContentType
+			contentType := "image/webp"
+			if item.Metadata != nil {
+				if ct, ok := item.Metadata["content_type"].(string); ok {
+					contentType = ct
+				}
+			}
+			return item.Data, contentType, nil
 		}
 		o.cacheMisses++
 	}
@@ -219,9 +242,15 @@ func (o *Optimizer) OptimizeResponse(originalData []byte, contentType string, r 
 	o.totalOptimizedSize += int64(len(optimizedData))
 	o.totalBytesSaved += int64(len(originalData) - len(optimizedData))
 
-	// 缓存结果
-	if o.Config.CacheEnabled {
-		o.putToCache(cacheKey, optimizedData, newContentType)
+	// 异步缓存结果（避免阻塞响应）
+	if o.Config.CacheEnabled && o.memCache != nil {
+		go func() {
+			metadata := map[string]interface{}{
+				"content_type": newContentType,
+				"cache_key":    cacheKey,
+			}
+			o.memCache.SetWithMetadata(cacheKey, optimizedData, metadata, 0) // 使用默认 TTL
+		}()
 	}
 
 	o.log.Debugf("Image optimized: %s, original: %d bytes, optimized: %d bytes, saved: %.1f%%",
@@ -635,125 +664,44 @@ func (o *Optimizer) buildCacheKey(r *http.Request, format ImageFormat) string {
 	return key
 }
 
-// getFromCache 从缓存获取
-func (o *Optimizer) getFromCache(key string) *CacheItem {
-	o.mu.RLock()
-	defer o.mu.RUnlock()
+// 以下缓存方法已被统一的 MemoryCache 管理器替代
+// 保留空函数以保持兼容性
 
-	item, exists := o.cache[key]
-	if !exists {
-		return nil
-	}
-
-	// 检查是否过期
-	if time.Since(item.CreatedAt) > time.Duration(o.Config.CacheTTL)*time.Second {
-		return nil
-	}
-
-	return item
+// getFromCache 从缓存获取 (已废弃，使用 memCache.Get)
+func (o *Optimizer) getFromCache(key string) interface{} {
+	return nil // 已由 OptimizeResponse 中直接使用 memCache.Get 替代
 }
 
-// putToCache 放入缓存
+// putToCache 放入缓存 (已废弃，使用 memCache.Set)
 func (o *Optimizer) putToCache(key string, data []byte, contentType string) {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-
-	// 检查缓存大小
-	currentSize := o.getCurrentCacheSize()
-	if currentSize+int64(len(data)) > o.Config.MaxCacheSize {
-		// 缓存满了，清理最少使用的项
-		o.evictLRU(int64(len(data)))
-	}
-
-	o.cache[key] = &CacheItem{
-		Data:        data,
-		ContentType: contentType,
-		Size:        int64(len(data)),
-		CreatedAt:   time.Now(),
-		LastAccess:  time.Now(),
-		AccessCount: 0,
-	}
+	// 已由 OptimizeResponse 中直接使用 memCache.SetWithMetadata 替代
 }
 
-// getCurrentCacheSize 获取当前缓存大小
+// getCurrentCacheSize 获取当前缓存大小 (已废弃，使用 memCache.GetSize)
 func (o *Optimizer) getCurrentCacheSize() int64 {
-	var total int64
-	for _, item := range o.cache {
-		total += item.Size
+	if o.memCache != nil {
+		return o.memCache.GetSize()
 	}
-	return total
+	return 0
 }
 
-// evictLRU 清理最少使用的缓存项
+// evictLRU 清理最少使用的缓存项 (已废弃，由 memCache 自动管理)
 func (o *Optimizer) evictLRU(neededSize int64) {
-	type cacheEntry struct {
-		key  string
-		item *CacheItem
-	}
-
-	// 收集所有项
-	entries := make([]cacheEntry, 0, len(o.cache))
-	for k, v := range o.cache {
-		entries = append(entries, cacheEntry{k, v})
-	}
-
-	// 按最后访问时间排序（最旧的在前）
-	for i := 0; i < len(entries)-1; i++ {
-		for j := i + 1; j < len(entries); j++ {
-			if entries[i].item.LastAccess.After(entries[j].item.LastAccess) {
-				entries[i], entries[j] = entries[j], entries[i]
-			}
-		}
-	}
-
-	// 删除直到有足够空间
-	var freedSize int64
-	for _, entry := range entries {
-		delete(o.cache, entry.key)
-		freedSize += entry.item.Size
-		if freedSize >= neededSize {
-			break
-		}
-	}
-
-	o.log.Infof("Evicted LRU cache items, freed: %d bytes", freedSize)
+	// 由统一缓存管理器自动管理
 }
 
-// cacheCleanupLoop 缓存清理循环
+// cacheCleanupLoop 缓存清理循环 (已废弃，由 memCache 自动管理)
 func (o *Optimizer) cacheCleanupLoop() {
-	ticker := time.NewTicker(5 * time.Minute)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		o.cleanupExpiredCache()
-	}
+	// 由统一缓存管理器自动管理
 }
 
-// cleanupExpiredCache 清理过期缓存
+// cleanupExpiredCache 清理过期缓存 (已废弃，由 memCache 自动管理)
 func (o *Optimizer) cleanupExpiredCache() {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-
-	now := time.Now()
-	ttl := time.Duration(o.Config.CacheTTL) * time.Second
-	var removed int
-
-	for key, item := range o.cache {
-		if now.Sub(item.CreatedAt) > ttl {
-			delete(o.cache, key)
-			removed++
-		}
-	}
-
-	if removed > 0 {
-		o.log.Infof("Cleaned up %d expired cache items", removed)
-	}
+	// 由统一缓存管理器自动管理
 }
 
 // GetStats 获取统计信息
 func (o *Optimizer) GetStats() map[string]interface{} {
-	o.mu.RLock()
-	defer o.mu.RUnlock()
 
 	cacheSize := o.getCurrentCacheSize()
 	hitRate := float64(0)
@@ -766,13 +714,12 @@ func (o *Optimizer) GetStats() map[string]interface{} {
 		compressionRate = float64(o.totalBytesSaved) / float64(o.totalOriginalSize) * 100
 	}
 
-	return map[string]interface{}{
+	stats := map[string]interface{}{
 		"enabled":              o.Config.Enabled,
 		"total_requests":       o.totalRequests,
 		"cache_hits":           o.cacheHits,
 		"cache_misses":         o.cacheMisses,
 		"cache_hit_rate":       hitRate,
-		"cache_items":          len(o.cache),
 		"cache_size_bytes":     cacheSize,
 		"cache_size_mb":        float64(cacheSize) / 1024 / 1024,
 		"total_bytes_saved":    o.totalBytesSaved,
@@ -781,22 +728,29 @@ func (o *Optimizer) GetStats() map[string]interface{} {
 		"original_size_mb":     float64(o.totalOriginalSize) / 1024 / 1024,
 		"optimized_size_mb":    float64(o.totalOptimizedSize) / 1024 / 1024,
 	}
+
+	// 添加统一缓存管理器的统计信息
+	if o.memCache != nil {
+		cacheStats := o.memCache.Stats()
+		stats["cache_items"] = cacheStats["entries"]
+		stats["cache_manager"] = cacheStats
+	} else {
+		stats["cache_items"] = 0
+	}
+
+	return stats
 }
 
 // ClearCache 清空缓存
 func (o *Optimizer) ClearCache() {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-
-	o.cache = make(map[string]*CacheItem)
-	o.log.Info("Image cache cleared")
+	if o.memCache != nil {
+		o.memCache.Clear()
+		o.log.Info("Image cache cleared")
+	}
 }
 
 // UpdateConfig 更新配置
 func (o *Optimizer) UpdateConfig(config *Config) {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-
 	o.Config = config
 	o.log.Info("Image optimizer config updated")
 }

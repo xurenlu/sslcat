@@ -27,8 +27,9 @@ import (
 
 // loggingTransport 包装Transport以记录实际发送的请求
 type loggingTransport struct {
-	base http.RoundTripper
-	log  *logrus.Entry
+	base   http.RoundTripper
+	log    *logrus.Entry
+	config *config.Config
 }
 
 // ResponseProcessor 响应处理器接口
@@ -125,7 +126,7 @@ func (m *Manager) initializeLoadBalancers() {
 func (m *Manager) createLoadBalancer(rule *config.ProxyRule) error {
 	// 使用统一的后端配置
 	effectiveBackends := rule.GetEffectiveBackends()
-	
+
 	// 转换配置格式
 	var backends []loadbalancer.Backend
 	for i, proxyBackend := range effectiveBackends {
@@ -1025,8 +1026,9 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 
 	// 包装Transport以记录实际发送的请求
 	proxy.Transport = &loggingTransport{
-		base: baseTransport,
-		log:  m.log,
+		base:   baseTransport,
+		log:    m.log,
+		config: m.config,
 	}
 
 	// 自定义错误处理
@@ -1645,18 +1647,20 @@ func (m *Manager) logRequestDetails(r *http.Request, requestType string, rule *c
 		actualHost = r.Host
 	}
 
-	// 记录基本请求信息
-	m.log.WithFields(logrus.Fields{
-		"type":           requestType,
-		"method":         r.Method,
-		"url":            r.URL.String(),
-		"host":           actualHost,
-		"target":         targetInfo,
-		"user_agent":     r.Header.Get("User-Agent"),
-		"client_ip":      m.getClientIP(r),
-		"content_type":   r.Header.Get("Content-Type"),
-		"content_length": r.ContentLength,
-	}).Info("HTTP请求详情")
+	// 只在调试模式下记录详细请求信息
+	if m.config.Server.Debug {
+		m.log.WithFields(logrus.Fields{
+			"type":           requestType,
+			"method":         r.Method,
+			"url":            r.URL.String(),
+			"host":           actualHost,
+			"target":         targetInfo,
+			"user_agent":     r.Header.Get("User-Agent"),
+			"client_ip":      m.getClientIP(r),
+			"content_type":   r.Header.Get("Content-Type"),
+			"content_length": r.ContentLength,
+		}).Debug("HTTP请求详情")
+	}
 
 	// 记录重要的请求头部
 	importantHeaders := []string{
@@ -1720,16 +1724,18 @@ func (m *Manager) logResponseDetails(resp *http.Response, rule *config.ProxyRule
 		targetInfo = m.buildTargetInfo(rule)
 	}
 
-	// 记录基本响应信息
-	m.log.WithFields(logrus.Fields{
-		"type":           "RESPONSE",
-		"status_code":    resp.StatusCode,
-		"status":         resp.Status,
-		"target":         targetInfo,
-		"content_type":   resp.Header.Get("Content-Type"),
-		"content_length": resp.ContentLength,
-		"server":         resp.Header.Get("Server"),
-	}).Info("HTTP响应详情")
+	// 只在调试模式下记录详细响应信息
+	if m.config.Server.Debug {
+		m.log.WithFields(logrus.Fields{
+			"type":           "RESPONSE",
+			"status_code":    resp.StatusCode,
+			"status":         resp.Status,
+			"target":         targetInfo,
+			"content_type":   resp.Header.Get("Content-Type"),
+			"content_length": resp.ContentLength,
+			"server":         resp.Header.Get("Server"),
+		}).Debug("HTTP响应详情")
+	}
 
 	// 记录重要的响应头部
 	importantHeaders := []string{
@@ -1865,21 +1871,23 @@ func (lt *loggingTransport) RoundTrip(req *http.Request) (*http.Response, error)
 	// 构造等效的curl命令
 	curlCmd := lt.buildCurlCommand(req)
 
-	// 记录实际发送的请求
-	lt.log.WithFields(logrus.Fields{
-		"type":           "ACTUAL_OUTGOING_REQUEST",
-		"method":         req.Method,
-		"url":            req.URL.String(),
-		"host":           req.Header.Get("Host"),
-		"user_agent":     req.Header.Get("User-Agent"),
-		"content_type":   req.Header.Get("Content-Type"),
-		"content_length": req.ContentLength,
-		"all_headers":    req.Header,
-		"curl_command":   curlCmd,
-	}).Info("实际发送给上游的HTTP请求")
+	// 只在调试模式下记录详细的上游请求信息
+	if lt.config.Server.Debug {
+		lt.log.WithFields(logrus.Fields{
+			"type":           "ACTUAL_OUTGOING_REQUEST",
+			"method":         req.Method,
+			"url":            req.URL.String(),
+			"host":           req.Header.Get("Host"),
+			"user_agent":     req.Header.Get("User-Agent"),
+			"content_type":   req.Header.Get("Content-Type"),
+			"content_length": req.ContentLength,
+			"all_headers":    req.Header,
+			"curl_command":   curlCmd,
+		}).Debug("实际发送给上游的HTTP请求")
 
-	// 单独记录curl命令，便于复制
-	lt.log.Infof("等效的curl命令: %s", curlCmd)
+		// 单独记录curl命令，便于复制
+		lt.log.Debugf("等效的curl命令: %s", curlCmd)
+	}
 
 	// 记录重要的请求头部
 	importantHeaders := []string{
@@ -1922,8 +1930,8 @@ func (lt *loggingTransport) RoundTrip(req *http.Request) (*http.Response, error)
 	// 执行实际的请求
 	resp, err := lt.base.RoundTrip(req)
 
-	// 记录响应
-	if resp != nil {
+	// 只在调试模式下记录详细的上游响应信息
+	if resp != nil && lt.config.Server.Debug {
 		lt.log.WithFields(logrus.Fields{
 			"type":           "ACTUAL_RESPONSE",
 			"status_code":    resp.StatusCode,
@@ -1931,7 +1939,7 @@ func (lt *loggingTransport) RoundTrip(req *http.Request) (*http.Response, error)
 			"content_type":   resp.Header.Get("Content-Type"),
 			"content_length": resp.ContentLength,
 			"server":         resp.Header.Get("Server"),
-		}).Info("上游服务器实际返回的HTTP响应")
+		}).Debug("上游服务器实际返回的HTTP响应")
 	}
 
 	return resp, err
