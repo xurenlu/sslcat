@@ -8,16 +8,14 @@ Welcome to the comprehensive documentation for SSLcat - the enterprise-grade SSL
 - [Introduction](getting-started/introduction.md) - What is SSLcat and why use it?
 - [Quick Start](getting-started/quick-start.md) - Get up and running in 5 minutes
 - [Architecture](getting-started/architecture.md) - System overview and components
+- [Git Deployment Quick Start](getting-started/git-deploy-quickstart.md) - Git deployment quick start guide
 - [Installation](installation/) - Installation methods and requirements
 
 ### Part II: Configuration
 - [Basic Configuration](configuration/basic.md) - Essential settings
 - [Advanced Configuration](configuration/advanced.md) - Advanced features
-- [SSL Certificates](configuration/ssl-certificates.md) - Certificate management
-- [Proxy Rules](configuration/proxy-rules.md) - Rule configuration
-- [Load Balancing](configuration/load-balancing.md) - Load balancer setup
-- [Caching](configuration/caching.md) - Cache configuration
-- [Security](configuration/security.md) - Security settings
+- [Port Configuration Guide](configuration/port-configuration-guide.md) - Port configuration system
+- [Ports](configuration/ports.md) - Port configuration options
 
 ### Part III: Features
 - [SSL Termination](features/ssl-termination.md) - SSL/TLS handling
@@ -30,12 +28,9 @@ Welcome to the comprehensive documentation for SSLcat - the enterprise-grade SSL
 - [Distributed Tracing](features/tracing.md) - Tracing support
 - [Monitoring](features/monitoring.md) - Metrics and monitoring
 
-### Part IV: Administration
-- [Web Interface](administration/web-interface.md) - Management UI
-- [CLI Commands](administration/cli-commands.md) - Command line tools
-- [User Management](administration/user-management.md) - Authentication
-- [Backup & Restore](administration/backup-restore.md) - Data management
-- [Maintenance](administration/maintenance.md) - System maintenance
+### Part IV: Development
+- [Builder Architecture](development/builder-architecture.md) - Builder architecture documentation
+- [Architecture](development/architecture.md) - Development architecture
 
 ### Part V: Integration
 - [Spring Boot](integration/spring-boot.md) - Java integration

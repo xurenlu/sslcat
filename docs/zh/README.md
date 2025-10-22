@@ -8,34 +8,31 @@
 - [介绍](getting-started/introduction.md) - 什么是 SSLcat 以及为什么使用它？
 - [快速开始](getting-started/quick-start.md) - 5分钟内启动运行
 - [架构](getting-started/architecture.md) - 系统概览和组件
+- [Git部署快速开始](getting-started/git-deploy-quickstart.md) - Git部署快速开始指南
+- [压缩缓存快速开始](getting-started/QUICK_START_COMPRESSION_CACHE.md) - 压缩缓存快速开始
 - [安装](installation/) - 安装方法和要求
 
 ### 第二部分：配置
 - [基础配置](configuration/basic.md) - 基本设置
-- [高级配置](configuration/advanced.md) - 高级功能
-- [SSL证书](configuration/ssl-certificates.md) - 证书管理
-- [代理规则](configuration/proxy-rules.md) - 规则配置
-- [负载均衡](configuration/load-balancing.md) - 负载均衡器设置
-- [缓存](configuration/caching.md) - 缓存配置
-- [安全](configuration/security.md) - 安全设置
+- [端口配置指南](configuration/port-configuration-guide.md) - 端口配置系统
+- [端口配置设计](configuration/port-configuration-design.md) - 端口配置设计文档
 
 ### 第三部分：功能特性
-- [SSL终端](features/ssl-termination.md) - SSL/TLS 处理
-- [反向代理](features/reverse-proxy.md) - 代理功能
-- [负载均衡](features/load-balancing.md) - 流量分发
-- [缓存](features/caching.md) - 内容缓存
-- [压缩](features/compression.md) - 响应压缩
-- [WebSocket](features/websocket.md) - WebSocket 支持
-- [HTTP/2](features/http2.md) - HTTP/2 支持
+- [压缩缓存指南](features/COMPRESSION_CACHE_GUIDE.md) - 压缩和缓存功能
+- [HTTP/2实现](features/HTTP2_IMPLEMENTATION.md) - HTTP/2支持实现
+- [HTTP/2支持分析](features/HTTP2_SUPPORT_ANALYSIS.md) - HTTP/2支持分析
+- [Git部署WebUI功能](features/git-deploy-webui-features.md) - Git部署Web界面功能
+- [实时日志功能](features/realtime-logs-feature.md) - 实时日志功能
+- [WebSocket重连去重](features/websocket-reconnection-deduplication.md) - WebSocket重连去重
 - [分布式追踪](features/tracing.md) - 追踪支持
 - [监控](features/monitoring.md) - 指标和监控
 
-### 第四部分：管理
-- [Web界面](administration/web-interface.md) - 管理界面
-- [CLI命令](administration/cli-commands.md) - 命令行工具
-- [用户管理](administration/user-management.md) - 认证
-- [备份与恢复](administration/backup-restore.md) - 数据管理
-- [维护](administration/maintenance.md) - 系统维护
+### 第四部分：开发
+- [Builder架构](development/builder-architecture.md) - Builder架构文档
+- [Git部署SSH实现](development/git-deploy-ssh-implementation.md) - Git部署SSH实现
+- [Git部署SSH计划](development/git-deploy-ssh-plan.md) - Git部署SSH计划
+- [静态构建器Nginx](development/static-builder-nginx.md) - 静态构建器Nginx
+- [贡献指南](development/contributing.md) - 开发贡献指南
 
 ### 第五部分：集成
 - [Spring Boot](integration/spring-boot.md) - Java 集成
@@ -58,10 +55,10 @@
 
 ### 第八部分：故障排除
 - [常见问题](troubleshooting/common-issues.md) - 常见问题
-- [性能](troubleshooting/performance.md) - 性能调优
-- [SSL问题](troubleshooting/ssl-issues.md) - 证书问题
-- [代理问题](troubleshooting/proxy-issues.md) - 配置问题
-- [调试](troubleshooting/debugging.md) - 调试技术
+- [CPU故障排查指南](troubleshooting/CPU_TROUBLESHOOTING_GUIDE.md) - CPU占用问题排查
+- [镜像优化CPU修复](troubleshooting/IMAGE_OPTIMIZATION_CPU_FIX.md) - 镜像优化CPU修复
+- [日志和性能优化](troubleshooting/LOGGING_AND_PERFORMANCE_OPTIMIZATION.md) - 日志和性能优化
+- [日志CPU修复总结](troubleshooting/LOGGING_CPU_FIX_SUMMARY.md) - 日志CPU修复总结
 
 ### 第九部分：开发
 - [贡献](development/contributing.md) - 如何贡献
