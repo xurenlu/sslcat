@@ -381,6 +381,9 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 	// 检查是否启用了CDN缓存（全局或域名级别）
 	isCloudStorage := m.isCloudStorageService(rule.Target)
 
+	// 保存追踪头部（在清理其他头部之前）
+	traceHeaders := m.ExtractTraceHeaders(r)
+
 	// 在CDN模式或云存储模式下，预先清理可能存在的代理头部
 	if cdnEnabled || isCloudStorage {
 		r.Header.Del("X-Forwarded-For")
@@ -444,6 +447,9 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 
 		m.log.Debugf("Added proxy headers (non-CDN, non-cloud mode) for %s", r.Host)
 	}
+
+	// 重新注入追踪头部（确保追踪信息传递到上游）
+	m.InjectTraceHeaders(r, traceHeaders)
 
 	// 执行代理
 	// 在 ModifyResponse 中做缓存落盘（全局或域名启用）
@@ -1902,6 +1908,18 @@ func (lt *loggingTransport) RoundTrip(req *http.Request) (*http.Response, error)
 		"Accept-Language",
 		"Cache-Control",
 		"Referer",
+		// 追踪头部
+		"traceparent",
+		"tracestate",
+		"X-Trace-ID",
+		"X-Span-ID",
+		"X-Request-ID",
+		"X-B3-TraceId",
+		"X-B3-SpanId",
+		"X-B3-ParentSpanId",
+		"X-Cloud-Trace-Context",
+		"X-Amzn-Trace-Id",
+		"baggage",
 	}
 
 	headers := make(map[string]string)
@@ -2123,4 +2141,53 @@ func extractRegionFromCOS(parts []string) string {
 		return strings.TrimPrefix(cosPart, "cos-")
 	}
 	return ""
+}
+
+// ExtractTraceHeaders 提取追踪头部信息
+func (m *Manager) ExtractTraceHeaders(r *http.Request) map[string]string {
+	traceHeaders := make(map[string]string)
+
+	// 追踪头部列表
+	traceHeaderNames := []string{
+		"traceparent",           // W3C Trace Context
+		"tracestate",            // W3C Trace Context
+		"X-Trace-ID",            // 自定义标准
+		"X-Span-ID",             // 自定义标准
+		"X-Request-ID",          // 请求ID
+		"X-B3-TraceId",          // Zipkin B3
+		"X-B3-SpanId",           // Zipkin B3
+		"X-B3-ParentSpanId",     // Zipkin B3
+		"X-B3-Sampled",          // Zipkin B3
+		"X-B3-Flags",            // Zipkin B3
+		"X-Cloud-Trace-Context", // Google Cloud
+		"X-Amzn-Trace-Id",       // AWS X-Ray
+		"baggage",               // W3C Baggage
+	}
+
+	// 提取追踪头部
+	for _, headerName := range traceHeaderNames {
+		if value := r.Header.Get(headerName); value != "" {
+			traceHeaders[headerName] = value
+		}
+	}
+
+	// 提取以 "Baggage-" 开头的头部
+	for key, values := range r.Header {
+		if strings.HasPrefix(key, "Baggage-") {
+			traceHeaders[key] = values[0]
+		}
+	}
+
+	return traceHeaders
+}
+
+// InjectTraceHeaders 将追踪头部注入到请求中
+func (m *Manager) InjectTraceHeaders(r *http.Request, traceHeaders map[string]string) {
+	for headerName, value := range traceHeaders {
+		r.Header.Set(headerName, value)
+	}
+
+	if len(traceHeaders) > 0 && m.log != nil {
+		m.log.Debugf("Injected trace headers for %s: %v", r.Host, traceHeaders)
+	}
 }
