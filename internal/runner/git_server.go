@@ -61,6 +61,8 @@ type GitServer struct {
 
 	// 部署数据库
 	deployDB *DeployDatabase
+	// 发布数据库（新版本）
+	deploymentDB *DeploymentDatabase
 
 	// 通知管理器
 	notificationManager *notification.NotificationManager
@@ -481,6 +483,13 @@ func NewGitServer(cfg *config.Config, translator *i18n.Translator) *GitServer {
 		deployDB = nil // 继续运行，但没有数据库支持
 	}
 
+	// 初始化发布数据库（新版本）
+	deploymentDB, err := NewDeploymentDatabase(dataDir)
+	if err != nil {
+		logrus.Errorf("初始化发布数据库失败: %v", err)
+		deploymentDB = nil // 继续运行，但没有数据库支持
+	}
+
 	// 初始化通知管理器 - 从配置文件读取
 	var notificationMgr *notification.NotificationManager
 	if cfg.Notification.Enabled {
@@ -507,6 +516,7 @@ func NewGitServer(cfg *config.Config, translator *i18n.Translator) *GitServer {
 		logStreamManager:    logStreamManager,
 		dockerRegistry:      dockerRegistry,
 		deployDB:            deployDB,
+		deploymentDB:        deploymentDB,
 		notificationManager: notificationMgr,
 		stopChan:            make(chan struct{}),
 	}
@@ -1028,33 +1038,73 @@ func (gs *GitServer) HandleGitPush(appName string, pushData []byte) error {
 
 // processGitPush 处理 Git 推送
 func (gs *GitServer) processGitPush(app *GitApp, pushData []byte) {
-	// 生成部署ID
-	deployID := fmt.Sprintf("deploy_%d", time.Now().Unix())
+	// 解析推送数据获取提交信息
+	var commitSHA, branch, message, deployer string
+	if len(pushData) > 0 {
+		// 尝试解析推送数据
+		var pushInfo map[string]interface{}
+		if err := json.Unmarshal(pushData, &pushInfo); err == nil {
+			if cs, ok := pushInfo["commit"].(string); ok {
+				commitSHA = cs
+			}
+			if b, ok := pushInfo["ref"].(string); ok {
+				branch = b
+			}
+			if m, ok := pushInfo["message"].(string); ok {
+				message = m
+			}
+			if d, ok := pushInfo["deployer"].(string); ok {
+				deployer = d
+			}
+		}
+	}
 
-	// 创建部署日志记录器
-	logFile := filepath.Join(app.LogsDir, fmt.Sprintf("deploy-%s.log", time.Now().Format("2006-01-02")))
-	deployLogger, err := NewDeployLogger(app.Name, deployID, logFile)
+	// 设置默认值
+	if commitSHA == "" {
+		commitSHA = "unknown"
+	}
+	if branch == "" {
+		branch = "main"
+	}
+	if message == "" {
+		message = "Git push deployment"
+	}
+	if deployer == "" {
+		deployer = "system"
+	}
+
+	// 创建新的发布日志记录器
+	deployLogger, err := NewDeploymentLogger(app.Name, commitSHA, branch, deployer, message, gs.deploymentDB, app.LogsDir)
 	if err != nil {
-		gs.handleDeployError(app, fmt.Errorf("创建部署日志记录器失败: %w", err))
+		gs.handleDeployError(app, fmt.Errorf("创建发布日志记录器失败: %w", err))
 		return
 	}
 	defer deployLogger.Close()
 
+	// 获取部署ID（UUID）
+	deployID := deployLogger.GetUUID()
+
 	// 启动实时日志流
+	logFile := deployLogger.GetLogFile()
 	logStream := gs.logStreamManager.GetOrCreateStream(app.Name, logFile)
 	if logStream == nil {
 		gs.logger.Warnf("Failed to create log stream for app: %s", app.Name)
 	}
 
-	// 广播部署开始状态
-	gs.logStreamManager.BroadcastDeployStatus(DeployStatusUpdate{
-		AppName:   app.Name,
-		DeployID:  deployID,
-		Status:    "building",
-		Progress:  10,
-		Message:   "开始部署流程",
-		Timestamp: time.Now(),
+	// 设置状态更新回调
+	deployLogger.SetStatusCallback(func(status string, progress int, message string) {
+		gs.logStreamManager.BroadcastDeployStatus(DeployStatusUpdate{
+			AppName:   app.Name,
+			DeployID:  deployID,
+			Status:    status,
+			Progress:  progress,
+			Message:   message,
+			Timestamp: time.Now(),
+		})
 	})
+
+	// 广播部署开始状态
+	deployLogger.UpdateStatus("building", 10, "开始部署流程")
 
 	// 检测应用类型
 	deployLogger.WriteLog("info", "git", "开始检测应用类型")
@@ -1071,59 +1121,31 @@ func (gs *GitServer) processGitPush(app *GitApp, pushData []byte) {
 
 	deployLogger.WriteLog("info", "git", fmt.Sprintf("检测到应用类型: %s", appType))
 
-	// 广播构建状态
-	gs.logStreamManager.BroadcastDeployStatus(DeployStatusUpdate{
-		AppName:   app.Name,
-		DeployID:  deployID,
-		Status:    "building",
-		Progress:  30,
-		Message:   fmt.Sprintf("检测到应用类型: %s，开始构建", appType),
-		Timestamp: time.Now(),
-	})
+	// 更新构建状态
+	deployLogger.UpdateStatus("building", 30, fmt.Sprintf("检测到应用类型: %s，开始构建", appType))
 
 	// 执行构建和部署
 	deployLogger.WriteLog("info", "deploy", "开始构建和部署应用")
 
-	// 广播部署中状态
-	gs.logStreamManager.BroadcastDeployStatus(DeployStatusUpdate{
-		AppName:   app.Name,
-		DeployID:  deployID,
-		Status:    "deploying",
-		Progress:  60,
-		Message:   "正在部署应用",
-		Timestamp: time.Now(),
-	})
+	// 更新部署中状态
+	deployLogger.UpdateStatus("deploying", 60, "正在部署应用")
 
 	if err := gs.buildAndDeployAppWithLogging(app, deployLogger); err != nil {
 		deployLogger.WriteError(err)
 
-		// 广播部署失败状态
-		gs.logStreamManager.BroadcastDeployStatus(DeployStatusUpdate{
-			AppName:   app.Name,
-			DeployID:  deployID,
-			Status:    "failed",
-			Progress:  100,
-			Message:   "部署失败",
-			Error:     err.Error(),
-			Timestamp: time.Now(),
-		})
+		// 更新部署失败状态
+		deployLogger.UpdateStatus("failed", 100, fmt.Sprintf("部署失败: %s", err.Error()))
 
 		gs.handleDeployError(app, err)
 		return
 	}
 
 	// 部署成功
-	deployLogger.WriteSuccess(time.Since(deployLogger.startTime))
+	deployLogger.WriteLog("info", "deploy", fmt.Sprintf("部署成功 - 耗时: %v", deployLogger.GetDuration()))
 
-	// 广播部署成功状态
-	gs.logStreamManager.BroadcastDeployStatus(DeployStatusUpdate{
-		AppName:   app.Name,
-		DeployID:  deployID,
-		Status:    "success",
-		Progress:  100,
-		Message:   fmt.Sprintf("部署成功 - 耗时: %v", time.Since(deployLogger.startTime)),
-		Timestamp: time.Now(),
-	})
+	// 更新部署成功状态
+	deployLogger.UpdateStatus("success", 100, fmt.Sprintf("部署成功 - 耗时: %v", deployLogger.GetDuration()))
+	
 	gs.handleDeploySuccess(app)
 }
 
