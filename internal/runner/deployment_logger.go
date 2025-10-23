@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -57,22 +58,23 @@ func NewDeploymentLogger(appName, commitSHA, branch, deployer, message string, d
 		return nil, fmt.Errorf("打开日志文件失败: %v", err)
 	}
 	
-	// 创建发布记录
-	deployment := &Deployment{
-		UUID:      deploymentUUID,
-		AppName:   appName,
-		CommitSHA: commitSHA,
-		Branch:    branch,
-		Status:    "pending",
-		StartedAt: time.Now(),
-		Deployer:  deployer,
-		Message:   message,
-	}
-	
-	// 保存到数据库
-	if err := db.CreateDeployment(deployment); err != nil {
-		file.Close()
-		return nil, fmt.Errorf("创建发布记录失败: %v", err)
+	// 创建发布记录（仅在数据库可用时）
+	if db != nil {
+		deployment := &Deployment{
+			UUID:      deploymentUUID,
+			AppName:   appName,
+			CommitSHA: commitSHA,
+			Branch:    branch,
+			Status:    "pending",
+			StartedAt: time.Now(),
+			Deployer:  deployer,
+			Message:   message,
+		}
+		
+		// 保存到数据库
+		if err := db.CreateDeployment(deployment); err != nil {
+			log.Printf("警告：创建发布记录失败，将使用文件日志模式: %v", err)
+		}
 	}
 	
 	logger := &DeploymentLogger{
@@ -140,9 +142,14 @@ func (dl *DeploymentLogger) writeToFile(entry *LogEntry) {
 	}
 }
 
-// writeToDB 写入数据库
+// writeToDB 写入数据库（仅存储关键日志，不存储详细日志）
 func (dl *DeploymentLogger) writeToDB(entry *LogEntry) {
 	if dl.DB == nil {
+		return
+	}
+	
+	// 只存储关键日志，不存储所有日志
+	if !dl.isImportantLog(entry) {
 		return
 	}
 	
@@ -169,6 +176,33 @@ func (dl *DeploymentLogger) writeToDB(entry *LogEntry) {
 	if err := dl.DB.AddDeploymentLog(dbLog); err != nil {
 		dl.logger.Errorf("写入数据库日志失败: %v", err)
 	}
+}
+
+// isImportantLog 判断是否为重要日志（需要存储到数据库）
+func (dl *DeploymentLogger) isImportantLog(entry *LogEntry) bool {
+	// 只存储错误和警告级别的日志
+	if entry.Level == "error" || entry.Level == "warn" {
+		return true
+	}
+	
+	// 存储关键状态变更日志
+	importantSources := []string{"status", "deploy", "system"}
+	for _, source := range importantSources {
+		if entry.Source == source {
+			return true
+		}
+	}
+	
+	// 存储包含关键信息的日志
+	importantKeywords := []string{"failed", "error", "success", "complete", "start", "stop"}
+	message := strings.ToLower(entry.Message)
+	for _, keyword := range importantKeywords {
+		if strings.Contains(message, keyword) {
+			return true
+		}
+	}
+	
+	return false
 }
 
 // logToSystem 记录到系统日志

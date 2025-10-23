@@ -484,10 +484,14 @@ func NewGitServer(cfg *config.Config, translator *i18n.Translator) *GitServer {
 	}
 
 	// 初始化发布数据库（新版本）
-	deploymentDB, err := NewDeploymentDatabase(dataDir)
-	if err != nil {
+	var deploymentDB *DeploymentDatabase
+	if db, err := NewDeploymentDatabase(dataDir); err != nil {
 		logrus.Errorf("初始化发布数据库失败: %v", err)
+		logrus.Warn("发布数据库初始化失败，将使用文件日志模式继续运行")
 		deploymentDB = nil // 继续运行，但没有数据库支持
+	} else {
+		deploymentDB = db
+		logrus.Info("发布数据库初始化成功")
 	}
 
 	// 初始化通知管理器 - 从配置文件读取
