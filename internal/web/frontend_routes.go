@@ -359,41 +359,35 @@ func (s *Server) serveWithCachedCompression(w http.ResponseWriter, r *http.Reque
 	}
 
 	// 缓存未命中，需要压缩
-	// 读取文件内容
-	data, err := io.ReadAll(file)
-	if err != nil {
-		s.log.Errorf("Failed to read file for compression: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	// 压缩数据
-	var compressed []byte
-	level := 6 // 默认压缩级别
-	if s.config.Compression.Enabled {
-		if algorithm == AlgorithmGzip && s.config.Compression.Level.Gzip > 0 {
-			level = s.config.Compression.Level.Gzip
-		} else if algorithm == AlgorithmBrotli && s.config.Compression.Level.Brotli > 0 {
-			level = s.config.Compression.Level.Brotli
-		}
-	}
-
-	compressed, err = CompressData(data, algorithm, level)
-	if err != nil {
-		s.log.Errorf("Failed to compress data: %v", err)
-		// 压缩失败，返回原始数据
-		w.Write(data)
-		return
-	}
-
-	// 存入缓存（异步，避免阻塞）
-	go s.compressionCache.Set(filePath, algorithm, compressed, fileInfo.Size(), etag)
-
-	// 返回压缩数据
+	// 使用流式压缩，避免将大文件读入内存
 	w.Header().Set("Content-Encoding", string(algorithm))
 	w.Header().Set("Vary", "Accept-Encoding")
 	w.Header().Del("Content-Length")
-	w.Write(compressed)
+
+	// 使用流式压缩
+	if s.compressor != nil {
+		s.compressor.CompressStream(w, file, compression.Algorithm(algorithm))
+	} else {
+		// 如果压缩器未初始化，直接复制
+		io.Copy(w, file)
+	}
+
+	// 异步缓存压缩结果（不阻塞响应）
+	go func() {
+		// 重新读取文件进行缓存（这里需要重新打开文件）
+		if file, err := os.Open(filePath); err == nil {
+			defer file.Close()
+			data, err := io.ReadAll(file)
+			if err == nil {
+				// 压缩数据用于缓存
+				if compressed, err := CompressData(data, algorithm, 6); err == nil {
+					s.compressionCache.Set(filePath, algorithm, compressed, fileInfo.Size(), etag)
+				}
+			}
+		}
+	}()
+	return
+
 }
 
 // getContentType 根据文件名获取Content-Type

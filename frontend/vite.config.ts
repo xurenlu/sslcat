@@ -14,13 +14,27 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
-    // 生成 source maps（用于 Sentry 错误追踪）
-    sourcemap: true,
+    // 生产环境不生成 source maps，减少文件大小
+    sourcemap: false,
+    // 启用代码压缩（使用 esbuild，更快）
+    minify: 'esbuild',
+    // 设置 chunk 大小警告阈值
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        manualChunks: undefined,
-        // Source map 文件名（可选，方便管理）
-        sourcemapBaseUrl: undefined,
+        // 启用代码分割
+        manualChunks: {
+          // 将 React 相关库分离
+          'react-vendor': ['react', 'react-dom'],
+          // 将 Chakra UI 分离
+          'chakra-vendor': ['@chakra-ui/react', '@emotion/react', '@emotion/styled', 'framer-motion'],
+          // 将路由相关分离
+          'router-vendor': ['react-router-dom'],
+          // 将工具库分离
+          'utils-vendor': ['axios', 'i18next', 'react-i18next'],
+          // 将图标库分离
+          'icons-vendor': ['react-icons'],
+        },
       },
     },
   },

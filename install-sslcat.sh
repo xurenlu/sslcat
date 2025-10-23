@@ -191,19 +191,28 @@ install_git_hook() {
     log_info "安装 sslcat-git-hook..."
     
     # 检查是否有 sslcat-git-hook 脚本
-    if [[ ! -f "./scripts/sslcat-git-hook" ]]; then
+    # 优先检查根目录（发布包中的位置），然后检查 scripts 目录（开发环境）
+    if [[ ! -f "./sslcat-git-hook" ]] && [[ ! -f "./scripts/sslcat-git-hook" ]]; then
         log_warning "未找到 sslcat-git-hook 脚本，跳过安装"
         return 0
     fi
     
+    # 确定 sslcat-git-hook 脚本的位置
+    local hook_script=""
+    if [[ -f "./sslcat-git-hook" ]]; then
+        hook_script="./sslcat-git-hook"
+    elif [[ -f "./scripts/sslcat-git-hook" ]]; then
+        hook_script="./scripts/sslcat-git-hook"
+    fi
+    
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
         # Linux 系统安装
-        cp scripts/sslcat-git-hook /usr/local/bin/sslcat-git-hook
+        cp "$hook_script" /usr/local/bin/sslcat-git-hook
         chmod +x /usr/local/bin/sslcat-git-hook
         chown root:root /usr/local/bin/sslcat-git-hook
     elif [[ "$OSTYPE" == "darwin"* ]]; then
         # macOS 系统安装
-        cp scripts/sslcat-git-hook /usr/local/bin/sslcat-git-hook
+        cp "$hook_script" /usr/local/bin/sslcat-git-hook
         chmod +x /usr/local/bin/sslcat-git-hook
         chown root:wheel /usr/local/bin/sslcat-git-hook
     fi
