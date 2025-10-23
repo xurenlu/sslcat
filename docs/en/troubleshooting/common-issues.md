@@ -33,14 +33,19 @@ curl -I http://example.com/.well-known/acme-challenge/test
 **Symptoms**: Browser shows "Certificate Expired" error
 
 **Solutions**:
-```yaml
-# sslcat.conf - Enable auto-renewal
-ssl:
-  certificates:
-    - domain: "example.com"
-      provider: "letsencrypt"
-      auto_renew: true
-      renew_before_expiry: "30d"  # Renew 30 days before expiry
+```json
+{
+  "ssl": {
+    "certificates": [
+      {
+        "domain": "example.com",
+        "provider": "letsencrypt",
+        "auto_renew": true,
+        "renew_before_expiry": "30d"
+      }
+    ]
+  }
+}
 ```
 
 ```bash
@@ -93,14 +98,19 @@ docker logs sslcat
 **Symptoms**: Requests going to wrong backend or not being processed
 
 **Solutions**:
-```yaml
-# sslcat.conf - Check proxy rules
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:8080"  # Verify this is correct
-      ssl: true
-      path: "/api"  # Add path if needed
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:8080",
+        "ssl": true,
+        "path": "/api"
+      }
+    ]
+  }
+}
 ```
 
 ```bash
@@ -115,17 +125,24 @@ sslcat -config sslcat.conf -test
 **Symptoms**: Backend not receiving expected headers
 
 **Solutions**:
-```yaml
-# sslcat.conf - Configure header passing
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:8080"
-      headers:
-        pass_through: true  # Pass all headers
-        custom:
-          X-Forwarded-Proto: "https"
-          X-Real-IP: "$remote_addr"
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:8080",
+        "headers": {
+          "pass_through": true,
+          "custom": {
+            "X-Forwarded-Proto": "https",
+            "X-Real-IP": "$remote_addr"
+          }
+        }
+      }
+    ]
+  }
+}
 ```
 
 ## Load Balancing Issues
@@ -139,24 +156,31 @@ proxy:
 - Incorrect load balancing configuration
 
 **Solutions**:
-```yaml
-# sslcat.conf - Check load balancing config
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:8080"
-      load_balancing:
-        enabled: true
-        algorithm: "round_robin"
-        backends:
-          - "http://localhost:8080"
-          - "http://localhost:8081"
-          - "http://localhost:8082"
-        health_check:
-          enabled: true
-          path: "/health"
-          interval: 30s
-          timeout: 5s
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:8080",
+        "load_balancing": {
+          "enabled": true,
+          "algorithm": "round_robin",
+          "backends": [
+            "http://localhost:8080",
+            "http://localhost:8081",
+            "http://localhost:8082"
+          ],
+          "health_check": {
+            "enabled": true,
+            "path": "/health",
+            "interval": "30s"
+          }
+        }
+      }
+    ]
+  }
+}
 ```
 
 ```bash
@@ -192,21 +216,28 @@ ps aux | grep your-backend-service
 **Symptoms**: SSLcat using high CPU resources
 
 **Solutions**:
-```yaml
-# sslcat.conf - Optimize configuration
-server:
-  workers: 4  # Adjust based on CPU cores
-  max_connections: 1000
-
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:8080"
-      caching:
-        enabled: true
-        ttl: 300
-      compression:
-        enabled: true
+```json
+{
+  "server": {
+    "workers": 4,
+    "max_connections": 1000
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:8080",
+        "caching": {
+          "enabled": true,
+          "ttl": 300
+        },
+        "compression": {
+          "enabled": true
+        }
+      }
+    ]
+  }
+}
 ```
 
 ```bash
@@ -221,19 +252,25 @@ curl http://localhost:8080/metrics | grep cpu
 **Symptoms**: SSLcat using excessive memory
 
 **Solutions**:
-```yaml
-# sslcat.conf - Optimize memory usage
-server:
-  max_connections: 500
-  cache_size: "50MB"
-
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:8080"
-      caching:
-        enabled: true
-        max_size: "50MB"
+```json
+{
+  "server": {
+    "max_connections": 500,
+    "cache_size": "50MB"
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:8080",
+        "caching": {
+          "enabled": true,
+          "max_size": "50MB"
+        }
+      }
+    ]
+  }
+}
 ```
 
 ```bash
@@ -248,18 +285,25 @@ curl http://localhost:8080/metrics | grep memory
 **Symptoms**: High response times, slow page loads
 
 **Solutions**:
-```yaml
-# sslcat.conf - Enable caching and compression
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:8080"
-      caching:
-        enabled: true
-        ttl: 3600  # 1 hour
-      compression:
-        enabled: true
-        types: ["text/html", "text/css", "application/javascript"]
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:8080",
+        "caching": {
+          "enabled": true,
+          "ttl": 3600
+        },
+        "compression": {
+          "enabled": true,
+          "types": ["text/html", "text/css", "application/javascript"]
+        }
+      }
+    ]
+  }
+}
 ```
 
 ```bash
@@ -345,13 +389,16 @@ sslcat -config /full/path/to/sslcat.conf
 **Symptoms**: Metrics endpoint not responding
 
 **Solutions**:
-```yaml
-# sslcat.conf - Enable metrics
-monitoring:
-  metrics:
-    enabled: true
-    endpoint: "/metrics"
-    port: 8080
+```json
+{
+  "monitoring": {
+    "metrics": {
+      "enabled": true,
+      "endpoint": "/metrics",
+      "port": 8080
+    }
+  }
+}
 ```
 
 ```bash
@@ -366,15 +413,20 @@ curl http://localhost:8080/health
 **Symptoms**: No trace data in monitoring systems
 
 **Solutions**:
-```yaml
-# sslcat.conf - Enable tracing
-monitoring:
-  tracing:
-    enabled: true
-    sample_rate: 1.0
-    exporters:
-      jaeger:
-        endpoint: "http://jaeger:14268/api/traces"
+```json
+{
+  "monitoring": {
+    "tracing": {
+      "enabled": true,
+      "sample_rate": 1.0,
+      "exporters": {
+        "jaeger": {
+          "endpoint": "http://jaeger:14268/api/traces"
+        }
+      }
+    }
+  }
+}
 ```
 
 ```bash
@@ -420,11 +472,13 @@ docker run --rm -v $(pwd)/sslcat.conf:/app/sslcat.conf sslcat:latest -test
 ## Debugging Tools
 
 ### SSLcat Debug Mode
-```yaml
-# sslcat.conf
-server:
-  debug: true
-  log_level: "DEBUG"
+```json
+{
+  "server": {
+    "debug": true,
+    "log_level": "DEBUG"
+  }
+}
 ```
 
 ### Log Analysis

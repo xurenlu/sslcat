@@ -53,385 +53,505 @@
 ```
 
 ### 高级代理规则
-```yaml
-proxy:
-  rules:
-    - domain: "api.example.com"
-      target: "http://localhost:8080"
-      ssl: true
-      path: "/api"       # 路径匹配
-      path_rewrite: "/v1" # 路径重写
-      
-      # 头部设置
-      headers:
-        pass_through: true
-        add:
-          X-Forwarded-Proto: "https"
-          X-Real-IP: "$remote_addr"
-        remove: ["X-Forwarded-For"]
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "api.example.com",
+        "target": "http://localhost:8080",
+        "ssl": true,
+        "path": "/api",
+        "path_rewrite": "/v1",
+        "headers": {
+          "pass_through": true,
+          "add": {
+            "X-Forwarded-Proto": "https",
+            "X-Real-IP": "$remote_addr"
+          },
+          "remove": ["X-Forwarded-For"]
+        }
+      }
+    ]
+  }
+}
 ```
 
 ### 多域名配置
-```yaml
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:8080"
-      ssl: true
-    
-    - domain: "api.example.com"
-      target: "http://localhost:3000"
-      ssl: true
-    
-    - domain: "admin.example.com"
-      target: "http://localhost:4000"
-      ssl: true
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:8080",
+        "ssl": true
+      },
+      {
+        "domain": "api.example.com",
+        "target": "http://localhost:3000",
+        "ssl": true
+      },
+      {
+        "domain": "admin.example.com",
+        "target": "http://localhost:4000",
+        "ssl": true
+      }
+    ]
+  }
+}
 ```
 
 ## SSL 证书配置
 
 ### Let's Encrypt 自动证书
-```yaml
-# sslcat.conf
-ssl:
-  certificates:
-    - domain: "example.com"
-      provider: "letsencrypt"
-      email: "admin@example.com"
-      auto_renew: true
+```json
+{
+  "ssl": {
+    "certificates": [
+      {
+        "domain": "example.com",
+        "provider": "letsencrypt",
+        "email": "admin@example.com",
+        "auto_renew": true
+      }
+    ]
+  }
+}
 ```
 
 ### 自定义证书
-```yaml
-ssl:
-  certificates:
-    - domain: "example.com"
-      cert_file: "/path/to/cert.pem"
-      key_file: "/path/to/key.pem"
-      chain_file: "/path/to/chain.pem"
+```json
+{
+  "ssl": {
+    "certificates": [
+      {
+        "domain": "example.com",
+        "cert_file": "/path/to/cert.pem",
+        "key_file": "/path/to/key.pem",
+        "chain_file": "/path/to/chain.pem"
+      }
+    ]
+  }
+}
 ```
 
 ### 多域名证书
-```yaml
-ssl:
-  certificates:
-    - domain: "example.com"
-      provider: "letsencrypt"
-      email: "admin@example.com"
-      auto_renew: true
-      subdomains: ["www", "api", "admin"]
+```json
+{
+  "ssl": {
+    "certificates": [
+      {
+        "domain": "example.com",
+        "provider": "letsencrypt",
+        "email": "admin@example.com",
+        "auto_renew": true,
+        "subdomains": ["www", "api", "admin"]
+      }
+    ]
+  }
+}
 ```
 
 ## 负载均衡配置
 
 ### 基本负载均衡
-```yaml
-proxy:
-  rules:
-    - domain: "api.example.com"
-      target: "http://localhost:8080"
-      ssl: true
-      load_balancing:
-        enabled: true
-        algorithm: "round_robin"
-        backends:
-          - "http://localhost:8080"
-          - "http://localhost:8081"
-          - "http://localhost:8082"
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "api.example.com",
+        "target": "http://localhost:8080",
+        "ssl": true,
+        "load_balancing": {
+          "enabled": true,
+          "algorithm": "round_robin",
+          "backends": [
+            "http://localhost:8080",
+            "http://localhost:8081",
+            "http://localhost:8082"
+          ]
+        }
+      }
+    ]
+  }
+}
 ```
 
 ### 高级负载均衡
-```yaml
-proxy:
-  rules:
-    - domain: "api.example.com"
-      target: "http://localhost:8080"
-      ssl: true
-      load_balancing:
-        enabled: true
-        algorithm: "least_connections"
-        backends:
-          - url: "http://localhost:8080"
-            weight: 3
-            max_connections: 100
-          - url: "http://localhost:8081"
-            weight: 2
-            max_connections: 50
-          - url: "http://localhost:8082"
-            weight: 1
-            max_connections: 25
-        
-        # 健康检查
-        health_check:
-          enabled: true
-          path: "/health"
-          interval: 30s
-          timeout: 5s
-          retries: 3
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "api.example.com",
+        "target": "http://localhost:8080",
+        "ssl": true,
+        "load_balancing": {
+          "enabled": true,
+          "algorithm": "least_connections",
+          "backends": [
+            {
+              "url": "http://localhost:8080",
+              "weight": 3,
+              "max_connections": 100
+            },
+            {
+              "url": "http://localhost:8081",
+              "weight": 2,
+              "max_connections": 50
+            },
+            {
+              "url": "http://localhost:8082",
+              "weight": 1,
+              "max_connections": 25
+            }
+          ],
+          "health_check": {
+            "enabled": true,
+            "path": "/health",
+            "interval": "30s",
+            "timeout": "5s",
+            "retries": 3
+          }
+        }
+      }
+    ]
+  }
+}
 ```
 
 ## 缓存配置
 
 ### 基本缓存
-```yaml
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:8080"
-      ssl: true
-      caching:
-        enabled: true
-        ttl: 3600  # 1小时
-        max_size: "100MB"
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:8080",
+        "ssl": true,
+        "caching": {
+          "enabled": true,
+          "ttl": 3600,
+          "max_size": "100MB"
+        }
+      }
+    ]
+  }
+}
 ```
 
 ### 高级缓存
-```yaml
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:8080"
-      ssl: true
-      caching:
-        enabled: true
-        ttl: 3600
-        max_size: "100MB"
-        max_entries: 10000
-        
-        # 缓存策略
-        policies:
-          - path: "/static/*"
-            ttl: 86400  # 24小时
-          - path: "/api/cacheable/*"
-            ttl: 300   # 5分钟
-          - path: "/api/dynamic/*"
-            ttl: 0     # 不缓存
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:8080",
+        "ssl": true,
+        "caching": {
+          "enabled": true,
+          "ttl": 3600,
+          "max_size": "100MB",
+          "max_entries": 10000,
+          "policies": [
+            {
+              "path": "/static/*",
+              "ttl": 86400
+            },
+            {
+              "path": "/api/cacheable/*",
+              "ttl": 300
+            },
+            {
+              "path": "/api/dynamic/*",
+              "ttl": 0
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
 ```
 
 ## 压缩配置
 
 ### 基本压缩
-```yaml
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:8080"
-      ssl: true
-      compression:
-        enabled: true
-        types: ["text/html", "text/css", "application/javascript"]
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:8080",
+        "ssl": true,
+        "compression": {
+          "enabled": true,
+          "types": ["text/html", "text/css", "application/javascript"]
+        }
+      }
+    ]
+  }
+}
 ```
 
 ### 高级压缩
-```yaml
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:8080"
-      ssl: true
-      compression:
-        enabled: true
-        algorithm: "gzip"
-        min_size: 1024
-        max_size: 10485760  # 10MB
-        types: ["text/html", "text/css", "application/javascript", "application/json"]
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:8080",
+        "ssl": true,
+        "compression": {
+          "enabled": true,
+          "algorithm": "gzip",
+          "min_size": 1024,
+          "max_size": 10485760,
+          "types": ["text/html", "text/css", "application/javascript", "application/json"]
+        }
+      }
+    ]
+  }
+}
 ```
 
 ## 监控配置
 
 ### 基本监控
-```yaml
-# sslcat.conf
-monitoring:
-  metrics:
-    enabled: true
-    endpoint: "/metrics"
-    port: 8080
+```json
+{
+  "monitoring": {
+    "metrics": {
+      "enabled": true,
+      "endpoint": "/metrics",
+      "port": 8080
+    }
+  }
+}
 ```
 
 ### 高级监控
-```yaml
-monitoring:
-  metrics:
-    enabled: true
-    endpoint: "/metrics"
-    port: 8080
-    
-    # Prometheus 指标
-    prometheus:
-      enabled: true
-      path: "/metrics"
-      format: "prometheus"
-  
-  # 分布式追踪
-  tracing:
-    enabled: true
-    service_name: "sslcat-proxy"
-    sample_rate: 0.1  # 10%采样
-    
-    # 追踪导出器
-    exporters:
-      jaeger:
-        endpoint: "http://jaeger:14268/api/traces"
-      zipkin:
-        endpoint: "http://zipkin:9411/api/v2/spans"
+```json
+{
+  "monitoring": {
+    "metrics": {
+      "enabled": true,
+      "endpoint": "/metrics",
+      "port": 8080,
+      "prometheus": {
+        "enabled": true,
+        "path": "/metrics",
+        "format": "prometheus"
+      }
+    },
+    "tracing": {
+      "enabled": true,
+      "service_name": "sslcat-proxy",
+      "sample_rate": 0.1,
+      "exporters": {
+        "jaeger": {
+          "endpoint": "http://jaeger:14268/api/traces"
+        },
+        "zipkin": {
+          "endpoint": "http://zipkin:9411/api/v2/spans"
+        }
+      }
+    }
+  }
+}
 ```
 
 ## 安全配置
 
 ### 基本安全设置
-```yaml
-# sslcat.conf
-security:
-  # DDoS 防护
-  ddos_protection:
-    enabled: true
-    rate_limit: 100  # 每秒请求数
-    burst_size: 200  # 突发请求数
-  
-  # 访问控制
-  access_control:
-    enabled: true
-    whitelist: ["192.168.1.0/24"]
-    blacklist: ["192.168.1.100"]
+```json
+{
+  "security": {
+    "ddos_protection": {
+      "enabled": true,
+      "rate_limit": 100,
+      "burst_size": 200
+    },
+    "access_control": {
+      "enabled": true,
+      "whitelist": ["192.168.1.0/24"],
+      "blacklist": ["192.168.1.100"]
+    }
+  }
+}
 ```
 
 ### 高级安全设置
-```yaml
-security:
-  # DDoS 防护
-  ddos_protection:
-    enabled: true
-    rate_limiting:
-      global:
-        requests_per_second: 1000
-        burst_size: 2000
-      per_ip:
-        requests_per_second: 10
-        burst_size: 20
-  
-  # 访问控制
-  access_control:
-    enabled: true
-    ip_filtering:
-      whitelist: ["192.168.1.0/24", "10.0.0.0/8"]
-      blacklist: ["192.168.1.100"]
-      default_policy: "deny"
-  
-  # 安全头部
-  security_headers:
-    enabled: true
-    hsts: true
-    xss_protection: true
-    content_type_options: true
-    frame_options: "DENY"
+```json
+{
+  "security": {
+    "ddos_protection": {
+      "enabled": true,
+      "rate_limiting": {
+        "global": {
+          "requests_per_second": 1000,
+          "burst_size": 2000
+        },
+        "per_ip": {
+          "requests_per_second": 10,
+          "burst_size": 20
+        }
+      }
+    },
+    "access_control": {
+      "enabled": true,
+      "ip_filtering": {
+        "whitelist": ["192.168.1.0/24", "10.0.0.0/8"],
+        "blacklist": ["192.168.1.100"],
+        "default_policy": "deny"
+      }
+    },
+    "security_headers": {
+      "enabled": true,
+      "hsts": true,
+      "xss_protection": true,
+      "content_type_options": true,
+      "frame_options": "DENY"
+    }
+  }
+}
 ```
 
 ## 日志配置
 
 ### 基本日志设置
-```yaml
-# sslcat.conf
-logging:
-  level: "info"
-  format: "json"
-  output: "stdout"
+```json
+{
+  "logging": {
+    "level": "info",
+    "format": "json",
+    "output": "stdout"
+  }
+}
 ```
 
 ### 高级日志设置
-```yaml
-logging:
-  level: "info"
-  format: "json"
-  
-  # 日志输出
-  outputs:
-    - type: "file"
-      path: "/var/log/sslcat/sslcat.log"
-      max_size: "100MB"
-      max_files: 5
-      compress: true
-    
-    - type: "syslog"
-      host: "localhost"
-      port: 514
-      facility: "local0"
-  
-  # 结构化日志
-  structured:
-    enabled: true
-    fields:
-      timestamp: true
-      level: true
-      message: true
-      request_id: true
-      trace_id: true
-      span_id: true
+```json
+{
+  "logging": {
+    "level": "info",
+    "format": "json",
+    "outputs": [
+      {
+        "type": "file",
+        "path": "/var/log/sslcat/sslcat.log",
+        "max_size": "100MB",
+        "max_files": 5,
+        "compress": true
+      },
+      {
+        "type": "syslog",
+        "host": "localhost",
+        "port": 514,
+        "facility": "local0"
+      }
+    ],
+    "structured": {
+      "enabled": true,
+      "fields": {
+        "timestamp": true,
+        "level": true,
+        "message": true,
+        "request_id": true,
+        "trace_id": true
+      }
+    }
+  }
+}
 ```
 
 ## 完整配置示例
 
 ### 生产环境配置
-```yaml
-# sslcat.conf
-server:
-  host: "0.0.0.0"
-  port: 80
-  ssl_port: 443
-  debug: false
-  workers: 4
-  max_connections: 1000
-
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:8080"
-      ssl: true
-      load_balancing:
-        enabled: true
-        algorithm: "round_robin"
-        backends:
-          - "http://localhost:8080"
-          - "http://localhost:8081"
-          - "http://localhost:8082"
-        health_check:
-          enabled: true
-          path: "/health"
-          interval: 30s
-      caching:
-        enabled: true
-        ttl: 3600
-        max_size: "100MB"
-      compression:
-        enabled: true
-        types: ["text/html", "text/css", "application/javascript"]
-
-ssl:
-  certificates:
-    - domain: "example.com"
-      provider: "letsencrypt"
-      email: "admin@example.com"
-      auto_renew: true
-
-monitoring:
-  metrics:
-    enabled: true
-    endpoint: "/metrics"
-  tracing:
-    enabled: true
-    sample_rate: 0.1
-
-security:
-  ddos_protection:
-    enabled: true
-    rate_limit: 100
-  access_control:
-    enabled: true
-    whitelist: ["192.168.1.0/24"]
-
-logging:
-  level: "info"
-  format: "json"
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 80,
+    "ssl_port": 443,
+    "debug": false,
+    "workers": 4,
+    "max_connections": 1000
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:8080",
+        "ssl": true,
+        "load_balancing": {
+          "enabled": true,
+          "algorithm": "round_robin",
+          "backends": [
+            "http://localhost:8080",
+            "http://localhost:8081",
+            "http://localhost:8082"
+          ],
+          "health_check": {
+            "enabled": true,
+            "path": "/health",
+            "interval": "30s"
+          }
+        },
+        "caching": {
+          "enabled": true,
+          "ttl": 3600,
+          "max_size": "100MB"
+        },
+        "compression": {
+          "enabled": true,
+          "types": ["text/html", "text/css", "application/javascript"]
+        }
+      }
+    ]
+  },
+  "ssl": {
+    "certificates": [
+      {
+        "domain": "example.com",
+        "provider": "letsencrypt",
+        "email": "admin@example.com",
+        "auto_renew": true
+      }
+    ]
+  },
+  "monitoring": {
+    "metrics": {
+      "enabled": true,
+      "endpoint": "/metrics"
+    },
+    "tracing": {
+      "enabled": true,
+      "sample_rate": 0.1
+    }
+  },
+  "security": {
+    "ddos_protection": {
+      "enabled": true,
+      "rate_limit": 100
+    },
+    "access_control": {
+      "enabled": true,
+      "whitelist": ["192.168.1.0/24"]
+    }
+  },
+  "logging": {
+    "level": "info",
+    "format": "json"
+  }
+}
 ```
 
 ## 配置验证

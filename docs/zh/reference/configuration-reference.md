@@ -77,16 +77,21 @@ SSLcat 使用 JSON 格式的配置文件，默认文件名为 `sslcat.conf`。
 ```
 
 ### 管理界面
-```yaml
-server:
-  admin:
-    enabled: true
-    host: "0.0.0.0"
-    port: 8080
-    path: "/admin"
-    auth:
-      username: "admin"
-      password: "admin123"
+```json
+{
+  "server": {
+    "admin": {
+      "enabled": true,
+      "host": "0.0.0.0",
+      "port": 8080,
+      "path": "/admin",
+      "auth": {
+        "username": "admin",
+        "password": "admin123"
+      }
+    }
+  }
+}
 ```
 
 ## 代理配置

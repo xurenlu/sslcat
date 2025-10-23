@@ -14,26 +14,34 @@
 
 创建基础 SSLcat 配置：
 
-```yaml
-# sslcat.conf
-server:
-  host: "0.0.0.0"
-  port: 80
-  ssl_port: 443
-  debug: true
-
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:3000"
-      ssl: true
-
-ssl:
-  certificates:
-    - domain: "example.com"
-      provider: "letsencrypt"
-      email: "admin@example.com"
-      auto_renew: true
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 80,
+    "ssl_port": 443,
+    "debug": true
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:3000",
+        "ssl": true
+      }
+    ]
+  },
+  "ssl": {
+    "certificates": [
+      {
+        "domain": "example.com",
+        "provider": "letsencrypt",
+        "email": "admin@example.com",
+        "auto_renew": true
+      }
+    ]
+  }
+}
 ```
 
 ## 步骤 2：启动 SSLcat

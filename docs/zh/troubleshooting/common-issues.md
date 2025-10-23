@@ -33,14 +33,19 @@ curl -I http://example.com/.well-known/acme-challenge/test
 **症状**: 浏览器显示"证书过期"错误
 
 **解决方案**:
-```yaml
-# sslcat.conf - 启用自动续期
-ssl:
-  certificates:
-    - domain: "example.com"
-      provider: "letsencrypt"
-      auto_renew: true
-      renew_before_expiry: "30d"  # 过期前30天续期
+```json
+{
+  "ssl": {
+    "certificates": [
+      {
+        "domain": "example.com",
+        "provider": "letsencrypt",
+        "auto_renew": true,
+        "renew_before_expiry": "30d"
+      }
+    ]
+  }
+}
 ```
 
 ```bash
@@ -93,14 +98,19 @@ docker logs sslcat
 **症状**: 请求发送到错误的后端或未被处理
 
 **解决方案**:
-```yaml
-# sslcat.conf - 检查代理规则
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:8080"  # 验证这是正确的
-      ssl: true
-      path: "/api"  # 如果需要，添加路径
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:8080",
+        "ssl": true,
+        "path": "/api"
+      }
+    ]
+  }
+}
 ```
 
 ```bash
@@ -115,17 +125,24 @@ sslcat -config sslcat.conf -test
 **症状**: 后端未收到预期的头部
 
 **解决方案**:
-```yaml
-# sslcat.conf - 配置头部传递
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:8080"
-      headers:
-        pass_through: true  # 传递所有头部
-        custom:
-          X-Forwarded-Proto: "https"
-          X-Real-IP: "$remote_addr"
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:8080",
+        "headers": {
+          "pass_through": true,
+          "custom": {
+            "X-Forwarded-Proto": "https",
+            "X-Real-IP": "$remote_addr"
+          }
+        }
+      }
+    ]
+  }
+}
 ```
 
 ## 负载均衡问题
@@ -139,24 +156,32 @@ proxy:
 - 负载均衡配置错误
 
 **解决方案**:
-```yaml
-# sslcat.conf - 检查负载均衡配置
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:8080"
-      load_balancing:
-        enabled: true
-        algorithm: "round_robin"
-        backends:
-          - "http://localhost:8080"
-          - "http://localhost:8081"
-          - "http://localhost:8082"
-        health_check:
-          enabled: true
-          path: "/health"
-          interval: 30s
-          timeout: 5s
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:8080",
+        "load_balancing": {
+          "enabled": true,
+          "algorithm": "round_robin",
+          "backends": [
+            "http://localhost:8080",
+            "http://localhost:8081",
+            "http://localhost:8082"
+          ],
+          "health_check": {
+            "enabled": true,
+            "path": "/health",
+            "interval": "30s",
+            "timeout": "5s"
+          }
+        }
+      }
+    ]
+  }
+}
 ```
 
 ```bash
@@ -192,21 +217,28 @@ ps aux | grep your-backend-service
 **症状**: SSLcat 使用高 CPU 资源
 
 **解决方案**:
-```yaml
-# sslcat.conf - 优化配置
-server:
-  workers: 4  # 根据 CPU 核心数调整
-  max_connections: 1000
-
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:8080"
-      caching:
-        enabled: true
-        ttl: 300
-      compression:
-        enabled: true
+```json
+{
+  "server": {
+    "workers": 4,
+    "max_connections": 1000
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:8080",
+        "caching": {
+          "enabled": true,
+          "ttl": 300
+        },
+        "compression": {
+          "enabled": true
+        }
+      }
+    ]
+  }
+}
 ```
 
 ```bash
@@ -221,19 +253,25 @@ curl http://localhost:8080/metrics | grep cpu
 **症状**: SSLcat 使用过多内存
 
 **解决方案**:
-```yaml
-# sslcat.conf - 优化内存使用
-server:
-  max_connections: 500
-  cache_size: "50MB"
-
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:8080"
-      caching:
-        enabled: true
-        max_size: "50MB"
+```json
+{
+  "server": {
+    "max_connections": 500,
+    "cache_size": "50MB"
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:8080",
+        "caching": {
+          "enabled": true,
+          "max_size": "50MB"
+        }
+      }
+    ]
+  }
+}
 ```
 
 ```bash
@@ -248,18 +286,25 @@ curl http://localhost:8080/metrics | grep memory
 **症状**: 高响应时间，页面加载慢
 
 **解决方案**:
-```yaml
-# sslcat.conf - 启用缓存和压缩
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:8080"
-      caching:
-        enabled: true
-        ttl: 3600  # 1小时
-      compression:
-        enabled: true
-        types: ["text/html", "text/css", "application/javascript"]
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:8080",
+        "caching": {
+          "enabled": true,
+          "ttl": 3600
+        },
+        "compression": {
+          "enabled": true,
+          "types": ["text/html", "text/css", "application/javascript"]
+        }
+      }
+    ]
+  }
+}
 ```
 
 ```bash
@@ -345,13 +390,16 @@ sslcat -config /full/path/to/sslcat.conf
 **症状**: 指标端点无响应
 
 **解决方案**:
-```yaml
-# sslcat.conf - 启用指标
-monitoring:
-  metrics:
-    enabled: true
-    endpoint: "/metrics"
-    port: 8080
+```json
+{
+  "monitoring": {
+    "metrics": {
+      "enabled": true,
+      "endpoint": "/metrics",
+      "port": 8080
+    }
+  }
+}
 ```
 
 ```bash
@@ -366,15 +414,20 @@ curl http://localhost:8080/health
 **症状**: 监控系统中没有追踪数据
 
 **解决方案**:
-```yaml
-# sslcat.conf - 启用追踪
-monitoring:
-  tracing:
-    enabled: true
-    sample_rate: 1.0
-    exporters:
-      jaeger:
-        endpoint: "http://jaeger:14268/api/traces"
+```json
+{
+  "monitoring": {
+    "tracing": {
+      "enabled": true,
+      "sample_rate": 1.0,
+      "exporters": {
+        "jaeger": {
+          "endpoint": "http://jaeger:14268/api/traces"
+        }
+      }
+    }
+  }
+}
 ```
 
 ```bash
@@ -420,11 +473,13 @@ docker run --rm -v $(pwd)/sslcat.conf:/app/sslcat.conf sslcat:latest -test
 ## 调试工具
 
 ### SSLcat 调试模式
-```yaml
-# sslcat.conf
-server:
-  debug: true
-  log_level: "DEBUG"
+```json
+{
+  "server": {
+    "debug": true,
+    "log_level": "DEBUG"
+  }
+}
 ```
 
 ### 日志分析
