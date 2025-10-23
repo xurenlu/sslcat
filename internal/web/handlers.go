@@ -321,19 +321,12 @@ func (s *Server) processLogin(w http.ResponseWriter, r *http.Request) {
 	var authenticatedUser *User
 	var isSuperAdmin bool
 
-	// 1. 首先尝试普通用户认证
-	user, err := s.userManager.AuthenticateUser(username, password)
-	if err == nil {
-		authenticatedUser = user
-		s.log.Infof("普通用户认证成功: %s (角色: %s)", username, user.Role)
-	} else {
-		s.log.Debugf("普通用户认证失败: %v", err)
-
-		// 2. 如果普通用户认证失败，尝试超级管理员认证
-		usernameMatch := username == s.config.Admin.Username
+	// 1. 首先检查是否为超管用户名，如果是则优先使用超管认证
+	usernameMatch := username == s.config.Admin.Username
+	if usernameMatch {
+		// 超管用户名，优先使用超管认证
 		passwordMatch := s.verifyAdminPassword(password)
-
-		if usernameMatch && passwordMatch {
+		if passwordMatch {
 			// 创建超级管理员用户对象
 			authenticatedUser = &User{
 				Username: username,
@@ -342,6 +335,17 @@ func (s *Server) processLogin(w http.ResponseWriter, r *http.Request) {
 			}
 			isSuperAdmin = true
 			s.log.Infof("超级管理员认证成功: %s", username)
+		} else {
+			s.log.Debugf("超级管理员认证失败: %s", username)
+		}
+	} else {
+		// 2. 非超管用户名，尝试普通用户认证
+		user, err := s.userManager.AuthenticateUser(username, password)
+		if err == nil {
+			authenticatedUser = user
+			s.log.Infof("普通用户认证成功: %s (角色: %s)", username, user.Role)
+		} else {
+			s.log.Debugf("普通用户认证失败: %v", err)
 		}
 	}
 

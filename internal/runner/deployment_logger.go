@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,10 +33,10 @@ type DeploymentLogger struct {
 
 // LogEntry 日志条目
 type LogEntry struct {
-	Timestamp time.Time `json:"timestamp"`
-	Level     string    `json:"level"`
-	Source    string    `json:"source"`
-	Message   string    `json:"message"`
+	Timestamp time.Time              `json:"timestamp"`
+	Level     string                 `json:"level"`
+	Source    string                 `json:"source"`
+	Message   string                 `json:"message"`
 	Metadata  map[string]interface{} `json:"metadata,omitempty"`
 }
 
@@ -43,21 +44,21 @@ type LogEntry struct {
 func NewDeploymentLogger(appName, commitSHA, branch, deployer, message string, db *DeploymentDatabase, logsDir string) (*DeploymentLogger, error) {
 	// 生成 UUID
 	deploymentUUID := uuid.New().String()
-	
+
 	// 创建日志文件路径
 	logFile := filepath.Join(logsDir, fmt.Sprintf("deploy-%s.log", time.Now().Format("2006-01-02")))
-	
+
 	// 确保日志目录存在
 	if err := os.MkdirAll(filepath.Dir(logFile), 0755); err != nil {
 		return nil, fmt.Errorf("创建日志目录失败: %v", err)
 	}
-	
+
 	// 打开日志文件
 	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return nil, fmt.Errorf("打开日志文件失败: %v", err)
 	}
-	
+
 	// 创建发布记录（仅在数据库可用时）
 	if db != nil {
 		deployment := &Deployment{
@@ -70,13 +71,13 @@ func NewDeploymentLogger(appName, commitSHA, branch, deployer, message string, d
 			Deployer:  deployer,
 			Message:   message,
 		}
-		
+
 		// 保存到数据库
 		if err := db.CreateDeployment(deployment); err != nil {
 			log.Printf("警告：创建发布记录失败，将使用文件日志模式: %v", err)
 		}
 	}
-	
+
 	logger := &DeploymentLogger{
 		UUID:       deploymentUUID,
 		AppName:    appName,
@@ -89,12 +90,12 @@ func NewDeploymentLogger(appName, commitSHA, branch, deployer, message string, d
 		FileWriter: file,
 		startTime:  time.Now(),
 		logger: logrus.WithFields(logrus.Fields{
-			"component":    "deployment_logger",
-			"deployment":   deploymentUUID,
-			"app":         appName,
+			"component":  "deployment_logger",
+			"deployment": deploymentUUID,
+			"app":        appName,
 		}),
 	}
-	
+
 	logger.logger.Infof("创建发布日志记录器: %s", deploymentUUID)
 	return logger, nil
 }
@@ -107,7 +108,7 @@ func (dl *DeploymentLogger) WriteLog(level, source, message string) {
 // WriteLogWithMetadata 写入带元数据的日志
 func (dl *DeploymentLogger) WriteLogWithMetadata(level, source, message string, metadata map[string]interface{}) {
 	timestamp := time.Now()
-	
+
 	// 创建日志条目
 	logEntry := &LogEntry{
 		Timestamp: timestamp,
@@ -116,13 +117,13 @@ func (dl *DeploymentLogger) WriteLogWithMetadata(level, source, message string, 
 		Message:   message,
 		Metadata:  metadata,
 	}
-	
+
 	// 1. 写入文件（保持现有功能）
 	dl.writeToFile(logEntry)
-	
+
 	// 2. 写入数据库（新增功能）
 	dl.writeToDB(logEntry)
-	
+
 	// 3. 记录到系统日志
 	dl.logToSystem(logEntry)
 }
@@ -135,7 +136,7 @@ func (dl *DeploymentLogger) writeToFile(entry *LogEntry) {
 		dl.logger.Errorf("序列化日志失败: %v", err)
 		return
 	}
-	
+
 	_, err = dl.FileWriter.Write(append(jsonData, '\n'))
 	if err != nil {
 		dl.logger.Errorf("写入日志文件失败: %v", err)
@@ -147,12 +148,12 @@ func (dl *DeploymentLogger) writeToDB(entry *LogEntry) {
 	if dl.DB == nil {
 		return
 	}
-	
+
 	// 只存储关键日志，不存储所有日志
 	if !dl.isImportantLog(entry) {
 		return
 	}
-	
+
 	// 序列化元数据
 	var metadataStr string
 	if entry.Metadata != nil {
@@ -161,7 +162,7 @@ func (dl *DeploymentLogger) writeToDB(entry *LogEntry) {
 			metadataStr = string(metadataBytes)
 		}
 	}
-	
+
 	// 创建数据库日志记录
 	dbLog := &DeploymentLog{
 		DeploymentUUID: dl.UUID,
@@ -171,7 +172,7 @@ func (dl *DeploymentLogger) writeToDB(entry *LogEntry) {
 		Timestamp:      entry.Timestamp,
 		Metadata:       metadataStr,
 	}
-	
+
 	// 写入数据库
 	if err := dl.DB.AddDeploymentLog(dbLog); err != nil {
 		dl.logger.Errorf("写入数据库日志失败: %v", err)
@@ -184,7 +185,7 @@ func (dl *DeploymentLogger) isImportantLog(entry *LogEntry) bool {
 	if entry.Level == "error" || entry.Level == "warn" {
 		return true
 	}
-	
+
 	// 存储关键状态变更日志
 	importantSources := []string{"status", "deploy", "system"}
 	for _, source := range importantSources {
@@ -192,7 +193,7 @@ func (dl *DeploymentLogger) isImportantLog(entry *LogEntry) bool {
 			return true
 		}
 	}
-	
+
 	// 存储包含关键信息的日志
 	importantKeywords := []string{"failed", "error", "success", "complete", "start", "stop"}
 	message := strings.ToLower(entry.Message)
@@ -201,7 +202,7 @@ func (dl *DeploymentLogger) isImportantLog(entry *LogEntry) bool {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -212,14 +213,14 @@ func (dl *DeploymentLogger) logToSystem(entry *LogEntry) {
 		"app":        dl.AppName,
 		"source":     entry.Source,
 	}
-	
+
 	// 合并元数据
 	if entry.Metadata != nil {
 		for k, v := range entry.Metadata {
 			fields[k] = v
 		}
 	}
-	
+
 	switch entry.Level {
 	case "error":
 		dl.logger.WithFields(fields).Error(entry.Message)
@@ -244,19 +245,19 @@ func (dl *DeploymentLogger) WriteError(err error) {
 // UpdateStatus 更新发布状态
 func (dl *DeploymentLogger) UpdateStatus(status string, progress int, message string) {
 	dl.logger.Infof("更新发布状态: %s (%d%%) - %s", status, progress, message)
-	
+
 	// 更新数据库状态
 	if dl.DB != nil {
 		if err := dl.DB.UpdateDeploymentStatus(dl.UUID, status, progress, message); err != nil {
 			dl.logger.Errorf("更新发布状态失败: %v", err)
 		}
 	}
-	
+
 	// 调用状态回调
 	if dl.statusCallback != nil {
 		dl.statusCallback(status, progress, message)
 	}
-	
+
 	// 记录状态更新日志
 	dl.WriteLogWithMetadata("info", "status", fmt.Sprintf("状态更新: %s (%d%%)", status, progress), map[string]interface{}{
 		"status":   status,
@@ -298,21 +299,21 @@ func (dl *DeploymentLogger) GetDuration() time.Duration {
 // Close 关闭日志记录器
 func (dl *DeploymentLogger) Close() error {
 	dl.logger.Infof("关闭发布日志记录器: %s", dl.UUID)
-	
+
 	// 关闭文件
 	if file, ok := dl.FileWriter.(*os.File); ok {
 		if err := file.Close(); err != nil {
 			dl.logger.Errorf("关闭日志文件失败: %v", err)
 		}
 	}
-	
+
 	// 记录完成时间
 	duration := dl.GetDuration()
 	dl.WriteLogWithMetadata("info", "system", "发布日志记录器关闭", map[string]interface{}{
 		"duration_ms": duration.Milliseconds(),
 		"duration":    duration.String(),
 	})
-	
+
 	return nil
 }
 
@@ -324,16 +325,16 @@ func (dl *DeploymentLogger) GetLogFile() string {
 // GetDeploymentInfo 获取发布信息
 func (dl *DeploymentLogger) GetDeploymentInfo() map[string]interface{} {
 	return map[string]interface{}{
-		"uuid":         dl.UUID,
-		"app_name":     dl.AppName,
-		"commit_sha":   dl.CommitSHA,
-		"branch":       dl.Branch,
-		"version":      dl.Version,
-		"deployer":     dl.Deployer,
-		"message":      dl.Message,
-		"log_file":     dl.LogFile,
-		"start_time":   dl.startTime,
-		"duration":     dl.GetDuration().String(),
-		"duration_ms":  dl.GetDuration().Milliseconds(),
+		"uuid":        dl.UUID,
+		"app_name":    dl.AppName,
+		"commit_sha":  dl.CommitSHA,
+		"branch":      dl.Branch,
+		"version":     dl.Version,
+		"deployer":    dl.Deployer,
+		"message":     dl.Message,
+		"log_file":    dl.LogFile,
+		"start_time":  dl.startTime,
+		"duration":    dl.GetDuration().String(),
+		"duration_ms": dl.GetDuration().Milliseconds(),
 	}
 }

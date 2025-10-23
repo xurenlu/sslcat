@@ -35,19 +35,12 @@ func (s *Server) handleAPIAuthLogin(w http.ResponseWriter, r *http.Request) {
 	// 多账户认证逻辑
 	var authenticatedUser *User
 
-	// 1. 首先尝试普通用户认证
-	user, err := s.userManager.AuthenticateUser(req.Username, req.Password)
-	if err == nil {
-		authenticatedUser = user
-		s.log.Infof("普通用户认证成功: %s (角色: %s)", req.Username, user.Role)
-	} else {
-		s.log.Debugf("普通用户认证失败: %v", err)
-
-		// 2. 如果普通用户认证失败，尝试超级管理员认证
-		usernameMatch := req.Username == s.config.Admin.Username
+	// 1. 首先检查是否为超管用户名，如果是则优先使用超管认证
+	usernameMatch := req.Username == s.config.Admin.Username
+	if usernameMatch {
+		// 超管用户名，优先使用超管认证
 		passwordMatch := s.verifyAdminPassword(req.Password)
-
-		if usernameMatch && passwordMatch {
+		if passwordMatch {
 			// 创建超级管理员用户对象
 			authenticatedUser = &User{
 				Username: req.Username,
@@ -55,6 +48,17 @@ func (s *Server) handleAPIAuthLogin(w http.ResponseWriter, r *http.Request) {
 				IsActive: true,
 			}
 			s.log.Infof("超级管理员认证成功: %s", req.Username)
+		} else {
+			s.log.Debugf("超级管理员认证失败: %s", req.Username)
+		}
+	} else {
+		// 2. 非超管用户名，尝试普通用户认证
+		user, err := s.userManager.AuthenticateUser(req.Username, req.Password)
+		if err == nil {
+			authenticatedUser = user
+			s.log.Infof("普通用户认证成功: %s (角色: %s)", req.Username, user.Role)
+		} else {
+			s.log.Debugf("普通用户认证失败: %v", err)
 		}
 	}
 

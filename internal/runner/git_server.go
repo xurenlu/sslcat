@@ -1149,7 +1149,7 @@ func (gs *GitServer) processGitPush(app *GitApp, pushData []byte) {
 
 	// 更新部署成功状态
 	deployLogger.UpdateStatus("success", 100, fmt.Sprintf("部署成功 - 耗时: %v", deployLogger.GetDuration()))
-	
+
 	gs.handleDeploySuccess(app)
 }
 

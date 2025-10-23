@@ -36,9 +36,10 @@ const (
 
 // UserManager 用户管理器
 type UserManager struct {
-	db     *sql.DB
-	log    UserLogger
-	dbPath string
+	db              *sql.DB
+	log             UserLogger
+	dbPath          string
+	conflictManager *UserConflictManager
 }
 
 // UserLogger 用户管理器日志接口
@@ -50,7 +51,7 @@ type UserLogger interface {
 }
 
 // NewUserManager 创建用户管理器
-func NewUserManager(log UserLogger, dataDir string) (*UserManager, error) {
+func NewUserManager(log UserLogger, dataDir string, adminUsername string) (*UserManager, error) {
 	dbPath := filepath.Join(dataDir, "users.db")
 
 	// 确保数据目录存在
@@ -71,9 +72,10 @@ func NewUserManager(log UserLogger, dataDir string) (*UserManager, error) {
 	db.SetConnMaxLifetime(5 * time.Minute) // 连接最大生存时间
 
 	manager := &UserManager{
-		db:     db,
-		log:    log,
-		dbPath: dbPath,
+		db:              db,
+		log:             log,
+		dbPath:          dbPath,
+		conflictManager: NewUserConflictManager(adminUsername, log),
 	}
 
 	// 初始化数据库表
@@ -145,6 +147,11 @@ func (um *UserManager) CreateUser(username, password, role, email, createdBy str
 	// 验证用户名
 	if username == "" || len(username) < 3 {
 		return fmt.Errorf("用户名长度至少3个字符")
+	}
+	
+	// 检查用户名冲突
+	if err := um.conflictManager.ValidateUsername(username); err != nil {
+		return err
 	}
 
 	// 验证角色
