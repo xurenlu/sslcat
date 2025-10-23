@@ -120,8 +120,8 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	// 初始化压缩器
 	compressor := compression.NewCompressor(compression.FromConfig(cfg))
 
-	// 初始化压缩缓存（最多100个条目，单个最大5MB，总大小最大100MB）
-	compressionCache := NewCompressionCache(100, 5, 100)
+	// 初始化压缩缓存（最多1000个条目，单个最大10MB，总大小最大500MB）
+	compressionCache := NewCompressionCache(1000, 10, 500)
 
 	// 初始化Prometheus指标
 	prometheusMetrics := metrics.NewPrometheusMetrics()
@@ -1252,8 +1252,8 @@ func (s *Server) checkAuth(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 
-	// 记录用户访问日志
-	s.userManager.LogUserAction(
+	// 异步记录用户访问日志，避免阻塞响应
+	go s.userManager.LogUserAction(
 		session.Username,
 		"page_access",
 		r.URL.Path,
