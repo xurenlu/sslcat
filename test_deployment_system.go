@@ -9,7 +9,7 @@ import (
 	"github.com/xurenlu/sslcat/internal/runner"
 )
 
-func main() {
+func TestDeploymentSystem() {
 	// 创建临时目录
 	tempDir := "/tmp/sslcat_deployment_test"
 	if err := os.MkdirAll(tempDir, 0755); err != nil {
