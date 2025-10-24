@@ -437,6 +437,7 @@ func (lw *LogWatcher) parseLogLine(line string) LogEntry {
 		Level:     "info",
 		Source:    "app",
 		Message:   line,
+		AppName:   lw.log.Data["app"].(string),
 		Metadata:  make(map[string]interface{}),
 	}
 

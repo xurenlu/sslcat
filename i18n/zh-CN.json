@@ -57,6 +57,12 @@
   "proxy.unhealthy": "不健康",
   "proxy.unknown": "未知",
   
+  "proxy.performance_monitoring": "性能监控配置",
+  "proxy.enable_tracing": "启用请求追踪",
+  "proxy.enable_metrics": "启用指标收集",
+  "proxy.tracing_warning": "⚠️ 启用后会显著增加 CPU 占用，建议仅在调试时使用",
+  "proxy.metrics_warning": "⚠️ 启用后会增加 CPU 占用，建议仅在需要监控时使用",
+  
   "security.title": "安全防护",
   "security.waf": "Web应用防火墙",
   "security.ddos": "DDoS防护",

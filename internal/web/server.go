@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
@@ -242,7 +243,7 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	server.proxyAuthManager = NewProxyAuthManager(server.log)
 
 	// 初始化用户管理器
-	userManager, err := NewUserManager(server.log, "./data")
+	userManager, err := NewUserManager(server.log, "./data", "admin")
 	if err != nil {
 		logrus.Fatalf("初始化用户管理器失败: %v", err)
 	}
@@ -802,12 +803,25 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// 记录请求开始时间（用于计算请求耗时）
 	startTime := time.Now()
 
-	// 启动追踪 Span
-	span, ctx := s.tracer.StartSpanFromHTTPRequest(r)
-	r = r.WithContext(ctx)
+	// 根据转发规则决定是否启用追踪（减少 CPU 占用）
+	var span *tracing.Span
+	var ctx context.Context
+	var enableTracing bool
+	var enableMetrics bool
 
-	// 将追踪信息注入响应头
-	span.InjectHTTPHeaders(w.Header())
+	// 查找匹配的转发规则
+	matchedRule := s.findMatchingProxyRule(r)
+	if matchedRule != nil {
+		enableTracing = matchedRule.EnableTracing
+		enableMetrics = matchedRule.EnableMetrics
+	}
+
+	if enableTracing {
+		span, ctx = s.tracer.StartSpanFromHTTPRequest(r)
+		r = r.WithContext(ctx)
+		// 将追踪信息注入响应头
+		span.InjectHTTPHeaders(w.Header())
+	}
 
 	// 包装 ResponseWriter 以捕获状态码和字节数（使用 statistics.go 中的类型）
 	wrappedWriter := &responseWriter{
@@ -820,28 +834,32 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		duration := time.Since(startTime)
 
-		// 完成追踪 Span
-		span.SetTag("http.status_code", fmt.Sprintf("%d", wrappedWriter.statusCode))
-		span.SetTag("http.response_size", fmt.Sprintf("%d", wrappedWriter.written))
-		if wrappedWriter.statusCode >= 400 {
-			span.Success = false
-			span.ErrorMessage = fmt.Sprintf("HTTP %d", wrappedWriter.statusCode)
-		}
-		span.Finish()
-
-		// 记录到 Prometheus（只记录实际的代理请求，不记录管理面板）
-		domain := r.Host
-		if !strings.HasPrefix(r.URL.Path, s.config.AdminPrefix) {
-			s.prometheusMetrics.RecordHTTPRequest(
-				domain,
-				r.Method,
-				fmt.Sprintf("%d", wrappedWriter.statusCode),
-				duration,
-				wrappedWriter.written,
-			)
+		// 根据转发规则完成追踪 Span（减少 CPU 占用）
+		if enableTracing && span != nil {
+			span.SetTag("http.status_code", fmt.Sprintf("%d", wrappedWriter.statusCode))
+			span.SetTag("http.response_size", fmt.Sprintf("%d", wrappedWriter.written))
+			if wrappedWriter.statusCode >= 400 {
+				span.Success = false
+				span.ErrorMessage = fmt.Sprintf("HTTP %d", wrappedWriter.statusCode)
+			}
+			span.Finish()
 		}
 
-		// 记录访问日志
+		// 根据转发规则记录 Prometheus 指标（减少 CPU 占用）
+		if enableMetrics {
+			domain := r.Host
+			if !strings.HasPrefix(r.URL.Path, s.config.AdminPrefix) {
+				s.prometheusMetrics.RecordHTTPRequest(
+					domain,
+					r.Method,
+					fmt.Sprintf("%d", wrappedWriter.statusCode),
+					duration,
+					wrappedWriter.written,
+				)
+			}
+		}
+
+		// 记录访问日志（保持现有功能）
 		if s.accessLogger != nil {
 			s.accessLogger.LogRequest(r, wrappedWriter.statusCode, wrappedWriter.written,
 				duration, "", 0)
@@ -1429,4 +1447,83 @@ func (s *Server) handleFavicon(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "image/png")
 	w.Header().Set("Cache-Control", "public, max-age=86400") // 缓存1天
 	w.Write(favicon)
+}
+
+// findMatchingProxyRule 查找匹配的转发规则
+func (s *Server) findMatchingProxyRule(r *http.Request) *config.ProxyRule {
+	host := r.Host
+	path := r.URL.Path
+
+	// 移除端口号
+	if idx := strings.Index(host, ":"); idx != -1 {
+		host = host[:idx]
+	}
+
+	// 查找匹配的规则
+	for i := range s.config.Proxy.Rules {
+		rule := &s.config.Proxy.Rules[i]
+		if !rule.Enabled {
+			continue
+		}
+
+		// 域名匹配
+		if rule.Domain != host {
+			continue
+		}
+
+		// 路径前缀匹配
+		if len(rule.PathPrefixes) > 0 {
+			matched := false
+			for _, prefix := range rule.PathPrefixes {
+				if rule.PathExact {
+					if path == prefix {
+						matched = true
+						break
+					}
+				} else {
+					if strings.HasPrefix(path, prefix) {
+						matched = true
+						break
+					}
+				}
+			}
+			if !matched {
+				continue
+			}
+		}
+
+		// 路径前缀规则匹配
+		if len(rule.PathPrefixRules) > 0 {
+			matched := false
+			for _, pathRule := range rule.PathPrefixRules {
+				if !pathRule.Enabled {
+					continue
+				}
+				for _, prefix := range pathRule.Prefixes {
+					if pathRule.Exact {
+						if path == prefix {
+							matched = true
+							break
+						}
+					} else {
+						if strings.HasPrefix(path, prefix) {
+							matched = true
+							break
+						}
+					}
+				}
+				if matched {
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
+		}
+
+		// 找到匹配的规则
+		return rule
+	}
+
+	return nil
 }

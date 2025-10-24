@@ -141,6 +141,10 @@ interface ProxyRuleForm {
   connect_timeout_sec: number
   keep_alive_timeout_sec: number
   idle_timeout_sec: number
+  
+  // 性能监控配置
+  enable_tracing: boolean
+  enable_metrics: boolean
   tls_handshake_timeout_sec: number
   expect_continue_timeout_sec: number
   health_check_timeout_sec: number
@@ -258,6 +262,10 @@ const ProxyEdit: React.FC = () => {
     websocket_ping_interval: 30,
     upstream_request_headers: {},
     response_headers: {},
+    
+    // 性能监控配置
+    enable_tracing: false,
+    enable_metrics: false,
   })
 
   // 加载现有规则数据
@@ -393,6 +401,10 @@ const ProxyEdit: React.FC = () => {
             websocket_ping_interval: rule.websocket_ping_interval || 30,
             upstream_request_headers: rule.upstream_request_headers || {},
             response_headers: rule.response_headers || {},
+            
+            // 性能监控配置
+            enable_tracing: rule.enable_tracing || false,
+            enable_metrics: rule.enable_metrics || false,
           })
         }
       } catch (error) {
@@ -1008,6 +1020,50 @@ const ProxyEdit: React.FC = () => {
                     />
                   </CardBody>
                 </Card>
+
+                {/* 性能监控配置 */}
+                <Box>
+                  <Heading size="md" mb={4} color="gray.700">
+                    <Icon as={FiZap} mr={2} />
+                    性能监控配置
+                  </Heading>
+                  
+                  <VStack spacing={4}>
+                    <FormControl>
+                      <HStack justify="space-between">
+                        <Box>
+                          <FormLabel mb={1}>启用请求追踪</FormLabel>
+                          <Text fontSize="sm" color="red.500">
+                            ⚠️ 启用后会显著增加 CPU 占用，建议仅在调试时使用
+                          </Text>
+                        </Box>
+                        <Switch
+                          isChecked={formData.enable_tracing}
+                          onChange={(e) => handleInputChange('enable_tracing', e.target.checked)}
+                          size="lg"
+                          colorScheme="red"
+                        />
+                      </HStack>
+                    </FormControl>
+
+                    <FormControl>
+                      <HStack justify="space-between">
+                        <Box>
+                          <FormLabel mb={1}>启用指标收集</FormLabel>
+                          <Text fontSize="sm" color="orange.500">
+                            ⚠️ 启用后会增加 CPU 占用，建议仅在需要监控时使用
+                          </Text>
+                        </Box>
+                        <Switch
+                          isChecked={formData.enable_metrics}
+                          onChange={(e) => handleInputChange('enable_metrics', e.target.checked)}
+                          size="lg"
+                          colorScheme="orange"
+                        />
+                      </HStack>
+                    </FormControl>
+                  </VStack>
+                </Box>
 
                 {/* 提交按钮 */}
                 <HStack spacing={4} justify="flex-end">

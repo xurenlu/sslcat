@@ -57,6 +57,12 @@
   "proxy.unhealthy": "Unhealthy",
   "proxy.unknown": "Unknown",
   
+  "proxy.performance_monitoring": "Performance Monitoring",
+  "proxy.enable_tracing": "Enable Request Tracing",
+  "proxy.enable_metrics": "Enable Metrics Collection",
+  "proxy.tracing_warning": "⚠️ Enabling will significantly increase CPU usage, recommended for debugging only",
+  "proxy.metrics_warning": "⚠️ Enabling will increase CPU usage, recommended for monitoring needs only",
+  
   "security.title": "Security Protection",
   "security.waf": "Web Application Firewall",
   "security.ddos": "DDoS Protection",

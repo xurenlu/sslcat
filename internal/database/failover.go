@@ -252,7 +252,14 @@ func (fm *FailoverManager) CleanOldBackups(keepDays int) error {
 			continue
 		}
 
-		if entry.ModTime().Before(cutoffTime) {
+		// 获取文件信息以检查修改时间
+		fileInfo, err := entry.Info()
+		if err != nil {
+			fm.logger.Printf("获取文件信息失败: %s - %v", entry.Name(), err)
+			continue
+		}
+
+		if fileInfo.ModTime().Before(cutoffTime) {
 			backupPath := filepath.Join(fm.backupDir, entry.Name())
 			if err := os.Remove(backupPath); err != nil {
 				fm.logger.Printf("删除旧备份失败: %s - %v", entry.Name(), err)

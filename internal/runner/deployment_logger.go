@@ -37,6 +37,7 @@ type LogEntry struct {
 	Level     string                 `json:"level"`
 	Source    string                 `json:"source"`
 	Message   string                 `json:"message"`
+	AppName   string                 `json:"app_name"`
 	Metadata  map[string]interface{} `json:"metadata,omitempty"`
 }
 
@@ -115,6 +116,7 @@ func (dl *DeploymentLogger) WriteLogWithMetadata(level, source, message string, 
 		Level:     level,
 		Source:    source,
 		Message:   message,
+		AppName:   dl.AppName,
 		Metadata:  metadata,
 	}
 

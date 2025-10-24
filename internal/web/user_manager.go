@@ -148,7 +148,7 @@ func (um *UserManager) CreateUser(username, password, role, email, createdBy str
 	if username == "" || len(username) < 3 {
 		return fmt.Errorf("用户名长度至少3个字符")
 	}
-	
+
 	// 检查用户名冲突
 	if err := um.conflictManager.ValidateUsername(username); err != nil {
 		return err

@@ -1134,7 +1134,14 @@ func (gs *GitServer) processGitPush(app *GitApp, pushData []byte) {
 	// 更新部署中状态
 	deployLogger.UpdateStatus("deploying", 60, "正在部署应用")
 
-	if err := gs.buildAndDeployAppWithLogging(app, deployLogger); err != nil {
+	// 创建简单的 DeployLogger 用于构建过程
+	simpleLogger, err := NewDeployLogger(app.Name, deployLogger.UUID, deployLogger.LogFile)
+	if err != nil {
+		deployLogger.WriteError(fmt.Errorf("创建构建日志记录器失败: %v", err))
+		return
+	}
+
+	if err := gs.buildAndDeployAppWithLogging(app, simpleLogger); err != nil {
 		deployLogger.WriteError(err)
 
 		// 更新部署失败状态
@@ -2822,8 +2829,8 @@ func (gs *GitServer) RestartSSHD() error {
 
 // ==================== 日志管理 ====================
 
-// LogEntry 日志条目
-type LogEntry struct {
+// GitLogEntry 日志条目（Git服务器专用）
+type GitLogEntry struct {
 	Timestamp time.Time              `json:"timestamp"`
 	Level     string                 `json:"level"` // "info" | "warn" | "error" | "debug"
 	Message   string                 `json:"message"`

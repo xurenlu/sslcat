@@ -24,20 +24,20 @@ func (ucm *UserConflictManager) ValidateUsername(username string) error {
 	if strings.ToLower(username) == ucm.adminUsername {
 		return fmt.Errorf("用户名不能与超管用户名相同: %s", username)
 	}
-	
+
 	// 检查其他保留用户名
 	reservedNames := []string{
 		"root", "administrator", "superuser", "superadmin",
 		"system", "sslcat", "sslcat-admin", "sslcat-admin",
 	}
-	
+
 	lowerUsername := strings.ToLower(username)
 	for _, reserved := range reservedNames {
 		if lowerUsername == reserved {
 			return fmt.Errorf("用户名不能使用保留名称: %s", username)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -50,19 +50,19 @@ func (ucm *UserConflictManager) IsAdminUsername(username string) bool {
 func (ucm *UserConflictManager) GetSafeUsername(suggestedUsername string) string {
 	baseUsername := suggestedUsername
 	suffix := 1
-	
+
 	for {
 		safeUsername := fmt.Sprintf("%s%d", baseUsername, suffix)
 		if !ucm.IsAdminUsername(safeUsername) {
 			return safeUsername
 		}
 		suffix++
-		
+
 		// 防止无限循环
 		if suffix > 999 {
 			break
 		}
 	}
-	
+
 	return fmt.Sprintf("%s_user", baseUsername)
 }

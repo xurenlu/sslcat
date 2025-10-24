@@ -23,6 +23,7 @@ import {
 import { FiArrowLeft, FiZap, FiGlobe, FiShield, FiPlus, FiClock, FiSettings } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
 import { useConfig, buildPath, buildApiPath } from '../contexts/ConfigContext'
+import { useTranslation } from '../hooks/useLanguage'
 import HeaderEditor from '../components/HeaderEditor'
 import { CORS_PRESET } from '../constants/cors'
 import BackendConfig from '../components/BackendConfig'
@@ -140,6 +141,10 @@ interface ProxyRuleForm {
   connect_timeout_sec: number
   keep_alive_timeout_sec: number
   idle_timeout_sec: number
+  
+  // 性能监控配置
+  enable_tracing: boolean
+  enable_metrics: boolean
   tls_handshake_timeout_sec: number
   expect_continue_timeout_sec: number
   health_check_timeout_sec: number
@@ -158,6 +163,7 @@ const ProxyAdd: React.FC = () => {
   const toast = useToast()
   const [loading, setLoading] = useState(false)
   const { adminPrefix } = useConfig()
+  const t = useTranslation()
   const [formData, setFormData] = useState<ProxyRuleForm>({
     domain: '',
     enabled: true,
@@ -231,6 +237,10 @@ const ProxyAdd: React.FC = () => {
     cdn_ttl_seconds: 259200, // 默认72小时
     // HTTP Host头部优化
     optimize_host_header: false,
+    
+    // 性能监控配置
+    enable_tracing: false,
+    enable_metrics: false,
     // 访问控制字段
     auth_enabled: false,
     auth_users: [{ username: '', password: '' }],
@@ -902,6 +912,50 @@ const ProxyAdd: React.FC = () => {
                   />
                 </CardBody>
               </Card>
+
+              {/* 性能监控配置 */}
+              <Box>
+                <Heading size="md" mb={4} color="gray.700">
+                  <Icon as={FiZap} mr={2} />
+                  性能监控配置
+                </Heading>
+                
+                <VStack spacing={4}>
+                  <FormControl>
+                    <HStack justify="space-between">
+                      <Box>
+                        <FormLabel mb={1}>启用请求追踪</FormLabel>
+                        <Text fontSize="sm" color="red.500">
+                          ⚠️ 启用后会显著增加 CPU 占用，建议仅在调试时使用
+                        </Text>
+                      </Box>
+                      <Switch
+                        isChecked={formData.enable_tracing}
+                        onChange={(e) => handleInputChange('enable_tracing', e.target.checked)}
+                        size="lg"
+                        colorScheme="red"
+                      />
+                    </HStack>
+                  </FormControl>
+
+                  <FormControl>
+                    <HStack justify="space-between">
+                      <Box>
+                        <FormLabel mb={1}>启用指标收集</FormLabel>
+                        <Text fontSize="sm" color="orange.500">
+                          ⚠️ 启用后会增加 CPU 占用，建议仅在需要监控时使用
+                        </Text>
+                      </Box>
+                      <Switch
+                        isChecked={formData.enable_metrics}
+                        onChange={(e) => handleInputChange('enable_metrics', e.target.checked)}
+                        size="lg"
+                        colorScheme="orange"
+                      />
+                    </HStack>
+                  </FormControl>
+                </VStack>
+              </Box>
 
               {/* 提示信息 */}
               <Alert status="info">

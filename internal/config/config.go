@@ -155,6 +155,10 @@ type ProxyRule struct {
 	SessionAffinityHeader  string `json:"session_affinity_header"`  // Header名称
 	SessionAffinityTTL     int    `json:"session_affinity_ttl"`     // 会话保持时间（秒）
 
+	// 性能监控配置
+	EnableTracing bool `json:"enable_tracing,omitempty"` // 是否启用请求追踪（会影响性能）
+	EnableMetrics bool `json:"enable_metrics,omitempty"` // 是否启用指标收集（会影响性能）
+
 	// 健康检查配置
 	HealthCheckEnabled  bool   `json:"health_check_enabled"`  // 是否启用健康检查
 	HealthCheckPath     string `json:"health_check_path"`     // 健康检查路径
@@ -254,6 +258,10 @@ type PathPrefixRule struct {
 	Name        string `json:"name,omitempty"`        // 规则名称
 	Description string `json:"description,omitempty"` // 规则描述
 	Enabled     bool   `json:"enabled"`               // 是否启用该规则
+
+	// 性能监控配置
+	EnableTracing bool `json:"enable_tracing,omitempty"` // 是否启用请求追踪（会影响性能）
+	EnableMetrics bool `json:"enable_metrics,omitempty"` // 是否启用指标收集（会影响性能）
 }
 
 // ProxyBackend 代理后端服务器
