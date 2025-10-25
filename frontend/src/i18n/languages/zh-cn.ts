@@ -390,6 +390,8 @@ export const zhCN: Translation = {
     refresh: '刷新',
     updateSite: '更新站点',
     createSite: '创建站点',
+    edit: '编辑',
+    delete: '删除',
   },
 
   cdn: {

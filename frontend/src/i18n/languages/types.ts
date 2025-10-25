@@ -156,6 +156,11 @@ export interface Translation {
     createFirst: string
     username: string
     password: string
+    performance_monitoring: string
+    enable_tracing: string
+    enable_metrics: string
+    tracing_warning: string
+    metrics_warning: string
   }
   
   // SSL证书
@@ -218,6 +223,8 @@ export interface Translation {
     cancel: string
     send: string
     noNotifications: string
+    title_placeholder: string
+    message_placeholder: string
   }
   
   // AI 安全分析
@@ -461,6 +468,8 @@ export interface Translation {
     refresh: string
     updateSite: string
     createSite: string
+    edit: string
+    delete: string
   }
 
   // CDN管理
@@ -805,6 +814,10 @@ export interface Translation {
     apiSecretPlaceholder: string
     apiKeyUpdatePlaceholder: string
     apiSecretUpdatePlaceholder: string
+    cloudflare_name_placeholder: string
+    api_key_placeholder: string
+    zone_id_placeholder: string
+    api_key_update_placeholder: string
   }
 
   // Git服务器管理
@@ -1088,19 +1101,6 @@ export interface Translation {
     delete: string
   }
 
-  // DNS管理
-  dns: {
-    cloudflare_name_placeholder: string
-    api_key_placeholder: string
-    zone_id_placeholder: string
-    api_key_update_placeholder: string
-  }
-
-  // 通知管理
-  notifications: {
-    title_placeholder: string
-    message_placeholder: string
-  }
 
   // 后端配置
   backend: {
