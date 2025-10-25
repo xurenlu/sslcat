@@ -25,8 +25,9 @@ type AdvancedRateLimiter struct {
 	// 路径规则编译后的正则表达式
 	pathRuleRegexes map[string]*regexp.Regexp
 
-	mutex sync.RWMutex
-	log   *logrus.Entry
+	mutex    sync.RWMutex
+	log      *logrus.Entry
+	stopChan chan struct{} // 停止清理任务
 }
 
 // RateLimitConfig 限流配置
@@ -98,7 +99,35 @@ func NewAdvancedRateLimiter(config config.RateLimitConfig) *AdvancedRateLimiter 
 		}
 	}
 
+	limiter.stopChan = make(chan struct{})
+
+	// 启动自动清理任务
+	go limiter.startCleanupTask()
+
 	return limiter
+}
+
+// startCleanupTask 启动清理任务
+func (arl *AdvancedRateLimiter) startCleanupTask() {
+	ticker := time.NewTicker(5 * time.Minute) // 每5分钟清理一次
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			arl.Cleanup()
+		case <-arl.stopChan:
+			arl.log.Info("Rate limiter cleanup task stopped")
+			return
+		}
+	}
+}
+
+// Stop 停止清理任务
+func (arl *AdvancedRateLimiter) Stop() {
+	if arl.stopChan != nil {
+		close(arl.stopChan)
+	}
 }
 
 // CheckRequest 检查请求是否被限流
@@ -490,6 +519,11 @@ func (arl *AdvancedRateLimiter) Cleanup() {
 
 	now := time.Now()
 	expireTime := 10 * time.Minute // 10分钟未使用则清理
+	maxIPLimiters := 10000         // 最多保留10000个IP限流器
+	maxUserLimiters := 1000        // 最多保留1000个用户限流器
+
+	initialIPCount := len(arl.ipLimiters)
+	initialUserCount := len(arl.userLimiters)
 
 	// 清理IP限流器
 	for ip, limiter := range arl.ipLimiters {
@@ -500,6 +534,11 @@ func (arl *AdvancedRateLimiter) Cleanup() {
 		if now.Sub(lastRequest) > expireTime {
 			delete(arl.ipLimiters, ip)
 		}
+	}
+
+	// 如果仍然超过限制，删除最旧的
+	if len(arl.ipLimiters) > maxIPLimiters {
+		arl.pruneOldestLimiters(arl.ipLimiters, maxIPLimiters)
 	}
 
 	// 清理用户限流器
@@ -513,8 +552,96 @@ func (arl *AdvancedRateLimiter) Cleanup() {
 		}
 	}
 
-	arl.log.Debugf("Cleaned up rate limiters: %d IP, %d user remaining",
-		len(arl.ipLimiters), len(arl.userLimiters))
+	// 如果仍然超过限制，删除最旧的
+	if len(arl.userLimiters) > maxUserLimiters {
+		arl.pruneOldestUserLimiters(arl.userLimiters, maxUserLimiters)
+	}
+
+	if initialIPCount > len(arl.ipLimiters) || initialUserCount > len(arl.userLimiters) {
+		arl.log.Infof("Cleaned up rate limiters: IP %d→%d, User %d→%d",
+			initialIPCount, len(arl.ipLimiters),
+			initialUserCount, len(arl.userLimiters))
+	}
+}
+
+// pruneOldestLimiters 删除最旧的IP限流器
+func (arl *AdvancedRateLimiter) pruneOldestLimiters(limiters map[string]*RateLimiter, maxCount int) {
+	if len(limiters) <= maxCount {
+		return
+	}
+
+	// 收集所有限流器及其最后请求时间
+	type limiterWithTime struct {
+		key  string
+		time time.Time
+	}
+
+	var items []limiterWithTime
+	for key, limiter := range limiters {
+		limiter.mutex.RLock()
+		items = append(items, limiterWithTime{
+			key:  key,
+			time: limiter.lastRequest,
+		})
+		limiter.mutex.RUnlock()
+	}
+
+	// 按时间排序（最旧的在前）
+	for i := 0; i < len(items)-1; i++ {
+		for j := i + 1; j < len(items); j++ {
+			if items[i].time.After(items[j].time) {
+				items[i], items[j] = items[j], items[i]
+			}
+		}
+	}
+
+	// 删除最旧的
+	deleteCount := len(limiters) - maxCount
+	for i := 0; i < deleteCount && i < len(items); i++ {
+		delete(limiters, items[i].key)
+	}
+
+	arl.log.Warnf("Pruned %d oldest IP limiters (limit: %d)", deleteCount, maxCount)
+}
+
+// pruneOldestUserLimiters 删除最旧的用户限流器
+func (arl *AdvancedRateLimiter) pruneOldestUserLimiters(limiters map[string]*RateLimiter, maxCount int) {
+	if len(limiters) <= maxCount {
+		return
+	}
+
+	// 收集所有限流器及其最后请求时间
+	type limiterWithTime struct {
+		key  string
+		time time.Time
+	}
+
+	var items []limiterWithTime
+	for key, limiter := range limiters {
+		limiter.mutex.RLock()
+		items = append(items, limiterWithTime{
+			key:  key,
+			time: limiter.lastRequest,
+		})
+		limiter.mutex.RUnlock()
+	}
+
+	// 按时间排序（最旧的在前）
+	for i := 0; i < len(items)-1; i++ {
+		for j := i + 1; j < len(items); j++ {
+			if items[i].time.After(items[j].time) {
+				items[i], items[j] = items[j], items[i]
+			}
+		}
+	}
+
+	// 删除最旧的
+	deleteCount := len(limiters) - maxCount
+	for i := 0; i < deleteCount && i < len(items); i++ {
+		delete(limiters, items[i].key)
+	}
+
+	arl.log.Warnf("Pruned %d oldest user limiters (limit: %d)", deleteCount, maxCount)
 }
 
 // rateLimitTokenBucket 令牌桶限流器 (内部实现)

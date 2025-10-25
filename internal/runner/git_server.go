@@ -72,6 +72,10 @@ type GitServer struct {
 
 	// 停止信号通道
 	stopChan chan struct{}
+
+	// 构建并发控制（防止内存暴增）
+	buildSemaphore chan struct{}
+	maxConcurrentBuilds int
 }
 
 // SSLManagerInterface SSL Manager 接口
@@ -505,6 +509,9 @@ func NewGitServer(cfg *config.Config, translator *i18n.Translator) *GitServer {
 		logrus.Infof("通知管理器已从环境变量初始化（向后兼容）")
 	}
 
+	// 构建并发控制配置
+	maxConcurrentBuilds := 3 // 最多3个并发构建
+	
 	gs := &GitServer{
 		config:              cfg,
 		apps:                make(map[string]*GitApp),
@@ -523,6 +530,8 @@ func NewGitServer(cfg *config.Config, translator *i18n.Translator) *GitServer {
 		deploymentDB:        deploymentDB,
 		notificationManager: notificationMgr,
 		stopChan:            make(chan struct{}),
+		buildSemaphore:      make(chan struct{}, maxConcurrentBuilds),
+		maxConcurrentBuilds: maxConcurrentBuilds,
 	}
 
 	// 初始化 Builder Registry
@@ -1033,8 +1042,19 @@ func (gs *GitServer) HandleGitPush(appName string, pushData []byte) error {
 	app.LastDeploy = time.Now()
 	gs.mutex.Unlock()
 
-	// 在 goroutine 中处理推送
-	go gs.processGitPush(app, pushData)
+	// 在 goroutine 中处理推送，使用信号量限制并发
+	go func() {
+		// 获取构建信号量
+		select {
+		case gs.buildSemaphore <- struct{}{}:
+			defer func() { <-gs.buildSemaphore }()
+			gs.processGitPush(app, pushData)
+		default:
+			// 构建队列已满
+			gs.logger.Warnf("构建队列已满（最多%d个并发），应用 %s 的构建被拒绝", gs.maxConcurrentBuilds, appName)
+			gs.handleDeployError(app, fmt.Errorf("构建队列已满，请稍后重试"))
+		}
+	}()
 
 	gs.logger.Infof("开始处理应用 %s 的 Git 推送", appName)
 	return nil
