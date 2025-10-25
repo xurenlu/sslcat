@@ -66,7 +66,7 @@ func (rm *ReloadManager) UnregisterComponent(componentName string) {
 	}
 }
 
-// ReloadAll 重载所有组件
+// ReloadAll 重载所有组件（增强版：智能变更检测）
 func (rm *ReloadManager) ReloadAll(oldConfig, newConfig *Config) error {
 	rm.mutex.RLock()
 	defer rm.mutex.RUnlock()
@@ -75,9 +75,34 @@ func (rm *ReloadManager) ReloadAll(oldConfig, newConfig *Config) error {
 	rm.reloadCount++
 	rm.lastReloadTime = startTime
 
-	rm.log.Infof("Starting reload of %d components", len(rm.components))
+	// 第一阶段：检测配置变更级别
+	detector := NewChangeDetector()
+	changes := detector.DetectChanges(oldConfig, newConfig)
+	maxLevel := detector.GetMaxChangeLevel()
 
-	// 第一阶段：验证所有组件
+	rm.log.Infof("Configuration changes detected: %d changes, max level: %s", len(changes), maxLevel)
+
+	// 记录所有变更
+	for _, change := range changes {
+		rm.log.Infof("Config change: %s (%s -> %s) [%s] - %s",
+			change.Field, change.OldValue, change.NewValue, change.Level, change.Description)
+	}
+
+	// 第二阶段：根据变更级别决定是否需要重载
+	if maxLevel == NoReloadNeeded {
+		rm.log.Info("No reload needed, only logging configuration changes")
+		return nil
+	}
+
+	// 第三阶段：验证配置
+	if errs := ValidateConfig(newConfig); len(errs) > 0 {
+		rm.errorCount++
+		return fmt.Errorf("configuration validation failed: %v", errs)
+	}
+
+	rm.log.Infof("Starting reload of %d components (level: %s)", len(rm.components), maxLevel)
+
+	// 第四阶段：验证所有组件
 	for _, component := range rm.components {
 		if err := component.Validate(newConfig); err != nil {
 			rm.errorCount++
@@ -87,7 +112,7 @@ func (rm *ReloadManager) ReloadAll(oldConfig, newConfig *Config) error {
 
 	rm.log.Info("All components validated successfully")
 
-	// 第二阶段：重载所有组件
+	// 第五阶段：重载所有组件
 	var failedComponents []string
 	for _, component := range rm.components {
 		if err := component.Reload(newConfig); err != nil {
