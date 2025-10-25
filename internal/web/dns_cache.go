@@ -9,11 +9,12 @@ import (
 
 // DNSCache DNS缓存管理器
 type DNSCache struct {
-	cache      map[string]*DNSProviderCache // 提供商名称 -> 缓存数据
-	mutex      sync.RWMutex
-	sslManager *ssl.Manager
-	stopChan   chan struct{} // 停止定期更新
-	ticker     *time.Ticker  // 定期更新的ticker
+	cache       map[string]*DNSProviderCache // 提供商名称 -> 缓存数据
+	mutex       sync.RWMutex
+	sslManager  *ssl.Manager
+	stopChan    chan struct{} // 停止定期更新
+	ticker      *time.Ticker  // 定期更新的ticker
+	updateMutex sync.Mutex    // 保护启动/停止操作
 }
 
 // DNSProviderCache DNS提供商缓存数据
@@ -126,11 +127,15 @@ func (c *DNSCache) GetCacheStatus() map[string]interface{} {
 	return status
 }
 
-// StartPeriodicUpdate 启动定期更新
+// StartPeriodicUpdate 启动定期更新（线程安全）
 func (c *DNSCache) StartPeriodicUpdate(providers []string, interval time.Duration) {
-	// 停止旧的更新任务（如果存在）
-	c.StopPeriodicUpdate()
+	c.updateMutex.Lock()
+	defer c.updateMutex.Unlock()
 
+	// 停止旧的更新任务（如果存在）
+	c.stopPeriodicUpdateLocked()
+
+	// 启动新的更新任务
 	c.stopChan = make(chan struct{})
 	c.ticker = time.NewTicker(interval)
 
@@ -147,8 +152,16 @@ func (c *DNSCache) StartPeriodicUpdate(providers []string, interval time.Duratio
 	}()
 }
 
-// StopPeriodicUpdate 停止定期更新
+// StopPeriodicUpdate 停止定期更新（线程安全）
 func (c *DNSCache) StopPeriodicUpdate() {
+	c.updateMutex.Lock()
+	defer c.updateMutex.Unlock()
+
+	c.stopPeriodicUpdateLocked()
+}
+
+// stopPeriodicUpdateLocked 停止定期更新（内部方法，假设已持有锁）
+func (c *DNSCache) stopPeriodicUpdateLocked() {
 	if c.ticker != nil {
 		c.ticker.Stop()
 		c.ticker = nil

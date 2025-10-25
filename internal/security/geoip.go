@@ -30,10 +30,10 @@ type GeoIPService struct {
 	cacheTTL  time.Duration
 
 	// 自动更新配置
-	autoUpdateEnabled  bool
-	updateInterval     time.Duration // 更新间隔（默认7天）
-	updateURL          string        // 更新URL
-	stopUpdateChan     chan struct{} // 停止更新任务
+	autoUpdateEnabled bool
+	updateInterval    time.Duration // 更新间隔（默认7天）
+	updateURL         string        // 更新URL
+	stopUpdateChan    chan struct{} // 停止更新任务
 }
 
 // GeoLocation 地理位置信息
@@ -62,11 +62,11 @@ func NewGeoIPService(config config.GeoBlockingConfig) (*GeoIPService, error) {
 	service := &GeoIPService{
 		config:            config,
 		cache:             make(map[string]*GeoLocation),
-		cacheSize:         10000,                 // 缓存1万个IP查询结果
-		cacheTTL:          time.Hour,             // 缓存1小时
-		autoUpdateEnabled: true,                  // 默认启用自动更新
-		updateInterval:    7 * 24 * time.Hour,    // 每7天更新一次
-		updateURL:         "",                    // 默认不设置更新URL（需要手动配置）
+		cacheSize:         10000,              // 缓存1万个IP查询结果
+		cacheTTL:          time.Hour,          // 缓存1小时
+		autoUpdateEnabled: true,               // 默认启用自动更新
+		updateInterval:    7 * 24 * time.Hour, // 每7天更新一次
+		updateURL:         "",                 // 默认不设置更新URL（需要手动配置）
 		stopUpdateChan:    make(chan struct{}),
 		log: logrus.WithFields(logrus.Fields{
 			"component": "geoip_service",
@@ -93,36 +93,25 @@ func NewGeoIPService(config config.GeoBlockingConfig) (*GeoIPService, error) {
 	return service, nil
 }
 
-// loadDatabase 加载GeoIP数据库
+// loadDatabase 加载GeoIP数据库（优化版：减少锁持有时间）
 func (g *GeoIPService) loadDatabase() error {
-	g.mutex.Lock()
-	defer g.mutex.Unlock()
-
-	// 关闭旧数据库
-	if g.cityDatabase != nil {
-		g.cityDatabase.Close()
-	}
-	if g.asnDatabase != nil {
-		g.asnDatabase.Close()
-	}
-
 	// 检查城市数据库文件是否存在
 	if _, err := os.Stat(g.config.DatabasePath); os.IsNotExist(err) {
 		return fmt.Errorf("GeoIP city database file not found: %s", g.config.DatabasePath)
 	}
 
-	// 打开城市数据库
-	cityDB, err := geoip2.Open(g.config.DatabasePath)
+	// 在锁外打开新数据库（耗时操作）
+	newCityDB, err := geoip2.Open(g.config.DatabasePath)
 	if err != nil {
 		return fmt.Errorf("failed to open GeoIP city database: %w", err)
 	}
-	g.cityDatabase = cityDB
 
 	// 尝试打开ASN数据库（可选）
+	var newASNDB *geoip2.Reader
 	asnPath := strings.Replace(g.config.DatabasePath, "GeoLite2-City.mmdb", "GeoLite2-ASN.mmdb", 1)
 	if _, err := os.Stat(asnPath); err == nil {
 		if asnDB, err := geoip2.Open(asnPath); err == nil {
-			g.asnDatabase = asnDB
+			newASNDB = asnDB
 			g.log.Infof("ASN database loaded successfully from: %s", asnPath)
 		} else {
 			g.log.Warnf("ASN database file exists but failed to open: %v", err)
@@ -131,9 +120,24 @@ func (g *GeoIPService) loadDatabase() error {
 		g.log.Infof("ASN database not found at: %s (this is optional)", asnPath)
 	}
 
+	// 快速切换数据库（持有锁的时间最短）
+	g.mutex.Lock()
+	oldCityDB := g.cityDatabase
+	oldASNDB := g.asnDatabase
+	g.cityDatabase = newCityDB
+	g.asnDatabase = newASNDB
 	g.lastUpdate = time.Now()
-	g.log.Infof("GeoIP city database loaded successfully from: %s", g.config.DatabasePath)
+	g.mutex.Unlock()
 
+	// 在锁外关闭旧数据库
+	if oldCityDB != nil {
+		oldCityDB.Close()
+	}
+	if oldASNDB != nil {
+		oldASNDB.Close()
+	}
+
+	g.log.Infof("GeoIP city database loaded successfully from: %s", g.config.DatabasePath)
 	return nil
 }
 
