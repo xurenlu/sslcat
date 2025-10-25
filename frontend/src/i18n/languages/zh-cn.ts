@@ -1182,19 +1182,6 @@ export const zhCN: Translation = {
     delete: '删除',
   },
 
-  // DNS管理
-  dns: {
-    cloudflare_name_placeholder: '我的 Cloudflare',
-    api_key_placeholder: 'API 密钥',
-    zone_id_placeholder: 'Zone ID (Cloudflare等需要)',
-    api_key_update_placeholder: 'API 密钥（留空则不更新）',
-  },
-
-  // 通知管理
-  notifications: {
-    title_placeholder: '请输入通知标题',
-    message_placeholder: '请输入通知消息',
-  },
 
   // 后端配置
   backend: {
