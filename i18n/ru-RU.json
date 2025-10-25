@@ -61,6 +61,8 @@
   "proxy.enable_metrics": "Включить сбор метрик",
   "proxy.tracing_warning": "⚠️ Включение значительно увеличит использование CPU, рекомендуется только для отладки",
   "proxy.metrics_warning": "⚠️ Включение увеличит использование CPU, рекомендуется только при необходимости мониторинга",
+  "proxy.username": "Имя пользователя",
+  "proxy.password": "Пароль",
   
   "security.title": "Защита безопасности",
   "security.waf": "Брандмауэр веб-приложений",
@@ -133,6 +135,8 @@
   "common.import": "Импорт",
   "common.yes": "Да",
   "common.no": "Нет",
+  "common.creating": "Создание...",
+  "common.saving": "Сохранение...",
   "common.ok": "ОК",
   
   "time.seconds": "секунды",

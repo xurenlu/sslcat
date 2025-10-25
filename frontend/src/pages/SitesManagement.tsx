@@ -276,14 +276,14 @@ const SitesManagement: React.FC = () => {
                             <Td>
                               <HStack spacing={2}>
                                 <IconButton
-                                  aria-label="编辑"
+                                  aria-label={t.sites.edit}
                                   icon={<FiEdit />}
                                   size="sm"
                                   variant="ghost"
                                   onClick={() => handleEditSite(site, 'static')}
                                 />
                                 <IconButton
-                                  aria-label="删除"
+                                  aria-label={t.sites.delete}
                                   icon={<FiTrash2 />}
                                   size="sm"
                                   variant="ghost"
@@ -382,14 +382,14 @@ const SitesManagement: React.FC = () => {
                             <Td>
                               <HStack spacing={2}>
                                 <IconButton
-                                  aria-label="编辑"
+                                  aria-label={t.sites.edit}
                                   icon={<FiEdit />}
                                   size="sm"
                                   variant="ghost"
                                   onClick={() => handleEditSite(site, 'php')}
                                 />
                                 <IconButton
-                                  aria-label="删除"
+                                  aria-label={t.sites.delete}
                                   icon={<FiTrash2 />}
                                   size="sm"
                                   variant="ghost"

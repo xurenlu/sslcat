@@ -61,6 +61,8 @@
   "proxy.enable_metrics": "Metrik-Sammlung aktivieren",
   "proxy.tracing_warning": "⚠️ Aktivierung erhöht die CPU-Nutzung erheblich, nur für Debugging empfohlen",
   "proxy.metrics_warning": "⚠️ Aktivierung erhöht die CPU-Nutzung, nur bei Bedarf für Überwachung empfohlen",
+  "proxy.username": "Benutzername",
+  "proxy.password": "Passwort",
   
   "security.title": "Sicherheitsschutz",
   "security.waf": "Web-Application-Firewall",
@@ -133,6 +135,8 @@
   "common.import": "Importieren",
   "common.yes": "Ja",
   "common.no": "Nein",
+  "common.creating": "Erstellen...",
+  "common.saving": "Speichern...",
   "common.ok": "OK",
   
   "time.seconds": "Sekunden",

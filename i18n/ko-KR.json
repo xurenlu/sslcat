@@ -61,6 +61,8 @@
   "proxy.enable_metrics": "메트릭 수집 활성화",
   "proxy.tracing_warning": "⚠️ 활성화하면 CPU 사용량이 크게 증가합니다. 디버깅 시에만 권장",
   "proxy.metrics_warning": "⚠️ 활성화하면 CPU 사용량이 증가합니다. 모니터링이 필요한 경우에만 권장",
+  "proxy.username": "사용자명",
+  "proxy.password": "비밀번호",
   
   "security.title": "보안 보호",
   "security.waf": "웹 애플리케이션 방화벽",
@@ -133,6 +135,8 @@
   "common.import": "가져오기",
   "common.yes": "예",
   "common.no": "아니오",
+  "common.creating": "생성 중...",
+  "common.saving": "저장 중...",
   "common.ok": "확인",
   
   "time.seconds": "초",

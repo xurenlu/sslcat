@@ -61,6 +61,8 @@
   "proxy.enable_metrics": "啟用指標收集",
   "proxy.tracing_warning": "⚠️ 啟用後會顯著增加 CPU 占用，建議僅在調試時使用",
   "proxy.metrics_warning": "⚠️ 啟用後會增加 CPU 占用，建議僅在需要監控時使用",
+  "proxy.username": "使用者名稱",
+  "proxy.password": "密碼",
   
   "security.title": "安全防護",
   "security.waf": "Web應用程式防火牆",
@@ -133,6 +135,8 @@
   "common.import": "匯入",
   "common.yes": "是",
   "common.no": "否",
+  "common.creating": "建立中...",
+  "common.saving": "儲存中...",
   "common.ok": "確定",
   
   "time.seconds": "秒",

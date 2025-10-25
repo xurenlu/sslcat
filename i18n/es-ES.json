@@ -61,6 +61,8 @@
   "proxy.enable_metrics": "Habilitar Recopilación de Métricas",
   "proxy.tracing_warning": "⚠️ Habilitar aumentará significativamente el uso de CPU, recomendado solo para depuración",
   "proxy.metrics_warning": "⚠️ Habilitar aumentará el uso de CPU, recomendado solo cuando se necesite monitoreo",
+  "proxy.username": "Nombre de usuario",
+  "proxy.password": "Contraseña",
   
   "security.title": "Protección de Seguridad",
   "security.waf": "Firewall de Aplicación Web",
@@ -133,6 +135,8 @@
   "common.import": "Importar",
   "common.yes": "Sí",
   "common.no": "No",
+  "common.creating": "Creando...",
+  "common.saving": "Guardando...",
   "common.ok": "OK",
   
   "time.seconds": "segundos",

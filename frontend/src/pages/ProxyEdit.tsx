@@ -861,7 +861,7 @@ const ProxyEdit: React.FC = () => {
                               <Input
                                 value={user.username}
                                 onChange={(e) => handleAuthUserChange(index, 'username', e.target.value)}
-                                placeholder="用户名"
+                                placeholder={t.proxy.username}
                               />
                             </FormControl>
                             <FormControl>
@@ -870,7 +870,7 @@ const ProxyEdit: React.FC = () => {
                                 type="password"
                                 value={user.password}
                                 onChange={(e) => handleAuthUserChange(index, 'password', e.target.value)}
-                                placeholder="密码"
+                                placeholder={t.proxy.password}
                               />
                             </FormControl>
                             <Button
@@ -1078,7 +1078,7 @@ const ProxyEdit: React.FC = () => {
                     colorScheme="blue"
                     leftIcon={<Icon as={FiSave} />}
                     isLoading={loading}
-                    loadingText="保存中..."
+                    loadingText={t.common.saving}
                   >
                     保存更改
                   </Button>

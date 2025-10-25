@@ -151,7 +151,7 @@ const Settings: React.FC = () => {
           }
         }
       } catch (error) {
-        console.error('加载基础配置失败:', error)
+        console.error(t.settings.basic_config_load_failed, error)
       }
   }
 
@@ -182,7 +182,7 @@ const Settings: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error('加载通知配置失败:', error)
+      console.error(t.settings.notification_config_load_failed, error)
     }
   }
 
@@ -276,17 +276,17 @@ const Settings: React.FC = () => {
       // 检查基础设置保存结果
       if (!basicResponse.ok) {
         const errorData = await basicResponse.json()
-        throw new Error(errorData.message || '基础设置保存失败')
+        throw new Error(errorData.message || t.settings.basic_config_save_failed)
       }
 
       // 检查通知设置保存结果
       if (!notificationResponse.ok) {
         const errorData = await notificationResponse.json()
-        throw new Error(errorData.message || '通知设置保存失败')
+        throw new Error(errorData.message || t.settings.notification_config_save_failed)
       }
 
       toast({
-        title: '所有设置保存成功',
+        title: t.settings.save_success,
         status: 'success',
         duration: 3000,
         isClosable: true,
@@ -305,8 +305,8 @@ const Settings: React.FC = () => {
           (newPrefix) => {
             // 成功回调
             toast({
-              title: 'Admin Prefix更改成功',
-              description: `管理面板前缀已更改为: ${newPrefix}，通知已发送`,
+              title: t.settings.admin_prefix_change_success,
+              description: `${t.settings.admin_prefix_changed}: ${newPrefix}，${t.settings.notification_sent}`,
               status: 'success',
               duration: 5000,
               isClosable: true,
@@ -315,7 +315,7 @@ const Settings: React.FC = () => {
           (error) => {
             // 错误回调
             toast({
-              title: 'Admin Prefix更改失败',
+              title: t.settings.admin_prefix_change_failed,
               description: error.message,
               status: 'error',
               duration: 5000,
@@ -326,8 +326,8 @@ const Settings: React.FC = () => {
       }
     } catch (error) {
       toast({
-        title: '保存失败',
-        description: error instanceof Error ? error.message : '未知错误',
+        title: t.settings.save_failed,
+        description: error instanceof Error ? error.message : t.common.unknownError,
         status: 'error',
         duration: 3000,
         isClosable: true,
@@ -400,7 +400,7 @@ const Settings: React.FC = () => {
     })
     
     toast({
-      title: '设置已重置',
+      title: t.settings.reset_success,
       status: 'info',
       duration: 3000,
       isClosable: true,
@@ -794,7 +794,7 @@ const Settings: React.FC = () => {
               <Select
                 value={settings.minNotificationLevel}
                 onChange={(e) => handleInputChange('minNotificationLevel', e.target.value)}
-                placeholder="选择最小通知级别"
+                placeholder={t.settings.select_min_notification_level}
               >
                 <option value="info">信息 (info) - 所有通知</option>
                 <option value="warning">警告 (warning) - 警告及以上</option>
@@ -1054,7 +1054,7 @@ const Settings: React.FC = () => {
                           newUrls[index] = e.target.value
                           setSettings(prev => ({ ...prev, webhookUrls: newUrls }))
                         }}
-                        placeholder="https://hooks.slack.com/services/xxx 或 https://qyapi.weixin.qq.com/xxx"
+                        placeholder={t.settings.webhook_placeholder}
                       />
                     </FormControl>
                     {settings.webhookUrls.length > 1 && (

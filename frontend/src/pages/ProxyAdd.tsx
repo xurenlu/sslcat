@@ -735,14 +735,14 @@ const ProxyAdd: React.FC = () => {
                           {formData.auth_users.map((user, index) => (
                             <HStack key={index} spacing={3}>
                               <Input
-                                placeholder="用户名"
+                                placeholder={t.proxy.username}
                                 value={user.username}
                                 onChange={(e) => handleAuthUserChange(index, 'username', e.target.value)}
                                 size="md"
                               />
                               <Input
                                 type="password"
-                                placeholder="密码"
+                                placeholder={t.proxy.password}
                                 value={user.password}
                                 onChange={(e) => handleAuthUserChange(index, 'password', e.target.value)}
                                 size="md"
@@ -983,7 +983,7 @@ const ProxyAdd: React.FC = () => {
                   colorScheme="blue"
                   size="lg"
                   isLoading={loading}
-                  loadingText="创建中..."
+                  loadingText={t.common.creating}
                 >
                   创建规则
                 </Button>

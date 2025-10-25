@@ -61,6 +61,8 @@
   "proxy.enable_metrics": "メトリクス収集を有効化",
   "proxy.tracing_warning": "⚠️ 有効化するとCPU使用率が大幅に増加します。デバッグ時のみ推奨",
   "proxy.metrics_warning": "⚠️ 有効化するとCPU使用率が増加します。監視が必要な場合のみ推奨",
+  "proxy.username": "ユーザー名",
+  "proxy.password": "パスワード",
   
   "security.title": "セキュリティ保護",
   "security.waf": "Webアプリケーションファイアウォール",
@@ -133,6 +135,8 @@
   "common.import": "インポート",
   "common.yes": "はい",
   "common.no": "いいえ",
+  "common.creating": "作成中...",
+  "common.saving": "保存中...",
   "common.ok": "OK",
   
   "time.seconds": "秒",

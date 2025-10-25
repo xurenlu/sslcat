@@ -52,6 +52,8 @@ export interface Translation {
     failed: string
     unknown: string
     unknownError?: string
+    creating: string
+    saving: string
   }
   
   // 导航菜单
@@ -152,6 +154,8 @@ export interface Translation {
     disableRule: string
     noRules: string
     createFirst: string
+    username: string
+    password: string
   }
   
   // SSL证书
@@ -418,6 +422,17 @@ export interface Translation {
     notificationLevelWarning: string
     notificationLevelError: string
     notificationLevelCritical: string
+    save_success: string
+    save_failed: string
+    reset_success: string
+    admin_prefix_change_success: string
+    admin_prefix_change_failed: string
+    admin_prefix_changed: string
+    notification_sent: string
+    basic_config_load_failed: string
+    notification_config_load_failed: string
+    basic_config_save_failed: string
+    notification_config_save_failed: string
   }
   
   // 侧边栏

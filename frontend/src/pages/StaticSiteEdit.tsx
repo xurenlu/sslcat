@@ -310,7 +310,7 @@ const StaticSiteEdit: React.FC = () => {
                 leftIcon={<Icon as={FiSave} />}
                 onClick={handleSave}
                 isLoading={saving}
-                loadingText="保存中..."
+                loadingText={t.common.saving}
               >
                 保存配置
               </Button>
