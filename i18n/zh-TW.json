@@ -56,6 +56,11 @@
   "proxy.healthy": "健康",
   "proxy.unhealthy": "不健康",
   "proxy.unknown": "未知",
+  "proxy.performance_monitoring": "效能監控配置",
+  "proxy.enable_tracing": "啟用請求追蹤",
+  "proxy.enable_metrics": "啟用指標收集",
+  "proxy.tracing_warning": "⚠️ 啟用後會顯著增加 CPU 占用，建議僅在調試時使用",
+  "proxy.metrics_warning": "⚠️ 啟用後會增加 CPU 占用，建議僅在需要監控時使用",
   
   "security.title": "安全防護",
   "security.waf": "Web應用程式防火牆",

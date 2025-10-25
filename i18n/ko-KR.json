@@ -56,6 +56,11 @@
   "proxy.healthy": "건강함",
   "proxy.unhealthy": "건강하지 않음",
   "proxy.unknown": "알 수 없음",
+  "proxy.performance_monitoring": "성능 모니터링 설정",
+  "proxy.enable_tracing": "요청 추적 활성화",
+  "proxy.enable_metrics": "메트릭 수집 활성화",
+  "proxy.tracing_warning": "⚠️ 활성화하면 CPU 사용량이 크게 증가합니다. 디버깅 시에만 권장",
+  "proxy.metrics_warning": "⚠️ 활성화하면 CPU 사용량이 증가합니다. 모니터링이 필요한 경우에만 권장",
   
   "security.title": "보안 보호",
   "security.waf": "웹 애플리케이션 방화벽",

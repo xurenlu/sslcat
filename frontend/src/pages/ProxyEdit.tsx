@@ -1025,16 +1025,16 @@ const ProxyEdit: React.FC = () => {
                 <Box>
                   <Heading size="md" mb={4} color="gray.700">
                     <Icon as={FiZap} mr={2} />
-                    性能监控配置
+                    {t.proxy.performance_monitoring}
                   </Heading>
                   
                   <VStack spacing={4}>
                     <FormControl>
                       <HStack justify="space-between">
                         <Box>
-                          <FormLabel mb={1}>启用请求追踪</FormLabel>
+                          <FormLabel mb={1}>{t.proxy.enable_tracing}</FormLabel>
                           <Text fontSize="sm" color="red.500">
-                            ⚠️ 启用后会显著增加 CPU 占用，建议仅在调试时使用
+                            {t.proxy.tracing_warning}
                           </Text>
                         </Box>
                         <Switch
@@ -1049,9 +1049,9 @@ const ProxyEdit: React.FC = () => {
                     <FormControl>
                       <HStack justify="space-between">
                         <Box>
-                          <FormLabel mb={1}>启用指标收集</FormLabel>
+                          <FormLabel mb={1}>{t.proxy.enable_metrics}</FormLabel>
                           <Text fontSize="sm" color="orange.500">
-                            ⚠️ 启用后会增加 CPU 占用，建议仅在需要监控时使用
+                            {t.proxy.metrics_warning}
                           </Text>
                         </Box>
                         <Switch

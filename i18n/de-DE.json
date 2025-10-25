@@ -56,6 +56,11 @@
   "proxy.healthy": "Gesund",
   "proxy.unhealthy": "Ungesund",
   "proxy.unknown": "Unbekannt",
+  "proxy.performance_monitoring": "Leistungsüberwachung",
+  "proxy.enable_tracing": "Anfragenverfolgung aktivieren",
+  "proxy.enable_metrics": "Metrik-Sammlung aktivieren",
+  "proxy.tracing_warning": "⚠️ Aktivierung erhöht die CPU-Nutzung erheblich, nur für Debugging empfohlen",
+  "proxy.metrics_warning": "⚠️ Aktivierung erhöht die CPU-Nutzung, nur bei Bedarf für Überwachung empfohlen",
   
   "security.title": "Sicherheitsschutz",
   "security.waf": "Web-Application-Firewall",

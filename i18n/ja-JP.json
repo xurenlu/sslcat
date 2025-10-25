@@ -56,6 +56,11 @@
   "proxy.healthy": "正常",
   "proxy.unhealthy": "異常",
   "proxy.unknown": "不明",
+  "proxy.performance_monitoring": "パフォーマンス監視設定",
+  "proxy.enable_tracing": "リクエストトレーシングを有効化",
+  "proxy.enable_metrics": "メトリクス収集を有効化",
+  "proxy.tracing_warning": "⚠️ 有効化するとCPU使用率が大幅に増加します。デバッグ時のみ推奨",
+  "proxy.metrics_warning": "⚠️ 有効化するとCPU使用率が増加します。監視が必要な場合のみ推奨",
   
   "security.title": "セキュリティ保護",
   "security.waf": "Webアプリケーションファイアウォール",

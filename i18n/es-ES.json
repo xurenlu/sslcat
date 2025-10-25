@@ -56,6 +56,11 @@
   "proxy.healthy": "Saludable",
   "proxy.unhealthy": "No Saludable",
   "proxy.unknown": "Desconocido",
+  "proxy.performance_monitoring": "Configuración de Monitoreo de Rendimiento",
+  "proxy.enable_tracing": "Habilitar Seguimiento de Solicitudes",
+  "proxy.enable_metrics": "Habilitar Recopilación de Métricas",
+  "proxy.tracing_warning": "⚠️ Habilitar aumentará significativamente el uso de CPU, recomendado solo para depuración",
+  "proxy.metrics_warning": "⚠️ Habilitar aumentará el uso de CPU, recomendado solo cuando se necesite monitoreo",
   
   "security.title": "Protección de Seguridad",
   "security.waf": "Firewall de Aplicación Web",

@@ -56,6 +56,11 @@
   "proxy.healthy": "En Bonne Santé",
   "proxy.unhealthy": "Défaillant",
   "proxy.unknown": "Inconnu",
+  "proxy.performance_monitoring": "Configuration de Surveillance des Performances",
+  "proxy.enable_tracing": "Activer le Suivi des Requêtes",
+  "proxy.enable_metrics": "Activer la Collecte de Métriques",
+  "proxy.tracing_warning": "⚠️ L'activation augmentera considérablement l'utilisation du CPU, recommandé uniquement pour le débogage",
+  "proxy.metrics_warning": "⚠️ L'activation augmentera l'utilisation du CPU, recommandé uniquement en cas de besoin de surveillance",
   
   "security.title": "Protection de Sécurité",
   "security.waf": "Pare-feu d'Application Web",
