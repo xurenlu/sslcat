@@ -18,6 +18,8 @@
 - [端口配置设计](configuration/port-configuration-design.md) - 端口配置设计文档
 
 ### 第三部分：功能特性
+- [v1.3.17 新特性](FEATURES_v1.3.17.md) - v1.3.17 版本新特性总览 ⭐ NEW
+- [监控系统](features/monitoring.md) - 内置监控系统（Goroutine、内存、性能）⭐ NEW
 - [压缩缓存指南](features/COMPRESSION_CACHE_GUIDE.md) - 压缩和缓存功能
 - [HTTP/2实现](features/HTTP2_IMPLEMENTATION.md) - HTTP/2支持实现
 - [HTTP/2支持分析](features/HTTP2_SUPPORT_ANALYSIS.md) - HTTP/2支持分析
@@ -25,7 +27,6 @@
 - [实时日志功能](features/realtime-logs-feature.md) - 实时日志功能
 - [WebSocket重连去重](features/websocket-reconnection-deduplication.md) - WebSocket重连去重
 - [分布式追踪](features/tracing.md) - 追踪支持
-- [监控](features/monitoring.md) - 指标和监控
 
 ### 第四部分：开发
 - [Builder架构](development/builder-architecture.md) - Builder架构文档
@@ -105,9 +106,21 @@
 
 ## 🔄 版本信息
 
-- **当前版本**: v1.3.16-rc18
+- **当前版本**: v1.3.17-rc24
 - **文档版本**: 1.0
-- **最后更新**: 2024
+- **最后更新**: 2025
+
+## 🎉 v1.3.17 新特性亮点
+
+v1.3.17 版本引入了5个重大新特性：
+
+1. **📊 监控系统** - 内置 Goroutine、内存、性能监控，16个 Prometheus 指标
+2. **☁️ AWS Route53 支持** - 自动 DNS 验证，零手动操作 SSL 证书申请
+3. **⚡ 智能配置重载** - 3级变更检测，减少不必要的重载
+4. **🔥 缓存预热** - 消除冷启动延迟，性能提升 35倍
+5. **🎛️ 智能限流** - 4种先进算法，精确流量控制
+
+[查看完整新特性文档](FEATURES_v1.3.17.md)
 
 ## 🤝 贡献文档
 

@@ -11,11 +11,11 @@ import (
 type RateLimitAlgorithm string
 
 const (
-	AlgorithmFixedWindow    RateLimitAlgorithm = "fixed_window"    // 固定窗口
-	AlgorithmSlidingWindow  RateLimitAlgorithm = "sliding_window"  // 滑动窗口
-	AlgorithmTokenBucket    RateLimitAlgorithm = "token_bucket"    // 令牌桶
-	AlgorithmLeakyBucket    RateLimitAlgorithm = "leaky_bucket"    // 漏桶
-	AlgorithmAdaptive       RateLimitAlgorithm = "adaptive"        // 自适应
+	AlgorithmFixedWindow   RateLimitAlgorithm = "fixed_window"   // 固定窗口
+	AlgorithmSlidingWindow RateLimitAlgorithm = "sliding_window" // 滑动窗口
+	AlgorithmTokenBucket   RateLimitAlgorithm = "token_bucket"   // 令牌桶
+	AlgorithmLeakyBucket   RateLimitAlgorithm = "leaky_bucket"   // 漏桶
+	AlgorithmAdaptive      RateLimitAlgorithm = "adaptive"       // 自适应
 )
 
 // SmartRateLimiter 智能限流器（支持多种算法）
@@ -164,10 +164,10 @@ func (swl *SlidingWindowLimiter) GetStats() map[string]interface{} {
 	defer swl.mutex.RUnlock()
 
 	return map[string]interface{}{
-		"algorithm":         "sliding_window",
-		"current_requests":  len(swl.requests),
-		"max_rate":          swl.maxRate,
-		"window_size_sec":   swl.windowSize.Seconds(),
+		"algorithm":        "sliding_window",
+		"current_requests": len(swl.requests),
+		"max_rate":         swl.maxRate,
+		"window_size_sec":  swl.windowSize.Seconds(),
 	}
 }
 
@@ -177,10 +177,10 @@ func (swl *SlidingWindowLimiter) GetStats() map[string]interface{} {
 
 // TokenBucketLimiter 令牌桶限流器
 type TokenBucketLimiter struct {
-	maxRate    int           // 每秒生成令牌数
-	capacity   int           // 桶容量
-	tokens     int           // 当前令牌数
-	lastUpdate time.Time     // 上次更新时间
+	maxRate    int       // 每秒生成令牌数
+	capacity   int       // 桶容量
+	tokens     int       // 当前令牌数
+	lastUpdate time.Time // 上次更新时间
 	mutex      sync.RWMutex
 }
 
@@ -238,11 +238,11 @@ func (tbl *TokenBucketLimiter) GetStats() map[string]interface{} {
 
 // LeakyBucketLimiter 漏桶限流器
 type LeakyBucketLimiter struct {
-	maxRate    int           // 每秒漏出速率
-	capacity   int           // 桶容量
-	queue      int           // 当前队列长度
-	lastLeak   time.Time     // 上次漏水时间
-	mutex      sync.RWMutex
+	maxRate  int       // 每秒漏出速率
+	capacity int       // 桶容量
+	queue    int       // 当前队列长度
+	lastLeak time.Time // 上次漏水时间
+	mutex    sync.RWMutex
 }
 
 // NewLeakyBucketLimiter 创建漏桶限流器
@@ -286,10 +286,10 @@ func (lbl *LeakyBucketLimiter) GetStats() map[string]interface{} {
 	defer lbl.mutex.RUnlock()
 
 	return map[string]interface{}{
-		"algorithm":      "leaky_bucket",
-		"current_queue":  lbl.queue,
-		"capacity":       lbl.capacity,
-		"max_rate":       lbl.maxRate,
+		"algorithm":     "leaky_bucket",
+		"current_queue": lbl.queue,
+		"capacity":      lbl.capacity,
+		"max_rate":      lbl.maxRate,
 	}
 }
 
@@ -370,11 +370,11 @@ func (al *AdaptiveLimiter) GetStats() map[string]interface{} {
 	defer al.mutex.RUnlock()
 
 	return map[string]interface{}{
-		"algorithm":       "adaptive",
-		"current_tokens":  al.tokens,
-		"capacity":        al.capacity,
-		"current_rate":    al.currentRate,
-		"target_latency":  al.targetLatency.Milliseconds(),
+		"algorithm":      "adaptive",
+		"current_tokens": al.tokens,
+		"capacity":       al.capacity,
+		"current_rate":   al.currentRate,
+		"target_latency": al.targetLatency.Milliseconds(),
 	}
 }
 
@@ -395,4 +395,3 @@ func max(a, b int) int {
 	}
 	return b
 }
-

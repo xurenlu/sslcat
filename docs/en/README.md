@@ -18,6 +18,8 @@ Welcome to the comprehensive documentation for SSLcat - the enterprise-grade SSL
 - [Ports](configuration/ports.md) - Port configuration options
 
 ### Part III: Features
+- [v1.3.17 New Features](FEATURES_v1.3.17.md) - v1.3.17 Release Overview ⭐ NEW
+- [Monitoring System](features/monitoring.md) - Built-in Monitoring (Goroutine, Memory, Performance) ⭐ NEW
 - [SSL Termination](features/ssl-termination.md) - SSL/TLS handling
 - [Reverse Proxy](features/reverse-proxy.md) - Proxy functionality
 - [Load Balancing](features/load-balancing.md) - Traffic distribution
@@ -26,7 +28,6 @@ Welcome to the comprehensive documentation for SSLcat - the enterprise-grade SSL
 - [WebSocket](features/websocket.md) - WebSocket support
 - [HTTP/2](features/http2.md) - HTTP/2 support
 - [Distributed Tracing](features/tracing.md) - Tracing support
-- [Monitoring](features/monitoring.md) - Metrics and monitoring
 
 ### Part IV: Development
 - [Builder Architecture](development/builder-architecture.md) - Builder architecture documentation
@@ -103,9 +104,21 @@ This documentation is designed to be:
 
 ## 🔄 Version Information
 
-- **Current Version**: v1.3.16-rc18
+- **Current Version**: v1.3.17-rc24
 - **Documentation Version**: 1.0
-- **Last Updated**: 2024
+- **Last Updated**: 2025
+
+## 🎉 v1.3.17 New Features Highlights
+
+v1.3.17 introduces 5 major new features:
+
+1. **📊 Monitoring System** - Built-in Goroutine, memory, and performance monitoring with 16 Prometheus metrics
+2. **☁️ AWS Route53 Support** - Automatic DNS verification for zero-manual SSL certificate issuance
+3. **⚡ Smart Config Reload** - 3-level change detection to reduce unnecessary reloads
+4. **🔥 Cache Warmup** - Eliminate cold start latency with 35x performance improvement
+5. **🎛️ Smart Rate Limiting** - 4 advanced algorithms for precise traffic control
+
+[View Full New Features Documentation](FEATURES_v1.3.17.md)
 
 ## 🤝 Contributing to Documentation
 

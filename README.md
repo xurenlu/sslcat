@@ -1,6 +1,6 @@
 # SSLcat 🚀
 
-[![Version](https://img.shields.io/badge/version-1.3.16--rc18-blue.svg)](https://github.com/xurenlu/sslcat/releases/tag/v1.3.16-rc18)
+[![Version](https://img.shields.io/badge/version-1.3.17--rc24-blue.svg)](https://github.com/xurenlu/sslcat/releases/tag/v1.3.17-rc24)
 [![Go Version](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://golang.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![CPU Optimized](https://img.shields.io/badge/CPU%20optimized-97%25%20reduction-brightgreen.svg)](#performance)
@@ -27,6 +27,11 @@ SSLcat 是一个功能强大的高性能 SSL 代理服务器，使用 Go 语言�
 - 🛡️ **Advanced Security** - AI-powered threat detection and IP blocking
 - 📡 **Real-time Logs** - WebSocket-based live log streaming
 - 🌍 **Multi-language** - English, Chinese, Japanese support
+- 📊 **Built-in Monitoring** - Automatic Goroutine, memory, and performance monitoring
+- ☁️ **AWS Route53 Support** - Automatic DNS verification for SSL certificates
+- ⚡ **Smart Config Reload** - Intelligent configuration change detection
+- 🔥 **Cache Warmup** - Eliminate cold start latency
+- 🎛️ **Advanced Rate Limiting** - 4 algorithms for precise traffic control
 
 - 🔒 **自动 SSL 管理** - Let's Encrypt 集成，自动证书续期
 - 🔄 **智能负载均衡** - 6种算法，健康检查和会话保持
@@ -36,6 +41,11 @@ SSLcat 是一个功能强大的高性能 SSL 代理服务器，使用 Go 语言�
 - 🛡️ **高级安全** - AI 驱动的威胁检测和 IP 封禁
 - 📡 **实时日志** - 基于 WebSocket 的实时日志流
 - 🌍 **多语言支持** - 英语、中文、日语
+- 📊 **内置监控** - 自动 Goroutine、内存和性能监控
+- ☁️ **AWS Route53 支持** - SSL 证书自动 DNS 验证
+- ⚡ **智能配置重载** - 智能配置变更检测
+- 🔥 **缓存预热** - 消除冷启动延迟
+- 🎛️ **高级限流** - 4种算法精确流量控制
 
 ---
 
