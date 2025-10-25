@@ -60,6 +60,7 @@ type Manager struct {
 	// TLS 指纹持久化
 	tlsFPRotator *logger.Rotator
 	geoIPService *GeoIPService
+	corsMiddleware *CORSMiddleware
 
 	// 内存泄漏防护
 	maxAccessLogEntries int // 每个IP的访问日志最多保留多少条
@@ -108,8 +109,8 @@ func NewManager(cfg *config.Config) *Manager {
 		uaInvalid5Min:  make(map[string][]time.Time),
 		tlsFPCounts:    make(map[string][]time.Time),
 		stopChan:       make(chan struct{}),
-		corsMiddleware: corsMiddleware,
 		geoIPService:   geoIPService,
+		corsMiddleware: corsMiddleware,
 		log: logrus.WithFields(logrus.Fields{
 			"component": "security_manager",
 		}),

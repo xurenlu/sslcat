@@ -269,12 +269,9 @@ sslcat_config_enabled{feature="image_optimization"} %d
 		map[bool]int{true: 1, false: 0}[s.config.ImageOptimization.Enabled])
 
 	// 添加监控器指标（如果启用）
-	// 注意：需要在Server结构中添加monitorManager字段并初始化
-	// 详见 MONITOR_INTEGRATION_GUIDE.md
-	/*
 	if s.monitorManager != nil {
 		monitorStats := s.monitorManager.GetAllStats()
-		
+
 		// Goroutine监控指标
 		if goroutineStats, ok := monitorStats["goroutine"].(map[string]interface{}); ok {
 			fmt.Fprintf(w, `
@@ -299,7 +296,7 @@ sslcat_goroutines_warnings_total %d
 				goroutineStats["peak_count"],
 				goroutineStats["warning_count"])
 		}
-		
+
 		// 内存监控指标
 		if memoryStats, ok := monitorStats["memory"].(map[string]interface{}); ok {
 			fmt.Fprintf(w, `
@@ -334,7 +331,7 @@ sslcat_memory_gc_count %d
 				memoryStats["warning_count"],
 				memoryStats["gc_count"])
 		}
-		
+
 		// 性能监控指标
 		if perfStats, ok := monitorStats["performance"].(map[string]interface{}); ok {
 			fmt.Fprintf(w, `
@@ -370,5 +367,4 @@ sslcat_performance_current_error_rate %.6f
 				perfStats["current_error_rate"])
 		}
 	}
-	*/
 }

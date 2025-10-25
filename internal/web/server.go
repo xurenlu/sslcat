@@ -24,6 +24,7 @@ import (
 	"github.com/xurenlu/sslcat/internal/imageopt"
 	"github.com/xurenlu/sslcat/internal/logger"
 	"github.com/xurenlu/sslcat/internal/metrics"
+	"github.com/xurenlu/sslcat/internal/monitor"
 	"github.com/xurenlu/sslcat/internal/notification"
 	"github.com/xurenlu/sslcat/internal/notify"
 	"github.com/xurenlu/sslcat/internal/proxy"
@@ -108,6 +109,9 @@ type Server struct {
 	aiSecurityAnalyzer *ai.SecurityAnalyzer
 	// 图片优化器
 	imageOptimizer *imageopt.Optimizer
+
+	// 监控管理器
+	monitorManager *monitor.Manager
 
 	// Cluster runtime status
 	clusterLastConfigSyncAt      time.Time
@@ -292,6 +296,13 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 
 		logrus.Infof("AI 安全分析器已启动，模型: %s，间隔: %v",
 			cfg.AISecurity.Model, cfg.AISecurity.CheckInterval)
+	}
+
+	// 初始化监控管理器（如果启用）
+	if cfg.Monitoring.Enabled {
+		server.monitorManager = monitor.NewManager(cfg.Monitoring.Enabled)
+		server.monitorManager.Start()
+		server.log.Info("监控管理器已启动")
 	}
 
 	// 初始化审计日志轮转器（10MB*10）
@@ -962,6 +973,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if s.accessLogger != nil {
 			s.accessLogger.LogRequest(r, wrappedWriter.statusCode, wrappedWriter.written,
 				duration, "", 0)
+		}
+
+		// 记录性能监控数据（如果监控系统启用）
+		if s.monitorManager != nil {
+			perfMonitor := s.monitorManager.GetPerformanceMonitor()
+			isError := wrappedWriter.statusCode >= 400
+			perfMonitor.RecordRequest(duration, isError)
 		}
 	}()
 
