@@ -30,6 +30,7 @@ import {
   ListItem,
   ListIcon,
 } from '@chakra-ui/react'
+import { useTranslation } from '@/i18n'
 import { 
   FiCheckCircle, 
   FiXCircle, 
@@ -84,6 +85,7 @@ interface ValidationResult {
 
 const ConfigTest: React.FC = () => {
   const { adminPrefix } = useConfig()
+  const t = useTranslation()
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<ValidationResult | null>(null)
   const toast = useToast()

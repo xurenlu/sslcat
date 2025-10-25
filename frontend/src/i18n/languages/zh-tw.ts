@@ -750,6 +750,8 @@ export const zhTW: Translation = {
     cancel: '取消',
     send: '傳送',
     noNotifications: '暫無通知',
+    title_placeholder: '請輸入通知標題',
+    message_placeholder: '請輸入通知消息',
   },
   imageOptimization: {
     title: '圖片最佳化',
