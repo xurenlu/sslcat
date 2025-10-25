@@ -209,6 +209,7 @@ type ProxyRule struct {
 	WebSocketReadTimeout  int  `json:"websocket_read_timeout"`  // WebSocket读取超时（秒），默认30
 	WebSocketWriteTimeout int  `json:"websocket_write_timeout"` // WebSocket写入超时（秒），默认10
 	WebSocketPingInterval int  `json:"websocket_ping_interval"` // WebSocket心跳间隔（秒），默认30
+	WebSocketTimeout      int  `json:"websocket_timeout"`       // WebSocket连接总超时（秒），默认1800
 
 	// 自定义头部配置
 	UpstreamRequestHeaders map[string]string `json:"upstream_request_headers,omitempty"`

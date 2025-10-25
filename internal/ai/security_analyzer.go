@@ -31,6 +31,11 @@ type SecurityAnalyzer struct {
 	temperature   float64
 	systemPrompt  string
 	language      string // 语言设置：zh-CN 或 en-US
+	
+	// 内存泄漏防护
+	stopChan      chan struct{}
+	maxCacheSize  int
+	cacheCleanupInterval time.Duration
 }
 
 // SecurityData 安全数据摘要
@@ -176,6 +181,11 @@ func NewSecurityAnalyzer(cfg config.AISecurityConfig, notifier *notification.Not
 		notifier:      notifier,
 		analysisCache: make(map[string]*AnalysisResult),
 		log:           logrus.WithFields(logrus.Fields{"component": "ai_security"}),
+		
+		// 内存泄漏防护配置
+		stopChan:             make(chan struct{}),
+		maxCacheSize:         100,  // 最多100个缓存项
+		cacheCleanupInterval: 1 * time.Hour, // 每小时清理一次
 	}
 
 	// 设置默认值
@@ -348,6 +358,9 @@ func (a *SecurityAnalyzer) Start(dataCollector func() *SecurityData) {
 
 	a.log.Infof("AI 安全分析器已启动，检查间隔: %v", a.checkInterval)
 
+	// 启动缓存清理任务
+	go a.startCacheCleanupTask()
+
 	go func() {
 		ticker := time.NewTicker(a.checkInterval)
 		defer ticker.Stop()
@@ -355,8 +368,14 @@ func (a *SecurityAnalyzer) Start(dataCollector func() *SecurityData) {
 		// 立即执行一次
 		a.runAnalysis(dataCollector)
 
-		for range ticker.C {
-			a.runAnalysis(dataCollector)
+		for {
+			select {
+			case <-ticker.C:
+				a.runAnalysis(dataCollector)
+			case <-a.stopChan:
+				a.log.Info("AI 安全分析器已停止")
+				return
+			}
 		}
 	}()
 }
@@ -413,6 +432,105 @@ func (a *SecurityAnalyzer) runAnalysis(dataCollector func() *SecurityData) {
 	}
 
 	a.log.Infof("AI 分析完成，威胁等级: %s，置信度: %.2f", result.ThreatLevel, result.Confidence)
+}
+
+// startCacheCleanupTask 启动缓存清理任务
+func (a *SecurityAnalyzer) startCacheCleanupTask() {
+	ticker := time.NewTicker(a.cacheCleanupInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			a.cleanupCache()
+		case <-a.stopChan:
+			a.log.Info("AI 安全分析器缓存清理任务已停止")
+			return
+		}
+	}
+}
+
+// cleanupCache 清理过期缓存
+func (a *SecurityAnalyzer) cleanupCache() {
+	a.cacheMutex.Lock()
+	defer a.cacheMutex.Unlock()
+
+	now := time.Now()
+	var expiredKeys []string
+
+	// 清理过期缓存（超过24小时）
+	for hash, result := range a.analysisCache {
+		if now.Sub(result.Timestamp) > 24*time.Hour {
+			expiredKeys = append(expiredKeys, hash)
+		}
+	}
+
+	// 删除过期缓存
+	for _, key := range expiredKeys {
+		delete(a.analysisCache, key)
+	}
+
+	// 限制缓存大小
+	if len(a.analysisCache) > a.maxCacheSize {
+		a.limitCacheSize()
+	}
+
+	if len(expiredKeys) > 0 || len(a.analysisCache) > a.maxCacheSize {
+		a.log.Infof("AI 安全分析器缓存清理完成，删除 %d 个过期项，当前缓存大小: %d", 
+			len(expiredKeys), len(a.analysisCache))
+	}
+}
+
+// limitCacheSize 限制缓存大小
+func (a *SecurityAnalyzer) limitCacheSize() {
+	if len(a.analysisCache) <= a.maxCacheSize {
+		return
+	}
+
+	// 按时间排序，删除最旧的缓存项
+	type cacheItem struct {
+		hash string
+		time time.Time
+	}
+
+	var sortedItems []cacheItem
+	for hash, result := range a.analysisCache {
+		sortedItems = append(sortedItems, cacheItem{
+			hash: hash,
+			time: result.Timestamp,
+		})
+	}
+
+	// 按时间排序（最旧的在前）
+	for i := 0; i < len(sortedItems)-1; i++ {
+		for j := i + 1; j < len(sortedItems); j++ {
+			if sortedItems[i].time.After(sortedItems[j].time) {
+				sortedItems[i], sortedItems[j] = sortedItems[j], sortedItems[i]
+			}
+		}
+	}
+
+	// 删除最旧的缓存项
+	deleteCount := len(a.analysisCache) - a.maxCacheSize
+	for i := 0; i < deleteCount && i < len(sortedItems); i++ {
+		delete(a.analysisCache, sortedItems[i].hash)
+	}
+
+	a.log.Warnf("AI 安全分析器缓存大小超限，清理到 %d 项", len(a.analysisCache))
+}
+
+// Stop 停止 AI 安全分析器
+func (a *SecurityAnalyzer) Stop() {
+	a.cacheMutex.Lock()
+	defer a.cacheMutex.Unlock()
+
+	if a.stopChan != nil {
+		close(a.stopChan)
+		a.stopChan = nil
+	}
+
+	a.enabled = false
+	a.log.Info("AI 安全分析器已停止")
 }
 
 // AnalyzeWithGPT 使用 GPT API 进行分析（公开方法）

@@ -94,6 +94,13 @@ type Collector struct {
 	cleanupInterval time.Duration
 	maxDataAge      time.Duration
 	geoIPEnabled    bool
+
+	// 内存泄漏防护
+	stopChan       chan struct{}
+	maxIPEntries   int
+	maxUAEntries   int
+	maxCityEntries int
+	maxDomainStats int
 }
 
 // NewCollector 创建统计收集器
@@ -125,6 +132,13 @@ func NewCollector(dataDir string, enabled bool) *Collector {
 		cleanupInterval: 1 * time.Hour,
 		maxDataAge:      30 * 24 * time.Hour, // 30天
 		geoIPEnabled:    false,
+
+		// 内存泄漏防护配置
+		stopChan:       make(chan struct{}),
+		maxIPEntries:   1000, // 最多1000个IP条目
+		maxUAEntries:   500,  // 最多500个UA条目
+		maxCityEntries: 200,  // 最多200个城市条目
+		maxDomainStats: 100,  // 最多100个域名统计
 	}
 
 	if enabled {
@@ -289,12 +303,17 @@ func (c *Collector) startCleanupTask() {
 	ticker := time.NewTicker(c.cleanupInterval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		if !c.enabled {
-			break
+	for {
+		select {
+		case <-ticker.C:
+			if !c.enabled {
+				return
+			}
+			c.cleanup()
+		case <-c.stopChan:
+			c.log.Info("统计收集器清理任务已停止")
+			return
 		}
-
-		c.cleanup()
 	}
 }
 
@@ -312,6 +331,9 @@ func (c *Collector) cleanup() {
 
 	// 清理域名统计数据
 	c.cleanupDomainStats(now)
+
+	// 限制数据增长（防止内存泄漏）
+	c.limitDataGrowth()
 
 	c.log.Debug("完成数据清理")
 }
@@ -363,6 +385,123 @@ func (c *Collector) isTimeKeyExpired(timeKey string, dimension TimeDimension, no
 	}
 
 	return now.Sub(t) > maxAge
+}
+
+// limitDataGrowth 限制数据增长（防止内存泄漏）
+func (c *Collector) limitDataGrowth() {
+	// 限制 IP 条目数量
+	if len(c.ipEntries) > c.maxIPEntries {
+		c.cleanupOldEntries(c.ipEntries, c.maxIPEntries/2)
+		c.log.Warnf("IP条目数量超限，清理到 %d 条", len(c.ipEntries))
+	}
+
+	// 限制 UA 条目数量
+	if len(c.uaEntries) > c.maxUAEntries {
+		c.cleanupOldEntries(c.uaEntries, c.maxUAEntries/2)
+		c.log.Warnf("UA条目数量超限，清理到 %d 条", len(c.uaEntries))
+	}
+
+	// 限制城市条目数量
+	if len(c.cityEntries) > c.maxCityEntries {
+		c.cleanupOldEntries(c.cityEntries, c.maxCityEntries/2)
+		c.log.Warnf("城市条目数量超限，清理到 %d 条", len(c.cityEntries))
+	}
+
+	// 限制域名统计数量
+	if len(c.domainStats) > c.maxDomainStats {
+		c.cleanupOldDomainStats(c.maxDomainStats / 2)
+		c.log.Warnf("域名统计数量超限，清理到 %d 个", len(c.domainStats))
+	}
+}
+
+// cleanupOldEntries 清理最旧的条目
+func (c *Collector) cleanupOldEntries(entries map[string]*FunnelEntry, targetCount int) {
+	if len(entries) <= targetCount {
+		return
+	}
+
+	// 按最后访问时间排序
+	type entryWithTime struct {
+		key  string
+		time time.Time
+	}
+
+	var sortedEntries []entryWithTime
+	for key, entry := range entries {
+		sortedEntries = append(sortedEntries, entryWithTime{
+			key:  key,
+			time: entry.LastAccess,
+		})
+	}
+
+	// 按时间排序（最旧的在前）
+	for i := 0; i < len(sortedEntries)-1; i++ {
+		for j := i + 1; j < len(sortedEntries); j++ {
+			if sortedEntries[i].time.After(sortedEntries[j].time) {
+				sortedEntries[i], sortedEntries[j] = sortedEntries[j], sortedEntries[i]
+			}
+		}
+	}
+
+	// 删除最旧的条目
+	deleteCount := len(entries) - targetCount
+	for i := 0; i < deleteCount && i < len(sortedEntries); i++ {
+		delete(entries, sortedEntries[i].key)
+	}
+}
+
+// cleanupOldDomainStats 清理最旧的域名统计
+func (c *Collector) cleanupOldDomainStats(targetCount int) {
+	if len(c.domainStats) <= targetCount {
+		return
+	}
+
+	// 按域名统计条目数量排序，删除条目最少的
+	type domainWithCount struct {
+		domain string
+		count  int
+	}
+
+	var sortedDomains []domainWithCount
+	for domain, dimStats := range c.domainStats {
+		totalCount := 0
+		for _, timeStats := range dimStats {
+			totalCount += len(timeStats)
+		}
+		sortedDomains = append(sortedDomains, domainWithCount{
+			domain: domain,
+			count:  totalCount,
+		})
+	}
+
+	// 按统计条目数量排序（最少的在前）
+	for i := 0; i < len(sortedDomains)-1; i++ {
+		for j := i + 1; j < len(sortedDomains); j++ {
+			if sortedDomains[i].count > sortedDomains[j].count {
+				sortedDomains[i], sortedDomains[j] = sortedDomains[j], sortedDomains[i]
+			}
+		}
+	}
+
+	// 删除统计条目最少的域名
+	deleteCount := len(c.domainStats) - targetCount
+	for i := 0; i < deleteCount && i < len(sortedDomains); i++ {
+		delete(c.domainStats, sortedDomains[i].domain)
+	}
+}
+
+// Stop 停止统计收集器
+func (c *Collector) Stop() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.stopChan != nil {
+		close(c.stopChan)
+		c.stopChan = nil
+	}
+
+	c.enabled = false
+	c.log.Info("统计收集器已停止")
 }
 
 // SaveToFile 保存统计数据到文件

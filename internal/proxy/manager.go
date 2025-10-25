@@ -3,6 +3,7 @@ package proxy
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -1319,6 +1320,16 @@ func (m *Manager) HandleWebSocketOptimized(w http.ResponseWriter, r *http.Reques
 
 // startOptimizedWebSocketProxy 启动优化的WebSocket代理
 func (m *Manager) startOptimizedWebSocketProxy(clientConn, upstreamConn net.Conn, rule *config.ProxyRule) {
+	// 设置连接超时
+	timeout := time.Duration(rule.WebSocketTimeout) * time.Second
+	if timeout <= 0 {
+		timeout = 30 * time.Minute // 默认 30 分钟
+	}
+
+	// 创建带超时的上下文
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
 	// 获取缓冲区大小配置
 	bufferSize := rule.WebSocketBufferSize
 	if bufferSize <= 0 {
@@ -1336,18 +1347,24 @@ func (m *Manager) startOptimizedWebSocketProxy(clientConn, upstreamConn net.Conn
 	var clientClosed, upstreamClosed int32
 
 	// 启动数据读取goroutine
-	go m.readWebSocketData(clientConn, clientToUpstream, errChan, &clientClosed, "client", rule)
-	go m.readWebSocketData(upstreamConn, upstreamToClient, errChan, &upstreamClosed, "upstream", rule)
+	go m.readWebSocketData(ctx, clientConn, clientToUpstream, errChan, &clientClosed, "client", rule)
+	go m.readWebSocketData(ctx, upstreamConn, upstreamToClient, errChan, &upstreamClosed, "upstream", rule)
 
 	// 启动数据写入goroutine
-	go m.writeWebSocketData(upstreamConn, clientToUpstream, errChan, &upstreamClosed, "upstream", rule)
-	go m.writeWebSocketData(clientConn, upstreamToClient, errChan, &clientClosed, "client", rule)
+	go m.writeWebSocketData(ctx, upstreamConn, clientToUpstream, errChan, &upstreamClosed, "upstream", rule)
+	go m.writeWebSocketData(ctx, clientConn, upstreamToClient, errChan, &clientClosed, "client", rule)
 
 	// 监控连接状态和错误
-	go m.monitorWebSocketConnections(clientConn, upstreamConn, errChan, &clientClosed, &upstreamClosed, rule)
+	go m.monitorWebSocketConnections(ctx, clientConn, upstreamConn, errChan, &clientClosed, &upstreamClosed, rule)
 
-	// 等待连接关闭
-	<-errChan
+	// 等待连接关闭或超时
+	select {
+	case <-errChan:
+		// 连接正常关闭
+	case <-ctx.Done():
+		// 连接超时
+		m.log.Warnf("WebSocket connection timeout for %s", rule.Target)
+	}
 
 	// 清理资源
 	atomic.StoreInt32(&clientClosed, 1)
@@ -1366,7 +1383,7 @@ func (m *Manager) startOptimizedWebSocketProxy(clientConn, upstreamConn net.Conn
 }
 
 // readWebSocketData 读取WebSocket数据
-func (m *Manager) readWebSocketData(conn net.Conn, dataChan chan<- []byte, errChan chan<- error, closed *int32, connType string, rule *config.ProxyRule) {
+func (m *Manager) readWebSocketData(ctx context.Context, conn net.Conn, dataChan chan<- []byte, errChan chan<- error, closed *int32, connType string, rule *config.ProxyRule) {
 	defer func() {
 		if r := recover(); r != nil {
 			m.log.Errorf("Panic in readWebSocketData (%s): %v", connType, r)
@@ -1381,6 +1398,14 @@ func (m *Manager) readWebSocketData(conn net.Conn, dataChan chan<- []byte, errCh
 
 	buffer := make([]byte, 32*1024)
 	for atomic.LoadInt32(closed) == 0 {
+		// 检查上下文是否已取消
+		select {
+		case <-ctx.Done():
+			m.log.Debugf("WebSocket read context cancelled (%s)", connType)
+			return
+		default:
+		}
+
 		// 设置读取超时
 		conn.SetReadDeadline(time.Now().Add(time.Duration(readTimeout) * time.Second))
 
