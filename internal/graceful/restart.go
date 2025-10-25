@@ -17,6 +17,7 @@ import (
 type RestartManager struct {
 	listeners map[string]net.Listener
 	log       *logrus.Entry
+	stopChan  chan struct{}
 }
 
 // NewRestartManager 创建重启管理器
@@ -26,6 +27,7 @@ func NewRestartManager() *RestartManager {
 		log: logrus.WithFields(logrus.Fields{
 			"component": "restart_manager",
 		}),
+		stopChan: make(chan struct{}),
 	}
 }
 
@@ -47,11 +49,16 @@ func (rm *RestartManager) StartGracefulRestart() {
 
 	go func() {
 		for {
-			sig := <-sigChan
-			rm.log.Infof("Received signal %v, starting graceful restart", sig)
+			select {
+			case sig := <-sigChan:
+				rm.log.Infof("Received signal %v, starting graceful restart", sig)
 
-			if err := rm.performGracefulRestart(); err != nil {
-				rm.log.Errorf("Graceful restart failed: %v", err)
+				if err := rm.performGracefulRestart(); err != nil {
+					rm.log.Errorf("Graceful restart failed: %v", err)
+				}
+			case <-rm.stopChan:
+				rm.log.Info("Graceful restart manager stopped")
+				return
 			}
 		}
 	}()
@@ -225,6 +232,15 @@ func (rm *RestartManager) gracefulShutdown() {
 	// 3. 强制退出
 	rm.log.Info("Graceful shutdown complete")
 	os.Exit(0)
+}
+
+// Stop 停止平滑重启管理器
+func (rm *RestartManager) Stop() {
+	if rm.stopChan != nil {
+		close(rm.stopChan)
+		rm.stopChan = nil
+	}
+	rm.log.Info("Graceful restart manager stopped")
 }
 
 // CreateContext 创建带超时的上下文
