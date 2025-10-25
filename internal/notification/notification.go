@@ -102,23 +102,29 @@ type NotificationChannel interface {
 
 // NotificationManager 通知管理器
 type NotificationManager struct {
-	channels    map[string]NotificationChannel
-	log         *logrus.Entry
-	rateLimiter *RateLimiter
-	history     []Notification
-	maxHistory  int
-	minLevel    NotificationLevel // 最小通知级别
+	channels         map[string]NotificationChannel
+	log              *logrus.Entry
+	rateLimiter      *RateLimiter
+	history          []Notification
+	maxHistory       int
+	minLevel         NotificationLevel // 最小通知级别
+	sendSemaphore    chan struct{}     // 并发控制
+	maxConcurrentSends int             // 最大并发发送数
 }
 
 // NewNotificationManager 创建通知管理器
 func NewNotificationManager() *NotificationManager {
+	maxConcurrentSends := 10 // 最多10个并发发送
+
 	nm := &NotificationManager{
-		channels:    make(map[string]NotificationChannel),
-		log:         logrus.WithFields(logrus.Fields{"component": "notification"}),
-		rateLimiter: NewRateLimiter(),
-		history:     make([]Notification, 0),
-		maxHistory:  1000,
-		minLevel:    LevelInfo, // 默认最小级别为info
+		channels:           make(map[string]NotificationChannel),
+		log:                logrus.WithFields(logrus.Fields{"component": "notification"}),
+		rateLimiter:        NewRateLimiter(),
+		history:            make([]Notification, 0),
+		maxHistory:         1000,
+		minLevel:           LevelInfo, // 默认最小级别为info
+		sendSemaphore:      make(chan struct{}, maxConcurrentSends),
+		maxConcurrentSends: maxConcurrentSends,
 	}
 
 	// 初始化默认渠道
@@ -129,13 +135,17 @@ func NewNotificationManager() *NotificationManager {
 
 // NewNotificationManagerFromConfig 从配置创建通知管理器
 func NewNotificationManagerFromConfig(cfg config.NotificationConfig) *NotificationManager {
+	maxConcurrentSends := 10 // 最多10个并发发送
+
 	nm := &NotificationManager{
-		channels:    make(map[string]NotificationChannel),
-		log:         logrus.WithFields(logrus.Fields{"component": "notification"}),
-		rateLimiter: NewRateLimiter(),
-		history:     make([]Notification, 0),
-		maxHistory:  1000,
-		minLevel:    parseNotificationLevel(cfg.MinNotificationLevel),
+		channels:           make(map[string]NotificationChannel),
+		log:                logrus.WithFields(logrus.Fields{"component": "notification"}),
+		rateLimiter:        NewRateLimiter(),
+		history:            make([]Notification, 0),
+		maxHistory:         1000,
+		minLevel:           parseNotificationLevel(cfg.MinNotificationLevel),
+		sendSemaphore:      make(chan struct{}, maxConcurrentSends),
+		maxConcurrentSends: maxConcurrentSends,
 	}
 
 	// 从配置文件初始化各个渠道
@@ -241,7 +251,7 @@ func (nm *NotificationManager) initDefaultChannels() {
 	nm.channels["console"] = NewConsoleChannel()
 }
 
-// Send 发送通知
+// Send 发送通知（异步）
 func (nm *NotificationManager) Send(notification *Notification) error {
 	// 设置默认值
 	if notification.ID == "" {
@@ -270,6 +280,24 @@ func (nm *NotificationManager) Send(notification *Notification) error {
 	// 记录到历史
 	nm.addToHistory(notification)
 
+	// 异步发送到各个渠道（避免阻塞）
+	go nm.sendAsync(notification)
+
+	return nil
+}
+
+// sendAsync 异步发送通知到各个渠道
+func (nm *NotificationManager) sendAsync(notification *Notification) {
+	// 并发控制
+	select {
+	case nm.sendSemaphore <- struct{}{}:
+		defer func() { <-nm.sendSemaphore }()
+	default:
+		// 发送队列已满，记录警告
+		nm.log.Warnf("通知发送队列已满（最多%d个并发），跳过: %s", nm.maxConcurrentSends, notification.Type)
+		return
+	}
+
 	// 发送到各个渠道
 	var errors []string
 	for name, channel := range nm.channels {
@@ -286,11 +314,10 @@ func (nm *NotificationManager) Send(notification *Notification) error {
 	}
 
 	if len(errors) > 0 {
-		return fmt.Errorf("部分通知发送失败: %s", strings.Join(errors, "; "))
+		nm.log.Errorf("部分通知发送失败: %s", strings.Join(errors, "; "))
+	} else {
+		nm.log.Infof("通知已发送: %s - %s", notification.Type, notification.Title)
 	}
-
-	nm.log.Infof("通知已发送: %s - %s", notification.Type, notification.Title)
-	return nil
 }
 
 // SendDDoSAttack 发送DDoS攻击通知

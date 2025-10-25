@@ -691,6 +691,8 @@ func (p *Protector) cleanup() {
 	defer p.mutex.Unlock()
 
 	now := time.Now()
+	initialClients := len(p.clients)
+	initialAttacks := len(p.attacks)
 
 	// 清理过期的客户端记录
 	for ip, client := range p.clients {
@@ -698,6 +700,11 @@ func (p *Protector) cleanup() {
 		if now.Sub(client.LastRequest) > time.Hour && now.After(client.BlockedUntil) {
 			delete(p.clients, ip)
 		}
+	}
+
+	// 如果客户端数量仍然超过限制，删除最旧的
+	if len(p.clients) > p.maxClients {
+		p.pruneOldestClients(p.maxClients)
 	}
 
 	// 清理旧的攻击记录（保留24小时）
@@ -710,8 +717,54 @@ func (p *Protector) cleanup() {
 	}
 	p.attacks = newAttacks
 
-	p.log.Debugf("清理完成，当前客户端数: %d，攻击记录数: %d",
-		len(p.clients), len(p.attacks))
+	// 如果攻击记录仍然超过限制，只保留最新的
+	if len(p.attacks) > p.maxAttacks {
+		p.attacks = p.attacks[len(p.attacks)-p.maxAttacks:]
+	}
+
+	if initialClients > len(p.clients) || initialAttacks > len(p.attacks) {
+		p.log.Infof("清理完成，客户端: %d→%d，攻击记录: %d→%d",
+			initialClients, len(p.clients),
+			initialAttacks, len(p.attacks))
+	}
+}
+
+// pruneOldestClients 删除最旧的客户端记录
+func (p *Protector) pruneOldestClients(maxCount int) {
+	if len(p.clients) <= maxCount {
+		return
+	}
+
+	// 收集所有客户端及其最后请求时间
+	type clientWithTime struct {
+		ip   string
+		time time.Time
+	}
+
+	var items []clientWithTime
+	for ip, client := range p.clients {
+		items = append(items, clientWithTime{
+			ip:   ip,
+			time: client.LastRequest,
+		})
+	}
+
+	// 按时间排序（最旧的在前）
+	for i := 0; i < len(items)-1; i++ {
+		for j := i + 1; j < len(items); j++ {
+			if items[i].time.After(items[j].time) {
+				items[i], items[j] = items[j], items[i]
+			}
+		}
+	}
+
+	// 删除最旧的
+	deleteCount := len(p.clients) - maxCount
+	for i := 0; i < deleteCount && i < len(items); i++ {
+		delete(p.clients, items[i].ip)
+	}
+
+	p.log.Warnf("Pruned %d oldest client records (limit: %d)", deleteCount, maxCount)
 }
 
 // SetEnabled 设置启用状态

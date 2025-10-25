@@ -74,7 +74,7 @@ type GitServer struct {
 	stopChan chan struct{}
 
 	// 构建并发控制（防止内存暴增）
-	buildSemaphore chan struct{}
+	buildSemaphore      chan struct{}
 	maxConcurrentBuilds int
 }
 
@@ -511,7 +511,7 @@ func NewGitServer(cfg *config.Config, translator *i18n.Translator) *GitServer {
 
 	// 构建并发控制配置
 	maxConcurrentBuilds := 3 // 最多3个并发构建
-	
+
 	gs := &GitServer{
 		config:              cfg,
 		apps:                make(map[string]*GitApp),

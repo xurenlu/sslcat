@@ -12,8 +12,9 @@ import (
 
 // ThreatIntelDB 威胁情报数据库
 type ThreatIntelDB struct {
-	db  *sql.DB
-	log *logrus.Entry
+	db       *sql.DB
+	log      *logrus.Entry
+	stopChan chan struct{} // 停止清理任务
 }
 
 // NewThreatIntelDB 创建威胁情报数据库
@@ -28,12 +29,18 @@ func NewThreatIntelDB(dbPath string) (*ThreatIntelDB, error) {
 		return nil, fmt.Errorf("failed to create tables: %v", err)
 	}
 
-	return &ThreatIntelDB{
+	tidb := &ThreatIntelDB{
 		db: db,
 		log: logrus.WithFields(logrus.Fields{
 			"component": "threat_intel_db",
 		}),
-	}, nil
+		stopChan: make(chan struct{}),
+	}
+
+	// 启动自动清理任务
+	go tidb.startCleanupTask()
+
+	return tidb, nil
 }
 
 // createTables 创建数据库表
@@ -118,7 +125,33 @@ func createTables(db *sql.DB) error {
 
 // Close 关闭数据库连接
 func (tidb *ThreatIntelDB) Close() error {
+	if tidb.stopChan != nil {
+		close(tidb.stopChan)
+	}
 	return tidb.db.Close()
+}
+
+// startCleanupTask 启动清理任务
+func (tidb *ThreatIntelDB) startCleanupTask() {
+	ticker := time.NewTicker(1 * time.Hour) // 每小时清理一次
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			// 清理30天前的数据
+			if err := tidb.CleanupOldData(30 * 24 * time.Hour); err != nil {
+				tidb.log.Errorf("Failed to cleanup old data: %v", err)
+			}
+			// 限制数据库大小
+			if err := tidb.LimitDatabaseSize(); err != nil {
+				tidb.log.Errorf("Failed to limit database size: %v", err)
+			}
+		case <-tidb.stopChan:
+			tidb.log.Info("Threat intel database cleanup task stopped")
+			return
+		}
+	}
 }
 
 // SaveIOC 保存IOC到数据库
@@ -355,7 +388,9 @@ func (tidb *ThreatIntelDB) CleanupOldData(maxAge time.Duration) error {
 	}
 
 	rowsAffected, _ := result.RowsAffected()
-	tidb.log.Infof("Cleaned up %d old IOCs", rowsAffected)
+	if rowsAffected > 0 {
+		tidb.log.Infof("Cleaned up %d old IOCs", rowsAffected)
+	}
 
 	// 删除过期的更新日志
 	query = "DELETE FROM update_logs WHERE updated_at < ?"
@@ -365,7 +400,61 @@ func (tidb *ThreatIntelDB) CleanupOldData(maxAge time.Duration) error {
 	}
 
 	rowsAffected, _ = result.RowsAffected()
-	tidb.log.Infof("Cleaned up %d old update logs", rowsAffected)
+	if rowsAffected > 0 {
+		tidb.log.Infof("Cleaned up %d old update logs", rowsAffected)
+	}
+
+	return nil
+}
+
+// LimitDatabaseSize 限制数据库大小
+func (tidb *ThreatIntelDB) LimitDatabaseSize() error {
+	maxIOCs := 100000        // 最多保留10万条IOC
+	maxUpdateLogs := 10000   // 最多保留1万条更新日志
+
+	// 检查IOC数量
+	var iocCount int
+	query := "SELECT COUNT(*) FROM iocs"
+	if err := tidb.db.QueryRow(query).Scan(&iocCount); err != nil {
+		return fmt.Errorf("failed to count IOCs: %v", err)
+	}
+
+	// 如果超过限制，删除最旧的
+	if iocCount > maxIOCs {
+		deleteCount := iocCount - maxIOCs
+		query = `DELETE FROM iocs WHERE id IN (
+			SELECT id FROM iocs ORDER BY last_seen ASC LIMIT ?
+		)`
+		result, err := tidb.db.Exec(query, deleteCount)
+		if err != nil {
+			return fmt.Errorf("failed to limit IOCs: %v", err)
+		}
+		rowsAffected, _ := result.RowsAffected()
+		tidb.log.Warnf("Limited IOC database size: deleted %d oldest entries (total: %d → %d)",
+			rowsAffected, iocCount, iocCount-int(rowsAffected))
+	}
+
+	// 检查更新日志数量
+	var logCount int
+	query = "SELECT COUNT(*) FROM update_logs"
+	if err := tidb.db.QueryRow(query).Scan(&logCount); err != nil {
+		return fmt.Errorf("failed to count update logs: %v", err)
+	}
+
+	// 如果超过限制，删除最旧的
+	if logCount > maxUpdateLogs {
+		deleteCount := logCount - maxUpdateLogs
+		query = `DELETE FROM update_logs WHERE id IN (
+			SELECT id FROM update_logs ORDER BY updated_at ASC LIMIT ?
+		)`
+		result, err := tidb.db.Exec(query, deleteCount)
+		if err != nil {
+			return fmt.Errorf("failed to limit update logs: %v", err)
+		}
+		rowsAffected, _ := result.RowsAffected()
+		tidb.log.Warnf("Limited update log size: deleted %d oldest entries (total: %d → %d)",
+			rowsAffected, logCount, logCount-int(rowsAffected))
+	}
 
 	return nil
 }

@@ -223,10 +223,20 @@ func (ec *EmailChannel) buildEmailBody(notification *Notification) string {
 func (ec *EmailChannel) sendEmailSMTP(to []string, subject, body string) error {
 	addr := ec.smtpHost + ":" + ec.smtpPort
 
-	// 创建SMTP客户端
-	client, err := smtp.Dial(addr)
+	// 创建带超时的连接
+	conn, err := net.DialTimeout("tcp", addr, 10*time.Second)
 	if err != nil {
 		return fmt.Errorf("连接SMTP服务器失败: %v", err)
+	}
+	defer conn.Close()
+
+	// 设置总超时（30秒）
+	conn.SetDeadline(time.Now().Add(30 * time.Second))
+
+	// 创建SMTP客户端
+	client, err := smtp.NewClient(conn, ec.smtpHost)
+	if err != nil {
+		return fmt.Errorf("创建SMTP客户端失败: %v", err)
 	}
 	defer client.Quit()
 
