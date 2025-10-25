@@ -45,6 +45,8 @@ type Config struct {
 	ImageOptimization ImageOptimizationConfig `json:"image_optimization"`
 	// 监控配置
 	Monitoring MonitoringConfig `json:"monitoring"`
+	// 缓存预热配置
+	CacheWarmup CacheWarmupConfig `json:"cache_warmup"`
 }
 
 // ServerConfig 服务器配置
@@ -930,6 +932,12 @@ func Load(configFile string) (*Config, error) {
 		Monitoring: MonitoringConfig{
 			Enabled: true, // 默认启用监控
 		},
+		CacheWarmup: CacheWarmupConfig{
+			Enabled:  false, // 默认禁用缓存预热
+			URLs:     []string{},
+			Interval: 60, // 默认60分钟
+			BaseURL:  "",
+		},
 	}
 
 	// 如果配置文件存在，则加载
@@ -1721,4 +1729,12 @@ func (rule *PathPrefixRule) GetMatchedPrefix(requestPath string) string {
 // MonitoringConfig 监控配置
 type MonitoringConfig struct {
 	Enabled bool `json:"enabled"`
+}
+
+// CacheWarmupConfig 缓存预热配置
+type CacheWarmupConfig struct {
+	Enabled   bool     `json:"enabled"`    // 是否启用缓存预热
+	URLs      []string `json:"urls"`       // 需要预热的URL列表
+	Interval  int      `json:"interval"`   // 预热间隔（分钟）
+	BaseURL   string   `json:"base_url"`   // 基础URL（可选，默认自动检测）
 }
