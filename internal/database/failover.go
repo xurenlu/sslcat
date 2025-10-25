@@ -11,10 +11,12 @@ import (
 
 // FailoverManager 数据库故障转移管理器
 type FailoverManager struct {
-	dataDir    string
-	logger     *log.Logger
-	backupDir  string
-	lastBackup time.Time
+	dataDir       string
+	logger        *log.Logger
+	backupDir     string
+	lastBackup    time.Time
+	maxBackups    int           // 最多保留多少个备份
+	maxBackupAge  time.Duration // 最多保留多久的备份
 }
 
 // NewFailoverManager 创建故障转移管理器
@@ -22,9 +24,11 @@ func NewFailoverManager(dataDir string) *FailoverManager {
 	backupDir := filepath.Join(dataDir, "backups")
 
 	return &FailoverManager{
-		dataDir:   dataDir,
-		backupDir: backupDir,
-		logger:    log.New(os.Stdout, "[DB-FAILOVER] ", log.LstdFlags),
+		dataDir:      dataDir,
+		backupDir:    backupDir,
+		logger:       log.New(os.Stdout, "[DB-FAILOVER] ", log.LstdFlags),
+		maxBackups:   30,                // 最多保留30个备份
+		maxBackupAge: 90 * 24 * time.Hour, // 最多保留90天
 	}
 }
 
@@ -118,6 +122,12 @@ func (fm *FailoverManager) CreateBackup() error {
 	}
 
 	fm.lastBackup = time.Now()
+
+	// 自动清理旧备份
+	if err := fm.CleanupBackups(); err != nil {
+		fm.logger.Printf("清理旧备份失败: %v", err)
+	}
+
 	return nil
 }
 
@@ -238,7 +248,7 @@ func (fm *FailoverManager) AutoBackup(interval time.Duration) {
 	}
 }
 
-// CleanOldBackups 清理旧备份
+// CleanOldBackups 清理旧备份（按时间）
 func (fm *FailoverManager) CleanOldBackups(keepDays int) error {
 	entries, err := os.ReadDir(fm.backupDir)
 	if err != nil {
@@ -246,6 +256,7 @@ func (fm *FailoverManager) CleanOldBackups(keepDays int) error {
 	}
 
 	cutoffTime := time.Now().AddDate(0, 0, -keepDays)
+	deletedCount := 0
 
 	for _, entry := range entries {
 		if entry.IsDir() {
@@ -264,9 +275,95 @@ func (fm *FailoverManager) CleanOldBackups(keepDays int) error {
 			if err := os.Remove(backupPath); err != nil {
 				fm.logger.Printf("删除旧备份失败: %s - %v", entry.Name(), err)
 			} else {
-				fm.logger.Printf("删除旧备份: %s", entry.Name())
+				deletedCount++
 			}
 		}
+	}
+
+	if deletedCount > 0 {
+		fm.logger.Printf("按时间清理: 删除了 %d 个旧备份（超过 %d 天）", deletedCount, keepDays)
+	}
+
+	return nil
+}
+
+// CleanupBackups 清理备份（按数量和时间）
+func (fm *FailoverManager) CleanupBackups() error {
+	entries, err := os.ReadDir(fm.backupDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil // 备份目录不存在，无需清理
+		}
+		return err
+	}
+
+	// 收集所有备份文件
+	type backupFileInfo struct {
+		path    string
+		modTime time.Time
+	}
+
+	var backupFiles []backupFileInfo
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		fileInfo, err := entry.Info()
+		if err != nil {
+			continue
+		}
+
+		backupFiles = append(backupFiles, backupFileInfo{
+			path:    filepath.Join(fm.backupDir, entry.Name()),
+			modTime: fileInfo.ModTime(),
+		})
+	}
+
+	if len(backupFiles) == 0 {
+		return nil
+	}
+
+	// 按修改时间排序（最新的在前）
+	for i := 0; i < len(backupFiles)-1; i++ {
+		for j := i + 1; j < len(backupFiles); j++ {
+			if backupFiles[i].modTime.Before(backupFiles[j].modTime) {
+				backupFiles[i], backupFiles[j] = backupFiles[j], backupFiles[i]
+			}
+		}
+	}
+
+	cutoffTime := time.Now().Add(-fm.maxBackupAge)
+	deletedCount := 0
+
+	// 清理策略：
+	// 1. 保留最近 maxBackups 个文件
+	// 2. 删除超过 maxBackupAge 的文件
+	for i, backup := range backupFiles {
+		shouldDelete := false
+
+		// 超过数量限制
+		if i >= fm.maxBackups {
+			shouldDelete = true
+		}
+
+		// 超过时间限制
+		if backup.modTime.Before(cutoffTime) {
+			shouldDelete = true
+		}
+
+		if shouldDelete {
+			if err := os.Remove(backup.path); err != nil {
+				fm.logger.Printf("删除备份失败: %s - %v", backup.path, err)
+			} else {
+				deletedCount++
+			}
+		}
+	}
+
+	if deletedCount > 0 {
+		fm.logger.Printf("清理了 %d 个旧备份（保留 %d 个，最多 %d 天）",
+			deletedCount, len(backupFiles)-deletedCount, int(fm.maxBackupAge.Hours()/24))
 	}
 
 	return nil

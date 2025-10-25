@@ -76,6 +76,10 @@ type GitServer struct {
 	// 构建并发控制（防止内存暴增）
 	buildSemaphore      chan struct{}
 	maxConcurrentBuilds int
+
+	// 日志清理配置
+	maxDeploymentLogs int           // 最多保留多少个部署日志文件
+	maxDeploymentAge  time.Duration // 最多保留多久的部署日志
 }
 
 // SSLManagerInterface SSL Manager 接口
@@ -532,6 +536,8 @@ func NewGitServer(cfg *config.Config, translator *i18n.Translator) *GitServer {
 		stopChan:            make(chan struct{}),
 		buildSemaphore:      make(chan struct{}, maxConcurrentBuilds),
 		maxConcurrentBuilds: maxConcurrentBuilds,
+		maxDeploymentLogs:   100,              // 最多保留100个部署日志文件
+		maxDeploymentAge:    30 * 24 * time.Hour, // 最多保留30天
 	}
 
 	// 初始化 Builder Registry
@@ -2278,6 +2284,7 @@ func (gs *GitServer) cleanupRoutine() {
 
 	for range ticker.C {
 		gs.cleanupOldApps()
+		gs.cleanupDeploymentLogs()
 	}
 }
 
@@ -2302,6 +2309,97 @@ func (gs *GitServer) cleanupOldApps() {
 	}
 
 	gs.saveApps()
+}
+
+// cleanupDeploymentLogs 清理部署日志
+func (gs *GitServer) cleanupDeploymentLogs() {
+	gs.mutex.RLock()
+	apps := make([]*GitApp, 0, len(gs.apps))
+	for _, app := range gs.apps {
+		apps = append(apps, app)
+	}
+	gs.mutex.RUnlock()
+
+	now := time.Now()
+	cutoffTime := now.Add(-gs.maxDeploymentAge)
+
+	for _, app := range apps {
+		if app.LogsDir == "" {
+			continue
+		}
+
+		// 读取日志目录
+		entries, err := os.ReadDir(app.LogsDir)
+		if err != nil {
+			gs.logger.Warnf("读取日志目录失败 %s: %v", app.LogsDir, err)
+			continue
+		}
+
+		// 收集所有部署日志文件
+		type logFileInfo struct {
+			path    string
+			modTime time.Time
+		}
+
+		var logFiles []logFileInfo
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+
+			// 只处理 deploy-*.log 文件
+			if !strings.HasPrefix(entry.Name(), "deploy-") || !strings.HasSuffix(entry.Name(), ".log") {
+				continue
+			}
+
+			filePath := filepath.Join(app.LogsDir, entry.Name())
+			fileInfo, err := entry.Info()
+			if err != nil {
+				continue
+			}
+
+			logFiles = append(logFiles, logFileInfo{
+				path:    filePath,
+				modTime: fileInfo.ModTime(),
+			})
+		}
+
+		// 按修改时间排序（最新的在前）
+		sort.Slice(logFiles, func(i, j int) bool {
+			return logFiles[i].modTime.After(logFiles[j].modTime)
+		})
+
+		// 清理策略：
+		// 1. 保留最近 maxDeploymentLogs 个文件
+		// 2. 删除超过 maxDeploymentAge 天的文件
+		deletedCount := 0
+		for i, logFile := range logFiles {
+			shouldDelete := false
+
+			// 超过数量限制
+			if i >= gs.maxDeploymentLogs {
+				shouldDelete = true
+			}
+
+			// 超过时间限制
+			if logFile.modTime.Before(cutoffTime) {
+				shouldDelete = true
+			}
+
+			if shouldDelete {
+				if err := os.Remove(logFile.path); err != nil {
+					gs.logger.Warnf("删除部署日志失败 %s: %v", logFile.path, err)
+				} else {
+					deletedCount++
+				}
+			}
+		}
+
+		if deletedCount > 0 {
+			gs.logger.Infof("应用 %s: 清理了 %d 个旧部署日志（保留 %d 个，最多 %d 天）",
+				app.Name, deletedCount, len(logFiles)-deletedCount, int(gs.maxDeploymentAge.Hours()/24))
+		}
+	}
 }
 
 // ==================== SSH 用户管理 ====================
