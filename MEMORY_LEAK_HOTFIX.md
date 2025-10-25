@@ -8,6 +8,12 @@
 2. **健康检查 goroutine 泄漏** - 负载均衡健康检查创建过多 goroutine
 3. **日志监听器泄漏** - LogWatcher 没有正确关闭
 4. **缓存无限增长** - 内存缓存没有正确的清理机制
+5. **统计收集器泄漏** - Statistics Collector 数据无限增长
+6. **AI 安全分析器泄漏** - 分析缓存无限增长
+7. **WebSocket 连接泄漏** - WebSocket 代理连接没有正确关闭
+8. **配置文件监听器泄漏** - ConfigWatcher 没有正确停止
+9. **会话存储泄漏** - 会话数据无限增长
+10. **数据库连接泄漏** - SQLite 连接没有正确关闭
 
 ## 🔧 紧急修复方案
 
@@ -62,6 +68,16 @@ curl -s "http://localhost:8080/debug/pprof/goroutine?debug=1" | grep -c "gorouti
   "cache": {
     "max_size": "100MB",
     "cleanup_interval": "5m"
+  },
+  "statistics": {
+    "enabled": false
+  },
+  "ai_security": {
+    "enabled": false
+  },
+  "websocket": {
+    "buffer_size": 50,
+    "max_connections": 100
   }
 }
 ```
@@ -148,7 +164,113 @@ if len(backends) > maxConcurrent {
 }
 ```
 
-#### 5.3 添加内存监控和自动重启
+#### 5.3 修复统计收集器泄漏
+
+在 `internal/statistics/collector.go` 中添加数据清理机制：
+
+```go
+// 添加定期清理机制
+func (c *Collector) startCleanupTask() {
+    ticker := time.NewTicker(c.cleanupInterval)
+    defer ticker.Stop()
+    
+    for {
+        select {
+        case <-ticker.C:
+            c.cleanup()
+        case <-c.stopChan:
+            return
+        }
+    }
+}
+
+// 限制数据增长
+func (c *Collector) limitDataGrowth() {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    
+    // 限制 IP 条目数量
+    if len(c.ipEntries) > 1000 {
+        c.cleanupOldEntries(c.ipEntries, 500)
+    }
+    
+    // 限制 UA 条目数量
+    if len(c.uaEntries) > 500 {
+        c.cleanupOldEntries(c.uaEntries, 250)
+    }
+    
+    // 限制城市条目数量
+    if len(c.cityEntries) > 200 {
+        c.cleanupOldEntries(c.cityEntries, 100)
+    }
+}
+```
+
+#### 5.4 修复 AI 安全分析器泄漏
+
+在 `internal/ai/security_analyzer.go` 中添加缓存清理：
+
+```go
+// 添加缓存清理机制
+func (a *SecurityAnalyzer) cleanupCache() {
+    a.cacheMutex.Lock()
+    defer a.cacheMutex.Unlock()
+    
+    now := time.Now()
+    for hash, result := range a.analysisCache {
+        if now.Sub(result.Timestamp) > 24*time.Hour {
+            delete(a.analysisCache, hash)
+        }
+    }
+    
+    // 限制缓存大小
+    if len(a.analysisCache) > 100 {
+        // 删除最旧的缓存项
+        var oldestHash string
+        var oldestTime time.Time
+        
+        for hash, result := range a.analysisCache {
+            if oldestHash == "" || result.Timestamp.Before(oldestTime) {
+                oldestHash = hash
+                oldestTime = result.Timestamp
+            }
+        }
+        
+        if oldestHash != "" {
+            delete(a.analysisCache, oldestHash)
+        }
+    }
+}
+```
+
+#### 5.5 修复 WebSocket 连接泄漏
+
+在 `internal/proxy/manager.go` 中添加连接超时：
+
+```go
+// 添加连接超时机制
+func (m *Manager) startOptimizedWebSocketProxy(clientConn, upstreamConn net.Conn, rule *config.ProxyRule) {
+    // 设置连接超时
+    timeout := time.Duration(rule.WebSocketTimeout) * time.Second
+    if timeout <= 0 {
+        timeout = 30 * time.Minute // 默认 30 分钟
+    }
+    
+    ctx, cancel := context.WithTimeout(context.Background(), timeout)
+    defer cancel()
+    
+    // 在超时或连接关闭时清理资源
+    go func() {
+        <-ctx.Done()
+        clientConn.Close()
+        upstreamConn.Close()
+    }()
+    
+    // ... 其余代码
+}
+```
+
+#### 5.6 添加内存监控和自动重启
 
 ```bash
 # 创建 systemd 服务监控
