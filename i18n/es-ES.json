@@ -1,7 +1,6 @@
 {
   "app.title": "SSLcat - Servidor Proxy SSL",
   "app.description": "Potente servidor proxy SSL con gestión automática de certificados, reenvío de dominios, protección de seguridad y panel de gestión web",
-  
   "nav.dashboard": "Panel de Control",
   "nav.domains": "Gestión de Dominios",
   "nav.proxy": "Configuración Proxy",
@@ -15,14 +14,12 @@
   "nav.cluster": "Gestión de Clúster",
   "nav.dns": "Configuración DNS",
   "nav.notifications": "Gestión de Notificaciones",
-  
   "login.title": "Inicio de Sesión de Administrador",
   "login.username": "Nombre de Usuario",
   "login.password": "Contraseña",
   "login.remember": "Recordarme",
   "login.submit": "Iniciar Sesión",
   "login.forgot_password": "¿Olvidaste tu contraseña?",
-  
   "dashboard.welcome": "Bienvenido a SSLcat",
   "dashboard.total_requests": "Total de Solicitudes",
   "dashboard.requests_per_sec": "Solicitudes por Segundo",
@@ -32,7 +29,6 @@
   "dashboard.ssl_certificates": "Certificados SSL",
   "dashboard.blocked_ips": "IPs Bloqueadas",
   "dashboard.uptime": "Tiempo de Actividad",
-  
   "ssl.title": "Gestión de Certificados SSL",
   "ssl.domain": "Dominio",
   "ssl.status": "Estado",
@@ -45,7 +41,6 @@
   "ssl.renew": "Renovar",
   "ssl.view": "Ver",
   "ssl.delete": "Eliminar",
-  
   "proxy.title": "Configuración de Proxy",
   "proxy.add_rule": "Agregar Regla",
   "proxy.domain": "Dominio de Origen",
@@ -63,7 +58,6 @@
   "proxy.metrics_warning": "⚠️ Habilitar aumentará el uso de CPU, recomendado solo cuando se necesite monitoreo",
   "proxy.username": "Nombre de usuario",
   "proxy.password": "Contraseña",
-  
   "security.title": "Protección de Seguridad",
   "security.waf": "Firewall de Aplicación Web",
   "security.ddos": "Protección DDoS",
@@ -73,20 +67,17 @@
   "security.protection_level": "Nivel de Protección",
   "security.enable": "Habilitar",
   "security.disable": "Deshabilitar",
-  
   "waf.sql_injection": "Inyección SQL",
   "waf.xss": "Cross-Site Scripting",
   "waf.path_traversal": "Path Traversal",
   "waf.command_injection": "Inyección de Comandos",
   "waf.detected": "Detectado",
   "waf.blocked": "Bloqueado",
-  
   "ddos.protection_off": "Desactivado",
   "ddos.protection_low": "Bajo",
   "ddos.protection_medium": "Medio",
   "ddos.protection_high": "Alto",
   "ddos.protection_extreme": "Extremo",
-  
   "monitoring.title": "Monitoreo y Estadísticas",
   "monitoring.real_time": "Monitoreo en Tiempo Real",
   "monitoring.traffic_chart": "Gráfico de Tráfico",
@@ -94,7 +85,6 @@
   "monitoring.status_codes": "Distribución de Códigos de Estado",
   "monitoring.top_domains": "Dominios Principales",
   "monitoring.recent_requests": "Solicitudes Recientes",
-  
   "logs.title": "Gestión de Logs",
   "logs.access_logs": "Logs de Acceso",
   "logs.error_logs": "Logs de Error",
@@ -102,7 +92,6 @@
   "logs.format": "Formato de Log",
   "logs.download": "Descargar",
   "logs.clear": "Limpiar",
-  
   "settings.title": "Configuración del Sistema",
   "settings.general": "Configuración General",
   "settings.language": "Configuración de Idioma",
@@ -110,12 +99,10 @@
   "settings.backup": "Copia de Seguridad y Restauración",
   "settings.save": "Guardar Configuración",
   "settings.reset": "Restablecer Configuración",
-  
   "language.select": "Seleccionar Idioma",
   "language.current": "Idioma Actual",
   "language.change": "Cambiar Idioma",
   "language.auto_detect": "Detección Automática",
-  
   "common.status": "Estado",
   "common.enabled": "Habilitado",
   "common.disabled": "Deshabilitado",
@@ -138,7 +125,6 @@
   "common.creating": "Creando...",
   "common.saving": "Guardando...",
   "common.ok": "OK",
-  
   "time.seconds": "segundos",
   "time.minutes": "minutos",
   "time.hours": "horas",
@@ -146,33 +132,28 @@
   "time.weeks": "semanas",
   "time.months": "meses",
   "time.years": "años",
-  
   "size.bytes": "bytes",
   "size.kb": "KB",
   "size.mb": "MB",
   "size.gb": "GB",
   "size.tb": "TB",
-  
   "error.not_found": "Página No Encontrada",
   "error.unauthorized": "Acceso No Autorizado",
   "error.forbidden": "Acceso Prohibido",
   "error.server_error": "Error Interno del Servidor",
   "error.network_error": "Error de Conexión de Red",
   "error.timeout": "Tiempo de Espera Agotado",
-  
   "success.saved": "Guardado Exitosamente",
-  "success.deleted": "Eliminado Exitosamente", 
+  "success.deleted": "Eliminado Exitosamente",
   "success.updated": "Actualizado Exitosamente",
   "success.created": "Creado Exitosamente",
   "success.uploaded": "Subido Exitosamente",
-  
   "mobile.quick_actions": "Acciones Rápidas",
   "mobile.ssl_management": "Gestión de Certificados SSL",
   "mobile.proxy_config": "Configuración de Proxy",
   "mobile.security_protection": "Protección de Seguridad",
   "mobile.view_logs": "Ver Logs",
   "mobile.real_time_monitor": "Monitoreo de Tráfico en Tiempo Real",
-  
   "git_deploy_server.title": "Gestión de Git Deploy Server",
   "git_deploy_server.create_app": "Crear Aplicación",
   "git_deploy_server.server_config": "Configuración del Servidor",
@@ -181,9 +162,7 @@
   "git_deploy_server.return": "Volver a Git Deploy Server",
   "git_deploy_server.create_app_title": "Crear Aplicación - SSLcat Git Deploy Server",
   "git_deploy_server.server_config_title": "Configuración del Servidor - SSLcat Git Deploy Server",
-  
   "git_server.welcome_message": "Welcome to SSLcat Git Deploy Platform!",
-  
   "frontend.delete_app_confirm": "Confirmar Eliminación de Aplicación",
   "frontend.delete_app_warning": "Esta es una operación peligrosa y no se puede deshacer. Todos los datos, código, registros y configuraciones de esta aplicación se eliminarán permanentemente.",
   "frontend.delete_app_instruction": "Por favor, escriba el nombre de la aplicación \"{appName}\" para confirmar la eliminación:",
@@ -191,5 +170,47 @@
   "frontend.delete_app_cancelled": "Operación de eliminación cancelada",
   "frontend.manual_deploy_not_supported": "El despliegue manual aún no está soportado. Por favor, active el despliegue mediante Git push.",
   "frontend.ssh_key_notice": "Ha habilitado el servidor Git pero aún no ha configurado claves SSH. Por favor, agregue al menos una clave SSH en la pestaña \"Claves SSH\" para permitir Git push.",
-  "frontend.select_ssh_key": "Seleccionar clave SSH"
+  "frontend.select_ssh_key": "Seleccionar clave SSH",
+  "common": {
+    "creating": "Creating...",
+    "saving": "Saving..."
+  },
+  "proxy": {
+    "username": "Username",
+    "password": "Password",
+    "performance_monitoring": "Performance Monitoring",
+    "enable_tracing": "Enable Request Tracing",
+    "enable_metrics": "Enable Metrics Collection",
+    "tracing_warning": "⚠️ Enabling will significantly increase CPU usage, recommended for debugging only",
+    "metrics_warning": "⚠️ Enabling will increase CPU usage, recommended for monitoring only"
+  },
+  "sites": {
+    "edit": "Edit",
+    "delete": "Delete"
+  },
+  "dns": {
+    "cloudflare_name_placeholder": "My Cloudflare",
+    "api_key_placeholder": "API Key",
+    "zone_id_placeholder": "Zone ID (required for Cloudflare etc.)",
+    "api_key_update_placeholder": "API Key (leave empty to not update)"
+  },
+  "notifications": {
+    "title_placeholder": "Enter notification title",
+    "message_placeholder": "Enter notification message"
+  },
+  "settings": {
+    "save_success": "All settings saved successfully",
+    "save_failed": "Save failed",
+    "reset_success": "Settings reset",
+    "admin_prefix_change_success": "Admin Prefix changed successfully",
+    "admin_prefix_change_failed": "Admin Prefix change failed",
+    "admin_prefix_changed": "Admin panel prefix changed to",
+    "notification_sent": "Notification sent",
+    "basic_config_load_failed": "Failed to load basic configuration",
+    "notification_config_load_failed": "Failed to load notification configuration",
+    "basic_config_save_failed": "Basic settings save failed",
+    "notification_config_save_failed": "Notification settings save failed",
+    "select_min_notification_level": "Select minimum notification level",
+    "webhook_placeholder": "https://hooks.slack.com/services/xxx or https://qyapi.weixin.qq.com/xxx"
+  }
 }

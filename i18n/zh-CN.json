@@ -1,7 +1,6 @@
 {
   "app.title": "SSLcat - SSL代理服务器",
   "app.description": "功能强大的SSL代理服务器，支持自动证书管理、域名转发、安全防护和Web管理面板",
-  
   "nav.dashboard": "仪表板",
   "nav.domains": "域名管理",
   "nav.proxy": "代理配置",
@@ -15,14 +14,12 @@
   "nav.cluster": "集群管理",
   "nav.dns": "DNS配置",
   "nav.notifications": "通知管理",
-  
   "login.title": "管理员登录",
   "login.username": "用户名",
   "login.password": "密码",
   "login.remember": "记住我",
   "login.submit": "登录",
   "login.forgot_password": "忘记密码？",
-  
   "dashboard.welcome": "欢迎使用 SSLcat",
   "dashboard.total_requests": "总请求数",
   "dashboard.requests_per_sec": "每秒请求数",
@@ -32,7 +29,6 @@
   "dashboard.ssl_certificates": "SSL证书",
   "dashboard.blocked_ips": "封禁IP",
   "dashboard.uptime": "运行时间",
-  
   "ssl.title": "SSL证书管理",
   "ssl.domain": "域名",
   "ssl.status": "状态",
@@ -45,7 +41,6 @@
   "ssl.renew": "续期",
   "ssl.view": "查看",
   "ssl.delete": "删除",
-  
   "proxy.title": "代理配置",
   "proxy.add_rule": "添加规则",
   "proxy.domain": "源域名",
@@ -56,7 +51,6 @@
   "proxy.healthy": "健康",
   "proxy.unhealthy": "不健康",
   "proxy.unknown": "未知",
-  
   "proxy.performance_monitoring": "性能监控配置",
   "proxy.enable_tracing": "启用请求追踪",
   "proxy.enable_metrics": "启用指标收集",
@@ -64,7 +58,6 @@
   "proxy.metrics_warning": "⚠️ 启用后会增加 CPU 占用，建议仅在需要监控时使用",
   "proxy.username": "用户名",
   "proxy.password": "密码",
-  
   "security.title": "安全防护",
   "security.waf": "Web应用防火墙",
   "security.ddos": "DDoS防护",
@@ -74,20 +67,17 @@
   "security.protection_level": "防护级别",
   "security.enable": "启用",
   "security.disable": "禁用",
-  
   "waf.sql_injection": "SQL注入",
   "waf.xss": "跨站脚本",
   "waf.path_traversal": "路径遍历",
   "waf.command_injection": "命令注入",
   "waf.detected": "检测到",
   "waf.blocked": "已阻止",
-  
   "ddos.protection_off": "关闭",
   "ddos.protection_low": "低级",
   "ddos.protection_medium": "中级",
   "ddos.protection_high": "高级",
   "ddos.protection_extreme": "极高",
-  
   "monitoring.title": "监控统计",
   "monitoring.real_time": "实时监控",
   "monitoring.traffic_chart": "流量图表",
@@ -95,7 +85,6 @@
   "monitoring.status_codes": "状态码分布",
   "monitoring.top_domains": "热门域名",
   "monitoring.recent_requests": "最近请求",
-  
   "logs.title": "日志管理",
   "logs.access_logs": "访问日志",
   "logs.error_logs": "错误日志",
@@ -103,7 +92,6 @@
   "logs.format": "日志格式",
   "logs.download": "下载",
   "logs.clear": "清空",
-  
   "settings.title": "系统设置",
   "settings.general": "常规设置",
   "settings.language": "语言设置",
@@ -186,12 +174,10 @@
   "configTest.reload_failed_error": "重载失败",
   "configTest.reload_failed_title": "重载失败",
   "configTest.reload_failed_desc": "无法重载配置，请检查配置文件",
-  
   "language.select": "选择语言",
   "language.current": "当前语言",
   "language.change": "切换语言",
   "language.auto_detect": "自动检测",
-  
   "common.status": "状态",
   "common.enabled": "已启用",
   "common.disabled": "已禁用",
@@ -214,7 +200,6 @@
   "common.creating": "创建中...",
   "common.saving": "保存中...",
   "common.ok": "确定",
-  
   "time.seconds": "秒",
   "time.minutes": "分钟",
   "time.hours": "小时",
@@ -222,33 +207,28 @@
   "time.weeks": "周",
   "time.months": "月",
   "time.years": "年",
-  
   "size.bytes": "字节",
   "size.kb": "KB",
   "size.mb": "MB",
   "size.gb": "GB",
   "size.tb": "TB",
-  
   "error.not_found": "页面未找到",
   "error.unauthorized": "未授权访问",
   "error.forbidden": "访问被禁止",
   "error.server_error": "服务器内部错误",
   "error.network_error": "网络连接错误",
   "error.timeout": "请求超时",
-  
   "success.saved": "保存成功",
-  "success.deleted": "删除成功", 
+  "success.deleted": "删除成功",
   "success.updated": "更新成功",
   "success.created": "创建成功",
   "success.uploaded": "上传成功",
-  
   "mobile.quick_actions": "快速操作",
   "mobile.ssl_management": "SSL证书管理",
   "mobile.proxy_config": "代理配置",
   "mobile.security_protection": "安全防护",
   "mobile.view_logs": "日志查看",
   "mobile.real_time_monitor": "实时流量监控",
-  
   "git_deploy_server.title": "Git Deploy Server管理",
   "git_deploy_server.create_app": "创建应用",
   "git_deploy_server.server_config": "服务器配置",
@@ -257,7 +237,6 @@
   "git_deploy_server.return": "返回 Git Deploy Server",
   "git_deploy_server.create_app_title": "创建应用 - SSLcat Git Deploy Server",
   "git_deploy_server.server_config_title": "服务器配置 - SSLcat Git Deploy Server",
-  
   "git_server.welcome_message": "欢迎使用 SSLcat Git 部署平台！",
   "git_server.load_apps_failed": "加载应用列表失败",
   "git_server.not_enabled": "Git 服务器未启用",
@@ -285,7 +264,6 @@
   "git_server.save_config_failed": "保存服务器配置失败",
   "git_server.save_app_info_failed": "保存应用信息失败",
   "git_server.app_not_exists": "应用不存在",
-  
   "cluster.title": "集群设置",
   "cluster.refresh_status": "刷新状态",
   "cluster.current_status": "当前集群状态",
@@ -298,7 +276,6 @@
   "cluster.slave_desc": "连接到主节点",
   "cluster.node_id": "节点ID",
   "cluster.not_set": "未设置",
-  
   "test.config_file": "测试配置文件",
   "test.validation_error": "验证过程出错",
   "test.config_errors": "配置文件有错误",
@@ -314,7 +291,6 @@
   "test.blocked_countries": "阻止国家",
   "test.update_config_failed": "更新配置失败",
   "test.ip_error": "错误",
-  
   "frontend.copy_command": "复制命令",
   "frontend.ssh_key_notice": "您已启用Git服务器，但还没有配置SSH密钥。请在\"SSH密钥\"标签页中添加至少一个SSH密钥以允许Git推送。",
   "frontend.env_var_name": "如 NODE_ENV",
@@ -337,5 +313,47 @@
   "frontend.delete_app_instruction": "请输入应用名称 \"{appName}\" 来确认删除：",
   "frontend.delete_app_name_mismatch": "应用名称不匹配",
   "frontend.delete_app_cancelled": "已取消删除操作",
-  "frontend.manual_deploy_not_supported": "暂不支持手动部署，请通过 Git push 触发部署。"
+  "frontend.manual_deploy_not_supported": "暂不支持手动部署，请通过 Git push 触发部署。",
+  "common": {
+    "creating": "Creating...",
+    "saving": "Saving..."
+  },
+  "proxy": {
+    "username": "Username",
+    "password": "Password",
+    "performance_monitoring": "Performance Monitoring",
+    "enable_tracing": "Enable Request Tracing",
+    "enable_metrics": "Enable Metrics Collection",
+    "tracing_warning": "⚠️ Enabling will significantly increase CPU usage, recommended for debugging only",
+    "metrics_warning": "⚠️ Enabling will increase CPU usage, recommended for monitoring only"
+  },
+  "sites": {
+    "edit": "Edit",
+    "delete": "Delete"
+  },
+  "dns": {
+    "cloudflare_name_placeholder": "My Cloudflare",
+    "api_key_placeholder": "API Key",
+    "zone_id_placeholder": "Zone ID (required for Cloudflare etc.)",
+    "api_key_update_placeholder": "API Key (leave empty to not update)"
+  },
+  "notifications": {
+    "title_placeholder": "Enter notification title",
+    "message_placeholder": "Enter notification message"
+  },
+  "settings": {
+    "save_success": "All settings saved successfully",
+    "save_failed": "Save failed",
+    "reset_success": "Settings reset",
+    "admin_prefix_change_success": "Admin Prefix changed successfully",
+    "admin_prefix_change_failed": "Admin Prefix change failed",
+    "admin_prefix_changed": "Admin panel prefix changed to",
+    "notification_sent": "Notification sent",
+    "basic_config_load_failed": "Failed to load basic configuration",
+    "notification_config_load_failed": "Failed to load notification configuration",
+    "basic_config_save_failed": "Basic settings save failed",
+    "notification_config_save_failed": "Notification settings save failed",
+    "select_min_notification_level": "Select minimum notification level",
+    "webhook_placeholder": "https://hooks.slack.com/services/xxx or https://qyapi.weixin.qq.com/xxx"
+  }
 }

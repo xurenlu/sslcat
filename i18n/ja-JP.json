@@ -1,7 +1,6 @@
 {
   "app.title": "SSLcat - SSL プロキシサーバー",
   "app.description": "自動証明書管理、ドメイン転送、セキュリティ保護、Web管理パネルを備えた強力なSSLプロキシサーバー",
-  
   "nav.dashboard": "ダッシュボード",
   "nav.domains": "ドメイン管理",
   "nav.proxy": "プロキシ設定",
@@ -15,14 +14,12 @@
   "nav.cluster": "クラスター管理",
   "nav.dns": "DNS設定",
   "nav.notifications": "通知管理",
-  
   "login.title": "管理者ログイン",
   "login.username": "ユーザー名",
   "login.password": "パスワード",
   "login.remember": "ログイン状態を保持",
   "login.submit": "ログイン",
   "login.forgot_password": "パスワードを忘れましたか？",
-  
   "dashboard.welcome": "SSLcatへようこそ",
   "dashboard.total_requests": "総リクエスト数",
   "dashboard.requests_per_sec": "秒間リクエスト数",
@@ -32,7 +29,6 @@
   "dashboard.ssl_certificates": "SSL証明書",
   "dashboard.blocked_ips": "ブロックされたIP",
   "dashboard.uptime": "稼働時間",
-  
   "ssl.title": "SSL証明書管理",
   "ssl.domain": "ドメイン",
   "ssl.status": "ステータス",
@@ -45,7 +41,6 @@
   "ssl.renew": "更新",
   "ssl.view": "表示",
   "ssl.delete": "削除",
-  
   "proxy.title": "プロキシ設定",
   "proxy.add_rule": "ルール追加",
   "proxy.domain": "ソースドメイン",
@@ -63,7 +58,6 @@
   "proxy.metrics_warning": "⚠️ 有効化するとCPU使用率が増加します。監視が必要な場合のみ推奨",
   "proxy.username": "ユーザー名",
   "proxy.password": "パスワード",
-  
   "security.title": "セキュリティ保護",
   "security.waf": "Webアプリケーションファイアウォール",
   "security.ddos": "DDoS保護",
@@ -73,20 +67,17 @@
   "security.protection_level": "保護レベル",
   "security.enable": "有効",
   "security.disable": "無効",
-  
   "waf.sql_injection": "SQLインジェクション",
   "waf.xss": "クロスサイトスクリプティング",
   "waf.path_traversal": "パストラバーサル",
   "waf.command_injection": "コマンドインジェクション",
   "waf.detected": "検出済み",
   "waf.blocked": "ブロック済み",
-  
   "ddos.protection_off": "オフ",
   "ddos.protection_low": "低",
   "ddos.protection_medium": "中",
   "ddos.protection_high": "高",
   "ddos.protection_extreme": "最高",
-  
   "monitoring.title": "監視・統計",
   "monitoring.real_time": "リアルタイム監視",
   "monitoring.traffic_chart": "トラフィックチャート",
@@ -94,7 +85,6 @@
   "monitoring.status_codes": "ステータスコード分布",
   "monitoring.top_domains": "人気ドメイン",
   "monitoring.recent_requests": "最近のリクエスト",
-  
   "logs.title": "ログ管理",
   "logs.access_logs": "アクセスログ",
   "logs.error_logs": "エラーログ",
@@ -102,7 +92,6 @@
   "logs.format": "ログフォーマット",
   "logs.download": "ダウンロード",
   "logs.clear": "クリア",
-  
   "settings.title": "システム設定",
   "settings.general": "一般設定",
   "settings.language": "言語設定",
@@ -110,12 +99,10 @@
   "settings.backup": "バックアップ・復元",
   "settings.save": "設定を保存",
   "settings.reset": "設定をリセット",
-  
   "language.select": "言語を選択",
   "language.current": "現在の言語",
   "language.change": "言語を変更",
   "language.auto_detect": "自動検出",
-  
   "common.status": "ステータス",
   "common.enabled": "有効",
   "common.disabled": "無効",
@@ -138,7 +125,6 @@
   "common.creating": "作成中...",
   "common.saving": "保存中...",
   "common.ok": "OK",
-  
   "time.seconds": "秒",
   "time.minutes": "分",
   "time.hours": "時間",
@@ -146,33 +132,28 @@
   "time.weeks": "週",
   "time.months": "月",
   "time.years": "年",
-  
   "size.bytes": "バイト",
   "size.kb": "KB",
   "size.mb": "MB",
   "size.gb": "GB",
   "size.tb": "TB",
-  
   "error.not_found": "ページが見つかりません",
   "error.unauthorized": "認証されていないアクセス",
   "error.forbidden": "アクセスが禁止されています",
   "error.server_error": "内部サーバーエラー",
   "error.network_error": "ネットワーク接続エラー",
   "error.timeout": "リクエストタイムアウト",
-  
   "success.saved": "正常に保存されました",
-  "success.deleted": "正常に削除されました", 
+  "success.deleted": "正常に削除されました",
   "success.updated": "正常に更新されました",
   "success.created": "正常に作成されました",
   "success.uploaded": "正常にアップロードされました",
-  
   "mobile.quick_actions": "クイックアクション",
   "mobile.ssl_management": "SSL証明書管理",
   "mobile.proxy_config": "プロキシ設定",
   "mobile.security_protection": "セキュリティ保護",
   "mobile.view_logs": "ログ表示",
   "mobile.real_time_monitor": "リアルタイム トラフィック監視",
-  
   "git_deploy_server.title": "Git Deploy Server管理",
   "git_deploy_server.create_app": "アプリケーション作成",
   "git_deploy_server.server_config": "サーバー設定",
@@ -181,9 +162,7 @@
   "git_deploy_server.return": "Git Deploy Serverに戻る",
   "git_deploy_server.create_app_title": "アプリケーション作成 - SSLcat Git Deploy Server",
   "git_deploy_server.server_config_title": "サーバー設定 - SSLcat Git Deploy Server",
-  
   "git_server.welcome_message": "Welcome to SSLcat Git Deploy Platform!",
-  
   "frontend.delete_app_confirm": "アプリケーション削除の確認",
   "frontend.delete_app_warning": "これは危険な操作であり、元に戻すことはできません。このアプリケーションのすべてのデータ、コード、ログ、および設定が完全に削除されます。",
   "frontend.delete_app_instruction": "削除を確認するには、アプリケーション名「{appName}」を入力してください：",
@@ -191,5 +170,47 @@
   "frontend.delete_app_cancelled": "削除操作がキャンセルされました",
   "frontend.manual_deploy_not_supported": "手動デプロイはまだサポートされていません。Git pushを介してデプロイをトリガーしてください。",
   "frontend.ssh_key_notice": "Gitサーバーを有効にしましたが、まだSSHキーを設定していません。Gitプッシュを許可するには、「SSHキー」タブで少なくとも1つのSSHキーを追加してください。",
-  "frontend.select_ssh_key": "SSHキーを選択"
+  "frontend.select_ssh_key": "SSHキーを選択",
+  "common": {
+    "creating": "Creating...",
+    "saving": "Saving..."
+  },
+  "proxy": {
+    "username": "Username",
+    "password": "Password",
+    "performance_monitoring": "Performance Monitoring",
+    "enable_tracing": "Enable Request Tracing",
+    "enable_metrics": "Enable Metrics Collection",
+    "tracing_warning": "⚠️ Enabling will significantly increase CPU usage, recommended for debugging only",
+    "metrics_warning": "⚠️ Enabling will increase CPU usage, recommended for monitoring only"
+  },
+  "sites": {
+    "edit": "Edit",
+    "delete": "Delete"
+  },
+  "dns": {
+    "cloudflare_name_placeholder": "My Cloudflare",
+    "api_key_placeholder": "API Key",
+    "zone_id_placeholder": "Zone ID (required for Cloudflare etc.)",
+    "api_key_update_placeholder": "API Key (leave empty to not update)"
+  },
+  "notifications": {
+    "title_placeholder": "Enter notification title",
+    "message_placeholder": "Enter notification message"
+  },
+  "settings": {
+    "save_success": "All settings saved successfully",
+    "save_failed": "Save failed",
+    "reset_success": "Settings reset",
+    "admin_prefix_change_success": "Admin Prefix changed successfully",
+    "admin_prefix_change_failed": "Admin Prefix change failed",
+    "admin_prefix_changed": "Admin panel prefix changed to",
+    "notification_sent": "Notification sent",
+    "basic_config_load_failed": "Failed to load basic configuration",
+    "notification_config_load_failed": "Failed to load notification configuration",
+    "basic_config_save_failed": "Basic settings save failed",
+    "notification_config_save_failed": "Notification settings save failed",
+    "select_min_notification_level": "Select minimum notification level",
+    "webhook_placeholder": "https://hooks.slack.com/services/xxx or https://qyapi.weixin.qq.com/xxx"
+  }
 }

@@ -1,7 +1,6 @@
 {
   "app.title": "SSLcat - SSL-прокси сервер",
   "app.description": "Мощный SSL-прокси сервер с автоматическим управлением сертификатами, перенаправлением доменов, защитой безопасности и веб-панелью управления",
-  
   "nav.dashboard": "Панель управления",
   "nav.domains": "Управление доменами",
   "nav.proxy": "Настройка прокси",
@@ -15,14 +14,12 @@
   "nav.cluster": "Управление кластером",
   "nav.dns": "Настройка DNS",
   "nav.notifications": "Управление уведомлениями",
-  
   "login.title": "Вход администратора",
   "login.username": "Имя пользователя",
   "login.password": "Пароль",
   "login.remember": "Запомнить меня",
   "login.submit": "Войти",
   "login.forgot_password": "Забыли пароль?",
-  
   "dashboard.welcome": "Добро пожаловать в SSLcat",
   "dashboard.total_requests": "Общее количество запросов",
   "dashboard.requests_per_sec": "Запросов в секунду",
@@ -32,7 +29,6 @@
   "dashboard.ssl_certificates": "SSL-сертификаты",
   "dashboard.blocked_ips": "Заблокированные IP",
   "dashboard.uptime": "Время работы",
-  
   "ssl.title": "Управление SSL-сертификатами",
   "ssl.domain": "Домен",
   "ssl.status": "Статус",
@@ -45,7 +41,6 @@
   "ssl.renew": "Обновить",
   "ssl.view": "Просмотр",
   "ssl.delete": "Удалить",
-  
   "proxy.title": "Настройка прокси",
   "proxy.add_rule": "Добавить правило",
   "proxy.domain": "Исходный домен",
@@ -63,7 +58,6 @@
   "proxy.metrics_warning": "⚠️ Включение увеличит использование CPU, рекомендуется только при необходимости мониторинга",
   "proxy.username": "Имя пользователя",
   "proxy.password": "Пароль",
-  
   "security.title": "Защита безопасности",
   "security.waf": "Брандмауэр веб-приложений",
   "security.ddos": "Защита от DDoS",
@@ -73,20 +67,17 @@
   "security.protection_level": "Уровень защиты",
   "security.enable": "Включить",
   "security.disable": "Отключить",
-  
   "waf.sql_injection": "SQL-инъекция",
   "waf.xss": "Межсайтовый скриптинг",
   "waf.path_traversal": "Обход пути",
   "waf.command_injection": "Инъекция команд",
   "waf.detected": "Обнаружено",
   "waf.blocked": "Заблокировано",
-  
   "ddos.protection_off": "Выключено",
   "ddos.protection_low": "Низкий",
   "ddos.protection_medium": "Средний",
   "ddos.protection_high": "Высокий",
   "ddos.protection_extreme": "Экстремальный",
-  
   "monitoring.title": "Мониторинг и статистика",
   "monitoring.real_time": "Мониторинг в реальном времени",
   "monitoring.traffic_chart": "График трафика",
@@ -94,7 +85,6 @@
   "monitoring.status_codes": "Распределение кодов состояния",
   "monitoring.top_domains": "Топ доменов",
   "monitoring.recent_requests": "Последние запросы",
-  
   "logs.title": "Управление логами",
   "logs.access_logs": "Логи доступа",
   "logs.error_logs": "Логи ошибок",
@@ -102,7 +92,6 @@
   "logs.format": "Формат логов",
   "logs.download": "Скачать",
   "logs.clear": "Очистить",
-  
   "settings.title": "Системные настройки",
   "settings.general": "Общие настройки",
   "settings.language": "Языковые настройки",
@@ -110,12 +99,10 @@
   "settings.backup": "Резервное копирование и восстановление",
   "settings.save": "Сохранить настройки",
   "settings.reset": "Сбросить настройки",
-  
   "language.select": "Выбрать язык",
   "language.current": "Текущий язык",
   "language.change": "Изменить язык",
   "language.auto_detect": "Автоопределение",
-  
   "common.status": "Статус",
   "common.enabled": "Включено",
   "common.disabled": "Отключено",
@@ -138,7 +125,6 @@
   "common.creating": "Создание...",
   "common.saving": "Сохранение...",
   "common.ok": "ОК",
-  
   "time.seconds": "секунды",
   "time.minutes": "минуты",
   "time.hours": "часы",
@@ -146,33 +132,28 @@
   "time.weeks": "недели",
   "time.months": "месяцы",
   "time.years": "годы",
-  
   "size.bytes": "байты",
   "size.kb": "КБ",
   "size.mb": "МБ",
   "size.gb": "ГБ",
   "size.tb": "ТБ",
-  
   "error.not_found": "Страница не найдена",
   "error.unauthorized": "Неавторизованный доступ",
   "error.forbidden": "Доступ запрещён",
   "error.server_error": "Внутренняя ошибка сервера",
   "error.network_error": "Ошибка сетевого подключения",
   "error.timeout": "Тайм-аут запроса",
-  
   "success.saved": "Успешно сохранено",
-  "success.deleted": "Успешно удалено", 
+  "success.deleted": "Успешно удалено",
   "success.updated": "Успешно обновлено",
   "success.created": "Успешно создано",
   "success.uploaded": "Успешно загружено",
-  
   "mobile.quick_actions": "Быстрые действия",
   "mobile.ssl_management": "Управление SSL-сертификатами",
   "mobile.proxy_config": "Настройка прокси",
   "mobile.security_protection": "Защита безопасности",
   "mobile.view_logs": "Просмотр логов",
   "mobile.real_time_monitor": "Мониторинг трафика в реальном времени",
-  
   "git_deploy_server.title": "Управление Git Deploy Server",
   "git_deploy_server.create_app": "Создать приложение",
   "git_deploy_server.server_config": "Конфигурация сервера",
@@ -181,9 +162,7 @@
   "git_deploy_server.return": "Вернуться к Git Deploy Server",
   "git_deploy_server.create_app_title": "Создать приложение - SSLcat Git Deploy Server",
   "git_deploy_server.server_config_title": "Конфигурация сервера - SSLcat Git Deploy Server",
-  
   "git_server.welcome_message": "Welcome to SSLcat Git Deploy Platform!",
-  
   "frontend.delete_app_confirm": "Подтвердите удаление приложения",
   "frontend.delete_app_warning": "Это опасная операция, которую нельзя отменить. Все данные, код, журналы и конфигурации этого приложения будут удалены навсегда.",
   "frontend.delete_app_instruction": "Пожалуйста, введите имя приложения \"{appName}\" для подтверждения удаления:",
@@ -191,5 +170,47 @@
   "frontend.delete_app_cancelled": "Операция удаления отменена",
   "frontend.manual_deploy_not_supported": "Ручное развертывание еще не поддерживается. Пожалуйста, запустите развертывание через Git push.",
   "frontend.ssh_key_notice": "Вы включили Git-сервер, но еще не настроили SSH-ключи. Пожалуйста, добавьте хотя бы один SSH-ключ на вкладке \"SSH-ключи\" для разрешения Git push.",
-  "frontend.select_ssh_key": "Выбрать SSH-ключ"
+  "frontend.select_ssh_key": "Выбрать SSH-ключ",
+  "common": {
+    "creating": "Creating...",
+    "saving": "Saving..."
+  },
+  "proxy": {
+    "username": "Username",
+    "password": "Password",
+    "performance_monitoring": "Performance Monitoring",
+    "enable_tracing": "Enable Request Tracing",
+    "enable_metrics": "Enable Metrics Collection",
+    "tracing_warning": "⚠️ Enabling will significantly increase CPU usage, recommended for debugging only",
+    "metrics_warning": "⚠️ Enabling will increase CPU usage, recommended for monitoring only"
+  },
+  "sites": {
+    "edit": "Edit",
+    "delete": "Delete"
+  },
+  "dns": {
+    "cloudflare_name_placeholder": "My Cloudflare",
+    "api_key_placeholder": "API Key",
+    "zone_id_placeholder": "Zone ID (required for Cloudflare etc.)",
+    "api_key_update_placeholder": "API Key (leave empty to not update)"
+  },
+  "notifications": {
+    "title_placeholder": "Enter notification title",
+    "message_placeholder": "Enter notification message"
+  },
+  "settings": {
+    "save_success": "All settings saved successfully",
+    "save_failed": "Save failed",
+    "reset_success": "Settings reset",
+    "admin_prefix_change_success": "Admin Prefix changed successfully",
+    "admin_prefix_change_failed": "Admin Prefix change failed",
+    "admin_prefix_changed": "Admin panel prefix changed to",
+    "notification_sent": "Notification sent",
+    "basic_config_load_failed": "Failed to load basic configuration",
+    "notification_config_load_failed": "Failed to load notification configuration",
+    "basic_config_save_failed": "Basic settings save failed",
+    "notification_config_save_failed": "Notification settings save failed",
+    "select_min_notification_level": "Select minimum notification level",
+    "webhook_placeholder": "https://hooks.slack.com/services/xxx or https://qyapi.weixin.qq.com/xxx"
+  }
 }

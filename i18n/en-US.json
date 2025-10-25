@@ -1,7 +1,6 @@
 {
   "app.title": "SSLcat - SSL Proxy Server",
   "app.description": "Powerful SSL proxy server with automatic certificate management, domain forwarding, security protection and web management panel",
-  
   "nav.dashboard": "Dashboard",
   "nav.domains": "Domain Management",
   "nav.proxy": "Proxy Configuration",
@@ -15,14 +14,12 @@
   "nav.cluster": "Cluster Management",
   "nav.dns": "DNS Configuration",
   "nav.notifications": "Notifications",
-  
   "login.title": "Administrator Login",
   "login.username": "Username",
   "login.password": "Password",
   "login.remember": "Remember me",
   "login.submit": "Login",
   "login.forgot_password": "Forgot password?",
-  
   "dashboard.welcome": "Welcome to SSLcat",
   "dashboard.total_requests": "Total Requests",
   "dashboard.requests_per_sec": "Requests Per Second",
@@ -32,7 +29,6 @@
   "dashboard.ssl_certificates": "SSL Certificates",
   "dashboard.blocked_ips": "Blocked IPs",
   "dashboard.uptime": "Uptime",
-  
   "ssl.title": "SSL Certificate Management",
   "ssl.domain": "Domain",
   "ssl.status": "Status",
@@ -45,7 +41,6 @@
   "ssl.renew": "Renew",
   "ssl.view": "View",
   "ssl.delete": "Delete",
-  
   "proxy.title": "Proxy Configuration",
   "proxy.add_rule": "Add Rule",
   "proxy.domain": "Source Domain",
@@ -56,7 +51,6 @@
   "proxy.healthy": "Healthy",
   "proxy.unhealthy": "Unhealthy",
   "proxy.unknown": "Unknown",
-  
   "proxy.performance_monitoring": "Performance Monitoring",
   "proxy.enable_tracing": "Enable Request Tracing",
   "proxy.enable_metrics": "Enable Metrics Collection",
@@ -64,7 +58,6 @@
   "proxy.metrics_warning": "⚠️ Enabling will increase CPU usage, recommended for monitoring needs only",
   "proxy.username": "Username",
   "proxy.password": "Password",
-  
   "security.title": "Security Protection",
   "security.waf": "Web Application Firewall",
   "security.ddos": "DDoS Protection",
@@ -74,20 +67,17 @@
   "security.protection_level": "Protection Level",
   "security.enable": "Enable",
   "security.disable": "Disable",
-  
   "waf.sql_injection": "SQL Injection",
   "waf.xss": "Cross-Site Scripting",
   "waf.path_traversal": "Path Traversal",
   "waf.command_injection": "Command Injection",
   "waf.detected": "Detected",
   "waf.blocked": "Blocked",
-  
   "ddos.protection_off": "Off",
   "ddos.protection_low": "Low",
   "ddos.protection_medium": "Medium",
   "ddos.protection_high": "High",
   "ddos.protection_extreme": "Extreme",
-  
   "monitoring.title": "Monitoring & Statistics",
   "monitoring.real_time": "Real-time Monitoring",
   "monitoring.traffic_chart": "Traffic Chart",
@@ -95,7 +85,6 @@
   "monitoring.status_codes": "Status Code Distribution",
   "monitoring.top_domains": "Top Domains",
   "monitoring.recent_requests": "Recent Requests",
-  
   "logs.title": "Log Management",
   "logs.access_logs": "Access Logs",
   "logs.error_logs": "Error Logs",
@@ -103,7 +92,6 @@
   "logs.format": "Log Format",
   "logs.download": "Download",
   "logs.clear": "Clear",
-  
   "settings.title": "System Settings",
   "settings.general": "General Settings",
   "settings.language": "Language Settings",
@@ -186,12 +174,10 @@
   "configTest.reload_failed_error": "Reload failed",
   "configTest.reload_failed_title": "Reload failed",
   "configTest.reload_failed_desc": "Unable to reload configuration, please check configuration file",
-  
   "language.select": "Select Language",
   "language.current": "Current Language",
   "language.change": "Change Language",
   "language.auto_detect": "Auto Detect",
-  
   "common.status": "Status",
   "common.enabled": "Enabled",
   "common.disabled": "Disabled",
@@ -214,7 +200,6 @@
   "common.creating": "Creating...",
   "common.saving": "Saving...",
   "common.ok": "OK",
-  
   "time.seconds": "seconds",
   "time.minutes": "minutes",
   "time.hours": "hours",
@@ -222,33 +207,28 @@
   "time.weeks": "weeks",
   "time.months": "months",
   "time.years": "years",
-  
   "size.bytes": "bytes",
   "size.kb": "KB",
   "size.mb": "MB",
   "size.gb": "GB",
   "size.tb": "TB",
-  
   "error.not_found": "Page Not Found",
   "error.unauthorized": "Unauthorized Access",
   "error.forbidden": "Access Forbidden",
   "error.server_error": "Internal Server Error",
   "error.network_error": "Network Connection Error",
   "error.timeout": "Request Timeout",
-  
   "success.saved": "Saved Successfully",
-  "success.deleted": "Deleted Successfully", 
+  "success.deleted": "Deleted Successfully",
   "success.updated": "Updated Successfully",
   "success.created": "Created Successfully",
   "success.uploaded": "Uploaded Successfully",
-  
   "mobile.quick_actions": "Quick Actions",
   "mobile.ssl_management": "SSL Certificate Management",
   "mobile.proxy_config": "Proxy Configuration",
   "mobile.security_protection": "Security Protection",
   "mobile.view_logs": "View Logs",
   "mobile.real_time_monitor": "Real-time Traffic Monitoring",
-  
   "git_deploy_server.title": "Git Deploy Server Management",
   "git_deploy_server.create_app": "Create App",
   "git_deploy_server.server_config": "Server Configuration",
@@ -257,7 +237,6 @@
   "git_deploy_server.return": "Back to Git Deploy Server",
   "git_deploy_server.create_app_title": "Create App - SSLcat Git Deploy Server",
   "git_deploy_server.server_config_title": "Server Configuration - SSLcat Git Deploy Server",
-  
   "git_server.welcome_message": "Welcome to SSLcat Git Deploy Platform!",
   "git_server.load_apps_failed": "Failed to load app list",
   "git_server.not_enabled": "Git server not enabled",
@@ -285,7 +264,6 @@
   "git_server.save_config_failed": "Failed to save server configuration",
   "git_server.save_app_info_failed": "Failed to save app information",
   "git_server.app_not_exists": "App does not exist",
-  
   "cluster.title": "Cluster Settings",
   "cluster.refresh_status": "Refresh Status",
   "cluster.current_status": "Current Cluster Status",
@@ -298,7 +276,6 @@
   "cluster.slave_desc": "Connected to master node",
   "cluster.node_id": "Node ID",
   "cluster.not_set": "Not Set",
-  
   "test.config_file": "Testing config file",
   "test.validation_error": "Validation process error",
   "test.config_errors": "Config file has errors",
@@ -314,7 +291,6 @@
   "test.blocked_countries": "Blocked Countries",
   "test.update_config_failed": "Update config failed",
   "test.ip_error": "Error",
-  
   "frontend.copy_command": "Copy Command",
   "frontend.ssh_key_notice": "You have enabled Git server but haven't configured SSH keys yet. Please add at least one SSH key in the \"SSH Keys\" tab to allow Git push.",
   "frontend.env_var_name": "e.g. NODE_ENV",
@@ -337,5 +313,47 @@
   "frontend.delete_app_instruction": "Please type the application name \"{appName}\" to confirm deletion:",
   "frontend.delete_app_name_mismatch": "Application name does not match",
   "frontend.delete_app_cancelled": "Delete operation cancelled",
-  "frontend.manual_deploy_not_supported": "Manual deployment is not yet supported. Please trigger deployment via Git push."
+  "frontend.manual_deploy_not_supported": "Manual deployment is not yet supported. Please trigger deployment via Git push.",
+  "common": {
+    "creating": "Creating...",
+    "saving": "Saving..."
+  },
+  "proxy": {
+    "username": "Username",
+    "password": "Password",
+    "performance_monitoring": "Performance Monitoring",
+    "enable_tracing": "Enable Request Tracing",
+    "enable_metrics": "Enable Metrics Collection",
+    "tracing_warning": "⚠️ Enabling will significantly increase CPU usage, recommended for debugging only",
+    "metrics_warning": "⚠️ Enabling will increase CPU usage, recommended for monitoring only"
+  },
+  "sites": {
+    "edit": "Edit",
+    "delete": "Delete"
+  },
+  "dns": {
+    "cloudflare_name_placeholder": "My Cloudflare",
+    "api_key_placeholder": "API Key",
+    "zone_id_placeholder": "Zone ID (required for Cloudflare etc.)",
+    "api_key_update_placeholder": "API Key (leave empty to not update)"
+  },
+  "notifications": {
+    "title_placeholder": "Enter notification title",
+    "message_placeholder": "Enter notification message"
+  },
+  "settings": {
+    "save_success": "All settings saved successfully",
+    "save_failed": "Save failed",
+    "reset_success": "Settings reset",
+    "admin_prefix_change_success": "Admin Prefix changed successfully",
+    "admin_prefix_change_failed": "Admin Prefix change failed",
+    "admin_prefix_changed": "Admin panel prefix changed to",
+    "notification_sent": "Notification sent",
+    "basic_config_load_failed": "Failed to load basic configuration",
+    "notification_config_load_failed": "Failed to load notification configuration",
+    "basic_config_save_failed": "Basic settings save failed",
+    "notification_config_save_failed": "Notification settings save failed",
+    "select_min_notification_level": "Select minimum notification level",
+    "webhook_placeholder": "https://hooks.slack.com/services/xxx or https://qyapi.weixin.qq.com/xxx"
+  }
 }

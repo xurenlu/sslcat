@@ -1,7 +1,6 @@
 {
   "app.title": "SSLcat - SSL代理伺服器",
   "app.description": "功能強大的SSL代理伺服器，支援自動憑證管理、域名轉發、安全防護和Web管理面板",
-  
   "nav.dashboard": "儀表板",
   "nav.domains": "域名管理",
   "nav.proxy": "代理設定",
@@ -15,14 +14,12 @@
   "nav.cluster": "叢集管理",
   "nav.dns": "DNS設定",
   "nav.notifications": "通知管理",
-  
   "login.title": "管理員登入",
   "login.username": "使用者名稱",
   "login.password": "密碼",
   "login.remember": "記住我",
   "login.submit": "登入",
   "login.forgot_password": "忘記密碼？",
-  
   "dashboard.welcome": "歡迎使用 SSLcat",
   "dashboard.total_requests": "總請求數",
   "dashboard.requests_per_sec": "每秒請求數",
@@ -32,7 +29,6 @@
   "dashboard.ssl_certificates": "SSL憑證",
   "dashboard.blocked_ips": "封鎖IP",
   "dashboard.uptime": "運行時間",
-  
   "ssl.title": "SSL憑證管理",
   "ssl.domain": "域名",
   "ssl.status": "狀態",
@@ -45,7 +41,6 @@
   "ssl.renew": "續期",
   "ssl.view": "檢視",
   "ssl.delete": "刪除",
-  
   "proxy.title": "代理設定",
   "proxy.add_rule": "新增規則",
   "proxy.domain": "來源域名",
@@ -63,7 +58,6 @@
   "proxy.metrics_warning": "⚠️ 啟用後會增加 CPU 占用，建議僅在需要監控時使用",
   "proxy.username": "使用者名稱",
   "proxy.password": "密碼",
-  
   "security.title": "安全防護",
   "security.waf": "Web應用程式防火牆",
   "security.ddos": "DDoS防護",
@@ -73,20 +67,17 @@
   "security.protection_level": "防護級別",
   "security.enable": "啟用",
   "security.disable": "停用",
-  
   "waf.sql_injection": "SQL注入",
   "waf.xss": "跨站腳本",
   "waf.path_traversal": "路徑遍歷",
   "waf.command_injection": "命令注入",
   "waf.detected": "檢測到",
   "waf.blocked": "已阻止",
-  
   "ddos.protection_off": "關閉",
   "ddos.protection_low": "低級",
   "ddos.protection_medium": "中級",
   "ddos.protection_high": "高級",
   "ddos.protection_extreme": "極高",
-  
   "monitoring.title": "監控統計",
   "monitoring.real_time": "即時監控",
   "monitoring.traffic_chart": "流量圖表",
@@ -94,7 +85,6 @@
   "monitoring.status_codes": "狀態碼分佈",
   "monitoring.top_domains": "熱門域名",
   "monitoring.recent_requests": "最近請求",
-  
   "logs.title": "記錄管理",
   "logs.access_logs": "存取記錄",
   "logs.error_logs": "錯誤記錄",
@@ -102,7 +92,6 @@
   "logs.format": "記錄格式",
   "logs.download": "下載",
   "logs.clear": "清空",
-  
   "settings.title": "系統設定",
   "settings.general": "常規設定",
   "settings.language": "語言設定",
@@ -110,12 +99,10 @@
   "settings.backup": "備份與復原",
   "settings.save": "儲存設定",
   "settings.reset": "重設設定",
-  
   "language.select": "選擇語言",
   "language.current": "目前語言",
   "language.change": "變更語言",
   "language.auto_detect": "自動偵測",
-  
   "common.status": "狀態",
   "common.enabled": "已啟用",
   "common.disabled": "已停用",
@@ -138,7 +125,6 @@
   "common.creating": "建立中...",
   "common.saving": "儲存中...",
   "common.ok": "確定",
-  
   "time.seconds": "秒",
   "time.minutes": "分鐘",
   "time.hours": "小時",
@@ -146,33 +132,28 @@
   "time.weeks": "週",
   "time.months": "月",
   "time.years": "年",
-  
   "size.bytes": "位元組",
   "size.kb": "KB",
   "size.mb": "MB",
   "size.gb": "GB",
   "size.tb": "TB",
-  
   "error.not_found": "找不到頁面",
   "error.unauthorized": "未經授權的存取",
   "error.forbidden": "存取被禁止",
   "error.server_error": "內部伺服器錯誤",
   "error.network_error": "網路連線錯誤",
   "error.timeout": "請求逾時",
-  
   "success.saved": "成功儲存",
-  "success.deleted": "成功刪除", 
+  "success.deleted": "成功刪除",
   "success.updated": "成功更新",
   "success.created": "成功建立",
   "success.uploaded": "成功上傳",
-  
   "mobile.quick_actions": "快速操作",
   "mobile.ssl_management": "SSL憑證管理",
   "mobile.proxy_config": "代理設定",
   "mobile.security_protection": "安全防護",
   "mobile.view_logs": "檢視記錄",
   "mobile.real_time_monitor": "即時流量監控",
-  
   "git_deploy_server.title": "Git Deploy Server管理",
   "git_deploy_server.create_app": "建立應用程式",
   "git_deploy_server.server_config": "伺服器設定",
@@ -181,9 +162,7 @@
   "git_deploy_server.return": "返回Git Deploy Server",
   "git_deploy_server.create_app_title": "建立應用程式 - SSLcat Git Deploy Server",
   "git_deploy_server.server_config_title": "伺服器設定 - SSLcat Git Deploy Server",
-  
   "git_server.welcome_message": "Welcome to SSLcat Git Deploy Platform!",
-  
   "frontend.delete_app_confirm": "確認刪除應用程式",
   "frontend.delete_app_warning": "這是一個危險操作，無法復原。此應用程式的所有資料、程式碼、記錄和配置將被永久刪除。",
   "frontend.delete_app_instruction": "請輸入應用程式名稱「{appName}」以確認刪除：",
@@ -191,5 +170,47 @@
   "frontend.delete_app_cancelled": "刪除操作已取消",
   "frontend.manual_deploy_not_supported": "尚不支援手動部署。請透過Git push觸發部署。",
   "frontend.ssh_key_notice": "您已啟用Git伺服器，但還沒有配置SSH金鑰。請在「SSH金鑰」標籤頁中新增至少一個SSH金鑰以允許Git推送。",
-  "frontend.select_ssh_key": "選擇SSH金鑰"
+  "frontend.select_ssh_key": "選擇SSH金鑰",
+  "common": {
+    "creating": "創建中...",
+    "saving": "保存中..."
+  },
+  "proxy": {
+    "username": "用戶名",
+    "password": "密碼",
+    "performance_monitoring": "性能監控配置",
+    "enable_tracing": "啟用請求追蹤",
+    "enable_metrics": "啟用指標收集",
+    "tracing_warning": "⚠️ 啟用後會顯著增加 CPU 佔用，建議僅在調試時使用",
+    "metrics_warning": "⚠️ 啟用後會增加 CPU 佔用，建議僅在需要監控時使用"
+  },
+  "sites": {
+    "edit": "編輯",
+    "delete": "刪除"
+  },
+  "dns": {
+    "cloudflare_name_placeholder": "我的 Cloudflare",
+    "api_key_placeholder": "API 密鑰",
+    "zone_id_placeholder": "Zone ID (Cloudflare等需要)",
+    "api_key_update_placeholder": "API 密鑰（留空則不更新）"
+  },
+  "notifications": {
+    "title_placeholder": "請輸入通知標題",
+    "message_placeholder": "請輸入通知消息"
+  },
+  "settings": {
+    "save_success": "所有設置保存成功",
+    "save_failed": "保存失敗",
+    "reset_success": "設置已重置",
+    "admin_prefix_change_success": "Admin Prefix更改成功",
+    "admin_prefix_change_failed": "Admin Prefix更改失敗",
+    "admin_prefix_changed": "管理面板前綴已更改為",
+    "notification_sent": "通知已發送",
+    "basic_config_load_failed": "加載基礎配置失敗",
+    "notification_config_load_failed": "加載通知配置失敗",
+    "basic_config_save_failed": "基礎設置保存失敗",
+    "notification_config_save_failed": "通知設置保存失敗",
+    "select_min_notification_level": "選擇最小通知級別",
+    "webhook_placeholder": "https://hooks.slack.com/services/xxx 或 https://qyapi.weixin.qq.com/xxx"
+  }
 }

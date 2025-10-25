@@ -1,7 +1,6 @@
 {
   "app.title": "SSLcat - SSL-Proxy-Server",
   "app.description": "Leistungsstarker SSL-Proxy-Server mit automatischer Zertifikatsverwaltung, Domain-Weiterleitung, Sicherheitsschutz und Web-Management-Panel",
-  
   "nav.dashboard": "Dashboard",
   "nav.domains": "Domain-Verwaltung",
   "nav.proxy": "Proxy-Konfiguration",
@@ -15,14 +14,12 @@
   "nav.cluster": "Cluster-Verwaltung",
   "nav.dns": "DNS-Konfiguration",
   "nav.notifications": "Benachrichtigungsverwaltung",
-  
   "login.title": "Administrator-Anmeldung",
   "login.username": "Benutzername",
   "login.password": "Passwort",
   "login.remember": "Angemeldet bleiben",
   "login.submit": "Anmelden",
   "login.forgot_password": "Passwort vergessen?",
-  
   "dashboard.welcome": "Willkommen bei SSLcat",
   "dashboard.total_requests": "Gesamte Anfragen",
   "dashboard.requests_per_sec": "Anfragen pro Sekunde",
@@ -32,7 +29,6 @@
   "dashboard.ssl_certificates": "SSL-Zertifikate",
   "dashboard.blocked_ips": "Blockierte IPs",
   "dashboard.uptime": "Betriebszeit",
-  
   "ssl.title": "SSL-Zertifikatsverwaltung",
   "ssl.domain": "Domain",
   "ssl.status": "Status",
@@ -45,7 +41,6 @@
   "ssl.renew": "Erneuern",
   "ssl.view": "Anzeigen",
   "ssl.delete": "Löschen",
-  
   "proxy.title": "Proxy-Konfiguration",
   "proxy.add_rule": "Regel hinzufügen",
   "proxy.domain": "Quell-Domain",
@@ -63,7 +58,6 @@
   "proxy.metrics_warning": "⚠️ Aktivierung erhöht die CPU-Nutzung, nur bei Bedarf für Überwachung empfohlen",
   "proxy.username": "Benutzername",
   "proxy.password": "Passwort",
-  
   "security.title": "Sicherheitsschutz",
   "security.waf": "Web-Application-Firewall",
   "security.ddos": "DDoS-Schutz",
@@ -73,20 +67,17 @@
   "security.protection_level": "Schutzlevel",
   "security.enable": "Aktivieren",
   "security.disable": "Deaktivieren",
-  
   "waf.sql_injection": "SQL-Injection",
   "waf.xss": "Cross-Site-Scripting",
   "waf.path_traversal": "Path Traversal",
   "waf.command_injection": "Command Injection",
   "waf.detected": "Erkannt",
   "waf.blocked": "Blockiert",
-  
   "ddos.protection_off": "Aus",
   "ddos.protection_low": "Niedrig",
   "ddos.protection_medium": "Mittel",
   "ddos.protection_high": "Hoch",
   "ddos.protection_extreme": "Extrem",
-  
   "monitoring.title": "Überwachung und Statistiken",
   "monitoring.real_time": "Echtzeitüberwachung",
   "monitoring.traffic_chart": "Traffic-Diagramm",
@@ -94,7 +85,6 @@
   "monitoring.status_codes": "Status-Code-Verteilung",
   "monitoring.top_domains": "Top-Domains",
   "monitoring.recent_requests": "Aktuelle Anfragen",
-  
   "logs.title": "Log-Verwaltung",
   "logs.access_logs": "Zugriffslogs",
   "logs.error_logs": "Fehlerlogs",
@@ -102,7 +92,6 @@
   "logs.format": "Log-Format",
   "logs.download": "Herunterladen",
   "logs.clear": "Löschen",
-  
   "settings.title": "Systemeinstellungen",
   "settings.general": "Allgemeine Einstellungen",
   "settings.language": "Spracheinstellungen",
@@ -110,12 +99,10 @@
   "settings.backup": "Backup und Wiederherstellung",
   "settings.save": "Einstellungen speichern",
   "settings.reset": "Einstellungen zurücksetzen",
-  
   "language.select": "Sprache auswählen",
   "language.current": "Aktuelle Sprache",
   "language.change": "Sprache ändern",
   "language.auto_detect": "Automatische Erkennung",
-  
   "common.status": "Status",
   "common.enabled": "Aktiviert",
   "common.disabled": "Deaktiviert",
@@ -138,7 +125,6 @@
   "common.creating": "Erstellen...",
   "common.saving": "Speichern...",
   "common.ok": "OK",
-  
   "time.seconds": "Sekunden",
   "time.minutes": "Minuten",
   "time.hours": "Stunden",
@@ -146,33 +132,28 @@
   "time.weeks": "Wochen",
   "time.months": "Monate",
   "time.years": "Jahre",
-  
   "size.bytes": "Bytes",
   "size.kb": "KB",
   "size.mb": "MB",
   "size.gb": "GB",
   "size.tb": "TB",
-  
   "error.not_found": "Seite nicht gefunden",
   "error.unauthorized": "Nicht autorisierter Zugriff",
   "error.forbidden": "Zugriff verweigert",
   "error.server_error": "Interner Serverfehler",
   "error.network_error": "Netzwerkverbindungsfehler",
   "error.timeout": "Anfrage-Timeout",
-  
   "success.saved": "Erfolgreich gespeichert",
-  "success.deleted": "Erfolgreich gelöscht", 
+  "success.deleted": "Erfolgreich gelöscht",
   "success.updated": "Erfolgreich aktualisiert",
   "success.created": "Erfolgreich erstellt",
   "success.uploaded": "Erfolgreich hochgeladen",
-  
   "mobile.quick_actions": "Schnellaktionen",
   "mobile.ssl_management": "SSL-Zertifikatsverwaltung",
   "mobile.proxy_config": "Proxy-Konfiguration",
   "mobile.security_protection": "Sicherheitsschutz",
   "mobile.view_logs": "Logs anzeigen",
   "mobile.real_time_monitor": "Echtzeit-Traffic-Überwachung",
-  
   "git_deploy_server.title": "Git Deploy Server-Verwaltung",
   "git_deploy_server.create_app": "Anwendung erstellen",
   "git_deploy_server.server_config": "Server-Konfiguration",
@@ -181,9 +162,7 @@
   "git_deploy_server.return": "Zurück zu Git Deploy Server",
   "git_deploy_server.create_app_title": "Anwendung erstellen - SSLcat Git Deploy Server",
   "git_deploy_server.server_config_title": "Server-Konfiguration - SSLcat Git Deploy Server",
-  
   "git_server.welcome_message": "Welcome to SSLcat Git Deploy Platform!",
-  
   "frontend.delete_app_confirm": "Löschen der Anwendung bestätigen",
   "frontend.delete_app_warning": "Dies ist eine gefährliche Operation, die nicht rückgängig gemacht werden kann. Alle Daten, Code, Protokolle und Konfigurationen dieser Anwendung werden dauerhaft gelöscht.",
   "frontend.delete_app_instruction": "Bitte geben Sie den Anwendungsnamen \"{appName}\" ein, um das Löschen zu bestätigen:",
@@ -191,5 +170,47 @@
   "frontend.delete_app_cancelled": "Löschvorgang abgebrochen",
   "frontend.manual_deploy_not_supported": "Manuelles Deployment wird noch nicht unterstützt. Bitte lösen Sie das Deployment über Git push aus.",
   "frontend.ssh_key_notice": "Sie haben den Git-Server aktiviert, aber noch keine SSH-Schlüssel konfiguriert. Bitte fügen Sie mindestens einen SSH-Schlüssel im \"SSH-Schlüssel\"-Tab hinzu, um Git-Push zu ermöglichen.",
-  "frontend.select_ssh_key": "SSH-Schlüssel auswählen"
+  "frontend.select_ssh_key": "SSH-Schlüssel auswählen",
+  "common": {
+    "creating": "Creating...",
+    "saving": "Saving..."
+  },
+  "proxy": {
+    "username": "Username",
+    "password": "Password",
+    "performance_monitoring": "Performance Monitoring",
+    "enable_tracing": "Enable Request Tracing",
+    "enable_metrics": "Enable Metrics Collection",
+    "tracing_warning": "⚠️ Enabling will significantly increase CPU usage, recommended for debugging only",
+    "metrics_warning": "⚠️ Enabling will increase CPU usage, recommended for monitoring only"
+  },
+  "sites": {
+    "edit": "Edit",
+    "delete": "Delete"
+  },
+  "dns": {
+    "cloudflare_name_placeholder": "My Cloudflare",
+    "api_key_placeholder": "API Key",
+    "zone_id_placeholder": "Zone ID (required for Cloudflare etc.)",
+    "api_key_update_placeholder": "API Key (leave empty to not update)"
+  },
+  "notifications": {
+    "title_placeholder": "Enter notification title",
+    "message_placeholder": "Enter notification message"
+  },
+  "settings": {
+    "save_success": "All settings saved successfully",
+    "save_failed": "Save failed",
+    "reset_success": "Settings reset",
+    "admin_prefix_change_success": "Admin Prefix changed successfully",
+    "admin_prefix_change_failed": "Admin Prefix change failed",
+    "admin_prefix_changed": "Admin panel prefix changed to",
+    "notification_sent": "Notification sent",
+    "basic_config_load_failed": "Failed to load basic configuration",
+    "notification_config_load_failed": "Failed to load notification configuration",
+    "basic_config_save_failed": "Basic settings save failed",
+    "notification_config_save_failed": "Notification settings save failed",
+    "select_min_notification_level": "Select minimum notification level",
+    "webhook_placeholder": "https://hooks.slack.com/services/xxx or https://qyapi.weixin.qq.com/xxx"
+  }
 }
