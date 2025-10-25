@@ -291,26 +291,43 @@ func (nm *NotificationManager) sendAsync(notification *Notification) {
 	// 并发控制
 	select {
 	case nm.sendSemaphore <- struct{}{}:
-		defer func() { <-nm.sendSemaphore }()
+		// 添加panic恢复，确保信号量不泄漏
+		defer func() {
+			<-nm.sendSemaphore
+			if r := recover(); r != nil {
+				nm.log.Errorf("Notification send panic recovered for %s: %v", notification.Type, r)
+			}
+		}()
 	default:
 		// 发送队列已满，记录警告
 		nm.log.Warnf("通知发送队列已满（最多%d个并发），跳过: %s", nm.maxConcurrentSends, notification.Type)
 		return
 	}
 
-	// 发送到各个渠道
+	// 发送到各个渠道（每个渠道单独捕获panic）
 	var errors []string
 	for name, channel := range nm.channels {
 		if !channel.IsEnabled() {
 			continue
 		}
 
-		if err := channel.Send(notification); err != nil {
-			nm.log.Errorf("发送通知到 %s 失败: %v", name, err)
-			errors = append(errors, fmt.Sprintf("%s: %v", name, err))
-		} else {
-			nm.log.Debugf("通知已发送到 %s", name)
-		}
+		// 为每个渠道添加panic保护
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					errMsg := fmt.Sprintf("panic: %v", r)
+					nm.log.Errorf("发送通知到 %s 时panic: %v", name, r)
+					errors = append(errors, fmt.Sprintf("%s: %s", name, errMsg))
+				}
+			}()
+
+			if err := channel.Send(notification); err != nil {
+				nm.log.Errorf("发送通知到 %s 失败: %v", name, err)
+				errors = append(errors, fmt.Sprintf("%s: %v", name, err))
+			} else {
+				nm.log.Debugf("通知已发送到 %s", name)
+			}
+		}()
 	}
 
 	if len(errors) > 0 {

@@ -89,7 +89,41 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		avgResponseTime = v
 	}
 
-	// 输出 Prometheus 格式指标
+	// 获取压缩缓存统计
+	compressionHits := int64(0)
+	compressionMisses := int64(0)
+	compressionSize := int64(0)
+	if s.compressionCache != nil {
+		cStats := s.compressionCache.Stats()
+		if v, ok := cStats["hits"].(int64); ok {
+			compressionHits = v
+		}
+		if v, ok := cStats["misses"].(int64); ok {
+			compressionMisses = v
+		}
+		if v, ok := cStats["total_size"].(int64); ok {
+			compressionSize = v
+		}
+	}
+
+	// 获取图片优化统计
+	imgOptTotal := int64(0)
+	imgOptOptimized := int64(0)
+	imgOptCacheHits := int64(0)
+	if s.imageOptimizer != nil {
+		imgStats := s.imageOptimizer.GetStats()
+		if v, ok := imgStats["total_requests"].(int64); ok {
+			imgOptTotal = v
+		}
+		if v, ok := imgStats["optimized_count"].(int64); ok {
+			imgOptOptimized = v
+		}
+		if v, ok := imgStats["cache_hits"].(int64); ok {
+			imgOptCacheHits = v
+		}
+	}
+
+	// 输出 Prometheus 格式指标（增强版）
 	fmt.Fprintf(w, `# HELP sslcat_uptime_seconds Server uptime in seconds
 # TYPE sslcat_uptime_seconds counter
 sslcat_uptime_seconds %.2f
@@ -150,6 +184,38 @@ sslcat_cdn_cache_misses_total %d
 # TYPE sslcat_cdn_cache_size_bytes gauge
 sslcat_cdn_cache_size_bytes %d
 
+# HELP sslcat_compression_cache_hits_total Compression cache hits
+# TYPE sslcat_compression_cache_hits_total counter
+sslcat_compression_cache_hits_total %d
+
+# HELP sslcat_compression_cache_misses_total Compression cache misses
+# TYPE sslcat_compression_cache_misses_total counter
+sslcat_compression_cache_misses_total %d
+
+# HELP sslcat_compression_cache_size_bytes Compression cache total size in bytes
+# TYPE sslcat_compression_cache_size_bytes gauge
+sslcat_compression_cache_size_bytes %d
+
+# HELP sslcat_compression_cache_hit_rate Compression cache hit rate (0-1)
+# TYPE sslcat_compression_cache_hit_rate gauge
+sslcat_compression_cache_hit_rate %.4f
+
+# HELP sslcat_image_optimization_total Total image optimization requests
+# TYPE sslcat_image_optimization_total counter
+sslcat_image_optimization_total %d
+
+# HELP sslcat_image_optimization_optimized Images actually optimized
+# TYPE sslcat_image_optimization_optimized counter
+sslcat_image_optimization_optimized %d
+
+# HELP sslcat_image_optimization_cache_hits Image optimization cache hits
+# TYPE sslcat_image_optimization_cache_hits counter
+sslcat_image_optimization_cache_hits %d
+
+# HELP sslcat_image_optimization_rate Image optimization rate (0-1)
+# TYPE sslcat_image_optimization_rate gauge
+sslcat_image_optimization_rate %.4f
+
 # HELP sslcat_config_enabled Security feature flags
 # TYPE sslcat_config_enabled gauge
 sslcat_config_enabled{feature="captcha"} %d
@@ -157,6 +223,8 @@ sslcat_config_enabled{feature="pow"} %d
 sslcat_config_enabled{feature="ddos"} %d
 sslcat_config_enabled{feature="waf"} %d
 sslcat_config_enabled{feature="ua_filter"} %d
+sslcat_config_enabled{feature="compression"} %d
+sslcat_config_enabled{feature="image_optimization"} %d
 `,
 		uptime,
 		stats["ActiveRules"].(int),
@@ -173,9 +241,30 @@ sslcat_config_enabled{feature="ua_filter"} %d
 		cdnHits,
 		cdnMisses,
 		cdnSize,
+		compressionHits,
+		compressionMisses,
+		compressionSize,
+		func() float64 {
+			total := compressionHits + compressionMisses
+			if total == 0 {
+				return 0
+			}
+			return float64(compressionHits) / float64(total)
+		}(),
+		imgOptTotal,
+		imgOptOptimized,
+		imgOptCacheHits,
+		func() float64 {
+			if imgOptTotal == 0 {
+				return 0
+			}
+			return float64(imgOptOptimized) / float64(imgOptTotal)
+		}(),
 		map[bool]int{true: 1, false: 0}[s.config.Security.EnableCaptcha],
 		0, // PoW功能已移除
 		map[bool]int{true: 1, false: 0}[s.config.Security.EnableDDOS],
 		map[bool]int{true: 1, false: 0}[s.config.Security.EnableWAF],
-		map[bool]int{true: 1, false: 0}[s.config.Security.EnableUAFilter])
+		map[bool]int{true: 1, false: 0}[s.config.Security.EnableUAFilter],
+		map[bool]int{true: 1, false: 0}[s.config.Compression.Enabled],
+		map[bool]int{true: 1, false: 0}[s.config.ImageOptimization.Enabled])
 }

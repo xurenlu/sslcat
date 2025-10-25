@@ -760,7 +760,7 @@ func (dl *DeployLogger) Close() error {
 
 // ==================== WebSocket 支持 ====================
 
-// HandleWebSocketLogsWS 处理 WebSocket 日志连接（真正的 WebSocket）
+// HandleWebSocketLogsWS 处理 WebSocket 日志连接（真正的 WebSocket）- 增强panic恢复
 func (lsm *LogStreamManager) HandleWebSocketLogsWS(w http.ResponseWriter, r *http.Request, appName string) {
 	// 升级到 WebSocket 连接
 	conn, err := lsm.upgrader.Upgrade(w, r, nil)
@@ -768,7 +768,14 @@ func (lsm *LogStreamManager) HandleWebSocketLogsWS(w http.ResponseWriter, r *htt
 		lsm.log.Errorf("WebSocket upgrade failed: %v", err)
 		return
 	}
-	defer conn.Close()
+
+	// 添加panic恢复和确保资源清理
+	defer func() {
+		if r := recover(); r != nil {
+			lsm.log.Errorf("WebSocket panic recovered for app %s: %v", appName, r)
+		}
+		conn.Close()
+	}()
 
 	// 获取或创建日志流
 	stream := lsm.GetStream(appName)

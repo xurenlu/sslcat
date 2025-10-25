@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -185,7 +186,7 @@ func (c *Collector) RecordAccess(record *AccessRecord) {
 	c.updateDomainStats(record, now)
 }
 
-// shouldSample 判断是否应该记录此次访问（动态采样）
+// shouldSample 判断是否应该记录此次访问（动态采样）- 使用atomic确保并发安全
 func (c *Collector) shouldSample() bool {
 	// 获取当前条目数（不加锁，允许轻微不准确）
 	ipCount := len(c.ipEntries)
@@ -195,15 +196,16 @@ func (c *Collector) shouldSample() bool {
 		return true
 	}
 
+	// 使用atomic操作确保计数器并发安全
+	counter := atomic.AddUint64(&c.samplingCounter, 1)
+
 	// 接近限制（90%以上），采样 10%
 	if ipCount >= c.maxIPEntries*9/10 {
-		c.samplingCounter++
-		return c.samplingCounter%10 == 0
+		return counter%10 == 0
 	}
 
 	// 中间状态（50%-90%），采样 50%
-	c.samplingCounter++
-	return c.samplingCounter%2 == 0
+	return counter%2 == 0
 }
 
 // updateDomainStats 更新域名统计数据

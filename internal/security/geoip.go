@@ -209,8 +209,18 @@ func (g *GeoIPService) CheckCountryAccess(ip string) (*GeoFilterResult, error) {
 	}, nil
 }
 
-// GetLocation 获取IP的地理位置信息
+// GetLocation 获取IP的地理位置信息（增强版：慢查询日志）
 func (g *GeoIPService) GetLocation(ipStr string) (*GeoLocation, error) {
+	// 记录开始时间（用于慢查询检测）
+	startTime := time.Now()
+	defer func() {
+		duration := time.Since(startTime)
+		// 慢查询阈值：100ms
+		if duration > 100*time.Millisecond {
+			g.log.Warnf("GeoIP慢查询: IP=%s, 耗时=%v", ipStr, duration)
+		}
+	}()
+
 	g.mutex.RLock()
 
 	// 检查缓存

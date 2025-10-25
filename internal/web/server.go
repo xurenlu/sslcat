@@ -923,9 +923,15 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		written:        0,
 	}
 
-	// defer 记录访问日志、完成追踪、记录Prometheus指标
+	// defer 记录访问日志、完成追踪、记录Prometheus指标（增强版：慢查询日志）
 	defer func() {
 		duration := time.Since(startTime)
+
+		// 慢查询检测：超过5秒的请求
+		if duration > 5*time.Second {
+			s.log.Warnf("HTTP慢查询: method=%s, path=%s, duration=%v, status=%d, client=%s",
+				r.Method, r.URL.Path, duration, wrappedWriter.statusCode, s.getClientIP(r))
+		}
 
 		// 根据转发规则完成追踪 Span（减少 CPU 占用）
 		if enableTracing && span != nil {

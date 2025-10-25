@@ -195,7 +195,13 @@ func (o *Optimizer) OptimizeResponse(originalData []byte, contentType string, r 
 	// 并发控制：防止内存暴增
 	select {
 	case o.concurrencySem <- struct{}{}:
-		defer func() { <-o.concurrencySem }()
+		// 添加panic恢复，确保信号量不泄漏
+		defer func() {
+			<-o.concurrencySem
+			if r := recover(); r != nil {
+				o.log.Errorf("Image optimization panic recovered: %v", r)
+			}
+		}()
 	default:
 		// 并发已满，直接返回原图
 		o.log.Warn("Image optimization concurrency limit reached, returning original")
