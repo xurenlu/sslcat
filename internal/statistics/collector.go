@@ -96,11 +96,13 @@ type Collector struct {
 	geoIPEnabled    bool
 
 	// 内存泄漏防护
-	stopChan       chan struct{}
-	maxIPEntries   int
-	maxUAEntries   int
-	maxCityEntries int
-	maxDomainStats int
+	stopChan        chan struct{}
+	maxIPEntries    int
+	maxUAEntries    int
+	maxCityEntries  int
+	maxDomainStats  int
+	samplingEnabled bool
+	samplingCounter uint64
 }
 
 // NewCollector 创建统计收集器
@@ -129,16 +131,17 @@ func NewCollector(dataDir string, enabled bool) *Collector {
 
 		// 默认配置
 		topN:            20,
-		cleanupInterval: 1 * time.Hour,
+		cleanupInterval: 5 * time.Minute,     // 从1小时改为5分钟，更频繁清理
 		maxDataAge:      30 * 24 * time.Hour, // 30天
 		geoIPEnabled:    false,
 
 		// 内存泄漏防护配置
-		stopChan:       make(chan struct{}),
-		maxIPEntries:   1000, // 最多1000个IP条目
-		maxUAEntries:   500,  // 最多500个UA条目
-		maxCityEntries: 200,  // 最多200个城市条目
-		maxDomainStats: 100,  // 最多100个域名统计
+		stopChan:        make(chan struct{}),
+		maxIPEntries:    5000, // 从1000提升到5000
+		maxUAEntries:    2000, // 从500提升到2000
+		maxCityEntries:  500,  // 从200提升到500
+		maxDomainStats:  100,  // 最多100个域名统计
+		samplingEnabled: true, // 启用采样
 	}
 
 	if enabled {
@@ -156,6 +159,11 @@ func (c *Collector) RecordAccess(record *AccessRecord) {
 		return
 	}
 
+	// 采样检查（高流量时降低记录频率）
+	if c.samplingEnabled && !c.shouldSample() {
+		return
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -164,17 +172,38 @@ func (c *Collector) RecordAccess(record *AccessRecord) {
 		now = time.Now()
 	}
 
-	// 更新漏斗条目
-	c.ipFunnel.UpdateEntry(c.ipEntries, record.IP, now)
-	c.uaFunnel.UpdateEntry(c.uaEntries, record.UserAgent, now)
+	// 更新漏斗条目（带大小限制）
+	c.ipFunnel.UpdateEntry(c.ipEntries, record.IP, now, c.maxIPEntries)
+	c.uaFunnel.UpdateEntry(c.uaEntries, record.UserAgent, now, c.maxUAEntries)
 
 	// 如果启用了地理位置且有城市信息
 	if c.geoIPEnabled && record.City != "" {
-		c.cityFunnel.UpdateEntry(c.cityEntries, record.City, now)
+		c.cityFunnel.UpdateEntry(c.cityEntries, record.City, now, c.maxCityEntries)
 	}
 
 	// 更新域名统计
 	c.updateDomainStats(record, now)
+}
+
+// shouldSample 判断是否应该记录此次访问（动态采样）
+func (c *Collector) shouldSample() bool {
+	// 获取当前条目数（不加锁，允许轻微不准确）
+	ipCount := len(c.ipEntries)
+
+	// 未达到一半限制，全部记录
+	if ipCount < c.maxIPEntries/2 {
+		return true
+	}
+
+	// 接近限制（90%以上），采样 10%
+	if ipCount >= c.maxIPEntries*9/10 {
+		c.samplingCounter++
+		return c.samplingCounter%10 == 0
+	}
+
+	// 中间状态（50%-90%），采样 50%
+	c.samplingCounter++
+	return c.samplingCounter%2 == 0
 }
 
 // updateDomainStats 更新域名统计数据
@@ -371,7 +400,7 @@ func (c *Collector) isTimeKeyExpired(timeKey string, dimension TimeDimension, no
 		maxAge = 7 * 24 * time.Hour // 保留7天的小时数据
 	case DimensionDay:
 		format = "2006-01-02"
-		maxAge = 30 * 24 * time.Hour // 保留30天的日数据
+		maxAge = 90 * 24 * time.Hour // 从30天延长到90天
 	case DimensionMonth:
 		format = "2006-01"
 		maxAge = 365 * 24 * time.Hour // 保留1年的月数据
@@ -430,7 +459,7 @@ func (c *Collector) cleanupOldEntries(entries map[string]*FunnelEntry, targetCou
 	for key, entry := range entries {
 		sortedEntries = append(sortedEntries, entryWithTime{
 			key:  key,
-			time: entry.LastAccess,
+			time: entry.LastSeen, // 使用 LastSeen 而不是 LastAccess
 		})
 	}
 

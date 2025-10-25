@@ -43,6 +43,7 @@ type Config struct {
 	// 文件大小限制（优化 CPU 使用）
 	MinSizeBytes int64 `json:"min_size_bytes"` // 最小文件大小（字节），小于此值不转换
 	MaxSizeBytes int64 `json:"max_size_bytes"` // 最大文件大小（字节），大于此值不转换
+	MaxPixels    int64 `json:"max_pixels"`     // 最大像素数（宽*高），防止大图片占用过多内存
 
 	// 尺寸调整
 	AllowResize  bool  `json:"allow_resize"`  // 允许尺寸调整
@@ -71,13 +72,14 @@ func DefaultConfig() *Config {
 		StripMetadata:   true,
 		MinSizeBytes:    60 * 1024,       // 60KB - 跳过小图标
 		MaxSizeBytes:    5 * 1024 * 1024, // 5MB - 跳过超大图
+		MaxPixels:       4000 * 3000,     // 1200万像素 - 防止大图片内存暴增
 		AllowResize:     true,
 		MaxWidth:        2000,
 		MaxHeight:       2000,
 		AllowedSizes:    []int{100, 200, 400, 800, 1200, 1600},
 		CacheEnabled:    true,
-		CacheTTL:        86400,              // 24小时
-		MaxCacheSize:    1024 * 1024 * 1024, // 1GB
+		CacheTTL:        86400,            // 24小时
+		MaxCacheSize:    512 * 1024 * 1024, // 从1GB降到512MB
 		IncludePatterns: []string{"*.jpg", "*.jpeg", "*.png", "*.gif"},
 		ExcludePatterns: []string{"/admin/*", "/api/*"},
 	}
@@ -96,6 +98,10 @@ type Optimizer struct {
 	totalBytesSaved    int64
 	totalOriginalSize  int64
 	totalOptimizedSize int64
+
+	// 并发控制（防止内存暴增）
+	concurrencySem chan struct{}
+	maxConcurrent  int
 }
 
 // NewOptimizer 创建图片优化器
@@ -109,6 +115,8 @@ func NewOptimizer(config *Config) *Optimizer {
 		log: logrus.WithFields(logrus.Fields{
 			"component": "image_optimizer",
 		}),
+		maxConcurrent:  10,                      // 最多10个并发转换
+		concurrencySem: make(chan struct{}, 10), // 信号量
 	}
 
 	// 初始化统一缓存管理器
@@ -117,9 +125,9 @@ func NewOptimizer(config *Config) *Optimizer {
 			Name:            "image_optimization",
 			MaxEntries:      500,                                          // 图片数量多
 			MaxSizeBytes:    config.MaxCacheSize,                          // 使用配置的最大缓存大小
-			MaxItemSize:     10 * 1024 * 1024,                             // 单个最大 10MB
+			MaxItemSize:     5 * 1024 * 1024,                              // 从10MB降到5MB
 			DefaultTTL:      time.Duration(config.CacheTTL) * time.Second, // 使用配置的 TTL
-			CleanupInterval: 10 * time.Minute,                             // 10 分钟清理一次
+			CleanupInterval: 2 * time.Minute,                              // 从10分钟改为2分钟
 		})
 	}
 
@@ -183,6 +191,16 @@ func (o *Optimizer) ProcessResponse(data []byte, contentType string, r *http.Req
 // OptimizeResponse 优化响应中的图片
 func (o *Optimizer) OptimizeResponse(originalData []byte, contentType string, r *http.Request) ([]byte, string, error) {
 	o.totalRequests++
+
+	// 并发控制：防止内存暴增
+	select {
+	case o.concurrencySem <- struct{}{}:
+		defer func() { <-o.concurrencySem }()
+	default:
+		// 并发已满，直接返回原图
+		o.log.Warn("Image optimization concurrency limit reached, returning original")
+		return originalData, contentType, nil
+	}
 
 	// 检查文件大小（优化 CPU 使用）
 	originalSize := int64(len(originalData))
@@ -430,6 +448,22 @@ func detectFormat(data []byte, contentType string) ImageFormat {
 
 // optimize 执行图片优化
 func (o *Optimizer) optimize(data []byte, sourceFormat ImageFormat, params *OptimizeParams, r *http.Request) ([]byte, string, error) {
+	// 先检查图片尺寸（避免解码大图片）
+	config, _, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		return nil, "", fmt.Errorf("decode config: %w", err)
+	}
+
+	// 检查像素数限制（防止大图片内存暴增）
+	if o.Config.MaxPixels > 0 {
+		pixels := int64(config.Width) * int64(config.Height)
+		if pixels > o.Config.MaxPixels {
+			o.log.Warnf("Image too large: %dx%d (%d pixels, max: %d), skipping",
+				config.Width, config.Height, pixels, o.Config.MaxPixels)
+			return data, contentTypeFromFormat(sourceFormat), nil
+		}
+	}
+
 	// 解码原始图片
 	img, err := o.decodeImage(data, sourceFormat)
 	if err != nil {

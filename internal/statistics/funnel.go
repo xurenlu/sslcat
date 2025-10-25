@@ -83,19 +83,27 @@ func (fm *FunnelModel) Filter(entries map[string]*FunnelEntry, now time.Time) []
 	return filtered
 }
 
-// UpdateEntry 更新条目信息
-func (fm *FunnelModel) UpdateEntry(entries map[string]*FunnelEntry, key string, timestamp time.Time) {
+// UpdateEntry 更新条目信息（带大小限制）
+func (fm *FunnelModel) UpdateEntry(entries map[string]*FunnelEntry, key string, timestamp time.Time, maxEntries int) bool {
 	if entry, exists := entries[key]; exists {
 		entry.Count++
 		entry.LastSeen = timestamp
-	} else {
-		entries[key] = &FunnelEntry{
-			Key:       key,
-			Count:     1,
-			FirstSeen: timestamp,
-			LastSeen:  timestamp,
-		}
+		return true
 	}
+
+	// 检查是否超过限制
+	if len(entries) >= maxEntries {
+		// 已达到限制，拒绝新条目
+		return false
+	}
+
+	entries[key] = &FunnelEntry{
+		Key:       key,
+		Count:     1,
+		FirstSeen: timestamp,
+		LastSeen:  timestamp,
+	}
+	return true
 }
 
 // CleanupOldEntries 清理过期条目
