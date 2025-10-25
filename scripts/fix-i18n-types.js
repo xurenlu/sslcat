@@ -49,6 +49,8 @@ const additions = {
   }
 };
 
+// 运行更新
+
 // 翻译映射
 const translations = {
   'en-US': {

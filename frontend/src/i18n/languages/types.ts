@@ -440,6 +440,8 @@ export interface Translation {
     notification_config_load_failed: string
     basic_config_save_failed: string
     notification_config_save_failed: string
+    select_min_notification_level: string
+    webhook_placeholder: string
   }
   
   // 侧边栏

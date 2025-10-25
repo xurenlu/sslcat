@@ -366,6 +366,8 @@ export const zhCN: Translation = {
     notification_config_load_failed: '加载通知配置失败',
     basic_config_save_failed: '基础设置保存失败',
     notification_config_save_failed: '通知设置保存失败',
+    select_min_notification_level: '选择最小通知级别',
+    webhook_placeholder: 'https://hooks.slack.com/services/xxx 或 https://qyapi.weixin.qq.com/xxx',
   },
   sidebar: {
     sslProxyServer: 'AI 增强的安全网关',
