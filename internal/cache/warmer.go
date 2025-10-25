@@ -12,12 +12,12 @@ import (
 
 // CacheWarmer 缓存预热器
 type CacheWarmer struct {
-	urls      []string        // 需要预热的URL列表
-	interval  time.Duration  // 预热间隔
-	log       *logrus.Entry   // 日志记录器
-	client    *http.Client    // HTTP客户端
-	isRunning bool            // 是否正在运行
-	mutex     sync.RWMutex    // 并发控制
+	urls      []string      // 需要预热的URL列表
+	interval  time.Duration // 预热间隔
+	log       *logrus.Entry // 日志记录器
+	client    *http.Client  // HTTP客户端
+	isRunning bool          // 是否正在运行
+	mutex     sync.RWMutex  // 并发控制
 }
 
 // NewCacheWarmer 创建缓存预热器
@@ -191,4 +191,3 @@ func (cw *CacheWarmer) GetURLs() []string {
 	copy(urls, cw.urls)
 	return urls
 }
-

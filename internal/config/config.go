@@ -1733,8 +1733,8 @@ type MonitoringConfig struct {
 
 // CacheWarmupConfig 缓存预热配置
 type CacheWarmupConfig struct {
-	Enabled   bool     `json:"enabled"`    // 是否启用缓存预热
-	URLs      []string `json:"urls"`       // 需要预热的URL列表
-	Interval  int      `json:"interval"`   // 预热间隔（分钟）
-	BaseURL   string   `json:"base_url"`   // 基础URL（可选，默认自动检测）
+	Enabled  bool     `json:"enabled"`  // 是否启用缓存预热
+	URLs     []string `json:"urls"`     // 需要预热的URL列表
+	Interval int      `json:"interval"` // 预热间隔（分钟）
+	BaseURL  string   `json:"base_url"` // 基础URL（可选，默认自动检测）
 }
