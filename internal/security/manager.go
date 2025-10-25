@@ -59,12 +59,16 @@ type Manager struct {
 	stopChan    chan struct{}
 	// TLS 指纹持久化
 	tlsFPRotator *logger.Rotator
-
-	// CORS中间件
-	corsMiddleware *CORSMiddleware
-
-	// 地理位置IP服务
 	geoIPService *GeoIPService
+
+	// 内存泄漏防护
+	maxAccessLogEntries int // 每个IP的访问日志最多保留多少条
+	maxBlockedIPs       int // 最多保留多少个被封禁的IP
+	maxAttemptCounts    int // 最多保留多少个IP的尝试计数
+	maxLastAttempts     int // 最多保留多少个IP的最后尝试时间
+	maxUAInvalidEntries int // 最多保留多少个IP的UA违规记录
+	maxTLSFPEntries     int // 最多保留多少个TLS指纹计数
+	cleanupInterval     time.Duration // 清理间隔
 }
 
 // NewManager 创建安全管理器
@@ -109,6 +113,14 @@ func NewManager(cfg *config.Config) *Manager {
 		log: logrus.WithFields(logrus.Fields{
 			"component": "security_manager",
 		}),
+		// 内存泄漏防护初始化
+		maxAccessLogEntries: cfg.Security.MaxAccessLogEntries, 
+		maxBlockedIPs:       cfg.Security.MaxBlockedIPs,
+		maxAttemptCounts:    cfg.Security.MaxAttemptCounts,
+		maxLastAttempts:     cfg.Security.MaxLastAttempts,
+		maxUAInvalidEntries: cfg.Security.UAInvalidMaxTotal,
+		maxTLSFPEntries:     cfg.Security.TLSFingerprintMaxTotal,
+		cleanupInterval:     time.Duration(cfg.Security.CleanupIntervalMin) * time.Minute,
 	}
 }
 
@@ -570,7 +582,7 @@ func (m *Manager) saveBlockedIPs() {
 
 // cleanupTask 清理任务
 func (m *Manager) cleanupTask() {
-	ticker := time.NewTicker(time.Minute)
+	ticker := time.NewTicker(m.cleanupInterval)
 	defer ticker.Stop()
 
 	for {
@@ -597,6 +609,12 @@ func (m *Manager) cleanup() {
 		}
 	}
 
+	// 限制被封禁IP的数量
+	if len(m.blockedIPs) > m.maxBlockedIPs {
+		m.log.Warnf("Blocked IPs count exceeded limit, pruning from %d to %d", len(m.blockedIPs), m.maxBlockedIPs)
+		m.pruneMapByTime(m.blockedIPs, m.maxBlockedIPs)
+	}
+
 	// 清理过期的访问日志
 	for ip, logs := range m.accessLogs {
 		var validLogs []AccessLog
@@ -608,11 +626,21 @@ func (m *Manager) cleanup() {
 		if len(validLogs) == 0 {
 			delete(m.accessLogs, ip)
 		} else {
+			// 限制每个IP的日志数量
+			if len(validLogs) > m.maxAccessLogEntries {
+				validLogs = validLogs[len(validLogs)-m.maxAccessLogEntries:]
+			}
 			m.accessLogs[ip] = validLogs
 		}
 	}
 
-	// 清理过期的失败记录
+	// 限制访问日志IP的数量
+	if len(m.accessLogs) > m.maxAttemptCounts {
+		m.log.Warnf("Access logs IP count exceeded limit, pruning from %d to %d", len(m.accessLogs), m.maxAttemptCounts)
+		m.pruneMapByLastAccessTime(m.accessLogs, m.maxAttemptCounts)
+	}
+
+	// 清理过期的失败记录和尝试计数
 	for ip, attempts := range m.lastAttempts {
 		var validAttempts []time.Time
 		for _, attempt := range attempts {
@@ -624,24 +652,197 @@ func (m *Manager) cleanup() {
 			delete(m.lastAttempts, ip)
 			delete(m.attemptCounts, ip)
 		} else {
+			// 限制每个IP的尝试次数
+			if len(validAttempts) > m.maxLastAttempts {
+				validAttempts = validAttempts[len(validAttempts)-m.maxLastAttempts:]
+			}
 			m.lastAttempts[ip] = validAttempts
 		}
+	}
+
+	// 限制失败尝试IP的数量
+	if len(m.attemptCounts) > m.maxAttemptCounts {
+		m.log.Warnf("Attempt counts IP count exceeded limit, pruning from %d to %d", len(m.attemptCounts), m.maxAttemptCounts)
+		m.pruneMap(m.attemptCounts, m.maxAttemptCounts)
+	}
+
+	// 清理过期的 UA 违规记录
+	for ip := range m.uaInvalid1Min {
+		m.pruneUAInvalidEntries(ip, now)
+	}
+	// 限制 UA 违规记录的数量
+	if len(m.uaInvalid1Min) > m.maxUAInvalidEntries {
+		m.log.Warnf("UA invalid entries count exceeded limit, pruning from %d to %d", len(m.uaInvalid1Min), m.maxUAInvalidEntries)
+		m.pruneMap(m.uaInvalid1Min, m.maxUAInvalidEntries)
 	}
 
 	// 清理过期的 TLS 指纹计数
 	for fp, times := range m.tlsFPCounts {
 		var validTimes []time.Time
+		window := time.Duration(m.config.Security.TLSFingerprintWindowSec) * time.Second
+		if window <= 0 {
+			window = time.Minute
+		}
+		cut := now.Add(-window)
 		for _, t := range times {
-			if now.Sub(t) <= time.Duration(m.config.Security.TLSFingerprintWindowSec)*time.Second {
+			if t.After(cut) {
 				validTimes = append(validTimes, t)
 			}
 		}
 		if len(validTimes) == 0 {
 			delete(m.tlsFPCounts, fp)
 		} else {
+			// 限制每个指纹的计数数量
+			if len(validTimes) > m.maxTLSFPEntries {
+				validTimes = validTimes[len(validTimes)-m.maxTLSFPEntries:]
+			}
 			m.tlsFPCounts[fp] = validTimes
 		}
 	}
+
+	// 限制 TLS 指纹计数器的数量
+	if len(m.tlsFPCounts) > m.maxTLSFPEntries {
+		m.log.Warnf("TLS fingerprint entries count exceeded limit, pruning from %d to %d", len(m.tlsFPCounts), m.maxTLSFPEntries)
+		m.pruneMap(m.tlsFPCounts, m.maxTLSFPEntries)
+	}
+}
+
+// pruneMap 裁剪map，删除最旧的元素
+func (m *Manager) pruneMap(data interface{}, maxEntries int) {
+	switch v := data.(type) {
+	case map[string]BlockedIP:
+		if len(v) <= maxEntries {
+			return
+		}
+		// 按 BlockTime 排序并删除
+		keys := make([]string, 0, len(v))
+		for k := range v {
+			keys = append(keys, k)
+		}
+		sort.Slice(keys, func(i, j int) bool {
+			return v[keys[i]].BlockTime.Before(v[keys[j]].BlockTime)
+		})
+		for i := 0; i < len(v)-maxEntries; i++ {
+			delete(v, keys[i])
+		}
+	case map[string]int:
+		if len(v) <= maxEntries {
+			return
+		}
+		// 随机删除一些，或者根据某种策略删除
+		keys := make([]string, 0, len(v))
+		for k := range v {
+			keys = append(keys, k)
+		}
+		for i := 0; i < len(v)-maxEntries; i++ {
+			delete(v, keys[i])
+		}
+	case map[string][]time.Time:
+		if len(v) <= maxEntries {
+			return
+		}
+		// 按最早时间戳排序并删除
+		keys := make([]string, 0, len(v))
+		for k := range v {
+			keys = append(keys, k)
+		}
+		sort.Slice(keys, func(i, j int) bool {
+			if len(v[keys[i]]) == 0 || len(v[keys[j]]) == 0 {
+				return false
+			}
+			return v[keys[i]][0].Before(v[keys[j]][0])
+		})
+		for i := 0; i < len(v)-maxEntries; i++ {
+			delete(v, keys[i])
+		}
+	case map[string][]AccessLog:
+		if len(v) <= maxEntries {
+			return
+		}
+		// 按最早日志时间戳排序并删除
+		keys := make([]string, 0, len(v))
+		for k := range v {
+			keys = append(keys, k)
+		}
+		sort.Slice(keys, func(i, j int) bool {
+			if len(v[keys[i]]) == 0 || len(v[keys[j]]) == 0 {
+				return false
+			}
+			return v[keys[i]][0].Timestamp.Before(v[keys[j]][0].Timestamp)
+		})
+		for i := 0; i < len(v)-maxEntries; i++ {
+			delete(v, keys[i])
+		}
+	}
+}
+
+// pruneMapByTime 裁剪 map，删除最旧的元素（基于BlockTime或ExpireTime）
+func (m *Manager) pruneMapByTime(data interface{}, maxEntries int) {
+	switch v := data.(type) {
+	case map[string]BlockedIP:
+		if len(v) <= maxEntries {
+			return
+		}
+		// 按 ExpireTime 排序并删除
+		keys := make([]string, 0, len(v))
+		for k := range v {
+			keys = append(keys, k)
+		}
+		sort.Slice(keys, func(i, j int) bool {
+			return v[keys[i]].ExpireTime.Before(v[keys[j]].ExpireTime)
+		})
+		for i := 0; i < len(v)-maxEntries; i++ {
+			delete(v, keys[i])
+		}
+	}
+}
+
+// pruneMapByLastAccessTime 裁剪 map，删除最旧的元素（基于AccessLog的LastAccessTime）
+func (m *Manager) pruneMapByLastAccessTime(data interface{}, maxEntries int) {
+	switch v := data.(type) {
+	case map[string][]AccessLog:
+		if len(v) <= maxEntries {
+			return
+		}
+		// 按 AccessLog 最后一条的时间排序并删除
+		keys := make([]string, 0, len(v))
+		for k := range v {
+			keys = append(keys, k)
+		}
+		sort.Slice(keys, func(i, j int) bool {
+			if len(v[keys[i]]) == 0 || len(v[keys[j]]) == 0 {
+				return false
+			}
+			return v[keys[i]][len(v[keys[i]])-1].Timestamp.Before(v[keys[j]][len(v[keys[j]])-1].Timestamp)
+		})
+		for i := 0; i < len(v)-maxEntries; i++ {
+			delete(v, keys[i])
+		}
+	}
+}
+
+// pruneUAInvalidEntries 清理UA违规记录
+func (m *Manager) pruneUAInvalidEntries(ip string, now time.Time) {
+	cut1 := now.Add(-1 * time.Minute)
+	cut5 := now.Add(-5 * time.Minute)
+
+	// 清理1分钟窗口
+	pruned1 := m.uaInvalid1Min[ip][:0]
+	for _, t := range m.uaInvalid1Min[ip] {
+		if t.After(cut1) {
+			pruned1 = append(pruned1, t)
+		}
+	}
+	m.uaInvalid1Min[ip] = pruned1
+
+	// 清理5分钟窗口
+	pruned5 := m.uaInvalid5Min[ip][:0]
+	for _, t := range m.uaInvalid5Min[ip] {
+		if t.After(cut5) {
+			pruned5 = append(pruned5, t)
+		}
+	}
+	m.uaInvalid5Min[ip] = pruned5
 }
 
 // GetClientIP 获取客户端真实IP

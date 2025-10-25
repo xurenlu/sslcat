@@ -346,6 +346,15 @@ type SecurityConfig struct {
 
 	// 解析后的时间字段
 	BlockDuration time.Duration `json:"-"`
+
+	// 安全管理器内存泄漏防护
+	MaxAccessLogEntries   int `json:"max_access_log_entries"`    // 每个IP的访问日志最多保留多少条，默认3000
+	MaxBlockedIPs         int `json:"max_blocked_ips"`          // 最多保留多少个被封禁的IP，默认1000
+	MaxAttemptCounts      int `json:"max_attempt_counts"`       // 最多保留多少个IP的尝试计数，默认1000
+	MaxLastAttempts       int `json:"max_last_attempts"`        // 最多保留多少个IP的最后尝试时间，默认100
+	UAInvalidMaxTotal     int `json:"u-invalid_max_total"`     // 最多保留多少个IP的UA违规记录，默认500
+	TLSFingerprintMaxTotal int `json:"tls_fingerprint_max_total"` // 最多保留多少个TLS指纹计数，默认500
+	CleanupIntervalMin    int `json:"cleanup_interval_min"`     // 清理间隔（分钟），默认5
 }
 
 // GeoBlockingConfig 地理位置过滤配置
@@ -856,6 +865,14 @@ func Load(configFile string) (*Config, error) {
 			EnableDDOS:              true,
 			EnableCaptcha:           false,
 			MinFormMs:               800,
+			// 安全管理器内存泄漏防护默认值
+			MaxAccessLogEntries:   3000,
+			MaxBlockedIPs:         1000,
+			MaxAttemptCounts:      1000,
+			MaxLastAttempts:       100,
+			UAInvalidMaxTotal:     500,
+			TLSFingerprintMaxTotal: 500,
+			CleanupIntervalMin:    5,
 		},
 		AdminPrefix: "/sslcat-panel",
 		Cluster: ClusterConfig{
