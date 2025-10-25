@@ -28,6 +28,12 @@ type GeoIPService struct {
 	cache     map[string]*GeoLocation
 	cacheSize int
 	cacheTTL  time.Duration
+
+	// 自动更新配置
+	autoUpdateEnabled  bool
+	updateInterval     time.Duration // 更新间隔（默认7天）
+	updateURL          string        // 更新URL
+	stopUpdateChan     chan struct{} // 停止更新任务
 }
 
 // GeoLocation 地理位置信息
@@ -54,10 +60,14 @@ type GeoFilterResult struct {
 // NewGeoIPService 创建地理位置IP服务
 func NewGeoIPService(config config.GeoBlockingConfig) (*GeoIPService, error) {
 	service := &GeoIPService{
-		config:    config,
-		cache:     make(map[string]*GeoLocation),
-		cacheSize: 10000,     // 缓存1万个IP查询结果
-		cacheTTL:  time.Hour, // 缓存1小时
+		config:            config,
+		cache:             make(map[string]*GeoLocation),
+		cacheSize:         10000,                 // 缓存1万个IP查询结果
+		cacheTTL:          time.Hour,             // 缓存1小时
+		autoUpdateEnabled: true,                  // 默认启用自动更新
+		updateInterval:    7 * 24 * time.Hour,    // 每7天更新一次
+		updateURL:         "",                    // 默认不设置更新URL（需要手动配置）
+		stopUpdateChan:    make(chan struct{}),
 		log: logrus.WithFields(logrus.Fields{
 			"component": "geoip_service",
 		}),
@@ -69,6 +79,11 @@ func NewGeoIPService(config config.GeoBlockingConfig) (*GeoIPService, error) {
 			// 不返回错误，而是禁用功能并继续运行
 			service.config.Enabled = false
 			service.log.Warn("GeoIP功能已自动禁用，因为无法加载数据库文件")
+		} else {
+			// 启动自动更新任务
+			if service.autoUpdateEnabled {
+				go service.startAutoUpdateTask()
+			}
 		}
 	} else if config.Enabled && config.DatabasePath == "" {
 		service.log.Warn("GeoIP功能已启用但未配置数据库路径，功能将被禁用")
@@ -292,11 +307,120 @@ func (g *GeoIPService) GetLocation(ipStr string) (*GeoLocation, error) {
 	return location, nil
 }
 
+// startAutoUpdateTask 启动自动更新任务
+func (g *GeoIPService) startAutoUpdateTask() {
+	ticker := time.NewTicker(g.updateInterval)
+	defer ticker.Stop()
+
+	g.log.Infof("GeoIP自动更新任务已启动，更新间隔: %v", g.updateInterval)
+
+	for {
+		select {
+		case <-ticker.C:
+			g.log.Info("开始自动更新GeoIP数据库...")
+			if err := g.UpdateDatabase(context.Background()); err != nil {
+				g.log.Errorf("自动更新GeoIP数据库失败: %v", err)
+			} else {
+				g.log.Info("GeoIP数据库自动更新成功")
+			}
+		case <-g.stopUpdateChan:
+			g.log.Info("GeoIP自动更新任务已停止")
+			return
+		}
+	}
+}
+
+// StopAutoUpdate 停止自动更新任务
+func (g *GeoIPService) StopAutoUpdate() {
+	if g.stopUpdateChan != nil {
+		close(g.stopUpdateChan)
+		g.stopUpdateChan = nil
+	}
+}
+
 // UpdateDatabase 更新GeoIP数据库
 func (g *GeoIPService) UpdateDatabase(ctx context.Context) error {
-	// 这里可以实现自动下载和更新GeoIP数据库的逻辑
-	// 例如从MaxMind或其他提供商下载最新数据库
-	g.log.Info("Database update not implemented yet")
+	// 检查数据库文件的修改时间
+	fileInfo, err := os.Stat(g.config.DatabasePath)
+	if err != nil {
+		return fmt.Errorf("无法获取数据库文件信息: %w", err)
+	}
+
+	// 如果文件在最近7天内更新过，跳过更新
+	if time.Since(fileInfo.ModTime()) < g.updateInterval {
+		g.log.Infof("GeoIP数据库文件较新（%v），跳过更新", fileInfo.ModTime().Format("2006-01-02"))
+		return nil
+	}
+
+	// 如果配置了更新URL，尝试下载
+	if g.updateURL != "" {
+		g.log.Infof("从 %s 下载GeoIP数据库更新...", g.updateURL)
+		if err := g.downloadDatabase(ctx); err != nil {
+			return fmt.Errorf("下载数据库失败: %w", err)
+		}
+	} else {
+		// 没有配置更新URL，只记录提示
+		g.log.Warnf("GeoIP数据库文件已过期（%v），但未配置更新URL，请手动更新", fileInfo.ModTime().Format("2006-01-02"))
+		g.log.Info("提示：可以从 https://dev.maxmind.com/geoip/geolite2-free-geolocation-data 下载最新数据库")
+		return nil
+	}
+
+	// 重新加载数据库
+	if err := g.loadDatabase(); err != nil {
+		return fmt.Errorf("重新加载数据库失败: %w", err)
+	}
+
+	g.log.Info("GeoIP数据库更新成功")
+	return nil
+}
+
+// downloadDatabase 下载GeoIP数据库
+func (g *GeoIPService) downloadDatabase(ctx context.Context) error {
+	// 创建HTTP客户端
+	client := &http.Client{
+		Timeout: 5 * time.Minute, // 5分钟超时
+	}
+
+	// 创建请求
+	req, err := http.NewRequestWithContext(ctx, "GET", g.updateURL, nil)
+	if err != nil {
+		return fmt.Errorf("创建请求失败: %w", err)
+	}
+
+	// 发送请求
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("下载失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("下载失败，HTTP状态码: %d", resp.StatusCode)
+	}
+
+	// 创建临时文件
+	tmpFile := g.config.DatabasePath + ".tmp"
+	file, err := os.Create(tmpFile)
+	if err != nil {
+		return fmt.Errorf("创建临时文件失败: %w", err)
+	}
+	defer file.Close()
+
+	// 复制数据
+	written, err := file.ReadFrom(resp.Body)
+	if err != nil {
+		os.Remove(tmpFile)
+		return fmt.Errorf("保存文件失败: %w", err)
+	}
+	file.Close()
+
+	// 替换旧文件
+	if err := os.Rename(tmpFile, g.config.DatabasePath); err != nil {
+		os.Remove(tmpFile)
+		return fmt.Errorf("替换数据库文件失败: %w", err)
+	}
+
+	g.log.Infof("GeoIP数据库下载成功，大小: %d bytes", written)
 	return nil
 }
 

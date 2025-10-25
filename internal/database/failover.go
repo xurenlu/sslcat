@@ -11,12 +11,12 @@ import (
 
 // FailoverManager 数据库故障转移管理器
 type FailoverManager struct {
-	dataDir       string
-	logger        *log.Logger
-	backupDir     string
-	lastBackup    time.Time
-	maxBackups    int           // 最多保留多少个备份
-	maxBackupAge  time.Duration // 最多保留多久的备份
+	dataDir      string
+	logger       *log.Logger
+	backupDir    string
+	lastBackup   time.Time
+	maxBackups   int           // 最多保留多少个备份
+	maxBackupAge time.Duration // 最多保留多久的备份
 }
 
 // NewFailoverManager 创建故障转移管理器
@@ -27,7 +27,7 @@ func NewFailoverManager(dataDir string) *FailoverManager {
 		dataDir:      dataDir,
 		backupDir:    backupDir,
 		logger:       log.New(os.Stdout, "[DB-FAILOVER] ", log.LstdFlags),
-		maxBackups:   30,                // 最多保留30个备份
+		maxBackups:   30,                  // 最多保留30个备份
 		maxBackupAge: 90 * 24 * time.Hour, // 最多保留90天
 	}
 }

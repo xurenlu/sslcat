@@ -12,6 +12,8 @@ type DNSCache struct {
 	cache      map[string]*DNSProviderCache // 提供商名称 -> 缓存数据
 	mutex      sync.RWMutex
 	sslManager *ssl.Manager
+	stopChan   chan struct{} // 停止定期更新
+	ticker     *time.Ticker  // 定期更新的ticker
 }
 
 // DNSProviderCache DNS提供商缓存数据
@@ -126,13 +128,35 @@ func (c *DNSCache) GetCacheStatus() map[string]interface{} {
 
 // StartPeriodicUpdate 启动定期更新
 func (c *DNSCache) StartPeriodicUpdate(providers []string, interval time.Duration) {
-	ticker := time.NewTicker(interval)
+	// 停止旧的更新任务（如果存在）
+	c.StopPeriodicUpdate()
+
+	c.stopChan = make(chan struct{})
+	c.ticker = time.NewTicker(interval)
+
 	go func() {
-		defer ticker.Stop()
-		for range ticker.C {
-			c.UpdateAllProvidersCache(providers)
+		defer c.ticker.Stop()
+		for {
+			select {
+			case <-c.ticker.C:
+				c.UpdateAllProvidersCache(providers)
+			case <-c.stopChan:
+				return
+			}
 		}
 	}()
+}
+
+// StopPeriodicUpdate 停止定期更新
+func (c *DNSCache) StopPeriodicUpdate() {
+	if c.ticker != nil {
+		c.ticker.Stop()
+		c.ticker = nil
+	}
+	if c.stopChan != nil {
+		close(c.stopChan)
+		c.stopChan = nil
+	}
 }
 
 // IsCacheValid 检查缓存是否有效

@@ -536,7 +536,7 @@ func NewGitServer(cfg *config.Config, translator *i18n.Translator) *GitServer {
 		stopChan:            make(chan struct{}),
 		buildSemaphore:      make(chan struct{}, maxConcurrentBuilds),
 		maxConcurrentBuilds: maxConcurrentBuilds,
-		maxDeploymentLogs:   100,              // 最多保留100个部署日志文件
+		maxDeploymentLogs:   100,                 // 最多保留100个部署日志文件
 		maxDeploymentAge:    30 * 24 * time.Hour, // 最多保留30天
 	}
 
@@ -2285,6 +2285,7 @@ func (gs *GitServer) cleanupRoutine() {
 	for range ticker.C {
 		gs.cleanupOldApps()
 		gs.cleanupDeploymentLogs()
+		gs.cleanupDockerImages()
 	}
 }
 
@@ -2398,6 +2399,35 @@ func (gs *GitServer) cleanupDeploymentLogs() {
 		if deletedCount > 0 {
 			gs.logger.Infof("应用 %s: 清理了 %d 个旧部署日志（保留 %d 个，最多 %d 天）",
 				app.Name, deletedCount, len(logFiles)-deletedCount, int(gs.maxDeploymentAge.Hours()/24))
+		}
+	}
+}
+
+// cleanupDockerImages 清理Docker镜像
+func (gs *GitServer) cleanupDockerImages() {
+	if gs.dockerRegistry == nil || !gs.dockerRegistry.config.Enabled {
+		return
+	}
+
+	if !gs.dockerRegistry.config.CleanupPolicy.Enabled {
+		return
+	}
+
+	gs.mutex.RLock()
+	apps := make([]*GitApp, 0, len(gs.apps))
+	for _, app := range gs.apps {
+		// 只清理使用Docker部署策略的应用
+		if app.DeployConfig != nil && app.DeployConfig.Strategy == "docker" {
+			apps = append(apps, app)
+		}
+	}
+	gs.mutex.RUnlock()
+
+	for _, app := range apps {
+		if err := gs.dockerRegistry.CleanupOldImages(app.Name); err != nil {
+			gs.logger.Warnf("清理应用 %s 的Docker镜像失败: %v", app.Name, err)
+		} else {
+			gs.logger.Debugf("已清理应用 %s 的旧Docker镜像", app.Name)
 		}
 	}
 }

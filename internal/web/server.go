@@ -358,6 +358,10 @@ func (s *Server) UpdateConfig(newConfig *config.Config) {
 	s.log.Info("Updating server configuration")
 
 	oldConfig := s.config
+
+	// 清理旧配置相关的资源
+	s.cleanupOldConfigResources(oldConfig, newConfig)
+
 	s.config = newConfig
 
 	// 更新压缩器配置
@@ -374,6 +378,89 @@ func (s *Server) UpdateConfig(newConfig *config.Config) {
 	}
 
 	s.log.Info("Server configuration updated successfully")
+}
+
+// cleanupOldConfigResources 清理旧配置相关的资源
+func (s *Server) cleanupOldConfigResources(oldConfig, newConfig *config.Config) {
+	// 1. 清理DNS缓存（如果DNS提供商发生变化）
+	if s.dnsCache != nil {
+		oldProviders := make(map[string]bool)
+		for _, p := range oldConfig.SSL.DNSProviders {
+			if p.Enabled {
+				oldProviders[p.Name] = true
+			}
+		}
+
+		newProviders := make(map[string]bool)
+		for _, p := range newConfig.SSL.DNSProviders {
+			if p.Enabled {
+				newProviders[p.Name] = true
+			}
+		}
+
+		// 检查是否有变化
+		hasChanges := false
+		for name := range oldProviders {
+			if !newProviders[name] {
+				hasChanges = true
+				break
+			}
+		}
+		for name := range newProviders {
+			if !oldProviders[name] {
+				hasChanges = true
+				break
+			}
+		}
+
+		if hasChanges {
+			s.log.Info("DNS providers changed, stopping old periodic update")
+			s.dnsCache.StopPeriodicUpdate()
+
+			// 重新初始化DNS缓存
+			var enabledProviders []string
+			for _, provider := range newConfig.SSL.DNSProviders {
+				if provider.Enabled {
+					enabledProviders = append(enabledProviders, provider.Name)
+				}
+			}
+			s.dnsCache.UpdateAllProvidersCache(enabledProviders)
+			s.dnsCache.StartPeriodicUpdate(enabledProviders, 5*time.Minute)
+			s.log.Infof("DNS cache reinitialized for %d providers", len(enabledProviders))
+		}
+	}
+
+	// 2. 清理GeoIP服务（如果数据库路径发生变化）
+	if s.securityManager != nil {
+		oldGeoPath := oldConfig.Security.GeoBlocking.DatabasePath
+		newGeoPath := newConfig.Security.GeoBlocking.DatabasePath
+
+		if oldGeoPath != newGeoPath {
+			s.log.Info("GeoIP database path changed, will reload on next access")
+			// GeoIPService 会在下次访问时自动重新加载
+		}
+	}
+
+	// 3. 清理压缩缓存（如果压缩配置发生显著变化）
+	if s.compressionCache != nil {
+		if oldConfig.Compression.Enabled != newConfig.Compression.Enabled ||
+			oldConfig.Compression.Level != newConfig.Compression.Level {
+			s.log.Info("Compression config changed significantly, clearing cache")
+			s.compressionCache.Clear()
+		}
+	}
+
+	// 4. 清理图片优化缓存（如果图片优化配置发生变化）
+	if s.imageOptimizer != nil {
+		if oldConfig.ImageOptimization.Enabled != newConfig.ImageOptimization.Enabled ||
+			oldConfig.ImageOptimization.WebPQuality != newConfig.ImageOptimization.WebPQuality ||
+			oldConfig.ImageOptimization.JPEGQuality != newConfig.ImageOptimization.JPEGQuality {
+			s.log.Info("Image optimization config changed, clearing cache")
+			s.imageOptimizer.ClearCache()
+		}
+	}
+
+	s.log.Debug("Old config resources cleanup completed")
 }
 
 // initDNSCache 初始化DNS缓存并启动定期更新
