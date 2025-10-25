@@ -370,7 +370,7 @@ func (g *GeoIPService) UpdateDatabase(ctx context.Context) error {
 	// 如果配置了更新URL，尝试下载（带重试）
 	if g.updateURL != "" {
 		g.log.Infof("从 %s 下载GeoIP数据库更新...", g.updateURL)
-		
+
 		// 重试机制：最多3次
 		var lastErr error
 		for retry := 0; retry < 3; retry++ {

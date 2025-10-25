@@ -102,14 +102,14 @@ type NotificationChannel interface {
 
 // NotificationManager 通知管理器
 type NotificationManager struct {
-	channels         map[string]NotificationChannel
-	log              *logrus.Entry
-	rateLimiter      *RateLimiter
-	history          []Notification
-	maxHistory       int
-	minLevel         NotificationLevel // 最小通知级别
-	sendSemaphore    chan struct{}     // 并发控制
-	maxConcurrentSends int             // 最大并发发送数
+	channels           map[string]NotificationChannel
+	log                *logrus.Entry
+	rateLimiter        *RateLimiter
+	history            []Notification
+	maxHistory         int
+	minLevel           NotificationLevel // 最小通知级别
+	sendSemaphore      chan struct{}     // 并发控制
+	maxConcurrentSends int               // 最大并发发送数
 }
 
 // NewNotificationManager 创建通知管理器

@@ -78,7 +78,7 @@ func DefaultConfig() *Config {
 		MaxHeight:       2000,
 		AllowedSizes:    []int{100, 200, 400, 800, 1200, 1600},
 		CacheEnabled:    true,
-		CacheTTL:        86400,            // 24小时
+		CacheTTL:        86400,             // 24小时
 		MaxCacheSize:    512 * 1024 * 1024, // 从1GB降到512MB
 		IncludePatterns: []string{"*.jpg", "*.jpeg", "*.png", "*.gif"},
 		ExcludePatterns: []string{"/admin/*", "/api/*"},

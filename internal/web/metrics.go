@@ -267,4 +267,108 @@ sslcat_config_enabled{feature="image_optimization"} %d
 		map[bool]int{true: 1, false: 0}[s.config.Security.EnableUAFilter],
 		map[bool]int{true: 1, false: 0}[s.config.Compression.Enabled],
 		map[bool]int{true: 1, false: 0}[s.config.ImageOptimization.Enabled])
+
+	// 添加监控器指标（如果启用）
+	// 注意：需要在Server结构中添加monitorManager字段并初始化
+	// 详见 MONITOR_INTEGRATION_GUIDE.md
+	/*
+	if s.monitorManager != nil {
+		monitorStats := s.monitorManager.GetAllStats()
+		
+		// Goroutine监控指标
+		if goroutineStats, ok := monitorStats["goroutine"].(map[string]interface{}); ok {
+			fmt.Fprintf(w, `
+# HELP sslcat_goroutines_current Current number of goroutines
+# TYPE sslcat_goroutines_current gauge
+sslcat_goroutines_current %d
+
+# HELP sslcat_goroutines_baseline Baseline number of goroutines
+# TYPE sslcat_goroutines_baseline gauge
+sslcat_goroutines_baseline %d
+
+# HELP sslcat_goroutines_peak Peak number of goroutines
+# TYPE sslcat_goroutines_peak gauge
+sslcat_goroutines_peak %d
+
+# HELP sslcat_goroutines_warnings_total Total goroutine leak warnings
+# TYPE sslcat_goroutines_warnings_total counter
+sslcat_goroutines_warnings_total %d
+`,
+				goroutineStats["current_count"],
+				goroutineStats["baseline_count"],
+				goroutineStats["peak_count"],
+				goroutineStats["warning_count"])
+		}
+		
+		// 内存监控指标
+		if memoryStats, ok := monitorStats["memory"].(map[string]interface{}); ok {
+			fmt.Fprintf(w, `
+# HELP sslcat_memory_alloc_mb Current memory allocation in MB
+# TYPE sslcat_memory_alloc_mb gauge
+sslcat_memory_alloc_mb %.2f
+
+# HELP sslcat_memory_sys_mb System memory in MB
+# TYPE sslcat_memory_sys_mb gauge
+sslcat_memory_sys_mb %.2f
+
+# HELP sslcat_memory_baseline_mb Baseline memory allocation in MB
+# TYPE sslcat_memory_baseline_mb gauge
+sslcat_memory_baseline_mb %.2f
+
+# HELP sslcat_memory_peak_mb Peak memory allocation in MB
+# TYPE sslcat_memory_peak_mb gauge
+sslcat_memory_peak_mb %.2f
+
+# HELP sslcat_memory_warnings_total Total memory leak warnings
+# TYPE sslcat_memory_warnings_total counter
+sslcat_memory_warnings_total %d
+
+# HELP sslcat_memory_gc_count Total GC count
+# TYPE sslcat_memory_gc_count counter
+sslcat_memory_gc_count %d
+`,
+				memoryStats["current_alloc_mb"],
+				memoryStats["current_sys_mb"],
+				memoryStats["baseline_alloc_mb"],
+				memoryStats["peak_alloc_mb"],
+				memoryStats["warning_count"],
+				memoryStats["gc_count"])
+		}
+		
+		// 性能监控指标
+		if perfStats, ok := monitorStats["performance"].(map[string]interface{}); ok {
+			fmt.Fprintf(w, `
+# HELP sslcat_performance_baseline_qps Baseline QPS
+# TYPE sslcat_performance_baseline_qps gauge
+sslcat_performance_baseline_qps %.2f
+
+# HELP sslcat_performance_current_qps Current QPS
+# TYPE sslcat_performance_current_qps gauge
+sslcat_performance_current_qps %.2f
+
+# HELP sslcat_performance_baseline_rt_ms Baseline response time in ms
+# TYPE sslcat_performance_baseline_rt_ms gauge
+sslcat_performance_baseline_rt_ms %.2f
+
+# HELP sslcat_performance_current_rt_ms Current response time in ms
+# TYPE sslcat_performance_current_rt_ms gauge
+sslcat_performance_current_rt_ms %.2f
+
+# HELP sslcat_performance_baseline_error_rate Baseline error rate
+# TYPE sslcat_performance_baseline_error_rate gauge
+sslcat_performance_baseline_error_rate %.6f
+
+# HELP sslcat_performance_current_error_rate Current error rate
+# TYPE sslcat_performance_current_error_rate gauge
+sslcat_performance_current_error_rate %.6f
+`,
+				perfStats["baseline_qps"],
+				perfStats["current_qps"],
+				perfStats["baseline_avg_rt_ms"],
+				perfStats["current_avg_rt_ms"],
+				perfStats["baseline_error_rate"],
+				perfStats["current_error_rate"])
+		}
+	}
+	*/
 }
