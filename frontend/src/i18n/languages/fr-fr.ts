@@ -52,6 +52,8 @@ export const frFR: Translation = {
     failed: 'Échec',
     unknown: 'Inconnu',
     unknownError: 'Erreur inconnue',
+    creating: 'Création...',
+
   },
   navigation: {
     dashboard: 'Tableau de Bord',
@@ -100,6 +102,16 @@ export const frFR: Translation = {
     disableRule: 'Désactiver la Règle',
     noRules: 'Aucune règle proxy',
     createFirst: 'Créer la première règle',
+    performance_monitoring: 'Surveillance des performances',
+    enable_tracing: 'Activer le traçage des requêtes',
+    enable_metrics: 'Activer la collecte de métriques',
+    tracing_warning: '⚠️ L\'activation augmentera considérablement l\'utilisation du CPU, recommandé uniquement pour le débogage',
+    metrics_warning: '⚠️ L\'activation augmentera l\'utilisation du CPU, recommandé uniquement pour la surveillance',
+
+
+
+
+
   },
   ssl: {
     title: 'Gestion des Certificats SSL',
@@ -334,6 +346,32 @@ export const frFR: Translation = {
     notificationLevelWarning: 'Avertissement',
     notificationLevelError: 'Erreur',
     notificationLevelCritical: 'Critique',
+    save_success: 'Tous les paramètres enregistrés avec succès',
+    save_failed: 'Échec de l\'enregistrement',
+    reset_success: 'Paramètres réinitialisés',
+    admin_prefix_change_success: 'Préfixe d\'administration modifié avec succès',
+    admin_prefix_change_failed: 'Échec de la modification du préfixe d\'administration',
+    admin_prefix_changed: 'Préfixe du panneau d\'administration modifié en',
+    notification_sent: 'Notification envoyée',
+    basic_config_load_failed: 'Échec du chargement de la configuration de base',
+    notification_config_load_failed: 'Échec du chargement de la configuration des notifications',
+    basic_config_save_failed: 'Échec de l\'enregistrement de la configuration de base',
+    notification_config_save_failed: 'Échec de l\'enregistrement de la configuration des notifications',
+    select_min_notification_level: 'Sélectionner le niveau de notification minimum',
+    webhook_placeholder: 'https://hooks.slack.com/services/xxx ou https://qyapi.weixin.qq.com/xxx',
+
+
+
+
+
+
+
+
+
+
+
+
+
   },
   sidebar: {
     sslProxyServer: 'Passerelle de Sécurité Améliorée par IA',
@@ -690,6 +728,14 @@ export const frFR: Translation = {
     apiSecretPlaceholder: 'Secret API',
     apiKeyUpdatePlaceholder: 'Clé API (laisser vide pour ne pas mettre à jour)',
     apiSecretUpdatePlaceholder: 'Secret API (laisser vide pour ne pas mettre à jour)',
+    cloudflare_name_placeholder: 'Mon Cloudflare',
+    api_key_placeholder: 'Clé API',
+    zone_id_placeholder: 'ID de zone (requis pour Cloudflare, etc.)',
+    api_key_update_placeholder: 'Clé API (laisser vide pour ne pas mettre à jour)',
+
+
+
+
   },
   gitServer: {
     title: 'Service de Déploiement Git',
@@ -750,6 +796,10 @@ export const frFR: Translation = {
     cancel: 'Annuler',
     send: 'Envoyer',
     noNotifications: 'Aucune notification',
+    title_placeholder: 'Entrez le titre de la notification',
+    message_placeholder: 'Entrez le message de notification',
+
+
   },
   imageOptimization: {
     title: 'Optimisation d\'Images',

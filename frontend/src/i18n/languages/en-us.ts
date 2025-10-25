@@ -52,6 +52,8 @@ export const enUS: Translation = {
     failed: 'Failed',
     unknown: 'Unknown',
     unknownError: 'Unknown error',
+    creating: 'Creating...',
+
   },
   navigation: {
     dashboard: 'Dashboard',
@@ -117,6 +119,16 @@ export const enUS: Translation = {
     disableRule: 'Disable Rule',
     noRules: 'No proxy rules',
     createFirst: 'Create first rule',
+    performance_monitoring: 'Performance Monitoring',
+    enable_tracing: 'Enable Request Tracing',
+    enable_metrics: 'Enable Metrics Collection',
+    tracing_warning: '⚠️ Enabling will significantly increase CPU usage, recommended for debugging only',
+    metrics_warning: '⚠️ Enabling will increase CPU usage, recommended for monitoring only',
+
+
+
+
+
   },
   ssl: {
     title: 'SSL Certificate Management',
@@ -726,6 +738,14 @@ export const enUS: Translation = {
     apiSecretPlaceholder: 'API Secret',
     apiKeyUpdatePlaceholder: 'API Key (leave empty to not update)',
     apiSecretUpdatePlaceholder: 'API Secret (leave empty to not update)',
+    cloudflare_name_placeholder: 'My Cloudflare',
+    api_key_placeholder: 'API Key',
+    zone_id_placeholder: 'Zone ID (required for Cloudflare etc.)',
+    api_key_update_placeholder: 'API Key (leave empty to not update)',
+
+
+
+
   },
   gitServer: {
     title: 'Git Deployment Service',
@@ -786,6 +806,10 @@ export const enUS: Translation = {
     cancel: 'Cancel',
     send: 'Send',
     noNotifications: 'No notifications',
+    title_placeholder: 'Enter notification title',
+    message_placeholder: 'Enter notification message',
+
+
   },
   imageOptimization: {
     title: 'Image Optimization',

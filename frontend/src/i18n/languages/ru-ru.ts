@@ -52,6 +52,8 @@ export const ruRU: Translation = {
     failed: 'Не удалось',
     unknown: 'Неизвестно',
     unknownError: 'Неизвестная ошибка',
+    creating: 'Создание...',
+
   },
   navigation: {
     dashboard: 'Панель управления',
@@ -100,6 +102,16 @@ export const ruRU: Translation = {
     disableRule: 'Отключить правило',
     noRules: 'Нет правил прокси',
     createFirst: 'Создать первое правило',
+    performance_monitoring: 'Мониторинг производительности',
+    enable_tracing: 'Включить трассировку запросов',
+    enable_metrics: 'Включить сбор метрик',
+    tracing_warning: '⚠️ Включение значительно увеличит использование ЦП, рекомендуется только для отладки',
+    metrics_warning: '⚠️ Включение увеличит использование ЦП, рекомендуется только для мониторинга',
+
+
+
+
+
   },
   ssl: {
     title: 'Управление SSL-сертификатами',
@@ -334,6 +346,32 @@ export const ruRU: Translation = {
     notificationLevelWarning: 'Предупреждение',
     notificationLevelError: 'Ошибка',
     notificationLevelCritical: 'Критический',
+    save_success: 'Все настройки успешно сохранены',
+    save_failed: 'Сохранение не удалось',
+    reset_success: 'Настройки сброшены',
+    admin_prefix_change_success: 'Префикс администратора успешно изменен',
+    admin_prefix_change_failed: 'Не удалось изменить префикс администратора',
+    admin_prefix_changed: 'Префикс панели администратора изменен на',
+    notification_sent: 'Уведомление отправлено',
+    basic_config_load_failed: 'Не удалось загрузить базовую конфигурацию',
+    notification_config_load_failed: 'Не удалось загрузить конфигурацию уведомлений',
+    basic_config_save_failed: 'Не удалось сохранить базовые настройки',
+    notification_config_save_failed: 'Не удалось сохранить настройки уведомлений',
+    select_min_notification_level: 'Выбрать минимальный уровень уведомлений',
+    webhook_placeholder: 'https://hooks.slack.com/services/xxx или https://qyapi.weixin.qq.com/xxx',
+
+
+
+
+
+
+
+
+
+
+
+
+
   },
   sidebar: {
     sslProxyServer: 'Шлюз безопасности с усилением ИИ',
@@ -690,6 +728,14 @@ export const ruRU: Translation = {
     apiSecretPlaceholder: 'API секрет',
     apiKeyUpdatePlaceholder: 'API ключ (оставить пустым, чтобы не обновлять)',
     apiSecretUpdatePlaceholder: 'API секрет (оставить пустым, чтобы не обновлять)',
+    cloudflare_name_placeholder: 'Мой Cloudflare',
+    api_key_placeholder: 'API ключ',
+    zone_id_placeholder: 'ID зоны (требуется для Cloudflare и т.д.)',
+    api_key_update_placeholder: 'API ключ (оставьте пустым, чтобы не обновлять)',
+
+
+
+
   },
   gitServer: {
     title: 'Сервис развертывания Git',
@@ -750,6 +796,10 @@ export const ruRU: Translation = {
     cancel: 'Отмена',
     send: 'Отправить',
     noNotifications: 'Нет уведомлений',
+    title_placeholder: 'Введите заголовок уведомления',
+    message_placeholder: 'Введите сообщение уведомления',
+
+
   },
   imageOptimization: {
     title: 'Оптимизация изображений',

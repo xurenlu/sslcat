@@ -52,6 +52,8 @@ export const koKR: Translation = {
     failed: '실패',
     unknown: '알 수 없음',
     unknownError: '알 수 없는 오류',
+    creating: '생성 중...',
+
   },
   navigation: {
     dashboard: '대시보드',
@@ -100,6 +102,16 @@ export const koKR: Translation = {
     disableRule: '규칙 비활성화',
     noRules: '프록시 규칙이 없습니다',
     createFirst: '첫 번째 규칙 생성',
+    performance_monitoring: '성능 모니터링',
+    enable_tracing: '요청 추적 활성화',
+    enable_metrics: '메트릭 수집 활성화',
+    tracing_warning: '⚠️ 활성화하면 CPU 사용량이 크게 증가합니다. 디버깅 시에만 권장',
+    metrics_warning: '⚠️ 활성화하면 CPU 사용량이 증가합니다. 모니터링 시에만 권장',
+
+
+
+
+
   },
   ssl: {
     title: 'SSL 인증서 관리',
@@ -334,6 +346,32 @@ export const koKR: Translation = {
     notificationLevelWarning: '경고',
     notificationLevelError: '오류',
     notificationLevelCritical: '중요',
+    save_success: '모든 설정이 성공적으로 저장되었습니다',
+    save_failed: '저장 실패',
+    reset_success: '설정이 재설정되었습니다',
+    admin_prefix_change_success: '관리자 접두사가 성공적으로 변경되었습니다',
+    admin_prefix_change_failed: '관리자 접두사 변경 실패',
+    admin_prefix_changed: '관리 패널 접두사가 다음으로 변경됨',
+    notification_sent: '알림이 전송되었습니다',
+    basic_config_load_failed: '기본 구성 로드 실패',
+    notification_config_load_failed: '알림 구성 로드 실패',
+    basic_config_save_failed: '기본 설정 저장 실패',
+    notification_config_save_failed: '알림 설정 저장 실패',
+    select_min_notification_level: '최소 알림 수준 선택',
+    webhook_placeholder: 'https://hooks.slack.com/services/xxx 또는 https://qyapi.weixin.qq.com/xxx',
+
+
+
+
+
+
+
+
+
+
+
+
+
   },
   sidebar: {
     sslProxyServer: 'AI 강화 보안 게이트웨이',
@@ -690,6 +728,14 @@ export const koKR: Translation = {
     apiSecretPlaceholder: 'API 시크릿',
     apiKeyUpdatePlaceholder: 'API 키 (비워두면 업데이트하지 않음)',
     apiSecretUpdatePlaceholder: 'API 시크릿 (비워두면 업데이트하지 않음)',
+    cloudflare_name_placeholder: '내 Cloudflare',
+    api_key_placeholder: 'API 키',
+    zone_id_placeholder: '존 ID (Cloudflare 등에 필요)',
+    api_key_update_placeholder: 'API 키 (비워두면 업데이트하지 않음)',
+
+
+
+
   },
   gitServer: {
     title: 'Git 배포 서비스',
@@ -750,6 +796,10 @@ export const koKR: Translation = {
     cancel: '취소',
     send: '전송',
     noNotifications: '알림 없음',
+    title_placeholder: '알림 제목 입력',
+    message_placeholder: '알림 메시지 입력',
+
+
   },
   imageOptimization: {
     title: '이미지 최적화',

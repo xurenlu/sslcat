@@ -52,6 +52,8 @@ export const jaJP: Translation = {
     failed: '失敗',
     unknown: '不明',
     unknownError: '不明なエラー',
+    creating: '作成中...',
+
   },
   navigation: {
     dashboard: 'ダッシュボード',
@@ -100,6 +102,16 @@ export const jaJP: Translation = {
     disableRule: 'ルール無効',
     noRules: 'プロキシルールがありません',
     createFirst: '最初のルールを作成',
+    performance_monitoring: 'パフォーマンス監視',
+    enable_tracing: 'リクエストトレースを有効化',
+    enable_metrics: 'メトリクス収集を有効化',
+    tracing_warning: '⚠️ 有効にするとCPU使用率が大幅に増加します。デバッグ時のみ推奨',
+    metrics_warning: '⚠️ 有効にするとCPU使用率が増加します。監視時のみ推奨',
+
+
+
+
+
   },
   ssl: {
     title: 'SSL証明書管理',
@@ -334,6 +346,32 @@ export const jaJP: Translation = {
     notificationLevelWarning: '警告',
     notificationLevelError: 'エラー',
     notificationLevelCritical: '重要',
+    save_success: 'すべての設定が正常に保存されました',
+    save_failed: '保存に失敗しました',
+    reset_success: '設定がリセットされました',
+    admin_prefix_change_success: '管理プレフィックスが正常に変更されました',
+    admin_prefix_change_failed: '管理プレフィックスの変更に失敗しました',
+    admin_prefix_changed: '管理パネルのプレフィックスが変更されました',
+    notification_sent: '通知が送信されました',
+    basic_config_load_failed: '基本設定の読み込みに失敗しました',
+    notification_config_load_failed: '通知設定の読み込みに失敗しました',
+    basic_config_save_failed: '基本設定の保存に失敗しました',
+    notification_config_save_failed: '通知設定の保存に失敗しました',
+    select_min_notification_level: '最小通知レベルを選択',
+    webhook_placeholder: 'https://hooks.slack.com/services/xxx または https://qyapi.weixin.qq.com/xxx',
+
+
+
+
+
+
+
+
+
+
+
+
+
   },
   sidebar: {
     sslProxyServer: 'AI強化セキュリティゲートウェイ',
@@ -690,6 +728,14 @@ export const jaJP: Translation = {
     apiSecretPlaceholder: 'API シークレット',
     apiKeyUpdatePlaceholder: 'API キー（空の場合は更新しません）',
     apiSecretUpdatePlaceholder: 'API シークレット（空の場合は更新しません）',
+    cloudflare_name_placeholder: 'マイCloudflare',
+    api_key_placeholder: 'APIキー',
+    zone_id_placeholder: 'ゾーンID（Cloudflareなどで必要）',
+    api_key_update_placeholder: 'APIキー（空欄で更新しない）',
+
+
+
+
   },
   gitServer: {
     title: 'Gitデプロイメントサービス',
@@ -750,6 +796,10 @@ export const jaJP: Translation = {
     cancel: 'キャンセル',
     send: '送信',
     noNotifications: '通知なし',
+    title_placeholder: '通知タイトルを入力',
+    message_placeholder: '通知メッセージを入力',
+
+
   },
   imageOptimization: {
     title: '画像最適化',

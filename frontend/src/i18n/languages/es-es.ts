@@ -52,6 +52,8 @@ export const esES: Translation = {
     failed: 'Fallido',
     unknown: 'Desconocido',
     unknownError: 'Error desconocido',
+    creating: 'Creando...',
+
   },
   navigation: {
     dashboard: 'Panel de Control',
@@ -100,6 +102,16 @@ export const esES: Translation = {
     disableRule: 'Deshabilitar Regla',
     noRules: 'No hay reglas de proxy',
     createFirst: 'Crear primera regla',
+    performance_monitoring: 'Monitoreo de rendimiento',
+    enable_tracing: 'Habilitar rastreo de solicitudes',
+    enable_metrics: 'Habilitar recopilación de métricas',
+    tracing_warning: '⚠️ Habilitar aumentará significativamente el uso de CPU, recomendado solo para depuración',
+    metrics_warning: '⚠️ Habilitar aumentará el uso de CPU, recomendado solo para monitoreo',
+
+
+
+
+
   },
   ssl: {
     title: 'Gestión de Certificados SSL',
@@ -334,6 +346,32 @@ export const esES: Translation = {
     notificationLevelWarning: 'Advertencia',
     notificationLevelError: 'Error',
     notificationLevelCritical: 'Crítico',
+    save_success: 'Todas las configuraciones guardadas exitosamente',
+    save_failed: 'Guardado fallido',
+    reset_success: 'Configuraciones restablecidas',
+    admin_prefix_change_success: 'Prefijo de administrador cambiado exitosamente',
+    admin_prefix_change_failed: 'Cambio de prefijo de administrador fallido',
+    admin_prefix_changed: 'Prefijo del panel de administración cambiado a',
+    notification_sent: 'Notificación enviada',
+    basic_config_load_failed: 'Error al cargar configuración básica',
+    notification_config_load_failed: 'Error al cargar configuración de notificaciones',
+    basic_config_save_failed: 'Error al guardar configuración básica',
+    notification_config_save_failed: 'Error al guardar configuración de notificaciones',
+    select_min_notification_level: 'Seleccionar nivel mínimo de notificación',
+    webhook_placeholder: 'https://hooks.slack.com/services/xxx o https://qyapi.weixin.qq.com/xxx',
+
+
+
+
+
+
+
+
+
+
+
+
+
   },
   sidebar: {
     sslProxyServer: 'Puerta de Enlace de Seguridad Mejorada con IA',
@@ -690,6 +728,14 @@ export const esES: Translation = {
     apiSecretPlaceholder: 'Secreto API',
     apiKeyUpdatePlaceholder: 'Clave API (dejar vacío para no actualizar)',
     apiSecretUpdatePlaceholder: 'Secreto API (dejar vacío para no actualizar)',
+    cloudflare_name_placeholder: 'Mi Cloudflare',
+    api_key_placeholder: 'Clave API',
+    zone_id_placeholder: 'ID de zona (requerido para Cloudflare, etc.)',
+    api_key_update_placeholder: 'Clave API (dejar vacío para no actualizar)',
+
+
+
+
   },
   gitServer: {
     title: 'Servicio de Despliegue Git',
@@ -750,6 +796,10 @@ export const esES: Translation = {
     cancel: 'Cancelar',
     send: 'Enviar',
     noNotifications: 'Sin notificaciones',
+    title_placeholder: 'Ingrese título de notificación',
+    message_placeholder: 'Ingrese mensaje de notificación',
+
+
   },
   imageOptimization: {
     title: 'Optimización de Imágenes',

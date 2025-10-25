@@ -52,6 +52,8 @@ export const deDE: Translation = {
     failed: 'Fehlgeschlagen',
     unknown: 'Unbekannt',
     unknownError: 'Unbekannter Fehler',
+    creating: 'Erstellen...',
+
   },
   navigation: {
     dashboard: 'Dashboard',
@@ -100,6 +102,16 @@ export const deDE: Translation = {
     disableRule: 'Regel deaktivieren',
     noRules: 'Keine Proxy-Regeln',
     createFirst: 'Erste Regel erstellen',
+    performance_monitoring: 'Leistungsüberwachung',
+    enable_tracing: 'Anforderungsverfolgung aktivieren',
+    enable_metrics: 'Metriksammlung aktivieren',
+    tracing_warning: '⚠️ Die Aktivierung erhöht die CPU-Auslastung erheblich, nur für Debugging empfohlen',
+    metrics_warning: '⚠️ Die Aktivierung erhöht die CPU-Auslastung, nur für Überwachung empfohlen',
+
+
+
+
+
   },
   ssl: {
     title: 'SSL-Zertifikatsverwaltung',
@@ -334,6 +346,32 @@ export const deDE: Translation = {
     notificationLevelWarning: 'Warnung',
     notificationLevelError: 'Fehler',
     notificationLevelCritical: 'Kritisch',
+    save_success: 'Alle Einstellungen erfolgreich gespeichert',
+    save_failed: 'Speichern fehlgeschlagen',
+    reset_success: 'Einstellungen zurückgesetzt',
+    admin_prefix_change_success: 'Admin-Präfix erfolgreich geändert',
+    admin_prefix_change_failed: 'Admin-Präfix-Änderung fehlgeschlagen',
+    admin_prefix_changed: 'Admin-Panel-Präfix geändert zu',
+    notification_sent: 'Benachrichtigung gesendet',
+    basic_config_load_failed: 'Grundkonfiguration konnte nicht geladen werden',
+    notification_config_load_failed: 'Benachrichtigungskonfiguration konnte nicht geladen werden',
+    basic_config_save_failed: 'Speichern der Grundeinstellungen fehlgeschlagen',
+    notification_config_save_failed: 'Speichern der Benachrichtigungseinstellungen fehlgeschlagen',
+    select_min_notification_level: 'Mindestbenachrichtigungsstufe auswählen',
+    webhook_placeholder: 'https://hooks.slack.com/services/xxx oder https://qyapi.weixin.qq.com/xxx',
+
+
+
+
+
+
+
+
+
+
+
+
+
   },
   sidebar: {
     sslProxyServer: 'KI-verstärktes Sicherheitsgateway',
@@ -690,6 +728,14 @@ export const deDE: Translation = {
     apiSecretPlaceholder: 'API-Geheimnis',
     apiKeyUpdatePlaceholder: 'API-Schlüssel (leer lassen, um nicht zu aktualisieren)',
     apiSecretUpdatePlaceholder: 'API-Geheimnis (leer lassen, um nicht zu aktualisieren)',
+    cloudflare_name_placeholder: 'Mein Cloudflare',
+    api_key_placeholder: 'API-Schlüssel',
+    zone_id_placeholder: 'Zone ID (für Cloudflare usw. erforderlich)',
+    api_key_update_placeholder: 'API-Schlüssel (leer lassen, um nicht zu aktualisieren)',
+
+
+
+
   },
   gitServer: {
     title: 'Git-Bereitstellungsdienst',
@@ -750,6 +796,10 @@ export const deDE: Translation = {
     cancel: 'Abbrechen',
     send: 'Senden',
     noNotifications: 'Keine Benachrichtigungen',
+    title_placeholder: 'Benachrichtigungstitel eingeben',
+    message_placeholder: 'Benachrichtigungsnachricht eingeben',
+
+
   },
   imageOptimization: {
     title: 'Bildoptimierung',
