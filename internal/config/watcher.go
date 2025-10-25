@@ -150,14 +150,18 @@ func (cw *ConfigWatcher) handleFileEvent(event fsnotify.Event) {
 
 		// 延迟处理，等待文件写入完成
 		go func() {
-			time.Sleep(cw.debounceInterval)
+			select {
+			case <-time.After(cw.debounceInterval):
+				// 检查是否有新的变化
+				if cw.lastChangeTime.After(now) {
+					return // 有更新的变化，取消这次处理
+				}
 
-			// 检查是否有新的变化
-			if cw.lastChangeTime.After(now) {
-				return // 有更新的变化，取消这次处理
+				cw.reloadConfig()
+			case <-cw.ctx.Done():
+				// 监听器已停止，取消处理
+				return
 			}
-
-			cw.reloadConfig()
 		}()
 	}
 }

@@ -1441,7 +1441,7 @@ func (m *Manager) readWebSocketData(ctx context.Context, conn net.Conn, dataChan
 }
 
 // writeWebSocketData 写入WebSocket数据
-func (m *Manager) writeWebSocketData(conn net.Conn, dataChan <-chan []byte, errChan chan<- error, closed *int32, connType string, rule *config.ProxyRule) {
+func (m *Manager) writeWebSocketData(ctx context.Context, conn net.Conn, dataChan <-chan []byte, errChan chan<- error, closed *int32, connType string, rule *config.ProxyRule) {
 	defer func() {
 		if r := recover(); r != nil {
 			m.log.Errorf("Panic in writeWebSocketData (%s): %v", connType, r)
@@ -1483,12 +1483,15 @@ func (m *Manager) writeWebSocketData(conn net.Conn, dataChan <-chan []byte, errC
 }
 
 // monitorWebSocketConnections 监控WebSocket连接状态
-func (m *Manager) monitorWebSocketConnections(clientConn, upstreamConn net.Conn, errChan chan<- error, clientClosed, upstreamClosed *int32, rule *config.ProxyRule) {
+func (m *Manager) monitorWebSocketConnections(ctx context.Context, clientConn, upstreamConn net.Conn, errChan chan<- error, clientClosed, upstreamClosed *int32, rule *config.ProxyRule) {
 	ticker := time.NewTicker(30 * time.Second) // 从10秒改为30秒
 	defer ticker.Stop()
 
 	for {
 		select {
+		case <-ctx.Done():
+			// 上下文已取消
+			return
 		case <-ticker.C:
 			// 定期检查连接状态
 			if atomic.LoadInt32(clientClosed) != 0 || atomic.LoadInt32(upstreamClosed) != 0 {
