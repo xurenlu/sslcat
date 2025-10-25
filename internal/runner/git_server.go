@@ -2312,17 +2312,23 @@ func (gs *GitServer) cleanupOldApps() {
 	gs.saveApps()
 }
 
-// cleanupDeploymentLogs 清理部署日志
+// cleanupDeploymentLogs 清理部署日志（安全版：不删除活跃文件）
 func (gs *GitServer) cleanupDeploymentLogs() {
 	gs.mutex.RLock()
 	apps := make([]*GitApp, 0, len(gs.apps))
+	activeLogFiles := make(map[string]bool)
 	for _, app := range gs.apps {
 		apps = append(apps, app)
+		// 记录当前活跃的日志文件
+		if app.CurrentLog != "" {
+			activeLogFiles[app.CurrentLog] = true
+		}
 	}
 	gs.mutex.RUnlock()
 
 	now := time.Now()
 	cutoffTime := now.Add(-gs.maxDeploymentAge)
+	recentFileThreshold := now.Add(-5 * time.Minute) // 最近5分钟修改的文件不删除
 
 	for _, app := range apps {
 		if app.LogsDir == "" {
@@ -2373,7 +2379,10 @@ func (gs *GitServer) cleanupDeploymentLogs() {
 		// 清理策略：
 		// 1. 保留最近 maxDeploymentLogs 个文件
 		// 2. 删除超过 maxDeploymentAge 天的文件
+		// 3. 不删除活跃的日志文件
+		// 4. 不删除最近5分钟修改的文件
 		deletedCount := 0
+		skippedCount := 0
 		for i, logFile := range logFiles {
 			shouldDelete := false
 
@@ -2388,6 +2397,20 @@ func (gs *GitServer) cleanupDeploymentLogs() {
 			}
 
 			if shouldDelete {
+				// 安全检查：不删除活跃文件
+				if activeLogFiles[logFile.path] {
+					gs.logger.Debugf("跳过活跃日志文件: %s", logFile.path)
+					skippedCount++
+					continue
+				}
+
+				// 安全检查：不删除最近修改的文件
+				if logFile.modTime.After(recentFileThreshold) {
+					gs.logger.Debugf("跳过最近修改的日志文件: %s (修改时间: %v)", logFile.path, logFile.modTime)
+					skippedCount++
+					continue
+				}
+
 				if err := os.Remove(logFile.path); err != nil {
 					gs.logger.Warnf("删除部署日志失败 %s: %v", logFile.path, err)
 				} else {
@@ -2396,14 +2419,14 @@ func (gs *GitServer) cleanupDeploymentLogs() {
 			}
 		}
 
-		if deletedCount > 0 {
-			gs.logger.Infof("应用 %s: 清理了 %d 个旧部署日志（保留 %d 个，最多 %d 天）",
-				app.Name, deletedCount, len(logFiles)-deletedCount, int(gs.maxDeploymentAge.Hours()/24))
+		if deletedCount > 0 || skippedCount > 0 {
+			gs.logger.Infof("应用 %s: 清理了 %d 个旧部署日志，跳过 %d 个活跃/最近文件（保留 %d 个，最多 %d 天）",
+				app.Name, deletedCount, skippedCount, len(logFiles)-deletedCount, int(gs.maxDeploymentAge.Hours()/24))
 		}
 	}
 }
 
-// cleanupDockerImages 清理Docker镜像
+// cleanupDockerImages 清理Docker镜像（并发版：提升性能）
 func (gs *GitServer) cleanupDockerImages() {
 	if gs.dockerRegistry == nil || !gs.dockerRegistry.config.Enabled {
 		return
@@ -2423,12 +2446,44 @@ func (gs *GitServer) cleanupDockerImages() {
 	}
 	gs.mutex.RUnlock()
 
+	if len(apps) == 0 {
+		return
+	}
+
+	// 并发清理，最多3个并发
+	var wg sync.WaitGroup
+	semaphore := make(chan struct{}, 3)
+	successCount := 0
+	failCount := 0
+	var countMutex sync.Mutex
+
 	for _, app := range apps {
-		if err := gs.dockerRegistry.CleanupOldImages(app.Name); err != nil {
-			gs.logger.Warnf("清理应用 %s 的Docker镜像失败: %v", app.Name, err)
-		} else {
-			gs.logger.Debugf("已清理应用 %s 的旧Docker镜像", app.Name)
-		}
+		wg.Add(1)
+		go func(a *GitApp) {
+			defer wg.Done()
+
+			// 获取信号量
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
+
+			if err := gs.dockerRegistry.CleanupOldImages(a.Name); err != nil {
+				gs.logger.Warnf("清理应用 %s 的Docker镜像失败: %v", a.Name, err)
+				countMutex.Lock()
+				failCount++
+				countMutex.Unlock()
+			} else {
+				gs.logger.Debugf("已清理应用 %s 的旧Docker镜像", a.Name)
+				countMutex.Lock()
+				successCount++
+				countMutex.Unlock()
+			}
+		}(app)
+	}
+
+	wg.Wait()
+
+	if successCount > 0 || failCount > 0 {
+		gs.logger.Infof("Docker镜像清理完成: 成功 %d 个，失败 %d 个", successCount, failCount)
 	}
 }
 

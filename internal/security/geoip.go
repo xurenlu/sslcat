@@ -3,6 +3,7 @@ package security
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -342,7 +343,7 @@ func (g *GeoIPService) StopAutoUpdate() {
 	}
 }
 
-// UpdateDatabase 更新GeoIP数据库
+// UpdateDatabase 更新GeoIP数据库（增强版：重试机制）
 func (g *GeoIPService) UpdateDatabase(ctx context.Context) error {
 	// 检查数据库文件的修改时间
 	fileInfo, err := os.Stat(g.config.DatabasePath)
@@ -356,11 +357,31 @@ func (g *GeoIPService) UpdateDatabase(ctx context.Context) error {
 		return nil
 	}
 
-	// 如果配置了更新URL，尝试下载
+	// 如果配置了更新URL，尝试下载（带重试）
 	if g.updateURL != "" {
 		g.log.Infof("从 %s 下载GeoIP数据库更新...", g.updateURL)
-		if err := g.downloadDatabase(ctx); err != nil {
-			return fmt.Errorf("下载数据库失败: %w", err)
+		
+		// 重试机制：最多3次
+		var lastErr error
+		for retry := 0; retry < 3; retry++ {
+			if retry > 0 {
+				waitTime := time.Duration(retry) * 10 * time.Second
+				g.log.Warnf("下载失败，%v 后重试（第%d次尝试）: %v", waitTime, retry+1, lastErr)
+				time.Sleep(waitTime)
+			}
+
+			if err := g.downloadDatabase(ctx); err != nil {
+				lastErr = err
+				continue
+			}
+
+			// 下载成功，跳出重试循环
+			lastErr = nil
+			break
+		}
+
+		if lastErr != nil {
+			return fmt.Errorf("下载数据库失败（已重试3次）: %w", lastErr)
 		}
 	} else {
 		// 没有配置更新URL，只记录提示
@@ -378,11 +399,11 @@ func (g *GeoIPService) UpdateDatabase(ctx context.Context) error {
 	return nil
 }
 
-// downloadDatabase 下载GeoIP数据库
+// downloadDatabase 下载GeoIP数据库（增强版：进度监控）
 func (g *GeoIPService) downloadDatabase(ctx context.Context) error {
-	// 创建HTTP客户端
+	// 创建HTTP客户端（增加超时时间）
 	client := &http.Client{
-		Timeout: 5 * time.Minute, // 5分钟超时
+		Timeout: 10 * time.Minute, // 10分钟超时（大文件可能需要更长时间）
 	}
 
 	// 创建请求
@@ -402,6 +423,14 @@ func (g *GeoIPService) downloadDatabase(ctx context.Context) error {
 		return fmt.Errorf("下载失败，HTTP状态码: %d", resp.StatusCode)
 	}
 
+	// 获取文件大小
+	contentLength := resp.ContentLength
+	if contentLength > 0 {
+		g.log.Infof("开始下载GeoIP数据库，大小: %.2f MB", float64(contentLength)/(1024*1024))
+	} else {
+		g.log.Info("开始下载GeoIP数据库（大小未知）")
+	}
+
 	// 创建临时文件
 	tmpFile := g.config.DatabasePath + ".tmp"
 	file, err := os.Create(tmpFile)
@@ -410,13 +439,23 @@ func (g *GeoIPService) downloadDatabase(ctx context.Context) error {
 	}
 	defer file.Close()
 
-	// 复制数据
-	written, err := file.ReadFrom(resp.Body)
+	// 创建进度读取器
+	progressReader := &progressReader{
+		reader:        resp.Body,
+		total:         contentLength,
+		logger:        g.log,
+		lastReportPct: -1,
+	}
+
+	// 复制数据（带进度监控）
+	written, err := file.ReadFrom(progressReader)
 	if err != nil {
 		os.Remove(tmpFile)
 		return fmt.Errorf("保存文件失败: %w", err)
 	}
 	file.Close()
+
+	g.log.Infof("GeoIP数据库下载完成，大小: %.2f MB", float64(written)/(1024*1024))
 
 	// 替换旧文件
 	if err := os.Rename(tmpFile, g.config.DatabasePath); err != nil {
@@ -424,8 +463,35 @@ func (g *GeoIPService) downloadDatabase(ctx context.Context) error {
 		return fmt.Errorf("替换数据库文件失败: %w", err)
 	}
 
-	g.log.Infof("GeoIP数据库下载成功，大小: %d bytes", written)
 	return nil
+}
+
+// progressReader 进度读取器
+type progressReader struct {
+	reader        io.Reader
+	total         int64
+	read          int64
+	logger        *logrus.Entry
+	lastReportPct int
+}
+
+func (pr *progressReader) Read(p []byte) (int, error) {
+	n, err := pr.reader.Read(p)
+	pr.read += int64(n)
+
+	// 如果知道总大小，报告进度（每10%报告一次）
+	if pr.total > 0 {
+		pct := int(float64(pr.read) / float64(pr.total) * 100)
+		if pct >= pr.lastReportPct+10 && pct <= 100 {
+			pr.logger.Infof("下载进度: %d%% (%.2f MB / %.2f MB)",
+				pct,
+				float64(pr.read)/(1024*1024),
+				float64(pr.total)/(1024*1024))
+			pr.lastReportPct = pct
+		}
+	}
+
+	return n, err
 }
 
 // UpdateGeoConfig 更新地理位置配置

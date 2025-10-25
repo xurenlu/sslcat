@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -324,14 +325,10 @@ func (fm *FailoverManager) CleanupBackups() error {
 		return nil
 	}
 
-	// 按修改时间排序（最新的在前）
-	for i := 0; i < len(backupFiles)-1; i++ {
-		for j := i + 1; j < len(backupFiles); j++ {
-			if backupFiles[i].modTime.Before(backupFiles[j].modTime) {
-				backupFiles[i], backupFiles[j] = backupFiles[j], backupFiles[i]
-			}
-		}
-	}
+	// 按修改时间排序（最新的在前）- 使用标准库排序
+	sort.Slice(backupFiles, func(i, j int) bool {
+		return backupFiles[i].modTime.After(backupFiles[j].modTime)
+	})
 
 	cutoffTime := time.Now().Add(-fm.maxBackupAge)
 	deletedCount := 0

@@ -441,22 +441,28 @@ func (s *Server) cleanupOldConfigResources(oldConfig, newConfig *config.Config) 
 		}
 	}
 
-	// 3. 清理压缩缓存（如果压缩配置发生显著变化）
+	// 3. 清理压缩缓存（如果压缩配置发生显著变化）- 异步执行
 	if s.compressionCache != nil {
 		if oldConfig.Compression.Enabled != newConfig.Compression.Enabled ||
 			oldConfig.Compression.Level != newConfig.Compression.Level {
-			s.log.Info("Compression config changed significantly, clearing cache")
-			s.compressionCache.Clear()
+			s.log.Info("Compression config changed significantly, clearing cache asynchronously")
+			go func() {
+				s.compressionCache.Clear()
+				s.log.Info("Compression cache cleared")
+			}()
 		}
 	}
 
-	// 4. 清理图片优化缓存（如果图片优化配置发生变化）
+	// 4. 清理图片优化缓存（如果图片优化配置发生变化）- 异步执行
 	if s.imageOptimizer != nil {
 		if oldConfig.ImageOptimization.Enabled != newConfig.ImageOptimization.Enabled ||
 			oldConfig.ImageOptimization.WebPQuality != newConfig.ImageOptimization.WebPQuality ||
 			oldConfig.ImageOptimization.JPEGQuality != newConfig.ImageOptimization.JPEGQuality {
-			s.log.Info("Image optimization config changed, clearing cache")
-			s.imageOptimizer.ClearCache()
+			s.log.Info("Image optimization config changed, clearing cache asynchronously")
+			go func() {
+				s.imageOptimizer.ClearCache()
+				s.log.Info("Image optimization cache cleared")
+			}()
 		}
 	}
 
