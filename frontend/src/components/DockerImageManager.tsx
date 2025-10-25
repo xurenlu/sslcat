@@ -56,6 +56,7 @@ import {
   FiXCircle,
 } from 'react-icons/fi'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
+import { useTranslation } from '../hooks/useLanguage'
 
 interface DockerImage {
   name: string
@@ -95,6 +96,7 @@ interface DockerImageManagerProps {
 
 const DockerImageManager: React.FC<DockerImageManagerProps> = ({ appName }) => {
   const { adminPrefix } = useConfig()
+  const t = useTranslation()
   const [images, setImages] = useState<DockerImage[]>([])
   const [registryConfig, setRegistryConfig] = useState<DockerRegistryConfig | null>(null)
   const [loading, setLoading] = useState(false)

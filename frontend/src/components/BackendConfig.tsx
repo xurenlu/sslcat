@@ -35,6 +35,7 @@ import {
   FiShield,
   FiClock
 } from 'react-icons/fi'
+import { useTranslation } from '../hooks/useLanguage'
 
 interface ProxyBackend {
   id: string
@@ -122,6 +123,8 @@ const BackendConfig: React.FC<BackendConfigProps> = ({
   onAddBackend,
   onRemoveBackend
 }) => {
+  const t = useTranslation()
+  
   const algorithmOptions = [
     { value: 'round_robin', label: '轮询 (Round Robin)' },
     { value: 'weighted_round_robin', label: '加权轮询 (Weighted Round Robin)' },

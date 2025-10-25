@@ -31,8 +31,11 @@ import {
   FiInfo,
   FiTerminal,
 } from 'react-icons/fi'
+import { useTranslation } from '../hooks/useLanguage'
 
 const GeoIPSetupGuide: React.FC = () => {
+  const t = useTranslation()
+  
   return (
     <VStack spacing={6} align="stretch">
       {/* 概述 */}

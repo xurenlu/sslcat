@@ -1,6 +1,7 @@
 import React from 'react'
 import { VStack, HStack, Input, IconButton, Button, Text } from '@chakra-ui/react'
 import { FiTrash2, FiPlus } from 'react-icons/fi'
+import { useTranslation } from '../hooks/useLanguage'
 
 interface HeaderEditorProps {
   value: Record<string, string>
@@ -10,6 +11,7 @@ interface HeaderEditorProps {
 }
 
 const HeaderEditor: React.FC<HeaderEditorProps> = ({ value, onChange, placeholderKey, placeholderValue }) => {
+  const t = useTranslation()
   const currentEntries = Object.entries(value || {})
 
   const updateEntry = (oldKey: string, newKey: string, newValue: string) => {

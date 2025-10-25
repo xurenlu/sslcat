@@ -39,6 +39,7 @@ import {
   FiAlertCircle,
 } from 'react-icons/fi'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
+import { useTranslation } from '../hooks/useLanguage'
 
 interface PushRecord {
   id: string
@@ -65,6 +66,7 @@ interface PushHistoryProps {
 
 const PushHistory: React.FC<PushHistoryProps> = ({ appName, limit = 50 }) => {
   const { adminPrefix } = useConfig()
+  const t = useTranslation()
   const [pushHistory, setPushHistory] = useState<PushRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedPush, setSelectedPush] = useState<PushRecord | null>(null)

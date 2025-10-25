@@ -52,6 +52,7 @@ import {
 } from 'react-icons/fi'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
 import RealtimeLogs from './RealtimeLogs'
+import { useTranslation } from '../hooks/useLanguage'
 
 interface DeployRecord {
   id: string
@@ -81,6 +82,7 @@ interface DeployHistoryProps {
 
 const DeployHistory: React.FC<DeployHistoryProps> = ({ appName }) => {
   const { adminPrefix } = useConfig()
+  const t = useTranslation()
   const [deployHistory, setDeployHistory] = useState<DeployRecord[]>([])
   const [deployStats, setDeployStats] = useState<DeployStats | null>(null)
   const [selectedDeploy, setSelectedDeploy] = useState<DeployRecord | null>(null)

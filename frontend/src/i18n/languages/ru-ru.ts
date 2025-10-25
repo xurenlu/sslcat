@@ -53,7 +53,7 @@ export const ruRU: Translation = {
     unknown: 'Неизвестно',
     unknownError: 'Неизвестная ошибка',
     creating: 'Создание...',
-
+    saving: 'Сохранение...',
   },
   navigation: {
     dashboard: 'Панель управления',
@@ -102,6 +102,8 @@ export const ruRU: Translation = {
     disableRule: 'Отключить правило',
     noRules: 'Нет правил прокси',
     createFirst: 'Создать первое правило',
+    username: 'Имя пользователя',
+    password: 'Пароль',
     performance_monitoring: 'Мониторинг производительности',
     enable_tracing: 'Включить трассировку запросов',
     enable_metrics: 'Включить сбор метрик',
@@ -394,6 +396,8 @@ export const ruRU: Translation = {
     refresh: 'Обновить',
     updateSite: 'Обновить сайт',
     createSite: 'Создать сайт',
+    edit: 'Редактировать',
+    delete: 'Удалить',
   },
   cdn: {
     title: 'Управление CDN-кешем',
@@ -1165,4 +1169,113 @@ export const ruRU: Translation = {
     serverError: 'Внутренняя ошибка сервера',
     unknownError: 'Неизвестная ошибка',
   },
+
+  login: {
+    username_placeholder: 'TODO',
+    password_placeholder: 'TODO',
+    captcha_alt: 'TODO',
+    refresh_captcha: 'TODO',
+    captcha_placeholder: 'TODO',
+    loading: 'TODO',
+    enter_captcha: 'TODO',
+    enter_totp: 'TODO',
+  },
+
+  php: {
+    fpm_placeholder: 'unix:/var/run/php-fpm.sock or 127.0.0.1:9000',
+  },
+
+  user: {
+    new_password_placeholder: 'TODO',
+    confirm_password_placeholder: 'TODO',
+    email_placeholder: 'TODO',
+  },
+
+  git: {
+    ssh_key_warning: 'TODO',
+    close: 'TODO',
+    deployment_strategy_desc: 'TODO',
+  },
+
+  pathPrefix: {
+    edit_rule: 'TODO',
+    delete_rule: 'TODO',
+  },
+
+  proxyList: {
+    edit: 'TODO',
+    delete: 'TODO',
+  },
+
+  backend: {
+    at_least_one_server: 'TODO',
+    single_server_proxy: 'TODO',
+    delete_backend: 'TODO',
+    server_placeholder: 'TODO',
+  },
+
+  geoip: {
+    select_country_placeholder: 'TODO',
+  },
+
+  ai: {
+    api_key_placeholder: 'TODO',
+    poe_models_label: 'TODO',
+  },
+
+  setup: {
+    password_placeholder: 'TODO',
+    confirm_password_placeholder: 'TODO',
+    loading: 'TODO',
+  },
+
+  docker: {
+    delete_image: 'TODO',
+  },
+
+  pushHistory: {
+    view_details: 'TODO',
+  },
+
+  header: {
+    delete_header: 'TODO',
+    open_menu: 'TODO',
+  },
+
+  websocket: {
+    tooltip: 'TODO',
+  },
+
+  loadBalancer: {
+    warning: 'TODO',
+    delete_server: 'TODO',
+  },
+
+  geoipSetup: {
+    test_function: 'TODO',
+  },
+
+  deployHistory: {
+    view_logs: 'TODO',
+    rollback: 'TODO',
+  },
+
+  configTest: {
+    verifying: 'TODO',
+    reloading: 'TODO',
+    after_verification: 'TODO',
+    validation_success_title: 'TODO',
+    validation_success_desc: 'TODO',
+    validation_failed_title: 'TODO',
+    validation_failed_desc: 'TODO',
+    validation_error: 'TODO',
+    validation_failed_general: 'TODO',
+    validation_failed_desc_general: 'TODO',
+    reload_success_title: 'TODO',
+    reload_success_desc: 'TODO',
+    reload_failed_error: 'TODO',
+    reload_failed_title: 'TODO',
+    reload_failed_desc: 'TODO',
+  },
 }
+

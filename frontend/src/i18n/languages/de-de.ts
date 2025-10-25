@@ -53,7 +53,7 @@ export const deDE: Translation = {
     unknown: 'Unbekannt',
     unknownError: 'Unbekannter Fehler',
     creating: 'Erstellen...',
-
+    saving: 'Speichern...',
   },
   navigation: {
     dashboard: 'Dashboard',
@@ -102,6 +102,8 @@ export const deDE: Translation = {
     disableRule: 'Regel deaktivieren',
     noRules: 'Keine Proxy-Regeln',
     createFirst: 'Erste Regel erstellen',
+    username: 'Benutzername',
+    password: 'Passwort',
     performance_monitoring: 'Leistungsüberwachung',
     enable_tracing: 'Anforderungsverfolgung aktivieren',
     enable_metrics: 'Metriksammlung aktivieren',
@@ -394,6 +396,8 @@ export const deDE: Translation = {
     refresh: 'Aktualisieren',
     updateSite: 'Website Aktualisieren',
     createSite: 'Website Erstellen',
+    edit: 'Bearbeiten',
+    delete: 'Löschen',
   },
   cdn: {
     title: 'CDN-Cache-Verwaltung',
@@ -1164,5 +1168,113 @@ export const deDE: Translation = {
     networkTimeout: 'Netzwerk-Anfrage-Timeout',
     serverError: 'Server-interner Fehler',
     unknownError: 'Unbekannter Fehler',
+  },
+
+  login: {
+    username_placeholder: 'Bitte Benutzernamen eingeben',
+    password_placeholder: 'Bitte Passwort eingeben',
+    captcha_alt: 'Bestätigungscode',
+    refresh_captcha: 'Bestätigungscode aktualisieren',
+    captcha_placeholder: 'Bitte Zeichen im Bild eingeben',
+    loading: 'Anmeldung...',
+    enter_captcha: 'Bitte Bestätigungscode eingeben',
+    enter_totp: 'Bitte 6-stelligen TOTP-Code eingeben',
+  },
+
+  php: {
+    fpm_placeholder: 'unix:/var/run/php-fpm.sock oder 127.0.0.1:9000',
+  },
+
+  user: {
+    new_password_placeholder: 'Neues Passwort eingeben (mindestens 6 Zeichen)',
+    confirm_password_placeholder: 'Neues Passwort erneut eingeben',
+    email_placeholder: 'E-Mail-Adresse eingeben',
+  },
+
+  git: {
+    ssh_key_warning: 'Sie haben den Git-Server aktiviert, aber noch keinen SSH-Schlüssel konfiguriert. Bitte fügen Sie mindestens einen SSH-Schlüssel im Tab "SSH-Schlüssel" hinzu, um Git-Pushes zu ermöglichen.',
+    close: 'Schließen',
+    deployment_strategy_desc: 'Standard-Bereitstellungsstrategie für neue Anwendungen. "Automatische Erkennung" erkennt den Anwendungstyp automatisch basierend auf den Projektdateien',
+  },
+
+  pathPrefix: {
+    edit_rule: 'Regel bearbeiten',
+    delete_rule: 'Regel löschen',
+  },
+
+  proxyList: {
+    edit: 'Bearbeiten',
+    delete: 'Löschen',
+  },
+
+  backend: {
+    at_least_one_server: '❌ Mindestens 1 Backend-Server erforderlich',
+    single_server_proxy: '🟢 Einzelner Server-Proxy',
+    delete_backend: 'Backend löschen',
+    server_placeholder: '192.168.1.10 oder example.com',
+  },
+
+  geoip: {
+    select_country_placeholder: 'Land auswählen...',
+  },
+
+  ai: {
+    api_key_placeholder: 'sk-... oder poe-...',
+    poe_models_label: 'Von POE unterstützte Modelle',
+  },
+
+  setup: {
+    password_placeholder: 'Mindestens 6 Zeichen',
+    confirm_password_placeholder: 'Neues Passwort erneut eingeben',
+    loading: 'Einrichten...',
+  },
+
+  docker: {
+    delete_image: 'Image löschen',
+  },
+
+  pushHistory: {
+    view_details: 'Details anzeigen',
+  },
+
+  header: {
+    delete_header: 'Header löschen',
+    open_menu: 'Menü öffnen',
+  },
+
+  websocket: {
+    tooltip: 'Aktivierung verhindert Datenverlust bei WebSocket-Trennung, bietet Puffermechanismus und Verbindungsüberwachung',
+  },
+
+  loadBalancer: {
+    warning: '⚠️ Nach Aktivierung des Load Balancing wird das Feld "Zieladresse" oben ignoriert, das System verwendet die unten konfigurierte Backend-Serverliste',
+    delete_server: 'Server löschen',
+  },
+
+  geoipSetup: {
+    test_function: 'Klicken Sie auf "Funktion testen", um die Funktion zu überprüfen',
+  },
+
+  deployHistory: {
+    view_logs: 'Logs anzeigen',
+    rollback: 'Zurücksetzen',
+  },
+
+  configTest: {
+    verifying: 'Überprüfung...',
+    reloading: 'Neu laden...',
+    after_verification: 'Nach erfolgreicher Überprüfung können Sie die Funktion "Konfiguration neu laden" verwenden, um die neue Konfiguration ohne Neustart des Dienstes anzuwenden.',
+    validation_success_title: 'Konfiguration erfolgreich überprüft',
+    validation_success_desc: 'Die Konfigurationsdatei-Syntax ist korrekt, alle erforderlichen Einstellungen sind konfiguriert',
+    validation_failed_title: 'Konfigurationsüberprüfung fehlgeschlagen',
+    validation_failed_desc: '{count} Fehler gefunden',
+    validation_error: 'Überprüfungsanfrage fehlgeschlagen',
+    validation_failed_general: 'Überprüfung fehlgeschlagen',
+    validation_failed_desc_general: 'Konfigurationsdatei konnte nicht überprüft werden, bitte versuchen Sie es später erneut',
+    reload_success_title: 'Konfiguration erfolgreich neu geladen',
+    reload_success_desc: 'Konfiguration aktualisiert, Dauer {duration}',
+    reload_failed_error: 'Neu laden fehlgeschlagen',
+    reload_failed_title: 'Neu laden fehlgeschlagen',
+    reload_failed_desc: 'Konfiguration konnte nicht neu geladen werden, bitte überprüfen Sie die Konfigurationsdatei',
   },
 }

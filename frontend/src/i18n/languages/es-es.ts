@@ -53,7 +53,7 @@ export const esES: Translation = {
     unknown: 'Desconocido',
     unknownError: 'Error desconocido',
     creating: 'Creando...',
-
+    saving: 'Guardando...',
   },
   navigation: {
     dashboard: 'Panel de Control',
@@ -102,6 +102,8 @@ export const esES: Translation = {
     disableRule: 'Deshabilitar Regla',
     noRules: 'No hay reglas de proxy',
     createFirst: 'Crear primera regla',
+    username: 'Nombre de usuario',
+    password: 'Contraseña',
     performance_monitoring: 'Monitoreo de rendimiento',
     enable_tracing: 'Habilitar rastreo de solicitudes',
     enable_metrics: 'Habilitar recopilación de métricas',
@@ -394,6 +396,8 @@ export const esES: Translation = {
     refresh: 'Actualizar',
     updateSite: 'Actualizar Sitio',
     createSite: 'Crear Sitio',
+    edit: 'Editar',
+    delete: 'Eliminar',
   },
   cdn: {
     title: 'Gestión de Caché CDN',
@@ -1164,5 +1168,113 @@ export const esES: Translation = {
     networkTimeout: 'Tiempo de espera de solicitud de red',
     serverError: 'Error interno del servidor',
     unknownError: 'Error desconocido',
+  },
+
+  login: {
+    username_placeholder: 'Por favor ingrese el nombre de usuario',
+    password_placeholder: 'Por favor ingrese la contraseña',
+    captcha_alt: 'Código de verificación',
+    refresh_captcha: 'Actualizar código de verificación',
+    captcha_placeholder: 'Por favor ingrese los caracteres en la imagen',
+    loading: 'Iniciando sesión...',
+    enter_captcha: 'Por favor ingrese el código de verificación',
+    enter_totp: 'Por favor ingrese el código TOTP de 6 dígitos',
+  },
+
+  php: {
+    fpm_placeholder: 'unix:/var/run/php-fpm.sock o 127.0.0.1:9000',
+  },
+
+  user: {
+    new_password_placeholder: 'Ingrese nueva contraseña (al menos 6 caracteres)',
+    confirm_password_placeholder: 'Ingrese nueva contraseña nuevamente',
+    email_placeholder: 'Ingrese dirección de correo electrónico',
+  },
+
+  git: {
+    ssh_key_warning: 'Ha habilitado el servidor Git pero aún no ha configurado las claves SSH. Por favor agregue al menos una clave SSH en la pestaña "Claves SSH" para permitir los push de Git.',
+    close: 'Cerrar',
+    deployment_strategy_desc: 'Estrategia de despliegue predeterminada para nuevas aplicaciones. Seleccionar "Auto-detectar" identificará automáticamente el tipo de aplicación basado en los archivos del proyecto',
+  },
+
+  pathPrefix: {
+    edit_rule: 'Editar regla',
+    delete_rule: 'Eliminar regla',
+  },
+
+  proxyList: {
+    edit: 'Editar',
+    delete: 'Eliminar',
+  },
+
+  backend: {
+    at_least_one_server: '❌ Se requiere al menos 1 servidor backend',
+    single_server_proxy: '🟢 Proxy de servidor único',
+    delete_backend: 'Eliminar backend',
+    server_placeholder: '192.168.1.10 o example.com',
+  },
+
+  geoip: {
+    select_country_placeholder: 'Seleccionar país...',
+  },
+
+  ai: {
+    api_key_placeholder: 'sk-... o poe-...',
+    poe_models_label: 'Modelos soportados por POE',
+  },
+
+  setup: {
+    password_placeholder: 'Al menos 6 caracteres',
+    confirm_password_placeholder: 'Ingrese nueva contraseña nuevamente',
+    loading: 'Configurando...',
+  },
+
+  docker: {
+    delete_image: 'Eliminar imagen',
+  },
+
+  pushHistory: {
+    view_details: 'Ver detalles',
+  },
+
+  header: {
+    delete_header: 'Eliminar encabezado',
+    open_menu: 'Abrir menú',
+  },
+
+  websocket: {
+    tooltip: 'Cuando está habilitado, previene la pérdida de datos cuando WebSocket se desconecta, proporciona mecanismo de almacenamiento en búfer y monitoreo de conexión',
+  },
+
+  loadBalancer: {
+    warning: '⚠️ Después de habilitar el balanceo de carga, el campo "Dirección de destino" arriba será ignorado, el sistema usará la lista de servidores backend configurada abajo',
+    delete_server: 'Eliminar servidor',
+  },
+
+  geoipSetup: {
+    test_function: 'Haga clic en el botón "Probar función" para verificar la función',
+  },
+
+  deployHistory: {
+    view_logs: 'Ver registros',
+    rollback: 'Reversión',
+  },
+
+  configTest: {
+    verifying: 'Verificando...',
+    reloading: 'Recargando...',
+    after_verification: 'Después de que la verificación pase, puede usar la función "Recargar configuración" para aplicar nueva configuración sin reiniciar el servicio.',
+    validation_success_title: 'Validación de configuración pasada',
+    validation_success_desc: 'La sintaxis del archivo de configuración es correcta, todas las configuraciones necesarias están configuradas',
+    validation_failed_title: 'Validación de configuración fallida',
+    validation_failed_desc: 'Se encontraron {count} errores',
+    validation_error: 'Solicitud de validación fallida',
+    validation_failed_general: 'Validación fallida',
+    validation_failed_desc_general: 'No se puede validar el archivo de configuración, por favor intente de nuevo más tarde',
+    reload_success_title: 'Configuración recargada exitosamente',
+    reload_success_desc: 'Configuración actualizada, tomó {duration}',
+    reload_failed_error: 'Recarga fallida',
+    reload_failed_title: 'Recarga fallida',
+    reload_failed_desc: 'No se puede recargar la configuración, por favor verifique el archivo de configuración',
   },
 }

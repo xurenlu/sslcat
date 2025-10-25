@@ -30,7 +30,7 @@ import {
   ListItem,
   ListIcon,
 } from '@chakra-ui/react'
-import { useTranslation } from '@/i18n'
+import { useTranslation } from '../hooks/useLanguage'
 import { 
   FiCheckCircle, 
   FiXCircle, 

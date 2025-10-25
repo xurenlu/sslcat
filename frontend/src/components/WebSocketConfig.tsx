@@ -19,6 +19,7 @@ import {
   Badge,
 } from '@chakra-ui/react'
 import { FiWifi, FiClock, FiLayers, FiActivity } from 'react-icons/fi'
+import { useTranslation } from '../hooks/useLanguage'
 
 interface WebSocketConfigProps {
   websocket_optimized: boolean
@@ -37,6 +38,8 @@ const WebSocketConfig: React.FC<WebSocketConfigProps> = ({
   websocket_ping_interval,
   onFieldChange,
 }) => {
+  const t = useTranslation()
+  
   return (
     <Box>
       <VStack spacing={6} align="stretch">

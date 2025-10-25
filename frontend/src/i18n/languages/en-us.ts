@@ -53,7 +53,7 @@ export const enUS: Translation = {
     unknown: 'Unknown',
     unknownError: 'Unknown error',
     creating: 'Creating...',
-
+    saving: 'Saving...',
   },
   navigation: {
     dashboard: 'Dashboard',
@@ -119,6 +119,8 @@ export const enUS: Translation = {
     disableRule: 'Disable Rule',
     noRules: 'No proxy rules',
     createFirst: 'Create first rule',
+    username: 'Username',
+    password: 'Password',
     performance_monitoring: 'Performance Monitoring',
     enable_tracing: 'Enable Request Tracing',
     enable_metrics: 'Enable Metrics Collection',
@@ -400,6 +402,8 @@ export const enUS: Translation = {
     refresh: 'Refresh',
     updateSite: 'Update Site',
     createSite: 'Create Site',
+    edit: 'Edit',
+    delete: 'Delete',
   },
 
   cdn: {
@@ -1157,5 +1161,113 @@ export const enUS: Translation = {
     networkTimeout: 'Network request timeout',
     serverError: 'Internal server error',
     unknownError: 'Unknown error',
+  },
+
+  login: {
+    username_placeholder: 'Please enter username',
+    password_placeholder: 'Please enter password',
+    captcha_alt: 'Verification code',
+    refresh_captcha: 'Refresh verification code',
+    captcha_placeholder: 'Please enter characters in image',
+    loading: 'Logging in...',
+    enter_captcha: 'Please enter verification code',
+    enter_totp: 'Please enter 6-digit TOTP code',
+  },
+
+  php: {
+    fpm_placeholder: 'unix:/var/run/php-fpm.sock or 127.0.0.1:9000',
+  },
+
+  user: {
+    new_password_placeholder: 'Enter new password (at least 6 characters)',
+    confirm_password_placeholder: 'Enter new password again',
+    email_placeholder: 'Enter email address',
+  },
+
+  git: {
+    ssh_key_warning: 'You have enabled Git server but haven\'t configured SSH keys yet. Please add at least one SSH key in the "SSH Keys" tab to allow Git pushes.',
+    close: 'Close',
+    deployment_strategy_desc: 'Default deployment strategy for new applications. Select "Auto-detect" will automatically identify application type based on project files',
+  },
+
+  pathPrefix: {
+    edit_rule: 'Edit rule',
+    delete_rule: 'Delete rule',
+  },
+
+  proxyList: {
+    edit: 'Edit',
+    delete: 'Delete',
+  },
+
+  backend: {
+    at_least_one_server: '❌ At least 1 backend server required',
+    single_server_proxy: '🟢 Single server proxy',
+    delete_backend: 'Delete backend',
+    server_placeholder: '192.168.1.10 or example.com',
+  },
+
+  geoip: {
+    select_country_placeholder: 'Select country...',
+  },
+
+  ai: {
+    api_key_placeholder: 'sk-... or poe-...',
+    poe_models_label: 'POE supported models',
+  },
+
+  setup: {
+    password_placeholder: 'At least 6 characters',
+    confirm_password_placeholder: 'Enter new password again',
+    loading: 'Setting up...',
+  },
+
+  docker: {
+    delete_image: 'Delete image',
+  },
+
+  pushHistory: {
+    view_details: 'View details',
+  },
+
+  header: {
+    delete_header: 'Delete header',
+    open_menu: 'Open menu',
+  },
+
+  websocket: {
+    tooltip: 'When enabled, prevents data loss when WebSocket disconnects, provides buffering mechanism and connection monitoring',
+  },
+
+  loadBalancer: {
+    warning: '⚠️ After enabling load balancing, the "Target Address" field above will be ignored, the system will use the backend server list configured below',
+    delete_server: 'Delete server',
+  },
+
+  geoipSetup: {
+    test_function: 'Click "Test Function" button to verify function',
+  },
+
+  deployHistory: {
+    view_logs: 'View logs',
+    rollback: 'Rollback',
+  },
+
+  configTest: {
+    verifying: 'Verifying...',
+    reloading: 'Reloading...',
+    after_verification: 'After verification passes, you can use the "Reload Configuration" function to apply new configuration without restarting the service.',
+    validation_success_title: 'Configuration validation passed',
+    validation_success_desc: 'Configuration file syntax is correct, all necessary settings are configured',
+    validation_failed_title: 'Configuration validation failed',
+    validation_failed_desc: 'Found {count} errors',
+    validation_error: 'Validation request failed',
+    validation_failed_general: 'Validation failed',
+    validation_failed_desc_general: 'Unable to validate configuration file, please try again later',
+    reload_success_title: 'Configuration reloaded successfully',
+    reload_success_desc: 'Configuration updated, took {duration}',
+    reload_failed_error: 'Reload failed',
+    reload_failed_title: 'Reload failed',
+    reload_failed_desc: 'Unable to reload configuration, please check configuration file',
   },
 }

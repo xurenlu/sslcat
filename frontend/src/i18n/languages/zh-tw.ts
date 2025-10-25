@@ -52,6 +52,8 @@ export const zhTW: Translation = {
     failed: '失敗',
     unknown: '未知',
     unknownError: '未知錯誤',
+    creating: '創建中...',
+    saving: '儲存中...',
   },
   navigation: {
     dashboard: '儀表板',
@@ -100,6 +102,13 @@ export const zhTW: Translation = {
     disableRule: '停用規則',
     noRules: '暫無代理規則',
     createFirst: '建立第一個規則',
+    username: '使用者名稱',
+    password: '密碼',
+    performance_monitoring: '效能監控',
+    enable_tracing: '啟用請求追蹤',
+    enable_metrics: '啟用指標收集',
+    tracing_warning: '⚠️ 啟用將顯著增加 CPU 使用率，建議僅用於除錯',
+    metrics_warning: '⚠️ 啟用將增加 CPU 使用率，建議僅用於監控',
   },
   ssl: {
     title: 'SSL憑證管理',
@@ -334,6 +343,19 @@ export const zhTW: Translation = {
     notificationLevelWarning: '警告',
     notificationLevelError: '錯誤',
     notificationLevelCritical: '嚴重',
+    save_success: '所有設定儲存成功',
+    save_failed: '儲存失敗',
+    reset_success: '設定已重設',
+    admin_prefix_change_success: 'Admin Prefix更改成功',
+    admin_prefix_change_failed: 'Admin Prefix更改失敗',
+    admin_prefix_changed: '管理面板前綴已更改為',
+    notification_sent: '通知已發送',
+    basic_config_load_failed: '載入基礎配置失敗',
+    notification_config_load_failed: '載入通知配置失敗',
+    basic_config_save_failed: '基礎設定儲存失敗',
+    notification_config_save_failed: '通知設定儲存失敗',
+    select_min_notification_level: '選擇最小通知等級',
+    webhook_placeholder: 'https://hooks.slack.com/services/xxx 或 https://qyapi.weixin.qq.com/xxx',
   },
   sidebar: {
     sslProxyServer: 'AI 增強的安全閘道',
@@ -356,6 +378,8 @@ export const zhTW: Translation = {
     refresh: '重新整理',
     updateSite: '更新網站',
     createSite: '創建網站',
+    edit: '編輯',
+    delete: '刪除',
   },
   cdn: {
     title: '類CDN快取管理',
@@ -690,6 +714,10 @@ export const zhTW: Translation = {
     apiSecretPlaceholder: 'API 金鑰',
     apiKeyUpdatePlaceholder: 'API 金鑰（留空則不更新）',
     apiSecretUpdatePlaceholder: 'API 金鑰（留空則不更新）',
+    cloudflare_name_placeholder: '我的 Cloudflare',
+    api_key_placeholder: 'API 金鑰',
+    zone_id_placeholder: 'Zone ID',
+    api_key_update_placeholder: 'API 金鑰（留空則不更新）',
   },
   gitServer: {
     title: 'Git 部署服務',
@@ -1116,5 +1144,131 @@ export const zhTW: Translation = {
     networkTimeout: '網路請求逾時',
     serverError: '伺服器內部錯誤',
     unknownError: '未知錯誤',
+  },
+
+  // 登入相關
+  login: {
+    username_placeholder: '請輸入使用者名稱',
+    password_placeholder: '請輸入密碼',
+    captcha_alt: '驗證碼',
+    refresh_captcha: '重新整理驗證碼',
+    captcha_placeholder: '請輸入圖片中的字元',
+    loading: '登入中...',
+    enter_captcha: '請輸入驗證碼',
+    enter_totp: '請輸入 6 位 TOTP 驗證碼',
+  },
+
+  // PHP相關
+  php: {
+    fpm_placeholder: 'unix:/var/run/php-fpm.sock 或 127.0.0.1:9000',
+  },
+
+  // 使用者管理
+  user: {
+    new_password_placeholder: '輸入新密碼（至少6個字元）',
+    confirm_password_placeholder: '再次輸入新密碼',
+    email_placeholder: '輸入電子郵件地址',
+  },
+
+  // Git相關
+  git: {
+    ssh_key_warning: '您已啟用Git伺服器，但還沒有設定SSH金鑰。請在"SSH金鑰"標籤頁中新增至少一個SSH金鑰以允許Git推送。',
+    close: '關閉',
+    deployment_strategy_desc: '新應用程式的預設部署策略。選擇"自動檢測"會根據專案檔案自動識別應用程式類型',
+  },
+
+  // 路徑前綴規則
+  pathPrefix: {
+    edit_rule: '編輯規則',
+    delete_rule: '刪除規則',
+  },
+
+  // 代理列表
+  proxyList: {
+    edit: '編輯',
+    delete: '刪除',
+  },
+
+  // 後端配置
+  backend: {
+    at_least_one_server: '❌ 至少需要1個後端伺服器',
+    single_server_proxy: '🟢 單伺服器代理',
+    delete_backend: '刪除後端',
+    server_placeholder: '192.168.1.10 或 example.com',
+  },
+
+  // GeoIP配置
+  geoip: {
+    select_country_placeholder: '選擇國家...',
+  },
+
+  // AI安全分析
+  ai: {
+    api_key_placeholder: 'sk-... 或 poe-...',
+    poe_models_label: 'POE 支援的模型',
+  },
+
+  // 首次設定
+  setup: {
+    password_placeholder: '至少 6 個字元',
+    confirm_password_placeholder: '再次輸入新密碼',
+    loading: '設定中...',
+  },
+
+  // Docker鏡像管理
+  docker: {
+    delete_image: '刪除鏡像',
+  },
+
+  // 推送歷史
+  pushHistory: {
+    view_details: '查看詳情',
+  },
+
+  // 頭部編輯器
+  header: {
+    delete_header: '刪除頭部',
+    open_menu: '開啟選單',
+  },
+
+  // WebSocket配置
+  websocket: {
+    tooltip: '啟用後可以防止WebSocket連線斷開時的資料遺失，提供緩衝機制和連線監控',
+  },
+
+  // 負載平衡器配置
+  loadBalancer: {
+    warning: '⚠️ 啟用負載平衡後，上方的"目標位址"欄位將被忽略，系統將使用下方設定的後端伺服器列表',
+    delete_server: '刪除伺服器',
+  },
+
+  // GeoIP設定指南
+  geoipSetup: {
+    test_function: '點擊 "測試功能" 按鈕驗證功能正常',
+  },
+
+  // 部署歷史
+  deployHistory: {
+    view_logs: '查看日誌',
+    rollback: '回滾',
+  },
+
+  // 配置測試
+  configTest: {
+    verifying: '驗證中...',
+    reloading: '重新載入中...',
+    after_verification: '驗證通過後可以使用"重新載入配置"功能在不重啟服務的情況下套用新配置。',
+    validation_success_title: '配置驗證通過',
+    validation_success_desc: '配置檔案語法正確，所有必要設定已配置',
+    validation_failed_title: '配置驗證失敗',
+    validation_failed_desc: '發現 {count} 個錯誤',
+    validation_error: '驗證請求失敗',
+    validation_failed_general: '驗證失敗',
+    validation_failed_desc_general: '無法驗證配置檔案，請稍後重試',
+    reload_success_title: '配置重新載入成功',
+    reload_success_desc: '配置已更新，耗時 {duration}',
+    reload_failed_error: '重新載入失敗',
+    reload_failed_title: '重新載入失敗',
+    reload_failed_desc: '無法重新載入配置，請檢查配置檔案',
   },
 }

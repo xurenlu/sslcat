@@ -19,7 +19,7 @@ import { FiMenu, FiUser, FiLogOut, FiLock } from 'react-icons/fi'
 import { useAuth } from '../contexts/AuthContext'
 import { useConfig, buildPath } from '../contexts/ConfigContext'
 import { Link as RouterLink } from 'react-router-dom'
-import { useLanguage, supportedLanguages } from '../hooks/useLanguage'
+import { useLanguage, supportedLanguages, useTranslation } from '../hooks/useLanguage'
 
 interface HeaderProps {
   onMenuClick: () => void
@@ -30,6 +30,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const { user, logout } = useAuth()
   const { adminPrefix } = useConfig()
   const { currentLanguage, changeLanguage } = useLanguage()
+  const t = useTranslation()
 
   return (
     <Box

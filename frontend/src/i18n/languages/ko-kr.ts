@@ -53,7 +53,7 @@ export const koKR: Translation = {
     unknown: '알 수 없음',
     unknownError: '알 수 없는 오류',
     creating: '생성 중...',
-
+    saving: '저장 중...',
   },
   navigation: {
     dashboard: '대시보드',
@@ -102,6 +102,8 @@ export const koKR: Translation = {
     disableRule: '규칙 비활성화',
     noRules: '프록시 규칙이 없습니다',
     createFirst: '첫 번째 규칙 생성',
+    username: '사용자 이름',
+    password: '비밀번호',
     performance_monitoring: '성능 모니터링',
     enable_tracing: '요청 추적 활성화',
     enable_metrics: '메트릭 수집 활성화',
@@ -394,6 +396,8 @@ export const koKR: Translation = {
     refresh: '새로고침',
     updateSite: '사이트 업데이트',
     createSite: '사이트 생성',
+    edit: '편집',
+    delete: '삭제',
   },
   cdn: {
     title: 'CDN 캐시 관리',
@@ -1165,4 +1169,113 @@ export const koKR: Translation = {
     serverError: '서버 내부 오류',
     unknownError: '알 수 없는 오류',
   },
+
+  login: {
+    username_placeholder: 'TODO',
+    password_placeholder: 'TODO',
+    captcha_alt: 'TODO',
+    refresh_captcha: 'TODO',
+    captcha_placeholder: 'TODO',
+    loading: 'TODO',
+    enter_captcha: 'TODO',
+    enter_totp: 'TODO',
+  },
+
+  php: {
+    fpm_placeholder: 'unix:/var/run/php-fpm.sock or 127.0.0.1:9000',
+  },
+
+  user: {
+    new_password_placeholder: 'TODO',
+    confirm_password_placeholder: 'TODO',
+    email_placeholder: 'TODO',
+  },
+
+  git: {
+    ssh_key_warning: 'TODO',
+    close: 'TODO',
+    deployment_strategy_desc: 'TODO',
+  },
+
+  pathPrefix: {
+    edit_rule: 'TODO',
+    delete_rule: 'TODO',
+  },
+
+  proxyList: {
+    edit: 'TODO',
+    delete: 'TODO',
+  },
+
+  backend: {
+    at_least_one_server: 'TODO',
+    single_server_proxy: 'TODO',
+    delete_backend: 'TODO',
+    server_placeholder: 'TODO',
+  },
+
+  geoip: {
+    select_country_placeholder: 'TODO',
+  },
+
+  ai: {
+    api_key_placeholder: 'TODO',
+    poe_models_label: 'TODO',
+  },
+
+  setup: {
+    password_placeholder: 'TODO',
+    confirm_password_placeholder: 'TODO',
+    loading: 'TODO',
+  },
+
+  docker: {
+    delete_image: 'TODO',
+  },
+
+  pushHistory: {
+    view_details: 'TODO',
+  },
+
+  header: {
+    delete_header: 'TODO',
+    open_menu: 'TODO',
+  },
+
+  websocket: {
+    tooltip: 'TODO',
+  },
+
+  loadBalancer: {
+    warning: 'TODO',
+    delete_server: 'TODO',
+  },
+
+  geoipSetup: {
+    test_function: 'TODO',
+  },
+
+  deployHistory: {
+    view_logs: 'TODO',
+    rollback: 'TODO',
+  },
+
+  configTest: {
+    verifying: 'TODO',
+    reloading: 'TODO',
+    after_verification: 'TODO',
+    validation_success_title: 'TODO',
+    validation_success_desc: 'TODO',
+    validation_failed_title: 'TODO',
+    validation_failed_desc: 'TODO',
+    validation_error: 'TODO',
+    validation_failed_general: 'TODO',
+    validation_failed_desc_general: 'TODO',
+    reload_success_title: 'TODO',
+    reload_success_desc: 'TODO',
+    reload_failed_error: 'TODO',
+    reload_failed_title: 'TODO',
+    reload_failed_desc: 'TODO',
+  },
 }
+

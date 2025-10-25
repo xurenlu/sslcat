@@ -179,7 +179,7 @@ git push sslcat main
 ## 🌍 Use Cases / 使用场景
 
 - **Microservices Gateway** - Route traffic to multiple services / **微服务网关** - 将流量路由到多个服务
-- **SSL Termination** - Centralized certificate management / **SSL 终止** - 集中式证书管理
+- **Automated SSL Management** - Centralized certificate management / **自动化SSL管理** - 集中式证书管理
 - **Development Platform** - GitOps deployment for teams / **开发平台** - 团队的 GitOps 部署
 - **Container Orchestration** - Docker-based application hosting / **容器编排** - 基于 Docker 的应用托管
 - **API Gateway** - Load balancing and security for APIs / **API 网关** - API 的负载均衡和安全

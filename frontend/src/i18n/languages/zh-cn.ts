@@ -121,6 +121,11 @@ export const zhCN: Translation = {
     createFirst: '创建第一个规则',
     username: '用户名',
     password: '密码',
+    performance_monitoring: '性能监控',
+    enable_tracing: '启用请求追踪',
+    enable_metrics: '启用指标收集',
+    tracing_warning: '⚠️ 启用将显著增加 CPU 使用率，建议仅用于调试',
+    metrics_warning: '⚠️ 启用将增加 CPU 使用率，建议仅用于监控',
   },
   ssl: {
     title: 'SSL证书管理',
@@ -732,6 +737,10 @@ export const zhCN: Translation = {
     apiSecretPlaceholder: 'API 密钥',
     apiKeyUpdatePlaceholder: 'API 密钥（留空则不更新）',
     apiSecretUpdatePlaceholder: 'API 密钥（留空则不更新）',
+    cloudflare_name_placeholder: '我的 Cloudflare',
+    api_key_placeholder: 'API 密钥',
+    zone_id_placeholder: 'Zone ID',
+    api_key_update_placeholder: 'API 密钥（留空则不更新）',
   },
   gitServer: {
     title: 'Git 部署服务',
@@ -792,6 +801,8 @@ export const zhCN: Translation = {
     cancel: '取消',
     send: '发送',
     noNotifications: '暂无通知',
+    title_placeholder: '请输入通知标题',
+    message_placeholder: '请输入通知消息',
   },
   imageOptimization: {
     title: '图片优化',

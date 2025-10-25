@@ -33,8 +33,10 @@ import {
 import { FiEye, FiEyeOff, FiCheck, FiMail, FiLock } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
+import { useTranslation } from '../hooks/useLanguage'
 
 const FirstTimeSetup: React.FC = () => {
+  const t = useTranslation()
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [adminEmail, setAdminEmail] = useState('')
