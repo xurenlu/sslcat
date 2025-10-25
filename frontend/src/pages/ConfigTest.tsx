@@ -106,29 +106,29 @@ const ConfigTest: React.FC = () => {
         
         if (data.valid) {
           toast({
-            title: '配置验证通过',
-            description: '配置文件语法正确，所有必要设置已配置',
+            title: t.configTest.validation_success_title,
+            description: t.configTest.validation_success_desc,
             status: 'success',
             duration: 3000,
             isClosable: true,
           })
         } else {
           toast({
-            title: '配置验证失败',
-            description: `发现 ${data.errors?.length || 0} 个错误`,
+            title: t.configTest.validation_failed_title,
+            description: t.configTest.validation_failed_desc.replace('{count}', `${data.errors?.length || 0}`),
             status: 'error',
             duration: 5000,
             isClosable: true,
           })
         }
       } else {
-        throw new Error(data.error || '验证请求失败')
+        throw new Error(data.error || t.configTest.validation_error)
       }
     } catch (error) {
       console.error('Config validation error:', error)
       toast({
-        title: '验证失败',
-        description: '无法验证配置文件，请稍后重试',
+        title: t.configTest.validation_failed_general,
+        description: t.configTest.validation_failed_desc_general,
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -153,8 +153,8 @@ const ConfigTest: React.FC = () => {
       
       if (response.ok && data.success) {
         toast({
-          title: '配置重载成功',
-          description: `配置已更新，耗时 ${data.duration}`,
+          title: t.configTest.reload_success_title,
+          description: t.configTest.reload_success_desc.replace('{duration}', data.duration),
           status: 'success',
           duration: 3000,
           isClosable: true,
@@ -165,13 +165,13 @@ const ConfigTest: React.FC = () => {
           validateConfig()
         }, 1000)
       } else {
-        throw new Error(data.error || '重载失败')
+        throw new Error(data.error || t.configTest.reload_failed_error)
       }
     } catch (error) {
       console.error('Config reload error:', error)
       toast({
-        title: '重载失败',
-        description: '无法重载配置，请检查配置文件',
+        title: t.configTest.reload_failed_title,
+        description: t.configTest.reload_failed_desc,
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -195,7 +195,7 @@ const ConfigTest: React.FC = () => {
             leftIcon={<Icon as={FiRefreshCw} />}
             onClick={validateConfig}
             isLoading={loading}
-            loadingText="验证中..."
+            loadingText={t.configTest.verifying}
           >
             验证配置
           </Button>
@@ -205,7 +205,7 @@ const ConfigTest: React.FC = () => {
             colorScheme="blue"
             onClick={reloadConfig}
             isLoading={loading}
-            loadingText="重载中..."
+            loadingText={t.configTest.reloading}
           >
             重载配置
           </Button>
@@ -449,7 +449,7 @@ const ConfigTest: React.FC = () => {
                 <VStack align="start" spacing={1}>
                   <Text fontWeight="medium">配置热重载</Text>
                   <Text fontSize="sm">
-                    验证通过后可以使用"重载配置"功能在不重启服务的情况下应用新配置。
+                    {t.configTest.after_verification}
                   </Text>
                 </VStack>
               </Alert>

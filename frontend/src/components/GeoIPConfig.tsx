@@ -475,7 +475,7 @@ const GeoIPConfig: React.FC = () => {
               
               <HStack mb={3}>
                 <Select
-                  placeholder="选择国家..."
+                  placeholder={t.geoip.select_country_placeholder}
                   value={selectedCountry}
                   onChange={(e) => setSelectedCountry(e.target.value)}
                   maxW="300px"
@@ -527,7 +527,7 @@ const GeoIPConfig: React.FC = () => {
               
               <HStack mb={3}>
                 <Select
-                  placeholder="选择国家..."
+                  placeholder={t.geoip.select_country_placeholder}
                   value={selectedCountry}
                   onChange={(e) => setSelectedCountry(e.target.value)}
                   maxW="300px"
@@ -580,7 +580,7 @@ const GeoIPConfig: React.FC = () => {
               leftIcon={<FiCheckCircle />}
               onClick={saveConfig}
               isLoading={saving}
-              loadingText="保存中..."
+              loadingText={t.common.saving}
             >
               保存配置
             </Button>

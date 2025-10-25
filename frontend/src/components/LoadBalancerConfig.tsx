@@ -156,7 +156,7 @@ const LoadBalancerConfig: React.FC<LoadBalancerConfigProps> = ({
           启用后可以将请求分发到多个后端服务器，提高可用性和性能
         </Text>
         <Text fontSize="sm" color="blue.500" mt={1} fontWeight="medium">
-          ⚠️ 启用负载均衡后，上方的"目标地址"字段将被忽略，系统将使用下方配置的后端服务器列表
+          {t.loadBalancer.warning}
         </Text>
       </Box>
 
@@ -216,7 +216,7 @@ const LoadBalancerConfig: React.FC<LoadBalancerConfigProps> = ({
                             <Text fontWeight="medium">服务器 {index + 1}</Text>
                           </HStack>
                           <IconButton
-                            aria-label="删除服务器"
+                            aria-label={t.loadBalancer.delete_server}
                             icon={<Icon as={FiTrash2} />}
                             size="sm"
                             colorScheme="red"

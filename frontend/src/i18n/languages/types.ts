@@ -1082,6 +1082,109 @@ export interface Translation {
     delete_rule: string
   }
 
+  // 代理列表
+  proxyList: {
+    edit: string
+    delete: string
+  }
+
+  // DNS管理
+  dns: {
+    cloudflare_name_placeholder: string
+    api_key_placeholder: string
+    zone_id_placeholder: string
+    api_key_update_placeholder: string
+  }
+
+  // 通知管理
+  notifications: {
+    title_placeholder: string
+    message_placeholder: string
+  }
+
+  // 后端配置
+  backend: {
+    at_least_one_server: string
+    single_server_proxy: string
+    delete_backend: string
+    server_placeholder: string
+  }
+
+  // GeoIP配置
+  geoip: {
+    select_country_placeholder: string
+  }
+
+  // AI安全分析
+  ai: {
+    api_key_placeholder: string
+    poe_models_label: string
+  }
+
+  // 首次设置
+  setup: {
+    password_placeholder: string
+    confirm_password_placeholder: string
+    loading: string
+  }
+
+  // Docker镜像管理
+  docker: {
+    delete_image: string
+  }
+
+  // 推送历史
+  pushHistory: {
+    view_details: string
+  }
+
+  // 头部编辑器
+  header: {
+    delete_header: string
+    open_menu: string
+  }
+
+  // WebSocket配置
+  websocket: {
+    tooltip: string
+  }
+
+  // 负载均衡器配置
+  loadBalancer: {
+    warning: string
+    delete_server: string
+  }
+
+  // GeoIP设置指南
+  geoipSetup: {
+    test_function: string
+  }
+
+  // 部署历史
+  deployHistory: {
+    view_logs: string
+    rollback: string
+  }
+
+  // 配置测试
+  configTest: {
+    verifying: string
+    reloading: string
+    after_verification: string
+    validation_success_title: string
+    validation_success_desc: string
+    validation_failed_title: string
+    validation_failed_desc: string
+    validation_error: string
+    validation_failed_general: string
+    validation_failed_desc_general: string
+    reload_success_title: string
+    reload_success_desc: string
+    reload_failed_error: string
+    reload_failed_title: string
+    reload_failed_desc: string
+  }
+
   // Toast 消息
   toast: {
     // 通用消息

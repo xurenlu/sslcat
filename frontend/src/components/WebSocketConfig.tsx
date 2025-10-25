@@ -47,7 +47,7 @@ const WebSocketConfig: React.FC<WebSocketConfigProps> = ({
             <FormLabel mb="0" fontWeight="medium">
               启用WebSocket优化
             </FormLabel>
-            <Tooltip label="启用后可以防止WebSocket连接断开时的数据丢失，提供缓冲机制和连接监控">
+            <Tooltip label={t.websocket.tooltip}>
               <Badge colorScheme="blue" fontSize="xs">推荐</Badge>
             </Tooltip>
           </HStack>

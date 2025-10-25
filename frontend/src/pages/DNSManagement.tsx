@@ -460,7 +460,7 @@ const DNSManagement: React.FC = () => {
                 <Input
                   value={newProvider.name}
                   onChange={(e) => setNewProvider({ ...newProvider, name: e.target.value })}
-                  placeholder="我的 Cloudflare"
+                  placeholder={t.dns.cloudflare_name_placeholder}
                 />
               </FormControl>
 
@@ -485,7 +485,7 @@ const DNSManagement: React.FC = () => {
                   type="password"
                   value={newProvider.apiKey}
                   onChange={(e) => setNewProvider({ ...newProvider, apiKey: e.target.value })}
-                  placeholder="API 密钥"
+                  placeholder={t.dns.api_key_placeholder}
                 />
               </FormControl>
 
@@ -508,7 +508,7 @@ const DNSManagement: React.FC = () => {
                     type="password"
                     value={newProvider.apiSecret}
                     onChange={(e) => setNewProvider({ ...newProvider, apiSecret: e.target.value })}
-                    placeholder="API 密钥"
+                    placeholder={t.dns.api_key_placeholder}
                   />
                 </FormControl>
               )}
@@ -519,7 +519,7 @@ const DNSManagement: React.FC = () => {
                   <Input
                     value={newProvider.zoneId}
                     onChange={(e) => setNewProvider({ ...newProvider, zoneId: e.target.value })}
-                    placeholder="Zone ID (Cloudflare等需要)"
+                    placeholder={t.dns.zone_id_placeholder}
                   />
                 </FormControl>
               )}
@@ -561,7 +561,7 @@ const DNSManagement: React.FC = () => {
                 <Input
                   value={newProvider.name}
                   onChange={(e) => setNewProvider({ ...newProvider, name: e.target.value })}
-                  placeholder="我的 Cloudflare"
+                  placeholder={t.dns.cloudflare_name_placeholder}
                 />
               </FormControl>
 
@@ -586,7 +586,7 @@ const DNSManagement: React.FC = () => {
                   type="password"
                   value={newProvider.apiKey}
                   onChange={(e) => setNewProvider({ ...newProvider, apiKey: e.target.value })}
-                  placeholder="API 密钥（留空则不更新）"
+                  placeholder={t.dns.api_key_update_placeholder}
                 />
               </FormControl>
 
@@ -609,7 +609,7 @@ const DNSManagement: React.FC = () => {
                     type="password"
                     value={newProvider.apiSecret}
                     onChange={(e) => setNewProvider({ ...newProvider, apiSecret: e.target.value })}
-                    placeholder="API 密钥（留空则不更新）"
+                    placeholder={t.dns.api_key_update_placeholder}
                   />
                 </FormControl>
               )}
@@ -620,7 +620,7 @@ const DNSManagement: React.FC = () => {
                   <Input
                     value={newProvider.zoneId}
                     onChange={(e) => setNewProvider({ ...newProvider, zoneId: e.target.value })}
-                    placeholder="Zone ID (Cloudflare等需要)"
+                    placeholder={t.dns.zone_id_placeholder}
                   />
                 </FormControl>
               )}

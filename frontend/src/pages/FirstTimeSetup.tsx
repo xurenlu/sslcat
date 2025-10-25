@@ -211,7 +211,7 @@ const FirstTimeSetup: React.FC = () => {
                           type={showPassword ? 'text' : 'password'}
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
-                          placeholder="至少 6 个字符"
+                          placeholder={t.setup.password_placeholder}
                         />
                         <InputRightElement>
                           <IconButton
@@ -233,7 +233,7 @@ const FirstTimeSetup: React.FC = () => {
                           type={showConfirm ? 'text' : 'password'}
                           value={confirmPassword}
                           onChange={(e) => setConfirmPassword(e.target.value)}
-                          placeholder="再次输入新密码"
+                          placeholder={t.setup.confirm_password_placeholder}
                         />
                         <InputRightElement>
                           <IconButton
@@ -323,7 +323,7 @@ const FirstTimeSetup: React.FC = () => {
                   colorScheme="blue"
                   size="lg"
                   isLoading={isLoading}
-                  loadingText="设置中..."
+                  loadingText={t.setup.loading}
                   leftIcon={<FiCheck />}
                 >
                   完成设置

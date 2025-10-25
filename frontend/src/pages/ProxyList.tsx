@@ -283,14 +283,14 @@ const ProxyList: React.FC = () => {
                     <Td>
                       <HStack spacing={2}>
                         <IconButton
-                          aria-label="编辑"
+                          aria-label={t.proxyList.edit}
                           icon={<FiEdit />}
                           size="sm"
                           variant="ghost"
                           onClick={() => navigate(buildPath(adminPrefix, `/proxy/edit?domain=${encodeURIComponent(rule.domain)}`))}
                         />
                         <IconButton
-                          aria-label="删除"
+                          aria-label={t.proxyList.delete}
                           icon={<FiTrash2 />}
                           size="sm"
                           variant="ghost"

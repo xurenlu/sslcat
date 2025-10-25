@@ -45,7 +45,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
       <Flex align="center">
         {showMobileMenu && (
           <IconButton
-            aria-label="打开菜单"
+            aria-label={t.header.open_menu}
             icon={<FiMenu />}
             variant="ghost"
             onClick={onMenuClick}

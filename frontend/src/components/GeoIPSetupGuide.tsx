@@ -223,7 +223,7 @@ const GeoIPSetupGuide: React.FC = () => {
               </ListItem>
               
               <ListItem>
-                <Text>点击 "测试功能" 按钮验证功能正常</Text>
+                <Text>{t.geoipSetup.test_function}</Text>
               </ListItem>
             </OrderedList>
 

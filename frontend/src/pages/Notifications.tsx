@@ -482,7 +482,7 @@ const Notifications: React.FC = () => {
                 <Input
                   value={testForm.title}
                   onChange={(e) => setTestForm({ ...testForm, title: e.target.value })}
-                  placeholder="请输入通知标题"
+                  placeholder={t.notifications.title_placeholder}
                   isInvalid={!testForm.title.trim() && testForm.title !== ''}
                 />
               </FormControl>
@@ -492,7 +492,7 @@ const Notifications: React.FC = () => {
                 <Textarea
                   value={testForm.message}
                   onChange={(e) => setTestForm({ ...testForm, message: e.target.value })}
-                  placeholder="请输入通知消息"
+                  placeholder={t.notifications.message_placeholder}
                   rows={3}
                   isInvalid={!testForm.message.trim() && testForm.message !== ''}
                 />

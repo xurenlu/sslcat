@@ -232,7 +232,7 @@ const PushHistory: React.FC<PushHistoryProps> = ({ appName, limit = 50 }) => {
                 </Td>
                 <Td>
                   <IconButton
-                    aria-label="查看详情"
+                    aria-label={t.pushHistory.view_details}
                     icon={<FiInfo />}
                     size="sm"
                     onClick={() => handleViewDetails(push)}

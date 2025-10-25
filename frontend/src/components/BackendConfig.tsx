@@ -145,9 +145,9 @@ const BackendConfig: React.FC<BackendConfigProps> = ({
 
   const getBackendStatus = (backendCount: number) => {
     if (backendCount === 0) {
-      return { text: "❌ 至少需要1个后端服务器", color: "red.500" }
+      return { text: t.backend.at_least_one_server, color: "red.500" }
     } else if (backendCount === 1) {
-      return { text: "🟢 单服务器代理", color: "green.500" }
+      return { text: t.backend.single_server_proxy, color: "green.500" }
     } else {
       return { text: `🔵 负载均衡代理 (${backendCount}个服务器)`, color: "blue.500" }
     }
@@ -196,7 +196,7 @@ const BackendConfig: React.FC<BackendConfigProps> = ({
                     </HStack>
                     {backends.length > 1 && (
                       <IconButton
-                        aria-label="删除后端"
+                        aria-label={t.backend.delete_backend}
                         icon={<FiTrash2 />}
                         size="sm"
                         colorScheme="red"
@@ -212,7 +212,7 @@ const BackendConfig: React.FC<BackendConfigProps> = ({
                       <Input
                         value={backend.host}
                         onChange={(e) => onBackendChange(index, 'host', e.target.value)}
-                        placeholder="192.168.1.10 或 example.com"
+                        placeholder={t.backend.server_placeholder}
                       />
                     </FormControl>
 

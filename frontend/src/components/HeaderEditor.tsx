@@ -63,7 +63,7 @@ const HeaderEditor: React.FC<HeaderEditorProps> = ({ value, onChange, placeholde
             onChange={(e) => updateEntry(key, key, e.target.value)}
           />
           <IconButton
-            aria-label="删除头部"
+            aria-label={t.header.delete_header}
             icon={<FiTrash2 />}
             variant="ghost"
             colorScheme="red"

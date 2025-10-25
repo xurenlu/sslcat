@@ -1173,4 +1173,107 @@ export const zhCN: Translation = {
     edit_rule: '编辑规则',
     delete_rule: '删除规则',
   },
+
+  // 代理列表
+  proxyList: {
+    edit: '编辑',
+    delete: '删除',
+  },
+
+  // DNS管理
+  dns: {
+    cloudflare_name_placeholder: '我的 Cloudflare',
+    api_key_placeholder: 'API 密钥',
+    zone_id_placeholder: 'Zone ID (Cloudflare等需要)',
+    api_key_update_placeholder: 'API 密钥（留空则不更新）',
+  },
+
+  // 通知管理
+  notifications: {
+    title_placeholder: '请输入通知标题',
+    message_placeholder: '请输入通知消息',
+  },
+
+  // 后端配置
+  backend: {
+    at_least_one_server: '❌ 至少需要1个后端服务器',
+    single_server_proxy: '🟢 单服务器代理',
+    delete_backend: '删除后端',
+    server_placeholder: '192.168.1.10 或 example.com',
+  },
+
+  // GeoIP配置
+  geoip: {
+    select_country_placeholder: '选择国家...',
+  },
+
+  // AI安全分析
+  ai: {
+    api_key_placeholder: 'sk-... 或 poe-...',
+    poe_models_label: 'POE 支持的模型',
+  },
+
+  // 首次设置
+  setup: {
+    password_placeholder: '至少 6 个字符',
+    confirm_password_placeholder: '再次输入新密码',
+    loading: '设置中...',
+  },
+
+  // Docker镜像管理
+  docker: {
+    delete_image: '删除镜像',
+  },
+
+  // 推送历史
+  pushHistory: {
+    view_details: '查看详情',
+  },
+
+  // 头部编辑器
+  header: {
+    delete_header: '删除头部',
+    open_menu: '打开菜单',
+  },
+
+  // WebSocket配置
+  websocket: {
+    tooltip: '启用后可以防止WebSocket连接断开时的数据丢失，提供缓冲机制和连接监控',
+  },
+
+  // 负载均衡器配置
+  loadBalancer: {
+    warning: '⚠️ 启用负载均衡后，上方的"目标地址"字段将被忽略，系统将使用下方配置的后端服务器列表',
+    delete_server: '删除服务器',
+  },
+
+  // GeoIP设置指南
+  geoipSetup: {
+    test_function: '点击 "测试功能" 按钮验证功能正常',
+  },
+
+  // 部署历史
+  deployHistory: {
+    view_logs: '查看日志',
+    rollback: '回滚',
+  },
+
+  // 配置测试
+  configTest: {
+    verifying: '验证中...',
+    reloading: '重载中...',
+    after_verification: '验证通过后可以使用"重载配置"功能在不重启服务的情况下应用新配置。',
+    validation_success_title: '配置验证通过',
+    validation_success_desc: '配置文件语法正确，所有必要设置已配置',
+    validation_failed_title: '配置验证失败',
+    validation_failed_desc: '发现 {count} 个错误',
+    validation_error: '验证请求失败',
+    validation_failed_general: '验证失败',
+    validation_failed_desc_general: '无法验证配置文件，请稍后重试',
+    reload_success_title: '配置重载成功',
+    reload_success_desc: '配置已更新，耗时 {duration}',
+    reload_failed_error: '重载失败',
+    reload_failed_title: '重载失败',
+    reload_failed_desc: '无法重载配置，请检查配置文件',
+  },
 }

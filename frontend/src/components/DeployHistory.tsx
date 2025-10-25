@@ -369,9 +369,9 @@ const DeployHistory: React.FC<DeployHistoryProps> = ({ appName }) => {
                     </Td>
                     <Td>
                       <HStack spacing={1}>
-                        <Tooltip label="查看日志">
+                        <Tooltip label={t.deployHistory.view_logs}>
                           <IconButton
-                            aria-label="查看日志"
+                            aria-label={t.deployHistory.view_logs}
                             icon={<Icon as={FiEye} />}
                             size="sm"
                             variant="ghost"
@@ -380,9 +380,9 @@ const DeployHistory: React.FC<DeployHistoryProps> = ({ appName }) => {
                         </Tooltip>
                         
                         {deploy.status === 'success' && index > 0 && (
-                          <Tooltip label="回滚到此版本">
+                          <Tooltip label={t.deployHistory.rollback}>
                             <IconButton
-                              aria-label="回滚"
+                              aria-label={t.deployHistory.rollback}
                               icon={<Icon as={FiRotateCcw} />}
                               size="sm"
                               colorScheme="orange"

@@ -408,7 +408,7 @@ const DockerImageManager: React.FC<DockerImageManagerProps> = ({ appName }) => {
                     </Td>
                     <Td>
                       <IconButton
-                        aria-label="删除镜像"
+                        aria-label={t.docker.delete_image}
                         icon={<Icon as={FiTrash2} />}
                         size="sm"
                         colorScheme="red"

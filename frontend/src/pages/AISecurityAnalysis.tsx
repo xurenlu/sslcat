@@ -392,7 +392,7 @@ const AISecurityAnalysis: React.FC = () => {
                       type="password"
                       value={config.api_key}
                       onChange={(e) => setConfig({ ...config, api_key: e.target.value })}
-                      placeholder="sk-... 或 poe-..."
+                      placeholder={t.ai.api_key_placeholder}
                     />
                     <Text fontSize="xs" color="gray.500" mt={1}>
                       <Link href="https://platform.openai.com/api-keys" isExternal color="blue.500">
@@ -428,7 +428,7 @@ const AISecurityAnalysis: React.FC = () => {
                         <option value="gpt-4-turbo">GPT-4 Turbo</option>
                         <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
                       </optgroup>
-                      <optgroup label="POE 支持的模型">
+                      <optgroup label={t.ai.poe_models_label}>
                         <option value="GPT-4-Turbo">GPT-4-Turbo (推荐)</option>
                         <option value="Claude-3-Sonnet">Claude-3-Sonnet (性价比)</option>
                         <option value="Claude-3-Opus">Claude-3-Opus (最高准确度)</option>
