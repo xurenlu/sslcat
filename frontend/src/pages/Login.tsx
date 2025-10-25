@@ -27,6 +27,7 @@ import { FiShield, FiUser, FiLock, FiRefreshCw, FiSmartphone } from 'react-icons
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
+import { useTranslation } from '../hooks/useLanguage'
 
 interface SystemConfig {
   require_captcha?: boolean
@@ -48,6 +49,7 @@ const Login: React.FC = () => {
   const { adminPrefix } = useConfig()
   const navigate = useNavigate()
   const toast = useToast()
+  const t = useTranslation()
 
   // 加载系统配置（检查是否需要验证码和TOTP）
   useEffect(() => {
@@ -111,13 +113,13 @@ const Login: React.FC = () => {
 
     // 验证必填项
     if (systemConfig.require_captcha && !captchaText) {
-      setError('请输入验证码')
+      setError(t.login.enter_captcha)
       setIsLoading(false)
       return
     }
 
     if (systemConfig.require_totp && totpCode.length !== 6) {
-      setError('请输入 6 位 TOTP 验证码')
+      setError(t.login.enter_totp)
       setIsLoading(false)
       return
     }
@@ -246,7 +248,7 @@ const Login: React.FC = () => {
                     <Input
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
-                      placeholder="请输入用户名"
+                      placeholder={t.login.username_placeholder}
                       size="lg"
                       isDisabled={isLoading}
                     />
@@ -262,7 +264,7 @@ const Login: React.FC = () => {
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder="请输入密码"
+                        placeholder={t.login.password_placeholder}
                         size="lg"
                         isDisabled={isLoading}
                       />
@@ -276,14 +278,14 @@ const Login: React.FC = () => {
                       <HStack>
                         <Image
                           src={captchaImageUrl}
-                          alt="验证码"
+                          alt={t.login.captcha_alt}
                           h="48px"
                           borderRadius="md"
                           border="1px solid"
                           borderColor="gray.200"
                         />
                         <IconButton
-                          aria-label="刷新验证码"
+                          aria-label={t.login.refresh_captcha}
                           icon={<FiRefreshCw />}
                           onClick={loadCaptcha}
                           variant="outline"
@@ -293,7 +295,7 @@ const Login: React.FC = () => {
                       <Input
                         value={captchaText}
                         onChange={(e) => setCaptchaText(e.target.value)}
-                        placeholder="请输入图片中的字符"
+                        placeholder={t.login.captcha_placeholder}
                         size="md"
                         mt={2}
                         isDisabled={isLoading}
@@ -338,7 +340,7 @@ const Login: React.FC = () => {
                     size="lg"
                     w="full"
                     isLoading={isLoading}
-                    loadingText="登录中..."
+                    loadingText={t.login.loading}
                     isDisabled={!username.trim() || !password.trim()}
                   >
                     登录

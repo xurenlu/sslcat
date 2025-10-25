@@ -745,7 +745,7 @@ git push sslcat main`
           setTimeout(() => {
             toast({
               title: '提示：添加SSH密钥',
-              description: '您已启用Git服务器，但还没有配置SSH密钥。请在"SSH密钥"标签页中添加至少一个SSH密钥以允许Git推送。',
+              description: t.git.ssh_key_warning,
               status: 'warning',
               duration: 8000,
               isClosable: true,
@@ -840,7 +840,7 @@ git push sslcat main`
                 <Text fontWeight="bold">配置已更新</Text>
               </HStack>
               <IconButton
-                aria-label="关闭"
+                aria-label={t.git.close}
                 icon={<Icon as={FiRefreshCw} />}
                 size="xs"
                 variant="ghost"
@@ -1778,7 +1778,7 @@ git push sslcat main`
                     <option value="php">PHP应用</option>
                   </Select>
                   <Text fontSize="sm" color="gray.500" mt={1}>
-                    新应用的默认部署策略。选择"自动检测"会根据项目文件自动识别应用类型
+                    {t.git.deployment_strategy_desc}
                   </Text>
                 </FormControl>
 

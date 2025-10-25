@@ -273,14 +273,14 @@ const PathPrefixRulesConfig: React.FC<PathPrefixRulesConfigProps> = ({
                   </VStack>
                   <HStack>
                     <IconButton
-                      aria-label="编辑规则"
+                      aria-label={t.pathPrefix.edit_rule}
                       icon={<Icon as={FiEdit} />}
                       size="sm"
                       variant="outline"
                       onClick={() => editRule(index)}
                     />
                     <IconButton
-                      aria-label="删除规则"
+                      aria-label={t.pathPrefix.delete_rule}
                       icon={<Icon as={FiTrash2} />}
                       size="sm"
                       variant="outline"

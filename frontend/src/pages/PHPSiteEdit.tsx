@@ -296,7 +296,7 @@ const PHPSiteEdit: React.FC = () => {
                   <Input
                     value={formData.fcgi_addr}
                     onChange={(e) => handleInputChange('fcgi_addr', e.target.value)}
-                    placeholder="unix:/var/run/php-fpm.sock 或 127.0.0.1:9000"
+                    placeholder={t.php.fpm_placeholder}
                   />
                   <Text fontSize="sm" color="gray.500" mt={1}>
                     支持 Unix Socket (unix:/path/to/sock) 或 TCP 连接 (host:port)
@@ -393,7 +393,7 @@ const PHPSiteEdit: React.FC = () => {
                 leftIcon={<Icon as={FiSave} />}
                 onClick={handleSave}
                 isLoading={saving}
-                loadingText="保存中..."
+                loadingText={t.common.saving}
               >
                 保存配置
               </Button>

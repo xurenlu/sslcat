@@ -646,7 +646,7 @@ const UserManagement: React.FC = () => {
                     type="password"
                     value={editForm.password}
                     onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
-                    placeholder="输入新密码（至少6个字符）"
+                    placeholder={t.user.new_password_placeholder}
                   />
                 </FormControl>
                 {editForm.password && (
@@ -656,7 +656,7 @@ const UserManagement: React.FC = () => {
                       type="password"
                       value={editForm.confirmPassword}
                       onChange={(e) => setEditForm({ ...editForm, confirmPassword: e.target.value })}
-                      placeholder="再次输入新密码"
+                      placeholder={t.user.confirm_password_placeholder}
                     />
                   </FormControl>
                 )}
@@ -680,7 +680,7 @@ const UserManagement: React.FC = () => {
                     type="email"
                     value={editForm.email}
                     onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                    placeholder="输入邮箱地址"
+                    placeholder={t.user.email_placeholder}
                   />
                 </FormControl>
                 <FormControl display="flex" alignItems="center">

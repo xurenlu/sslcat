@@ -1045,6 +1045,43 @@ export interface Translation {
     years: string
   }
 
+  // 登录相关
+  login: {
+    username_placeholder: string
+    password_placeholder: string
+    captcha_alt: string
+    refresh_captcha: string
+    captcha_placeholder: string
+    loading: string
+    enter_captcha: string
+    enter_totp: string
+  }
+
+  // PHP相关
+  php: {
+    fpm_placeholder: string
+  }
+
+  // 用户管理
+  user: {
+    new_password_placeholder: string
+    confirm_password_placeholder: string
+    email_placeholder: string
+  }
+
+  // Git相关
+  git: {
+    ssh_key_warning: string
+    close: string
+    deployment_strategy_desc: string
+  }
+
+  // 路径前缀规则
+  pathPrefix: {
+    edit_rule: string
+    delete_rule: string
+  }
+
   // Toast 消息
   toast: {
     // 通用消息

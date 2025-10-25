@@ -1136,4 +1136,41 @@ export const zhCN: Translation = {
     serverError: '服务器内部错误',
     unknownError: '未知错误',
   },
+
+  // 登录相关
+  login: {
+    username_placeholder: '请输入用户名',
+    password_placeholder: '请输入密码',
+    captcha_alt: '验证码',
+    refresh_captcha: '刷新验证码',
+    captcha_placeholder: '请输入图片中的字符',
+    loading: '登录中...',
+    enter_captcha: '请输入验证码',
+    enter_totp: '请输入 6 位 TOTP 验证码',
+  },
+
+  // PHP相关
+  php: {
+    fpm_placeholder: 'unix:/var/run/php-fpm.sock 或 127.0.0.1:9000',
+  },
+
+  // 用户管理
+  user: {
+    new_password_placeholder: '输入新密码（至少6个字符）',
+    confirm_password_placeholder: '再次输入新密码',
+    email_placeholder: '输入邮箱地址',
+  },
+
+  // Git相关
+  git: {
+    ssh_key_warning: '您已启用Git服务器，但还没有配置SSH密钥。请在"SSH密钥"标签页中添加至少一个SSH密钥以允许Git推送。',
+    close: '关闭',
+    deployment_strategy_desc: '新应用的默认部署策略。选择"自动检测"会根据项目文件自动识别应用类型',
+  },
+
+  // 路径前缀规则
+  pathPrefix: {
+    edit_rule: '编辑规则',
+    delete_rule: '删除规则',
+  },
 }
