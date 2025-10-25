@@ -812,11 +812,16 @@ func (lsm *LogStreamManager) HandleWebSocketLogsWS(w http.ResponseWriter, r *htt
 
 	// 启动一个 goroutine 读取客户端消息（用于心跳检测）
 	go func() {
+		defer cancel() // 确保在退出时取消上下文
 		for {
-			_, _, err := conn.ReadMessage()
-			if err != nil {
-				cancel()
+			select {
+			case <-ctx.Done():
 				return
+			default:
+				_, _, err := conn.ReadMessage()
+				if err != nil {
+					return
+				}
 			}
 		}
 	}()
