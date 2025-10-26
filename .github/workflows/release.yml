@@ -128,8 +128,8 @@ jobs:
           echo "- install-git-hook.sh - Git Hook installation script" >> release-package/README.md
           echo "- README.md - This file" >> release-package/README.md
           
-          # 打包（强制设置所有者为root，避免GitHub Actions runner UID冲突）
-          tar -C release-package --owner=root --group=root -czf artifacts/${NAME}.tar.gz .
+          # 打包（不保留所有者信息，解压时自动归属于解压用户，避免UID冲突）
+          tar -C release-package --no-same-owner -czf artifacts/${NAME}.tar.gz .
           ls -lh artifacts
 
       - name: Upload Linux artifact
@@ -249,8 +249,8 @@ jobs:
           echo "## Access Panel" >> release-package/README.md
           echo "http://localhost:8080/sslcat-panel" >> release-package/README.md
           
-          # 打包（强制设置所有者为root，避免GitHub Actions runner UID冲突）
-          tar -C release-package --owner=root --group=root -czf artifacts/${NAME}.tar.gz .
+          # 打包（不保留所有者信息，解压时自动归属于解压用户，避免UID冲突）
+          tar -C release-package --no-same-owner -czf artifacts/${NAME}.tar.gz .
           ls -lh artifacts
 
       - name: Upload macOS artifact
@@ -308,7 +308,7 @@ jobs:
             tar -xzf sslcat.tgz && sudo ./install-sslcat.sh
             ```
             
-            > **注意**: 所有文件已预设为root权限，确保安装安全性
+            > **注意**: 文件权限将自动适配解压用户，以root解压获得root权限
              
             #### 🖥️ 各平台详细下载地址
             
