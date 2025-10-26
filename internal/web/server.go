@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	_ "net/http/pprof" // 导入 pprof 用于性能分析
 	"os"
 	"path/filepath"
 	"runtime"
@@ -632,6 +633,12 @@ func (s *Server) applyConfigInPlace(newCfg *config.Config) {
 
 // setupRoutes 设置路由
 func (s *Server) setupRoutes() {
+	// 性能分析路由 (pprof) - 用于调试性能问题
+	s.mux.HandleFunc("/debug/pprof/", func(w http.ResponseWriter, r *http.Request) {
+		// 在生产环境中可以添加认证
+		http.DefaultServeMux.ServeHTTP(w, r)
+	})
+
 	// 根路径重定向
 	s.mux.HandleFunc("/", s.handleRoot)
 
@@ -1493,9 +1500,9 @@ func (s *Server) audit(action, detail string) {
 
 // 保留扩展点：若未来需要根路径也跳转，可在此扩展
 
-// 每30秒刷新一次首选LE域名（证书有效且解析到本机公网IP）
+// 每31秒刷新一次首选LE域名（证书有效且解析到本机公网IP）
 func (s *Server) refreshLEPreferredHostLoop() {
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(31 * time.Second) // 使用质数间隔避免与其他定时器同时触发
 	defer ticker.Stop()
 	for range ticker.C {
 		s.refreshLEPreferredHost()
