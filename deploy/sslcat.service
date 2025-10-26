@@ -1,5 +1,5 @@
 [Unit]
-Description=SSLcat SSL Proxy Server
+Description=SSLcat Web Server & Reverse Proxy
 After=network.target
 
 [Service]
