@@ -834,7 +834,7 @@ func (lsm *LogStreamManager) HandleWebSocketLogsWS(w http.ResponseWriter, r *htt
 	}()
 
 	// 定时器用于心跳
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(37 * time.Second) // 使用质数间隔避免与其他定时器同时触发
 	defer ticker.Stop()
 
 	// 监听新日志并发送

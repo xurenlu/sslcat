@@ -289,7 +289,7 @@ func (p *ProxyAuthManager) getSessionCookieName(domain string) string {
 
 // cleanupExpiredSessions 定期清理过期会话
 func (p *ProxyAuthManager) cleanupExpiredSessions() {
-	ticker := time.NewTicker(5 * time.Minute)
+	ticker := time.NewTicker(17 * time.Minute) // 使用质数间隔避免与其他定时器同时触发
 	defer ticker.Stop()
 
 	for range ticker.C {

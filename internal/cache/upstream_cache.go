@@ -732,7 +732,7 @@ func (uc *UpstreamCache) Clean() error {
 // StartCleaner 启动定期清理
 func (uc *UpstreamCache) StartCleaner() {
 	go func() {
-		ticker := time.NewTicker(1 * time.Hour) // 每小时清理一次
+		ticker := time.NewTicker(61 * time.Minute) // 使用质数间隔避免与其他定时器同时触发
 		defer ticker.Stop()
 
 		for range ticker.C {

@@ -37,41 +37,31 @@
 
 ### 第五部分：集成
 - [Spring Boot](integration/spring-boot.md) - Java 集成
-- [Node.js](integration/nodejs.md) - JavaScript 集成
-- [Python](integration/python.md) - Python 集成
-- [微服务](integration/microservices.md) - 服务架构
 
 ### 第六部分：部署
 - [Docker](deployment/docker.md) - 容器部署
-- [Kubernetes](deployment/kubernetes.md) - 编排
-- [云平台](deployment/cloud.md) - 云平台
-- [生产环境](deployment/production.md) - 生产环境设置
+- [Docker Compose](deployment/docker-compose-deploy.md) - Docker Compose 部署
 
 ### 第七部分：示例
 - [基础代理](examples/basic-proxy.md) - 简单代理设置
-- [SSL终端](examples/ssl-termination.md) - SSL终端示例
-- [负载均衡](examples/load-balancing.md) - 负载均衡示例
-- [缓存](examples/caching.md) - 缓存示例
-- [分布式追踪](examples/tracing.md) - 追踪示例
 
 ### 第八部分：故障排除
 - [常见问题](troubleshooting/common-issues.md) - 常见问题
+- [内存峰值修复](troubleshooting/memory-spike-fix.md) - 内存问题修复
+- [pprof 使用指南](troubleshooting/pprof-usage.md) - 性能分析工具
+- [内存泄漏调试](troubleshooting/debug-memory-leak-with-pprof.md) - 内存泄漏排查
+- [journalctl 日志策略](troubleshooting/journalctl-logging-strategy.md) - 日志记录策略
 - [CPU故障排查指南](troubleshooting/CPU_TROUBLESHOOTING_GUIDE.md) - CPU占用问题排查
-- [镜像优化CPU修复](troubleshooting/IMAGE_OPTIMIZATION_CPU_FIX.md) - 镜像优化CPU修复
 - [日志和性能优化](troubleshooting/LOGGING_AND_PERFORMANCE_OPTIMIZATION.md) - 日志和性能优化
-- [日志CPU修复总结](troubleshooting/LOGGING_CPU_FIX_SUMMARY.md) - 日志CPU修复总结
 
 ### 第九部分：开发
-- [贡献](development/contributing.md) - 如何贡献
-- [构建](development/building.md) - 从源码构建
-- [测试](development/testing.md) - 测试流程
-- [架构](development/architecture.md) - 开发架构
+- [Builder架构](development/builder-architecture.md) - Builder架构文档
+- [Git部署SSH实现](development/git-deploy-ssh-implementation.md) - Git部署SSH实现
+- [静态构建器Nginx](development/static-builder-nginx.md) - 静态构建器Nginx
+- [贡献指南](development/contributing.md) - 开发贡献指南
 
 ### 第十部分：参考
 - [配置参考](reference/configuration-reference.md) - 完整配置选项
-- [CLI参考](reference/cli-reference.md) - 所有命令
-- [API参考](reference/api-reference.md) - REST API
-- [更新日志](reference/changelog.md) - 版本历史
 
 ## 🚀 快速导航
 
@@ -87,13 +77,13 @@
 
 ### 开发者
 1. 探索[集成](integration/)指南
-2. 查看[API参考](reference/api-reference.md)
+2. 查看[配置参考](reference/configuration-reference.md)
 3. 检查[开发](development/)部分
 
 ### 故障排除
 1. 查看[常见问题](troubleshooting/common-issues.md)
-2. 参考[性能](troubleshooting/performance.md)指南
-3. 使用[调试](troubleshooting/debugging.md)技术
+2. 参考故障排除指南
+3. 查看[故障排除](troubleshooting/)部分
 
 ## 📖 文档理念
 

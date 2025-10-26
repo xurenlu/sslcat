@@ -33,6 +33,11 @@ type GoroutineMonitor struct {
 
 // NewGoroutineMonitor 创建Goroutine监控器
 func NewGoroutineMonitor(checkInterval time.Duration) *GoroutineMonitor {
+	// 使用质数间隔避免与其他定时器同时触发（61秒）
+	if checkInterval == 1*time.Minute {
+		checkInterval = 61 * time.Second
+	}
+
 	return &GoroutineMonitor{
 		log: logrus.WithFields(logrus.Fields{
 			"component": "goroutine_monitor",

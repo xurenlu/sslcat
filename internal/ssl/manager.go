@@ -215,9 +215,9 @@ func (m *Manager) Start() error {
 	// 周期性证书到期提醒
 	go m.expiryNotifier()
 
-	// 周期性从 acme-cache 同步证书到 certs/keys（每5分钟，因为申请成功后会立即同步）
+	// 周期性从 acme-cache 同步证书到 certs/keys（每13分钟，因为申请成功后会立即同步）
 	go func() {
-		ticker := time.NewTicker(5 * time.Minute)
+		ticker := time.NewTicker(13 * time.Minute) // 使用质数间隔避免与其他定时器同时触发
 		defer ticker.Stop()
 		for {
 			select {

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 	"time"
-	
+
 	"github.com/sirupsen/logrus"
 )
 
@@ -130,22 +130,22 @@ func (c *CaptchaManager) VerifyCaptchaString(sessionID string, userAnswer string
 		logrus.Debugf("Captcha verification failed: session %s expired", sessionID)
 		return false
 	}
-	
+
 	expected := strings.TrimSpace(session.AnswerStr)
 	actual := strings.TrimSpace(userAnswer)
 	result := strings.EqualFold(expected, actual)
-	
-	logrus.Debugf("Captcha verification: sessionID=%s, expected='%s', actual='%s', result=%v", 
+
+	logrus.Debugf("Captcha verification: sessionID=%s, expected='%s', actual='%s', result=%v",
 		sessionID, expected, actual, result)
-	
+
 	return result
 }
 
 // GenerateImageCaptcha 生成图形验证码（增强字符集、长度6，至少1个数字和1个特殊符号）
 func (c *CaptchaManager) GenerateImageCaptcha() (string, string, error) {
-	letters := "ABCDEFGHJKMNPQRSTUVWXYZ"  // 移除容易混淆的 I 和 L
-	digits := "23457" // 区分度高的数字，移除8（与B相似）
-	special := "?*%$@#"  // 移除感叹号（与i相似）
+	letters := "ABCDEFGHJKMNPQRSTUVWXYZ" // 移除容易混淆的 I 和 L
+	digits := "23457"                    // 区分度高的数字，移除8（与B相似）
+	special := "?*%$@#"                  // 移除感叹号（与i相似）
 	all := letters + digits + special
 
 	pick := func(set string) (byte, error) {
@@ -231,7 +231,7 @@ func (c *CaptchaManager) generateSalt() string {
 
 // cleanup 清理过期的session
 func (c *CaptchaManager) cleanup() {
-	ticker := time.NewTicker(5 * time.Minute)
+	ticker := time.NewTicker(19 * time.Minute) // 使用质数间隔避免与其他定时器同时触发
 	defer ticker.Stop()
 
 	for range ticker.C {

@@ -133,7 +133,7 @@ func (tidb *ThreatIntelDB) Close() error {
 
 // startCleanupTask 启动清理任务
 func (tidb *ThreatIntelDB) startCleanupTask() {
-	ticker := time.NewTicker(1 * time.Hour) // 每小时清理一次
+	ticker := time.NewTicker(59 * time.Minute) // 使用质数间隔避免与其他定时器同时触发
 	defer ticker.Stop()
 
 	for {
@@ -409,8 +409,8 @@ func (tidb *ThreatIntelDB) CleanupOldData(maxAge time.Duration) error {
 
 // LimitDatabaseSize 限制数据库大小
 func (tidb *ThreatIntelDB) LimitDatabaseSize() error {
-	maxIOCs := 100000        // 最多保留10万条IOC
-	maxUpdateLogs := 10000   // 最多保留1万条更新日志
+	maxIOCs := 100000      // 最多保留10万条IOC
+	maxUpdateLogs := 10000 // 最多保留1万条更新日志
 
 	// 检查IOC数量
 	var iocCount int

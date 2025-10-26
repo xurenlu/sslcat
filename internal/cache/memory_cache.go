@@ -235,7 +235,13 @@ func (mc *MemoryCache) evictOne() bool {
 
 // cleanupLoop 定期清理过期项
 func (mc *MemoryCache) cleanupLoop() {
-	ticker := time.NewTicker(mc.config.CleanupInterval)
+	// 使用质数间隔避免与其他定时器同时触发（7分钟）
+	cleanupInterval := mc.config.CleanupInterval
+	if cleanupInterval == 5*time.Minute {
+		cleanupInterval = 7 * time.Minute
+	}
+
+	ticker := time.NewTicker(cleanupInterval)
 	defer ticker.Stop()
 
 	for {

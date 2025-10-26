@@ -265,7 +265,7 @@ func (tim *ThreatIntelManager) initSources() {
 
 // updateLoop 更新循环
 func (tim *ThreatIntelManager) updateLoop() {
-	ticker := time.NewTicker(30 * time.Minute)
+	ticker := time.NewTicker(31 * time.Minute) // 使用质数间隔避免与其他定时器同时触发
 	defer ticker.Stop()
 
 	for {

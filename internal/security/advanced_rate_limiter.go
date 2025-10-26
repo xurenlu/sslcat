@@ -109,7 +109,7 @@ func NewAdvancedRateLimiter(config config.RateLimitConfig) *AdvancedRateLimiter 
 
 // startCleanupTask 启动清理任务
 func (arl *AdvancedRateLimiter) startCleanupTask() {
-	ticker := time.NewTicker(5 * time.Minute) // 每5分钟清理一次
+	ticker := time.NewTicker(11 * time.Minute) // 每11分钟清理一次（质数间隔）
 	defer ticker.Stop()
 
 	for {

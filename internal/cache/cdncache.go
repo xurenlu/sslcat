@@ -253,7 +253,7 @@ func (c *CDNCache) MaybeStoreWithConfig(resp *http.Response, forceEnabled bool) 
 	}
 
 	contentType := resp.Header.Get("Content-Type")
-	
+
 	// 不缓存动态API接口（application/json 和 API 路径）
 	// 排除条件：
 	// 1. Content-Type 是 application/json
@@ -268,7 +268,7 @@ func (c *CDNCache) MaybeStoreWithConfig(resp *http.Response, forceEnabled bool) 
 		c.cleanupProcessing(req)
 		return
 	}
-	
+
 	// 规则 TTL 计算
 	ttl := c.selectTTL(req.URL.Path, contentType)
 	// 域名级默认 TTL 覆盖（由代理暂存至响应头）
@@ -460,6 +460,10 @@ func (c *CDNCache) StartCleaner() {
 	interval := time.Duration(c.cfg.CDNCache.CleanIntervalSec)
 	if interval <= 0 {
 		interval = 60
+	}
+	// 使用质数间隔避免与其他定时器同时触发（53秒）
+	if interval == 60 {
+		interval = 53
 	}
 	go func() {
 		ticker := time.NewTicker(interval * time.Second)

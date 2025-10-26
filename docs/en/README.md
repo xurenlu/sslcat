@@ -35,41 +35,26 @@ Welcome to the comprehensive documentation for SSLcat - the enterprise-grade SSL
 
 ### Part V: Integration
 - [Spring Boot](integration/spring-boot.md) - Java integration
-- [Node.js](integration/nodejs.md) - JavaScript integration
-- [Python](integration/python.md) - Python integration
-- [Microservices](integration/microservices.md) - Service architecture
 
 ### Part VI: Deployment
 - [Docker](deployment/docker.md) - Container deployment
-- [Kubernetes](deployment/kubernetes.md) - Orchestration
-- [Cloud](deployment/cloud.md) - Cloud platforms
-- [Production](deployment/production.md) - Production setup
+- [Docker Compose](deployment/docker-compose-deploy.md) - Docker Compose deployment
 
 ### Part VII: Examples
 - [Basic Proxy](examples/basic-proxy.md) - Simple proxy setup
-- [SSL Termination](examples/ssl-termination.md) - SSL termination example
-- [Load Balancing](examples/load-balancing.md) - Load balancing example
-- [Caching](examples/caching.md) - Caching example
-- [Distributed Tracing](examples/tracing.md) - Tracing example
 
 ### Part VIII: Troubleshooting
 - [Common Issues](troubleshooting/common-issues.md) - Frequent problems
-- [Performance](troubleshooting/performance.md) - Performance tuning
-- [SSL Issues](troubleshooting/ssl-issues.md) - Certificate problems
-- [Proxy Issues](troubleshooting/proxy-issues.md) - Configuration problems
-- [Debugging](troubleshooting/debugging.md) - Debug techniques
+- [CPU Troubleshooting Guide](troubleshooting/CPU_TROUBLESHOOTING_GUIDE.md) - CPU usage troubleshooting
+- [Logging and Performance Optimization](troubleshooting/logging.md) - Logging optimization
 
 ### Part IX: Development
+- [Builder Architecture](development/builder-architecture.md) - Builder architecture documentation
 - [Contributing](development/contributing.md) - How to contribute
-- [Building](development/building.md) - Build from source
-- [Testing](development/testing.md) - Test procedures
-- [Architecture](development/architecture.md) - Development architecture
 
 ### Part X: Reference
 - [Configuration Reference](reference/configuration-reference.md) - Complete config options
-- [CLI Reference](reference/cli-reference.md) - All commands
 - [API Reference](reference/api-reference.md) - REST API
-- [Changelog](reference/changelog.md) - Version history
 
 ## 🚀 Quick Navigation
 
@@ -90,8 +75,7 @@ Welcome to the comprehensive documentation for SSLcat - the enterprise-grade SSL
 
 ### For Troubleshooting
 1. Check [Common Issues](troubleshooting/common-issues.md)
-2. Review [Performance](troubleshooting/performance.md) guide
-3. Use [Debugging](troubleshooting/debugging.md) techniques
+2. Check [Troubleshooting](troubleshooting/) section
 
 ## 📖 Documentation Philosophy
 

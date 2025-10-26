@@ -227,7 +227,7 @@ func (sm *SessionManager) ExtendSession(sessionID string, duration time.Duration
 
 // cleanupExpiredSessions 清理过期会话
 func (sm *SessionManager) cleanupExpiredSessions() {
-	ticker := time.NewTicker(10 * time.Minute)
+	ticker := time.NewTicker(11 * time.Minute) // 使用质数间隔避免与其他定时器同时触发
 	defer ticker.Stop()
 
 	for range ticker.C {

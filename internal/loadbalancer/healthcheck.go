@@ -72,7 +72,7 @@ func (lb *LoadBalancer) StartHealthCheck() {
 	minInterval := 30 * time.Second
 
 	if interval <= 0 {
-		interval = 60 * time.Second // 默认 60 秒
+		interval = 61 * time.Second // 默认 61 秒（质数间隔）
 	} else if interval < minInterval {
 		lb.log.Warnf("Health check interval %v is too short, using minimum: %v", interval, minInterval)
 		interval = minInterval

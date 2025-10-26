@@ -131,7 +131,7 @@ func (s *FileSessionStorage) Close() error {
 
 // cleanupExpiredSessions 清理过期会话
 func (s *FileSessionStorage) cleanupExpiredSessions() {
-	ticker := time.NewTicker(10 * time.Minute)
+	ticker := time.NewTicker(13 * time.Minute) // 使用质数间隔避免与其他定时器同时触发
 	defer ticker.Stop()
 
 	for range ticker.C {
