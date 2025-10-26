@@ -278,8 +278,11 @@ func main() {
 	}
 	defer configWatcher.Stop()
 
-	// 日志级别
-	if cfg.Server.Debug {
+	// 日志级别 - 优先使用配置文件中的 log_level
+	if cfg.Server.LogLevel != "" {
+		logger.Init(cfg.Server.LogLevel)
+		log.Infof("日志级别已设置为: %s", cfg.Server.LogLevel)
+	} else if cfg.Server.Debug {
 		logrus.SetLevel(logrus.DebugLevel)
 	} else {
 		logrus.SetLevel(logrus.InfoLevel)

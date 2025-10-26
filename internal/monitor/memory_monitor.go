@@ -40,13 +40,24 @@ func NewMemoryMonitor(checkInterval time.Duration) *MemoryMonitor {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 
+	// 使用质数间隔避免与其他定时器同时触发（59秒）
+	if checkInterval == 1*time.Minute {
+		checkInterval = 59 * time.Second
+	}
+
+	// 设置合理的基线内存（至少 100MB，避免启动时内存过低导致的误报）
+	baselineAlloc := m.Alloc
+	if baselineAlloc < 100*1024*1024 {
+		baselineAlloc = 100 * 1024 * 1024 // 100MB 作为最小基线
+	}
+
 	return &MemoryMonitor{
 		log: logrus.WithFields(logrus.Fields{
 			"component": "memory_monitor",
 		}),
 		stopChan:          make(chan struct{}),
 		checkInterval:     checkInterval,
-		baselineAlloc:     m.Alloc,
+		baselineAlloc:     baselineAlloc,
 		warningThreshold:  500 * 1024 * 1024,  // 500MB增长警告
 		criticalThreshold: 1024 * 1024 * 1024, // 1GB增长严重警告
 		maxHistorySize:    100,

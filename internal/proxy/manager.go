@@ -986,8 +986,8 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 			}
 		}
 
-		// 记录Host字段的最终状态
-		m.log.Infof("最终发送的Host信息 - req.Host: %s, Header['Host']: %s", req.Host, req.Header.Get("Host"))
+		// 记录Host字段的最终状态 (Debug级别，避免频繁日志)
+		m.log.Debugf("最终发送的Host信息 - req.Host: %s, Header['Host']: %s", req.Host, req.Header.Get("Host"))
 
 		// 记录向上游发送的请求详情
 		m.logRequestDetails(req, "OUTGOING_REQUEST", rule)
@@ -1484,7 +1484,7 @@ func (m *Manager) writeWebSocketData(ctx context.Context, conn net.Conn, dataCha
 
 // monitorWebSocketConnections 监控WebSocket连接状态
 func (m *Manager) monitorWebSocketConnections(ctx context.Context, clientConn, upstreamConn net.Conn, errChan chan<- error, clientClosed, upstreamClosed *int32, rule *config.ProxyRule) {
-	ticker := time.NewTicker(30 * time.Second) // 从10秒改为30秒
+	ticker := time.NewTicker(29 * time.Second) // 使用质数间隔避免与其他定时器同时触发
 	defer ticker.Stop()
 
 	for {
