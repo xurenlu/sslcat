@@ -76,153 +76,197 @@ curl -X DELETE http://localhost:8080/api/v1/users/user-1 \
 ## 权限管理
 
 ### 角色权限
-```yaml
-# sslcat.conf
-security:
-  authentication:
-    enabled: true
-    roles:
-      admin:
-        permissions:
-          - "config:read"
-          - "config:write"
-          - "users:read"
-          - "users:write"
-          - "monitoring:read"
-          - "system:read"
-      
-      operator:
-        permissions:
-          - "config:read"
-          - "monitoring:read"
-          - "logs:read"
-      
-      viewer:
-        permissions:
-          - "config:read"
-          - "monitoring:read"
+```json
+{
+  "security": {
+    "authentication": {
+      "enabled": true,
+      "roles": {
+        "admin": {
+          "permissions": [
+            "config:read",
+            "config:write",
+            "users:read",
+            "users:write",
+            "monitoring:read",
+            "system:read"
+          ]
+        },
+        "operator": {
+          "permissions": [
+            "config:read",
+            "monitoring:read",
+            "logs:read"
+          ]
+        },
+        "viewer": {
+          "permissions": [
+            "config:read",
+            "monitoring:read"
+          ]
+        }
+      }
+    }
+  }
+}
 ```
 
 ### 资源权限
-```yaml
-# sslcat.conf
-security:
-  access_control:
-    enabled: true
-    resources:
-      config:
-        admin: ["read", "write"]
-        operator: ["read"]
-        viewer: ["read"]
-      
-      users:
-        admin: ["read", "write"]
-        operator: []
-        viewer: []
-      
-      monitoring:
-        admin: ["read", "write"]
-        operator: ["read"]
-        viewer: ["read"]
+```json
+{
+  "security": {
+    "access_control": {
+      "enabled": true,
+      "resources": {
+        "config": {
+          "admin": ["read", "write"],
+          "operator": ["read"],
+          "viewer": ["read"]
+        },
+        "users": {
+          "admin": ["read", "write"],
+          "operator": [],
+          "viewer": []
+        },
+        "monitoring": {
+          "admin": ["read", "write"],
+          "operator": ["read"],
+          "viewer": ["read"]
+        }
+      }
+    }
+  }
+}
 ```
 
 ## 认证配置
 
 ### 基本认证
-```yaml
-# sslcat.conf
-security:
-  authentication:
-    enabled: true
-    method: "basic"
-    users:
-      - username: "admin"
-        password: "$2a$10$..."  # bcrypt 哈希
-        role: "admin"
-      - username: "operator"
-        password: "$2a$10$..."
-        role: "operator"
+```json
+{
+  "security": {
+    "authentication": {
+      "enabled": true,
+      "method": "basic",
+      "users": [
+        {
+          "username": "admin",
+          "password": "$2a$10$...",
+          "role": "admin"
+        },
+        {
+          "username": "operator",
+          "password": "$2a$10$...",
+          "role": "operator"
+        }
+      ]
+    }
+  }
+}
 ```
 
 ### JWT 认证
-```yaml
-# sslcat.conf
-security:
-  authentication:
-    enabled: true
-    method: "jwt"
-    jwt:
-      secret: "your-jwt-secret"
-      issuer: "sslcat"
-      audience: "sslcat-users"
-      expiration: 3600s
+```json
+{
+  "security": {
+    "authentication": {
+      "enabled": true,
+      "method": "jwt",
+      "jwt": {
+        "secret": "your-jwt-secret",
+        "issuer": "sslcat",
+        "audience": "sslcat-users",
+        "expiration": "3600s"
+      }
+    }
+  }
+}
 ```
 
 ### OAuth2 认证
-```yaml
-# sslcat.conf
-security:
-  authentication:
-    enabled: true
-    method: "oauth2"
-    oauth2:
-      provider: "google"
-      client_id: "your-client-id"
-      client_secret: "your-client-secret"
-      redirect_url: "https://sslcat.example.com/auth/callback"
+```json
+{
+  "security": {
+    "authentication": {
+      "enabled": true,
+      "method": "oauth2",
+      "oauth2": {
+        "provider": "google",
+        "client_id": "your-client-id",
+        "client_secret": "your-client-secret",
+        "redirect_url": "https://sslcat.example.com/auth/callback"
+      }
+    }
+  }
+}
 ```
 
 ## 访问控制
 
 ### IP 白名单
-```yaml
-# sslcat.conf
-security:
-  access_control:
-    enabled: true
-    ip_whitelist:
-      - "192.168.1.0/24"
-      - "10.0.0.0/8"
-      - "172.16.0.0/12"
+```json
+{
+  "security": {
+    "access_control": {
+      "enabled": true,
+      "ip_whitelist": [
+        "192.168.1.0/24",
+        "10.0.0.0/8",
+        "172.16.0.0/12"
+      ]
+    }
+  }
+}
 ```
 
 ### 时间限制
-```yaml
-# sslcat.conf
-security:
-  access_control:
-    enabled: true
-    time_restrictions:
-      enabled: true
-      allowed_hours: "09:00-17:00"
-      allowed_days: ["monday", "tuesday", "wednesday", "thursday", "friday"]
-      timezone: "UTC"
+```json
+{
+  "security": {
+    "access_control": {
+      "enabled": true,
+      "time_restrictions": {
+        "enabled": true,
+        "allowed_hours": "09:00-17:00",
+        "allowed_days": ["monday", "tuesday", "wednesday", "thursday", "friday"],
+        "timezone": "UTC"
+      }
+    }
+  }
+}
 ```
 
 ### 地理位置限制
-```yaml
-# sslcat.conf
-security:
-  access_control:
-    enabled: true
-    geo_restrictions:
-      enabled: true
-      allowed_countries: ["US", "CA", "GB"]
-      blocked_countries: ["CN", "RU"]
+```json
+{
+  "security": {
+    "access_control": {
+      "enabled": true,
+      "geo_restrictions": {
+        "enabled": true,
+        "allowed_countries": ["US", "CA", "GB"],
+        "blocked_countries": ["CN", "RU"]
+      }
+    }
+  }
+}
 ```
 
 ## 会话管理
 
 ### 会话配置
-```yaml
-# sslcat.conf
-security:
-  session:
-    enabled: true
-    timeout: 3600s  # 1小时
-    max_sessions: 10
-    secure_cookies: true
-    http_only: true
+```json
+{
+  "security": {
+    "session": {
+      "enabled": true,
+      "timeout": "3600s",
+      "max_sessions": 10,
+      "secure_cookies": true,
+      "http_only": true
+    }
+  }
+}
 ```
 
 ### 会话监控
@@ -240,19 +284,23 @@ sslcat sessions clear
 ## 审计日志
 
 ### 启用审计
-```yaml
-# sslcat.conf
-security:
-  audit:
-    enabled: true
-    log_level: "info"
-    events:
-      - "user_login"
-      - "user_logout"
-      - "config_change"
-      - "user_creation"
-      - "user_deletion"
-      - "permission_change"
+```json
+{
+  "security": {
+    "audit": {
+      "enabled": true,
+      "log_level": "info",
+      "events": [
+        "user_login",
+        "user_logout",
+        "config_change",
+        "user_creation",
+        "user_deletion",
+        "permission_change"
+      ]
+    }
+  }
+}
 ```
 
 ### 审计日志格式
@@ -274,18 +322,21 @@ security:
 ## 密码策略
 
 ### 密码要求
-```yaml
-# sslcat.conf
-security:
-  password_policy:
-    enabled: true
-    min_length: 8
-    require_uppercase: true
-    require_lowercase: true
-    require_numbers: true
-    require_special_chars: true
-    max_age: 90  # 天
-    history_count: 5
+```json
+{
+  "security": {
+    "password_policy": {
+      "enabled": true,
+      "min_length": 8,
+      "require_uppercase": true,
+      "require_lowercase": true,
+      "require_numbers": true,
+      "require_special_chars": true,
+      "max_age": 90,
+      "history_count": 5
+    }
+  }
+}
 ```
 
 ### 密码重置
@@ -305,14 +356,17 @@ curl -X POST http://localhost:8080/api/v1/users/user-1/password \
 ## 多因素认证
 
 ### 启用 2FA
-```yaml
-# sslcat.conf
-security:
-  mfa:
-    enabled: true
-    methods: ["totp", "sms"]
-    backup_codes: true
-    grace_period: 7  # 天
+```json
+{
+  "security": {
+    "mfa": {
+      "enabled": true,
+      "methods": ["totp", "sms"],
+      "backup_codes": true,
+      "grace_period": 7
+    }
+  }
+}
 ```
 
 ### TOTP 配置

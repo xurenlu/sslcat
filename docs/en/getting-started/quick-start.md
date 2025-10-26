@@ -29,18 +29,23 @@ docker run -d --name sslcat \
 
 Create a basic configuration file:
 
-```yaml
-# sslcat.conf
-server:
-  host: "0.0.0.0"
-  port: 80
-  ssl_port: 443
-
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:8080"
-      ssl: true
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 80,
+    "ssl_port": 443
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:8080",
+        "ssl": true
+      }
+    ]
+  }
+}
 ```
 
 ## Start SSLcat

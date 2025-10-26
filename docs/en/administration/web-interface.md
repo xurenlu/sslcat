@@ -10,17 +10,21 @@ SSLcat provides a modern, intuitive web-based management interface for configuri
 - **Default Password**: `admin123` (change immediately!)
 
 ### Custom Configuration
-```yaml
-# sslcat.conf
-server:
-  admin:
-    enabled: true
-    host: "0.0.0.0"
-    port: 8080
-    path: "/admin"
-    auth:
-      username: "admin"
-      password: "your-secure-password"
+```json
+{
+  "server": {
+    "admin": {
+      "enabled": true,
+      "host": "0.0.0.0",
+      "port": 8080,
+      "path": "/admin",
+      "auth": {
+        "username": "admin",
+        "password": "your-secure-password"
+      }
+    }
+  }
+}
 ```
 
 ## Dashboard Overview
@@ -46,30 +50,35 @@ The main dashboard provides a comprehensive overview of your SSLcat instance:
 Create and manage proxy rules through the web interface:
 
 #### Basic Proxy Rule
-```yaml
-# Created via web interface
-domain: "example.com"
-target: "http://backend:8080"
-ssl: true
+```json
+{
+  "domain": "example.com",
+  "target": "http://backend:8080",
+  "ssl": true
+}
 ```
 
 #### Advanced Proxy Rule
-```yaml
-# Created via web interface
-domain: "api.example.com"
-target: "http://api-backend:8080"
-ssl: true
-load_balancing:
-  enabled: true
-  algorithm: "round_robin"
-  backends:
-    - "http://api-1:8080"
-    - "http://api-2:8080"
-    - "http://api-3:8080"
-health_check:
-  enabled: true
-  path: "/health"
-  interval: 30s
+```json
+{
+  "domain": "api.example.com",
+  "target": "http://api-backend:8080",
+  "ssl": true,
+  "load_balancing": {
+    "enabled": true,
+    "algorithm": "round_robin",
+    "backends": [
+      "http://api-1:8080",
+      "http://api-2:8080",
+      "http://api-3:8080"
+    ]
+  },
+  "health_check": {
+    "enabled": true,
+    "path": "/health",
+    "interval": "30s"
+  }
+}
 ```
 
 ### SSL Certificate Management
@@ -194,13 +203,16 @@ curl -X PUT -H "Authorization: Bearer your-token" \
 ### Debug Mode
 Enable debug mode for detailed logging:
 
-```yaml
-# sslcat.conf
-server:
-  debug: true
-  admin:
-    debug: true
-    log_level: "DEBUG"
+```json
+{
+  "server": {
+    "debug": true,
+    "admin": {
+      "debug": true,
+      "log_level": "DEBUG"
+    }
+  }
+}
 ```
 
 ## Best Practices

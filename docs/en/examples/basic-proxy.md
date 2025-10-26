@@ -14,26 +14,34 @@ You have a web application running on `localhost:3000` and want to:
 
 Create a basic SSLcat configuration:
 
-```yaml
-# sslcat.conf
-server:
-  host: "0.0.0.0"
-  port: 80
-  ssl_port: 443
-  debug: true
-
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:3000"
-      ssl: true
-
-ssl:
-  certificates:
-    - domain: "example.com"
-      provider: "letsencrypt"
-      email: "admin@example.com"
-      auto_renew: true
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 80,
+    "ssl_port": 443,
+    "debug": true
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:3000",
+        "ssl": true
+      }
+    ]
+  },
+  "ssl": {
+    "certificates": [
+      {
+        "domain": "example.com",
+        "provider": "letsencrypt",
+        "email": "admin@example.com",
+        "auto_renew": true
+      }
+    ]
+  }
+}
 ```
 
 ## Step 2: Start SSLcat
@@ -66,82 +74,106 @@ curl -H "X-Custom-Header: test" https://example.com
 
 Configure multiple backend instances:
 
-```yaml
-# sslcat.conf
-server:
-  host: "0.0.0.0"
-  port: 80
-  ssl_port: 443
-
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:3000"
-      ssl: true
-      load_balancing:
-        enabled: true
-        algorithm: "round_robin"
-        backends:
-          - "http://localhost:3000"
-          - "http://localhost:3001"
-          - "http://localhost:3002"
-        health_check:
-          enabled: true
-          path: "/health"
-          interval: 30s
-          timeout: 5s
-
-ssl:
-  certificates:
-    - domain: "example.com"
-      provider: "letsencrypt"
-      email: "admin@example.com"
-      auto_renew: true
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 80,
+    "ssl_port": 443
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:3000",
+        "ssl": true,
+        "load_balancing": {
+          "enabled": true,
+          "algorithm": "round_robin",
+          "backends": [
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "http://localhost:3002"
+          ],
+          "health_check": {
+            "enabled": true,
+            "path": "/health",
+            "interval": "30s",
+            "timeout": "5s"
+          }
+        }
+      }
+    ]
+  },
+  "ssl": {
+    "certificates": [
+      {
+        "domain": "example.com",
+        "provider": "letsencrypt",
+        "email": "admin@example.com",
+        "auto_renew": true
+      }
+    ]
+  }
+}
 ```
 
 ## Step 5: Add Monitoring
 
 Enable monitoring and metrics:
 
-```yaml
-# sslcat.conf
-server:
-  host: "0.0.0.0"
-  port: 80
-  ssl_port: 443
-
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:3000"
-      ssl: true
-      load_balancing:
-        enabled: true
-        algorithm: "round_robin"
-        backends:
-          - "http://localhost:3000"
-          - "http://localhost:3001"
-          - "http://localhost:3002"
-        health_check:
-          enabled: true
-          path: "/health"
-          interval: 30s
-          timeout: 5s
-
-ssl:
-  certificates:
-    - domain: "example.com"
-      provider: "letsencrypt"
-      email: "admin@example.com"
-      auto_renew: true
-
-monitoring:
-  metrics:
-    enabled: true
-    endpoint: "/metrics"
-  tracing:
-    enabled: true
-    sample_rate: 1.0
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 80,
+    "ssl_port": 443
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:3000",
+        "ssl": true,
+        "load_balancing": {
+          "enabled": true,
+          "algorithm": "round_robin",
+          "backends": [
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "http://localhost:3002"
+          ],
+          "health_check": {
+            "enabled": true,
+            "path": "/health",
+            "interval": "30s",
+            "timeout": "5s"
+          }
+        }
+      }
+    ]
+  },
+  "ssl": {
+    "certificates": [
+      {
+        "domain": "example.com",
+        "provider": "letsencrypt",
+        "email": "admin@example.com",
+        "auto_renew": true
+      }
+    ]
+  },
+  "monitoring": {
+    "metrics": {
+      "enabled": true,
+      "endpoint": "/metrics"
+    },
+    "tracing": {
+      "enabled": true,
+      "sample_rate": 1.0
+    }
+  }
+}
 ```
 
 ## Step 6: Test Load Balancing
@@ -160,167 +192,214 @@ curl https://example.com/health
 
 Enable caching for better performance:
 
-```yaml
-# sslcat.conf
-server:
-  host: "0.0.0.0"
-  port: 80
-  ssl_port: 443
-
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:3000"
-      ssl: true
-      load_balancing:
-        enabled: true
-        algorithm: "round_robin"
-        backends:
-          - "http://localhost:3000"
-          - "http://localhost:3001"
-          - "http://localhost:3002"
-        health_check:
-          enabled: true
-          path: "/health"
-          interval: 30s
-          timeout: 5s
-      caching:
-        enabled: true
-        ttl: 300  # 5 minutes
-        max_size: "100MB"
-
-ssl:
-  certificates:
-    - domain: "example.com"
-      provider: "letsencrypt"
-      email: "admin@example.com"
-      auto_renew: true
-
-monitoring:
-  metrics:
-    enabled: true
-    endpoint: "/metrics"
-  tracing:
-    enabled: true
-    sample_rate: 1.0
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 80,
+    "ssl_port": 443
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:3000",
+        "ssl": true,
+        "load_balancing": {
+          "enabled": true,
+          "algorithm": "round_robin",
+          "backends": [
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "http://localhost:3002"
+          ],
+          "health_check": {
+            "enabled": true,
+            "path": "/health",
+            "interval": "30s",
+            "timeout": "5s"
+          }
+        },
+        "caching": {
+          "enabled": true,
+          "ttl": 300,
+          "max_size": "100MB"
+        }
+      }
+    ]
+  },
+  "ssl": {
+    "certificates": [
+      {
+        "domain": "example.com",
+        "provider": "letsencrypt",
+        "email": "admin@example.com",
+        "auto_renew": true
+      }
+    ]
+  },
+  "monitoring": {
+    "metrics": {
+      "enabled": true,
+      "endpoint": "/metrics"
+    },
+    "tracing": {
+      "enabled": true,
+      "sample_rate": 1.0
+    }
+  }
+}
 ```
 
 ## Step 8: Production Configuration
 
 Optimize for production use:
 
-```yaml
-# sslcat.conf
-server:
-  host: "0.0.0.0"
-  port: 80
-  ssl_port: 443
-  debug: false
-  workers: 4
-
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:3000"
-      ssl: true
-      load_balancing:
-        enabled: true
-        algorithm: "least_connections"
-        backends:
-          - "http://localhost:3000"
-          - "http://localhost:3001"
-          - "http://localhost:3002"
-        health_check:
-          enabled: true
-          path: "/health"
-          interval: 30s
-          timeout: 5s
-      caching:
-        enabled: true
-        ttl: 300
-        max_size: "100MB"
-      compression:
-        enabled: true
-        types: ["text/html", "text/css", "application/javascript"]
-
-ssl:
-  certificates:
-    - domain: "example.com"
-      provider: "letsencrypt"
-      email: "admin@example.com"
-      auto_renew: true
-
-monitoring:
-  metrics:
-    enabled: true
-    endpoint: "/metrics"
-  tracing:
-    enabled: true
-    sample_rate: 0.1  # 10% sampling for production
-
-security:
-  ddos_protection:
-    enabled: true
-    rate_limit: 100  # requests per second
-  access_control:
-    enabled: true
-    whitelist: ["192.168.1.0/24"]
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 80,
+    "ssl_port": 443,
+    "debug": false,
+    "workers": 4
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:3000",
+        "ssl": true,
+        "load_balancing": {
+          "enabled": true,
+          "algorithm": "least_connections",
+          "backends": [
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "http://localhost:3002"
+          ],
+          "health_check": {
+            "enabled": true,
+            "path": "/health",
+            "interval": "30s",
+            "timeout": "5s"
+          }
+        },
+        "caching": {
+          "enabled": true,
+          "ttl": 300,
+          "max_size": "100MB"
+        },
+        "compression": {
+          "enabled": true,
+          "types": ["text/html", "text/css", "application/javascript"]
+        }
+      }
+    ]
+  },
+  "ssl": {
+    "certificates": [
+      {
+        "domain": "example.com",
+        "provider": "letsencrypt",
+        "email": "admin@example.com",
+        "auto_renew": true
+      }
+    ]
+  },
+  "monitoring": {
+    "metrics": {
+      "enabled": true,
+      "endpoint": "/metrics"
+    },
+    "tracing": {
+      "enabled": true,
+      "sample_rate": 0.1
+    }
+  },
+  "security": {
+    "ddos_protection": {
+      "enabled": true,
+      "rate_limit": 100
+    },
+    "access_control": {
+      "enabled": true,
+      "whitelist": ["192.168.1.0/24"]
+    }
+  }
+}
 ```
 
 ## Docker Compose Example
 
-Complete setup with Docker Compose:
+Complete setup with Docker Compose (Note: For actual use, it's recommended to use `docker-compose.yml` file in YAML format, shown as JSON here for consistency):
 
-```yaml
-# docker-compose.yml
-version: '3.8'
-
-services:
-  sslcat:
-    image: sslcat:latest
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./sslcat.conf:/app/sslcat.conf
-      - ./data:/app/data
-    depends_on:
-      - app1
-      - app2
-      - app3
-    networks:
-      - app-network
-
-  app1:
-    image: your-app:latest
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-    networks:
-      - app-network
-
-  app2:
-    image: your-app:latest
-    ports:
-      - "3001:3000"
-    environment:
-      - NODE_ENV=production
-    networks:
-      - app-network
-
-  app3:
-    image: your-app:latest
-    ports:
-      - "3002:3000"
-    environment:
-      - NODE_ENV=production
-    networks:
-      - app-network
-
-networks:
-  app-network:
-    driver: bridge
+```json
+{
+  "version": "3.8",
+  "services": {
+    "sslcat": {
+      "image": "sslcat:latest",
+      "ports": [
+        "80:80",
+        "443:443"
+      ],
+      "volumes": [
+        "./sslcat.conf:/app/sslcat.conf",
+        "./data:/app/data"
+      ],
+      "depends_on": [
+        "app1",
+        "app2",
+        "app3"
+      ],
+      "networks": [
+        "app-network"
+      ]
+    },
+    "app1": {
+      "image": "your-app:latest",
+      "ports": [
+        "3000:3000"
+      ],
+      "environment": [
+        "NODE_ENV=production"
+      ],
+      "networks": [
+        "app-network"
+      ]
+    },
+    "app2": {
+      "image": "your-app:latest",
+      "ports": [
+        "3001:3000"
+      ],
+      "environment": [
+        "NODE_ENV=production"
+      ],
+      "networks": [
+        "app-network"
+      ]
+    },
+    "app3": {
+      "image": "your-app:latest",
+      "ports": [
+        "3002:3000"
+      ],
+      "environment": [
+        "NODE_ENV=production"
+      ],
+      "networks": [
+        "app-network"
+      ]
+    }
+  },
+  "networks": {
+    "app-network": {
+      "driver": "bridge"
+    }
+  }
+}
 ```
 
 ## Testing the Setup
@@ -427,11 +506,13 @@ docker logs -f sslcat
 ### Debug Mode
 Enable debug mode for detailed logging:
 
-```yaml
-# sslcat.conf
-server:
-  debug: true
-  log_level: "DEBUG"
+```json
+{
+  "server": {
+    "debug": true,
+    "log_level": "DEBUG"
+  }
+}
 ```
 
 ## Best Practices

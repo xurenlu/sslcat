@@ -39,25 +39,32 @@ public class DemoApplication {
 
 配置 SSLcat 代理到你的 Spring Boot 应用程序：
 
-```yaml
-# sslcat.conf
-server:
-  host: "0.0.0.0"
-  port: 80
-  ssl_port: 443
-
-proxy:
-  rules:
-    - domain: "api.example.com"
-      target: "http://localhost:8080"
-      ssl: true
-      load_balancing:
-        enabled: true
-        algorithm: "round_robin"
-        health_check:
-          enabled: true
-          path: "/actuator/health"
-          interval: 30s
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 80,
+    "ssl_port": 443
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "api.example.com",
+        "target": "http://localhost:8080",
+        "ssl": true,
+        "load_balancing": {
+          "enabled": true,
+          "algorithm": "round_robin",
+          "health_check": {
+            "enabled": true,
+            "path": "/actuator/health",
+            "interval": "30s"
+          }
+        }
+      }
+    ]
+  }
+}
 ```
 
 ### 3. 启动服务
@@ -176,25 +183,33 @@ public class ApiController {
 
 配置 SSLcat 在多个 Spring Boot 实例之间进行负载均衡：
 
-```yaml
-# sslcat.conf
-proxy:
-  rules:
-    - domain: "api.example.com"
-      target: "http://localhost:8080"
-      ssl: true
-      load_balancing:
-        enabled: true
-        algorithm: "round_robin"
-        backends:
-          - "http://localhost:8080"
-          - "http://localhost:8081"
-          - "http://localhost:8082"
-        health_check:
-          enabled: true
-          path: "/actuator/health"
-          interval: 30s
-          timeout: 5s
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "api.example.com",
+        "target": "http://localhost:8080",
+        "ssl": true,
+        "load_balancing": {
+          "enabled": true,
+          "algorithm": "round_robin",
+          "backends": [
+            "http://localhost:8080",
+            "http://localhost:8081",
+            "http://localhost:8082"
+          ],
+          "health_check": {
+            "enabled": true,
+            "path": "/actuator/health",
+            "interval": "30s",
+            "timeout": "5s"
+          }
+        }
+      }
+    ]
+  }
+}
 ```
 
 ### 2. Spring Boot 健康检查端点
@@ -219,25 +234,35 @@ public class HealthController {
 
 ### 1. 使用 Let's Encrypt 自动 SSL
 
-```yaml
-# sslcat.conf
-ssl:
-  certificates:
-    - domain: "api.example.com"
-      provider: "letsencrypt"
-      email: "admin@example.com"
-      auto_renew: true
+```json
+{
+  "ssl": {
+    "certificates": [
+      {
+        "domain": "api.example.com",
+        "provider": "letsencrypt",
+        "email": "admin@example.com",
+        "auto_renew": true
+      }
+    ]
+  }
+}
 ```
 
 ### 2. 自定义 SSL 证书
 
-```yaml
-# sslcat.conf
-ssl:
-  certificates:
-    - domain: "api.example.com"
-      cert_file: "/path/to/cert.pem"
-      key_file: "/path/to/key.pem"
+```json
+{
+  "ssl": {
+    "certificates": [
+      {
+        "domain": "api.example.com",
+        "cert_file": "/path/to/cert.pem",
+        "key_file": "/path/to/key.pem"
+      }
+    ]
+  }
+}
 ```
 
 ## 监控和指标
@@ -347,46 +372,59 @@ networks:
 
 ### 1. SSLcat 生产配置
 
-```yaml
-# sslcat.conf
-server:
-  host: "0.0.0.0"
-  port: 80
-  ssl_port: 443
-  debug: false
-
-proxy:
-  rules:
-    - domain: "api.example.com"
-      target: "http://spring-boot-app:8080"
-      ssl: true
-      load_balancing:
-        enabled: true
-        algorithm: "least_connections"
-        backends:
-          - "http://spring-boot-app-1:8080"
-          - "http://spring-boot-app-2:8080"
-          - "http://spring-boot-app-3:8080"
-        health_check:
-          enabled: true
-          path: "/actuator/health"
-          interval: 30s
-          timeout: 5s
-
-ssl:
-  certificates:
-    - domain: "api.example.com"
-      provider: "letsencrypt"
-      email: "admin@example.com"
-      auto_renew: true
-
-monitoring:
-  metrics:
-    enabled: true
-    endpoint: "/metrics"
-  tracing:
-    enabled: true
-    sample_rate: 0.1  # 生产环境10%采样
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 80,
+    "ssl_port": 443,
+    "debug": false
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "api.example.com",
+        "target": "http://spring-boot-app:8080",
+        "ssl": true,
+        "load_balancing": {
+          "enabled": true,
+          "algorithm": "least_connections",
+          "backends": [
+            "http://spring-boot-app-1:8080",
+            "http://spring-boot-app-2:8080",
+            "http://spring-boot-app-3:8080"
+          ],
+          "health_check": {
+            "enabled": true,
+            "path": "/actuator/health",
+            "interval": "30s",
+            "timeout": "5s"
+          }
+        }
+      }
+    ]
+  },
+  "ssl": {
+    "certificates": [
+      {
+        "domain": "api.example.com",
+        "provider": "letsencrypt",
+        "email": "admin@example.com",
+        "auto_renew": true
+      }
+    ]
+  },
+  "monitoring": {
+    "metrics": {
+      "enabled": true,
+      "endpoint": "/metrics"
+    },
+    "tracing": {
+      "enabled": true,
+      "sample_rate": 0.1
+    }
+  }
+}
 ```
 
 ### 2. Spring Boot 生产配置
@@ -438,11 +476,16 @@ logging:
 
 启用调试日志：
 
-```yaml
-# sslcat.conf
-server:
-  debug: true
+```json
+// sslcat.conf
+{
+  "server": {
+    "debug": true
+  }
+}
+```
 
+```yaml
 # application.yml
 logging:
   level:

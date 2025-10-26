@@ -74,82 +74,106 @@ curl -H "X-Custom-Header: test" https://example.com
 
 配置多个后端实例：
 
-```yaml
-# sslcat.conf
-server:
-  host: "0.0.0.0"
-  port: 80
-  ssl_port: 443
-
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:3000"
-      ssl: true
-      load_balancing:
-        enabled: true
-        algorithm: "round_robin"
-        backends:
-          - "http://localhost:3000"
-          - "http://localhost:3001"
-          - "http://localhost:3002"
-        health_check:
-          enabled: true
-          path: "/health"
-          interval: 30s
-          timeout: 5s
-
-ssl:
-  certificates:
-    - domain: "example.com"
-      provider: "letsencrypt"
-      email: "admin@example.com"
-      auto_renew: true
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 80,
+    "ssl_port": 443
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:3000",
+        "ssl": true,
+        "load_balancing": {
+          "enabled": true,
+          "algorithm": "round_robin",
+          "backends": [
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "http://localhost:3002"
+          ],
+          "health_check": {
+            "enabled": true,
+            "path": "/health",
+            "interval": "30s",
+            "timeout": "5s"
+          }
+        }
+      }
+    ]
+  },
+  "ssl": {
+    "certificates": [
+      {
+        "domain": "example.com",
+        "provider": "letsencrypt",
+        "email": "admin@example.com",
+        "auto_renew": true
+      }
+    ]
+  }
+}
 ```
 
 ## 步骤 5：添加监控
 
 启用监控和指标：
 
-```yaml
-# sslcat.conf
-server:
-  host: "0.0.0.0"
-  port: 80
-  ssl_port: 443
-
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:3000"
-      ssl: true
-      load_balancing:
-        enabled: true
-        algorithm: "round_robin"
-        backends:
-          - "http://localhost:3000"
-          - "http://localhost:3001"
-          - "http://localhost:3002"
-        health_check:
-          enabled: true
-          path: "/health"
-          interval: 30s
-          timeout: 5s
-
-ssl:
-  certificates:
-    - domain: "example.com"
-      provider: "letsencrypt"
-      email: "admin@example.com"
-      auto_renew: true
-
-monitoring:
-  metrics:
-    enabled: true
-    endpoint: "/metrics"
-  tracing:
-    enabled: true
-    sample_rate: 1.0
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 80,
+    "ssl_port": 443
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:3000",
+        "ssl": true,
+        "load_balancing": {
+          "enabled": true,
+          "algorithm": "round_robin",
+          "backends": [
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "http://localhost:3002"
+          ],
+          "health_check": {
+            "enabled": true,
+            "path": "/health",
+            "interval": "30s",
+            "timeout": "5s"
+          }
+        }
+      }
+    ]
+  },
+  "ssl": {
+    "certificates": [
+      {
+        "domain": "example.com",
+        "provider": "letsencrypt",
+        "email": "admin@example.com",
+        "auto_renew": true
+      }
+    ]
+  },
+  "monitoring": {
+    "metrics": {
+      "enabled": true,
+      "endpoint": "/metrics"
+    },
+    "tracing": {
+      "enabled": true,
+      "sample_rate": 1.0
+    }
+  }
+}
 ```
 
 ## 步骤 6：测试负载均衡
@@ -168,167 +192,214 @@ curl https://example.com/health
 
 启用缓存以提高性能：
 
-```yaml
-# sslcat.conf
-server:
-  host: "0.0.0.0"
-  port: 80
-  ssl_port: 443
-
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:3000"
-      ssl: true
-      load_balancing:
-        enabled: true
-        algorithm: "round_robin"
-        backends:
-          - "http://localhost:3000"
-          - "http://localhost:3001"
-          - "http://localhost:3002"
-        health_check:
-          enabled: true
-          path: "/health"
-          interval: 30s
-          timeout: 5s
-      caching:
-        enabled: true
-        ttl: 3600  # 1小时
-        max_size: "100MB"
-
-ssl:
-  certificates:
-    - domain: "example.com"
-      provider: "letsencrypt"
-      email: "admin@example.com"
-      auto_renew: true
-
-monitoring:
-  metrics:
-    enabled: true
-    endpoint: "/metrics"
-  tracing:
-    enabled: true
-    sample_rate: 1.0
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 80,
+    "ssl_port": 443
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:3000",
+        "ssl": true,
+        "load_balancing": {
+          "enabled": true,
+          "algorithm": "round_robin",
+          "backends": [
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "http://localhost:3002"
+          ],
+          "health_check": {
+            "enabled": true,
+            "path": "/health",
+            "interval": "30s",
+            "timeout": "5s"
+          }
+        },
+        "caching": {
+          "enabled": true,
+          "ttl": 3600,
+          "max_size": "100MB"
+        }
+      }
+    ]
+  },
+  "ssl": {
+    "certificates": [
+      {
+        "domain": "example.com",
+        "provider": "letsencrypt",
+        "email": "admin@example.com",
+        "auto_renew": true
+      }
+    ]
+  },
+  "monitoring": {
+    "metrics": {
+      "enabled": true,
+      "endpoint": "/metrics"
+    },
+    "tracing": {
+      "enabled": true,
+      "sample_rate": 1.0
+    }
+  }
+}
 ```
 
 ## 步骤 8：生产环境配置
 
 为生产使用优化：
 
-```yaml
-# sslcat.conf
-server:
-  host: "0.0.0.0"
-  port: 80
-  ssl_port: 443
-  debug: false
-  workers: 4
-
-proxy:
-  rules:
-    - domain: "example.com"
-      target: "http://localhost:3000"
-      ssl: true
-      load_balancing:
-        enabled: true
-        algorithm: "least_connections"
-        backends:
-          - "http://localhost:3000"
-          - "http://localhost:3001"
-          - "http://localhost:3002"
-        health_check:
-          enabled: true
-          path: "/health"
-          interval: 30s
-          timeout: 5s
-      caching:
-        enabled: true
-        ttl: 3600
-        max_size: "100MB"
-      compression:
-        enabled: true
-        types: ["text/html", "text/css", "application/javascript"]
-
-ssl:
-  certificates:
-    - domain: "example.com"
-      provider: "letsencrypt"
-      email: "admin@example.com"
-      auto_renew: true
-
-monitoring:
-  metrics:
-    enabled: true
-    endpoint: "/metrics"
-  tracing:
-    enabled: true
-    sample_rate: 0.1  # 生产环境10%采样
-
-security:
-  ddos_protection:
-    enabled: true
-    rate_limit: 100  # 每秒请求数
-  access_control:
-    enabled: true
-    whitelist: ["192.168.1.0/24"]
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 80,
+    "ssl_port": 443,
+    "debug": false,
+    "workers": 4
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "http://localhost:3000",
+        "ssl": true,
+        "load_balancing": {
+          "enabled": true,
+          "algorithm": "least_connections",
+          "backends": [
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "http://localhost:3002"
+          ],
+          "health_check": {
+            "enabled": true,
+            "path": "/health",
+            "interval": "30s",
+            "timeout": "5s"
+          }
+        },
+        "caching": {
+          "enabled": true,
+          "ttl": 3600,
+          "max_size": "100MB"
+        },
+        "compression": {
+          "enabled": true,
+          "types": ["text/html", "text/css", "application/javascript"]
+        }
+      }
+    ]
+  },
+  "ssl": {
+    "certificates": [
+      {
+        "domain": "example.com",
+        "provider": "letsencrypt",
+        "email": "admin@example.com",
+        "auto_renew": true
+      }
+    ]
+  },
+  "monitoring": {
+    "metrics": {
+      "enabled": true,
+      "endpoint": "/metrics"
+    },
+    "tracing": {
+      "enabled": true,
+      "sample_rate": 0.1
+    }
+  },
+  "security": {
+    "ddos_protection": {
+      "enabled": true,
+      "rate_limit": 100
+    },
+    "access_control": {
+      "enabled": true,
+      "whitelist": ["192.168.1.0/24"]
+    }
+  }
+}
 ```
 
 ## Docker Compose 示例
 
-使用 Docker Compose 的完整设置：
+使用 Docker Compose 的完整设置（注意：实际使用时建议使用 `docker-compose.yml` 文件并保存为 YAML 格式，这里为保持一致性显示为 JSON）：
 
-```yaml
-# docker-compose.yml
-version: '3.8'
-
-services:
-  sslcat:
-    image: sslcat:latest
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./sslcat.conf:/app/sslcat.conf
-      - ./data:/app/data
-    depends_on:
-      - app1
-      - app2
-      - app3
-    networks:
-      - app-network
-
-  app1:
-    image: your-app:latest
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-    networks:
-      - app-network
-
-  app2:
-    image: your-app:latest
-    ports:
-      - "3001:3000"
-    environment:
-      - NODE_ENV=production
-    networks:
-      - app-network
-
-  app3:
-    image: your-app:latest
-    ports:
-      - "3002:3000"
-    environment:
-      - NODE_ENV=production
-    networks:
-      - app-network
-
-networks:
-  app-network:
-    driver: bridge
+```json
+{
+  "version": "3.8",
+  "services": {
+    "sslcat": {
+      "image": "sslcat:latest",
+      "ports": [
+        "80:80",
+        "443:443"
+      ],
+      "volumes": [
+        "./sslcat.conf:/app/sslcat.conf",
+        "./data:/app/data"
+      ],
+      "depends_on": [
+        "app1",
+        "app2",
+        "app3"
+      ],
+      "networks": [
+        "app-network"
+      ]
+    },
+    "app1": {
+      "image": "your-app:latest",
+      "ports": [
+        "3000:3000"
+      ],
+      "environment": [
+        "NODE_ENV=production"
+      ],
+      "networks": [
+        "app-network"
+      ]
+    },
+    "app2": {
+      "image": "your-app:latest",
+      "ports": [
+        "3001:3000"
+      ],
+      "environment": [
+        "NODE_ENV=production"
+      ],
+      "networks": [
+        "app-network"
+      ]
+    },
+    "app3": {
+      "image": "your-app:latest",
+      "ports": [
+        "3002:3000"
+      ],
+      "environment": [
+        "NODE_ENV=production"
+      ],
+      "networks": [
+        "app-network"
+      ]
+    }
+  },
+  "networks": {
+    "app-network": {
+      "driver": "bridge"
+    }
+  }
+}
 ```
 
 ## 测试设置
@@ -435,11 +506,13 @@ docker logs -f sslcat
 ### 调试模式
 启用调试模式进行详细日志记录：
 
-```yaml
-# sslcat.conf
-server:
-  debug: true
-  log_level: "DEBUG"
+```json
+{
+  "server": {
+    "debug": true,
+    "log_level": "DEBUG"
+  }
+}
 ```
 
 ## 最佳实践
