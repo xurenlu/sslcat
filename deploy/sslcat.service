@@ -12,7 +12,7 @@ ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=5
 StandardOutput=null
-StandardError=null
+StandardError=journal
 SyslogIdentifier=sslcat
 
 # Go 运行时内存管理优化
