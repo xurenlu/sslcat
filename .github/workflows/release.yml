@@ -128,8 +128,8 @@ jobs:
           echo "- install-git-hook.sh - Git Hook installation script" >> release-package/README.md
           echo "- README.md - This file" >> release-package/README.md
           
-          # 打包
-          tar -C release-package -czf artifacts/${NAME}.tar.gz .
+          # 打包（强制设置所有者为root，避免GitHub Actions runner UID冲突）
+          tar -C release-package --owner=root --group=root -czf artifacts/${NAME}.tar.gz .
           ls -lh artifacts
 
       - name: Upload Linux artifact
@@ -249,8 +249,8 @@ jobs:
           echo "## Access Panel" >> release-package/README.md
           echo "http://localhost:8080/sslcat-panel" >> release-package/README.md
           
-          # 打包
-          tar -C release-package -czf artifacts/${NAME}.tar.gz .
+          # 打包（强制设置所有者为root，避免GitHub Actions runner UID冲突）
+          tar -C release-package --owner=root --group=root -czf artifacts/${NAME}.tar.gz .
           ls -lh artifacts
 
       - name: Upload macOS artifact
@@ -299,7 +299,7 @@ jobs:
             curl -fsSL https://github.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_darwin-$(uname -m).tar.gz -o sslcat.tgz
             tar -xzf sslcat.tgz && sudo ./install-sslcat.sh
             
-            # Linux AMD64
+            # Linux AMD64  
             curl -fsSL https://github.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-amd64.tar.gz -o sslcat.tgz
             tar -xzf sslcat.tgz && sudo ./install-sslcat.sh
             
@@ -307,6 +307,8 @@ jobs:
             curl -fsSL https://github.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-arm64.tar.gz -o sslcat.tgz
             tar -xzf sslcat.tgz && sudo ./install-sslcat.sh
             ```
+            
+            > **注意**: 所有文件已预设为root权限，确保安装安全性
              
             #### 🖥️ 各平台详细下载地址
             
