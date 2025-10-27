@@ -7,6 +7,7 @@ toolchain go1.25.1
 require github.com/sirupsen/logrus v1.9.3
 
 require (
+	github.com/allegro/bigcache/v3 v3.1.0
 	github.com/andybalholm/brotli v1.2.0
 	github.com/aws/aws-sdk-go-v2 v1.39.4
 	github.com/aws/aws-sdk-go-v2/config v1.31.15

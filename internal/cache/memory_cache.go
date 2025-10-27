@@ -1,22 +1,24 @@
 package cache
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
-	"sync"
 	"time"
 
+	"github.com/allegro/bigcache/v3"
 	"github.com/sirupsen/logrus"
 )
 
 // MemoryCacheItem 统一的内存缓存项
 type MemoryCacheItem struct {
-	Data        []byte
-	Metadata    map[string]interface{} // 额外元数据
-	Size        int64
-	CreatedAt   time.Time
-	ExpiresAt   time.Time // TTL 过期时间
-	LastAccess  time.Time
-	AccessCount int64
+	Data        []byte                 `json:"data"`
+	Metadata    map[string]interface{} `json:"metadata"`
+	Size        int64                  `json:"size"`
+	CreatedAt   time.Time              `json:"created_at"`
+	ExpiresAt   time.Time              `json:"expires_at"`
+	LastAccess  time.Time              `json:"last_access"`
+	AccessCount int64                  `json:"access_count"`
 }
 
 // IsExpired 检查是否过期
@@ -41,7 +43,7 @@ type MemoryCacheConfig struct {
 func DefaultMemoryCacheConfig(name string) *MemoryCacheConfig {
 	return &MemoryCacheConfig{
 		Name:            name,
-		MaxEntries:      100,
+		MaxEntries:      1000,              // 增加到1000，BigCache性能更好
 		MaxSizeBytes:    100 * 1024 * 1024, // 100MB
 		MaxItemSize:     10 * 1024 * 1024,  // 10MB
 		DefaultTTL:      24 * time.Hour,    // 24小时
@@ -49,22 +51,18 @@ func DefaultMemoryCacheConfig(name string) *MemoryCacheConfig {
 	}
 }
 
-// MemoryCache 统一的内存缓存管理器
+// MemoryCache 统一的内存缓存管理器（使用 BigCache 作为底层实现）
 type MemoryCache struct {
-	config    *MemoryCacheConfig
-	cache     map[string]*MemoryCacheItem
-	mutex     sync.RWMutex
-	totalSize int64
-	log       *logrus.Entry
+	cache  *bigcache.BigCache
+	config *bigcache.Config
+	log    *logrus.Entry
+	name   string
 
-	// 统计
+	// 统计信息（手动维护，因为 BigCache 不提供详细统计）
 	hits      uint64
 	misses    uint64
 	evictions uint64
 	expired   uint64
-
-	// 控制
-	stopCleanup chan struct{}
 }
 
 // NewMemoryCache 创建统一的内存缓存管理器
@@ -73,22 +71,34 @@ func NewMemoryCache(config *MemoryCacheConfig) *MemoryCache {
 		config = DefaultMemoryCacheConfig("default")
 	}
 
+	// 转换配置为 BigCache 配置
+	bigCacheConfig := bigcache.DefaultConfig(time.Duration(config.DefaultTTL))
+	bigCacheConfig.Shards = 1024 // 使用更多分片提高并发性能
+	bigCacheConfig.LifeWindow = time.Duration(config.DefaultTTL)
+	bigCacheConfig.CleanWindow = time.Duration(config.CleanupInterval)
+	bigCacheConfig.MaxEntriesInWindow = config.MaxEntries * 10 // 窗口内最大条目
+	bigCacheConfig.MaxEntrySize = int(config.MaxItemSize)
+	bigCacheConfig.HardMaxCacheSize = int(config.MaxSizeBytes / (1024 * 1024)) // 转换为 MB
+	bigCacheConfig.Verbose = false
+	bigCacheConfig.Logger = logrus.New()
+
+	// 创建 BigCache 实例
+	cache, err := bigcache.New(context.Background(), bigCacheConfig)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create BigCache: %v", err))
+	}
+
 	mc := &MemoryCache{
-		config:      config,
-		cache:       make(map[string]*MemoryCacheItem),
-		stopCleanup: make(chan struct{}),
+		cache:  cache,
+		config: &bigCacheConfig,
+		name:   config.Name,
 		log: logrus.WithFields(logrus.Fields{
 			"component": "memory_cache",
 			"name":      config.Name,
 		}),
 	}
 
-	// 启动自动清理
-	if config.CleanupInterval > 0 {
-		go mc.cleanupLoop()
-	}
-
-	mc.log.Infof("Memory cache initialized: max_entries=%d, max_size=%d bytes, ttl=%v",
+	mc.log.Infof("Memory cache initialized with BigCache: max_entries=%d, max_size=%d bytes, ttl=%v",
 		config.MaxEntries, config.MaxSizeBytes, config.DefaultTTL)
 
 	return mc
@@ -96,34 +106,38 @@ func NewMemoryCache(config *MemoryCacheConfig) *MemoryCache {
 
 // Get 获取缓存项
 func (mc *MemoryCache) Get(key string) (*MemoryCacheItem, bool) {
-	mc.mutex.RLock()
-	item, ok := mc.cache[key]
-	mc.mutex.RUnlock()
-
-	if !ok {
+	data, err := mc.cache.Get(key)
+	if err != nil {
 		mc.misses++
+		return nil, false
+	}
+
+	// 反序列化缓存项
+	var item MemoryCacheItem
+	if err := json.Unmarshal(data, &item); err != nil {
+		mc.misses++
+		mc.log.Errorf("Failed to unmarshal cache item: %v", err)
 		return nil, false
 	}
 
 	// 检查是否过期
 	if item.IsExpired() {
-		mc.mutex.Lock()
-		delete(mc.cache, key)
-		mc.totalSize -= item.Size
-		mc.mutex.Unlock()
+		mc.cache.Delete(key)
 		mc.misses++
 		mc.expired++
 		return nil, false
 	}
 
 	// 更新访问信息
-	mc.mutex.Lock()
 	item.LastAccess = time.Now()
 	item.AccessCount++
-	mc.mutex.Unlock()
+
+	// 重新序列化并存储（更新访问时间）
+	updatedData, _ := json.Marshal(item)
+	mc.cache.Set(key, updatedData)
 
 	mc.hits++
-	return item, true
+	return &item, true
 }
 
 // Set 设置缓存项
@@ -136,204 +150,76 @@ func (mc *MemoryCache) SetWithMetadata(key string, data []byte, metadata map[str
 	size := int64(len(data))
 
 	// 检查单个项大小
-	if mc.config.MaxItemSize > 0 && size > mc.config.MaxItemSize {
-		return fmt.Errorf("item too large: %d bytes (max: %d)", size, mc.config.MaxItemSize)
-	}
-
-	mc.mutex.Lock()
-	defer mc.mutex.Unlock()
-
-	// 如果已存在，先减去旧的大小
-	if old, exists := mc.cache[key]; exists {
-		mc.totalSize -= old.Size
-	}
-
-	// 检查是否需要驱逐
-	for mc.totalSize+size > mc.config.MaxSizeBytes || len(mc.cache) >= mc.config.MaxEntries {
-		if !mc.evictOne() {
-			return fmt.Errorf("failed to evict items to make space")
-		}
+	if size > int64(mc.config.MaxEntrySize) {
+		return fmt.Errorf("item too large: %d bytes (max: %d)", size, mc.config.MaxEntrySize)
 	}
 
 	// 确定过期时间
 	var expiresAt time.Time
 	if ttl > 0 {
 		expiresAt = time.Now().Add(ttl)
-	} else if mc.config.DefaultTTL > 0 {
-		expiresAt = time.Now().Add(mc.config.DefaultTTL)
+	} else if mc.config.LifeWindow > 0 {
+		expiresAt = time.Now().Add(mc.config.LifeWindow)
 	}
-	// 否则 expiresAt 保持零值（永不过期）
 
-	// 添加新项
-	now := time.Now()
-	mc.cache[key] = &MemoryCacheItem{
+	// 创建缓存项
+	item := &MemoryCacheItem{
 		Data:        data,
 		Metadata:    metadata,
 		Size:        size,
-		CreatedAt:   now,
+		CreatedAt:   time.Now(),
 		ExpiresAt:   expiresAt,
-		LastAccess:  now,
+		LastAccess:  time.Now(),
 		AccessCount: 0,
 	}
-	mc.totalSize += size
 
-	return nil
+	// 序列化
+	itemData, err := json.Marshal(item)
+	if err != nil {
+		return fmt.Errorf("failed to marshal cache item: %w", err)
+	}
+
+	// 存储到 BigCache
+	return mc.cache.Set(key, itemData)
 }
 
 // Delete 删除缓存项
 func (mc *MemoryCache) Delete(key string) bool {
-	mc.mutex.Lock()
-	defer mc.mutex.Unlock()
-
-	if item, ok := mc.cache[key]; ok {
-		delete(mc.cache, key)
-		mc.totalSize -= item.Size
-		return true
-	}
-	return false
+	err := mc.cache.Delete(key)
+	return err == nil
 }
 
 // Clear 清空所有缓存
 func (mc *MemoryCache) Clear() {
-	mc.mutex.Lock()
-	defer mc.mutex.Unlock()
-
-	mc.cache = make(map[string]*MemoryCacheItem)
-	mc.totalSize = 0
+	mc.cache.Reset()
 	mc.log.Info("Cache cleared")
-}
-
-// evictOne 驱逐一个最久未使用的项（需要持有锁）
-func (mc *MemoryCache) evictOne() bool {
-	if len(mc.cache) == 0 {
-		return false
-	}
-
-	// 找到最久未访问的项
-	var oldestKey string
-	var oldestTime time.Time
-
-	for key, item := range mc.cache {
-		if oldestKey == "" || item.LastAccess.Before(oldestTime) {
-			oldestKey = key
-			oldestTime = item.LastAccess
-		}
-	}
-
-	if oldestKey != "" {
-		item := mc.cache[oldestKey]
-		delete(mc.cache, oldestKey)
-		mc.totalSize -= item.Size
-		mc.evictions++
-		mc.log.Debugf("Evicted item: key=%s, size=%d bytes, age=%v",
-			oldestKey, item.Size, time.Since(item.CreatedAt))
-		return true
-	}
-
-	return false
-}
-
-// cleanupLoop 定期清理过期项
-func (mc *MemoryCache) cleanupLoop() {
-	// 使用质数间隔避免与其他定时器同时触发（7分钟）
-	cleanupInterval := mc.config.CleanupInterval
-	if cleanupInterval == 5*time.Minute {
-		cleanupInterval = 7 * time.Minute
-	}
-
-	ticker := time.NewTicker(cleanupInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			mc.cleanupExpired()
-		case <-mc.stopCleanup:
-			return
-		}
-	}
-}
-
-// cleanupExpired 清理过期项
-func (mc *MemoryCache) cleanupExpired() {
-	mc.mutex.Lock()
-	defer mc.mutex.Unlock()
-
-	var expiredKeys []string
-	now := time.Now()
-
-	for key, item := range mc.cache {
-		if !item.ExpiresAt.IsZero() && now.After(item.ExpiresAt) {
-			expiredKeys = append(expiredKeys, key)
-		}
-	}
-
-	if len(expiredKeys) > 0 {
-		for _, key := range expiredKeys {
-			if item, ok := mc.cache[key]; ok {
-				delete(mc.cache, key)
-				mc.totalSize -= item.Size
-				mc.expired++
-			}
-		}
-		mc.log.Infof("Cleaned up %d expired items", len(expiredKeys))
-	}
 }
 
 // Stats 获取统计信息
 func (mc *MemoryCache) Stats() map[string]interface{} {
-	mc.mutex.RLock()
-	defer mc.mutex.RUnlock()
-
-	hitRate := float64(0)
-	total := mc.hits + mc.misses
-	if total > 0 {
-		hitRate = float64(mc.hits) / float64(total) * 100
-	}
-
+	stats := mc.cache.Len()
 	return map[string]interface{}{
-		"name":        mc.config.Name,
-		"entries":     len(mc.cache),
-		"max_entries": mc.config.MaxEntries,
-		"total_size":  mc.totalSize,
-		"max_size":    mc.config.MaxSizeBytes,
-		"hits":        mc.hits,
-		"misses":      mc.misses,
-		"hit_rate":    fmt.Sprintf("%.2f%%", hitRate),
-		"evictions":   mc.evictions,
-		"expired":     mc.expired,
+		"entries":          stats,
+		"hits":             mc.hits,
+		"misses":           mc.misses,
+		"evictions":        mc.evictions,
+		"expired":          mc.expired,
+		"hit_rate":         float64(mc.hits) / float64(mc.hits+mc.misses) * 100,
+		"cache_size_bytes": int64(stats) * 1024, // 估算
 	}
 }
 
-// Close 关闭缓存管理器
-func (mc *MemoryCache) Close() {
-	close(mc.stopCleanup)
-	mc.Clear()
-	mc.log.Info("Memory cache closed")
-}
-
-// GetKeys 获取所有键（用于调试）
-func (mc *MemoryCache) GetKeys() []string {
-	mc.mutex.RLock()
-	defer mc.mutex.RUnlock()
-
-	keys := make([]string, 0, len(mc.cache))
-	for key := range mc.cache {
-		keys = append(keys, key)
-	}
-	return keys
-}
-
-// GetSize 获取当前缓存大小
+// GetSize 获取当前缓存大小（字节）
 func (mc *MemoryCache) GetSize() int64 {
-	mc.mutex.RLock()
-	defer mc.mutex.RUnlock()
-	return mc.totalSize
+	// BigCache 不直接提供大小信息，我们通过条目数估算
+	entries := mc.cache.Len()
+	// 估算每个条目平均大小（包括序列化开销）
+	avgSize := int64(1024) // 1KB 作为平均大小
+	return int64(entries) * avgSize
 }
 
-// GetCount 获取当前缓存项数量
-func (mc *MemoryCache) GetCount() int {
-	mc.mutex.RLock()
-	defer mc.mutex.RUnlock()
-	return len(mc.cache)
+// Close 关闭缓存
+func (mc *MemoryCache) Close() {
+	mc.cache.Close()
+	mc.log.Info("Memory cache closed")
 }
