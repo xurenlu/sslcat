@@ -72,6 +72,7 @@ export const ruRU: Translation = {
     userManagement: 'Управление пользователями',
     changePassword: 'Изменить пароль',
     statistics: 'Статистика Доступа',
+    slowRequests: 'Анализ Медленных Запросов',
     imageOptimization: 'Оптимизация Изображений',
   },
   dashboard: {

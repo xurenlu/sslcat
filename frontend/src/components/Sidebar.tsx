@@ -34,6 +34,7 @@ import {
   FiBarChart2,
   FiImage,
   FiServer,
+  FiClock,
 } from 'react-icons/fi'
 import { FaRobot } from 'react-icons/fa'
 
@@ -111,6 +112,7 @@ const SidebarContent = () => {
     { name: t.navigation.ssl, icon: FiShield, path: buildPath(adminPrefix, '/ssl') },
     { name: t.navigation.cdnCache, icon: FiHardDrive, path: buildPath(adminPrefix, '/cdn') },
     { name: t.navigation.statistics, icon: FiBarChart2, path: buildPath(adminPrefix, '/statistics') },
+    { name: t.navigation.slowRequests, icon: FiClock, path: buildPath(adminPrefix, '/slow-requests') },
     { name: t.navigation.settings, icon: FiSettings, path: buildPath(adminPrefix, '/settings') },
     { name: t.navigation.dns, icon: FiGlobe, path: buildPath(adminPrefix, '/dns') },
     { name: t.navigation.security, icon: FiShield, path: buildPath(adminPrefix, '/security') },

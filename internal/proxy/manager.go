@@ -57,20 +57,24 @@ type Manager struct {
 
 	// 响应处理器（可选，用于图片优化等）
 	responseProcessor ResponseProcessor
+
+	// 慢请求记录器
+	slowRequestRecorder SlowRequestRecorder
 }
 
 // NewManager 创建代理管理器
 func NewManager(cfg *config.Config, sslMgr *ssl.Manager, secMgr *security.Manager, cdn *cache.CDNCache, version string) *Manager {
 	manager := &Manager{
-		config:          cfg,
-		sslManager:      sslMgr,
-		securityManager: secMgr,
-		proxyCache:      make(map[string]*httputil.ReverseProxy),
-		cdnCache:        cdn,
-		upstreamCache:   cache.NewUpstreamCache(cfg),
-		version:         version,
-		loadBalancers:   make(map[string]loadbalancer.BalancerInterface),
-		lbFactory:       loadbalancer.NewBalancerFactory(),
+		config:              cfg,
+		sslManager:          sslMgr,
+		securityManager:     secMgr,
+		proxyCache:          make(map[string]*httputil.ReverseProxy),
+		cdnCache:            cdn,
+		upstreamCache:       cache.NewUpstreamCache(cfg),
+		version:             version,
+		loadBalancers:       make(map[string]loadbalancer.BalancerInterface),
+		lbFactory:           loadbalancer.NewBalancerFactory(),
+		slowRequestRecorder: &NoOpSlowRequestRecorder{}, // 默认使用空操作记录器
 		log: logrus.WithFields(logrus.Fields{
 			"component": "proxy_manager",
 		}),
@@ -80,6 +84,11 @@ func NewManager(cfg *config.Config, sslMgr *ssl.Manager, secMgr *security.Manage
 	manager.initializeLoadBalancers()
 
 	return manager
+}
+
+// SetSlowRequestRecorder 设置慢请求记录器
+func (m *Manager) SetSlowRequestRecorder(recorder SlowRequestRecorder) {
+	m.slowRequestRecorder = recorder
 }
 
 // SetResponseProcessor 设置响应处理器
@@ -462,6 +471,34 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 
 		// 记录响应详情
 		m.logResponseDetails(resp, rule)
+
+		// 检查并记录慢请求
+		if m.slowRequestRecorder.IsSlowRequest(responseTime) {
+			// 获取内容大小
+			contentSize := int64(0)
+			if resp.ContentLength > 0 {
+				contentSize = resp.ContentLength
+			}
+
+			// 获取规则名称（使用Domain作为规则名）
+			ruleName := ""
+			if rule != nil {
+				ruleName = rule.Domain
+			}
+
+			// 记录慢请求
+			m.slowRequestRecorder.RecordSlowRequest(
+				resp.Request,
+				resp.StatusCode,
+				responseTime,
+				backend.ID,
+				backend.GetAddress(),
+				rule.Target,
+				ruleName,
+				contentSize,
+				nil, // 这里可以传递错误信息
+			)
+		}
 
 		if originalModify != nil {
 			if err := originalModify(resp); err != nil {

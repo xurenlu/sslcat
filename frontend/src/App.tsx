@@ -24,6 +24,7 @@ import UserManagement from './pages/UserManagement'
 import ChangePassword from './pages/ChangePassword'
 import CDNManagement from './pages/CDNManagement'
 import Statistics from './pages/Statistics'
+import SlowRequests from './pages/SlowRequests'
 import AISecurityAnalysis from './pages/AISecurityAnalysis'
 import ImageOptimization from './pages/ImageOptimization'
 import FirstTimeSetup from './pages/FirstTimeSetup'
@@ -161,6 +162,11 @@ const AppRoutes: React.FC = () => {
       <Route path={`${adminPrefix}/statistics`} element={
         <AuthGuard>
           <Statistics />
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/slow-requests`} element={
+        <AuthGuard>
+          <SlowRequests />
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/cluster`} element={

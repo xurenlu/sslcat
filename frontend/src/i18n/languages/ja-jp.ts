@@ -72,6 +72,7 @@ export const jaJP: Translation = {
     userManagement: 'ユーザー管理',
     changePassword: 'パスワード変更',
     statistics: 'アクセス統計',
+    slowRequests: 'スロークエスト分析',
     imageOptimization: '画像最適化',
   },
   dashboard: {

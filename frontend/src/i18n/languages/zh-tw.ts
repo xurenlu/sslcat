@@ -72,6 +72,7 @@ export const zhTW: Translation = {
     userManagement: '使用者管理',
     changePassword: '修改密碼',
     statistics: '訪問統計',
+    slowRequests: '慢請求分析',
     imageOptimization: '圖片最佳化',
   },
   dashboard: {

@@ -72,6 +72,7 @@ export const deDE: Translation = {
     userManagement: 'Benutzerverwaltung',
     changePassword: 'Passwort ändern',
     statistics: 'Zugriffstatistiken',
+    slowRequests: 'Langsame Anfragen',
     imageOptimization: 'Bildoptimierung',
   },
   dashboard: {

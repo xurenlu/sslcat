@@ -31,6 +31,7 @@ import (
 	"github.com/xurenlu/sslcat/internal/proxy"
 	"github.com/xurenlu/sslcat/internal/runner"
 	"github.com/xurenlu/sslcat/internal/security"
+	"github.com/xurenlu/sslcat/internal/slowrequest"
 	"github.com/xurenlu/sslcat/internal/ssl"
 	"github.com/xurenlu/sslcat/internal/statistics"
 	"github.com/xurenlu/sslcat/internal/tracing"
@@ -113,6 +114,8 @@ type Server struct {
 
 	// 监控管理器
 	monitorManager *monitor.Manager
+	// 慢请求管理器
+	slowRequestManager *slowrequest.Manager
 
 	// Cluster runtime status
 	clusterLastConfigSyncAt      time.Time
@@ -138,6 +141,9 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		tracing.NewRateSampler(0.1),
 		tracing.NewLogReporter(),
 	)
+
+	// 初始化慢请求管理器（记录超过500ms的请求，最多保存1000条记录）
+	slowRequestManager := slowrequest.NewManager(1000, 500*time.Millisecond)
 
 	// 初始化图片优化器
 	imageOptConfig := &imageopt.Config{
@@ -206,23 +212,24 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	templateRenderer := NewTemplateRenderer(translator)
 
 	server := &Server{
-		config:            cfg,
-		proxyManager:      proxyMgr,
-		securityManager:   secMgr,
-		sslManager:        sslMgr,
-		notifier:          notify.NewFromEnv(),
-		templateRenderer:  templateRenderer,
-		translator:        translator,
-		mux:               http.NewServeMux(),
-		startTime:         time.Now(),
-		version:           version,
-		gitServer:         gitServer,
-		compressor:        compressor,
-		compressionCache:  compressionCache,
-		prometheusMetrics: prometheusMetrics,
-		tracer:            tracer,
-		imageOptimizer:    imageOptimizer,
-		wafEngine:         wafEngine,
+		config:             cfg,
+		proxyManager:       proxyMgr,
+		securityManager:    secMgr,
+		sslManager:         sslMgr,
+		notifier:           notify.NewFromEnv(),
+		templateRenderer:   templateRenderer,
+		translator:         translator,
+		mux:                http.NewServeMux(),
+		startTime:          time.Now(),
+		version:            version,
+		gitServer:          gitServer,
+		compressor:         compressor,
+		compressionCache:   compressionCache,
+		prometheusMetrics:  prometheusMetrics,
+		tracer:             tracer,
+		imageOptimizer:     imageOptimizer,
+		wafEngine:          wafEngine,
+		slowRequestManager: slowRequestManager,
 		log: logrus.WithFields(logrus.Fields{
 			"component": "web_server",
 		}),
@@ -279,6 +286,10 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	statsEnabled := true // 默认启用，可以通过配置控制
 	server.statisticsCollector = statistics.NewCollector("./data/statistics", statsEnabled)
 	server.statisticsAPI = NewStatisticsAPI(server.statisticsCollector, server)
+
+	// 设置慢请求记录器到代理管理器
+	slowRequestAdapter := slowrequest.NewAdapter(server.slowRequestManager)
+	server.proxyManager.SetSlowRequestRecorder(slowRequestAdapter)
 
 	// 初始化静态文件处理器
 	server.staticHandler = NewStaticFileHandler(cfg)
@@ -809,6 +820,10 @@ func (s *Server) setupRoutes() {
 	if s.statisticsAPI != nil {
 		s.statisticsAPI.RegisterRoutes(s.mux, s.config.AdminPrefix+"/api")
 	}
+
+	// 慢请求API
+	slowRequestAPI := NewSlowRequestAPI(s.slowRequestManager, s)
+	slowRequestAPI.RegisterRoutes(s.mux, s.config.AdminPrefix+"/api")
 
 	// Prometheus 指标
 	s.mux.Handle("/metrics", s.prometheusMetrics.Handler())

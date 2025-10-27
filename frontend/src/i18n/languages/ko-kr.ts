@@ -72,6 +72,7 @@ export const koKR: Translation = {
     userManagement: '사용자 관리',
     changePassword: '비밀번호 변경',
     statistics: '접근 통계',
+    slowRequests: '느린 요청 분석',
     imageOptimization: '이미지 최적화',
   },
   dashboard: {

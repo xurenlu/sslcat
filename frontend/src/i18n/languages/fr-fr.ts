@@ -72,6 +72,7 @@ export const frFR: Translation = {
     userManagement: 'Gestion des Utilisateurs',
     changePassword: 'Changer le Mot de Passe',
     statistics: 'Statistiques d\'Accès',
+    slowRequests: 'Requêtes Lentes',
     imageOptimization: 'Optimisation d\'Images',
   },
   dashboard: {

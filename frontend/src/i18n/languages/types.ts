@@ -74,6 +74,7 @@ export interface Translation {
     userManagement: string
     changePassword: string
     statistics: string
+    slowRequests: string
     imageOptimization: string
     cluster?: string
     clusterStatus?: string
@@ -344,6 +345,47 @@ export interface Translation {
     uaMinOccurrences: string
     cityMinOccurrences: string
     visits: string
+  }
+  
+  // 慢请求分析
+  slowRequests?: {
+    title: string
+    subtitle: string
+    totalSlowRequests: string
+    averageResponseTime: string
+    slowestResponseTime: string
+    threshold: string
+    thresholdDescription: string
+    recentRecords: string
+    records: string
+    searchPlaceholder: string
+    viewDetails: string
+    recordDetails: string
+    timestamp: string
+    method: string
+    url: string
+    host: string
+    statusCode: string
+    responseTime: string
+    backend: string
+    backendAddr: string
+    ruleName: string
+    clientIP: string
+    userAgent: string
+    contentType: string
+    contentSize: string
+    error: string
+    actions: string
+    noRecords: string
+    noRecordsDescription: string
+    exportRecords: string
+    exportStats: string
+    clearRecords: string
+    loadError: string
+    clearSuccess: string
+    clearError: string
+    exportSuccess: string
+    exportError: string
   }
   
   // 设置页面

@@ -72,6 +72,7 @@ export const esES: Translation = {
     userManagement: 'Gestión de Usuarios',
     changePassword: 'Cambiar Contraseña',
     statistics: 'Estadísticas de Acceso',
+    slowRequests: 'Solicitudes Lentas',
     imageOptimization: 'Optimización de Imágenes',
   },
   dashboard: {
