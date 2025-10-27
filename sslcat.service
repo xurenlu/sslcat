@@ -1,5 +1,5 @@
 [Unit]
-Description=SSLcat SSL Proxy Server
+Description=SSLcat Web Server & Reverse Proxy
 After=network.target
 
 [Service]
@@ -11,9 +11,14 @@ ExecStart=/opt/sslcat/sslcat --config /etc/sslcat/sslcat.conf
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=5
-StandardOutput=journal
+StandardOutput=null
 StandardError=journal
 SyslogIdentifier=sslcat
+
+# Go 运行时内存管理优化
+Environment="GOMEMLIMIT=1280MiB"
+Environment="GOGC=100"
+Environment="GODEBUG=madvdontneed=1"
 
 # 安全设置
 NoNewPrivileges=true
