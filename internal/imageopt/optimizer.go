@@ -123,11 +123,11 @@ func NewOptimizer(config *Config) *Optimizer {
 	if config.CacheEnabled {
 		opt.memCache = cache.NewMemoryCache(&cache.MemoryCacheConfig{
 			Name:            "image_optimization",
-			MaxEntries:      500,                                          // 图片数量多
+			MaxEntries:      200,                                          // 从500减少到200
 			MaxSizeBytes:    config.MaxCacheSize,                          // 使用配置的最大缓存大小
-			MaxItemSize:     5 * 1024 * 1024,                              // 从10MB降到5MB
+			MaxItemSize:     2 * 1024 * 1024,                              // 从5MB降到2MB
 			DefaultTTL:      time.Duration(config.CacheTTL) * time.Second, // 使用配置的 TTL
-			CleanupInterval: 2 * time.Minute,                              // 从10分钟改为2分钟
+			CleanupInterval: 1 * time.Minute,                              // 从2分钟改为1分钟，更频繁清理
 		})
 	}
 

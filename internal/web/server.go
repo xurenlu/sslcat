@@ -126,8 +126,8 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	// 初始化压缩器
 	compressor := compression.NewCompressor(compression.FromConfig(cfg))
 
-	// 初始化压缩缓存（最多1000个条目，单个最大10MB，总大小最大500MB）
-	compressionCache := NewCompressionCache(1000, 10, 500)
+	// 初始化压缩缓存（最多500个条目，单个最大5MB，总大小最大100MB）
+	compressionCache := NewCompressionCache(500, 5, 100)
 
 	// 初始化Prometheus指标
 	prometheusMetrics := metrics.NewPrometheusMetrics()
@@ -177,7 +177,7 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		imageOptConfig.CacheTTL = 86400
 	}
 	if imageOptConfig.MaxCacheSize == 0 {
-		imageOptConfig.MaxCacheSize = 1024 * 1024 * 1024
+		imageOptConfig.MaxCacheSize = 200 * 1024 * 1024 // 从1GB减少到200MB
 	}
 	imageOptimizer := imageopt.NewOptimizer(imageOptConfig)
 
