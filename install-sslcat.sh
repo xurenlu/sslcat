@@ -28,6 +28,31 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# 带超时的用户输入函数
+read_with_timeout() {
+    local prompt="$1"
+    local timeout="$2"
+    local default="$3"
+    
+    echo -e "${YELLOW}${prompt}${NC}"
+    if [[ -n "$default" ]]; then
+        echo -e "${YELLOW}超时 ${timeout} 秒后将自动选择: ${default}${NC}"
+    fi
+    
+    read -p "请选择 (y/N): " -n 1 -r -t "$timeout"
+    echo
+    
+    # 如果超时或用户没有输入，使用默认值
+    if [[ -z "$REPLY" ]]; then
+        if [[ "$default" == "y" || "$default" == "Y" ]]; then
+            REPLY="y"
+        else
+            REPLY="N"
+        fi
+        echo -e "${BLUE}超时，自动选择: ${REPLY}${NC}"
+    fi
+}
+
 # 检查是否为 root 用户
 check_root() {
     if [[ $EUID -ne 0 ]]; then
@@ -57,8 +82,7 @@ check_existing_installation() {
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
         if systemctl is-active --quiet sslcat 2>/dev/null; then
             log_warning "检测到 SSLcat 服务正在运行"
-            read -p "是否要停止现有服务并重新安装？(y/N): " -n 1 -r
-            echo
+            read_with_timeout "是否要停止现有服务并重新安装？选择 y 将停止服务并继续安装，选择 N 将取消安装" 30 "N"
             if [[ $REPLY =~ ^[Yy]$ ]]; then
                 log_info "停止现有服务..."
                 systemctl stop sslcat || true
@@ -70,8 +94,7 @@ check_existing_installation() {
         
         if [[ -f /opt/sslcat/sslcat ]]; then
             log_warning "检测到现有 SSLcat 安装"
-            read -p "是否要覆盖现有安装？(y/N): " -n 1 -r
-            echo
+            read_with_timeout "是否要覆盖现有安装？选择 y 将覆盖现有安装，选择 N 将取消安装" 30 "N"
             if [[ ! $REPLY =~ ^[Yy]$ ]]; then
                 log_info "安装已取消"
                 exit 0
@@ -83,8 +106,7 @@ check_existing_installation() {
     if [[ "$OSTYPE" == "darwin"* ]]; then
         if [[ -f /usr/local/bin/sslcat ]]; then
             log_warning "检测到现有 SSLcat 安装"
-            read -p "是否要覆盖现有安装？(y/N): " -n 1 -r
-            echo
+            read_with_timeout "是否要覆盖现有安装？选择 y 将覆盖现有安装，选择 N 将取消安装" 30 "N"
             if [[ ! $REPLY =~ ^[Yy]$ ]]; then
                 log_info "安装已取消"
                 exit 0
@@ -354,10 +376,10 @@ install_config() {
             log_warning "检测到现有配置文件与安装包中的配置文件不同"
             show_config_diff "./sslcat.conf" "$target_config"
             echo
-            read -p "是否要覆盖现有配置文件？(y/N): " -n 1 -r
-            echo
+            read_with_timeout "是否要覆盖现有配置文件？选择 y 将覆盖现有配置，选择 N 将保留现有配置。建议：如果现有配置已正常工作，建议选择 N 保留现有配置" 45 "N"
             if [[ ! $REPLY =~ ^[Yy]$ ]]; then
                 log_info "保留现有配置文件，跳过配置文件安装"
+                log_info "如需手动更新配置，请参考上述差异对比"
                 return 0
             fi
             
