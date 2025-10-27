@@ -1204,6 +1204,11 @@ func (s *Server) proxyMiddleware(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 
+	// 如果是调试路径，跳过代理
+	if strings.HasPrefix(r.URL.Path, "/debug/") {
+		return false
+	}
+
 	// 若命中 PHP 站点，则先交给 PHP 处理
 	if s.tryServePHP(w, r) {
 		return true
