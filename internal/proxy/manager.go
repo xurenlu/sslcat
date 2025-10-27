@@ -1706,6 +1706,11 @@ func (m *Manager) Validate(newConfig *config.Config) error {
 
 // logRequestDetails 记录请求详情
 func (m *Manager) logRequestDetails(r *http.Request, requestType string, rule *config.ProxyRule) {
+	// 只在调试模式下记录详细请求信息
+	if !m.config.Server.Debug {
+		return
+	}
+
 	// 构建目标地址信息
 	targetInfo := "unknown"
 	if rule != nil {
@@ -1718,20 +1723,17 @@ func (m *Manager) logRequestDetails(r *http.Request, requestType string, rule *c
 		actualHost = r.Host
 	}
 
-	// 只在调试模式下记录详细请求信息
-	if m.config.Server.Debug {
-		m.log.WithFields(logrus.Fields{
-			"type":           requestType,
-			"method":         r.Method,
-			"url":            r.URL.String(),
-			"host":           actualHost,
-			"target":         targetInfo,
-			"user_agent":     r.Header.Get("User-Agent"),
-			"client_ip":      m.getClientIP(r),
-			"content_type":   r.Header.Get("Content-Type"),
-			"content_length": r.ContentLength,
-		}).Debug("HTTP请求详情")
-	}
+	m.log.WithFields(logrus.Fields{
+		"type":           requestType,
+		"method":         r.Method,
+		"url":            r.URL.String(),
+		"host":           actualHost,
+		"target":         targetInfo,
+		"user_agent":     r.Header.Get("User-Agent"),
+		"client_ip":      m.getClientIP(r),
+		"content_type":   r.Header.Get("Content-Type"),
+		"content_length": r.ContentLength,
+	}).Debug("HTTP请求详情")
 
 	// 记录重要的请求头部
 	importantHeaders := []string{
@@ -1789,24 +1791,26 @@ func (m *Manager) logRequestDetails(r *http.Request, requestType string, rule *c
 
 // logResponseDetails 记录响应详情
 func (m *Manager) logResponseDetails(resp *http.Response, rule *config.ProxyRule) {
+	// 只在调试模式下记录详细响应信息
+	if !m.config.Server.Debug {
+		return
+	}
+
 	// 构建目标地址信息
 	targetInfo := "unknown"
 	if rule != nil {
 		targetInfo = m.buildTargetInfo(rule)
 	}
 
-	// 只在调试模式下记录详细响应信息
-	if m.config.Server.Debug {
-		m.log.WithFields(logrus.Fields{
-			"type":           "RESPONSE",
-			"status_code":    resp.StatusCode,
-			"status":         resp.Status,
-			"target":         targetInfo,
-			"content_type":   resp.Header.Get("Content-Type"),
-			"content_length": resp.ContentLength,
-			"server":         resp.Header.Get("Server"),
-		}).Debug("HTTP响应详情")
-	}
+	m.log.WithFields(logrus.Fields{
+		"type":           "RESPONSE",
+		"status_code":    resp.StatusCode,
+		"status":         resp.Status,
+		"target":         targetInfo,
+		"content_type":   resp.Header.Get("Content-Type"),
+		"content_length": resp.ContentLength,
+		"server":         resp.Header.Get("Server"),
+	}).Debug("HTTP响应详情")
 
 	// 记录重要的响应头部
 	importantHeaders := []string{
@@ -1939,11 +1943,11 @@ func (m *Manager) extractHostFromTarget(target string, port int) string {
 
 // RoundTrip 实现http.RoundTripper接口，记录实际发送的请求
 func (lt *loggingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	// 构造等效的curl命令
-	curlCmd := lt.buildCurlCommand(req)
-
 	// 只在调试模式下记录详细的上游请求信息
 	if lt.config.Server.Debug {
+		// 构造等效的curl命令
+		curlCmd := lt.buildCurlCommand(req)
+
 		lt.log.WithFields(logrus.Fields{
 			"type":           "ACTUAL_OUTGOING_REQUEST",
 			"method":         req.Method,
@@ -1958,56 +1962,56 @@ func (lt *loggingTransport) RoundTrip(req *http.Request) (*http.Response, error)
 
 		// 单独记录curl命令，便于复制
 		lt.log.Debugf("等效的curl命令: %s", curlCmd)
-	}
 
-	// 记录重要的请求头部
-	importantHeaders := []string{
-		"Authorization",
-		"Cookie",
-		"X-Forwarded-For",
-		"X-Real-IP",
-		"X-Forwarded-Proto",
-		"X-Forwarded-Host",
-		"Accept",
-		"Accept-Encoding",
-		"Accept-Language",
-		"Cache-Control",
-		"Referer",
-		// 追踪头部
-		"traceparent",
-		"tracestate",
-		"X-Trace-ID",
-		"X-Span-ID",
-		"X-Request-ID",
-		"X-B3-TraceId",
-		"X-B3-SpanId",
-		"X-B3-ParentSpanId",
-		"X-Cloud-Trace-Context",
-		"X-Amzn-Trace-Id",
-		"baggage",
-	}
+		// 记录重要的请求头部
+		importantHeaders := []string{
+			"Authorization",
+			"Cookie",
+			"X-Forwarded-For",
+			"X-Real-IP",
+			"X-Forwarded-Proto",
+			"X-Forwarded-Host",
+			"Accept",
+			"Accept-Encoding",
+			"Accept-Language",
+			"Cache-Control",
+			"Referer",
+			// 追踪头部
+			"traceparent",
+			"tracestate",
+			"X-Trace-ID",
+			"X-Span-ID",
+			"X-Request-ID",
+			"X-B3-TraceId",
+			"X-B3-SpanId",
+			"X-B3-ParentSpanId",
+			"X-Cloud-Trace-Context",
+			"X-Amzn-Trace-Id",
+			"baggage",
+		}
 
-	headers := make(map[string]string)
-	for _, header := range importantHeaders {
-		if value := req.Header.Get(header); value != "" {
-			// 对敏感信息进行脱敏处理
-			if header == "Authorization" || header == "Cookie" {
-				if len(value) > 20 {
-					headers[header] = value[:20] + "..."
+		headers := make(map[string]string)
+		for _, header := range importantHeaders {
+			if value := req.Header.Get(header); value != "" {
+				// 对敏感信息进行脱敏处理
+				if header == "Authorization" || header == "Cookie" {
+					if len(value) > 20 {
+						headers[header] = value[:20] + "..."
+					} else {
+						headers[header] = "***"
+					}
 				} else {
-					headers[header] = "***"
+					headers[header] = value
 				}
-			} else {
-				headers[header] = value
 			}
 		}
-	}
 
-	if len(headers) > 0 {
-		lt.log.WithFields(logrus.Fields{
-			"type":    "ACTUAL_OUTGOING_REQUEST",
-			"headers": headers,
-		}).Debug("实际发送的请求头部信息")
+		if len(headers) > 0 {
+			lt.log.WithFields(logrus.Fields{
+				"type":    "ACTUAL_OUTGOING_REQUEST",
+				"headers": headers,
+			}).Debug("实际发送的请求头部信息")
+		}
 	}
 
 	// 执行实际的请求
