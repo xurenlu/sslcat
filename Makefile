@@ -201,6 +201,20 @@ docker-cgo-zig:
 	@./build-cgo-zig.sh
 	@echo "✅ CGO二进制文件已提取到 $(BUILD_DIR)/sslcat-linux-amd64-cgo"
 
+# 使用 Zig + Alpine 快速编译静态链接版本（最快、最小）
+.PHONY: build-zig-alpine
+build-zig-alpine:
+	@echo "使用 Zig + Alpine 快速编译静态链接版本..."
+	@./build-zig-alpine.sh
+	@echo "✅ 静态链接二进制文件已提取到 $(BUILD_DIR)/sslcat-linux-amd64-static"
+
+# 使用 Zig + Debian 编译 GLIBC 兼容版本
+.PHONY: build-zig-cgo
+build-zig-cgo:
+	@echo "使用 Zig + Debian 编译 GLIBC 兼容版本..."
+	@./build-zig-cgo.sh
+	@echo "✅ GLIBC 兼容二进制文件已提取到 $(BUILD_DIR)/sslcat-linux-amd64-cgo"
+
 # 构建 ARM64 CGO 版本（适用于 ARM64 Linux 服务器）
 .PHONY: docker-cgo-arm64
 docker-cgo-arm64:
@@ -263,6 +277,8 @@ help:
 	@echo "  docker-cgo   - 创建CGO Docker镜像（中国优化版）"
 	@echo "  docker-cgo-extract - 构建CGO镜像并提取二进制文件"
 	@echo "  docker-cgo-zig - 使用Zig交叉编译AMD64 CGO版本（推荐）"
+	@echo "  build-zig-alpine - 使用Zig+Alpine编译静态链接版本（最快）"
+	@echo "  build-zig-cgo - 使用Zig+Debian编译GLIBC兼容版本"
 	@echo "  docker-cgo-arm64 - 构建ARM64 CGO版本"
 	@echo "  docker-run   - 运行Docker容器"
 	@echo "  docker-stop  - 停止Docker容器"

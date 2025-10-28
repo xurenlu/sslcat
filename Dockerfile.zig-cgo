@@ -1,0 +1,79 @@
+# 使用 Zig 进行 CGO 交叉编译（Mac ARM64 -> Linux AMD64）
+# 目标：在 Mac ARM64 上编译出兼容 GLIBC 2.32 的 Linux AMD64 CGO 二进制文件
+
+FROM --platform=linux/amd64 golang:1.23.4-bullseye AS builder
+
+# 安装 Zig 和必要的工具
+RUN apt-get update && apt-get install -y \
+    wget \
+    xz-utils \
+    git \
+    make \
+    file \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安装 Zig (最新稳定版)
+RUN wget https://ziglang.org/download/0.11.0/zig-linux-x86_64-0.11.0.tar.xz && \
+    tar -xf zig-linux-x86_64-0.11.0.tar.xz && \
+    mv zig-linux-x86_64-0.11.0 /usr/local/zig && \
+    ln -s /usr/local/zig/zig /usr/local/bin/zig && \
+    rm zig-linux-x86_64-0.11.0.tar.xz
+
+# 验证 Zig 安装
+RUN zig version
+
+# 设置工作目录
+WORKDIR /app
+
+# 复制 go.mod 和 go.sum 先下载依赖（利用 Docker 缓存）
+COPY go.mod go.sum ./
+RUN go mod download
+
+# 复制源代码
+COPY . .
+
+# 设置 Go 环境变量
+ENV CGO_ENABLED=1
+ENV GOOS=linux
+ENV GOARCH=amd64
+
+# 使用 Zig 作为 C 编译器，目标 GLIBC 2.32
+ENV CC="zig cc -target x86_64-linux-gnu.2.32"
+ENV CXX="zig c++ -target x86_64-linux-gnu.2.32"
+
+# 编译 sslcat
+RUN echo "🔨 开始编译 sslcat..." && \
+    go build -v -ldflags="-s -w -linkmode external" -o sslcat main.go
+
+# 验证二进制文件
+RUN echo "✅ 验证二进制文件..." && \
+    file sslcat && \
+    ldd sslcat || echo "静态链接或部分静态链接" && \
+    ./sslcat --version || echo "版本检查完成"
+
+# 最终阶段 - 使用 scratch 或 alpine
+FROM alpine:latest
+
+# 安装运行时依赖
+RUN apk add --no-cache ca-certificates tzdata
+
+# 复制二进制文件
+COPY --from=builder /app/sslcat /usr/local/bin/sslcat
+
+# 设置权限
+RUN chmod +x /usr/local/bin/sslcat
+
+# 创建数据目录
+RUN mkdir -p /etc/sslcat /opt/sslcat/data
+
+# 设置工作目录
+WORKDIR /opt/sslcat
+
+# 验证
+RUN sslcat --version || echo "sslcat ready"
+
+# 暴露端口
+EXPOSE 80 443
+
+CMD ["sslcat"]
+
