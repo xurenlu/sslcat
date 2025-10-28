@@ -149,7 +149,7 @@ const ProxyList: React.FC = () => {
 
   const toggleRule = async (domain: string, enabled: boolean) => {
     try {
-      const response = await fetch(buildApiPath(adminPrefix, '/proxy/rule'), {
+      const response = await fetch(buildApiPath(adminPrefix, `/proxy/rule?domain=${encodeURIComponent(domain)}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

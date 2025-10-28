@@ -455,52 +455,52 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		
-		// 验证后端配置
-		if len(req.Backends) == 0 {
-			http.Error(w, "at least one backend is required", http.StatusBadRequest)
-			return
-		}
-		
-		// 验证后端配置的有效性
-		for i, backend := range req.Backends {
-			if backend.Host == "" {
-				http.Error(w, fmt.Sprintf("backend %d: host is required", i), http.StatusBadRequest)
-				return
-			}
-			if backend.Port <= 0 || backend.Port > 65535 {
-				http.Error(w, fmt.Sprintf("backend %d: invalid port: %d", i, backend.Port), http.StatusBadRequest)
-				return
+		// 验证后端配置（仅在提供后端配置时验证）
+		if len(req.Backends) > 0 {
+			// 验证后端配置的有效性
+			for i, backend := range req.Backends {
+				if backend.Host == "" {
+					http.Error(w, fmt.Sprintf("backend %d: host is required", i), http.StatusBadRequest)
+					return
+				}
+				if backend.Port <= 0 || backend.Port > 65535 {
+					http.Error(w, fmt.Sprintf("backend %d: invalid port: %d", i, backend.Port), http.StatusBadRequest)
+					return
+				}
 			}
 		}
 
 		// 查找并更新规则
 		for i, rule := range s.config.Proxy.Rules {
 			if rule.Domain == domain {
-				// 更新基本字段
+				// 更新基本字段（始终更新）
 				s.config.Proxy.Rules[i].Enabled = req.Enabled
 				s.config.Proxy.Rules[i].SSLOnly = req.SSLOnly
 				
-				// 更新统一后端配置
-				s.config.Proxy.Rules[i].Backends = req.Backends
-				
-				// 为了向后兼容，同步到旧字段
+				// 更新统一后端配置（仅在提供时更新）
 				if len(req.Backends) > 0 {
+					s.config.Proxy.Rules[i].Backends = req.Backends
+					// 为了向后兼容，同步到旧字段
 					s.config.Proxy.Rules[i].Target = req.Backends[0].Host
 					s.config.Proxy.Rules[i].Port = req.Backends[0].Port
 				}
 				
-				// 类CDN设置
-				s.config.Proxy.Rules[i].CDNEnabled = req.CDNEnabled
-				s.config.Proxy.Rules[i].CDNPreset = req.CDNPreset
-				s.config.Proxy.Rules[i].CDNDefaultTTLSeconds = req.CDNDefaultTTLSeconds
+				// 类CDN设置（仅在提供时更新）
+				if req.CDNEnabled || req.CDNPreset != "" || req.CDNDefaultTTLSeconds > 0 {
+					s.config.Proxy.Rules[i].CDNEnabled = req.CDNEnabled
+					s.config.Proxy.Rules[i].CDNPreset = req.CDNPreset
+					s.config.Proxy.Rules[i].CDNDefaultTTLSeconds = req.CDNDefaultTTLSeconds
+				}
 				// HTTP Host头部优化
 				s.config.Proxy.Rules[i].OptimizeHostHeader = req.OptimizeHostHeader
 
-				// 访问控制字段
-				s.config.Proxy.Rules[i].AuthEnabled = req.AuthEnabled
-				s.config.Proxy.Rules[i].AuthUsers = req.AuthUsers
-				s.config.Proxy.Rules[i].AuthSessionTimeout = req.AuthSessionTimeout
-				s.config.Proxy.Rules[i].AuthCookieDomain = req.AuthCookieDomain
+				// 访问控制字段（仅在提供时更新）
+				if req.AuthEnabled || len(req.AuthUsers) > 0 || req.AuthSessionTimeout > 0 || req.AuthCookieDomain != "" {
+					s.config.Proxy.Rules[i].AuthEnabled = req.AuthEnabled
+					s.config.Proxy.Rules[i].AuthUsers = req.AuthUsers
+					s.config.Proxy.Rules[i].AuthSessionTimeout = req.AuthSessionTimeout
+					s.config.Proxy.Rules[i].AuthCookieDomain = req.AuthCookieDomain
+				}
 
 				// 代理超时配置
 				s.config.Proxy.Rules[i].ConnectTimeoutSec = req.ConnectTimeoutSec
