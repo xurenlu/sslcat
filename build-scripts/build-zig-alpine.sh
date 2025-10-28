@@ -39,7 +39,7 @@ echo ""
 
 # 构建 Docker 镜像
 echo -e "${BLUE}🏗️  构建编译环境 (使用缓存加速)...${NC}"
-docker build --platform linux/amd64 \
+DOCKER_BUILDKIT=1 docker build \
     --build-arg HTTP_PROXY=$http_proxy \
     --build-arg HTTPS_PROXY=$https_proxy \
     -f Dockerfile.zig-alpine \
