@@ -129,8 +129,8 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	// 初始化压缩器
 	compressor := compression.NewCompressor(compression.FromConfig(cfg))
 
-	// 初始化压缩缓存（最多500个条目，单个最大5MB，总大小最大100MB）
-	compressionCache := NewCompressionCache(500, 5, 100)
+	// 初始化压缩缓存（最多200个条目，单个最大2MB，总大小最大50MB）
+	compressionCache := NewCompressionCache(200, 2, 50)
 
 	// 初始化Prometheus指标
 	prometheusMetrics := metrics.NewPrometheusMetrics()
