@@ -16,7 +16,7 @@ env:
 jobs:
   # Linux 构建（CGO 启用，支持 SQLite）
   build-linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04  # 使用 Ubuntu 20.04 确保 GLIBC 2.32 兼容性
     strategy:
       fail-fast: false
       matrix:
@@ -65,6 +65,9 @@ jobs:
           if [ "${{ matrix.goarch }}" = "arm64" ]; then
             sudo apt-get install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross
           fi
+          # 检查 GLIBC 版本
+          echo "当前系统 GLIBC 版本:"
+          ldd --version
 
       - name: Build Linux ${{ matrix.goarch }} with CGO
         env:
@@ -78,7 +81,14 @@ jobs:
           if [ -z "$VERSION" ]; then VERSION="dev"; fi
           echo "Building $BIN_NAME for linux/${{ matrix.goarch }} (version=$VERSION) with CGO enabled (SQLite support)"
           echo "Using compiler: $CC"
-          go build -trimpath -ldflags "-s -w -X main.version=$VERSION -X main.build=$GITHUB_RUN_ID" -o build/${BIN_NAME} .
+          
+          # 使用静态链接确保兼容性
+          go build -trimpath -ldflags "-s -w -linkmode external -extldflags '-static' -X main.version=$VERSION -X main.build=$GITHUB_RUN_ID" -o build/${BIN_NAME} .
+          
+          # 验证二进制文件的 GLIBC 依赖
+          echo "验证二进制文件的 GLIBC 依赖:"
+          objdump -T build/${BIN_NAME} | grep GLIBC || echo "无 GLIBC 依赖（静态链接）"
+          ldd build/${BIN_NAME} || echo "静态链接或无 ldd 工具"
 
       - name: Package Linux
         run: |
