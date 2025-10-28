@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/xurenlu/sslcat/internal/cache"
+	"github.com/xurenlu/sslcat/internal/cli"
 	"github.com/xurenlu/sslcat/internal/config"
 	"github.com/xurenlu/sslcat/internal/i18n"
 	"github.com/xurenlu/sslcat/internal/logger"
@@ -73,6 +74,30 @@ func main() {
 
 	if *showVersion {
 		fmt.Printf("SSLcat v%s (build: %s)\n", version, build)
+		return
+	}
+
+	// 检查是否是 CLI 命令
+	if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], "-") {
+		// 处理子命令
+		cliManager := cli.NewManager()
+		cliManager.RegisterConfigCommands()
+		cliManager.RegisterProxyCommands()
+		cliManager.RegisterHelpCommand()
+		
+		// 加载配置用于 CLI 命令
+		cfg, err := config.Load(*configFile)
+		if err != nil {
+			fmt.Printf("❌ 加载配置文件失败: %v\n", err)
+			os.Exit(1)
+		}
+		cliManager.SetConfig(cfg)
+		
+		// 执行命令
+		if err := cliManager.Execute(os.Args[1:]); err != nil {
+			fmt.Printf("❌ 命令执行失败: %v\n", err)
+			os.Exit(1)
+		}
 		return
 	}
 
