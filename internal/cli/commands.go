@@ -3,6 +3,9 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/xurenlu/sslcat/internal/config"
@@ -17,8 +20,9 @@ type Command struct {
 
 // CLI 管理器
 type Manager struct {
-	commands map[string]*Command
-	config   *config.Config
+	commands   map[string]*Command
+	config     *config.Config
+	configFile string
 }
 
 // NewManager 创建新的 CLI 管理器
@@ -121,11 +125,17 @@ func (m *Manager) setConfig(args []string) error {
 		return fmt.Errorf("invalid config key format, use dot notation (e.g., server.port)")
 	}
 
-	// 这里需要实现配置项的设置逻辑
-	// 由于配置结构复杂，建议使用反射或专门的设置函数
-	fmt.Printf("Setting %s = %s\n", key, value)
-	fmt.Println("Note: Configuration modification not yet implemented")
+	// 使用反射设置配置值
+	if err := m.setConfigValue(m.config, keys, value); err != nil {
+		return fmt.Errorf("failed to set config: %w", err)
+	}
 
+	// 保存配置到文件
+	if err := m.saveConfig(); err != nil {
+		return fmt.Errorf("failed to save config: %w", err)
+	}
+
+	fmt.Printf("✅ 配置已更新: %s = %s\n", key, value)
 	return nil
 }
 
@@ -141,10 +151,19 @@ func (m *Manager) getConfig(args []string) error {
 		return fmt.Errorf("no configuration loaded")
 	}
 
-	// 这里需要实现配置项的获取逻辑
-	fmt.Printf("Getting %s\n", key)
-	fmt.Println("Note: Configuration reading not yet implemented")
+	// 解析配置路径
+	keys := strings.Split(key, ".")
+	if len(keys) < 2 {
+		return fmt.Errorf("invalid config key format, use dot notation (e.g., server.port)")
+	}
 
+	// 使用反射获取配置值
+	value, err := m.getConfigValue(m.config, keys)
+	if err != nil {
+		return fmt.Errorf("failed to get config: %w", err)
+	}
+
+	fmt.Printf("%s = %v\n", key, value)
 	return nil
 }
 
@@ -197,22 +216,400 @@ func (m *Manager) listProxyRules(args []string) error {
 
 // addProxyRule 添加代理规则
 func (m *Manager) addProxyRule(args []string) error {
-	fmt.Println("Adding proxy rule...")
-	fmt.Println("Note: Proxy rule addition not yet implemented")
+	if len(args) < 2 {
+		return fmt.Errorf("usage: sslcat proxy add -domain <domain> -target <target> [-port <port>] [-ssl] [-enabled]")
+	}
+
+	if m.config == nil {
+		return fmt.Errorf("no configuration loaded")
+	}
+
+	// 解析参数
+	var domain, target string
+	var port int = 80
+	var sslOnly, enabled bool = false, true
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "-domain":
+			if i+1 >= len(args) {
+				return fmt.Errorf("domain value required")
+			}
+			domain = args[i+1]
+			i++
+		case "-target":
+			if i+1 >= len(args) {
+				return fmt.Errorf("target value required")
+			}
+			target = args[i+1]
+			i++
+		case "-port":
+			if i+1 >= len(args) {
+				return fmt.Errorf("port value required")
+			}
+			var err error
+			port, err = strconv.Atoi(args[i+1])
+			if err != nil {
+				return fmt.Errorf("invalid port: %s", args[i+1])
+			}
+			i++
+		case "-ssl":
+			sslOnly = true
+		case "-enabled":
+			enabled = true
+		case "-disabled":
+			enabled = false
+		}
+	}
+
+	if domain == "" || target == "" {
+		return fmt.Errorf("domain and target are required")
+	}
+
+	// 检查域名是否已存在
+	for _, rule := range m.config.Proxy.Rules {
+		if rule.Domain == domain {
+			return fmt.Errorf("proxy rule for domain %s already exists", domain)
+		}
+	}
+
+	// 创建新的代理规则
+	newRule := config.ProxyRule{
+		Domain:  domain,
+		Target:  target,
+		Port:    port,
+		Enabled: enabled,
+		SSLOnly: sslOnly,
+	}
+
+	// 添加规则
+	m.config.Proxy.Rules = append(m.config.Proxy.Rules, newRule)
+
+	// 保存配置
+	if err := m.saveConfig(); err != nil {
+		return fmt.Errorf("failed to save config: %w", err)
+	}
+
+	fmt.Printf("✅ 代理规则已添加: %s -> %s:%d (SSL: %t, Enabled: %t)\n",
+		domain, target, port, sslOnly, enabled)
 	return nil
 }
 
 // updateProxyRule 更新代理规则
 func (m *Manager) updateProxyRule(args []string) error {
-	fmt.Println("Updating proxy rule...")
-	fmt.Println("Note: Proxy rule update not yet implemented")
+	if len(args) < 1 {
+		return fmt.Errorf("usage: sslcat proxy update -domain <domain> [-target <target>] [-port <port>] [-ssl] [-enabled]")
+	}
+
+	if m.config == nil {
+		return fmt.Errorf("no configuration loaded")
+	}
+
+	// 解析参数
+	var domain, target string
+	var port int = -1
+	var sslOnly, enabled *bool = nil, nil
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "-domain":
+			if i+1 >= len(args) {
+				return fmt.Errorf("domain value required")
+			}
+			domain = args[i+1]
+			i++
+		case "-target":
+			if i+1 >= len(args) {
+				return fmt.Errorf("target value required")
+			}
+			target = args[i+1]
+			i++
+		case "-port":
+			if i+1 >= len(args) {
+				return fmt.Errorf("port value required")
+			}
+			var err error
+			port, err = strconv.Atoi(args[i+1])
+			if err != nil {
+				return fmt.Errorf("invalid port: %s", args[i+1])
+			}
+			i++
+		case "-ssl":
+			sslOnly = &[]bool{true}[0]
+		case "-no-ssl":
+			sslOnly = &[]bool{false}[0]
+		case "-enabled":
+			enabled = &[]bool{true}[0]
+		case "-disabled":
+			enabled = &[]bool{false}[0]
+		}
+	}
+
+	if domain == "" {
+		return fmt.Errorf("domain is required")
+	}
+
+	// 查找并更新规则
+	found := false
+	for i, rule := range m.config.Proxy.Rules {
+		if rule.Domain == domain {
+			if target != "" {
+				rule.Target = target
+			}
+			if port != -1 {
+				rule.Port = port
+			}
+			if sslOnly != nil {
+				rule.SSLOnly = *sslOnly
+			}
+			if enabled != nil {
+				rule.Enabled = *enabled
+			}
+
+			m.config.Proxy.Rules[i] = rule
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("proxy rule for domain %s not found", domain)
+	}
+
+	// 保存配置
+	if err := m.saveConfig(); err != nil {
+		return fmt.Errorf("failed to save config: %w", err)
+	}
+
+	fmt.Printf("✅ 代理规则已更新: %s\n", domain)
 	return nil
 }
 
 // deleteProxyRule 删除代理规则
 func (m *Manager) deleteProxyRule(args []string) error {
-	fmt.Println("Deleting proxy rule...")
-	fmt.Println("Note: Proxy rule deletion not yet implemented")
+	if len(args) < 1 {
+		return fmt.Errorf("usage: sslcat proxy delete -domain <domain>")
+	}
+
+	if m.config == nil {
+		return fmt.Errorf("no configuration loaded")
+	}
+
+	// 解析参数
+	var domain string
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "-domain":
+			if i+1 >= len(args) {
+				return fmt.Errorf("domain value required")
+			}
+			domain = args[i+1]
+			i++
+		}
+	}
+
+	if domain == "" {
+		return fmt.Errorf("domain is required")
+	}
+
+	// 查找并删除规则
+	found := false
+	for i, rule := range m.config.Proxy.Rules {
+		if rule.Domain == domain {
+			m.config.Proxy.Rules = append(m.config.Proxy.Rules[:i], m.config.Proxy.Rules[i+1:]...)
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("proxy rule for domain %s not found", domain)
+	}
+
+	// 保存配置
+	if err := m.saveConfig(); err != nil {
+		return fmt.Errorf("failed to save config: %w", err)
+	}
+
+	fmt.Printf("✅ 代理规则已删除: %s\n", domain)
+	return nil
+}
+
+// RegisterSSLCommands 注册 SSL 证书管理命令
+func (m *Manager) RegisterSSLCommands() {
+	m.RegisterCommand(&Command{
+		Name:        "ssl",
+		Description: "SSL certificate management",
+		Handler: func(args []string) error {
+			if len(args) == 0 {
+				return fmt.Errorf("ssl subcommand required (list|show|request|renew|delete)")
+			}
+
+			subcmd := args[0]
+			switch subcmd {
+			case "list":
+				return m.listCertificates(args[1:])
+			case "show":
+				return m.showCertificate(args[1:])
+			case "request":
+				return m.requestCertificate(args[1:])
+			case "renew":
+				return m.renewCertificate(args[1:])
+			case "delete":
+				return m.deleteCertificate(args[1:])
+			default:
+				return fmt.Errorf("unknown ssl subcommand: %s", subcmd)
+			}
+		},
+	})
+}
+
+// listCertificates 列出所有证书
+func (m *Manager) listCertificates(args []string) error {
+	if m.config == nil {
+		return fmt.Errorf("no configuration loaded")
+	}
+
+	fmt.Println("SSL Certificates:")
+	fmt.Println("=================")
+
+	// 这里需要实现证书列表功能
+	// 由于需要访问 SSL 管理器，暂时显示占位信息
+	fmt.Println("Note: SSL certificate listing requires SSL manager integration")
+	fmt.Println("Available domains from config:")
+
+	for _, rule := range m.config.Proxy.Rules {
+		if rule.Enabled {
+			fmt.Printf("  - %s\n", rule.Domain)
+		}
+	}
+
+	return nil
+}
+
+// showCertificate 显示证书详情
+func (m *Manager) showCertificate(args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("usage: sslcat ssl show -domain <domain>")
+	}
+
+	var domain string
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "-domain":
+			if i+1 >= len(args) {
+				return fmt.Errorf("domain value required")
+			}
+			domain = args[i+1]
+			i++
+		}
+	}
+
+	if domain == "" {
+		return fmt.Errorf("domain is required")
+	}
+
+	fmt.Printf("Certificate details for %s:\n", domain)
+	fmt.Println("Note: SSL certificate details require SSL manager integration")
+
+	return nil
+}
+
+// requestCertificate 申请证书
+func (m *Manager) requestCertificate(args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("usage: sslcat ssl request -domain <domain> [-email <email>]")
+	}
+
+	var domain, email string
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "-domain":
+			if i+1 >= len(args) {
+				return fmt.Errorf("domain value required")
+			}
+			domain = args[i+1]
+			i++
+		case "-email":
+			if i+1 >= len(args) {
+				return fmt.Errorf("email value required")
+			}
+			email = args[i+1]
+			i++
+		}
+	}
+
+	if domain == "" {
+		return fmt.Errorf("domain is required")
+	}
+
+	if email == "" {
+		email = m.config.SSL.Email
+		if email == "" {
+			return fmt.Errorf("email is required (use -email flag or set ssl.email in config)")
+		}
+	}
+
+	fmt.Printf("Requesting SSL certificate for %s (email: %s)\n", domain, email)
+	fmt.Println("Note: SSL certificate request requires SSL manager integration")
+
+	return nil
+}
+
+// renewCertificate 续期证书
+func (m *Manager) renewCertificate(args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("usage: sslcat ssl renew -domain <domain>")
+	}
+
+	var domain string
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "-domain":
+			if i+1 >= len(args) {
+				return fmt.Errorf("domain value required")
+			}
+			domain = args[i+1]
+			i++
+		}
+	}
+
+	if domain == "" {
+		return fmt.Errorf("domain is required")
+	}
+
+	fmt.Printf("Renewing SSL certificate for %s\n", domain)
+	fmt.Println("Note: SSL certificate renewal requires SSL manager integration")
+
+	return nil
+}
+
+// deleteCertificate 删除证书
+func (m *Manager) deleteCertificate(args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("usage: sslcat ssl delete -domain <domain>")
+	}
+
+	var domain string
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "-domain":
+			if i+1 >= len(args) {
+				return fmt.Errorf("domain value required")
+			}
+			domain = args[i+1]
+			i++
+		}
+	}
+
+	if domain == "" {
+		return fmt.Errorf("domain is required")
+	}
+
+	fmt.Printf("Deleting SSL certificate for %s\n", domain)
+	fmt.Println("Note: SSL certificate deletion requires SSL manager integration")
+
 	return nil
 }
 
@@ -228,7 +625,141 @@ func (m *Manager) RegisterHelpCommand() {
 	})
 }
 
+// setConfigValue 使用反射设置配置值
+func (m *Manager) setConfigValue(obj interface{}, keys []string, value string) error {
+	v := reflect.ValueOf(obj)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	// 遍历路径，找到目标字段
+	for _, key := range keys[:len(keys)-1] {
+		field := v.FieldByName(strings.Title(key))
+		if !field.IsValid() {
+			return fmt.Errorf("field %s not found", key)
+		}
+
+		if field.Kind() == reflect.Ptr {
+			if field.IsNil() {
+				field.Set(reflect.New(field.Type().Elem()))
+			}
+			field = field.Elem()
+		}
+
+		v = field
+	}
+
+	// 设置最后一个字段的值
+	lastKey := keys[len(keys)-1]
+	field := v.FieldByName(strings.Title(lastKey))
+	if !field.IsValid() {
+		return fmt.Errorf("field %s not found", lastKey)
+	}
+
+	if !field.CanSet() {
+		return fmt.Errorf("field %s cannot be set", lastKey)
+	}
+
+	// 根据字段类型转换值
+	if err := m.setFieldValue(field, value); err != nil {
+		return fmt.Errorf("failed to set field %s: %w", lastKey, err)
+	}
+
+	return nil
+}
+
+// getConfigValue 使用反射获取配置值
+func (m *Manager) getConfigValue(obj interface{}, keys []string) (interface{}, error) {
+	v := reflect.ValueOf(obj)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	// 遍历路径，找到目标字段
+	for _, key := range keys {
+		field := v.FieldByName(strings.Title(key))
+		if !field.IsValid() {
+			return nil, fmt.Errorf("field %s not found", key)
+		}
+
+		if field.Kind() == reflect.Ptr {
+			if field.IsNil() {
+				return nil, fmt.Errorf("field %s is nil", key)
+			}
+			field = field.Elem()
+		}
+
+		v = field
+	}
+
+	return v.Interface(), nil
+}
+
+// setFieldValue 根据字段类型设置值
+func (m *Manager) setFieldValue(field reflect.Value, value string) error {
+	switch field.Kind() {
+	case reflect.String:
+		field.SetString(value)
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		intVal, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid integer value: %s", value)
+		}
+		field.SetInt(intVal)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		uintVal, err := strconv.ParseUint(value, 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid unsigned integer value: %s", value)
+		}
+		field.SetUint(uintVal)
+	case reflect.Bool:
+		boolVal, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("invalid boolean value: %s", value)
+		}
+		field.SetBool(boolVal)
+	case reflect.Float32, reflect.Float64:
+		floatVal, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return fmt.Errorf("invalid float value: %s", value)
+		}
+		field.SetFloat(floatVal)
+	default:
+		return fmt.Errorf("unsupported field type: %s", field.Kind())
+	}
+
+	return nil
+}
+
+// saveConfig 保存配置到文件
+func (m *Manager) saveConfig() error {
+	if m.config == nil {
+		return fmt.Errorf("no configuration loaded")
+	}
+
+	data, err := json.MarshalIndent(m.config, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	configFile := m.configFile
+	if configFile == "" {
+		configFile = "sslcat.conf"
+	}
+
+	if err := os.WriteFile(configFile, data, 0644); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	return nil
+}
+
 // SetConfig 设置配置
 func (m *Manager) SetConfig(cfg *config.Config) {
 	m.config = cfg
+}
+
+// SetConfigFile 设置配置文件路径
+func (m *Manager) SetConfigFile(configFile string) {
+	m.configFile = configFile
 }

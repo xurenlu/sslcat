@@ -51,6 +51,41 @@ func isIPHost(host string) bool {
 }
 
 func main() {
+	// 检查是否是 CLI 命令（在定义 flag 之前检查）
+	if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], "-") {
+		// 处理子命令
+		cliManager := cli.NewManager()
+		cliManager.RegisterConfigCommands()
+		cliManager.RegisterProxyCommands()
+		cliManager.RegisterSSLCommands()
+		cliManager.RegisterHelpCommand()
+
+		// 解析配置文件路径
+		configFile := "sslcat.conf"
+		for i, arg := range os.Args {
+			if arg == "-config" && i+1 < len(os.Args) {
+				configFile = os.Args[i+1]
+				break
+			}
+		}
+
+		// 加载配置用于 CLI 命令
+		cfg, err := config.Load(configFile)
+		if err != nil {
+			fmt.Printf("❌ 加载配置文件失败: %v\n", err)
+			os.Exit(1)
+		}
+		cliManager.SetConfig(cfg)
+		cliManager.SetConfigFile(configFile)
+
+		// 执行命令
+		if err := cliManager.Execute(os.Args[1:]); err != nil {
+			fmt.Printf("❌ 命令执行失败: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	var (
 		configFile  = flag.String("config", "/etc/sslcat/sslcat.conf", "配置文件路径")
 		adminPrefix = flag.String("admin-prefix", "/sslcat-panel", "管理面板路径前缀")
@@ -70,34 +105,11 @@ func main() {
 		pprofOutput  = flag.String("pprof-output", "", "导出文件路径 (默认: ./sslcat-{type}-{timestamp}.pprof)")
 		pprofServer  = flag.String("pprof-server", "http://localhost:8080", "pprof 服务器地址")
 	)
+
 	flag.Parse()
 
 	if *showVersion {
 		fmt.Printf("SSLcat v%s (build: %s)\n", version, build)
-		return
-	}
-
-	// 检查是否是 CLI 命令
-	if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], "-") {
-		// 处理子命令
-		cliManager := cli.NewManager()
-		cliManager.RegisterConfigCommands()
-		cliManager.RegisterProxyCommands()
-		cliManager.RegisterHelpCommand()
-
-		// 加载配置用于 CLI 命令
-		cfg, err := config.Load(*configFile)
-		if err != nil {
-			fmt.Printf("❌ 加载配置文件失败: %v\n", err)
-			os.Exit(1)
-		}
-		cliManager.SetConfig(cfg)
-
-		// 执行命令
-		if err := cliManager.Execute(os.Args[1:]); err != nil {
-			fmt.Printf("❌ 命令执行失败: %v\n", err)
-			os.Exit(1)
-		}
 		return
 	}
 
