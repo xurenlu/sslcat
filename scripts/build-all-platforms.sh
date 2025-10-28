@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # SSLCat 快速本地编译脚本（所有平台）
 # 仅编译，不发布

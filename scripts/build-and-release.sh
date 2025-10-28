@@ -1,7 +1,18 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # SSLCat 本地编译和发布脚本
 # 支持在本地编译所有平台的 CGO 版本并发布到 GitHub Release
+
+# 要求 bash 4.0+ (支持关联数组)
+if [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
+    echo "错误: 此脚本需要 Bash 4.0 或更高版本"
+    echo "当前版本: ${BASH_VERSION}"
+    echo ""
+    echo "macOS 用户请安装新版本 bash:"
+    echo "  brew install bash"
+    echo "  然后使用: bash ./scripts/build-and-release.sh"
+    exit 1
+fi
 
 set -e
 
