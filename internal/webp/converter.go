@@ -14,13 +14,13 @@ import (
 
 // Converter WebP转换器
 type Converter struct {
-	enabled         bool
-	quality         int
-	cacheSize       int
-	minFileSizeKB   int // 最小文件大小阈值（KB），超过此大小才进行转换
-	cache           map[string][]byte
-	cacheMutex      sync.RWMutex
-	log             *logrus.Entry
+	enabled       bool
+	quality       int
+	cacheSize     int
+	minFileSizeKB int // 最小文件大小阈值（KB），超过此大小才进行转换
+	cache         map[string][]byte
+	cacheMutex    sync.RWMutex
+	log           *logrus.Entry
 }
 
 // NewConverter 创建WebP转换器

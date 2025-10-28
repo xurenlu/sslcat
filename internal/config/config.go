@@ -55,6 +55,7 @@ type ServerConfig struct {
 	Port     int    `json:"port"` // 向后兼容，保留原字段
 	Debug    bool   `json:"debug"`
 	LogLevel string `json:"log_level"` // debug|info|warn|error
+	EnablePprof bool `json:"enable_pprof"` // 是否启用 pprof 性能分析端点
 
 	// 新的端口配置
 	PortMode    string `json:"port_mode"`    // "standard" | "custom" (默认 "standard")
@@ -799,6 +800,7 @@ func Load(configFile string) (*Config, error) {
 			Port:     443, // 向后兼容，保留原字段
 			Debug:    false,
 			LogLevel: "info", // 默认日志级别
+			EnablePprof: false, // 默认禁用 pprof
 			// 新的端口配置默认值
 			PortMode:          "standard", // 默认标准模式
 			CustomPort:        8080,       // 默认自定义端口
@@ -939,15 +941,15 @@ func Load(configFile string) (*Config, error) {
 			BaseURL:  "",
 		},
 		ImageOptimization: ImageOptimizationConfig{
-			Enabled:         false, // 默认禁用图片优化
-			AutoWebP:        false, // 默认禁用 WebP 转换
-			WebPQuality:     80,    // WebP 质量
-			WebPMinSizeKB:   200,   // WebP 转换最小文件大小 200KB
-			JPEGQuality:     85,    // JPEG 质量
-			PNGLevel:        6,     // PNG 压缩级别
-			StripMetadata:   false, // 不移除元数据
-			MinSizeBytes:    60 * 1024,  // 最小文件大小 60KB
-			MaxSizeBytes:    5 * 1024 * 1024, // 最大文件大小 5MB
+			Enabled:       false,           // 默认禁用图片优化
+			AutoWebP:      false,           // 默认禁用 WebP 转换
+			WebPQuality:   80,              // WebP 质量
+			WebPMinSizeKB: 200,             // WebP 转换最小文件大小 200KB
+			JPEGQuality:   85,              // JPEG 质量
+			PNGLevel:      6,               // PNG 压缩级别
+			StripMetadata: false,           // 不移除元数据
+			MinSizeBytes:  60 * 1024,       // 最小文件大小 60KB
+			MaxSizeBytes:  5 * 1024 * 1024, // 最大文件大小 5MB
 		},
 	}
 
@@ -1466,12 +1468,12 @@ type ImageOptimizationConfig struct {
 	Enabled bool `json:"enabled"` // 是否启用图片优化
 
 	// 格式转换
-	AutoWebP         bool `json:"auto_webp"`          // 自动转换为 WebP
-	WebPQuality      int  `json:"webp_quality"`       // WebP 质量 (0-100，默认 80)
-	WebPMinSizeKB    int  `json:"webp_min_size_kb"`   // WebP 转换最小文件大小 (KB，默认 200)
-	JPEGQuality      int  `json:"jpeg_quality"`       // JPEG 质量 (0-100，默认 85)
-	PNGLevel         int  `json:"png_level"`          // PNG 压缩级别 (0-9，默认 6)
-	StripMetadata    bool `json:"strip_metadata"`     // 移除 EXIF 元数据
+	AutoWebP      bool `json:"auto_webp"`        // 自动转换为 WebP
+	WebPQuality   int  `json:"webp_quality"`     // WebP 质量 (0-100，默认 80)
+	WebPMinSizeKB int  `json:"webp_min_size_kb"` // WebP 转换最小文件大小 (KB，默认 200)
+	JPEGQuality   int  `json:"jpeg_quality"`     // JPEG 质量 (0-100，默认 85)
+	PNGLevel      int  `json:"png_level"`        // PNG 压缩级别 (0-9，默认 6)
+	StripMetadata bool `json:"strip_metadata"`   // 移除 EXIF 元数据
 
 	// 文件大小限制（优化 CPU 使用）
 	MinSizeBytes int64 `json:"min_size_bytes"` // 最小文件大小（字节，默认 60KB）

@@ -645,15 +645,18 @@ func (s *Server) applyConfigInPlace(newCfg *config.Config) {
 // setupRoutes 设置路由
 func (s *Server) setupRoutes() {
 	// 性能分析路由 (pprof) - 用于调试性能问题，仅允许本地访问
-	s.mux.HandleFunc("/debug/pprof/", func(w http.ResponseWriter, r *http.Request) {
-		// 安全检查：只允许本地访问
-		clientIP := s.getClientIP(r)
-		if !s.isPrivateIP(clientIP) && clientIP != "127.0.0.1" && clientIP != "::1" {
-			http.Error(w, "Forbidden: pprof endpoint is only accessible from localhost", http.StatusForbidden)
-			return
-		}
-		http.DefaultServeMux.ServeHTTP(w, r)
-	})
+	if s.config.Server.EnablePprof {
+		s.mux.HandleFunc("/debug/pprof/", func(w http.ResponseWriter, r *http.Request) {
+			// 安全检查：只允许本地访问
+			clientIP := s.getClientIP(r)
+			if !s.isPrivateIP(clientIP) && clientIP != "127.0.0.1" && clientIP != "::1" {
+				http.Error(w, "Forbidden: pprof endpoint is only accessible from localhost", http.StatusForbidden)
+				return
+			}
+			http.DefaultServeMux.ServeHTTP(w, r)
+		})
+		s.log.Info("pprof 性能分析端点已启用: /debug/pprof/")
+	}
 
 	// 根路径重定向
 	s.mux.HandleFunc("/", s.handleRoot)
