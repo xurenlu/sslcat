@@ -5,6 +5,83 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.20-rc10] - 2025-10-28
+
+### 🎉 重大新特性
+
+#### 🖥️ CLI 命令行管理系统
+- **配置管理**: 新增 `config show/get/set` 命令，支持动态查看和修改配置
+  - `sslcat config show` - 显示完整配置
+  - `sslcat config get <key>` - 获取指定配置项（支持点号路径，如 `server.port`）
+  - `sslcat config set <key> <value>` - 设置配置项并自动保存
+- **代理规则管理**: 新增 `proxy` 子命令，支持完整的代理规则 CRUD 操作
+  - `sslcat proxy list` - 列出所有代理规则
+  - `sslcat proxy add` - 添加新的代理规则（交互式输入）
+  - `sslcat proxy update <domain>` - 更新指定域名的代理规则
+  - `sslcat proxy delete <domain>` - 删除指定域名的代理规则
+- **SSL 证书管理**: 新增 `ssl` 子命令，提供证书管理功能
+  - `sslcat ssl list` - 列出所有 SSL 证书
+  - `sslcat ssl show <domain>` - 显示指定域名的证书详情
+  - `sslcat ssl request <domain>` - 申请新的 SSL 证书
+  - `sslcat ssl renew <domain>` - 续期指定域名的证书
+  - `sslcat ssl delete <domain>` - 删除指定域名的证书
+- **帮助系统**: 新增 `help` 命令，显示所有可用命令和使用说明
+
+#### 🔨 静态链接构建支持
+- **完全静态链接**: 新增 `build-linux-static.sh` 脚本，使用 musl-cross 工具链编译
+- **零依赖部署**: 编译出的二进制文件完全静态链接，无需任何外部库
+- **CGO 支持**: 静态链接版本完整支持 CGO（WebP、SQLite 等）
+- **通用兼容性**: 可在任何 Linux 发行版上运行（Alpine、Ubuntu、CentOS、Debian 等）
+- **构建脚本整理**: 将所有构建相关脚本和 Dockerfile 整理到 `build-scripts/` 目录
+- **详细文档**: 新增 `build-scripts/README.md`，说明各种构建方式的使用方法
+
+### 🐛 Bug 修复
+
+#### 前端修复
+- **代理规则切换**: 修复前端切换代理规则时 API 调用参数错误的问题
+  - 修正 PUT 请求 URL，添加 `domain` 查询参数
+  - 确保请求体包含必要的字段
+
+#### 后端修复
+- **API 部分更新**: 优化代理规则更新 API，支持部分字段更新
+  - 修复切换启用/禁用时错误清空其他字段的问题
+  - 后端验证逻辑改为条件验证，仅在提供相关字段时进行验证
+  - 更新逻辑改为仅更新提供的字段，保留未提供字段的原值
+
+### 🛠️ 技术改进
+
+#### 代码架构
+- **CLI 框架**: 实现完整的命令行子命令系统
+  - 使用 `Command` 结构体和 `Manager` 管理器
+  - 支持命令注册、执行、帮助信息显示
+  - 使用反射实现配置项的动态读写
+- **配置管理**: 改进配置文件的加载和保存机制
+  - 支持通过点号路径访问嵌套配置项
+  - 自动类型转换和验证
+  - 保存时保留配置文件格式
+
+#### 构建系统
+- **多种构建方式**: 提供多种构建选项
+  - `build-linux-static.sh` - 本地 musl-cross 静态编译（推荐）
+  - `build-static.sh` - Docker + Debian 静态编译
+  - `build-zig-*.sh` - Zig 交叉编译（实验性）
+- **测试脚本**: 新增 `test-static-binary.sh`，用于在 Linux 上验证二进制文件
+- **文档完善**: 详细说明各种构建方式的优缺点和使用场景
+
+### 📈 性能提升
+
+- **编译速度**: 本地 musl-cross 编译比 Docker 方式快 3-5 倍
+- **二进制大小**: 静态链接版本约 34MB，包含所有必要功能
+- **部署便利**: 单文件部署，无需安装任何依赖
+
+### 📚 文档更新
+
+- **构建文档**: 新增 `build-scripts/README.md`，详细说明各种构建方式
+- **CLI 使用**: 通过 `sslcat help` 命令查看完整的命令行使用说明
+- **部署指南**: 更新部署文档，说明静态链接版本的优势
+
+---
+
 ## [1.3.19-rc1] - 2025-01-27
 
 ### 🎉 重大新特性
