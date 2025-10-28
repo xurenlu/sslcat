@@ -1,446 +1,254 @@
 # Installation Methods
 
-This guide covers various methods to install SSLcat, from quick one-click installations to advanced custom builds.
+This guide covers how to install SSLcat. We provide pre-compiled binary files that you can download and run the installation script.
 
-## 🚀 Quick Installation (Recommended)
+## Download Installation Package
 
-### One-Click Installation Script
-
-The fastest way to get SSLcat running:
-
+### Download Binary Files
 ```bash
-# Standard installation
-curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/install.sh | sudo bash
+# GitHub download
+curl -L https://github.com/xurenlu/sslcat/releases/download/v1.3.20-rc2/sslcat_v1.3.20-rc2_linux-amd64.tar.gz -o sslcat.tar.gz
 
-# For Chinese users (faster download)
-curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/scripts/install-from-release-zh.sh | sudo bash -s -- -v latest
+# CDN mirror download (faster for Chinese users)
+curl -L https://cdn.wxside.com/xurenlu/sslcat/releases/v1.3.20-rc2/sslcat_v1.3.20-rc2_linux-amd64.tar.gz -o sslcat.tar.gz
+
+# Or using wget
+wget https://github.com/xurenlu/sslcat/releases/download/v1.3.20-rc2/sslcat_v1.3.20-rc2_linux-amd64.tar.gz -O sslcat.tar.gz
 ```
 
-**What this script does:**
-- Downloads the latest SSLcat binary
-- Creates system user and directories
-- Installs systemd service
-- Sets up basic configuration
-- Starts the service
-
-### Installation with Specific Version
-
+### Extract and Install
 ```bash
-# Install specific version
-curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/scripts/install-from-release-zh.sh | sudo bash -s -- -v 1.3.3
+# Extract files
+tar -xzf sslcat.tar.gz
+
+# Run installation script
+sudo ./install-sslcat.sh
 ```
 
-## 📦 Package Installation
+## Installation Script Details
 
-### Ubuntu/Debian
+The installation script `install-sslcat.sh` automatically performs the following operations:
 
+1. **Check system requirements** - Verify operating system and permissions
+2. **Create system user** - Create `sslcat` user and group
+3. **Create directory structure** - Set up necessary directories and permissions
+4. **Install binary files** - Copy to system path and set permissions
+5. **Create system service** - Configure systemd service
+6. **Create default configuration** - Generate basic configuration file
+7. **Start service** - Enable and start SSLcat service
+
+### Installation Script Content
 ```bash
-# Add repository (if available)
-# wget -qO- https://repo.sslcat.com/key.gpg | sudo apt-key add -
-# echo "deb https://repo.sslcat.com/ubuntu/ focal main" | sudo tee /etc/apt/sources.list.d/sslcat.list
+#!/bin/bash
+# install-sslcat.sh
 
-# Update package list
-sudo apt update
+set -e
 
-# Install SSLcat
-sudo apt install sslcat
+# Configuration variables
+SSLCAT_VERSION="1.3.20-rc2"
+SSLCAT_USER="sslcat"
+SSLCAT_HOME="/opt/sslcat"
+SSLCAT_CONFIG="/etc/sslcat"
+SSLCAT_LOG="/var/log/sslcat"
 
-# Start service
-sudo systemctl start sslcat
-sudo systemctl enable sslcat
-```
-
-### CentOS/RHEL
-
-```bash
-# Add repository (if available)
-# sudo yum-config-manager --add-repo https://repo.sslcat.com/centos/sslcat.repo
-
-# Install SSLcat
-sudo yum install sslcat
-
-# Start service
-sudo systemctl start sslcat
-sudo systemctl enable sslcat
-```
-
-## 🐳 Docker Installation
-
-### Docker Run
-
-```bash
-# Pull the image
-docker pull sslcat/sslcat:latest
-
-# Run container
-docker run -d \
-  --name sslcat \
-  -p 80:80 \
-  -p 443:443 \
-  -v /etc/sslcat:/etc/sslcat \
-  -v /opt/sslcat:/opt/sslcat \
-  sslcat/sslcat:latest
-```
-
-### Docker Compose
-
-Create `docker-compose.yml`:
-
-```yaml
-version: '3.8'
-
-services:
-  sslcat:
-    image: sslcat/sslcat:latest
-    container_name: sslcat
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./config:/etc/sslcat
-      - ./data:/opt/sslcat
-    environment:
-      - SSL_EMAIL=your-email@example.com
-      - SSL_STAGING=false
-```
-
-Start with Docker Compose:
-
-```bash
-# Start services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f sslcat
-```
-
-## 🔨 Building from Source
-
-### Prerequisites
-
-```bash
-# Install Go 1.21+
-wget https://go.dev/dl/go1.21.5.linux-amd64.tar.gz
-sudo tar -C /usr/local -xzf go1.21.5.linux-amd64.tar.gz
-echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-source ~/.bashrc
-
-# Install build dependencies
-sudo apt install build-essential git
-```
-
-### Build Process
-
-```bash
-# Clone repository
-git clone https://github.com/xurenlu/sslcat.git
-cd sslcat
-
-# Download dependencies
-go mod download
-
-# Build binary
-go build -o sslcat main.go
-
-# Install
-sudo cp sslcat /usr/local/bin/
-sudo chmod +x /usr/local/bin/sslcat
-```
-
-### Cross-Platform Build
-
-```bash
-# Build for different architectures
-GOOS=linux GOARCH=amd64 go build -o sslcat-linux-amd64 main.go
-GOOS=darwin GOARCH=arm64 go build -o sslcat-darwin-arm64 main.go
-GOOS=windows GOARCH=amd64 go build -o sslcat-windows-amd64.exe main.go
-```
-
-## 🏗️ Manual Installation
-
-### Step 1: Download Binary
-
-```bash
-# Create installation directory
-sudo mkdir -p /opt/sslcat/{bin,certs,keys,logs,data}
-
-# Download binary
-wget https://github.com/xurenlu/sslcat/releases/download/v1.3.3/sslcat_v1.3.3_linux-amd64.tar.gz
-tar -xzf sslcat_v1.3.3_linux-amd64.tar.gz
-sudo cp sslcat /opt/sslcat/bin/
-sudo chmod +x /opt/sslcat/bin/sslcat
-```
-
-### Step 2: Create System User
-
-```bash
-# Create sslcat user
-sudo useradd -r -s /bin/false -d /opt/sslcat sslcat
-
-# Set ownership
-sudo chown -R sslcat:sslcat /opt/sslcat
-```
-
-### Step 3: Create Configuration
-
-```bash
-# Create config directory
-sudo mkdir -p /etc/sslcat
-
-# Create basic configuration
-sudo tee /etc/sslcat/sslcat.conf > /dev/null << EOF
-{
-  "server": {
-    "host": "0.0.0.0",
-    "port": 443,
-    "debug": false
-  },
-  "ssl": {
-    "email": "your-email@example.com",
-    "staging": false,
-    "auto_renew": true
-  },
-  "admin": {
-    "username": "admin",
-    "password_file": "/opt/sslcat/data/admin.pass",
-    "first_run": true
-  }
+# Check system requirements
+check_requirements() {
+    echo "Checking system requirements..."
+    
+    # Check operating system
+    if [[ "$OSTYPE" != "linux-gnu"* ]]; then
+        echo "Error: Only Linux systems are supported"
+        exit 1
+    fi
+    
+    # Check permissions
+    if [[ $EUID -ne 0 ]]; then
+        echo "Error: Root privileges required"
+        exit 1
+    fi
+    
+    echo "System requirements check passed"
 }
-EOF
-```
 
-### Step 4: Create Systemd Service
+# Download SSLcat
+download_sslcat() {
+    echo "Downloading SSLcat ${SSLCAT_VERSION}..."
+    
+    # Detect architecture
+    ARCH=$(uname -m)
+    case $ARCH in
+        x86_64) ARCH="amd64" ;;
+        aarch64) ARCH="arm64" ;;
+        armv7l) ARCH="arm" ;;
+        *) echo "Error: Unsupported architecture $ARCH"; exit 1 ;;
+    esac
+    
+    # Download binary file
+    DOWNLOAD_URL="https://github.com/xurenlu/sslcat/releases/download/v${SSLCAT_VERSION}/sslcat_v${SSLCAT_VERSION}_linux-${ARCH}.tar.gz"
+    
+    cd /tmp
+    wget -q "$DOWNLOAD_URL" -O sslcat.tar.gz
+    tar -xzf sslcat.tar.gz
+    chmod +x sslcat
+}
 
-```bash
-# Create systemd service file
-sudo tee /etc/systemd/system/sslcat.service > /dev/null << EOF
+# Install SSLcat
+install_sslcat() {
+    echo "Installing SSLcat..."
+    
+    # Create user
+    if ! id "$SSLCAT_USER" &>/dev/null; then
+        useradd -r -s /bin/false "$SSLCAT_USER"
+    fi
+    
+    # Create directories
+    mkdir -p "$SSLCAT_HOME"
+    mkdir -p "$SSLCAT_CONFIG"
+    mkdir -p "$SSLCAT_LOG"
+    
+    # Copy binary file
+    cp sslcat "$SSLCAT_HOME/"
+    chmod +x "$SSLCAT_HOME/sslcat"
+    
+    # Create symbolic link
+    ln -sf "$SSLCAT_HOME/sslcat" /usr/local/bin/sslcat
+    
+    # Set permissions
+    chown -R "$SSLCAT_USER:$SSLCAT_USER" "$SSLCAT_HOME"
+    chown -R "$SSLCAT_USER:$SSLCAT_USER" "$SSLCAT_CONFIG"
+    chown -R "$SSLCAT_USER:$SSLCAT_USER" "$SSLCAT_LOG"
+}
+
+# Create system service
+create_service() {
+    echo "Creating system service..."
+    
+    cat > /etc/systemd/system/sslcat.service <<EOF
 [Unit]
-Description=SSLcat SSL Proxy Server
+Description=SSLcat Proxy Server
 After=network.target
 
 [Service]
 Type=simple
-User=sslcat
-Group=sslcat
-WorkingDirectory=/opt/sslcat
-ExecStart=/opt/sslcat/bin/sslcat --config /etc/sslcat/sslcat.conf
+User=$SSLCAT_USER
+Group=$SSLCAT_USER
+ExecStart=$SSLCAT_HOME/sslcat -config $SSLCAT_CONFIG/sslcat.conf
 Restart=always
 RestartSec=5
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-# Reload systemd
-sudo systemctl daemon-reload
-sudo systemctl enable sslcat
-```
-
-## 🍎 macOS Installation
-
-### Homebrew (if available)
-
-```bash
-# Install via Homebrew
-brew install sslcat
-
-# Start service
-brew services start sslcat
-```
-
-### Manual Installation
-
-```bash
-# Download macOS binary
-curl -fsSL https://cdn.wxside.com/xurenlu/sslcat/releases/download/v1.3.3/sslcat_v1.3.3_darwin-arm64.tar.gz -o sslcat.tgz
-
-# Extract and install
-tar -xzf sslcat.tgz
-sudo install -m 0755 sslcat /usr/local/bin/sslcat
-
-# Create config
-mkdir -p ~/.sslcat
-cat > ~/.sslcat/sslcat.conf << EOF
-{
-  "server": {
-    "host": "0.0.0.0",
-    "port": 8080,
-    "debug": true
-  },
-  "ssl": {
-    "email": "your-email@example.com",
-    "staging": true,
-    "auto_renew": false
-  },
-  "admin": {
-    "username": "admin",
-    "password_file": "./data/admin.pass",
-    "first_run": true
-  }
+    systemctl daemon-reload
+    systemctl enable sslcat
 }
+
+# Create default configuration
+create_config() {
+    echo "Creating default configuration..."
+    
+    cat > "$SSLCAT_CONFIG/sslcat.conf" <<EOF
+server:
+  host: "0.0.0.0"
+  port: 80
+  ssl_port: 443
+  debug: false
+
+proxy:
+  rules:
+    - domain: "example.com"
+      target: "http://localhost:8080"
+      ssl: true
+
+ssl:
+  certificates:
+    - domain: "example.com"
+      provider: "letsencrypt"
+      email: "admin@example.com"
+      auto_renew: true
+
+monitoring:
+  metrics:
+    enabled: true
+    endpoint: "/metrics"
 EOF
 
-# Start SSLcat
-sslcat --config ~/.sslcat/sslcat.conf
+    chown "$SSLCAT_USER:$SSLCAT_USER" "$SSLCAT_CONFIG/sslcat.conf"
+}
+
+# Main function
+main() {
+    echo "Starting SSLcat installation..."
+    
+    check_requirements
+    download_sslcat
+    install_sslcat
+    create_service
+    create_config
+    
+    echo "SSLcat installation completed!"
+    echo "Configuration file: $SSLCAT_CONFIG/sslcat.conf"
+    echo "Start service: systemctl start sslcat"
+    echo "Check status: systemctl status sslcat"
+}
+
+# Run main function
+main "$@"
 ```
 
-## 🪟 Windows Installation
+## Verification
 
-### Download and Install
-
-1. Download the Windows binary from [GitHub Releases](https://github.com/xurenlu/sslcat/releases)
-2. Extract the ZIP file
-3. Run `sslcat.exe` from Command Prompt or PowerShell
-
-### Windows Service (Advanced)
-
-```powershell
-# Install as Windows service using NSSM
-nssm install sslcat "C:\path\to\sslcat.exe"
-nssm set sslcat AppParameters "--config C:\path\to\sslcat.conf"
-nssm start sslcat
-```
-
-## 🔧 Post-Installation Setup
-
-### Initial Configuration
-
+### Check Installation
 ```bash
-# Start SSLcat
-sudo systemctl start sslcat
+# Check version
+sslcat --version
 
-# Check status
-sudo systemctl status sslcat
-
-# View logs
-sudo journalctl -u sslcat -f
-```
-
-### Web Interface Access
-
-1. Open browser and navigate to: `http://your-server-ip/sslcat-panel`
-2. Login with default credentials:
-   - Username: `admin`
-   - Password: `admin*9527`
-3. Change password and configure settings
-
-### Firewall Configuration
-
-```bash
-# Ubuntu/Debian
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-
-# CentOS/RHEL
-sudo firewall-cmd --permanent --add-service=http
-sudo firewall-cmd --permanent --add-service=https
-sudo firewall-cmd --reload
-```
-
-## 🚨 Troubleshooting Installation
-
-### Common Issues
-
-**Permission Denied:**
-```bash
-# Check file permissions
-ls -la /opt/sslcat/bin/sslcat
-sudo chmod +x /opt/sslcat/bin/sslcat
-```
-
-**Port Already in Use:**
-```bash
-# Check what's using the port
-sudo netstat -tlnp | grep :443
-sudo lsof -i :443
-
-# Stop conflicting service
-sudo systemctl stop nginx
-```
-
-**Service Won't Start:**
-```bash
-# Check configuration
-sslcat --config /etc/sslcat/sslcat.conf --log-level debug
-
-# Check logs
-sudo journalctl -u sslcat -f
-```
-
-### Verification Commands
-
-```bash
-# Check if SSLcat is running
-sudo systemctl status sslcat
-
-# Test configuration
-sslcat --config /etc/sslcat/sslcat.conf --log-level debug
+# Check service status
+systemctl status sslcat
 
 # Check ports
-sudo netstat -tlnp | grep sslcat
-
-# Test web interface
-curl -I http://localhost/sslcat-panel
+netstat -tlnp | grep sslcat
 ```
 
-## 📋 Installation Checklist
+### Access Web Interface
+```bash
+# Web interface address
+http://your-server-ip:8080/sslcat-panel
 
-### Pre-Installation
-- [ ] System meets requirements
-- [ ] Ports 80 and 443 are available
-- [ ] Domain name points to server
-- [ ] Firewall rules configured
+# Default login credentials
+# Username: admin
+# Password: admin*9527
+```
 
-### Installation
-- [ ] Binary downloaded and installed
-- [ ] System user created
-- [ ] Configuration file created
-- [ ] Service installed and enabled
-
-### Post-Installation
-- [ ] Service started successfully
-- [ ] Web interface accessible
-- [ ] SSL certificates working
-- [ ] Proxy rules configured
-
-## 🔄 Upgrading SSLcat
-
-### Binary Upgrade
+## Uninstall
 
 ```bash
 # Stop service
 sudo systemctl stop sslcat
+sudo systemctl disable sslcat
 
-# Backup configuration
-sudo cp /etc/sslcat/sslcat.conf /etc/sslcat/sslcat.conf.backup
+# Remove service file
+sudo rm /etc/systemd/system/sslcat.service
+sudo systemctl daemon-reload
 
-# Download new version
-wget https://github.com/xurenlu/sslcat/releases/download/v1.3.4/sslcat_v1.3.4_linux-amd64.tar.gz
-tar -xzf sslcat_v1.3.4_linux-amd64.tar.gz
+# Remove files
+sudo rm /usr/local/bin/sslcat
+sudo rm -rf /etc/sslcat
+sudo rm -rf /var/log/sslcat
+sudo rm -rf /var/lib/sslcat
 
-# Replace binary
-sudo cp sslcat /opt/sslcat/bin/
-sudo chmod +x /opt/sslcat/bin/sslcat
-
-# Start service
-sudo systemctl start sslcat
+# Remove user
+sudo userdel sslcat
 ```
 
-### Docker Upgrade
+## Related Documentation
 
-```bash
-# Pull new image
-docker pull sslcat/sslcat:latest
-
-# Stop and remove old container
-docker stop sslcat
-docker rm sslcat
-
-# Start new container
-docker run -d --name sslcat -p 80:80 -p 443:443 -v /etc/sslcat:/etc/sslcat -v /opt/sslcat:/opt/sslcat sslcat/sslcat:latest
-```
+- [System Requirements](requirements.md)
+- [Configuration Guide](../configuration/basic.md)
 
 ---
 
-*Installation complete? Check out our [post-installation guide](post-install.md) for next steps.*
+*After installation, please access the web interface for initial configuration.*

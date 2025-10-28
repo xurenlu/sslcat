@@ -12,11 +12,15 @@
 ### 步骤 1：下载并安装
 
 ```bash
-# 下载并运行安装脚本
-curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/install.sh | sudo bash
+# 下载安装包
+curl -L https://github.com/xurenlu/sslcat/releases/download/v1.3.20-rc2/sslcat_v1.3.20-rc2_linux-amd64.tar.gz -o sslcat.tar.gz
 
-# 或者为中国用户（下载更快）
-curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/scripts/install-from-release-zh.sh | sudo bash -s -- -v latest
+# CDN 镜像下载（推荐国内用户）
+curl -L https://cdn.wxside.com/xurenlu/sslcat/releases/v1.3.20-rc2/sslcat_v1.3.20-rc2_linux-amd64.tar.gz -o sslcat.tar.gz
+
+# 解压并安装
+tar -xzf sslcat.tar.gz
+sudo ./install-sslcat.sh
 ```
 
 ### 步骤 2：基础配置
@@ -81,60 +85,6 @@ sudo systemctl status sslcat
 3. 更改管理员密码并自定义面板路径
 4. 配置您的第一个代理规则
 
-## 🐳 Docker 快速开始
-
-如果您喜欢 Docker：
-
-```bash
-# 克隆仓库
-git clone https://github.com/xurenlu/sslcat.git
-cd sslcat
-
-# 使用 Docker Compose 启动
-docker-compose up -d
-
-# 访问 Web 界面
-open http://localhost:8080/sslcat-panel
-```
-
-## 📱 macOS 开发设置
-
-在 macOS 上进行本地开发：
-
-```bash
-# 下载 macOS 二进制文件
-curl -fsSL https://cdn.wxside.com/xurenlu/sslcat/releases/download/v1.3.3/sslcat_v1.3.3_darwin-arm64.tar.gz -o sslcat.tgz
-
-# 解压并安装
-tar -xzf sslcat.tgz
-sudo install -m 0755 sslcat /usr/local/bin/sslcat
-
-# 创建基础配置
-cat > sslcat.conf << EOF
-{
-  "server": {
-    "host": "0.0.0.0",
-    "port": 8080,
-    "debug": true
-  },
-  "ssl": {
-    "email": "your-email@example.com",
-    "staging": true,
-    "auto_renew": false
-  },
-  "admin": {
-    "username": "admin",
-    "password_file": "./data/admin.pass",
-    "first_run": true
-  }
-}
-EOF
-
-# 启动 SSLcat
-sslcat --config sslcat.conf --port 8080
-```
-
-访问 Web 界面：`http://localhost:8080/sslcat-panel`
 
 ## ⚙️ 初始配置
 

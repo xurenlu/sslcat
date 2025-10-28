@@ -43,11 +43,11 @@ type MemoryCacheConfig struct {
 func DefaultMemoryCacheConfig(name string) *MemoryCacheConfig {
 	return &MemoryCacheConfig{
 		Name:            name,
-		MaxEntries:      1000,              // 增加到1000，BigCache性能更好
+		MaxEntries:      1000,             // 增加到1000，BigCache性能更好
 		MaxSizeBytes:    50 * 1024 * 1024, // 50MB
-		MaxItemSize:     10 * 1024 * 1024,  // 10MB
-		DefaultTTL:      24 * time.Hour,    // 24小时
-		CleanupInterval: 5 * time.Minute,   // 5分钟清理一次
+		MaxItemSize:     10 * 1024 * 1024, // 10MB
+		DefaultTTL:      24 * time.Hour,   // 24小时
+		CleanupInterval: 5 * time.Minute,  // 5分钟清理一次
 	}
 }
 

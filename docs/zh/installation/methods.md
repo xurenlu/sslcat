@@ -1,208 +1,43 @@
 # 安装方法
 
-本指南介绍 SSLcat 的多种安装方法，包括二进制安装、Docker 安装、源码编译和包管理器安装。
+本指南介绍 SSLcat 的安装方法。我们提供预编译的二进制文件，下载后运行安装脚本即可完成安装。
 
-## 二进制安装
+## 下载安装包
 
 ### 下载二进制文件
 ```bash
-# 下载最新版本
-curl -L https://github.com/xurenlu/sslcat/releases/latest/download/sslcat_linux_amd64.tar.gz | tar xz
+# GitHub 下载
+curl -L https://github.com/xurenlu/sslcat/releases/download/v1.3.20-rc2/sslcat_v1.3.20-rc2_linux-amd64.tar.gz -o sslcat.tar.gz
+
+# CDN 镜像下载（推荐国内用户）
+curl -L https://cdn.wxside.com/xurenlu/sslcat/releases/v1.3.20-rc2/sslcat_v1.3.20-rc2_linux-amd64.tar.gz -o sslcat.tar.gz
 
 # 或者使用 wget
-wget https://github.com/xurenlu/sslcat/releases/latest/download/sslcat_linux_amd64.tar.gz
-tar -xzf sslcat_linux_amd64.tar.gz
+wget https://github.com/xurenlu/sslcat/releases/download/v1.3.20-rc2/sslcat_v1.3.20-rc2_linux-amd64.tar.gz -O sslcat.tar.gz
 ```
 
-### 安装到系统
+### 解压并安装
 ```bash
-# 复制到系统路径
-sudo cp sslcat /usr/local/bin/
-sudo chmod +x /usr/local/bin/sslcat
+# 解压文件
+tar -xzf sslcat.tar.gz
 
-# 创建配置目录
-sudo mkdir -p /etc/sslcat
-sudo mkdir -p /var/log/sslcat
-sudo mkdir -p /var/lib/sslcat
+# 运行安装脚本
+sudo ./install-sslcat.sh
 ```
 
-### 创建系统服务
-```bash
-# 创建 systemd 服务文件
-sudo tee /etc/systemd/system/sslcat.service > /dev/null <<EOF
-[Unit]
-Description=SSLcat Proxy Server
-After=network.target
+## 安装脚本说明
 
-[Service]
-Type=simple
-User=sslcat
-Group=sslcat
-ExecStart=/usr/local/bin/sslcat -config /etc/sslcat/sslcat.conf
-Restart=always
-RestartSec=5
-StandardOutput=journal
-StandardError=journal
+安装脚本 `install-sslcat.sh` 会自动完成以下操作：
 
-[Install]
-WantedBy=multi-user.target
-EOF
+1. **检查系统要求** - 验证操作系统和权限
+2. **创建系统用户** - 创建 `sslcat` 用户和组
+3. **创建目录结构** - 设置必要的目录和权限
+4. **安装二进制文件** - 复制到系统路径并设置权限
+5. **创建系统服务** - 配置 systemd 服务
+6. **创建默认配置** - 生成基础配置文件
+7. **启动服务** - 启用并启动 SSLcat 服务
 
-# 创建用户
-sudo useradd -r -s /bin/false sslcat
-
-# 设置权限
-sudo chown -R sslcat:sslcat /etc/sslcat
-sudo chown -R sslcat:sslcat /var/log/sslcat
-sudo chown -R sslcat:sslcat /var/lib/sslcat
-
-# 启用服务
-sudo systemctl daemon-reload
-sudo systemctl enable sslcat
-sudo systemctl start sslcat
-```
-
-## Docker 安装
-
-### 基本 Docker 运行
-```bash
-# 拉取镜像
-docker pull xurenlu/sslcat:latest
-
-# 运行容器
-docker run -d --name sslcat \
-  -p 80:80 -p 443:443 \
-  -v $(pwd)/sslcat.conf:/app/sslcat.conf \
-  xurenlu/sslcat:latest
-```
-
-### Docker Compose 安装
-```yaml
-# docker-compose.yml
-version: '3.8'
-
-services:
-  sslcat:
-    image: xurenlu/sslcat:latest
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./sslcat.conf:/app/sslcat.conf
-      - ./data:/app/data
-      - ./logs:/app/logs
-    environment:
-      - SSLCAT_LOG_LEVEL=info
-    restart: unless-stopped
-```
-
-```bash
-# 启动服务
-docker-compose up -d
-
-# 查看日志
-docker-compose logs -f sslcat
-```
-
-## 源码编译
-
-### 安装 Go
-```bash
-# 安装 Go 1.21+
-wget https://go.dev/dl/go1.21.5.linux-amd64.tar.gz
-sudo tar -C /usr/local -xzf go1.21.5.linux-amd64.tar.gz
-
-# 设置环境变量
-echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-source ~/.bashrc
-
-# 验证安装
-go version
-```
-
-### 编译 SSLcat
-```bash
-# 克隆源码
-git clone https://github.com/xurenlu/sslcat.git
-cd sslcat
-
-# 安装依赖
-go mod download
-
-# 编译
-go build -o sslcat .
-
-# 或者使用 Makefile
-make build
-```
-
-### 交叉编译
-```bash
-# 编译多平台版本
-make build-all
-
-# 或者手动编译
-GOOS=linux GOARCH=amd64 go build -o sslcat-linux-amd64 .
-GOOS=windows GOARCH=amd64 go build -o sslcat-windows-amd64.exe .
-GOOS=darwin GOARCH=amd64 go build -o sslcat-darwin-amd64 .
-```
-
-## 包管理器安装
-
-### Ubuntu/Debian
-```bash
-# 添加 GPG 密钥
-wget -qO - https://repos.sslcat.com/key.gpg | sudo apt-key add -
-
-# 添加仓库
-echo "deb https://repos.sslcat.com/ubuntu focal main" | sudo tee /etc/apt/sources.list.d/sslcat.list
-
-# 更新包列表
-sudo apt update
-
-# 安装 SSLcat
-sudo apt install sslcat
-```
-
-### CentOS/RHEL
-```bash
-# 添加仓库
-sudo tee /etc/yum.repos.d/sslcat.repo > /dev/null <<EOF
-[sslcat]
-name=SSLcat Repository
-baseurl=https://repos.sslcat.com/centos/\$releasever/\$basearch
-enabled=1
-gpgcheck=1
-gpgkey=https://repos.sslcat.com/key.gpg
-EOF
-
-# 安装 SSLcat
-sudo yum install sslcat
-```
-
-### Arch Linux
-```bash
-# 使用 AUR
-yay -S sslcat
-
-# 或者手动安装
-git clone https://aur.archlinux.org/sslcat.git
-cd sslcat
-makepkg -si
-```
-
-## 自动化安装脚本
-
-### 一键安装脚本
-```bash
-# 下载安装脚本
-curl -fsSL https://install.sslcat.com/install.sh | bash
-
-# 或者使用 wget
-wget -qO- https://install.sslcat.com/install.sh | bash
-```
-
-### 自定义安装脚本
+### 安装脚本内容
 ```bash
 #!/bin/bash
 # install-sslcat.sh
@@ -210,7 +45,7 @@ wget -qO- https://install.sslcat.com/install.sh | bash
 set -e
 
 # 配置变量
-SSLCAT_VERSION="1.3.16-rc18"
+SSLCAT_VERSION="1.3.20-rc2"
 SSLCAT_USER="sslcat"
 SSLCAT_HOME="/opt/sslcat"
 SSLCAT_CONFIG="/etc/sslcat"
@@ -249,7 +84,7 @@ download_sslcat() {
     esac
     
     # 下载二进制文件
-    DOWNLOAD_URL="https://github.com/xurenlu/sslcat/releases/download/v${SSLCAT_VERSION}/sslcat_${SSLCAT_VERSION}_linux_${ARCH}.tar.gz"
+    DOWNLOAD_URL="https://github.com/xurenlu/sslcat/releases/download/v${SSLCAT_VERSION}/sslcat_v${SSLCAT_VERSION}_linux-${ARCH}.tar.gz"
     
     cd /tmp
     wget -q "$DOWNLOAD_URL" -O sslcat.tar.gz
@@ -371,9 +206,6 @@ main "$@"
 # 检查版本
 sslcat --version
 
-# 检查配置
-sslcat -config /etc/sslcat/sslcat.conf -validate
-
 # 检查服务状态
 systemctl status sslcat
 
@@ -381,21 +213,18 @@ systemctl status sslcat
 netstat -tlnp | grep sslcat
 ```
 
-### 测试功能
+### 访问管理界面
 ```bash
-# 测试 HTTP 重定向
-curl -I http://example.com
+# 管理界面地址
+http://your-server-ip:8080/sslcat-panel
 
-# 测试 HTTPS
-curl -I https://example.com
-
-# 测试管理界面
-curl http://localhost:8080/health
+# 默认登录信息
+# 用户名: admin
+# 密码: admin*9527
 ```
 
 ## 卸载
 
-### 二进制安装卸载
 ```bash
 # 停止服务
 sudo systemctl stop sslcat
@@ -415,26 +244,11 @@ sudo rm -rf /var/lib/sslcat
 sudo userdel sslcat
 ```
 
-### Docker 安装卸载
-```bash
-# 停止容器
-docker stop sslcat
-docker rm sslcat
-
-# 删除镜像
-docker rmi xurenlu/sslcat:latest
-
-# 删除数据卷
-docker volume rm sslcat-data
-```
-
 ## 相关文档
 
 - [系统要求](requirements.md)
-- [安装后步骤](post-install.md)
 - [配置指南](../configuration/basic.md)
-- [Docker 部署](../deployment/docker.md)
 
 ---
 
-*选择适合你环境的安装方法，确保 SSLcat 能够正常运行。*
+*安装完成后，请访问管理界面进行初始配置。*
