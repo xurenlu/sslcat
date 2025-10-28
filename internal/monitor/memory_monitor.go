@@ -207,7 +207,7 @@ func (mm *MemoryMonitor) getTrend() string {
 	mm.mu.RLock()
 	defer mm.mu.RUnlock()
 
-	if len(mm.allocHistory) < 10 {
+	if len(mm.allocHistory) < 20 {
 		return "数据不足"
 	}
 
