@@ -51,11 +51,11 @@ type Config struct {
 
 // ServerConfig 服务器配置
 type ServerConfig struct {
-	Host     string `json:"host"`
-	Port     int    `json:"port"` // 向后兼容，保留原字段
-	Debug    bool   `json:"debug"`
-	LogLevel string `json:"log_level"` // debug|info|warn|error
-	EnablePprof bool `json:"enable_pprof"` // 是否启用 pprof 性能分析端点
+	Host        string `json:"host"`
+	Port        int    `json:"port"` // 向后兼容，保留原字段
+	Debug       bool   `json:"debug"`
+	LogLevel    string `json:"log_level"`    // debug|info|warn|error
+	EnablePprof bool   `json:"enable_pprof"` // 是否启用 pprof 性能分析端点
 
 	// 新的端口配置
 	PortMode    string `json:"port_mode"`    // "standard" | "custom" (默认 "standard")
@@ -796,11 +796,11 @@ func Load(configFile string) (*Config, error) {
 	// 设置默认值
 	config := &Config{
 		Server: ServerConfig{
-			Host:     "0.0.0.0",
-			Port:     443, // 向后兼容，保留原字段
-			Debug:    false,
-			LogLevel: "info", // 默认日志级别
-			EnablePprof: false, // 默认禁用 pprof
+			Host:        "0.0.0.0",
+			Port:        443, // 向后兼容，保留原字段
+			Debug:       false,
+			LogLevel:    "info", // 默认日志级别
+			EnablePprof: false,  // 默认禁用 pprof
 			// 新的端口配置默认值
 			PortMode:          "standard", // 默认标准模式
 			CustomPort:        8080,       // 默认自定义端口

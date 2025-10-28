@@ -2,8 +2,10 @@ package main
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -59,11 +61,24 @@ func main() {
 		showVersion = flag.Bool("version", false, "显示版本信息")
 		testConfig  = flag.Bool("test", false, "测试配置文件语法和完整性")
 		checkConfig = flag.Bool("check", false, "检查配置文件并显示详细信息")
+		
+		// pprof 相关命令
+		pprofEnable  = flag.Bool("pprof-enable", false, "启用 pprof 性能分析端点")
+		pprofDisable = flag.Bool("pprof-disable", false, "禁用 pprof 性能分析端点")
+		pprofExport  = flag.String("pprof-export", "", "导出 pprof 数据 (heap|cpu|goroutine|allocs|block|mutex)")
+		pprofOutput  = flag.String("pprof-output", "", "导出文件路径 (默认: ./sslcat-{type}-{timestamp}.pprof)")
+		pprofServer  = flag.String("pprof-server", "http://localhost:8080", "pprof 服务器地址")
 	)
 	flag.Parse()
 
 	if *showVersion {
 		fmt.Printf("SSLcat v%s (build: %s)\n", version, build)
+		return
+	}
+
+	// pprof 命令处理
+	if *pprofEnable || *pprofDisable || *pprofExport != "" {
+		handlePprofCommands(configFile, pprofEnable, pprofDisable, pprofExport, pprofOutput, pprofServer)
 		return
 	}
 
@@ -483,4 +498,126 @@ func startCustomMode(cfg *config.Config, webServer http.Handler, readTimeout, wr
 			logrus.Fatalf("failed to start HTTP server: %v", err)
 		}
 	}()
+}
+
+// handlePprofCommands 处理 pprof 相关命令
+func handlePprofCommands(configFile *string, pprofEnable, pprofDisable *bool, pprofExport, pprofOutput, pprofServer *string) {
+	// 加载配置
+	cfg, err := config.Load(*configFile)
+	if err != nil {
+		fmt.Printf("❌ 加载配置文件失败: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 启用 pprof
+	if *pprofEnable {
+		cfg.Server.EnablePprof = true
+		if err := saveConfig(cfg, *configFile); err != nil {
+			fmt.Printf("❌ 保存配置失败: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("✅ pprof 性能分析端点已启用")
+		fmt.Println("   访问地址: http://localhost:8080/debug/pprof/")
+		fmt.Println("   注意: 需要重启 sslcat 服务使配置生效")
+		return
+	}
+
+	// 禁用 pprof
+	if *pprofDisable {
+		cfg.Server.EnablePprof = false
+		if err := saveConfig(cfg, *configFile); err != nil {
+			fmt.Printf("❌ 保存配置失败: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("✅ pprof 性能分析端点已禁用")
+		fmt.Println("   注意: 需要重启 sslcat 服务使配置生效")
+		return
+	}
+
+	// 导出 pprof 数据
+	if *pprofExport != "" {
+		exportPprofData(*pprofExport, *pprofOutput, *pprofServer)
+		return
+	}
+}
+
+// saveConfig 保存配置到文件
+func saveConfig(cfg *config.Config, configFile string) error {
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("序列化配置失败: %w", err)
+	}
+	return os.WriteFile(configFile, data, 0644)
+}
+
+// exportPprofData 导出 pprof 数据
+func exportPprofData(profileType, outputPath, serverURL string) {
+	// 验证 profile 类型
+	validTypes := map[string]bool{
+		"heap":      true,
+		"cpu":       true,
+		"goroutine": true,
+		"allocs":    true,
+		"block":     true,
+		"mutex":     true,
+	}
+	if !validTypes[profileType] {
+		fmt.Printf("❌ 无效的 profile 类型: %s\n", profileType)
+		fmt.Println("   支持的类型: heap, cpu, goroutine, allocs, block, mutex")
+		os.Exit(1)
+	}
+
+	// 生成输出文件名
+	if outputPath == "" {
+		timestamp := time.Now().Format("20060102-150405")
+		outputPath = fmt.Sprintf("./sslcat-%s-%s.pprof", profileType, timestamp)
+	}
+
+	// 构建 URL
+	url := fmt.Sprintf("%s/debug/pprof/%s", serverURL, profileType)
+	
+	fmt.Printf("📊 正在导出 %s profile 数据...\n", profileType)
+	fmt.Printf("   服务器: %s\n", url)
+	fmt.Printf("   输出文件: %s\n", outputPath)
+
+	// 下载数据
+	resp, err := http.Get(url)
+	if err != nil {
+		fmt.Printf("❌ 连接服务器失败: %v\n", err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		fmt.Printf("❌ 服务器返回错误: %s\n", resp.Status)
+		os.Exit(1)
+	}
+
+	// 保存文件
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Printf("❌ 读取数据失败: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := os.WriteFile(outputPath, data, 0644); err != nil {
+		fmt.Printf("❌ 保存文件失败: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("✅ %s profile 数据已导出到: %s\n", profileType, outputPath)
+	fmt.Printf("   文件大小: %d bytes\n", len(data))
+	
+	// 提供分析建议
+	switch profileType {
+	case "heap":
+		fmt.Println("💡 使用 go tool pprof 分析内存使用:")
+		fmt.Printf("   go tool pprof %s\n", outputPath)
+	case "cpu":
+		fmt.Println("💡 使用 go tool pprof 分析 CPU 使用:")
+		fmt.Printf("   go tool pprof %s\n", outputPath)
+	case "goroutine":
+		fmt.Println("💡 使用 go tool pprof 分析 goroutine:")
+		fmt.Printf("   go tool pprof %s\n", outputPath)
+	}
 }
