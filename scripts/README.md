@@ -4,7 +4,29 @@
 
 ## 📦 编译和发布脚本
 
-### `build-and-release.sh` ⭐️ 推荐
+### `publish-release.sh` ⭐️ 快速发布
+**将已编译文件发布到 GitHub Release**
+
+如果你已经编译好了文件，使用这个脚本可以快速发布：
+```bash
+./scripts/publish-release.sh [dist目录]
+```
+
+**功能**:
+- ✅ 自动检测版本号和标签
+- ✅ 从 CHANGELOG.md 提取 Release 说明
+- ✅ 支持交互式编辑说明
+- ✅ 智能处理标签和 Release 冲突
+- ✅ 友好的交互式界面
+
+**适用场景**:
+- 已编译文件，直接发布
+- 更新现有 Release
+- 自定义 Release 说明
+
+详细使用方法见 [PUBLISH_GUIDE.md](../PUBLISH_GUIDE.md)
+
+### `build-and-release.sh` 
 **完整的编译和发布流程**
 
 一键完成从编译到发布的全部流程：
