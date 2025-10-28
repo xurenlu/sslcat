@@ -61,7 +61,7 @@ func main() {
 		showVersion = flag.Bool("version", false, "显示版本信息")
 		testConfig  = flag.Bool("test", false, "测试配置文件语法和完整性")
 		checkConfig = flag.Bool("check", false, "检查配置文件并显示详细信息")
-		
+
 		// pprof 相关命令
 		pprofEnable  = flag.Bool("pprof-enable", false, "启用 pprof 性能分析端点")
 		pprofDisable = flag.Bool("pprof-disable", false, "禁用 pprof 性能分析端点")
@@ -575,7 +575,7 @@ func exportPprofData(profileType, outputPath, serverURL string) {
 
 	// 构建 URL
 	url := fmt.Sprintf("%s/debug/pprof/%s", serverURL, profileType)
-	
+
 	fmt.Printf("📊 正在导出 %s profile 数据...\n", profileType)
 	fmt.Printf("   服务器: %s\n", url)
 	fmt.Printf("   输出文件: %s\n", outputPath)
@@ -607,7 +607,7 @@ func exportPprofData(profileType, outputPath, serverURL string) {
 
 	fmt.Printf("✅ %s profile 数据已导出到: %s\n", profileType, outputPath)
 	fmt.Printf("   文件大小: %d bytes\n", len(data))
-	
+
 	// 提供分析建议
 	switch profileType {
 	case "heap":
