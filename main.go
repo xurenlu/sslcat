@@ -84,7 +84,7 @@ func main() {
 		cliManager.RegisterConfigCommands()
 		cliManager.RegisterProxyCommands()
 		cliManager.RegisterHelpCommand()
-		
+
 		// 加载配置用于 CLI 命令
 		cfg, err := config.Load(*configFile)
 		if err != nil {
@@ -92,7 +92,7 @@ func main() {
 			os.Exit(1)
 		}
 		cliManager.SetConfig(cfg)
-		
+
 		// 执行命令
 		if err := cliManager.Execute(os.Args[1:]); err != nil {
 			fmt.Printf("❌ 命令执行失败: %v\n", err)

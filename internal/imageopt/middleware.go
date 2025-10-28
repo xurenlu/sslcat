@@ -9,12 +9,12 @@ import (
 // ResponseWriter 包装的 ResponseWriter，用于拦截和优化图片响应
 type ResponseWriter struct {
 	http.ResponseWriter
-	optimizer   *Optimizer
-	request     *http.Request
-	buffer      *bytes.Buffer
-	statusCode  int
-	contentType string
-	written     bool
+	optimizer      *Optimizer
+	request        *http.Request
+	buffer         *bytes.Buffer
+	statusCode     int
+	contentType    string
+	written        bool
 	shouldOptimize bool
 }
 
@@ -39,7 +39,7 @@ func (rw *ResponseWriter) Header() http.Header {
 func (rw *ResponseWriter) WriteHeader(statusCode int) {
 	rw.statusCode = statusCode
 	rw.contentType = rw.ResponseWriter.Header().Get("Content-Type")
-	
+
 	// 检查是否应该优化
 	if !rw.shouldOptimize || !isImageContentType(rw.contentType) {
 		rw.shouldOptimize = false
@@ -72,7 +72,7 @@ func (rw *ResponseWriter) Flush() error {
 	}
 
 	originalData := rw.buffer.Bytes()
-	
+
 	// 如果没有数据，直接返回
 	if len(originalData) == 0 {
 		rw.ResponseWriter.WriteHeader(rw.statusCode)
@@ -97,7 +97,7 @@ func (rw *ResponseWriter) Flush() error {
 		rw.ResponseWriter.Header().Set("Content-Type", newContentType)
 	}
 	rw.ResponseWriter.Header().Set("Content-Length", string(rune(len(optimizedData))))
-	
+
 	// 添加优化标识
 	if len(optimizedData) < len(originalData) {
 		rw.ResponseWriter.Header().Set("X-Image-Optimized", "true")
@@ -127,4 +127,3 @@ func isImageContentType(contentType string) bool {
 func (rw *ResponseWriter) Close() error {
 	return rw.Flush()
 }
-
