@@ -938,6 +938,17 @@ func Load(configFile string) (*Config, error) {
 			Interval: 60, // 默认60分钟
 			BaseURL:  "",
 		},
+		ImageOptimization: ImageOptimizationConfig{
+			Enabled:         false, // 默认禁用图片优化
+			AutoWebP:        false, // 默认禁用 WebP 转换
+			WebPQuality:     80,    // WebP 质量
+			WebPMinSizeKB:   200,   // WebP 转换最小文件大小 200KB
+			JPEGQuality:     85,    // JPEG 质量
+			PNGLevel:        6,     // PNG 压缩级别
+			StripMetadata:   false, // 不移除元数据
+			MinSizeBytes:    60 * 1024,  // 最小文件大小 60KB
+			MaxSizeBytes:    5 * 1024 * 1024, // 最大文件大小 5MB
+		},
 	}
 
 	// 如果配置文件存在，则加载
@@ -1455,11 +1466,12 @@ type ImageOptimizationConfig struct {
 	Enabled bool `json:"enabled"` // 是否启用图片优化
 
 	// 格式转换
-	AutoWebP      bool `json:"auto_webp"`      // 自动转换为 WebP
-	WebPQuality   int  `json:"webp_quality"`   // WebP 质量 (0-100，默认 80)
-	JPEGQuality   int  `json:"jpeg_quality"`   // JPEG 质量 (0-100，默认 85)
-	PNGLevel      int  `json:"png_level"`      // PNG 压缩级别 (0-9，默认 6)
-	StripMetadata bool `json:"strip_metadata"` // 移除 EXIF 元数据
+	AutoWebP         bool `json:"auto_webp"`          // 自动转换为 WebP
+	WebPQuality      int  `json:"webp_quality"`       // WebP 质量 (0-100，默认 80)
+	WebPMinSizeKB    int  `json:"webp_min_size_kb"`   // WebP 转换最小文件大小 (KB，默认 200)
+	JPEGQuality      int  `json:"jpeg_quality"`       // JPEG 质量 (0-100，默认 85)
+	PNGLevel         int  `json:"png_level"`          // PNG 压缩级别 (0-9，默认 6)
+	StripMetadata    bool `json:"strip_metadata"`     // 移除 EXIF 元数据
 
 	// 文件大小限制（优化 CPU 使用）
 	MinSizeBytes int64 `json:"min_size_bytes"` // 最小文件大小（字节，默认 60KB）

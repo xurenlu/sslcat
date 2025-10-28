@@ -1,6 +1,3 @@
-//go:build ignore
-// +build ignore
-
 package webp
 
 import (
@@ -17,21 +14,23 @@ import (
 
 // Converter WebP转换器
 type Converter struct {
-	enabled    bool
-	quality    int
-	cacheSize  int
-	cache      map[string][]byte
-	cacheMutex sync.RWMutex
-	log        *logrus.Entry
+	enabled         bool
+	quality         int
+	cacheSize       int
+	minFileSizeKB   int // 最小文件大小阈值（KB），超过此大小才进行转换
+	cache           map[string][]byte
+	cacheMutex      sync.RWMutex
+	log             *logrus.Entry
 }
 
 // NewConverter 创建WebP转换器
 func NewConverter() *Converter {
 	return &Converter{
-		enabled:   true,
-		quality:   80,  // 默认质量
-		cacheSize: 100, // 缓存100张图片
-		cache:     make(map[string][]byte),
+		enabled:       false, // 默认关闭，需要手动启用
+		quality:       80,    // 默认质量
+		cacheSize:     100,   // 缓存100张图片
+		minFileSizeKB: 200,   // 默认200KB阈值
+		cache:         make(map[string][]byte),
 		log: logrus.WithFields(logrus.Fields{
 			"component": "webp_converter",
 		}),
@@ -57,6 +56,38 @@ func (c *Converter) ShouldConvert(r *http.Request) bool {
 	}
 
 	return true
+}
+
+// ShouldConvertWithSize 检查是否应该转换为WebP（带文件大小检查）
+func (c *Converter) ShouldConvertWithSize(r *http.Request, fileSizeBytes int64) bool {
+	if !c.ShouldConvert(r) {
+		return false
+	}
+
+	// 检查文件大小是否超过阈值
+	minFileSizeBytes := int64(c.minFileSizeKB * 1024)
+	if fileSizeBytes < minFileSizeBytes {
+		c.log.Debugf("文件大小 %d bytes 小于阈值 %d bytes，跳过 WebP 转换", fileSizeBytes, minFileSizeBytes)
+		return false
+	}
+
+	return true
+}
+
+// SetMinFileSizeKB 设置最小文件大小阈值（KB）
+func (c *Converter) SetMinFileSizeKB(sizeKB int) {
+	c.minFileSizeKB = sizeKB
+	c.log.Infof("设置 WebP 转换最小文件大小阈值为 %d KB", sizeKB)
+}
+
+// SetEnabled 设置是否启用 WebP 转换
+func (c *Converter) SetEnabled(enabled bool) {
+	c.enabled = enabled
+	if enabled {
+		c.log.Info("WebP 转换器已启用")
+	} else {
+		c.log.Info("WebP 转换器已禁用")
+	}
 }
 
 // supportsWebP 检查浏览器是否支持WebP
@@ -113,7 +144,14 @@ func (c *Converter) IsImageRequest(url string) bool {
 
 // ConvertResponse 转换响应中的图片
 func (c *Converter) ConvertResponse(w http.ResponseWriter, r *http.Request, originalResponse *http.Response) error {
-	if !c.ShouldConvert(r) {
+	// 获取文件大小
+	contentLength := originalResponse.ContentLength
+	if contentLength <= 0 {
+		// 如果 Content-Length 不可用，跳过转换
+		return c.copyResponse(w, originalResponse)
+	}
+
+	if !c.ShouldConvertWithSize(r, contentLength) {
 		return c.copyResponse(w, originalResponse)
 	}
 
