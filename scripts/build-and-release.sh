@@ -82,9 +82,11 @@ echo -e "   时间: ${CYAN}${BUILD_TIME}${NC}"
 echo ""
 
 # 询问是否创建新版本
-read -p "$(echo -e ${YELLOW}是否创建新的 Git 标签？ [y/N]: ${NC})" CREATE_TAG
+echo -e -n "${YELLOW}是否创建新的 Git 标签？ [y/N]: ${NC}"
+read CREATE_TAG
 if [[ "$CREATE_TAG" =~ ^[Yy]$ ]]; then
-    read -p "$(echo -e ${YELLOW}请输入新版本号 (例如 v1.3.20): ${NC})" NEW_VERSION
+    echo -e -n "${YELLOW}请输入新版本号 (例如 v1.3.20): ${NC}"
+    read NEW_VERSION
     if [ -n "$NEW_VERSION" ]; then
         git tag "$NEW_VERSION"
         VERSION="$NEW_VERSION"
@@ -264,7 +266,8 @@ ls -lh "$DIST_DIR"
 echo ""
 
 # 询问是否发布到 GitHub
-read -p "$(echo -e ${YELLOW}是否发布到 GitHub Release？ [y/N]: ${NC})" PUBLISH
+echo -e -n "${YELLOW}是否发布到 GitHub Release？ [y/N]: ${NC}"
+read PUBLISH
 if [[ "$PUBLISH" =~ ^[Yy]$ ]]; then
     echo ""
     echo -e "${BLUE}🚀 发布到 GitHub Release...${NC}"
