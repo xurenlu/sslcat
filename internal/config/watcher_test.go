@@ -124,11 +124,37 @@ func TestReloadManager_ReloadAll(t *testing.T) {
 
 	// 创建测试配置
 	oldConfig := &Config{
-		Server: ServerConfig{Port: 8080},
+		Server: ServerConfig{
+			Host: "0.0.0.0",
+			Port: 8080,
+		},
+		SSL: SSLConfig{
+			Email: "test@example.com",
+		},
+		Admin: AdminConfig{
+			Username: "admin",
+		},
+		Security: SecurityConfig{
+			MaxAttempts: 5,
+		},
+		AdminPrefix: "/admin",
 	}
 
 	newConfig := &Config{
-		Server: ServerConfig{Port: 8443},
+		Server: ServerConfig{
+			Host: "0.0.0.0",
+			Port: 8443,
+		},
+		SSL: SSLConfig{
+			Email: "test@example.com",
+		},
+		Admin: AdminConfig{
+			Username: "admin",
+		},
+		Security: SecurityConfig{
+			MaxAttempts: 5,
+		},
+		AdminPrefix: "/admin",
 	}
 
 	// 测试重载
@@ -165,7 +191,41 @@ func TestReloadManager_ValidationFailure(t *testing.T) {
 	rm.RegisterComponent(mockComponent)
 
 	// 测试重载
-	err := rm.ReloadAll(&Config{}, &Config{})
+	oldConfig := &Config{
+		Server: ServerConfig{
+			Host: "0.0.0.0",
+			Port: 8080,
+		},
+		SSL: SSLConfig{
+			Email: "test@example.com",
+		},
+		Admin: AdminConfig{
+			Username: "admin",
+		},
+		Security: SecurityConfig{
+			MaxAttempts: 5,
+		},
+		AdminPrefix: "/admin",
+	}
+
+	newConfig := &Config{
+		Server: ServerConfig{
+			Host: "0.0.0.0",
+			Port: 8443,
+		},
+		SSL: SSLConfig{
+			Email: "test@example.com",
+		},
+		Admin: AdminConfig{
+			Username: "admin",
+		},
+		Security: SecurityConfig{
+			MaxAttempts: 5,
+		},
+		AdminPrefix: "/admin",
+	}
+
+	err := rm.ReloadAll(oldConfig, newConfig)
 	if err == nil {
 		t.Error("Expected validation error")
 	}

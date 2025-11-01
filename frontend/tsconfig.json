@@ -22,8 +22,9 @@
     "noImplicitAny": false,
     "strictNullChecks": false,
     "strictFunctionTypes": false,
-    "strictPropertyInitialization": false
+    "strictPropertyInitialization": false,
+    "types": ["vitest/globals", "node"]
   },
-  "include": ["src"],
+  "include": ["src", "tests", "setupTests.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

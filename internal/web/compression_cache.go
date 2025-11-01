@@ -29,7 +29,7 @@ type CompressionCache struct {
 	log      *logrus.Entry
 }
 
-// NewCompressionCache 创建压缩缓存
+// NewCompressionCache 创建压缩缓存（独立实例）
 func NewCompressionCache(maxEntries int, maxSizeMB int64, maxTotalMB int64) *CompressionCache {
 	return &CompressionCache{
 		memCache: cache.NewMemoryCache(&cache.MemoryCacheConfig{
@@ -40,6 +40,16 @@ func NewCompressionCache(maxEntries int, maxSizeMB int64, maxTotalMB int64) *Com
 			DefaultTTL:      24 * time.Hour,
 			CleanupInterval: 5 * time.Minute,
 		}),
+		log: logrus.WithFields(logrus.Fields{
+			"component": "compression_cache",
+		}),
+	}
+}
+
+// NewCompressionCacheWithCache 使用共享缓存实例创建压缩缓存
+func NewCompressionCacheWithCache(sharedCache *cache.MemoryCache) *CompressionCache {
+	return &CompressionCache{
+		memCache: sharedCache,
 		log: logrus.WithFields(logrus.Fields{
 			"component": "compression_cache",
 		}),
@@ -107,9 +117,9 @@ func (c *CompressionCache) Close() {
 	c.memCache.Close()
 }
 
-// makeKey 生成缓存键
+// makeKey 生成缓存键（添加前缀以区分不同缓存类型）
 func (c *CompressionCache) makeKey(filepath string, algorithm CompressionAlgorithm) string {
-	return fmt.Sprintf("%s:%s", filepath, algorithm)
+	return fmt.Sprintf("compression:%s:%s", filepath, algorithm)
 }
 
 // CompressData 压缩数据（工具函数）
@@ -150,7 +160,7 @@ func CompressData(data []byte, algorithm CompressionAlgorithm, level int) ([]byt
 // GenerateETag 生成 ETag
 func GenerateETag(data []byte) string {
 	hash := sha256.Sum256(data)
-	return fmt.Sprintf(`"` + hex.EncodeToString(hash[:16]) + `"`)
+	return "\"" + hex.EncodeToString(hash[:16]) + "\""
 }
 
 // GenerateETagFromFile 从文件生成 ETag

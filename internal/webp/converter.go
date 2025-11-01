@@ -262,12 +262,6 @@ func (c *Converter) copyResponse(w http.ResponseWriter, originalResponse *http.R
 	return err
 }
 
-// SetEnabled 设置启用状态
-func (c *Converter) SetEnabled(enabled bool) {
-	c.enabled = enabled
-	c.log.Infof("WebP转换已%s", map[bool]string{true: "启用", false: "禁用"}[enabled])
-}
-
 // SetQuality 设置转换质量
 func (c *Converter) SetQuality(quality int) {
 	if quality < 1 {

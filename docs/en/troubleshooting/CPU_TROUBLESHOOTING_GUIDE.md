@@ -208,6 +208,81 @@ curl "http://localhost/sslcat-panel/api/ssl/stats"
 }
 ```
 
+## ❓ Why is SSLcat the Process with Highest CPU Usage?
+
+### 📊 This is Normal
+
+If you find that SSLcat is the process with the highest CPU usage in your system (e.g., 3-5% CPU), this is **usually normal**. Here's why:
+
+#### 1. SSLcat Runs 30+ Background Timers
+
+SSLcat needs to continuously execute various background tasks, including:
+
+- **1 second interval**: Real-time log checking (`internal/runner/realtime_logs.go`)
+- **5 second interval**: Configuration file watching (`internal/web/server.go`)
+- **30 second interval**: Performance monitoring, WebSocket monitoring, real-time log heartbeat
+- **60 second interval**: Memory monitoring, Goroutine monitoring, health checks, CDN cache cleanup
+- **5 minute interval**: Multiple cleanup tasks (cache, sessions, rate limiters, etc.)
+- **Longer intervals**: Certificate checks, threat intelligence updates, etc.
+
+Although each timer consumes minimal resources, together they result in baseline CPU usage.
+
+#### 2. CPU Usage is Typically Low
+
+- **3% CPU ≈ 0.75% per core** (on a 4-core machine)
+- This is in the **low usage range**, not abnormally high
+- Even when timers overlap (e.g., at the top of the hour), CPU usage typically doesn't exceed 10-15%
+
+#### 3. Other Processes are Usually Lighter
+
+- **puma**: Just a web server with fewer background tasks
+- **redis**: Mainly memory operations with low CPU usage
+- **Other services**: Usually have only a few scheduled tasks
+
+### 💡 How to Determine if It's Normal
+
+**Normal Conditions** (no need to worry):
+- ✅ CPU usage < 10% (idle or light load)
+- ✅ CPU usage increases proportionally with request volume
+- ✅ No sustained abnormal CPU usage (e.g., > 50% when idle)
+
+**Abnormal Conditions** (needs investigation):
+- ⚠️ CPU > 50% when idle
+- ⚠️ Single goroutine consuming 100% CPU
+- ⚠️ Goroutine count continuously increasing
+- ⚠️ CPU usage not proportional to request volume
+
+### 🔍 How to Verify
+
+```bash
+# 1. Check process CPU usage (10-second sampling)
+for i in {1..10}; do 
+    ps -p $(pgrep sslcat) -o %cpu | tail -1
+    sleep 1
+done | awk '{sum+=$1} END {print "Average CPU:", sum/NR "%"}'
+
+# 2. Check if it correlates with request volume
+# If CPU varies with request volume, it's normal business load
+
+# 3. Check timer activity
+# View logs to confirm timers are executing normally
+journalctl -u sslcat --since '1 hour ago' | grep -i "timer\|ticker\|cleanup\|monitor"
+```
+
+### ✅ Conclusion
+
+**It's normal for SSLcat to be the process with highest CPU usage** because:
+- ✅ It's the most complex service, requiring continuous monitoring, cleanup, and checks
+- ✅ These timers are **necessary features**, not bugs
+- ✅ 3-5% CPU usage indicates the system is running well
+
+**Only worry if**:
+- ❌ CPU > 50% when idle
+- ❌ CPU usage continuously increases unrelated to request volume
+- ❌ Goroutine leaks or other issues are detected
+
+---
+
 ## 📊 Monitoring and Alerting
 
 ### 1. CPU Monitoring

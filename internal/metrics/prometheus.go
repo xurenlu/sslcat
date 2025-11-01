@@ -39,6 +39,9 @@ type PrometheusMetrics struct {
 	blockedRequests *prometheus.CounterVec
 	securityEvents  *prometheus.CounterVec
 
+	// 首次设置指标
+	firstSetupEvents *prometheus.CounterVec
+
 	// 系统指标
 	uptime        prometheus.Gauge
 	configReloads *prometheus.CounterVec
@@ -195,6 +198,15 @@ func (pm *PrometheusMetrics) initMetrics() {
 		[]string{"event_type", "severity"},
 	)
 
+	// 首次设置指标
+	pm.firstSetupEvents = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "sslcat_first_setup_events_total",
+			Help: "Total number of first-time setup events",
+		},
+		[]string{"status", "reason"},
+	)
+
 	// 系统指标
 	pm.uptime = prometheus.NewGauge(
 		prometheus.GaugeOpts{
@@ -241,6 +253,9 @@ func (pm *PrometheusMetrics) registerMetrics() {
 		// 安全指标
 		pm.blockedRequests,
 		pm.securityEvents,
+
+		// 首次设置指标
+		pm.firstSetupEvents,
 
 		// 系统指标
 		pm.uptime,
@@ -328,6 +343,11 @@ func (pm *PrometheusMetrics) RecordSecurityEvent(eventType, severity string) {
 	pm.securityEvents.WithLabelValues(eventType, severity).Inc()
 }
 
+// RecordFirstSetup 记录首次设置事件
+func (pm *PrometheusMetrics) RecordFirstSetup(status, reason string) {
+	pm.firstSetupEvents.WithLabelValues(status, reason).Inc()
+}
+
 // SetUptime 设置运行时间
 func (pm *PrometheusMetrics) SetUptime(startTime time.Time) {
 	pm.uptime.Set(time.Since(startTime).Seconds())
@@ -403,6 +423,7 @@ func (pm *PrometheusMetrics) GetStats() map[string]interface{} {
 			"cache_misses":       "Counter",
 			"certificate_expiry": "Gauge",
 			"security_events":    "Counter",
+			"first_setup_events": "Counter",
 			"uptime":             "Gauge",
 			"config_reloads":     "Counter",
 		},

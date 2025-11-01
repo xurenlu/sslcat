@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/mail"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/xurenlu/sslcat/internal/config"
 	"golang.org/x/crypto/bcrypt"
@@ -29,6 +32,49 @@ func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request) {
 
 	// 重定向到仪表板
 	http.Redirect(w, r, s.config.AdminPrefix+"/dashboard", http.StatusFound)
+}
+
+func (s *Server) recordFirstSetupMetric(status, reason string) {
+	if s.prometheusMetrics != nil {
+		s.prometheusMetrics.RecordFirstSetup(status, reason)
+	}
+}
+
+func isValidFirstSetupDomain(domain string) bool {
+	if domain == "" {
+		return false
+	}
+
+	if strings.Contains(domain, " ") {
+		return false
+	}
+
+	if len(domain) > 253 {
+		return false
+	}
+
+	parts := strings.Split(domain, ".")
+	if len(parts) < 2 {
+		return false
+	}
+
+	for _, label := range parts {
+		if label == "" || len(label) > 63 {
+			return false
+		}
+
+		if label[0] == '-' || label[len(label)-1] == '-' {
+			return false
+		}
+
+		for _, r := range label {
+			if !(unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-') {
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -600,242 +646,193 @@ func (s *Server) handleFirstTimeSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// GET 请求应该由前端 SPA 处理，不应该到达这里
+	// 如果路由配置正确，GET 请求会被 setupFrontendRoutes 中的路由拦截
+	// 但为了兼容性，如果 GET 请求到达这里，也返回前端 SPA
 	if r.Method == "GET" {
-		currentEmail := s.config.SSL.Email
-		fmt.Fprintf(w, `<!DOCTYPE html><html><head><meta charset="utf-8"><title>首次设置向导</title>
-		<link href="https://cdnproxy.shifen.de/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-		<link href="https://cdnproxy.shifen.de/cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
-		</head><body class="bg-light">
-		<div class="container mt-4">
-			<div class="row justify-content-center">
-				<div class="col-md-8">
-					<div class="card shadow">
-						<div class="card-header bg-primary text-white">
-							<h4 class="mb-0"><i class="bi bi-gear"></i> 首次设置向导</h4>
-						</div>
-						<div class="card-body">
-							<p class="text-muted mb-4">欢迎使用 SSLcat！请完成以下初始设置：</p>
-							
-							<form method="POST" id="setupForm">
-								<!-- 步骤一：管理员设置 -->
-								<div class="card mb-4">
-									<div class="card-header">
-										<h5 class="mb-0"><i class="bi bi-person-gear"></i> 步骤一：管理员设置</h5>
-									</div>
-									<div class="card-body">
-										<div class="row">
-											<div class="col-md-6">
-												<div class="mb-3">
-													<label class="form-label"><i class="bi bi-lock"></i> 新密码</label>
-													<input class="form-control" type="password" name="new_password" required placeholder="请输入新的管理员密码">
-												</div>
-											</div>
-											<div class="col-md-6">
-												<div class="mb-3">
-													<label class="form-label"><i class="bi bi-lock-fill"></i> 确认新密码</label>
-													<input class="form-control" type="password" name="confirm_password" required placeholder="请再次输入新密码">
-												</div>
-											</div>
-										</div>
-									</div>
-								</div>
-
-								<!-- 步骤二：SSL 配置 -->
-								<div class="card mb-4">
-									<div class="card-header">
-										<h5 class="mb-0"><i class="bi bi-shield-check"></i> 步骤二：SSL 配置</h5>
-									</div>
-									<div class="card-body">
-										<div class="row">
-											<div class="col-md-6">
-												<div class="mb-3">
-													<label class="form-label"><i class="bi bi-envelope"></i> 管理员邮箱</label>
-													<input class="form-control" type="email" name="admin_email" required placeholder="用于SSL证书申请和通知" value="%s">
-													<div class="form-text">此邮箱将用于 Let's Encrypt 证书申请和系统通知</div>
-												</div>
-											</div>
-											<div class="col-md-6">
-												<div class="form-check mt-4">
-													<input class="form-check-input" type="checkbox" name="auto_renew" %s id="auto_renew">
-													<label class="form-check-label" for="auto_renew">
-														<i class="bi bi-arrow-clockwise"></i> 启用自动续期
-													</label>
-												</div>
-											</div>
-										</div>
-									</div>
-								</div>
-
-								<!-- 步骤三：代理规则（可选） -->
-								<div class="card mb-4">
-									<div class="card-header">
-										<h5 class="mb-0"><i class="bi bi-diagram-3"></i> 步骤三：添加首条代理规则（可选）</h5>
-									</div>
-									<div class="card-body">
-										<div class="row">
-											<div class="col-md-4">
-												<div class="mb-3">
-													<label class="form-label">域名</label>
-													<input class="form-control" name="domain" placeholder="example.com">
-												</div>
-											</div>
-											<div class="col-md-6">
-												<div class="mb-3">
-													<label class="form-label">目标（含协议与端口）</label>
-													<input class="form-control" name="target" placeholder="http://127.0.0.1:8080">
-												</div>
-											</div>
-											<div class="col-md-2">
-												<div class="mb-3">
-													<label class="form-label">&nbsp;</label>
-													<div class="form-text">可跳过此步骤</div>
-												</div>
-											</div>
-										</div>
-									</div>
-								</div>
-
-								<!-- 提交按钮 -->
-								<div class="d-grid gap-2">
-									<button class="btn btn-primary btn-lg" type="submit">
-										<i class="bi bi-check-circle"></i> 完成设置
-									</button>
-									<a class="btn btn-outline-secondary" href="%s/logout">
-										<i class="bi bi-box-arrow-right"></i> 退出登录
-									</a>
-								</div>
-							</form>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-		</body></html>`,
-			currentEmail,
-			func() string {
-				if s.config.SSL.AutoRenew {
-					return "checked"
-				}
-				return ""
-			}(),
-			s.config.AdminPrefix)
+		s.handleSPA(w, r)
 		return
 	}
 
-	if r.Method == "POST" {
-		// 解析表单数据
-		if err := r.ParseForm(); err != nil {
-			http.Error(w, "解析表单失败: "+err.Error(), http.StatusBadRequest)
+	// 只处理 POST 请求
+	// 解析表单数据
+	if err := r.ParseForm(); err != nil {
+		s.recordFirstSetupMetric("failure", "parse_form")
+		http.Error(w, "解析表单失败: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	newPassword := r.FormValue("new_password")
+	confirmPassword := r.FormValue("confirm_password")
+	adminEmail := strings.TrimSpace(r.FormValue("admin_email"))
+	autoRenew := r.FormValue("auto_renew") == "on"
+	domain := strings.TrimSpace(r.FormValue("domain"))
+	target := strings.TrimSpace(r.FormValue("target"))
+	const minPasswordLength = 10
+
+	// 调试日志
+	passwordStatus := "[已设置]"
+	if newPassword == "" {
+		passwordStatus = "[空]"
+	}
+	confirmStatus := "[已设置]"
+	if confirmPassword == "" {
+		confirmStatus = "[空]"
+	}
+	s.log.Infof("首次设置表单数据: new_password=%s, confirm_password=%s, admin_email=%s, auto_renew=%t, domain=%s, target=%s",
+		passwordStatus, confirmStatus, adminEmail, autoRenew, domain, target)
+
+	// 密码策略校验
+	if len(newPassword) < minPasswordLength {
+		s.recordFirstSetupMetric("failure", "password_length")
+		http.Error(w, fmt.Sprintf("password too short: require at least %d characters", minPasswordLength), http.StatusBadRequest)
+		return
+	}
+
+	if newPassword != confirmPassword {
+		s.recordFirstSetupMetric("failure", "password_mismatch")
+		http.Error(w, "passwords do not match", http.StatusBadRequest)
+		return
+	}
+
+	hasUpper := false
+	hasLower := false
+	hasDigit := false
+	hasSpecial := false
+	for _, r := range newPassword {
+		switch {
+		case unicode.IsUpper(r):
+			hasUpper = true
+		case unicode.IsLower(r):
+			hasLower = true
+		case unicode.IsDigit(r):
+			hasDigit = true
+		case unicode.IsPunct(r), unicode.IsSymbol(r):
+			hasSpecial = true
+		}
+	}
+	complexity := 0
+	for _, passed := range []bool{hasUpper, hasLower, hasDigit, hasSpecial} {
+		if passed {
+			complexity++
+		}
+	}
+	if complexity < 3 {
+		s.recordFirstSetupMetric("failure", "password_complexity")
+		http.Error(w, "password complexity requirement not met", http.StatusBadRequest)
+		return
+	}
+
+	// 验证邮箱
+	if adminEmail == "" {
+		s.recordFirstSetupMetric("failure", "email_empty")
+		http.Error(w, "admin email is required", http.StatusBadRequest)
+		return
+	}
+
+	if _, err := mail.ParseAddress(adminEmail); err != nil {
+		s.recordFirstSetupMetric("failure", "email_invalid")
+		http.Error(w, "invalid email address", http.StatusBadRequest)
+		return
+	}
+
+	// 验证代理规则
+	if (domain != "" && target == "") || (domain == "" && target != "") {
+		s.recordFirstSetupMetric("failure", "proxy_pair")
+		http.Error(w, "domain and target must be provided together", http.StatusBadRequest)
+		return
+	}
+
+	if domain != "" && !isValidFirstSetupDomain(domain) {
+		s.recordFirstSetupMetric("failure", "domain_invalid")
+		http.Error(w, "invalid domain", http.StatusBadRequest)
+		return
+	}
+
+	if target != "" {
+		parsedTarget, err := url.Parse(target)
+		if err != nil || parsedTarget.Host == "" {
+			s.recordFirstSetupMetric("failure", "target_invalid")
+			http.Error(w, "invalid target", http.StatusBadRequest)
 			return
 		}
-
-		newPassword := r.FormValue("new_password")
-		confirmPassword := r.FormValue("confirm_password")
-		adminEmail := strings.TrimSpace(r.FormValue("admin_email"))
-		autoRenew := r.FormValue("auto_renew") == "on"
-		domain := strings.TrimSpace(r.FormValue("domain"))
-		target := strings.TrimSpace(r.FormValue("target"))
-
-		// 调试日志
-		passwordStatus := "[已设置]"
-		if newPassword == "" {
-			passwordStatus = "[空]"
-		}
-		confirmStatus := "[已设置]"
-		if confirmPassword == "" {
-			confirmStatus = "[空]"
-		}
-		s.log.Infof("首次设置表单数据: new_password=%s, confirm_password=%s, admin_email=%s, auto_renew=%t, domain=%s, target=%s",
-			passwordStatus, confirmStatus, adminEmail, autoRenew, domain, target)
-
-		// 验证密码
-		if newPassword == "" || newPassword != confirmPassword {
-			http.Error(w, "passwords do not match or empty", http.StatusBadRequest)
+		if parsedTarget.Scheme != "http" && parsedTarget.Scheme != "https" {
+			s.recordFirstSetupMetric("failure", "target_scheme")
+			http.Error(w, "target must use http or https scheme", http.StatusBadRequest)
 			return
 		}
+	}
 
-		// 验证邮箱
-		if adminEmail == "" {
-			http.Error(w, "admin email is required", http.StatusBadRequest)
+	// 更新内存与持久化密码文件（bcrypt）
+	s.config.Admin.Password = "" // 避免将明文写入 sslcat.conf
+	if hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost); err == nil {
+		if err := os.WriteFile(s.config.Admin.PasswordFile, append(hash, '\n'), 0600); err != nil {
+			s.recordFirstSetupMetric("failure", "password_file")
+			http.Error(w, "failed to write password file: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+	} else {
+		s.recordFirstSetupMetric("failure", "password_hash")
+		http.Error(w, "failed to hash password", http.StatusInternalServerError)
+		return
+	}
 
-		// 简单的邮箱格式验证
-		if !strings.Contains(adminEmail, "@") || !strings.Contains(adminEmail, ".") {
-			http.Error(w, "invalid email address", http.StatusBadRequest)
-			return
+	// 更新邮箱和自动续期配置
+	s.config.SSL.Email = adminEmail
+	s.config.SSL.AutoRenew = autoRenew
+
+	// 添加代理规则（如果提供了）
+	if domain != "" && target != "" {
+		newRule := config.ProxyRule{
+			Domain:  domain,
+			Target:  target,
+			Port:    0,
+			Enabled: true,
+			SSLOnly: true,
 		}
+		s.config.Proxy.Rules = append(s.config.Proxy.Rules, newRule)
+	}
 
-		// 更新内存与持久化密码文件（bcrypt）
-		s.config.Admin.Password = "" // 避免将明文写入 sslcat.conf
-		if hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost); err == nil {
-			if err := os.WriteFile(s.config.Admin.PasswordFile, append(hash, '\n'), 0600); err != nil {
-				http.Error(w, "failed to write password file: "+err.Error(), http.StatusInternalServerError)
-				return
-			}
-		} else {
-			http.Error(w, "failed to hash password", http.StatusInternalServerError)
-			return
-		}
+	// 设置 FirstRun 为 false
+	s.config.Admin.FirstRun = false
 
-		// 更新邮箱和自动续期配置
-		s.config.SSL.Email = adminEmail
-		s.config.SSL.AutoRenew = autoRenew
+	// 保存配置（不包含密码）
+	if err := s.config.Save(s.config.ConfigFile); err != nil {
+		s.recordFirstSetupMetric("failure", "config_save")
+		http.Error(w, "failed to save config: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-		// 添加代理规则（如果提供了）
-		if domain != "" && target != "" {
-			newRule := config.ProxyRule{
-				Domain:  domain,
-				Target:  target,
-				Port:    0,
-				Enabled: true,
-				SSLOnly: true,
-			}
-			s.config.Proxy.Rules = append(s.config.Proxy.Rules, newRule)
-		}
+	// 尝试启用 ACME（现在有邮箱了）
+	if err := s.sslManager.EnableACME(); err != nil {
+		s.log.Warnf("Failed to enable ACME: %v", err)
+	}
 
-		// 设置 FirstRun 为 false
-		s.config.Admin.FirstRun = false
-
-		// 保存配置（不包含密码）
-		if err := s.config.Save(s.config.ConfigFile); err != nil {
-			http.Error(w, "failed to save config: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		// 尝试启用 ACME（现在有邮箱了）
-		if err := s.sslManager.EnableACME(); err != nil {
-			s.log.Warnf("Failed to enable ACME: %v", err)
-		}
-
-		// 创建首次设置完成标记文件
-		setupCompleteFile := filepath.Join("./data", ".first-setup-complete")
-		if err := os.WriteFile(setupCompleteFile, []byte(fmt.Sprintf("首次设置完成时间: %s\n管理员邮箱: %s\n自动续期: %t\n代理规则: %s",
-			time.Now().Format("2006-01-02 15:04:05"),
-			adminEmail,
-			autoRenew,
-			func() string {
-				if domain != "" && target != "" {
-					return fmt.Sprintf("%s -> %s", domain, target)
-				}
-				return "无"
-			}())), 0644); err != nil {
-			s.log.Warnf("创建首次设置完成标记失败: %v", err)
-		}
-
-		// 审计日志
-		s.audit("first_time_setup_complete", fmt.Sprintf("email:%s,auto_renew:%t,proxy_rule:%s", adminEmail, autoRenew, func() string {
+	// 创建首次设置完成标记文件
+	setupCompleteFile := filepath.Join("./data", ".first-setup-complete")
+	if err := os.WriteFile(setupCompleteFile, []byte(fmt.Sprintf("首次设置完成时间: %s\n管理员邮箱: %s\n自动续期: %t\n代理规则: %s",
+		time.Now().Format("2006-01-02 15:04:05"),
+		adminEmail,
+		autoRenew,
+		func() string {
 			if domain != "" && target != "" {
-				return fmt.Sprintf("%s->%s", domain, target)
+				return fmt.Sprintf("%s -> %s", domain, target)
 			}
-			return "none"
-		}()))
-
-		http.Redirect(w, r, s.config.AdminPrefix+"/dashboard", http.StatusFound)
-		return
+			return "无"
+		}())), 0644); err != nil {
+		s.log.Warnf("创建首次设置完成标记失败: %v", err)
 	}
 
-	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	// 审计日志
+	s.audit("first_time_setup_complete", fmt.Sprintf("email:%s,auto_renew:%t,proxy_rule:%s", adminEmail, autoRenew, func() string {
+		if domain != "" && target != "" {
+			return fmt.Sprintf("%s->%s", domain, target)
+		}
+		return "none"
+	}()))
+	s.recordFirstSetupMetric("success", "completed")
+
+	http.Redirect(w, r, s.config.AdminPrefix+"/dashboard", http.StatusFound)
 }
 
 func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {

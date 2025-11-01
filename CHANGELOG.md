@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.21-rc1] - 2025-01-29
+
+### 🎉 重大新特性
+
+#### 🌐 首次设置向导国际化支持
+- **多语言界面**: 首次设置页面 (`/settings/first-setup`) 现在支持完整的多语言切换
+- **语言覆盖**: 支持 9 种语言（中文简体、中文繁体、英文、日语、韩语、西班牙语、法语、德语、俄语）
+- **现代化 UI**: 迁移到 React SPA 架构，提供更好的用户体验和交互
+- **完整翻译**: 所有表单字段、错误消息、提示信息均已完整翻译
+
+### 🐛 Bug 修复
+
+#### 前端修复
+- **TypeScript 错误修复**: 修复 `Cannot find type definition file for 'node'` 错误
+  - 添加 `@types/node` 依赖包
+  - 修复 `tsconfig.json` 和 `tsconfig.node.json` 配置
+- **路由冲突修复**: 修复首次设置页面的路由冲突问题
+  - GET 请求由前端 SPA 处理
+  - POST 请求使用新的 API 端点 `/api/settings/first-setup`
+
+### 🛠️ 技术改进
+
+#### 前端架构
+- **路由优化**: 改进前后端路由分离，GET 请求返回 SPA，POST 请求由 API 处理
+- **类型安全**: 完善 TypeScript 类型定义，确保翻译键的完整性
+- **代码组织**: 优化代码结构，提升可维护性
+
+#### 国际化系统
+- **翻译键扩展**: 为首次设置页面添加 60+ 个翻译键
+- **类型定义**: 更新 Translation 类型定义，确保类型安全
+- **多语言文件**: 更新所有语言文件，添加完整翻译
+
+### 📚 文档更新
+
+- 更新 CHANGELOG.md，记录 1.3.21-rc1 版本变更
+
+---
+
 ## [1.3.20-rc10] - 2025-10-28
 
 ### 🎉 重大新特性

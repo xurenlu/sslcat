@@ -104,8 +104,13 @@ type Optimizer struct {
 	maxConcurrent  int
 }
 
-// NewOptimizer 创建图片优化器
+// NewOptimizer 创建图片优化器（独立实例）
 func NewOptimizer(config *Config) *Optimizer {
+	return NewOptimizerWithCache(config, nil)
+}
+
+// NewOptimizerWithCache 使用共享缓存实例创建图片优化器
+func NewOptimizerWithCache(config *Config, sharedCache *cache.MemoryCache) *Optimizer {
 	if config == nil {
 		config = DefaultConfig()
 	}
@@ -119,15 +124,17 @@ func NewOptimizer(config *Config) *Optimizer {
 		concurrencySem: make(chan struct{}, 10), // 信号量
 	}
 
-	// 初始化统一缓存管理器
-	if config.CacheEnabled {
+	// 如果提供了共享缓存实例，使用共享实例；否则创建独立实例
+	if sharedCache != nil {
+		opt.memCache = sharedCache
+	} else if config.CacheEnabled {
 		opt.memCache = cache.NewMemoryCache(&cache.MemoryCacheConfig{
 			Name:            "image_optimization",
 			MaxEntries:      200,                                          // 从500减少到200
 			MaxSizeBytes:    config.MaxCacheSize,                          // 使用配置的最大缓存大小
 			MaxItemSize:     2 * 1024 * 1024,                              // 从5MB降到2MB
 			DefaultTTL:      time.Duration(config.CacheTTL) * time.Second, // 使用配置的 TTL
-			CleanupInterval: 1 * time.Minute,                              // 从2分钟改为1分钟，更频繁清理
+			CleanupInterval: 5 * time.Minute,                              // 统一使用5分钟清理间隔
 		})
 	}
 
@@ -683,10 +690,10 @@ func contentTypeFromFormat(format ImageFormat) string {
 	}
 }
 
-// buildCacheKey 构建缓存键
+// buildCacheKey 构建缓存键（添加前缀以区分不同缓存类型）
 func (o *Optimizer) buildCacheKey(r *http.Request, format ImageFormat) string {
-	// 使用路径和参数构建唯一键
-	key := r.URL.Path
+	// 使用路径和参数构建唯一键，添加 image: 前缀
+	key := "image:" + r.URL.Path
 	if w := r.URL.Query().Get("width"); w != "" {
 		key += "_w" + w
 	}

@@ -1170,6 +1170,62 @@ export interface Translation {
     password_placeholder: string
     confirm_password_placeholder: string
     loading: string
+    title: string
+    subtitle: string
+    step1_title: string
+    step1_desc: string
+    step2_title: string
+    step2_desc: string
+    step3_title: string
+    step3_desc: string
+    step1_heading: string
+    step1_security_warning: string
+    step1_security_message: string
+    new_password_label: string
+    confirm_password_label: string
+    password_strength: string
+    password_not_filled: string
+    password_weak: string
+    password_normal: string
+    password_good: string
+    password_excellent: string
+    password_checklist_length: string
+    password_checklist_uppercase: string
+    password_checklist_lowercase: string
+    password_checklist_number: string
+    password_checklist_special: string
+    password_error_required: string
+    password_error_min_length: string
+    password_error_types: string
+    confirm_password_error_required: string
+    confirm_password_error_mismatch: string
+    show_password: string
+    hide_password: string
+    step2_heading: string
+    admin_email_label: string
+    admin_email_placeholder: string
+    admin_email_helper: string
+    admin_email_error_required: string
+    admin_email_error_format: string
+    step3_heading: string
+    step3_info: string
+    domain_label: string
+    domain_placeholder: string
+    domain_error_format: string
+    target_label: string
+    target_placeholder: string
+    target_helper: string
+    target_error_format: string
+    proxy_pair_error: string
+    submit_button: string
+    submit_success_title: string
+    submit_success_desc: string
+    submit_error_title: string
+    submit_error_unknown: string
+    form_incomplete_title: string
+    form_incomplete_desc: string
+    form_validation_error: string
+    submission_error_title: string
   }
 
   // Docker镜像管理

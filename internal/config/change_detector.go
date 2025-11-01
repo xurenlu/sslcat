@@ -242,8 +242,10 @@ func ValidateConfig(cfg *Config) []error {
 		errors = append(errors, fmt.Errorf("invalid server port: %d (must be 1-65535)", cfg.Server.Port))
 	}
 
-	if cfg.Server.CustomPort < 1 || cfg.Server.CustomPort > 65535 {
-		errors = append(errors, fmt.Errorf("invalid custom port: %d (must be 1-65535)", cfg.Server.CustomPort))
+	if cfg.Server.CustomPort != 0 {
+		if cfg.Server.CustomPort < 1 || cfg.Server.CustomPort > 65535 {
+			errors = append(errors, fmt.Errorf("invalid custom port: %d (must be 1-65535)", cfg.Server.CustomPort))
+		}
 	}
 
 	// 验证SSL配置

@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
+	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
@@ -164,6 +166,53 @@ func main() {
 	})
 
 	log.Infof("Starting SSLcat v%s (build: %s)", version, build)
+
+	// 配置 Go 运行时内存管理：更积极地归还内存给操作系统
+	// 1. 设置更积极的 GC 触发阈值（降低 GOGC 值）
+	//    GOGC 可以是任意正数值：
+	//    - 默认 100：每增长 100% 内存触发 GC
+	//    - 50：每增长 50% 内存就触发 GC（更频繁，内存峰值更低）
+	//    - 75：每增长 75% 内存触发 GC（平衡值，推荐）
+	//    - 更高的值（如 100, 150）：GC 频率更低，内存峰值更高
+	//    可以通过环境变量 GOGC 设置，也可以在代码中设置默认值
+	//    注意：Go 运行时会自动读取 GOGC 环境变量，如果设置了环境变量，会优先使用
+	goGCEnv := os.Getenv("GOGC")
+	if goGCEnv != "" {
+		// 解析环境变量值
+		var goGCPercent int
+		if _, err := fmt.Sscanf(goGCEnv, "%d", &goGCPercent); err == nil && goGCPercent > 0 {
+			debug.SetGCPercent(goGCPercent) // 显式设置以确保生效
+			log.Infof("GOGC set to %d via environment variable", goGCPercent)
+		} else {
+			log.Warnf("Invalid GOGC value '%s', using default", goGCEnv)
+			debug.SetGCPercent(75) // 无效值时使用默认值
+			log.Info("Set GC percent to 75 (default)")
+		}
+	} else {
+		// 如果未设置 GOGC 环境变量，使用代码设置的默认值 75
+		debug.SetGCPercent(75)
+		log.Info("Set GC percent to 75 for balanced memory release (can be adjusted via GOGC env var)")
+	}
+
+	// 2. 设置内存限制（如果未通过环境变量设置）
+	if os.Getenv("GOMEMLIMIT") == "" {
+		// 默认设置 1GB 内存限制
+		debug.SetMemoryLimit(1024 * 1024 * 1024) // 1GB
+		log.Info("Set memory limit to 1GB")
+	}
+
+	// 3. 启动定期内存释放 goroutine（每 5 分钟释放一次空闲内存）
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			// 强制 GC
+			runtime.GC()
+			// 请求将空闲内存归还给操作系统
+			debug.FreeOSMemory()
+			log.Debug("Memory released to OS")
+		}
+	}()
 
 	// 加载配置
 	cfg, err := config.Load(*configFile)

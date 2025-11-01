@@ -73,7 +73,7 @@ func NewMemoryCache(config *MemoryCacheConfig) *MemoryCache {
 
 	// 转换配置为 BigCache 配置
 	bigCacheConfig := bigcache.DefaultConfig(time.Duration(config.DefaultTTL))
-	bigCacheConfig.Shards = 32 // 从64减少到32，进一步减少内存开销
+	bigCacheConfig.Shards = 16 // 从32减少到16，减少内存开销（分片预分配）
 	bigCacheConfig.LifeWindow = time.Duration(config.DefaultTTL)
 	bigCacheConfig.CleanWindow = time.Duration(config.CleanupInterval)
 	bigCacheConfig.MaxEntriesInWindow = config.MaxEntries * 2 // 从5倍减少到2倍

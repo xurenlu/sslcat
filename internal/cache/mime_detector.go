@@ -146,7 +146,12 @@ func (md *MIMEDetector) DetectMIME(filename string, data []byte) string {
 		return mimeType
 	}
 
-	// 4. 默认返回二进制类型
+	// 4. 如果数据看起来像文本，则返回 text/plain
+	if md.isTextFile(data) {
+		return "text/plain"
+	}
+
+	// 5. 默认返回二进制类型
 	return "application/octet-stream"
 }
 
@@ -176,11 +181,6 @@ func (md *MIMEDetector) detectByMagicNumber(data []byte) string {
 			}
 			return mimeType
 		}
-	}
-
-	// 特殊处理：检查文本文件
-	if md.isTextFile(header) {
-		return "text/plain"
 	}
 
 	return ""

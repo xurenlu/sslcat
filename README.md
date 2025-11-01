@@ -1,6 +1,6 @@
 # SSLcat 🚀
 
-[![Version](https://img.shields.io/badge/version-1.3.17--rc24-blue.svg)](https://github.com/xurenlu/sslcat/releases/tag/v1.3.17-rc24)
+[![Version](https://img.shields.io/badge/version-1.3.21--rc1-blue.svg)](https://github.com/xurenlu/sslcat/releases/tag/v1.3.21-rc1)
 [![Go Version](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://golang.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![CPU Optimized](https://img.shields.io/badge/CPU%20optimized-97%25%20reduction-brightgreen.svg)](#performance)
@@ -217,6 +217,7 @@ For complete documentation, please visit / 完整文档请访问：
 - [🔧 **Configuration Reference** / **配置参考**](docs/zh/configuration/)
 - [🔒 **Security Features** / **安全功能**](docs/zh/security/)
 - [📊 **Performance Optimization** / **性能优化**](CPU_OPTIMIZATION_COMPLETE.md)
+- [📝 **Changelog** / **更新日志**](CHANGELOG.md) - 查看所有版本变更记录
 
 ---
 

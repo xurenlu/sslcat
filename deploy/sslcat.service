@@ -15,9 +15,17 @@ StandardOutput=null
 StandardError=journal
 SyslogIdentifier=sslcat
 
-# Go 运行时内存管理优化
-Environment="GOMEMLIMIT=1280MiB"
-Environment="GOGC=100"
+# Go 运行时内存管理优化 - 更积极地归还内存给操作系统
+# GOMEMLIMIT: 限制最大内存，超过时强制触发 GC
+# GOGC: GC 触发阈值，可以是任意正数值（推荐范围：50-150）
+#       - 50：每增长 50% 内存触发 GC（更频繁，内存峰值更低，CPU 开销略高）
+#       - 75：每增长 75% 内存触发 GC（平衡值，推荐）
+#       - 100：每增长 100% 内存触发 GC（默认值，平衡）
+#       - 150：每增长 150% 内存触发 GC（更保守，内存峰值更高，CPU 开销更低）
+#       可以根据实际情况调整，找到内存和性能的平衡点
+# GODEBUG=madvdontneed=1: 使用 Linux madvise(MADV_DONTNEED) 更快释放内存给操作系统
+Environment="GOMEMLIMIT=1200MiB"
+Environment="GOGC=75"
 Environment="GODEBUG=madvdontneed=1"
 
 # 安全设置

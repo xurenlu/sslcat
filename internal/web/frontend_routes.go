@@ -35,6 +35,7 @@ func (s *Server) setupFrontendRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/sites", s.handleSPA)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/ssl", s.handleSPA)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/settings", s.handleSPA)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/settings/first-setup", s.handleSPA)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/dns", s.handleSPA)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/security", s.handleSPA)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/cluster", s.handleSPA)

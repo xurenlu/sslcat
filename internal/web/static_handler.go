@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/xurenlu/sslcat/internal/cache"
@@ -255,7 +256,8 @@ func (h *StaticFileHandler) handleConditionalRequest(w http.ResponseWriter, r *h
 	// 检查If-Modified-Since
 	if ifModifiedSince := r.Header.Get("If-Modified-Since"); ifModifiedSince != "" {
 		if clientTime, err := http.ParseTime(ifModifiedSince); err == nil {
-			if !clientTime.Before(fileInfo.ModTime()) {
+			serverTime := fileInfo.ModTime().UTC().Truncate(time.Second)
+			if !serverTime.After(clientTime) {
 				w.WriteHeader(http.StatusNotModified)
 				return true
 			}

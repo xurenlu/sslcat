@@ -18,6 +18,7 @@ import (
 
 	"github.com/xurenlu/sslcat/internal/ai"
 	"github.com/xurenlu/sslcat/internal/assets"
+	"github.com/xurenlu/sslcat/internal/cache"
 	"github.com/xurenlu/sslcat/internal/compression"
 	"github.com/xurenlu/sslcat/internal/config"
 	"github.com/xurenlu/sslcat/internal/ddos"
@@ -129,8 +130,19 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	// 初始化压缩器
 	compressor := compression.NewCompressor(compression.FromConfig(cfg))
 
-	// 初始化压缩缓存（最多200个条目，单个最大2MB，总大小最大50MB）
-	compressionCache := NewCompressionCache(200, 2, 50)
+	// 创建共享的内存缓存实例（合并压缩缓存和图片优化缓存）
+	// 总配置：400条目（200+200），300MB总大小（50MB+256MB），单个最大2MB
+	sharedCache := cache.NewMemoryCache(&cache.MemoryCacheConfig{
+		Name:            "shared_cache",
+		MaxEntries:      400,               // 压缩200 + 图片200
+		MaxSizeBytes:    300 * 1024 * 1024, // 300MB (50MB + 256MB)
+		MaxItemSize:     2 * 1024 * 1024,   // 2MB
+		DefaultTTL:      24 * time.Hour,    // 24小时
+		CleanupInterval: 5 * time.Minute,   // 统一使用5分钟清理间隔
+	})
+
+	// 使用共享缓存实例创建压缩缓存
+	compressionCache := NewCompressionCacheWithCache(sharedCache)
 
 	// 初始化Prometheus指标
 	prometheusMetrics := metrics.NewPrometheusMetrics()
@@ -185,7 +197,8 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	if imageOptConfig.MaxCacheSize == 0 {
 		imageOptConfig.MaxCacheSize = 200 * 1024 * 1024 // 从1GB减少到200MB
 	}
-	imageOptimizer := imageopt.NewOptimizer(imageOptConfig)
+	// 使用共享缓存实例创建图片优化器
+	imageOptimizer := imageopt.NewOptimizerWithCache(imageOptConfig, sharedCache)
 
 	// 初始化WAF引擎
 	wafEngine := waf.NewAdvancedEngine()
@@ -702,7 +715,8 @@ func (s *Server) setupRoutes() {
 	// 系统设置路由 - 页面路由已迁移到前端SPA
 	// s.mux.HandleFunc(s.config.AdminPrefix+"/settings", s.handleSettings) // 已迁移到前端SPA
 	s.mux.HandleFunc(s.config.AdminPrefix+"/settings/save", s.handleSettingsSave)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/settings/first-setup", s.handleFirstTimeSetup)
+	// s.mux.HandleFunc(s.config.AdminPrefix+"/settings/first-setup", s.handleFirstTimeSetup) // GET 请求由前端 SPA 处理，POST 请求由下面的 API 路由处理
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/settings/first-setup", s.handleFirstTimeSetup) // POST 请求的 API 端点
 	s.mux.HandleFunc(s.config.AdminPrefix+"/settings/change-password", s.handleChangePassword)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/settings/totp", s.handleTOTPSetup)
 

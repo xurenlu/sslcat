@@ -240,19 +240,20 @@ func TestStaticFileHandler_ConditionalRequest(t *testing.T) {
 		t.Fatalf("Failed to get file info: %v", err)
 	}
 
+	handler := NewStaticFileHandler(&config.Config{})
+
 	// 测试If-None-Match
 	t.Run("If-None-Match", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/test.txt", nil)
-		req.Header.Set("If-None-Match", `"test-etag"`)
+		req.Header.Set("If-None-Match", handler.generateETag(fileInfo))
 		w := httptest.NewRecorder()
 
-		// 模拟ETag匹配的情况
-		// 这里需要修改handler来支持测试
-		// 为了简化，我们只测试基本功能
+		if !handler.handleConditionalRequest(w, req, fileInfo) {
+			t.Fatal("expected conditional request handler to short-circuit")
+		}
 
-		// 验证请求被正确处理
-		if w.Code != 0 {
-			t.Errorf("Expected no response code set, got %d", w.Code)
+		if w.Code != http.StatusNotModified {
+			t.Errorf("expected status %d, got %d", http.StatusNotModified, w.Code)
 		}
 	})
 
@@ -262,9 +263,12 @@ func TestStaticFileHandler_ConditionalRequest(t *testing.T) {
 		req.Header.Set("If-Modified-Since", fileInfo.ModTime().UTC().Format("Mon, 02 Jan 2006 15:04:05 GMT"))
 		w := httptest.NewRecorder()
 
-		// 验证请求被正确处理
-		if w.Code != 0 {
-			t.Errorf("Expected no response code set, got %d", w.Code)
+		if !handler.handleConditionalRequest(w, req, fileInfo) {
+			t.Fatal("expected conditional request handler to short-circuit")
+		}
+
+		if w.Code != http.StatusNotModified {
+			t.Errorf("expected status %d, got %d", http.StatusNotModified, w.Code)
 		}
 	})
 }

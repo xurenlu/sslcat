@@ -139,7 +139,7 @@ func main() {
 			} else {
 				for i, domain := range domains {
 					if i < 5 { // 只显示前5个域名
-						fmt.Printf("      - %s\n", domain)
+						fmt.Printf("      - %s\n", domain.Name)
 					} else if i == 5 {
 						fmt.Printf("      - ... (还有 %d 个域名)\n", len(domains)-5)
 						break
