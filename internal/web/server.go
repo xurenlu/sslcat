@@ -1592,7 +1592,15 @@ func (s *Server) refreshLEPreferredHostLoop() {
 	ticker := time.NewTicker(31 * time.Second) // 使用质数间隔避免与其他定时器同时触发
 	defer ticker.Stop()
 	for range ticker.C {
-		s.refreshLEPreferredHost()
+		// 添加 panic 恢复，避免整个循环崩溃
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					s.log.Errorf("refreshLEPreferredHost 发生 panic: %v", r)
+				}
+			}()
+			s.refreshLEPreferredHost()
+		}()
 	}
 }
 

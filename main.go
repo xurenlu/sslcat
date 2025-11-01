@@ -38,6 +38,21 @@ var (
 	build   = "dev"
 )
 
+// init 函数在包导入时执行，在所有其他初始化之前
+// 强制使用纯 Go DNS 解析器，避免 CGO DNS 解析导致的 SIGFPE 异常
+func init() {
+	// 检查是否已经设置了 GODEBUG，如果没有则设置
+	if os.Getenv("GODEBUG") == "" {
+		os.Setenv("GODEBUG", "netdns=go")
+	} else {
+		// 如果已经设置，确保包含 netdns=go
+		debug := os.Getenv("GODEBUG")
+		if !strings.Contains(debug, "netdns=") {
+			os.Setenv("GODEBUG", debug+",netdns=go")
+		}
+	}
+}
+
 // isIPHost 检查Host是否为IP地址或localhost
 func isIPHost(host string) bool {
 	// 移除端口号（如果有的话）

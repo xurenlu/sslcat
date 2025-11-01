@@ -788,8 +788,32 @@ func (m *Manager) tryDNSValidation(domain string) error {
 
 // checkDomainResolution 检查域名解析状态
 func (m *Manager) checkDomainResolution(domain string) (bool, string, error) {
-	// 使用系统DNS解析检查域名
-	ips, err := net.LookupIP(domain)
+	// 使用带超时和 panic 恢复的 DNS 解析
+	ips, err := func() ([]net.IP, error) {
+		type result struct {
+			ips []net.IP
+			err error
+		}
+		ch := make(chan result, 1)
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					m.log.Warnf("DNS 解析时发生异常: %v", r)
+					ch <- result{nil, fmt.Errorf("DNS 解析异常: %v", r)}
+				}
+			}()
+			ips, err := net.LookupIP(domain)
+			ch <- result{ips, err}
+		}()
+		
+		select {
+		case res := <-ch:
+			return res.ips, res.err
+		case <-time.After(5 * time.Second):
+			return nil, fmt.Errorf("DNS 解析超时")
+		}
+	}()
+	
 	if err != nil {
 		return false, "", fmt.Errorf("domain resolution failed: %w", err)
 	}
