@@ -8,7 +8,7 @@ import {
   useDisclosure, Code, Divider,
 } from '@chakra-ui/react';
 // import { SearchIcon, DownloadIcon, DeleteIcon, ExternalLinkIcon } from '@chakra-ui/icons';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '../hooks/useLanguage';
 import api from '../utils/api';
 
 interface SlowRequestRecord {
@@ -44,7 +44,7 @@ interface SlowRequestStats {
 }
 
 const SlowRequests: React.FC = () => {
-  const { t } = useTranslation();
+  const t = useTranslation();
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
 
@@ -78,8 +78,8 @@ const SlowRequests: React.FC = () => {
     } catch (error) {
       console.error('Failed to load slow request records:', error);
       toast({
-        title: t('error'),
-        description: t('slowRequests.loadError'),
+        title: t.common.error,
+        description: t.slowRequests.loadError,
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -95,8 +95,8 @@ const SlowRequests: React.FC = () => {
       const response: any = await api.post('/slow-requests/clear');
       if (response.success) {
         toast({
-          title: t('success'),
-          description: t('slowRequests.clearSuccess'),
+          title: t.common.success,
+          description: t.slowRequests.clearSuccess,
           status: 'success',
           duration: 3000,
           isClosable: true,
@@ -107,8 +107,8 @@ const SlowRequests: React.FC = () => {
     } catch (error) {
       console.error('Failed to clear slow request records:', error);
       toast({
-        title: t('error'),
-        description: t('slowRequests.clearError'),
+        title: t.common.error,
+        description: t.slowRequests.clearError,
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -136,8 +136,8 @@ const SlowRequests: React.FC = () => {
       window.URL.revokeObjectURL(url);
 
       toast({
-        title: t('success'),
-        description: t('slowRequests.exportSuccess'),
+        title: t.common.success,
+        description: t.slowRequests.exportSuccess,
         status: 'success',
         duration: 3000,
         isClosable: true,
@@ -145,8 +145,8 @@ const SlowRequests: React.FC = () => {
     } catch (error) {
       console.error('Failed to export slow request records:', error);
       toast({
-        title: t('error'),
-        description: t('slowRequests.exportError'),
+        title: t.common.error,
+        description: t.slowRequests.exportError,
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -202,7 +202,7 @@ const SlowRequests: React.FC = () => {
   if (loading && !stats) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minH="400px">
-        <Text>加载中...</Text>
+        <Text>{t.common.loading}</Text>
       </Box>
     );
   }
@@ -211,20 +211,20 @@ const SlowRequests: React.FC = () => {
     <Box p={6}>
       <VStack spacing={6} align="stretch">
         <HStack justify="space-between">
-          <Heading size="lg">{t('slowRequests.title')}</Heading>
+          <Heading size="lg">{t.slowRequests.title}</Heading>
           <HStack>
-            <Button onClick={() => exportRecords('json')} isLoading={exporting} variant="outline">📥 {t('slowRequests.exportRecords')}</Button>
-            <Button onClick={() => exportRecords('stats')} isLoading={exporting} variant="outline">📊 {t('slowRequests.exportStats')}</Button>
-            <Button onClick={clearRecords} isLoading={clearing} colorScheme="red" variant="outline">🗑️ {t('slowRequests.clearRecords')}</Button>
+            <Button onClick={() => exportRecords('json')} isLoading={exporting} variant="outline">📥 {t.slowRequests.exportRecords}</Button>
+            <Button onClick={() => exportRecords('stats')} isLoading={exporting} variant="outline">📊 {t.slowRequests.exportStats}</Button>
+            <Button onClick={clearRecords} isLoading={clearing} colorScheme="red" variant="outline">🗑️ {t.slowRequests.clearRecords}</Button>
           </HStack>
         </HStack>
 
         {stats && (
           <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={4}>
-            <Card><CardBody><Stat><StatLabel>{t('slowRequests.totalSlowRequests')}</StatLabel><StatNumber>{stats.total_slow_requests.toLocaleString()}</StatNumber></Stat></CardBody></Card>
-            <Card><CardBody><Stat><StatLabel>{t('slowRequests.averageResponseTime')}</StatLabel><StatNumber>{formatResponseTime(stats.average_response_time)}</StatNumber></Stat></CardBody></Card>
-            <Card><CardBody><Stat><StatLabel>{t('slowRequests.slowestResponseTime')}</StatLabel><StatNumber>{formatResponseTime(stats.slowest_response_time)}</StatNumber></Stat></CardBody></Card>
-            <Card><CardBody><Stat><StatLabel>{t('slowRequests.threshold')}</StatLabel><StatNumber>500ms</StatNumber><StatHelpText>{t('slowRequests.thresholdDescription')}</StatHelpText></Stat></CardBody></Card>
+            <Card><CardBody><Stat><StatLabel>{t.slowRequests.totalSlowRequests}</StatLabel><StatNumber>{stats.total_slow_requests.toLocaleString()}</StatNumber></Stat></CardBody></Card>
+            <Card><CardBody><Stat><StatLabel>{t.slowRequests.averageResponseTime}</StatLabel><StatNumber>{formatResponseTime(stats.average_response_time)}</StatNumber></Stat></CardBody></Card>
+            <Card><CardBody><Stat><StatLabel>{t.slowRequests.slowestResponseTime}</StatLabel><StatNumber>{formatResponseTime(stats.slowest_response_time)}</StatNumber></Stat></CardBody></Card>
+            <Card><CardBody><Stat><StatLabel>{t.slowRequests.threshold}</StatLabel><StatNumber>500ms</StatNumber><StatHelpText>{t.slowRequests.thresholdDescription}</StatHelpText></Stat></CardBody></Card>
           </SimpleGrid>
         )}
 
@@ -233,29 +233,29 @@ const SlowRequests: React.FC = () => {
             <HStack spacing={4}>
               <InputGroup maxW="300px">
                 <InputLeftElement pointerEvents="none"><Text color="gray.300">🔍</Text></InputLeftElement>
-                <Input placeholder={t('slowRequests.searchPlaceholder')} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                <Input placeholder={t.slowRequests.searchPlaceholder} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
               </InputGroup>
               <Select value={limit} onChange={(e) => setLimit(Number(e.target.value))} maxW="150px">
-                <option value={20}>20 {t('slowRequests.records')}</option>
-                <option value={50}>50 {t('slowRequests.records')}</option>
-                <option value={100}>100 {t('slowRequests.records')}</option>
-                <option value={200}>200 {t('slowRequests.records')}</option>
+                <option value={20}>20 {t.slowRequests.records}</option>
+                <option value={50}>50 {t.slowRequests.records}</option>
+                <option value={100}>100 {t.slowRequests.records}</option>
+                <option value={200}>200 {t.slowRequests.records}</option>
               </Select>
-              <Button onClick={loadRecords} isLoading={loading}>{t('refresh')}</Button>
+              <Button onClick={loadRecords} isLoading={loading}>{t.common.refresh}</Button>
             </HStack>
           </CardBody>
         </Card>
 
         <Card>
-          <CardHeader><Heading size="md">{t('slowRequests.recentRecords')}</Heading></CardHeader>
+          <CardHeader><Heading size="md">{t.slowRequests.recentRecords}</Heading></CardHeader>
           <CardBody>
             {loading ? (
-              <Box display="flex" justifyContent="center" py={8}><Text>{t('loading')}</Text></Box>
+              <Box display="flex" justifyContent="center" py={8}><Text>{t.common.loading}</Text></Box>
             ) : filteredRecords.length === 0 ? (
-              <Alert status="info"><AlertIcon /><AlertTitle>{t('slowRequests.noRecords')}</AlertTitle><AlertDescription>{t('slowRequests.noRecordsDescription')}</AlertDescription></Alert>
+              <Alert status="info"><AlertIcon /><AlertTitle>{t.slowRequests.noRecords}</AlertTitle><AlertDescription>{t.slowRequests.noRecordsDescription}</AlertDescription></Alert>
             ) : (
               <Table variant="simple" size="sm">
-                <Thead><Tr><Th>{t('slowRequests.timestamp')}</Th><Th>{t('slowRequests.method')}</Th><Th>{t('slowRequests.url')}</Th><Th>{t('slowRequests.statusCode')}</Th><Th>{t('slowRequests.responseTime')}</Th><Th>{t('slowRequests.backend')}</Th><Th>{t('slowRequests.actions')}</Th></Tr></Thead>
+                <Thead><Tr><Th>{t.slowRequests.timestamp}</Th><Th>{t.slowRequests.method}</Th><Th>{t.slowRequests.url}</Th><Th>{t.slowRequests.statusCode}</Th><Th>{t.slowRequests.responseTime}</Th><Th>{t.slowRequests.backend}</Th><Th>{t.slowRequests.actions}</Th></Tr></Thead>
                 <Tbody>
                   {filteredRecords.map((record) => (
                     <Tr key={record.id}>
@@ -265,7 +265,7 @@ const SlowRequests: React.FC = () => {
                       <Td><Badge colorScheme={getStatusCodeColor(record.status_code)}>{record.status_code}</Badge></Td>
                       <Td><Text fontSize="sm" fontWeight="bold" color="red.500">{formatResponseTime(record.response_time)}</Text></Td>
                       <Td><Text fontSize="sm" maxW="150px" isTruncated>{record.backend_id || '-'}</Text></Td>
-                      <Td><Tooltip label={t('slowRequests.viewDetails')}><IconButton aria-label={t('slowRequests.viewDetails')} size="sm" variant="ghost" onClick={() => viewRecord(record)}>🔗</IconButton></Tooltip></Td>
+                      <Td><Tooltip label={t.slowRequests.viewDetails}><IconButton aria-label={t.slowRequests.viewDetails} size="sm" variant="ghost" onClick={() => viewRecord(record)}>🔗</IconButton></Tooltip></Td>
                     </Tr>
                   ))}
                 </Tbody>
@@ -278,27 +278,27 @@ const SlowRequests: React.FC = () => {
       <Modal isOpen={isOpen} onClose={onClose} size="xl">
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>{t('slowRequests.recordDetails')}</ModalHeader>
+          <ModalHeader>{t.slowRequests.recordDetails}</ModalHeader>
           <ModalCloseButton />
           <ModalBody pb={6}>
             {selectedRecord && (
               <VStack spacing={4} align="stretch">
                 <SimpleGrid columns={2} spacing={4}>
-                  <Box><Text fontWeight="bold">{t('slowRequests.timestamp')}</Text><Text>{new Date(selectedRecord.timestamp).toLocaleString()}</Text></Box>
-                  <Box><Text fontWeight="bold">{t('slowRequests.method')}</Text><Badge colorScheme="blue">{selectedRecord.method}</Badge></Box>
-                  <Box><Text fontWeight="bold">{t('slowRequests.url')}</Text><Code fontSize="sm" wordBreak="break-all">{selectedRecord.url}</Code></Box>
-                  <Box><Text fontWeight="bold">{t('slowRequests.host')}</Text><Text>{selectedRecord.host}</Text></Box>
-                  <Box><Text fontWeight="bold">{t('slowRequests.statusCode')}</Text><Badge colorScheme={getStatusCodeColor(selectedRecord.status_code)}>{selectedRecord.status_code}</Badge></Box>
-                  <Box><Text fontWeight="bold">{t('slowRequests.responseTime')}</Text><Text color="red.500" fontWeight="bold">{formatResponseTime(selectedRecord.response_time)}</Text></Box>
-                  <Box><Text fontWeight="bold">{t('slowRequests.clientIP')}</Text><Text>{selectedRecord.client_ip}</Text></Box>
-                  <Box><Text fontWeight="bold">{t('slowRequests.backend')}</Text><Text>{selectedRecord.backend_id || '-'}</Text></Box>
-                  <Box><Text fontWeight="bold">{t('slowRequests.backendAddr')}</Text><Text>{selectedRecord.backend_addr || '-'}</Text></Box>
-                  <Box><Text fontWeight="bold">{t('slowRequests.ruleName')}</Text><Text>{selectedRecord.rule_name || '-'}</Text></Box>
-                  <Box><Text fontWeight="bold">{t('slowRequests.contentType')}</Text><Text>{selectedRecord.content_type || '-'}</Text></Box>
-                  <Box><Text fontWeight="bold">{t('slowRequests.contentSize')}</Text><Text>{formatFileSize(selectedRecord.content_size)}</Text></Box>
+                  <Box><Text fontWeight="bold">{t.slowRequests.timestamp}</Text><Text>{new Date(selectedRecord.timestamp).toLocaleString()}</Text></Box>
+                  <Box><Text fontWeight="bold">{t.slowRequests.method}</Text><Badge colorScheme="blue">{selectedRecord.method}</Badge></Box>
+                  <Box><Text fontWeight="bold">{t.slowRequests.url}</Text><Code fontSize="sm" wordBreak="break-all">{selectedRecord.url}</Code></Box>
+                  <Box><Text fontWeight="bold">{t.slowRequests.host}</Text><Text>{selectedRecord.host}</Text></Box>
+                  <Box><Text fontWeight="bold">{t.slowRequests.statusCode}</Text><Badge colorScheme={getStatusCodeColor(selectedRecord.status_code)}>{selectedRecord.status_code}</Badge></Box>
+                  <Box><Text fontWeight="bold">{t.slowRequests.responseTime}</Text><Text color="red.500" fontWeight="bold">{formatResponseTime(selectedRecord.response_time)}</Text></Box>
+                  <Box><Text fontWeight="bold">{t.slowRequests.clientIP}</Text><Text>{selectedRecord.client_ip}</Text></Box>
+                  <Box><Text fontWeight="bold">{t.slowRequests.backend}</Text><Text>{selectedRecord.backend_id || '-'}</Text></Box>
+                  <Box><Text fontWeight="bold">{t.slowRequests.backendAddr}</Text><Text>{selectedRecord.backend_addr || '-'}</Text></Box>
+                  <Box><Text fontWeight="bold">{t.slowRequests.ruleName}</Text><Text>{selectedRecord.rule_name || '-'}</Text></Box>
+                  <Box><Text fontWeight="bold">{t.slowRequests.contentType}</Text><Text>{selectedRecord.content_type || '-'}</Text></Box>
+                  <Box><Text fontWeight="bold">{t.slowRequests.contentSize}</Text><Text>{formatFileSize(selectedRecord.content_size)}</Text></Box>
                 </SimpleGrid>
-                {selectedRecord.user_agent && (<><Divider /><Box><Text fontWeight="bold">{t('slowRequests.userAgent')}</Text><Code fontSize="sm" wordBreak="break-all">{selectedRecord.user_agent}</Code></Box></>)}
-                {selectedRecord.error && (<><Divider /><Box><Text fontWeight="bold" color="red.500">{t('slowRequests.error')}</Text><Code fontSize="sm" colorScheme="red" wordBreak="break-all">{selectedRecord.error}</Code></Box></>)}
+                {selectedRecord.user_agent && (<><Divider /><Box><Text fontWeight="bold">{t.slowRequests.userAgent}</Text><Code fontSize="sm" wordBreak="break-all">{selectedRecord.user_agent}</Code></Box></>)}
+                {selectedRecord.error && (<><Divider /><Box><Text fontWeight="bold" color="red.500">{t.slowRequests.error}</Text><Code fontSize="sm" colorScheme="red" wordBreak="break-all">{selectedRecord.error}</Code></Box></>)}
               </VStack>
             )}
           </ModalBody>
