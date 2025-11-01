@@ -16,7 +16,7 @@ env:
 jobs:
   # Linux 构建（CGO 启用，支持 SQLite）
   build-linux:
-    runs-on: ubuntu-20.04  # 使用 Ubuntu 20.04 确保 GLIBC 2.32 兼容性
+    runs-on: ubuntu-24.04  # 使用 Ubuntu 24.04 获得更好的资源支持
     strategy:
       fail-fast: false
       matrix:
@@ -45,7 +45,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'yarn'
           cache-dependency-path: 'frontend/yarn.lock'
 
@@ -176,7 +176,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'yarn'
           cache-dependency-path: 'frontend/yarn.lock'
 
