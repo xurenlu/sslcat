@@ -1480,26 +1480,71 @@ func (s *Server) getSystemStats() map[string]interface{} {
 	proxyStats := s.proxyManager.GetProxyStats()
 	uptime := time.Since(s.startTime)
 
+	// 安全获取 proxyStats 中的值，避免类型错误或 nil 值
+	getInt64 := func(key string, defaultValue int64) int64 {
+		if v, ok := proxyStats[key]; ok {
+			if val, ok := v.(int64); ok {
+				return val
+			}
+			if val, ok := v.(int); ok {
+				return int64(val)
+			}
+		}
+		return defaultValue
+	}
+
+	getFloat64 := func(key string, defaultValue float64) float64 {
+		if v, ok := proxyStats[key]; ok {
+			if val, ok := v.(float64); ok {
+				return val
+			}
+			if val, ok := v.(int); ok {
+				return float64(val)
+			}
+			if val, ok := v.(int64); ok {
+				return float64(val)
+			}
+		}
+		return defaultValue
+	}
+
+	// 安全获取 publicIP，避免 DNS 解析异常导致程序崩溃
+	var publicIP string
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				s.log.Warnf("获取公网IP时发生异常: %v", r)
+				publicIP = ""
+			}
+		}()
+		publicIP = s.fetchPublicIPv4()
+	}()
+
+	totalRequests := getInt64("total_requests", 0)
+	if totalRequests == 0 {
+		totalRequests = getInt64("cached_proxies", 0)
+	}
+
 	return map[string]interface{}{
 		// 前端期望的字段名（小写开头）
 		"activeRules":   len(s.config.Proxy.Rules),
-		"cachedProxies": proxyStats["total_requests"], // 使用总请求数
-		"publicIP":      s.fetchPublicIPv4(),
+		"cachedProxies": totalRequests,
+		"publicIP":      publicIP,
 		"goVersion":     runtime.Version(),
 		"version":       s.version, // 添加应用版本
 
 		// 保持向后兼容的大写字段
 		"ActiveRules":     len(s.config.Proxy.Rules),
-		"CachedProxies":   proxyStats["cached_proxies"],
-		"TotalRequests":   proxyStats["total_requests"],
-		"ErrorRate":       proxyStats["error_rate"],
-		"QPS":             proxyStats["qps"],
-		"AvgResponseTime": proxyStats["avg_response_time"],
+		"CachedProxies":   getInt64("cached_proxies", 0),
+		"TotalRequests":   totalRequests,
+		"ErrorRate":       getFloat64("error_rate", 0),
+		"QPS":             getFloat64("qps", 0),
+		"AvgResponseTime": getFloat64("avg_response_time", 0),
 		"Uptime":          int64(uptime.Seconds()),
 		"UptimeString":    s.formatDuration(uptime),
 		"SSLCertificates": len(s.sslManager.GetCertificateList()),
 		"BlockedIPs":      len(s.securityManager.GetBlockedIPs()),
-		"PublicIP":        s.fetchPublicIPv4(),
+		"PublicIP":        publicIP,
 		"Version":         s.version, // 向后兼容的大写版本
 	}
 }
@@ -1569,8 +1614,34 @@ func (s *Server) refreshLEPreferredHost() {
 		return
 	}
 	// DNS 解析 domain 并检查是否包含本机公网IP
-	ips, err := net.LookupIP(domain)
+	// 使用带超时的 DNS 解析，避免 CGO 异常
+	ips, err := func() ([]net.IP, error) {
+		type result struct {
+			ips []net.IP
+			err error
+		}
+		ch := make(chan result, 1)
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					s.log.Warnf("DNS 解析时发生异常: %v", r)
+					ch <- result{nil, fmt.Errorf("DNS 解析异常: %v", r)}
+				}
+			}()
+			ips, err := net.LookupIP(domain)
+			ch <- result{ips, err}
+		}()
+		
+		select {
+		case res := <-ch:
+			return res.ips, res.err
+		case <-time.After(2 * time.Second):
+			return nil, fmt.Errorf("DNS 解析超时")
+		}
+	}()
+	
 	if err != nil {
+		s.log.Warnf("DNS 解析失败: %v", err)
 		s.leRedirectHost = ""
 		return
 	}
@@ -1584,14 +1655,38 @@ func (s *Server) refreshLEPreferredHost() {
 }
 
 func (s *Server) fetchPublicIPv4() string {
-	client := &http.Client{Timeout: 5 * time.Second}
-	req, _ := http.NewRequest("GET", "https://ip4.dev/myip", nil)
+	// 使用更短的超时时间，避免阻塞
+	client := &http.Client{
+		Timeout: 2 * time.Second,
+		// 禁用 DNS 缓存，避免潜在的 CGO 问题
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout:   1 * time.Second,
+				KeepAlive: 0,
+			}).DialContext,
+		},
+	}
+	
+	req, err := http.NewRequest("GET", "https://ip4.dev/myip", nil)
+	if err != nil {
+		return ""
+	}
+	
 	resp, err := client.Do(req)
-	if err != nil || resp.StatusCode != 200 {
+	if err != nil {
 		return ""
 	}
 	defer resp.Body.Close()
-	b, _ := io.ReadAll(resp.Body)
+	
+	if resp.StatusCode != 200 {
+		return ""
+	}
+	
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return ""
+	}
+	
 	ip := strings.TrimSpace(string(b))
 	if net.ParseIP(ip) == nil {
 		return ""
