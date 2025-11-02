@@ -152,3 +152,4 @@ sslcat_*.tar.gz
 
 # 私有文档和脚本目录
 _mine/
+docs/archive/
