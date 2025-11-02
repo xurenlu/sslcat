@@ -1,344 +1,515 @@
-# CLI 命令
+# CLI 命令参考
 
-SSLcat 提供了全面的命令行界面，用于配置、管理和故障排查。
+SSLcat 提供了完整的命令行界面（CLI），用于在服务器上直接管理和配置 SSLcat。即使 Web 界面无法访问，管理员也可以通过 CLI 命令完成所有配置管理任务，无需手动编辑配置文件。
 
-## 基本命令
+## 重要说明
 
-### 启动 SSLcat
+⚠️ **所有 CLI 命令都需要在服务器上以 root 权限运行**（SSLcat 需要 root 权限绑定特权端口）。
+
+## 基本用法
+
+### 命令格式
+
 ```bash
-# 使用默认配置启动
-sslcat
-
-# 使用自定义配置文件启动
-sslcat -config /path/to/sslcat.conf
-
-# 指定主机和端口启动
-sslcat -host 0.0.0.0 -port 80 -ssl-port 443
-
-# 调试模式启动
-sslcat -debug
-
-# 指定日志级别启动
-sslcat -log-level debug
+sslcat <command> [subcommand] [options]
 ```
 
-### 配置管理
+### 配置文件
+
+所有 CLI 命令默认使用 `sslcat.conf` 作为配置文件。如果需要指定不同的配置文件，使用 `-config` 参数：
+
 ```bash
-# 验证配置文件
-sslcat -config sslcat.conf -validate
+sslcat -config /path/to/sslcat.conf <command>
+```
 
-# 测试配置而不启动服务
-sslcat -config sslcat.conf -test
+## 可用命令
 
-# 显示当前配置
+### 1. 配置管理 (`config`)
+
+配置管理命令用于查看、获取和设置配置项。
+
+#### 显示完整配置
+
+```bash
+# 显示完整的 JSON 格式配置
 sslcat config show
 
-# 显示配置摘要
-sslcat config summary
+# 使用自定义配置文件
+sslcat -config /etc/sslcat/sslcat.conf config show
 ```
 
-## 用户管理命令
-
-### 用户操作
-```bash
-# 创建用户
-sslcat users create -username admin -email admin@example.com -role admin
-
-# 列出所有用户
-sslcat users list
-
-# 更新用户信息
-sslcat users update -username admin -role operator
-
-# 删除用户
-sslcat users delete -username old_user
-
-# 重置用户密码
-sslcat users reset-password -username admin
+**示例输出：**
+```json
+{
+  "server": {
+    "port": 443,
+    "host": "0.0.0.0",
+    ...
+  },
+  "ssl": {
+    "email": "admin@example.com",
+    ...
+  },
+  ...
+}
 ```
 
-### 权限管理
+#### 获取配置项
+
 ```bash
-# 查看用户权限
-sslcat users permissions -username admin
+# 获取服务器端口
+sslcat config get server.port
 
-# 更新用户权限
-sslcat users permissions -username admin -permissions "config:read,users:write"
+# 获取 SSL 邮箱
+sslcat config get ssl.email
 
-# 查看用户状态
-sslcat users status -username admin
+# 获取代理规则数量（需要先查看结构）
+sslcat config get proxy.rules
 ```
 
-## 代理管理命令
+**使用点号（.）分隔的路径访问嵌套配置项**，例如：
+- `server.port` - 服务器端口
+- `ssl.email` - SSL 证书邮箱
+- `ssl.staging` - 是否使用 Let's Encrypt 测试环境
+- `proxy.cache.enabled` - 是否启用代理缓存
 
-### 代理规则
+#### 设置配置项
+
 ```bash
-# 列出所有代理规则
+# 设置服务器端口
+sslcat config set server.port 8080
+
+# 设置 SSL 邮箱
+sslcat config set ssl.email admin@example.com
+
+# 启用 SSL 测试环境
+sslcat config set ssl.staging true
+
+# 禁用 SSL 测试环境
+sslcat config set ssl.staging false
+```
+
+**注意事项：**
+- 配置修改会立即保存到配置文件
+- 修改配置后需要重启 SSLcat 服务才能生效
+- 使用点号（.）分隔的路径访问嵌套配置项
+- 支持的类型：字符串、整数、布尔值、浮点数
+
+---
+
+### 2. 代理管理 (`proxy`)
+
+代理管理命令用于管理反向代理规则。
+
+#### 列出所有代理规则
+
+```bash
 sslcat proxy list
-
-# 添加代理规则
-sslcat proxy add -domain example.com -target http://localhost:8080 -ssl
-
-# 更新代理规则
-sslcat proxy update -id 1 -domain example.com -target http://localhost:3000
-
-# 删除代理规则
-sslcat proxy delete -id 1
-
-# 测试代理规则
-sslcat proxy test -domain example.com
 ```
 
-### 代理状态
-```bash
-# 查看代理状态
-sslcat proxy status
+**示例输出：**
+```
+Proxy Rules:
+============
+1. Domain: api.example.com
+   Target: localhost:8080
+   Enabled: true
+   SSL Only: false
 
-# 重新加载代理配置
-sslcat proxy reload
-
-# 验证代理配置
-sslcat proxy validate
+2. Domain: app.example.com
+   Target: localhost:3000
+   Enabled: true
+   SSL Only: true
 ```
 
-## SSL 证书管理
+#### 添加代理规则
 
-### 证书操作
 ```bash
-# 申请新证书
-sslcat ssl request -domain example.com -email admin@example.com
+# 基本用法：添加一个代理规则
+sslcat proxy add -domain example.com -target localhost -port 8080
 
-# 列出所有证书
+# 启用 SSL 强制
+sslcat proxy add -domain example.com -target localhost -port 8080 -ssl
+
+# 添加时禁用规则
+sslcat proxy add -domain example.com -target localhost -port 8080 -disabled
+
+# 完整示例
+sslcat proxy add -domain api.example.com -target localhost -port 3000 -ssl -enabled
+```
+
+**参数说明：**
+- `-domain <domain>` - **必需**，域名（例如：`example.com`）
+- `-target <target>` - **必需**，目标服务器地址（例如：`localhost` 或 `192.168.1.100`）
+- `-port <port>` - **可选**，目标端口（默认：`80`）
+- `-ssl` - **可选**，强制 HTTPS（SSL Only）
+- `-enabled` - **可选**，启用规则（默认：启用）
+- `-disabled` - **可选**，禁用规则
+
+**注意事项：**
+- 域名不能重复，如果已存在会报错
+- 规则添加后会自动保存到配置文件
+- 添加规则后需要重启 SSLcat 服务才能生效
+
+#### 更新代理规则
+
+```bash
+# 更新目标地址
+sslcat proxy update -domain example.com -target localhost -port 3000
+
+# 更新端口
+sslcat proxy update -domain example.com -port 8080
+
+# 启用 SSL 强制
+sslcat proxy update -domain example.com -ssl
+
+# 禁用 SSL 强制
+sslcat proxy update -domain example.com -no-ssl
+
+# 禁用规则
+sslcat proxy update -domain example.com -disabled
+
+# 启用规则
+sslcat proxy update -domain example.com -enabled
+```
+
+**参数说明：**
+- `-domain <domain>` - **必需**，要更新的域名
+- `-target <target>` - **可选**，新的目标地址
+- `-port <port>` - **可选**，新的目标端口
+- `-ssl` - **可选**，启用 SSL 强制
+- `-no-ssl` - **可选**，禁用 SSL 强制
+- `-enabled` - **可选**，启用规则
+- `-disabled` - **可选**，禁用规则
+
+**注意事项：**
+- 只更新指定的字段，未指定的字段保持不变
+- 更新后会自动保存到配置文件
+- 更新规则后需要重启 SSLcat 服务才能生效
+
+#### 删除代理规则
+
+```bash
+# 删除指定域名的代理规则
+sslcat proxy delete -domain example.com
+```
+
+**注意事项：**
+- 删除操作不可恢复，请谨慎操作
+- 删除后会自动保存到配置文件
+- 删除规则后需要重启 SSLcat 服务才能生效
+
+---
+
+### 3. SSL 证书管理 (`ssl`)
+
+SSL 证书管理命令用于管理 SSL 证书。**注意：当前版本的部分 SSL 命令功能为占位符实现，完整功能正在开发中。**
+
+#### 列出证书
+
+```bash
 sslcat ssl list
+```
 
-# 查看证书详情
+**当前实现：** 显示配置中启用的代理规则域名列表。
+
+#### 显示证书详情
+
+```bash
 sslcat ssl show -domain example.com
+```
 
-# 续期证书
+**当前实现：** 占位符，显示提示信息。
+
+#### 申请证书
+
+```bash
+# 使用配置文件中的邮箱
+sslcat ssl request -domain example.com
+
+# 指定邮箱
+sslcat ssl request -domain example.com -email admin@example.com
+```
+
+**参数说明：**
+- `-domain <domain>` - **必需**，要申请证书的域名
+- `-email <email>` - **可选**，Let's Encrypt 邮箱（如果未指定，使用配置文件中的 `ssl.email`）
+
+**当前实现：** 占位符，显示提示信息。
+
+#### 续期证书
+
+```bash
 sslcat ssl renew -domain example.com
+```
 
-# 删除证书
+**当前实现：** 占位符，显示提示信息。
+
+#### 删除证书
+
+```bash
 sslcat ssl delete -domain example.com
 ```
 
-### 证书状态
+**当前实现：** 占位符，显示提示信息。
+
+---
+
+### 4. 帮助命令 (`help`)
+
+显示所有可用命令的帮助信息。
+
 ```bash
-# 检查证书状态
-sslcat ssl status
-
-# 验证证书
-sslcat ssl verify -domain example.com
-
-# 自动续期设置
-sslcat ssl auto-renew -enable
+sslcat help
 ```
 
-## 系统管理命令
+**输出示例：**
+```
+SSLcat CLI Commands:
 
-### 服务控制
-```bash
-# 启动服务
-sslcat service start
+  config          Configuration management
+  proxy           Proxy management
+  ssl             SSL certificate management
+  help            Show help information
 
-# 停止服务
-sslcat service stop
-
-# 重启服务
-sslcat service restart
-
-# 服务状态
-sslcat service status
-
-# 重新加载配置
-sslcat service reload
+Use 'sslcat <command> --help' for detailed help
 ```
 
-### 系统信息
+---
+
+## 启动参数
+
+除了 CLI 子命令，SSLcat 还支持以下启动参数：
+
+### 基本参数
+
 ```bash
+# 指定配置文件
+sslcat -config /path/to/sslcat.conf
+
+# 指定管理面板路径前缀
+sslcat -admin-prefix /sslcat-panel
+
+# 指定监听地址和端口
+sslcat -host 0.0.0.0 -port 443
+
+# 指定 SSL 邮箱
+sslcat -email admin@example.com
+
+# 使用 Let's Encrypt 测试环境
+sslcat -staging
+
+# 指定日志级别
+sslcat -log-level debug
+```
+
+### 配置验证
+
+```bash
+# 测试配置文件语法
+sslcat -config sslcat.conf -test
+
+# 检查配置文件完整性
+sslcat -config sslcat.conf -check
+
 # 显示版本信息
-sslcat version
-
-# 显示系统信息
-sslcat system info
-
-# 显示配置信息
-sslcat system config
-
-# 显示统计信息
-sslcat system stats
+sslcat -version
 ```
 
-## 监控和日志命令
+**完整参数列表：**
+- `-config` - 配置文件路径（默认：`/etc/sslcat/sslcat.conf`）
+- `-admin-prefix` - 管理面板路径前缀（默认：`/sslcat-panel`）
+- `-host` - 监听地址（默认：`0.0.0.0`）
+- `-port` - 监听端口（默认：`443`）
+- `-email` - SSL 证书邮箱
+- `-staging` - 使用 Let's Encrypt 测试环境
+- `-log-level` - 日志级别：`debug`, `info`, `warn`, `error`（默认：`info`）
+- `-test` - 测试配置文件语法
+- `-check` - 检查配置文件完整性
+- `-version` - 显示版本信息
 
-### 日志管理
+---
+
+## 使用示例
+
+### 完整工作流程示例
+
 ```bash
-# 查看实时日志
-sslcat logs tail
+# 1. 查看当前配置
+sslcat config show
 
-# 查看访问日志
-sslcat logs access
+# 2. 添加代理规则
+sslcat proxy add -domain api.example.com -target localhost -port 3000 -ssl
 
-# 查看错误日志
-sslcat logs error
+# 3. 查看代理规则列表
+sslcat proxy list
 
-# 查看系统日志
-sslcat logs system
+# 4. 设置 SSL 邮箱
+sslcat config set ssl.email admin@example.com
 
-# 清除日志
-sslcat logs clear
+# 5. 申请 SSL 证书（占位符）
+sslcat ssl request -domain api.example.com
+
+# 6. 查看配置项
+sslcat config get ssl.email
+
+# 7. 更新代理规则
+sslcat proxy update -domain api.example.com -port 8080
+
+# 8. 删除代理规则
+sslcat proxy delete -domain api.example.com
 ```
 
-### 监控命令
+### 批量操作示例
+
 ```bash
-# 显示性能指标
-sslcat metrics
-
-# 显示连接统计
-sslcat metrics connections
-
-# 显示请求统计
-sslcat metrics requests
-
-# 显示错误统计
-sslcat metrics errors
-```
-
-## 故障排查命令
-
-### 诊断工具
-```bash
-# 系统诊断
-sslcat diagnose
-
-# 网络诊断
-sslcat diagnose network
-
-# SSL 诊断
-sslcat diagnose ssl
-
-# 配置诊断
-sslcat diagnose config
-```
-
-### 调试命令
-```bash
-# 启用调试模式
-sslcat debug -enable
-
-# 查看调试信息
-sslcat debug info
-
-# 生成调试报告
-sslcat debug report
-
-# 禁用调试模式
-sslcat debug -disable
-```
-
-## 高级命令
-
-### 性能调优
-```bash
-# 显示性能建议
-sslcat performance suggest
-
-# 优化配置
-sslcat performance optimize
-
-# 性能测试
-sslcat performance test
-
-# 基准测试
-sslcat performance benchmark
-```
-
-### 备份和恢复
-```bash
-# 备份配置
-sslcat backup config -output /backup/sslcat-config.tar.gz
-
-# 备份证书
-sslcat backup certificates -output /backup/certificates.tar.gz
-
-# 恢复配置
-sslcat restore config -input /backup/sslcat-config.tar.gz
-
-# 恢复证书
-sslcat restore certificates -input /backup/certificates.tar.gz
-```
-
-## 环境变量
-
-### 常用环境变量
-```bash
-# 配置文件路径
-export SSLCAT_CONFIG=/etc/sslcat/sslcat.conf
-
-# 日志级别
-export SSLCAT_LOG_LEVEL=info
-
-# 调试模式
-export SSLCAT_DEBUG=true
-
-# 数据目录
-export SSLCAT_DATA_DIR=/opt/sslcat/data
-```
-
-## 命令选项
-
-### 全局选项
-```bash
-# 配置文件
--config, -c string
-    配置文件路径 (默认: sslcat.conf)
-
-# 日志级别
--log-level string
-    日志级别: debug, info, warn, error (默认: info)
-
-# 调试模式
--debug
-    启用调试模式
-
-# 帮助信息
--help, -h
-    显示帮助信息
-
-# 版本信息
--version, -v
-    显示版本信息
-```
-
-## 示例用法
-
-### 基本使用
-```bash
-# 启动 SSLcat
-sslcat -config /etc/sslcat/sslcat.conf
-
-# 添加代理规则
-sslcat proxy add -domain api.example.com -target http://localhost:3000
-
-# 申请 SSL 证书
-sslcat ssl request -domain example.com -email admin@example.com
-
-# 查看系统状态
-sslcat system info
-```
-
-### 高级使用
-```bash
-# 批量添加代理规则
-for domain in api.example.com app.example.com; do
-    sslcat proxy add -domain $domain -target http://localhost:8080
+# 批量添加多个代理规则
+for domain in api.example.com app.example.com www.example.com; do
+    sslcat proxy add -domain $domain -target localhost -port 8080 -ssl
 done
 
-# 监控系统性能
-sslcat metrics --watch
-
-# 生成系统报告
-sslcat debug report -output system-report.html
+# 批量更新代理规则端口
+for domain in api.example.com app.example.com; do
+    sslcat proxy update -domain $domain -port 3000
+done
 ```
+
+### 配置管理示例
+
+```bash
+# 查看服务器配置
+sslcat config get server.port
+sslcat config get server.host
+
+# 修改服务器端口
+sslcat config set server.port 8443
+
+# 查看 SSL 配置
+sslcat config get ssl.email
+sslcat config get ssl.staging
+
+# 修改 SSL 配置
+sslcat config set ssl.email newadmin@example.com
+sslcat config set ssl.staging false
+```
+
+---
+
+## 配置文件格式
+
+CLI 命令操作的是 JSON 格式的配置文件。配置文件的基本结构：
+
+```json
+{
+  "server": {
+    "port": 443,
+    "host": "0.0.0.0"
+  },
+  "ssl": {
+    "email": "admin@example.com",
+    "staging": false
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "localhost",
+        "port": 8080,
+        "enabled": true,
+        "ssl_only": false
+      }
+    ]
+  }
+}
+```
+
+使用 `config get` 和 `config set` 命令时，使用点号（.）分隔的路径访问嵌套字段。
+
+---
+
+## 最佳实践
+
+### 1. 备份配置文件
+
+在修改配置之前，建议先备份配置文件：
+
+```bash
+cp /etc/sslcat/sslcat.conf /etc/sslcat/sslcat.conf.backup
+```
+
+### 2. 测试配置
+
+修改配置后，使用 `-test` 参数验证配置：
+
+```bash
+sslcat -config /etc/sslcat/sslcat.conf -test
+```
+
+### 3. 重启服务
+
+配置修改后，需要重启 SSLcat 服务才能生效：
+
+```bash
+# 如果使用 systemd
+sudo systemctl restart sslcat
+
+# 如果使用其他方式
+# 停止当前进程，然后重新启动
+```
+
+### 4. 查看日志
+
+修改配置后，查看日志确认配置是否正确加载：
+
+```bash
+# 如果使用 systemd
+sudo journalctl -u sslcat -f
+
+# 或查看日志文件
+tail -f /var/log/sslcat/sslcat.log
+```
+
+---
+
+## 故障排查
+
+### 命令无法执行
+
+**问题：** 运行 `sslcat` 命令提示找不到命令或权限不足
+
+**解决方案：**
+1. 确保 SSLcat 已正确安装
+2. 确保命令路径在 PATH 中，或使用完整路径
+3. 确保以 root 权限运行（SSLcat 需要 root 权限）
+
+### 配置文件无法读取
+
+**问题：** 提示配置文件不存在或无法读取
+
+**解决方案：**
+1. 检查配置文件路径是否正确
+2. 使用 `-config` 参数指定完整路径
+3. 确保配置文件有读取权限
+
+### 配置无法保存
+
+**问题：** 修改配置后提示保存失败
+
+**解决方案：**
+1. 确保配置文件有写入权限
+2. 确保配置文件路径正确
+3. 检查磁盘空间是否充足
+
+### 配置格式错误
+
+**问题：** 使用 `config set` 后配置文件格式错误
+
+**解决方案：**
+1. 检查配置路径是否正确（使用点号分隔）
+2. 检查值类型是否正确（字符串、数字、布尔值）
+3. 从备份恢复配置文件
+
+---
 
 ## 相关文档
 
@@ -346,3 +517,12 @@ sslcat debug report -output system-report.html
 - [Web 界面](web-interface.md)
 - [配置参考](../reference/configuration-reference.md)
 - [故障排查](../troubleshooting/common-issues.md)
+- [快速开始](../getting-started/quick-start.md)
+
+---
+
+## 版本信息
+
+本文档适用于 SSLcat v1.3.21-rc5 及更高版本。
+
+**最后更新：** 2025-01-29

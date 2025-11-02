@@ -1158,6 +1158,13 @@ func (c *Config) Save(configFile string) error {
 		return fmt.Errorf("序列化配置失败: %w", err)
 	}
 
+	// 在保存前创建备份
+	if err := c.createBackup(actualConfigFile); err != nil {
+		// 备份失败不影响主流程，只记录警告
+		// 使用 fmt.Printf 因为这里可能没有 logger
+		fmt.Printf("警告: 创建配置文件备份失败: %v\n", err)
+	}
+
 	// 尝试保存到主要路径
 	if err := c.saveToPath(actualConfigFile, data); err != nil {
 		// 如果主要路径失败，尝试备用路径
@@ -1297,6 +1304,196 @@ func (c *Config) canWriteToPath(path string) bool {
 	// 清理测试文件
 	os.Remove(tempFile)
 	return true
+}
+
+// createBackup 创建配置文件备份
+// 备份策略：
+// 1. 版本备份：保留最近10个版本备份（每次保存都创建新备份）
+// 2. 按天备份：保留最近10个按天备份（每天只保留一个）
+func (c *Config) createBackup(configFile string) error {
+	// 如果配置文件不存在，不需要备份
+	if _, err := os.Stat(configFile); os.IsNotExist(err) {
+		return nil
+	}
+
+	// 读取当前配置文件内容
+	currentData, err := os.ReadFile(configFile)
+	if err != nil {
+		return fmt.Errorf("读取配置文件失败: %w", err)
+	}
+
+	// 如果文件为空，不需要备份
+	if len(currentData) == 0 {
+		return nil
+	}
+
+	configDir := filepath.Dir(configFile)
+	configBaseName := filepath.Base(configFile)
+
+	// 创建版本备份（保留最近10个）
+	if err := c.createVersionBackup(configDir, configBaseName, currentData); err != nil {
+		return fmt.Errorf("创建版本备份失败: %w", err)
+	}
+
+	// 创建按天备份（保留最近10个不同的日期）
+	if err := c.createDailyBackup(configDir, configBaseName, currentData); err != nil {
+		return fmt.Errorf("创建按天备份失败: %w", err)
+	}
+
+	return nil
+}
+
+// createVersionBackup 创建版本备份（保留最近10个）
+func (c *Config) createVersionBackup(configDir, configBaseName string, data []byte) error {
+	backupPattern := filepath.Join(configDir, configBaseName+".backup.v*")
+	backupFiles, err := filepath.Glob(backupPattern)
+	if err != nil {
+		return fmt.Errorf("查找备份文件失败: %w", err)
+	}
+
+	// 找到当前最大的版本号
+	maxVersion := 0
+	for _, backupFile := range backupFiles {
+		// 提取版本号
+		base := filepath.Base(backupFile)
+		var version int
+		if _, err := fmt.Sscanf(base, configBaseName+".backup.v%d", &version); err == nil {
+			if version > maxVersion {
+				maxVersion = version
+			}
+		}
+	}
+
+	// 如果已有10个备份，删除最旧的（v1）
+	if len(backupFiles) >= 10 {
+		oldestBackup := filepath.Join(configDir, configBaseName+".backup.v1")
+		if err := os.Remove(oldestBackup); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("删除旧备份失败: %w", err)
+		}
+		// 重命名其他备份文件，使版本号连续
+		for i := 2; i <= maxVersion; i++ {
+			oldFile := filepath.Join(configDir, fmt.Sprintf("%s.backup.v%d", configBaseName, i))
+			newFile := filepath.Join(configDir, fmt.Sprintf("%s.backup.v%d", configBaseName, i-1))
+			if _, err := os.Stat(oldFile); err == nil {
+				if err := os.Rename(oldFile, newFile); err != nil {
+					return fmt.Errorf("重命名备份文件失败: %w", err)
+				}
+			}
+		}
+		maxVersion = maxVersion - 1
+	}
+
+	// 创建新的备份文件（版本号加1）
+	newVersion := maxVersion + 1
+	newBackupFile := filepath.Join(configDir, fmt.Sprintf("%s.backup.v%d", configBaseName, newVersion))
+	if err := os.WriteFile(newBackupFile, data, 0644); err != nil {
+		return fmt.Errorf("写入备份文件失败: %w", err)
+	}
+
+	return nil
+}
+
+// createDailyBackup 创建按天备份（保留最近10个不同的日期）
+func (c *Config) createDailyBackup(configDir, configBaseName string, data []byte) error {
+	// 获取今天的日期
+	today := time.Now().Format("2006-01-02")
+	todayBackupFile := filepath.Join(configDir, fmt.Sprintf("%s.backup.%s", configBaseName, today))
+
+	// 检查今天是否已经有备份
+	if _, err := os.Stat(todayBackupFile); err == nil {
+		// 今天已有备份，比较内容是否相同
+		existingData, err := os.ReadFile(todayBackupFile)
+		if err == nil && len(existingData) == len(data) {
+			// 如果内容相同，不需要更新
+			same := true
+			for i := range data {
+				if existingData[i] != data[i] {
+					same = false
+					break
+				}
+			}
+			if same {
+				return nil // 内容相同，不需要更新
+			}
+		}
+	}
+
+	// 创建或更新今天的备份
+	if err := os.WriteFile(todayBackupFile, data, 0644); err != nil {
+		return fmt.Errorf("写入按天备份文件失败: %w", err)
+	}
+
+	// 清理旧的按天备份（保留最近10个不同的日期）
+	if err := c.cleanupDailyBackups(configDir, configBaseName); err != nil {
+		return fmt.Errorf("清理旧备份失败: %w", err)
+	}
+
+	return nil
+}
+
+// cleanupDailyBackups 清理旧的按天备份，只保留最近10个不同的日期
+func (c *Config) cleanupDailyBackups(configDir, configBaseName string) error {
+	backupPattern := filepath.Join(configDir, configBaseName+".backup.????-??-??")
+	backupFiles, err := filepath.Glob(backupPattern)
+	if err != nil {
+		return fmt.Errorf("查找按天备份文件失败: %w", err)
+	}
+
+	// 如果备份文件数量不超过10个，不需要清理
+	if len(backupFiles) <= 10 {
+		return nil
+	}
+
+	// 提取日期并排序
+	type backupInfo struct {
+		file    string
+		date    time.Time
+		modTime time.Time
+	}
+
+	backups := make([]backupInfo, 0, len(backupFiles))
+	for _, backupFile := range backupFiles {
+		base := filepath.Base(backupFile)
+		var dateStr string
+		if _, err := fmt.Sscanf(base, configBaseName+".backup.%s", &dateStr); err != nil {
+			continue
+		}
+
+		date, err := time.Parse("2006-01-02", dateStr)
+		if err != nil {
+			continue
+		}
+
+		// 获取文件修改时间
+		info, err := os.Stat(backupFile)
+		if err != nil {
+			continue
+		}
+
+		backups = append(backups, backupInfo{
+			file:    backupFile,
+			date:    date,
+			modTime: info.ModTime(),
+		})
+	}
+
+	// 按日期排序（最新的在前）
+	for i := 0; i < len(backups)-1; i++ {
+		for j := i + 1; j < len(backups); j++ {
+			if backups[i].date.Before(backups[j].date) {
+				backups[i], backups[j] = backups[j], backups[i]
+			}
+		}
+	}
+
+	// 删除超过10个的旧备份
+	for i := 10; i < len(backups); i++ {
+		if err := os.Remove(backups[i].file); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("删除旧备份失败: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // GetProxyRule 获取指定域名的代理规则

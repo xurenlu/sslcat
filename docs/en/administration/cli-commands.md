@@ -1,530 +1,528 @@
-# CLI Commands
+# CLI Commands Reference
 
-SSLcat provides a comprehensive command-line interface for configuration, management, and troubleshooting.
+SSLcat provides a comprehensive command-line interface (CLI) for managing and configuring SSLcat directly on the server. Even when the Web interface is unavailable, administrators can perform all configuration management tasks through CLI commands without manually editing configuration files.
 
-## Basic Commands
+## Important Notes
 
-### Start SSLcat
+⚠️ **All CLI commands must be run as root on the server** (SSLcat requires root privileges to bind to privileged ports).
+
+## Basic Usage
+
+### Command Format
+
 ```bash
-# Start with default configuration
-sslcat
-
-# Start with custom configuration file
-sslcat -config /path/to/sslcat.conf
-
-# Start with specific host and port
-sslcat -host 0.0.0.0 -port 80 -ssl-port 443
-
-# Start in debug mode
-sslcat -debug
-
-# Start with custom log level
-sslcat -log-level debug
+sslcat <command> [subcommand] [options]
 ```
 
-### Configuration Management
+### Configuration File
+
+All CLI commands use `sslcat.conf` as the default configuration file. To specify a different configuration file, use the `-config` parameter:
+
 ```bash
-# Validate configuration file
-sslcat -config sslcat.conf -validate
-
-# Test configuration without starting
-sslcat -config sslcat.conf -test
-
-# Dry run (check configuration and exit)
-sslcat -config sslcat.conf -dry-run
-
-# Show configuration
-sslcat -config sslcat.conf -show-config
+sslcat -config /path/to/sslcat.conf <command>
 ```
 
-## Certificate Management
+## Available Commands
 
-### SSL Certificate Operations
+### 1. Configuration Management (`config`)
+
+Configuration management commands are used to view, get, and set configuration items.
+
+#### Show Complete Configuration
+
 ```bash
-# Generate new certificate
-sslcat cert generate -domain example.com -email admin@example.com
+# Display complete configuration in JSON format
+sslcat config show
 
-# Renew certificate
-sslcat cert renew -domain example.com
-
-# Renew all certificates
-sslcat cert renew -all
-
-# Check certificate status
-sslcat cert status -domain example.com
-
-# List all certificates
-sslcat cert list
-
-# Delete certificate
-sslcat cert delete -domain example.com
+# Use custom configuration file
+sslcat -config /etc/sslcat/sslcat.conf config show
 ```
 
-### Let's Encrypt Integration
-```bash
-# Register with Let's Encrypt
-sslcat cert register -email admin@example.com
-
-# Generate certificate with Let's Encrypt
-sslcat cert generate -domain example.com -provider letsencrypt
-
-# Check Let's Encrypt rate limits
-sslcat cert limits
+**Example Output:**
+```json
+{
+  "server": {
+    "port": 443,
+    "host": "0.0.0.0",
+    ...
+  },
+  "ssl": {
+    "email": "admin@example.com",
+    ...
+  },
+  ...
+}
 ```
 
-## Proxy Management
+#### Get Configuration Item
 
-### Proxy Rules
 ```bash
-# List proxy rules
-sslcat proxy list
+# Get server port
+sslcat config get server.port
 
-# Add proxy rule
-sslcat proxy add -domain api.example.com -target http://localhost:8080 -ssl
+# Get SSL email
+sslcat config get ssl.email
 
-# Update proxy rule
-sslcat proxy update -id rule-1 -target http://localhost:8081
-
-# Delete proxy rule
-sslcat proxy delete -id rule-1
-
-# Test proxy rule
-sslcat proxy test -domain api.example.com
+# Get proxy rules count (need to check structure first)
+sslcat config get proxy.rules
 ```
 
-### Load Balancing
+**Use dot-separated paths to access nested configuration items**, for example:
+- `server.port` - Server port
+- `ssl.email` - SSL certificate email
+- `ssl.staging` - Use Let's Encrypt staging environment
+- `proxy.cache.enabled` - Enable proxy cache
+
+#### Set Configuration Item
+
 ```bash
-# List backends
-sslcat lb list
+# Set server port
+sslcat config set server.port 8080
 
-# Add backend
-sslcat lb add -url http://localhost:8080 -weight 1
+# Set SSL email
+sslcat config set ssl.email admin@example.com
 
-# Remove backend
-sslcat lb remove -url http://localhost:8080
+# Enable SSL staging
+sslcat config set ssl.staging true
 
-# Check backend health
-sslcat lb health -url http://localhost:8080
-
-# Update backend status
-sslcat lb status -url http://localhost:8080 -status disabled
+# Disable SSL staging
+sslcat config set ssl.staging false
 ```
 
-## Monitoring and Diagnostics
-
-### System Information
-```bash
-# Show version information
-sslcat version
-
-# Show system information
-sslcat system info
-
-# Show configuration summary
-sslcat config summary
-
-# Show running processes
-sslcat processes
-```
-
-### Health Checks
-```bash
-# Check SSLcat health
-sslcat health
-
-# Check specific component
-sslcat health -component proxy
-sslcat health -component ssl
-sslcat health -component cache
-
-# Detailed health report
-sslcat health -detailed
-```
-
-### Metrics and Statistics
-```bash
-# Show current metrics
-sslcat metrics
-
-# Show metrics in JSON format
-sslcat metrics -format json
-
-# Show specific metrics
-sslcat metrics -metric requests_total
-sslcat metrics -metric response_time
-
-# Export metrics
-sslcat metrics -export -file metrics.json
-```
-
-### Logging
-```bash
-# Show logs
-sslcat logs
-
-# Show logs with specific level
-sslcat logs -level error
-
-# Show logs for specific component
-sslcat logs -component proxy
-
-# Follow logs in real-time
-sslcat logs -follow
-
-# Export logs
-sslcat logs -export -file logs.json
-```
-
-## Cache Management
-
-### Cache Operations
-```bash
-# Show cache statistics
-sslcat cache stats
-
-# Clear all cache
-sslcat cache clear
-
-# Clear cache by pattern
-sslcat cache clear -pattern "*.css"
-
-# Clear cache for specific domain
-sslcat cache clear -domain example.com
-
-# Show cache contents
-sslcat cache list
-
-# Warm cache
-sslcat cache warm -url https://example.com/api/popular
-```
-
-## User Management
-
-### User Operations
-```bash
-# List users
-sslcat users list
-
-# Create user
-sslcat users create -username admin -email admin@example.com -role admin
-
-# Update user
-sslcat users update -username admin -role super-admin
-
-# Delete user
-sslcat users delete -username admin
-
-# Change password
-sslcat users password -username admin
-```
-
-## Backup and Restore
-
-### Backup Operations
-```bash
-# Create backup
-sslcat backup create
-
-# Create backup with specific name
-sslcat backup create -name backup-20240101
-
-# List backups
-sslcat backup list
-
-# Show backup details
-sslcat backup info -name backup-20240101
-
-# Delete backup
-sslcat backup delete -name backup-20240101
-```
-
-### Restore Operations
-```bash
-# Restore from backup
-sslcat backup restore -name backup-20240101
-
-# Restore specific configuration
-sslcat backup restore -name backup-20240101 -config proxy
-
-# Validate backup
-sslcat backup validate -name backup-20240101
-```
-
-## Service Management
-
-### Service Control
-```bash
-# Start service
-sslcat service start
-
-# Stop service
-sslcat service stop
-
-# Restart service
-sslcat service restart
-
-# Reload configuration
-sslcat service reload
-
-# Check service status
-sslcat service status
-```
-
-### Process Management
-```bash
-# Show running processes
-sslcat processes
-
-# Kill specific process
-sslcat processes kill -pid 1234
-
-# Show process details
-sslcat processes info -pid 1234
-```
-
-## Network Diagnostics
-
-### Connectivity Tests
-```bash
-# Test connectivity to backend
-sslcat test -url http://localhost:8080
-
-# Test SSL connectivity
-sslcat test -url https://example.com -ssl
-
-# Test with specific headers
-sslcat test -url https://example.com -header "X-Custom: value"
-
-# Test load balancing
-sslcat test -url https://example.com -backend http://localhost:8080
-```
-
-### DNS Resolution
-```bash
-# Resolve domain
-sslcat dns resolve -domain example.com
-
-# Check DNS propagation
-sslcat dns check -domain example.com
-
-# Test DNS from different locations
-sslcat dns test -domain example.com -locations us,eu,asia
-```
-
-## Performance Tuning
-
-### Performance Analysis
-```bash
-# Show performance metrics
-sslcat performance
-
-# Profile CPU usage
-sslcat performance -cpu
-
-# Profile memory usage
-sslcat performance -memory
-
-# Profile network usage
-sslcat performance -network
-
-# Generate performance report
-sslcat performance -report -file performance.json
-```
-
-### Optimization
-```bash
-# Optimize configuration
-sslcat optimize
-
-# Check for optimization opportunities
-sslcat optimize -check
-
-# Apply optimizations
-sslcat optimize -apply
-
-# Revert optimizations
-sslcat optimize -revert
-```
-
-## Security Operations
-
-### Security Checks
-```bash
-# Run security audit
-sslcat security audit
-
-# Check SSL configuration
-sslcat security ssl-check
-
-# Check for vulnerabilities
-sslcat security scan
-
-# Generate security report
-sslcat security report -file security.json
-```
-
-### Access Control
-```bash
-# List access rules
-sslcat access list
-
-# Add access rule
-sslcat access add -ip 192.168.1.0/24 -action allow
-
-# Remove access rule
-sslcat access remove -ip 192.168.1.0/24
-
-# Test access
-sslcat access test -ip 192.168.1.100
-```
-
-## Troubleshooting
-
-### Debug Commands
-```bash
-# Enable debug mode
-sslcat -debug
-
-# Set debug level
-sslcat -debug -log-level debug
-
-# Debug specific component
-sslcat debug -component proxy
-
-# Debug specific request
-sslcat debug -request-id req-123456
-```
-
-### Diagnostic Tools
-```bash
-# Run diagnostics
-sslcat diagnose
-
-# Check system requirements
-sslcat diagnose -system
-
-# Check configuration
-sslcat diagnose -config
-
-# Check network
-sslcat diagnose -network
-
-# Generate diagnostic report
-sslcat diagnose -report -file diagnostic.json
-```
-
-## Advanced Operations
-
-### Plugin Management
-```bash
-# List plugins
-sslcat plugins list
-
-# Install plugin
-sslcat plugins install -name custom-plugin
-
-# Uninstall plugin
-sslcat plugins uninstall -name custom-plugin
-
-# Enable plugin
-sslcat plugins enable -name custom-plugin
-
-# Disable plugin
-sslcat plugins disable -name custom-plugin
-```
-
-### API Management
-```bash
-# Generate API key
-sslcat api key generate -user admin
-
-# List API keys
-sslcat api keys list
-
-# Revoke API key
-sslcat api key revoke -key abc123
-
-# Test API endpoint
-sslcat api test -endpoint /api/v1/config
-```
-
-## Configuration Examples
-
-### Environment Variables
-```bash
-# Set environment variables
-export SSLCAT_CONFIG=/path/to/sslcat.conf
-export SSLCAT_LOG_LEVEL=debug
-export SSLCAT_DEBUG=true
-
-# Use environment variables
-sslcat
-```
-
-### Configuration Files
-```bash
-# Use multiple configuration files
-sslcat -config base.conf -config override.conf
-
-# Include configuration from directory
-sslcat -config-dir /etc/sslcat/conf.d
-
-# Use configuration from URL
-sslcat -config https://config.example.com/sslcat.conf
-```
-
-## Scripting and Automation
-
-### Batch Operations
-```bash
-# Execute multiple commands
-sslcat batch -file commands.txt
-
-# Run commands in parallel
-sslcat parallel -commands "sslcat health,sslcat metrics,sslcat logs"
-
-# Schedule commands
-sslcat schedule -command "sslcat backup create" -interval "0 2 * * *"
-```
-
-### Output Formats
-```bash
-# JSON output
-sslcat metrics -format json
-
-# YAML output
-sslcat config -format yaml
-
-# CSV output
-sslcat logs -format csv
-
-# Table output
-sslcat users list -format table
-```
-
-## Best Practices
-
-### Command Line Tips
-1. **Use Configuration Files**: Prefer configuration files over command-line options
-2. **Enable Logging**: Always enable appropriate logging for troubleshooting
-3. **Use Health Checks**: Regularly check service health
-4. **Monitor Metrics**: Set up monitoring for key metrics
-5. **Backup Regularly**: Schedule regular configuration backups
-
-### Security Considerations
-1. **Secure API Keys**: Protect API keys and credentials
-2. **Limit Access**: Use appropriate access controls
-3. **Regular Updates**: Keep SSLcat updated
-4. **Audit Logs**: Monitor and review audit logs
-5. **Secure Communication**: Use HTTPS for all communications
-
-## Related Documentation
-
-- [Web Interface](web-interface.md)
-- [Configuration Guide](../configuration/basic.md)
-- [Troubleshooting](../troubleshooting/common-issues.md)
-- [API Reference](../reference/api-reference.md)
+**Notes:**
+- Configuration changes are saved to the configuration file immediately
+- After modifying configuration, you need to restart the SSLcat service for changes to take effect
+- Use dot-separated paths to access nested configuration items
+- Supported types: string, integer, boolean, float
 
 ---
 
-*The CLI provides powerful tools for managing SSLcat in both interactive and automated environments.*
+### 2. Proxy Management (`proxy`)
+
+Proxy management commands are used to manage reverse proxy rules.
+
+#### List All Proxy Rules
+
+```bash
+sslcat proxy list
+```
+
+**Example Output:**
+```
+Proxy Rules:
+============
+1. Domain: api.example.com
+   Target: localhost:8080
+   Enabled: true
+   SSL Only: false
+
+2. Domain: app.example.com
+   Target: localhost:3000
+   Enabled: true
+   SSL Only: true
+```
+
+#### Add Proxy Rule
+
+```bash
+# Basic usage: add a proxy rule
+sslcat proxy add -domain example.com -target localhost -port 8080
+
+# Enable SSL enforcement
+sslcat proxy add -domain example.com -target localhost -port 8080 -ssl
+
+# Add rule as disabled
+sslcat proxy add -domain example.com -target localhost -port 8080 -disabled
+
+# Complete example
+sslcat proxy add -domain api.example.com -target localhost -port 3000 -ssl -enabled
+```
+
+**Parameters:**
+- `-domain <domain>` - **Required**, domain name (e.g., `example.com`)
+- `-target <target>` - **Required**, target server address (e.g., `localhost` or `192.168.1.100`)
+- `-port <port>` - **Optional**, target port (default: `80`)
+- `-ssl` - **Optional**, enforce HTTPS (SSL Only)
+- `-enabled` - **Optional**, enable rule (default: enabled)
+- `-disabled` - **Optional**, disable rule
+
+**Notes:**
+- Domain names cannot be duplicated; an error will be shown if it already exists
+- Rules are automatically saved to the configuration file after adding
+- After adding a rule, you need to restart the SSLcat service for it to take effect
+
+#### Update Proxy Rule
+
+```bash
+# Update target address
+sslcat proxy update -domain example.com -target localhost -port 3000
+
+# Update port
+sslcat proxy update -domain example.com -port 8080
+
+# Enable SSL enforcement
+sslcat proxy update -domain example.com -ssl
+
+# Disable SSL enforcement
+sslcat proxy update -domain example.com -no-ssl
+
+# Disable rule
+sslcat proxy update -domain example.com -disabled
+
+# Enable rule
+sslcat proxy update -domain example.com -enabled
+```
+
+**Parameters:**
+- `-domain <domain>` - **Required**, domain to update
+- `-target <target>` - **Optional**, new target address
+- `-port <port>` - **Optional**, new target port
+- `-ssl` - **Optional**, enable SSL enforcement
+- `-no-ssl` - **Optional**, disable SSL enforcement
+- `-enabled` - **Optional**, enable rule
+- `-disabled` - **Optional**, disable rule
+
+**Notes:**
+- Only specified fields are updated; unspecified fields remain unchanged
+- Updates are automatically saved to the configuration file
+- After updating a rule, you need to restart the SSLcat service for it to take effect
+
+#### Delete Proxy Rule
+
+```bash
+# Delete proxy rule for specified domain
+sslcat proxy delete -domain example.com
+```
+
+**Notes:**
+- Delete operations cannot be undone; please use with caution
+- Deletions are automatically saved to the configuration file
+- After deleting a rule, you need to restart the SSLcat service for it to take effect
+
+---
+
+### 3. SSL Certificate Management (`ssl`)
+
+SSL certificate management commands are used to manage SSL certificates. **Note: Some SSL command functionalities in the current version are placeholder implementations, and full functionality is under development.**
+
+#### List Certificates
+
+```bash
+sslcat ssl list
+```
+
+**Current Implementation:** Displays the list of domains from enabled proxy rules in the configuration.
+
+#### Show Certificate Details
+
+```bash
+sslcat ssl show -domain example.com
+```
+
+**Current Implementation:** Placeholder, shows informational message.
+
+#### Request Certificate
+
+```bash
+# Use email from configuration file
+sslcat ssl request -domain example.com
+
+# Specify email
+sslcat ssl request -domain example.com -email admin@example.com
+```
+
+**Parameters:**
+- `-domain <domain>` - **Required**, domain to request certificate for
+- `-email <email>` - **Optional**, Let's Encrypt email (if not specified, uses `ssl.email` from configuration file)
+
+**Current Implementation:** Placeholder, shows informational message.
+
+#### Renew Certificate
+
+```bash
+sslcat ssl renew -domain example.com
+```
+
+**Current Implementation:** Placeholder, shows informational message.
+
+#### Delete Certificate
+
+```bash
+sslcat ssl delete -domain example.com
+```
+
+**Current Implementation:** Placeholder, shows informational message.
+
+---
+
+### 4. Help Command (`help`)
+
+Display help information for all available commands.
+
+```bash
+sslcat help
+```
+
+**Example Output:**
+```
+SSLcat CLI Commands:
+
+  config          Configuration management
+  proxy           Proxy management
+  ssl             SSL certificate management
+  help            Show help information
+
+Use 'sslcat <command> --help' for detailed help
+```
+
+---
+
+## Startup Parameters
+
+In addition to CLI subcommands, SSLcat also supports the following startup parameters:
+
+### Basic Parameters
+
+```bash
+# Specify configuration file
+sslcat -config /path/to/sslcat.conf
+
+# Specify admin panel path prefix
+sslcat -admin-prefix /sslcat-panel
+
+# Specify listening address and port
+sslcat -host 0.0.0.0 -port 443
+
+# Specify SSL email
+sslcat -email admin@example.com
+
+# Use Let's Encrypt staging environment
+sslcat -staging
+
+# Specify log level
+sslcat -log-level debug
+```
+
+### Configuration Validation
+
+```bash
+# Test configuration file syntax
+sslcat -config sslcat.conf -test
+
+# Check configuration file integrity
+sslcat -config sslcat.conf -check
+
+# Show version information
+sslcat -version
+```
+
+**Complete Parameter List:**
+- `-config` - Configuration file path (default: `/etc/sslcat/sslcat.conf`)
+- `-admin-prefix` - Admin panel path prefix (default: `/sslcat-panel`)
+- `-host` - Listening address (default: `0.0.0.0`)
+- `-port` - Listening port (default: `443`)
+- `-email` - SSL certificate email
+- `-staging` - Use Let's Encrypt staging environment
+- `-log-level` - Log level: `debug`, `info`, `warn`, `error` (default: `info`)
+- `-test` - Test configuration file syntax
+- `-check` - Check configuration file integrity
+- `-version` - Show version information
+
+---
+
+## Usage Examples
+
+### Complete Workflow Example
+
+```bash
+# 1. View current configuration
+sslcat config show
+
+# 2. Add proxy rule
+sslcat proxy add -domain api.example.com -target localhost -port 3000 -ssl
+
+# 3. View proxy rules list
+sslcat proxy list
+
+# 4. Set SSL email
+sslcat config set ssl.email admin@example.com
+
+# 5. Request SSL certificate (placeholder)
+sslcat ssl request -domain api.example.com
+
+# 6. View configuration item
+sslcat config get ssl.email
+
+# 7. Update proxy rule
+sslcat proxy update -domain api.example.com -port 8080
+
+# 8. Delete proxy rule
+sslcat proxy delete -domain api.example.com
+```
+
+### Batch Operations Example
+
+```bash
+# Batch add multiple proxy rules
+for domain in api.example.com app.example.com www.example.com; do
+    sslcat proxy add -domain $domain -target localhost -port 8080 -ssl
+done
+
+# Batch update proxy rule ports
+for domain in api.example.com app.example.com; do
+    sslcat proxy update -domain $domain -port 3000
+done
+```
+
+### Configuration Management Example
+
+```bash
+# View server configuration
+sslcat config get server.port
+sslcat config get server.host
+
+# Modify server port
+sslcat config set server.port 8443
+
+# View SSL configuration
+sslcat config get ssl.email
+sslcat config get ssl.staging
+
+# Modify SSL configuration
+sslcat config set ssl.email newadmin@example.com
+sslcat config set ssl.staging false
+```
+
+---
+
+## Configuration File Format
+
+CLI commands operate on JSON-format configuration files. Basic structure of the configuration file:
+
+```json
+{
+  "server": {
+    "port": 443,
+    "host": "0.0.0.0"
+  },
+  "ssl": {
+    "email": "admin@example.com",
+    "staging": false
+  },
+  "proxy": {
+    "rules": [
+      {
+        "domain": "example.com",
+        "target": "localhost",
+        "port": 8080,
+        "enabled": true,
+        "ssl_only": false
+      }
+    ]
+  }
+}
+```
+
+When using `config get` and `config set` commands, use dot-separated paths to access nested fields.
+
+---
+
+## Best Practices
+
+### 1. Backup Configuration File
+
+Before modifying configuration, it's recommended to backup the configuration file:
+
+```bash
+cp /etc/sslcat/sslcat.conf /etc/sslcat/sslcat.conf.backup
+```
+
+### 2. Test Configuration
+
+After modifying configuration, use the `-test` parameter to validate:
+
+```bash
+sslcat -config /etc/sslcat/sslcat.conf -test
+```
+
+### 3. Restart Service
+
+After modifying configuration, you need to restart the SSLcat service for changes to take effect:
+
+```bash
+# If using systemd
+sudo systemctl restart sslcat
+
+# If using other methods
+# Stop current process, then restart
+```
+
+### 4. View Logs
+
+After modifying configuration, check logs to confirm configuration is loaded correctly:
+
+```bash
+# If using systemd
+sudo journalctl -u sslcat -f
+
+# Or check log file
+tail -f /var/log/sslcat/sslcat.log
+```
+
+---
+
+## Troubleshooting
+
+### Command Cannot Execute
+
+**Problem:** Running `sslcat` command shows command not found or insufficient permissions
+
+**Solution:**
+1. Ensure SSLcat is properly installed
+2. Ensure command path is in PATH, or use full path
+3. Ensure running as root (SSLcat requires root privileges)
+
+### Configuration File Cannot Be Read
+
+**Problem:** Prompt shows configuration file doesn't exist or cannot be read
+
+**Solution:**
+1. Check if configuration file path is correct
+2. Use `-config` parameter to specify full path
+3. Ensure configuration file has read permissions
+
+### Configuration Cannot Be Saved
+
+**Problem:** After modifying configuration, prompt shows save failed
+
+**Solution:**
+1. Ensure configuration file has write permissions
+2. Ensure configuration file path is correct
+3. Check if disk space is sufficient
+
+### Configuration Format Error
+
+**Problem:** After using `config set`, configuration file format is incorrect
+
+**Solution:**
+1. Check if configuration path is correct (use dot-separated paths)
+2. Check if value type is correct (string, number, boolean)
+3. Restore configuration file from backup
+
+---
+
+## Related Documentation
+
+- [User Management](user-management.md)
+- [Web Interface](web-interface.md)
+- [Configuration Reference](../reference/configuration-reference.md)
+- [Troubleshooting](../troubleshooting/common-issues.md)
+- [Quick Start](../getting-started/quick-start.md)
+
+---
+
+## Version Information
+
+This documentation applies to SSLcat v1.3.21-rc5 and later versions.
+
+**Last Updated:** 2025-01-29
