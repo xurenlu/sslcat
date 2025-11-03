@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.3.21-rc2] - 2025-11-03
+## [1.3.21-rc7] - 2025-11-03
 
 ### 🛠️ 技术改进
 
@@ -29,11 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 📚 文档更新
 
 - 添加配置文件差异比较的单元测试
-- 更新 CHANGELOG.md，记录 1.3.21-rc2 版本变更
+- 更新 CHANGELOG.md，记录 1.3.21-rc7 版本变更
 
 ---
 
-## [1.3.21-rc1] - 2025-01-29
+## [1.3.21-rc6] - 2025-11-02
 
 ### 🎉 重大新特性
 
