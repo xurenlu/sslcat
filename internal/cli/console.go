@@ -185,11 +185,8 @@ func (m ConsoleModel) runProxyView() (tea.Model, tea.Cmd) {
 
 // runSitesView 运行站点管理视图
 func (m ConsoleModel) runSitesView() (tea.Model, tea.Cmd) {
-	sitesModel := ui.NewSitesModel(m.config, m.configFile)
-	p := tea.NewProgram(sitesModel, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "站点管理视图错误: %v\n", err)
-	}
+	// TODO: 实现站点管理视图
+	fmt.Fprintf(os.Stderr, "站点管理功能开发中...\n")
 	return m, nil
 }
 
@@ -205,111 +202,78 @@ func (m ConsoleModel) runSSLView() (tea.Model, tea.Cmd) {
 
 // runDNSView 运行 DNS 管理视图
 func (m ConsoleModel) runDNSView() (tea.Model, tea.Cmd) {
-	dnsModel := ui.NewDNSModel(m.config, m.configFile)
-	p := tea.NewProgram(dnsModel, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "DNS管理视图错误: %v\n", err)
-	}
+	// TODO: 实现 DNS 管理视图
+	fmt.Fprintf(os.Stderr, "DNS管理功能开发中...\n")
 	return m, nil
 }
 
 // runSecurityView 运行安全设置视图
 func (m ConsoleModel) runSecurityView() (tea.Model, tea.Cmd) {
-	securityModel := ui.NewSecurityModel(m.config, m.configFile)
-	p := tea.NewProgram(securityModel, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "安全设置视图错误: %v\n", err)
-	}
+	// TODO: 实现安全设置视图
+	fmt.Fprintf(os.Stderr, "安全设置功能开发中...\n")
 	return m, nil
 }
 
 // runSettingsView 运行系统设置视图
 func (m ConsoleModel) runSettingsView() (tea.Model, tea.Cmd) {
-	settingsModel := ui.NewSettingsModel(m.config, m.configFile)
-	p := tea.NewProgram(settingsModel, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "系统设置视图错误: %v\n", err)
-	}
+	// TODO: 实现系统设置视图
+	fmt.Fprintf(os.Stderr, "系统设置功能开发中...\n")
 	return m, nil
 }
 
 // runCDNView 运行 CDN 缓存管理视图
 func (m ConsoleModel) runCDNView() (tea.Model, tea.Cmd) {
-	cdnModel := ui.NewCDNModel(m.config, m.configFile)
-	p := tea.NewProgram(cdnModel, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "CDN缓存管理视图错误: %v\n", err)
-	}
+	// TODO: 实现 CDN 缓存管理视图
+	fmt.Fprintf(os.Stderr, "CDN缓存管理功能开发中...\n")
 	return m, nil
 }
 
 // runStatisticsView 运行访问统计视图
 func (m ConsoleModel) runStatisticsView() (tea.Model, tea.Cmd) {
-	statisticsModel := ui.NewStatisticsModel(m.config, m.configFile)
-	p := tea.NewProgram(statisticsModel, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "访问统计视图错误: %v\n", err)
-	}
+	// TODO: 实现访问统计视图
+	fmt.Fprintf(os.Stderr, "访问统计功能开发中...\n")
 	return m, nil
 }
 
 // runSlowRequestsView 运行慢请求分析视图
 func (m ConsoleModel) runSlowRequestsView() (tea.Model, tea.Cmd) {
-	slowRequestsModel := ui.NewSlowRequestsModel(m.config, m.configFile)
-	p := tea.NewProgram(slowRequestsModel, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "慢请求分析视图错误: %v\n", err)
-	}
+	// TODO: 实现慢请求分析视图
+	fmt.Fprintf(os.Stderr, "慢请求分析功能开发中...\n")
 	return m, nil
 }
 
 // runNotificationsView 运行通知管理视图
 func (m ConsoleModel) runNotificationsView() (tea.Model, tea.Cmd) {
-	notificationsModel := ui.NewNotificationsModel(m.config, m.configFile)
-	p := tea.NewProgram(notificationsModel, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "通知管理视图错误: %v\n", err)
-	}
+	// TODO: 实现通知管理视图
+	fmt.Fprintf(os.Stderr, "通知管理功能开发中...\n")
 	return m, nil
 }
 
 // runClusterView 运行集群管理视图
 func (m ConsoleModel) runClusterView() (tea.Model, tea.Cmd) {
-	clusterModel := ui.NewClusterModel(m.config, m.configFile)
-	p := tea.NewProgram(clusterModel, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "集群管理视图错误: %v\n", err)
-	}
+	// TODO: 实现集群管理视图
+	fmt.Fprintf(os.Stderr, "集群管理功能开发中...\n")
 	return m, nil
 }
 
 // runAISecurityView 运行 AI 安全分析视图
 func (m ConsoleModel) runAISecurityView() (tea.Model, tea.Cmd) {
-	aiSecurityModel := ui.NewAISecurityModel(m.config, m.configFile)
-	p := tea.NewProgram(aiSecurityModel, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "AI安全分析视图错误: %v\n", err)
-	}
+	// TODO: 实现 AI 安全分析视图
+	fmt.Fprintf(os.Stderr, "AI安全分析功能开发中...\n")
 	return m, nil
 }
 
 // runImageOptimizationView 运行图片优化视图
 func (m ConsoleModel) runImageOptimizationView() (tea.Model, tea.Cmd) {
-	imageOptimizationModel := ui.NewImageOptimizationModel(m.config, m.configFile)
-	p := tea.NewProgram(imageOptimizationModel, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "图片优化视图错误: %v\n", err)
-	}
+	// TODO: 实现图片优化视图
+	fmt.Fprintf(os.Stderr, "图片优化功能开发中...\n")
 	return m, nil
 }
 
 // runUserManagementView 运行用户管理视图
 func (m ConsoleModel) runUserManagementView() (tea.Model, tea.Cmd) {
-	userManagementModel := ui.NewUserManagementModel(m.config, m.configFile)
-	p := tea.NewProgram(userManagementModel, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "用户管理视图错误: %v\n", err)
-	}
+	// TODO: 实现用户管理视图
+	fmt.Fprintf(os.Stderr, "用户管理功能开发中...\n")
 	return m, nil
 }
 
