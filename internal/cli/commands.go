@@ -624,6 +624,32 @@ func (m *Manager) RegisterHelpCommand() {
 	})
 }
 
+// RegisterConsoleCommand 注册控制台命令
+func (m *Manager) RegisterConsoleCommand() {
+	m.RegisterCommand(&Command{
+		Name:        "console",
+		Description: "Interactive terminal UI console",
+		Handler: func(args []string) error {
+			if m.config == nil {
+				return fmt.Errorf("no configuration loaded")
+			}
+			return RunConsole(m.config, m.configFile)
+		},
+	})
+
+	// 同时注册 interactive 作为别名
+	m.RegisterCommand(&Command{
+		Name:        "interactive",
+		Description: "Interactive terminal UI console (alias for console)",
+		Handler: func(args []string) error {
+			if m.config == nil {
+				return fmt.Errorf("no configuration loaded")
+			}
+			return RunConsole(m.config, m.configFile)
+		},
+	})
+}
+
 // setConfigValue 使用反射设置配置值
 func (m *Manager) setConfigValue(obj interface{}, keys []string, value string) error {
 	v := reflect.ValueOf(obj)

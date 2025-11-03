@@ -81,6 +81,7 @@ func main() {
 		cliManager.RegisterProxyCommands()
 		cliManager.RegisterSSLCommands()
 		cliManager.RegisterHelpCommand()
+		cliManager.RegisterConsoleCommand()
 
 		// 解析配置文件路径
 		configFile := "sslcat.conf"
