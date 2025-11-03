@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.21-rc2] - 2025-11-03
+
+### 🛠️ 技术改进
+
+#### 配置文件优化
+- **精简配置保存**: 配置文件现在只保存与默认值不同的配置项，大幅减少配置文件大小
+  - 默认值不再写入配置文件，配置文件更简洁易读
+  - 支持嵌套结构的深度比较，只保留真正不同的字段
+  - 保持向后兼容，加载配置时自动应用默认值
+- **CLI 帮助系统优化**: 
+  - 新增 `-h` 和 `--help` 参数支持，显示所有子命令和启动参数帮助
+  - 改进 CLI 命令执行逻辑，确保命令执行成功后正确退出
+  - 优化错误提示信息，提供更友好的错误消息
+
+### 🐛 Bug 修复
+
+#### CLI 命令修复
+- **命令执行流程**: 修复 CLI 命令执行后可能继续执行服务器启动代码的问题
+  - 使用 `os.Exit(0)` 确保命令执行成功后立即退出
+  - 改进错误处理，使用 `fmt.Fprintf(os.Stderr, ...)` 输出错误信息
+
+### 📚 文档更新
+
+- 添加配置文件差异比较的单元测试
+- 更新 CHANGELOG.md，记录 1.3.21-rc2 版本变更
+
+---
+
 ## [1.3.21-rc1] - 2025-01-29
 
 ### 🎉 重大新特性

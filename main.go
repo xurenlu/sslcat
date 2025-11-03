@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/tls"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -34,7 +33,7 @@ import (
 )
 
 var (
-	version = "1.3.21-rc1"
+	version = "1.3.21-rc2"
 	build   = "dev"
 )
 
@@ -68,6 +67,12 @@ func isIPHost(host string) bool {
 }
 
 func main() {
+	// 检查是否是帮助请求（-h 或 --help）
+	if len(os.Args) > 1 && (os.Args[1] == "-h" || os.Args[1] == "--help" || os.Args[1] == "help") {
+		showHelp()
+		return
+	}
+
 	// 检查是否是 CLI 命令（在定义 flag 之前检查）
 	if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], "-") {
 		// 处理子命令
@@ -87,9 +92,10 @@ func main() {
 		}
 
 		// 加载配置用于 CLI 命令
+		// 注意：config.Load() 如果文件不存在会返回默认配置，不会报错
 		cfg, err := config.Load(configFile)
 		if err != nil {
-			fmt.Printf("❌ 加载配置文件失败: %v\n", err)
+			fmt.Fprintf(os.Stderr, "❌ 加载配置文件失败: %v\n", err)
 			os.Exit(1)
 		}
 		cliManager.SetConfig(cfg)
@@ -97,10 +103,12 @@ func main() {
 
 		// 执行命令
 		if err := cliManager.Execute(os.Args[1:]); err != nil {
-			fmt.Printf("❌ 命令执行失败: %v\n", err)
+			fmt.Fprintf(os.Stderr, "❌ 命令执行失败: %v\n", err)
+			fmt.Fprintf(os.Stderr, "💡 提示: 使用 'sslcat help' 查看所有可用命令\n")
 			os.Exit(1)
 		}
-		return
+		// CLI 命令执行成功，退出程序
+		os.Exit(0)
 	}
 
 	var (
@@ -644,11 +652,8 @@ func handlePprofCommands(configFile *string, pprofEnable, pprofDisable *bool, pp
 
 // saveConfig 保存配置到文件
 func saveConfig(cfg *config.Config, configFile string) error {
-	data, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		return fmt.Errorf("序列化配置失败: %w", err)
-	}
-	return os.WriteFile(configFile, data, 0644)
+	// 使用 Config.Save 方法，它会自动只保存与默认值不同的配置
+	return cfg.Save(configFile)
 }
 
 // exportPprofData 导出 pprof 数据
@@ -721,4 +726,56 @@ func exportPprofData(profileType, outputPath, serverURL string) {
 		fmt.Println("💡 使用 go tool pprof 分析 goroutine:")
 		fmt.Printf("   go tool pprof %s\n", outputPath)
 	}
+}
+
+// showHelp 显示帮助信息，包括所有子命令和启动参数
+func showHelp() {
+	fmt.Printf("SSLcat v%s (build: %s)\n", version, build)
+	fmt.Println()
+	fmt.Println("用法:")
+	fmt.Println("  sslcat [选项]                  # 启动服务器")
+	fmt.Println("  sslcat <命令> [子命令] [选项]  # 执行 CLI 命令")
+	fmt.Println()
+	fmt.Println("CLI 子命令:")
+	fmt.Println()
+
+	// 创建 CLI 管理器并注册所有命令以显示帮助
+	cliManager := cli.NewManager()
+	cliManager.RegisterConfigCommands()
+	cliManager.RegisterProxyCommands()
+	cliManager.RegisterSSLCommands()
+	cliManager.RegisterHelpCommand()
+	cliManager.ShowHelp()
+
+	fmt.Println("启动参数:")
+	fmt.Println()
+	fmt.Println("  基本参数:")
+	fmt.Println("    -config <path>              配置文件路径（默认：/etc/sslcat/sslcat.conf）")
+	fmt.Println("    -admin-prefix <path>        管理面板路径前缀（默认：/sslcat-panel）")
+	fmt.Println("    -host <address>             监听地址（默认：0.0.0.0）")
+	fmt.Println("    -port <port>                监听端口（默认：443）")
+	fmt.Println("    -email <email>              SSL证书邮箱")
+	fmt.Println("    -staging                    使用Let's Encrypt测试环境")
+	fmt.Println("    -log-level <level>         日志级别：debug, info, warn, error（默认：info）")
+	fmt.Println()
+	fmt.Println("  配置验证:")
+	fmt.Println("    -test                       测试配置文件语法和完整性")
+	fmt.Println("    -check                      检查配置文件并显示详细信息")
+	fmt.Println("    -version                    显示版本信息")
+	fmt.Println()
+	fmt.Println("  性能分析 (pprof):")
+	fmt.Println("    -pprof-enable               启用 pprof 性能分析端点")
+	fmt.Println("    -pprof-disable               禁用 pprof 性能分析端点")
+	fmt.Println("    -pprof-export <type>        导出 pprof 数据 (heap|cpu|goroutine|allocs|block|mutex)")
+	fmt.Println("    -pprof-output <path>        导出文件路径")
+	fmt.Println("    -pprof-server <url>         pprof 服务器地址（默认：http://localhost:8080）")
+	fmt.Println()
+	fmt.Println("示例:")
+	fmt.Println("  sslcat -h                     显示此帮助信息")
+	fmt.Println("  sslcat help                   显示 CLI 命令帮助")
+	fmt.Println("  sslcat config show            显示完整配置")
+	fmt.Println("  sslcat proxy list              列出所有代理规则")
+	fmt.Println("  sslcat ssl list               列出所有 SSL 证书")
+	fmt.Println("  sslcat -config ./sslcat.conf  使用自定义配置文件启动")
+	fmt.Println()
 }

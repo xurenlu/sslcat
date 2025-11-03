@@ -1134,6 +1134,279 @@ func (c *Config) GetSSLDomains() []string {
 	return c.SSL.Domains
 }
 
+// getDefaultConfig 获取默认配置（提取自 Load 函数）
+func getDefaultConfig() *Config {
+	return &Config{
+		Server: ServerConfig{
+			Host:        "0.0.0.0",
+			Port:        443,
+			Debug:       false,
+			LogLevel:    "info",
+			EnablePprof: false,
+			PortMode:          "standard",
+			CustomPort:        8080,
+			EnableHTTPS:       true,
+			AccessLogEnabled:  true,
+			AccessLogFormat:   "nginx",
+			AccessLogPath:     "./data/access.log",
+			AccessLogMaxSize:  100 * 1024 * 1024,
+			AccessLogMaxFiles: 10,
+			ReadTimeoutSec:    1800,
+			WriteTimeoutSec:   1800,
+			IdleTimeoutSec:    120,
+			MaxUploadBytes:    1 << 30,
+			SessionStorage:    "file",
+			DataDir:           "./data",
+		},
+		SSL: SSLConfig{
+			Staging:            false,
+			CertDir:            "./data/certs",
+			KeyDir:             "./data/keys",
+			AutoRenew:          true,
+			DisableSelfSigned:  true,
+			DNSProviders:       []DNSProvider{},
+			DefaultDNSProvider: "",
+			ChallengeMethods:   []string{"http-01"},
+		},
+		Admin: AdminConfig{
+			Username:       "admin",
+			Password:       "admin*9527",
+			FirstRun:       true,
+			PasswordFile:   "./data/admin.pass",
+			EnableTOTP:     false,
+			TOTPSecretFile: "./data/admin.totp",
+		},
+		Proxy: ProxyConfig{
+			Rules:                []ProxyRule{},
+			UnmatchedBehavior:    "502",
+			UnmatchedRedirectURL: "",
+		},
+		CDNCache: CDNCacheConfig{
+			Enabled:           false,
+			CacheDir:          "./data/cache/static",
+			MaxSizeBytes:      5 * 1024 * 1024 * 1024,
+			DefaultTTLSeconds: 3600,
+			CleanIntervalSec:  60,
+			MaxObjectBytes:    20 * 1024 * 1024,
+			Rules:             []CDNCacheRule{},
+		},
+		Security: SecurityConfig{
+			MaxAttempts:      900,
+			BlockDurationStr: "5s",
+			MaxAttempts5Min:  3000,
+			BlockFile:        "./data/sslcat.block",
+			AllowedUserAgents: []string{
+				"Mozilla/",
+				"Chrome/",
+				"Firefox/",
+				"Safari/",
+				"Edge/",
+			},
+			UAInvalidMax1Min:        30,
+			UAInvalidMax5Min:        100,
+			TLSFingerprintWindowSec: 60,
+			TLSFingerprintMaxPerMin: 60000,
+			TLSFingerprintTopN:      20,
+			EnableUAFilter:          false,
+			EnableWAF:               false,
+			EnableDDOS:              true,
+			EnableCaptcha:           false,
+			MinFormMs:               800,
+			MaxAccessLogEntries:    3000,
+			MaxBlockedIPs:          1000,
+			MaxAttemptCounts:       1000,
+			MaxLastAttempts:        100,
+			UAInvalidMaxTotal:      500,
+			TLSFingerprintMaxTotal: 500,
+			CleanupIntervalMin:     5,
+		},
+		AdminPrefix: "/sslcat-panel",
+		Cluster: ClusterConfig{
+			Mode:     "standalone",
+			NodeID:   generateNodeID(),
+			NodeName: "Node-1",
+			Master: MasterConfig{
+				Timeout:       30,
+				RetryInterval: 10,
+			},
+			Sync: SyncConfig{
+				ConfigEnabled: true,
+				CertEnabled:   true,
+				Interval:      30,
+				Timeout:       10,
+				ExcludeConfigs: []string{
+					"admin.password",
+					"admin.password_file",
+					"admin_prefix",
+					"cluster",
+				},
+			},
+			Port:    8443,
+			AuthKey: "",
+		},
+		StaticSites: []StaticSite{},
+		PHPSites:    []PHPSite{},
+		Runners: RunnerConfig{
+			Git: GitServerConfig{
+				Enabled:         false,
+				ReposDir:        "./data/runners/git",
+				MaxConcurrent:   3,
+				CloneTimeout:    300,
+				AutoCleanup:     true,
+				CleanupInterval: 7200,
+			},
+		},
+		UpstreamCache: UpstreamCacheConfig{
+			Enabled:         true,
+			CacheDir:        "./data/upstream-cache",
+			MaxSizeBytes:    1024 * 1024 * 1024,
+			DefaultTTL:      1 * time.Hour,
+			RespectUpstream: true,
+			MinFileSize:     1024,
+			MaxFileSize:     100 * 1024 * 1024,
+			CacheableTypes: []string{
+				"image/jpeg", "image/png", "image/gif", "image/webp",
+				"text/css", "text/javascript", "application/javascript",
+				"font/woff", "font/woff2", "application/font-woff",
+				"video/mp4", "audio/mpeg",
+			},
+		},
+		Monitoring: MonitoringConfig{
+			Enabled: true,
+		},
+		CacheWarmup: CacheWarmupConfig{
+			Enabled:  false,
+			URLs:     []string{},
+			Interval: 60,
+			BaseURL:  "",
+		},
+		ImageOptimization: ImageOptimizationConfig{
+			Enabled:       false,
+			AutoWebP:      false,
+			WebPQuality:   80,
+			WebPMinSizeKB: 200,
+			JPEGQuality:   85,
+			PNGLevel:      6,
+			StripMetadata: false,
+			MinSizeBytes:  60 * 1024,
+			MaxSizeBytes:  5 * 1024 * 1024,
+		},
+	}
+}
+
+// diffConfig 比较两个配置，返回只包含不同字段的配置
+// 使用 JSON 序列化/反序列化的方式来实现深度比较
+func diffConfig(current, defaultConfig *Config) (map[string]interface{}, error) {
+	// 序列化为 JSON map
+	currentJSON, err := json.Marshal(current)
+	if err != nil {
+		return nil, fmt.Errorf("序列化当前配置失败: %w", err)
+	}
+
+	defaultJSON, err := json.Marshal(defaultConfig)
+	if err != nil {
+		return nil, fmt.Errorf("序列化默认配置失败: %w", err)
+	}
+
+	var currentMap map[string]interface{}
+	var defaultMap map[string]interface{}
+
+	if err := json.Unmarshal(currentJSON, &currentMap); err != nil {
+		return nil, fmt.Errorf("反序列化当前配置失败: %w", err)
+	}
+
+	if err := json.Unmarshal(defaultJSON, &defaultMap); err != nil {
+		return nil, fmt.Errorf("反序列化默认配置失败: %w", err)
+	}
+
+	// 递归比较并保留不同的字段
+	result := make(map[string]interface{})
+	diffMap(currentMap, defaultMap, result)
+
+	return result, nil
+}
+
+// diffMap 递归比较两个 map，将不同的字段添加到结果中
+func diffMap(current, defaultVal map[string]interface{}, result map[string]interface{}) {
+	for key, currentVal := range current {
+		// 跳过 ConfigFile 字段（不序列化）
+		if key == "config_file" {
+			continue
+		}
+
+		defaultValForKey, exists := defaultVal[key]
+		if !exists {
+			// 默认配置中没有这个键，保留
+			result[key] = currentVal
+			continue
+		}
+
+		// 如果是嵌套的 map，递归比较
+		currentMap, currentIsMap := currentVal.(map[string]interface{})
+		defaultMap, defaultIsMap := defaultValForKey.(map[string]interface{})
+		
+		if currentIsMap && defaultIsMap {
+			// 都是 map，递归比较
+			nestedResult := make(map[string]interface{})
+			diffMap(currentMap, defaultMap, nestedResult)
+			if len(nestedResult) > 0 {
+				result[key] = nestedResult
+			}
+		} else if !deepEqual(currentVal, defaultValForKey) {
+			// 不是嵌套 map，直接比较
+			result[key] = currentVal
+		}
+	}
+}
+
+// deepEqual 深度比较两个值是否相等
+func deepEqual(a, b interface{}) bool {
+	// 处理 nil
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+
+	// 类型断言
+	aMap, aIsMap := a.(map[string]interface{})
+	bMap, bIsMap := b.(map[string]interface{})
+
+	if aIsMap && bIsMap {
+		// 都是 map，递归比较
+		if len(aMap) != len(bMap) {
+			return false
+		}
+		for key, aVal := range aMap {
+			bVal, exists := bMap[key]
+			if !exists || !deepEqual(aVal, bVal) {
+				return false
+			}
+		}
+		return true
+	}
+
+	aSlice, aIsSlice := a.([]interface{})
+	bSlice, bIsSlice := b.([]interface{})
+
+	if aIsSlice && bIsSlice {
+		// 都是 slice，比较长度和元素
+		if len(aSlice) != len(bSlice) {
+			return false
+		}
+		for i := range aSlice {
+			if !deepEqual(aSlice[i], bSlice[i]) {
+				return false
+			}
+		}
+		return true
+	}
+
+	// 其他类型直接比较
+	return a == b
+}
+
 // Save 保存配置文件
 func (c *Config) Save(configFile string) error {
 	// 智能选择配置文件路径
@@ -1147,13 +1420,31 @@ func (c *Config) Save(configFile string) error {
 		return fmt.Errorf("配置验证失败: %w", err)
 	}
 
-	// 序列化时避免写入敏感信息
+	// 创建用于比较的配置副本，清理敏感信息
 	shadow := *c
 	shadow.Security.BlockDurationStr = c.Security.BlockDuration.String()
 	shadow.Admin.Password = ""
 	shadow.Admin.TOTPSecret = "" // 不保存TOTP密钥到配置文件
 
-	data, err := json.MarshalIndent(&shadow, "", "  ")
+	// 获取默认配置
+	defaultConfig := getDefaultConfig()
+	defaultConfig.Security.BlockDurationStr = defaultConfig.Security.BlockDuration.String()
+	defaultConfig.Admin.Password = ""
+	defaultConfig.Admin.TOTPSecret = ""
+
+	// 比较配置，只保留不同的字段
+	diffMap, err := diffConfig(&shadow, defaultConfig)
+	if err != nil {
+		return fmt.Errorf("比较配置失败: %w", err)
+	}
+
+	// 如果没有任何差异，保存空对象 {}
+	if len(diffMap) == 0 {
+		diffMap = make(map[string]interface{})
+	}
+
+	// 序列化差异配置
+	data, err := json.MarshalIndent(diffMap, "", "  ")
 	if err != nil {
 		return fmt.Errorf("序列化配置失败: %w", err)
 	}

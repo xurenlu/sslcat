@@ -3,7 +3,6 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -737,18 +736,14 @@ func (m *Manager) saveConfig() error {
 		return fmt.Errorf("no configuration loaded")
 	}
 
-	data, err := json.MarshalIndent(m.config, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
-	}
-
 	configFile := m.configFile
 	if configFile == "" {
 		configFile = "sslcat.conf"
 	}
 
-	if err := os.WriteFile(configFile, data, 0644); err != nil {
-		return fmt.Errorf("failed to write config file: %w", err)
+	// 使用 Config.Save 方法，它会自动只保存与默认值不同的配置
+	if err := m.config.Save(configFile); err != nil {
+		return fmt.Errorf("failed to save config: %w", err)
 	}
 
 	return nil
