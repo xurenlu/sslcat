@@ -334,8 +334,61 @@ func (m proxyAdvancedModel) handleLoadBalancerStep(msg tea.KeyMsg) (tea.Model, t
 
 func (m proxyAdvancedModel) handleHealthCheckStep(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// 切换输入框焦点
-	if msg.String() == "tab" {
-		// TODO: 实现 Tab 切换
+	switch msg.String() {
+	case "tab":
+		// 切换到下一个输入框
+		if m.healthCheckEnabledInput.Focused() {
+			m.healthCheckEnabledInput.Blur()
+			m.healthCheckPathInput.Focus()
+			return m, textinput.Blink
+		} else if m.healthCheckPathInput.Focused() {
+			m.healthCheckPathInput.Blur()
+			m.healthCheckIntervalInput.Focus()
+			return m, textinput.Blink
+		} else if m.healthCheckIntervalInput.Focused() {
+			m.healthCheckIntervalInput.Blur()
+			m.healthCheckTimeoutInput.Focus()
+			return m, textinput.Blink
+		} else if m.healthCheckTimeoutInput.Focused() {
+			m.healthCheckTimeoutInput.Blur()
+			m.healthCheckMethodInput.Focus()
+			return m, textinput.Blink
+		} else if m.healthCheckMethodInput.Focused() {
+			m.healthCheckMethodInput.Blur()
+			m.expectedStatusCodeInput.Focus()
+			return m, textinput.Blink
+		} else {
+			m.expectedStatusCodeInput.Blur()
+			m.healthCheckEnabledInput.Focus()
+			return m, textinput.Blink
+		}
+	case "shift+tab":
+		// 切换到上一个输入框
+		if m.healthCheckEnabledInput.Focused() {
+			m.healthCheckEnabledInput.Blur()
+			m.expectedStatusCodeInput.Focus()
+			return m, textinput.Blink
+		} else if m.healthCheckPathInput.Focused() {
+			m.healthCheckPathInput.Blur()
+			m.healthCheckEnabledInput.Focus()
+			return m, textinput.Blink
+		} else if m.healthCheckIntervalInput.Focused() {
+			m.healthCheckIntervalInput.Blur()
+			m.healthCheckPathInput.Focus()
+			return m, textinput.Blink
+		} else if m.healthCheckTimeoutInput.Focused() {
+			m.healthCheckTimeoutInput.Blur()
+			m.healthCheckIntervalInput.Focus()
+			return m, textinput.Blink
+		} else if m.healthCheckMethodInput.Focused() {
+			m.healthCheckMethodInput.Blur()
+			m.healthCheckTimeoutInput.Focus()
+			return m, textinput.Blink
+		} else {
+			m.expectedStatusCodeInput.Blur()
+			m.healthCheckMethodInput.Focus()
+			return m, textinput.Blink
+		}
 	}
 
 	var cmd tea.Cmd
@@ -343,6 +396,14 @@ func (m proxyAdvancedModel) handleHealthCheckStep(msg tea.KeyMsg) (tea.Model, te
 		m.healthCheckEnabledInput, cmd = m.healthCheckEnabledInput.Update(msg)
 	} else if m.healthCheckPathInput.Focused() {
 		m.healthCheckPathInput, cmd = m.healthCheckPathInput.Update(msg)
+	} else if m.healthCheckIntervalInput.Focused() {
+		m.healthCheckIntervalInput, cmd = m.healthCheckIntervalInput.Update(msg)
+	} else if m.healthCheckTimeoutInput.Focused() {
+		m.healthCheckTimeoutInput, cmd = m.healthCheckTimeoutInput.Update(msg)
+	} else if m.healthCheckMethodInput.Focused() {
+		m.healthCheckMethodInput, cmd = m.healthCheckMethodInput.Update(msg)
+	} else if m.expectedStatusCodeInput.Focused() {
+		m.expectedStatusCodeInput, cmd = m.expectedStatusCodeInput.Update(msg)
 	} else {
 		m.healthCheckEnabledInput.Focus()
 		m.healthCheckEnabledInput, cmd = m.healthCheckEnabledInput.Update(msg)
@@ -351,20 +412,190 @@ func (m proxyAdvancedModel) handleHealthCheckStep(msg tea.KeyMsg) (tea.Model, te
 }
 
 func (m proxyAdvancedModel) handleSessionAffinityStep(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "tab":
+		if m.sessionAffinityEnabledInput.Focused() {
+			m.sessionAffinityEnabledInput.Blur()
+			m.sessionAffinityMethodInput.Focus()
+			return m, textinput.Blink
+		} else if m.sessionAffinityMethodInput.Focused() {
+			m.sessionAffinityMethodInput.Blur()
+			m.sessionAffinityCookieInput.Focus()
+			return m, textinput.Blink
+		} else if m.sessionAffinityCookieInput.Focused() {
+			m.sessionAffinityCookieInput.Blur()
+			m.sessionAffinityTTLInput.Focus()
+			return m, textinput.Blink
+		} else {
+			m.sessionAffinityTTLInput.Blur()
+			m.sessionAffinityEnabledInput.Focus()
+			return m, textinput.Blink
+		}
+	case "shift+tab":
+		if m.sessionAffinityEnabledInput.Focused() {
+			m.sessionAffinityEnabledInput.Blur()
+			m.sessionAffinityTTLInput.Focus()
+			return m, textinput.Blink
+		} else if m.sessionAffinityMethodInput.Focused() {
+			m.sessionAffinityMethodInput.Blur()
+			m.sessionAffinityEnabledInput.Focus()
+			return m, textinput.Blink
+		} else if m.sessionAffinityCookieInput.Focused() {
+			m.sessionAffinityCookieInput.Blur()
+			m.sessionAffinityMethodInput.Focus()
+			return m, textinput.Blink
+		} else {
+			m.sessionAffinityTTLInput.Blur()
+			m.sessionAffinityCookieInput.Focus()
+			return m, textinput.Blink
+		}
+	}
+
 	var cmd tea.Cmd
-	m.sessionAffinityEnabledInput, cmd = m.sessionAffinityEnabledInput.Update(msg)
+	if m.sessionAffinityEnabledInput.Focused() {
+		m.sessionAffinityEnabledInput, cmd = m.sessionAffinityEnabledInput.Update(msg)
+	} else if m.sessionAffinityMethodInput.Focused() {
+		m.sessionAffinityMethodInput, cmd = m.sessionAffinityMethodInput.Update(msg)
+	} else if m.sessionAffinityCookieInput.Focused() {
+		m.sessionAffinityCookieInput, cmd = m.sessionAffinityCookieInput.Update(msg)
+	} else if m.sessionAffinityTTLInput.Focused() {
+		m.sessionAffinityTTLInput, cmd = m.sessionAffinityTTLInput.Update(msg)
+	} else {
+		m.sessionAffinityEnabledInput.Focus()
+		m.sessionAffinityEnabledInput, cmd = m.sessionAffinityEnabledInput.Update(msg)
+	}
 	return m, cmd
 }
 
 func (m proxyAdvancedModel) handleFailoverStep(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "tab":
+		if m.failoverEnabledInput.Focused() {
+			m.failoverEnabledInput.Blur()
+			m.maxRetriesInput.Focus()
+			return m, textinput.Blink
+		} else if m.maxRetriesInput.Focused() {
+			m.maxRetriesInput.Blur()
+			m.retryIntervalInput.Focus()
+			return m, textinput.Blink
+		} else if m.retryIntervalInput.Focused() {
+			m.retryIntervalInput.Blur()
+			m.failureThresholdInput.Focus()
+			return m, textinput.Blink
+		} else if m.failureThresholdInput.Focused() {
+			m.failureThresholdInput.Blur()
+			m.recoveryThresholdInput.Focus()
+			return m, textinput.Blink
+		} else {
+			m.recoveryThresholdInput.Blur()
+			m.failoverEnabledInput.Focus()
+			return m, textinput.Blink
+		}
+	case "shift+tab":
+		if m.failoverEnabledInput.Focused() {
+			m.failoverEnabledInput.Blur()
+			m.recoveryThresholdInput.Focus()
+			return m, textinput.Blink
+		} else if m.maxRetriesInput.Focused() {
+			m.maxRetriesInput.Blur()
+			m.failoverEnabledInput.Focus()
+			return m, textinput.Blink
+		} else if m.retryIntervalInput.Focused() {
+			m.retryIntervalInput.Blur()
+			m.maxRetriesInput.Focus()
+			return m, textinput.Blink
+		} else if m.failureThresholdInput.Focused() {
+			m.failureThresholdInput.Blur()
+			m.retryIntervalInput.Focus()
+			return m, textinput.Blink
+		} else {
+			m.recoveryThresholdInput.Blur()
+			m.failureThresholdInput.Focus()
+			return m, textinput.Blink
+		}
+	}
+
 	var cmd tea.Cmd
-	m.failoverEnabledInput, cmd = m.failoverEnabledInput.Update(msg)
+	if m.failoverEnabledInput.Focused() {
+		m.failoverEnabledInput, cmd = m.failoverEnabledInput.Update(msg)
+	} else if m.maxRetriesInput.Focused() {
+		m.maxRetriesInput, cmd = m.maxRetriesInput.Update(msg)
+	} else if m.retryIntervalInput.Focused() {
+		m.retryIntervalInput, cmd = m.retryIntervalInput.Update(msg)
+	} else if m.failureThresholdInput.Focused() {
+		m.failureThresholdInput, cmd = m.failureThresholdInput.Update(msg)
+	} else if m.recoveryThresholdInput.Focused() {
+		m.recoveryThresholdInput, cmd = m.recoveryThresholdInput.Update(msg)
+	} else {
+		m.failoverEnabledInput.Focus()
+		m.failoverEnabledInput, cmd = m.failoverEnabledInput.Update(msg)
+	}
 	return m, cmd
 }
 
 func (m proxyAdvancedModel) handleAdvancedStep(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "tab":
+		if m.optimizeHostHeaderInput.Focused() {
+			m.optimizeHostHeaderInput.Blur()
+			m.cdnEnabledInput.Focus()
+			return m, textinput.Blink
+		} else if m.cdnEnabledInput.Focused() {
+			m.cdnEnabledInput.Blur()
+			m.cdnPresetInput.Focus()
+			return m, textinput.Blink
+		} else if m.cdnPresetInput.Focused() {
+			m.cdnPresetInput.Blur()
+			m.cdnTTLInput.Focus()
+			return m, textinput.Blink
+		} else if m.cdnTTLInput.Focused() {
+			m.cdnTTLInput.Blur()
+			m.websocketOptimizedInput.Focus()
+			return m, textinput.Blink
+		} else {
+			m.websocketOptimizedInput.Blur()
+			m.optimizeHostHeaderInput.Focus()
+			return m, textinput.Blink
+		}
+	case "shift+tab":
+		if m.optimizeHostHeaderInput.Focused() {
+			m.optimizeHostHeaderInput.Blur()
+			m.websocketOptimizedInput.Focus()
+			return m, textinput.Blink
+		} else if m.cdnEnabledInput.Focused() {
+			m.cdnEnabledInput.Blur()
+			m.optimizeHostHeaderInput.Focus()
+			return m, textinput.Blink
+		} else if m.cdnPresetInput.Focused() {
+			m.cdnPresetInput.Blur()
+			m.cdnEnabledInput.Focus()
+			return m, textinput.Blink
+		} else if m.cdnTTLInput.Focused() {
+			m.cdnTTLInput.Blur()
+			m.cdnPresetInput.Focus()
+			return m, textinput.Blink
+		} else {
+			m.websocketOptimizedInput.Blur()
+			m.cdnTTLInput.Focus()
+			return m, textinput.Blink
+		}
+	}
+
 	var cmd tea.Cmd
-	m.optimizeHostHeaderInput, cmd = m.optimizeHostHeaderInput.Update(msg)
+	if m.optimizeHostHeaderInput.Focused() {
+		m.optimizeHostHeaderInput, cmd = m.optimizeHostHeaderInput.Update(msg)
+	} else if m.cdnEnabledInput.Focused() {
+		m.cdnEnabledInput, cmd = m.cdnEnabledInput.Update(msg)
+	} else if m.cdnPresetInput.Focused() {
+		m.cdnPresetInput, cmd = m.cdnPresetInput.Update(msg)
+	} else if m.cdnTTLInput.Focused() {
+		m.cdnTTLInput, cmd = m.cdnTTLInput.Update(msg)
+	} else if m.websocketOptimizedInput.Focused() {
+		m.websocketOptimizedInput, cmd = m.websocketOptimizedInput.Update(msg)
+	} else {
+		m.optimizeHostHeaderInput.Focus()
+		m.optimizeHostHeaderInput, cmd = m.optimizeHostHeaderInput.Update(msg)
+	}
 	return m, cmd
 }
 
