@@ -148,6 +148,12 @@ func (m proxyModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case "a":
+			// 如果正在编辑/添加，将按键传递给输入框
+			if m.editing || m.adding {
+				var cmd tea.Cmd
+				m.formInputs[m.formIndex], cmd = m.formInputs[m.formIndex].Update(msg)
+				return m, cmd
+			}
 			// 添加新规则 - 使用高级配置视图
 			advancedModel := NewProxyAdvancedModel(m.config, m.configFile, nil, -1)
 			p := tea.NewProgram(advancedModel, tea.WithAltScreen())
@@ -160,6 +166,12 @@ func (m proxyModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case "A":
+			// 如果正在编辑/添加，将按键传递给输入框
+			if m.editing || m.adding {
+				var cmd tea.Cmd
+				m.formInputs[m.formIndex], cmd = m.formInputs[m.formIndex].Update(msg)
+				return m, cmd
+			}
 			// 简单添加模式（保留原有功能）
 			m.adding = true
 			m.resetForm()
@@ -168,6 +180,12 @@ func (m proxyModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, textinput.Blink
 
 		case "e":
+			// 如果正在编辑/添加，将按键传递给输入框
+			if m.editing || m.adding {
+				var cmd tea.Cmd
+				m.formInputs[m.formIndex], cmd = m.formInputs[m.formIndex].Update(msg)
+				return m, cmd
+			}
 			// 编辑选中的规则
 			selected := m.list.SelectedItem()
 			if selected != nil {
@@ -185,6 +203,12 @@ func (m proxyModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "E":
+			// 如果正在编辑/添加，将按键传递给输入框
+			if m.editing || m.adding {
+				var cmd tea.Cmd
+				m.formInputs[m.formIndex], cmd = m.formInputs[m.formIndex].Update(msg)
+				return m, cmd
+			}
 			// 高级编辑模式
 			selected := m.list.SelectedItem()
 			if selected != nil {
@@ -201,6 +225,12 @@ func (m proxyModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "d":
+			// 如果正在编辑/添加，将按键传递给输入框
+			if m.editing || m.adding {
+				var cmd tea.Cmd
+				m.formInputs[m.formIndex], cmd = m.formInputs[m.formIndex].Update(msg)
+				return m, cmd
+			}
 			// 删除选中的规则
 			selected := m.list.SelectedItem()
 			if selected != nil && m.config != nil {

@@ -155,6 +155,12 @@ func (m dnsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case "a":
+			// 如果正在编辑/添加，将按键传递给输入框
+			if m.editing || m.adding {
+				var cmd tea.Cmd
+				m.formInputs[m.formIndex], cmd = m.formInputs[m.formIndex].Update(msg)
+				return m, cmd
+			}
 			// 添加新服务商
 			m.adding = true
 			m.editingIndex = -1
@@ -164,6 +170,12 @@ func (m dnsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, textinput.Blink
 
 		case "e":
+			// 如果正在编辑/添加，将按键传递给输入框
+			if m.editing || m.adding {
+				var cmd tea.Cmd
+				m.formInputs[m.formIndex], cmd = m.formInputs[m.formIndex].Update(msg)
+				return m, cmd
+			}
 			// 编辑选中的服务商
 			selected := m.list.SelectedItem()
 			if selected != nil {
@@ -177,6 +189,12 @@ func (m dnsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "d":
+			// 如果正在编辑/添加，将按键传递给输入框
+			if m.editing || m.adding {
+				var cmd tea.Cmd
+				m.formInputs[m.formIndex], cmd = m.formInputs[m.formIndex].Update(msg)
+				return m, cmd
+			}
 			// 删除选中的服务商
 			selected := m.list.SelectedItem()
 			if selected != nil && m.config != nil {

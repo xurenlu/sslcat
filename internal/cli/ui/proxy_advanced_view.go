@@ -233,12 +233,20 @@ func (m proxyAdvancedModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case "left", "h":
+			// 如果输入框处于焦点状态或管理器处于编辑状态，将按键传递给输入处理
+			if m.hasAnyInputFocused() {
+				return m.handleStepInput(msg)
+			}
 			if m.step > 0 && !(m.backendMgr != nil && m.backendMgr.editing) && !(m.pathPrefixRuleMgr != nil && m.pathPrefixRuleMgr.editing) && !(m.headersMgr != nil && m.headersMgr.editing) && !(m.authMgr != nil && m.authMgr.editing) {
 				m.step--
 				return m, nil
 			}
 
 		case "right", "l":
+			// 如果输入框处于焦点状态或管理器处于编辑状态，将按键传递给输入处理
+			if m.hasAnyInputFocused() {
+				return m.handleStepInput(msg)
+			}
 			if m.step < len(proxySteps)-1 && !(m.backendMgr != nil && m.backendMgr.editing) && !(m.pathPrefixRuleMgr != nil && m.pathPrefixRuleMgr.editing) && !(m.headersMgr != nil && m.headersMgr.editing) && !(m.authMgr != nil && m.authMgr.editing) {
 				m.step++
 				return m, nil
