@@ -746,6 +746,7 @@ func showHelp() {
 	cliManager.RegisterProxyCommands()
 	cliManager.RegisterSSLCommands()
 	cliManager.RegisterHelpCommand()
+	cliManager.RegisterConsoleCommand()
 	cliManager.ShowHelp()
 
 	fmt.Println("启动参数:")
@@ -774,6 +775,7 @@ func showHelp() {
 	fmt.Println("示例:")
 	fmt.Println("  sslcat -h                     显示此帮助信息")
 	fmt.Println("  sslcat help                   显示 CLI 命令帮助")
+	fmt.Println("  sslcat console                启动交互式 Terminal UI 控制台")
 	fmt.Println("  sslcat config show            显示完整配置")
 	fmt.Println("  sslcat proxy list              列出所有代理规则")
 	fmt.Println("  sslcat ssl list               列出所有 SSL 证书")

@@ -8,7 +8,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/google/uuid"
 	"github.com/xurenlu/sslcat/internal/config"
 )
@@ -56,6 +55,15 @@ func newBackendManager(rule *config.ProxyRule) *backendManager {
 }
 
 func (bm *backendManager) refreshList() {
+	if bm.rule == nil {
+		// 如果 rule 为 nil，创建一个空列表
+		l := list.New([]list.Item{}, list.NewDefaultDelegate(), 0, 0)
+		l.Title = "后端服务器（空，请添加）"
+		l.SetShowStatusBar(false)
+		bm.list = l
+		return
+	}
+	
 	backends := bm.rule.GetEffectiveBackends()
 	if len(backends) == 0 {
 		l := list.New([]list.Item{}, list.NewDefaultDelegate(), 0, 0)
@@ -96,14 +104,26 @@ func (bm *backendManager) initForm() {
 }
 
 func (bm *backendManager) loadBackend(backend *config.ProxyBackend) {
-	bm.formInputs[0].SetValue(backend.Host)
-	bm.formInputs[1].SetValue(strconv.Itoa(backend.Port))
-	bm.formInputs[2].SetValue(strconv.Itoa(backend.Weight))
-	bm.formInputs[3].SetValue(strconv.Itoa(backend.Priority))
-	bm.formInputs[4].SetValue(strconv.FormatBool(backend.Enabled))
+	// 确保表单已初始化
+	if len(bm.formInputs) == 0 {
+		bm.initForm()
+	}
+	
+	if backend != nil {
+		bm.formInputs[0].SetValue(backend.Host)
+		bm.formInputs[1].SetValue(strconv.Itoa(backend.Port))
+		bm.formInputs[2].SetValue(strconv.Itoa(backend.Weight))
+		bm.formInputs[3].SetValue(strconv.Itoa(backend.Priority))
+		bm.formInputs[4].SetValue(strconv.FormatBool(backend.Enabled))
+	}
 }
 
 func (bm *backendManager) saveBackend() error {
+	// 确保表单已初始化
+	if len(bm.formInputs) == 0 {
+		bm.initForm()
+	}
+	
 	host := strings.TrimSpace(bm.formInputs[0].Value())
 	portStr := strings.TrimSpace(bm.formInputs[1].Value())
 	weightStr := strings.TrimSpace(bm.formInputs[2].Value())
@@ -159,10 +179,16 @@ func (bm *backendManager) saveBackend() error {
 		Enabled:  enabled,
 	}
 
+	if bm.rule == nil {
+		return fmt.Errorf("规则未初始化")
+	}
+	
 	backends := bm.rule.GetEffectiveBackends()
 	if bm.editingIndex >= 0 && bm.editingIndex < len(backends) {
 		backend.ID = backends[bm.editingIndex].ID // 保留原有ID
-		bm.rule.Backends[bm.editingIndex] = backend
+		if bm.editingIndex < len(bm.rule.Backends) {
+			bm.rule.Backends[bm.editingIndex] = backend
+		}
 	} else {
 		bm.rule.Backends = append(bm.rule.Backends, backend)
 	}
@@ -191,6 +217,10 @@ func (bm *backendManager) handleEdit() tea.Cmd {
 }
 
 func (bm *backendManager) handleDelete() error {
+	if bm.rule == nil {
+		return fmt.Errorf("规则未初始化")
+	}
+	
 	selected := bm.list.SelectedItem()
 	if selected != nil {
 		item := selected.(backendItem)
@@ -198,14 +228,21 @@ func (bm *backendManager) handleDelete() error {
 		if len(backends) <= 1 {
 			return fmt.Errorf("至少需要保留一个后端服务器")
 		}
-		bm.rule.Backends = append(backends[:item.index], backends[item.index+1:]...)
-		bm.refreshList()
-		return nil
+		if item.index >= 0 && item.index < len(backends) {
+			bm.rule.Backends = append(backends[:item.index], backends[item.index+1:]...)
+			bm.refreshList()
+			return nil
+		}
 	}
 	return fmt.Errorf("未选择后端服务器")
 }
 
 func (bm *backendManager) handleFormInput(msg tea.KeyMsg) (tea.Cmd, bool) {
+	// 确保表单已初始化
+	if len(bm.formInputs) == 0 {
+		bm.initForm()
+	}
+	
 	switch msg.String() {
 	case "enter":
 		if err := bm.saveBackend(); err != nil {
@@ -254,10 +291,18 @@ func (bm *backendManager) handleFormInput(msg tea.KeyMsg) (tea.Cmd, bool) {
 }
 
 func (bm *backendManager) Update(msg tea.Msg, width, height int) tea.Cmd {
-	bm.list.SetWidth(width - 4)
-	bm.list.SetHeight(height - 15)
+	// 设置列表大小（只有在有效尺寸时才设置）
+	if width > 0 && height > 0 {
+		bm.list.SetWidth(width - 4)
+		bm.list.SetHeight(height - 15)
+	}
 
 	if bm.editing {
+		// 确保表单已初始化
+		if len(bm.formInputs) == 0 {
+			bm.initForm()
+		}
+		
 		var cmd tea.Cmd
 		var done bool
 		switch msg := msg.(type) {
@@ -276,13 +321,27 @@ func (bm *backendManager) Update(msg tea.Msg, width, height int) tea.Cmd {
 }
 
 func (bm *backendManager) View() string {
+	// 确保列表已初始化
+	if bm.list.Width() == 0 && bm.list.Height() == 0 {
+		bm.refreshList()
+	}
+	
 	if bm.editing {
+		// 确保表单已初始化
+		if len(bm.formInputs) == 0 {
+			bm.initForm()
+		}
 		return bm.renderForm()
 	}
 	return bm.list.View()
 }
 
 func (bm *backendManager) renderForm() string {
+	// 确保表单已初始化
+	if len(bm.formInputs) == 0 {
+		bm.initForm()
+	}
+	
 	action := "添加"
 	if bm.editingIndex >= 0 {
 		action = "编辑"

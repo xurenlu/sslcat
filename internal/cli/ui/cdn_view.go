@@ -100,6 +100,15 @@ func (m cdnModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "q":
 			return m, tea.Quit
 
+		case "ctrl+s":
+			// Ctrl+S 总是可以保存，即使输入框处于焦点状态
+			if err := m.config.Save(m.configFile); err != nil {
+				m.message = fmt.Sprintf("❌ 保存失败: %v", err)
+			} else {
+				m.message = "✅ 配置已保存到文件"
+			}
+			return m, nil
+
 		case "esc":
 			if m.message != "" {
 				m.message = ""
@@ -121,6 +130,13 @@ func (m cdnModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "s":
+			// 只有在非编辑模式下才保存
+			if m.editing {
+				// 编辑模式下，将按键传递给输入框
+				var cmd tea.Cmd
+				m.editInput, cmd = m.editInput.Update(msg)
+				return m, cmd
+			}
 			if err := m.config.Save(m.configFile); err != nil {
 				m.message = fmt.Sprintf("❌ 保存失败: %v", err)
 			} else {

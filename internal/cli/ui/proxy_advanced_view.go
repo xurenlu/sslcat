@@ -184,12 +184,28 @@ func (m proxyAdvancedModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.headersMgr != nil {
 			m.headersMgr.Update(msg, m.width, m.height)
 		}
+		if m.authMgr != nil {
+			m.authMgr.Update(msg, m.width, m.height)
+		}
 		return m, nil
 
 	case tea.KeyMsg:
 		// 处理步骤导航
 		switch msg.String() {
 		case "ctrl+c", "q":
+			return m, tea.Quit
+
+		case "ctrl+s":
+			// Ctrl+S 总是可以保存，即使输入框处于焦点状态
+			if err := m.saveRule(); err != nil {
+				m.message = fmt.Sprintf("❌ 错误: %v", err)
+				return m, nil
+			}
+			if err := m.config.Save(m.configFile); err != nil {
+				m.message = fmt.Sprintf("❌ 保存失败: %v", err)
+				return m, nil
+			}
+			m.message = "✅ 规则已保存"
 			return m, tea.Quit
 
 		case "esc":
@@ -209,6 +225,11 @@ func (m proxyAdvancedModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.authMgr.editing = false
 				return m, nil
 			}
+			// 如果任何输入框处于焦点状态，取消焦点
+			if m.hasAnyInputFocused() {
+				m.blurAllInputs()
+				return m, nil
+			}
 			return m, tea.Quit
 
 		case "left", "h":
@@ -224,6 +245,11 @@ func (m proxyAdvancedModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "s":
+			// 只有在没有输入框处于焦点状态且没有管理器处于编辑状态时才保存
+			if m.hasAnyInputFocused() {
+				// 有输入框处于焦点状态，将按键传递给输入框处理
+				return m.handleStepInput(msg)
+			}
 			// 保存规则
 			if err := m.saveRule(); err != nil {
 				m.message = fmt.Sprintf("❌ 错误: %v", err)
@@ -242,6 +268,130 @@ func (m proxyAdvancedModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// blurAllInputs 取消所有输入框的焦点
+func (m proxyAdvancedModel) blurAllInputs() {
+	m.domainInput.Blur()
+	m.enabledInput.Blur()
+	m.sslOnlyInput.Blur()
+	m.lbAlgorithmInput.Blur()
+	m.healthCheckEnabledInput.Blur()
+	m.healthCheckPathInput.Blur()
+	m.healthCheckIntervalInput.Blur()
+	m.healthCheckTimeoutInput.Blur()
+	m.healthCheckMethodInput.Blur()
+	m.expectedStatusCodeInput.Blur()
+	m.sessionAffinityEnabledInput.Blur()
+	m.sessionAffinityMethodInput.Blur()
+	m.sessionAffinityCookieInput.Blur()
+	m.sessionAffinityTTLInput.Blur()
+	m.failoverEnabledInput.Blur()
+	m.maxRetriesInput.Blur()
+	m.retryIntervalInput.Blur()
+	m.failureThresholdInput.Blur()
+	m.recoveryThresholdInput.Blur()
+	m.optimizeHostHeaderInput.Blur()
+	m.cdnEnabledInput.Blur()
+	m.cdnPresetInput.Blur()
+	m.cdnTTLInput.Blur()
+	m.websocketOptimizedInput.Blur()
+	m.websocketBufferSizeInput.Blur()
+	m.websocketReadTimeoutInput.Blur()
+	m.websocketWriteTimeoutInput.Blur()
+	m.websocketPingIntervalInput.Blur()
+	m.websocketTimeoutInput.Blur()
+	m.connectTimeoutInput.Blur()
+	m.keepAliveTimeoutInput.Blur()
+	m.idleTimeoutInput.Blur()
+	m.tlsHandshakeTimeoutInput.Blur()
+	m.expectContinueTimeoutInput.Blur()
+	m.healthCheckTimeoutSecInput.Blur()
+	m.enableTracingInput.Blur()
+	m.enableMetricsInput.Blur()
+}
+
+// hasAnyInputFocused 检查是否有任何输入框处于焦点状态
+func (m proxyAdvancedModel) hasAnyInputFocused() bool {
+	// 检查基础配置输入框
+	if m.domainInput.Focused() || m.enabledInput.Focused() || m.sslOnlyInput.Focused() {
+		return true
+	}
+	
+	// 检查负载均衡输入框
+	if m.lbAlgorithmInput.Focused() {
+		return true
+	}
+	
+	// 检查健康检查输入框
+	if m.healthCheckEnabledInput.Focused() || m.healthCheckPathInput.Focused() ||
+		m.healthCheckIntervalInput.Focused() || m.healthCheckTimeoutInput.Focused() ||
+		m.healthCheckMethodInput.Focused() || m.expectedStatusCodeInput.Focused() {
+		return true
+	}
+	
+	// 检查会话保持输入框
+	if m.sessionAffinityEnabledInput.Focused() || m.sessionAffinityMethodInput.Focused() ||
+		m.sessionAffinityCookieInput.Focused() || m.sessionAffinityTTLInput.Focused() {
+		return true
+	}
+	
+	// 检查故障转移输入框
+	if m.failoverEnabledInput.Focused() || m.maxRetriesInput.Focused() ||
+		m.retryIntervalInput.Focused() || m.failureThresholdInput.Focused() ||
+		m.recoveryThresholdInput.Focused() {
+		return true
+	}
+	
+	// 检查高级选项输入框
+	if m.optimizeHostHeaderInput.Focused() || m.cdnEnabledInput.Focused() ||
+		m.cdnPresetInput.Focused() || m.cdnTTLInput.Focused() ||
+		m.websocketOptimizedInput.Focused() {
+		return true
+	}
+	
+	// 检查代理超时输入框
+	if m.connectTimeoutInput.Focused() || m.keepAliveTimeoutInput.Focused() ||
+		m.idleTimeoutInput.Focused() || m.tlsHandshakeTimeoutInput.Focused() ||
+		m.expectContinueTimeoutInput.Focused() || m.healthCheckTimeoutSecInput.Focused() {
+		return true
+	}
+	
+	// 检查 WebSocket 输入框
+	if m.websocketBufferSizeInput.Focused() || m.websocketReadTimeoutInput.Focused() ||
+		m.websocketWriteTimeoutInput.Focused() || m.websocketPingIntervalInput.Focused() ||
+		m.websocketTimeoutInput.Focused() {
+		return true
+	}
+	
+	// 检查性能监控输入框
+	if m.enableTracingInput.Focused() || m.enableMetricsInput.Focused() {
+		return true
+	}
+	
+	// 检查访问控制管理器输入框
+	if m.authMgr != nil {
+		if m.authMgr.enabledInput.Focused() || m.authMgr.timeoutInput.Focused() ||
+			m.authMgr.cookieDomainInput.Focused() {
+			return true
+		}
+	}
+	
+	// 检查管理器是否处于编辑状态
+	if m.backendMgr != nil && m.backendMgr.editing {
+		return true
+	}
+	if m.pathPrefixRuleMgr != nil && m.pathPrefixRuleMgr.editing {
+		return true
+	}
+	if m.headersMgr != nil && m.headersMgr.editing {
+		return true
+	}
+	if m.authMgr != nil && m.authMgr.editing {
+		return true
+	}
+	
+	return false
 }
 
 func (m proxyAdvancedModel) handleStepInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -307,6 +457,19 @@ func (m proxyAdvancedModel) handleBasicStep(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 }
 
 func (m proxyAdvancedModel) handleBackendStep(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// 确保后端管理器已初始化
+	if m.backendMgr == nil {
+		if m.rule == nil {
+			m.rule = &config.ProxyRule{
+				Domain:   "",
+				Enabled:  true,
+				SSLOnly:  false,
+				Backends: []config.ProxyBackend{},
+			}
+		}
+		m.backendMgr = newBackendManager(m.rule)
+	}
+	
 	switch msg.String() {
 	case "a":
 		return m, m.backendMgr.handleAdd()
@@ -369,6 +532,19 @@ func (m proxyAdvancedModel) handleAdvancedStep(msg tea.KeyMsg) (tea.Model, tea.C
 }
 
 func (m proxyAdvancedModel) handlePathPrefixRulesStep(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// 确保路径前缀规则管理器已初始化
+	if m.pathPrefixRuleMgr == nil {
+		if m.rule == nil {
+			m.rule = &config.ProxyRule{
+				Domain:   "",
+				Enabled:  true,
+				SSLOnly:  false,
+				Backends: []config.ProxyBackend{},
+			}
+		}
+		m.pathPrefixRuleMgr = newPathPrefixRuleManager(m.rule)
+	}
+	
 	switch msg.String() {
 	case "a":
 		return m, m.pathPrefixRuleMgr.handleAdd()
@@ -389,6 +565,20 @@ func (m proxyAdvancedModel) handlePathPrefixRulesStep(msg tea.KeyMsg) (tea.Model
 }
 
 func (m proxyAdvancedModel) handleHeadersStep(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// 确保头部管理器已初始化
+	if m.headersMgr == nil {
+		var requestHeaders, responseHeaders map[string]string
+		if m.rule != nil {
+			if m.rule.UpstreamRequestHeaders != nil {
+				requestHeaders = m.rule.UpstreamRequestHeaders
+			}
+			if m.rule.ResponseHeaders != nil {
+				responseHeaders = m.rule.ResponseHeaders
+			}
+		}
+		m.headersMgr = newHeadersManager(requestHeaders, responseHeaders)
+	}
+	
 	switch msg.String() {
 	case "a":
 		return m, m.headersMgr.handleAdd()
@@ -409,6 +599,20 @@ func (m proxyAdvancedModel) handleHeadersStep(msg tea.KeyMsg) (tea.Model, tea.Cm
 }
 
 func (m proxyAdvancedModel) handleAuthStep(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// 确保访问控制管理器已初始化
+	if m.authMgr == nil {
+		if m.rule == nil {
+			m.rule = &config.ProxyRule{
+				Domain:   "",
+				Enabled:  true,
+				SSLOnly:  false,
+				Backends: []config.ProxyBackend{},
+			}
+		}
+		m.authMgr = newAuthManager(m.rule)
+		m.authMgr.LoadAuthConfig()
+	}
+	
 	switch msg.String() {
 	case "a":
 		return m, m.authMgr.handleAdd()
@@ -442,6 +646,19 @@ func (m proxyAdvancedModel) handleAuthStep(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 }
 
 func (m proxyAdvancedModel) renderAuthStep() string {
+	// 确保访问控制管理器已初始化
+	if m.authMgr == nil {
+		if m.rule == nil {
+			m.rule = &config.ProxyRule{
+				Domain:   "",
+				Enabled:  true,
+				SSLOnly:  false,
+				Backends: []config.ProxyBackend{},
+			}
+		}
+		m.authMgr = newAuthManager(m.rule)
+		m.authMgr.LoadAuthConfig()
+	}
 	return m.authMgr.View()
 }
 
@@ -470,10 +687,12 @@ func (m proxyAdvancedModel) View() string {
 
 	// 帮助信息
 	help := renderHelp(map[string]string{
-		"←→/hl":  "切换步骤",
-		"Tab":    "切换输入框",
-		"s":      "保存并退出",
-		"q/Esc":  "退出",
+		"←→/hl":   "切换步骤",
+		"Tab":     "切换输入框",
+		"Ctrl+S":  "保存并退出（任何时候）",
+		"s":       "保存并退出（无输入焦点时）",
+		"Esc":     "取消焦点/退出",
+		"q":       "退出",
 	})
 
 	content := lipgloss.JoinVertical(
@@ -553,6 +772,19 @@ func (m proxyAdvancedModel) renderBasicStep() string {
 }
 
 func (m proxyAdvancedModel) renderBackendStep() string {
+	// 确保后端管理器已初始化
+	if m.backendMgr == nil {
+		if m.rule == nil {
+			m.rule = &config.ProxyRule{
+				Domain:   "",
+				Enabled:  true,
+				SSLOnly:  false,
+				Backends: []config.ProxyBackend{},
+			}
+		}
+		m.backendMgr = newBackendManager(m.rule)
+	}
+	
 	content := lipgloss.JoinVertical(
 		lipgloss.Left,
 		subtitleStyle.Render("后端服务器配置"),
@@ -661,6 +893,19 @@ func (m proxyAdvancedModel) renderAdvancedStep() string {
 }
 
 func (m proxyAdvancedModel) renderPathPrefixRulesStep() string {
+	// 确保路径前缀规则管理器已初始化
+	if m.pathPrefixRuleMgr == nil {
+		if m.rule == nil {
+			m.rule = &config.ProxyRule{
+				Domain:   "",
+				Enabled:  true,
+				SSLOnly:  false,
+				Backends: []config.ProxyBackend{},
+			}
+		}
+		m.pathPrefixRuleMgr = newPathPrefixRuleManager(m.rule)
+	}
+	
 	content := lipgloss.JoinVertical(
 		lipgloss.Left,
 		subtitleStyle.Render("路径前缀规则"),
@@ -673,6 +918,19 @@ func (m proxyAdvancedModel) renderPathPrefixRulesStep() string {
 }
 
 func (m proxyAdvancedModel) renderHeadersStep() string {
+	// 确保头部管理器已初始化
+	if m.headersMgr == nil {
+		var requestHeaders, responseHeaders map[string]string
+		if m.rule != nil {
+			if m.rule.UpstreamRequestHeaders != nil {
+				requestHeaders = m.rule.UpstreamRequestHeaders
+			}
+			if m.rule.ResponseHeaders != nil {
+				responseHeaders = m.rule.ResponseHeaders
+			}
+		}
+		m.headersMgr = newHeadersManager(requestHeaders, responseHeaders)
+	}
 	return m.headersMgr.View()
 }
 
@@ -710,6 +968,9 @@ func (m proxyAdvancedModel) loadRule() {
 		m.cdnPresetInput.SetValue("none")
 		m.cdnTTLInput.SetValue("0")
 		m.websocketOptimizedInput.SetValue("true")
+		
+		// 初始化后端管理器
+		m.backendMgr = newBackendManager(m.rule)
 		m.pathPrefixRuleMgr = newPathPrefixRuleManager(m.rule)
 		return
 	}
@@ -803,6 +1064,15 @@ func (m proxyAdvancedModel) loadRule() {
 
 
 func (m proxyAdvancedModel) saveRule() error {
+	// 确保 rule 不为 nil
+	if m.rule == nil {
+		m.rule = &config.ProxyRule{
+			Domain:  "",
+			Enabled: true,
+			SSLOnly: false,
+		}
+	}
+
 	// 保存基础配置
 	m.rule.Domain = strings.TrimSpace(m.domainInput.Value())
 	if m.rule.Domain == "" {
@@ -969,19 +1239,32 @@ func (m proxyAdvancedModel) saveRule() error {
 	m.rule.EnableMetrics = enableMetrics
 
 	// 保存自定义头部
-	m.rule.UpstreamRequestHeaders = m.headersMgr.GetRequestHeaders()
-	m.rule.ResponseHeaders = m.headersMgr.GetResponseHeaders()
+	if m.headersMgr != nil {
+		m.rule.UpstreamRequestHeaders = m.headersMgr.GetRequestHeaders()
+		m.rule.ResponseHeaders = m.headersMgr.GetResponseHeaders()
+	} else {
+		// 如果 headersMgr 未初始化，使用空 map
+		m.rule.UpstreamRequestHeaders = make(map[string]string)
+		m.rule.ResponseHeaders = make(map[string]string)
+	}
 
 	// 保存访问控制配置
-	if err := m.authMgr.SaveAuthConfig(); err != nil {
-		return fmt.Errorf("保存访问控制配置失败: %v", err)
+	if m.authMgr != nil {
+		if err := m.authMgr.SaveAuthConfig(); err != nil {
+			return fmt.Errorf("保存访问控制配置失败: %v", err)
+		}
 	}
 
 	// 更新或添加到配置
-	if m.editingIndex >= 0 && m.editingIndex < len(m.config.Proxy.Rules) {
-		m.config.Proxy.Rules[m.editingIndex] = *m.rule
-	} else {
-		m.config.Proxy.Rules = append(m.config.Proxy.Rules, *m.rule)
+	if m.config != nil {
+		if m.config.Proxy.Rules == nil {
+			m.config.Proxy.Rules = []config.ProxyRule{}
+		}
+		if m.editingIndex >= 0 && m.editingIndex < len(m.config.Proxy.Rules) {
+			m.config.Proxy.Rules[m.editingIndex] = *m.rule
+		} else {
+			m.config.Proxy.Rules = append(m.config.Proxy.Rules, *m.rule)
+		}
 	}
 
 	return nil

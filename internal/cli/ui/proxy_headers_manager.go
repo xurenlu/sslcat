@@ -313,11 +313,23 @@ func (hm *headersManager) renderForm() string {
 
 // GetRequestHeaders 获取请求头映射
 func (hm *headersManager) GetRequestHeaders() map[string]string {
+	if hm == nil {
+		return make(map[string]string)
+	}
+	if hm.requestHeaders == nil {
+		return make(map[string]string)
+	}
 	return hm.requestHeaders
 }
 
 // GetResponseHeaders 获取响应头映射
 func (hm *headersManager) GetResponseHeaders() map[string]string {
+	if hm == nil {
+		return make(map[string]string)
+	}
+	if hm.responseHeaders == nil {
+		return make(map[string]string)
+	}
 	return hm.responseHeaders
 }
 

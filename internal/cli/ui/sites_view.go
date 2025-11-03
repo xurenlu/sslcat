@@ -30,21 +30,23 @@ type siteItem struct {
 func NewSitesModel(cfg *config.Config, configFile string) sitesModel {
 	// 合并静态站点和PHP站点
 	var items []list.Item
-	for i := range cfg.StaticSites {
-		items = append(items, siteItem{
-			site:     &cfg.StaticSites[i],
-			siteType: "static",
-			index:    i,
-			isStatic: true,
-		})
-	}
-	for i := range cfg.PHPSites {
-		items = append(items, siteItem{
-			site:     &cfg.PHPSites[i],
-			siteType: "php",
-			index:    i,
-			isStatic: false,
-		})
+	if cfg != nil {
+		for i := range cfg.StaticSites {
+			items = append(items, siteItem{
+				site:     &cfg.StaticSites[i],
+				siteType: "static",
+				index:    i,
+				isStatic: true,
+			})
+		}
+		for i := range cfg.PHPSites {
+			items = append(items, siteItem{
+				site:     &cfg.PHPSites[i],
+				siteType: "php",
+				index:    i,
+				isStatic: false,
+			})
+		}
 	}
 
 	l := list.New(items, list.NewDefaultDelegate(), 0, 0)
@@ -85,6 +87,12 @@ func (m sitesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case "s":
+			// 注意：sites_view 目前没有编辑模式，所以直接保存
+			// 如果将来添加编辑功能，需要在这里添加检查
+			if m.config == nil {
+				m.message = "❌ 配置未初始化"
+				return m, nil
+			}
 			if err := m.config.Save(m.configFile); err != nil {
 				m.message = fmt.Sprintf("❌ 保存失败: %v", err)
 			} else {
@@ -118,9 +126,17 @@ func (m sitesModel) View() string {
 		}
 	}
 
-	info := []string{
-		fmt.Sprintf("静态站点数量: %d", len(m.config.StaticSites)),
-		fmt.Sprintf("PHP 站点数量: %d", len(m.config.PHPSites)),
+	var info []string
+	if m.config != nil {
+		info = []string{
+			fmt.Sprintf("静态站点数量: %d", len(m.config.StaticSites)),
+			fmt.Sprintf("PHP 站点数量: %d", len(m.config.PHPSites)),
+		}
+	} else {
+		info = []string{
+			"静态站点数量: 0",
+			"PHP 站点数量: 0",
+		}
 	}
 	infoBox := renderBox("站点统计", strings.Join(info, "\n"), m.width)
 

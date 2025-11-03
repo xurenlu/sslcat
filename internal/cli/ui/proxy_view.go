@@ -32,11 +32,14 @@ type proxyRuleItem struct {
 }
 
 func NewProxyModel(cfg *config.Config, configFile string) proxyModel {
-	items := make([]list.Item, len(cfg.Proxy.Rules))
-	for i := range cfg.Proxy.Rules {
-		items[i] = proxyRuleItem{
-			rule:  &cfg.Proxy.Rules[i],
-			index: i,
+	var items []list.Item
+	if cfg != nil && cfg.Proxy.Rules != nil {
+		items = make([]list.Item, len(cfg.Proxy.Rules))
+		for i := range cfg.Proxy.Rules {
+			items[i] = proxyRuleItem{
+				rule:  &cfg.Proxy.Rules[i],
+				index: i,
+			}
 		}
 	}
 
@@ -200,18 +203,31 @@ func (m proxyModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "d":
 			// 删除选中的规则
 			selected := m.list.SelectedItem()
-			if selected != nil {
+			if selected != nil && m.config != nil {
 				item := selected.(proxyRuleItem)
-				m.config.Proxy.Rules = append(
-					m.config.Proxy.Rules[:item.index],
-					m.config.Proxy.Rules[item.index+1:]...,
-				)
-				m.refreshList()
-				m.message = "✅ 规则已删除"
+				if item.index >= 0 && item.index < len(m.config.Proxy.Rules) {
+					m.config.Proxy.Rules = append(
+						m.config.Proxy.Rules[:item.index],
+						m.config.Proxy.Rules[item.index+1:]...,
+					)
+					m.refreshList()
+					m.message = "✅ 规则已删除"
+				}
 			}
 			return m, nil
 
 		case "s":
+			// 只有在非编辑模式下才保存
+			if m.editing || m.adding {
+				// 编辑模式下，将按键传递给输入框
+				var cmd tea.Cmd
+				m.formInputs[m.formIndex], cmd = m.formInputs[m.formIndex].Update(msg)
+				return m, cmd
+			}
+			if m.config == nil {
+				m.message = "❌ 配置未初始化"
+				return m, nil
+			}
 			// 保存配置到文件
 			if err := m.config.Save(m.configFile); err != nil {
 				m.message = fmt.Sprintf("❌ 保存失败: %v", err)
@@ -314,6 +330,10 @@ func (m proxyModel) loadRule(rule *config.ProxyRule) {
 }
 
 func (m proxyModel) saveRule() error {
+	if m.config == nil {
+		return fmt.Errorf("配置未初始化")
+	}
+
 	domain := strings.TrimSpace(m.formInputs[0].Value())
 	target := strings.TrimSpace(m.formInputs[1].Value())
 	portStr := strings.TrimSpace(m.formInputs[2].Value())
@@ -363,20 +383,28 @@ func (m proxyModel) saveRule() error {
 	}
 
 	if m.adding {
+		if m.config.Proxy.Rules == nil {
+			m.config.Proxy.Rules = []config.ProxyRule{}
+		}
 		m.config.Proxy.Rules = append(m.config.Proxy.Rules, rule)
 	} else {
-		m.config.Proxy.Rules[m.selectedIndex] = rule
+		if m.selectedIndex >= 0 && m.selectedIndex < len(m.config.Proxy.Rules) {
+			m.config.Proxy.Rules[m.selectedIndex] = rule
+		}
 	}
 
 	return nil
 }
 
 func (m proxyModel) refreshList() {
-	items := make([]list.Item, len(m.config.Proxy.Rules))
-	for i := range m.config.Proxy.Rules {
-		items[i] = proxyRuleItem{
-			rule:  &m.config.Proxy.Rules[i],
-			index: i,
+	var items []list.Item
+	if m.config != nil && m.config.Proxy.Rules != nil {
+		items = make([]list.Item, len(m.config.Proxy.Rules))
+		for i := range m.config.Proxy.Rules {
+			items[i] = proxyRuleItem{
+				rule:  &m.config.Proxy.Rules[i],
+				index: i,
+			}
 		}
 	}
 	m.list.SetItems(items)
