@@ -45,6 +45,9 @@ type Manager struct {
 	dnsManager *DNSProviderManager
 	// 通知集成器
 	notificationIntegrator *notification.NotificationIntegrator
+	// 失败域名缓存：记录已知没有证书的域名，避免重复查找（TTL: 5分钟）
+	failedDomainCache map[string]time.Time
+	failedCacheMutex  sync.RWMutex
 }
 
 // NewManager 创建SSL管理器
@@ -62,6 +65,7 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 		lastNotify:         make(map[string]string),
 		tempAllowedDomains: make(map[string]time.Time),
 		dnsManager:         NewDNSProviderManager(log),
+		failedDomainCache:  make(map[string]time.Time),
 	}
 
 	// 初始化一个默认自签证书（用于未允许域名回退，避免写盘）
@@ -107,6 +111,9 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 	} else {
 		log.Infof("ACME disabled (ssl.email not configured)")
 	}
+
+	// 启动失败缓存清理 goroutine
+	go manager.cleanFailedCache()
 
 	return manager, nil
 }
@@ -240,6 +247,32 @@ func (m *Manager) Stop() {
 	close(m.stopChan)
 }
 
+// cleanFailedCache 定期清理过期的失败缓存条目
+func (m *Manager) cleanFailedCache() {
+	ticker := time.NewTicker(10 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			now := time.Now()
+			m.failedCacheMutex.Lock()
+			cleaned := 0
+			for domain, expireTime := range m.failedDomainCache {
+				if now.After(expireTime) {
+					delete(m.failedDomainCache, domain)
+					cleaned++
+				}
+			}
+			m.failedCacheMutex.Unlock()
+			if cleaned > 0 {
+				m.log.Debugf("Cleaned %d expired failed domain cache entries", cleaned)
+			}
+		case <-m.stopChan:
+			return
+		}
+	}
+}
+
 // expiryNotifier 定期检查证书到期，分别在15/7/3天提醒一次
 func (m *Manager) expiryNotifier() {
 	ticker := time.NewTicker(12 * time.Hour)
@@ -288,6 +321,24 @@ func (m *Manager) notifyExpiringCerts() {
 
 // GetCertificate 获取指定域名的证书
 func (m *Manager) GetCertificate(domain string) (*tls.Certificate, error) {
+	// 检查失败缓存，避免重复查找已知没有证书的域名
+	m.failedCacheMutex.RLock()
+	if expireTime, exists := m.failedDomainCache[domain]; exists {
+		if time.Now().Before(expireTime) {
+			// 仍在缓存期内，直接返回错误，避免重复查找
+			m.failedCacheMutex.RUnlock()
+			// 不记录日志，避免日志刷屏
+			return nil, fmt.Errorf("no certificate for %s (cached failure)", domain)
+		}
+		// 缓存已过期，删除过期条目
+		m.failedCacheMutex.RUnlock()
+		m.failedCacheMutex.Lock()
+		delete(m.failedDomainCache, domain)
+		m.failedCacheMutex.Unlock()
+	} else {
+		m.failedCacheMutex.RUnlock()
+	}
+
 	// 首先检查是否有包含此域名的多域名证书
 	m.certMutex.RLock()
 	for cachedDomain, cert := range m.certCache {
@@ -320,6 +371,10 @@ func (m *Manager) GetCertificate(domain string) (*tls.Certificate, error) {
 				m.certMutex.Lock()
 				m.certCache[domain] = &cert
 				m.certMutex.Unlock()
+				// 清除失败缓存（如果存在）
+				m.failedCacheMutex.Lock()
+				delete(m.failedDomainCache, domain)
+				m.failedCacheMutex.Unlock()
 				return &cert, nil
 			}
 		}
@@ -327,11 +382,19 @@ func (m *Manager) GetCertificate(domain string) (*tls.Certificate, error) {
 
 	// 检查是否有通配符证书
 	if wildcardCert := m.findWildcardCert(domain); wildcardCert != nil {
+		// 清除失败缓存（如果存在）
+		m.failedCacheMutex.Lock()
+		delete(m.failedDomainCache, domain)
+		m.failedCacheMutex.Unlock()
 		return wildcardCert, nil
 	}
 
 	// 如果没有证书
 	if m.config.SSL.DisableSelfSigned {
+		// 将失败结果缓存5分钟，避免重复查找
+		m.failedCacheMutex.Lock()
+		m.failedDomainCache[domain] = time.Now().Add(5 * time.Minute)
+		m.failedCacheMutex.Unlock()
 		m.log.Warnf("No certificate available for %s and self-signed fallback is disabled", domain)
 		return nil, fmt.Errorf("no certificate for %s and self-signed disabled", domain)
 	}
