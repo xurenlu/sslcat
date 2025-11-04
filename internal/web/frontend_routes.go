@@ -104,7 +104,18 @@ func (s *Server) handleFrontendAssets(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "image/x-icon")
 			w.Header().Set("Cache-Control", "public, max-age=31536000") // 1年
 		default:
+			// 尝试根据扩展名设置 Content-Type
+			contentType := getContentType(relativePath)
+			if contentType != "" {
+				w.Header().Set("Content-Type", contentType)
+			}
 			w.Header().Set("Cache-Control", "public, max-age=3600") // 1小时
+		}
+	} else {
+		// 即使没有扩展名，也尝试设置 Content-Type
+		contentType := getContentType(relativePath)
+		if contentType != "" {
+			w.Header().Set("Content-Type", contentType)
 		}
 	}
 
@@ -350,6 +361,13 @@ func (s *Server) serveWithCachedCompression(w http.ResponseWriter, r *http.Reque
 	if cachedData, cachedETag, ok := s.compressionCache.Get(filePath, algorithm); ok {
 		// 检查 ETag 是否匹配（确保缓存有效）
 		if cachedETag == etag {
+			// 确保 Content-Type 被设置（如果还没有设置）
+			if w.Header().Get("Content-Type") == "" {
+				contentType := getContentType(fileInfo.Name())
+				if contentType != "" {
+					w.Header().Set("Content-Type", contentType)
+				}
+			}
 			w.Header().Set("Content-Encoding", string(algorithm))
 			w.Header().Set("Vary", "Accept-Encoding")
 			w.Header().Del("Content-Length")
@@ -360,6 +378,13 @@ func (s *Server) serveWithCachedCompression(w http.ResponseWriter, r *http.Reque
 	}
 
 	// 缓存未命中，需要压缩
+	// 确保 Content-Type 被设置（如果还没有设置）
+	if w.Header().Get("Content-Type") == "" {
+		contentType := getContentType(fileInfo.Name())
+		if contentType != "" {
+			w.Header().Set("Content-Type", contentType)
+		}
+	}
 	// 使用流式压缩，避免将大文件读入内存
 	w.Header().Set("Content-Encoding", string(algorithm))
 	w.Header().Set("Vary", "Accept-Encoding")
