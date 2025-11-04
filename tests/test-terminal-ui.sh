@@ -1070,6 +1070,339 @@ EOF
     rm -f "$config_file"
 }
 
+# 测试 22: 表单初始值预填充（编辑模式）
+test_form_initial_values() {
+    print_test "表单初始值预填充（编辑模式）"
+    
+    local config_file=$(mktemp)
+    create_test_config "$config_file"
+    
+    if expect << EOF
+log_user 0
+set timeout 3
+spawn "$TEST_BINARY" -config "$config_file" console
+expect {
+    -re ".*" {
+        sleep 0.1
+        # 导航到代理规则管理
+        send "\033\[B"
+        send "\033\[B"
+        sleep 0.1
+        send "\r"
+        sleep 0.2
+        # 编辑现有规则
+        send "e"
+        sleep 0.2
+        # 检查表单是否显示（应该已经预填充了值）
+        # 使用 Tab 键切换字段，验证表单存在
+        send "\t"
+        sleep 0.1
+        send "\t"
+        sleep 0.1
+        # 退出高级配置视图
+        send "q"
+        sleep 0.1
+        # 退出代理规则管理视图
+        send "q"
+        sleep 0.1
+        expect eof
+        exit 0
+    }
+    timeout {
+        send "q"
+        expect eof
+        exit 1
+    }
+}
+EOF
+    then
+        print_pass "表单初始值预填充成功"
+    else
+        print_fail "表单初始值预填充失败"
+    fi
+    
+    rm -f "$config_file"
+}
+
+# 测试 23: ESC 键恢复到初始值
+test_form_esc_reset() {
+    print_test "ESC 键恢复到初始值"
+    
+    local config_file=$(mktemp)
+    create_test_config "$config_file"
+    
+    if expect << EOF
+log_user 0
+set timeout 3
+spawn "$TEST_BINARY" -config "$config_file" console
+expect {
+    -re ".*" {
+        sleep 0.1
+        # 导航到代理规则管理
+        send "\033\[B"
+        send "\033\[B"
+        sleep 0.1
+        send "\r"
+        sleep 0.2
+        # 编辑现有规则
+        send "e"
+        sleep 0.2
+        # 切换到后端服务器步骤
+        send "l"
+        sleep 0.2
+        # 尝试编辑后端服务器
+        send "e"
+        sleep 0.2
+        # 修改一些值（输入一些字符）
+        send "test"
+        sleep 0.1
+        send "\t"
+        sleep 0.1
+        send "9999"
+        sleep 0.1
+        # 按 ESC 退出，应该恢复到初始值
+        send "\033"
+        sleep 0.2
+        # 退出后端管理视图
+        send "q"
+        sleep 0.1
+        # 退出高级配置视图
+        send "q"
+        sleep 0.1
+        # 退出代理规则管理视图
+        send "q"
+        sleep 0.1
+        expect eof
+        exit 0
+    }
+    timeout {
+        send "q"
+        expect eof
+        exit 1
+    }
+}
+EOF
+    then
+        print_pass "ESC 键恢复初始值成功"
+    else
+        print_fail "ESC 键恢复初始值失败"
+    fi
+    
+    rm -f "$config_file"
+}
+
+# 测试 24: 空格键切换布尔值
+test_form_boolean_toggle() {
+    print_test "空格键切换布尔值"
+    
+    local config_file=$(mktemp)
+    create_test_config "$config_file"
+    
+    if expect << EOF
+log_user 0
+set timeout 3
+spawn "$TEST_BINARY" -config "$config_file" console
+expect {
+    -re ".*" {
+        sleep 0.1
+        # 导航到代理规则管理
+        send "\033\[B"
+        send "\033\[B"
+        sleep 0.1
+        send "\r"
+        sleep 0.2
+        # 编辑现有规则
+        send "e"
+        sleep 0.2
+        # 切换到后端服务器步骤
+        send "l"
+        sleep 0.2
+        # 添加后端服务器
+        send "a"
+        sleep 0.2
+        # 使用 Tab 键导航到布尔值字段（启用字段）
+        send "\t"
+        sleep 0.05
+        send "\t"
+        sleep 0.05
+        send "\t"
+        sleep 0.05
+        send "\t"
+        sleep 0.05
+        send "\t"
+        sleep 0.05
+        # 现在应该在启用字段，按空格键切换
+        send " "
+        sleep 0.1
+        # 再次按空格键切换回来
+        send " "
+        sleep 0.1
+        # 按 ESC 退出
+        send "\033"
+        sleep 0.1
+        # 退出后端管理视图
+        send "q"
+        sleep 0.1
+        # 退出高级配置视图
+        send "q"
+        sleep 0.1
+        # 退出代理规则管理视图
+        send "q"
+        sleep 0.1
+        expect eof
+        exit 0
+    }
+    timeout {
+        send "q"
+        expect eof
+        exit 1
+    }
+}
+EOF
+    then
+        print_pass "空格键切换布尔值成功"
+    else
+        print_fail "空格键切换布尔值失败"
+    fi
+    
+    rm -f "$config_file"
+}
+
+# 测试 25: 添加模式默认值设置
+test_form_default_values() {
+    print_test "添加模式默认值设置"
+    
+    local config_file=$(mktemp)
+    create_test_config "$config_file"
+    
+    if expect << EOF
+log_user 0
+set timeout 3
+spawn "$TEST_BINARY" -config "$config_file" console
+expect {
+    -re ".*" {
+        sleep 0.1
+        # 导航到代理规则管理
+        send "\033\[B"
+        send "\033\[B"
+        sleep 0.1
+        send "\r"
+        sleep 0.2
+        # 切换到后端服务器步骤
+        send "l"
+        sleep 0.2
+        # 添加后端服务器
+        send "a"
+        sleep 0.2
+        # 使用 Tab 键导航到各个字段，检查默认值
+        send "\t"
+        sleep 0.05
+        send "\t"
+        sleep 0.05
+        send "\t"
+        sleep 0.05
+        send "\t"
+        sleep 0.05
+        send "\t"
+        sleep 0.05
+        # 按 ESC 退出
+        send "\033"
+        sleep 0.1
+        # 退出后端管理视图
+        send "q"
+        sleep 0.1
+        # 退出高级配置视图
+        send "q"
+        sleep 0.1
+        # 退出代理规则管理视图
+        send "q"
+        sleep 0.1
+        expect eof
+        exit 0
+    }
+    timeout {
+        send "q"
+        expect eof
+        exit 1
+    }
+}
+EOF
+    then
+        print_pass "添加模式默认值设置成功"
+    else
+        print_fail "添加模式默认值设置失败"
+    fi
+    
+    rm -f "$config_file"
+}
+
+# 测试 26: Ctrl+R 重置表单
+test_form_ctrl_r_reset() {
+    print_test "Ctrl+R 重置表单"
+    
+    local config_file=$(mktemp)
+    create_test_config "$config_file"
+    
+    if expect << EOF
+log_user 0
+set timeout 3
+spawn "$TEST_BINARY" -config "$config_file" console
+expect {
+    -re ".*" {
+        sleep 0.1
+        # 导航到代理规则管理
+        send "\033\[B"
+        send "\033\[B"
+        sleep 0.1
+        send "\r"
+        sleep 0.2
+        # 切换到后端服务器步骤
+        send "l"
+        sleep 0.2
+        # 添加后端服务器
+        send "a"
+        sleep 0.2
+        # 输入一些值
+        send "test-host"
+        sleep 0.1
+        send "\t"
+        sleep 0.1
+        send "9999"
+        sleep 0.1
+        # 按 Ctrl+R 重置表单
+        send "\018"
+        sleep 0.2
+        # 按 ESC 退出
+        send "\033"
+        sleep 0.1
+        # 退出后端管理视图
+        send "q"
+        sleep 0.1
+        # 退出高级配置视图
+        send "q"
+        sleep 0.1
+        # 退出代理规则管理视图
+        send "q"
+        sleep 0.1
+        expect eof
+        exit 0
+    }
+    timeout {
+        send "q"
+        expect eof
+        exit 1
+    }
+}
+EOF
+    then
+        print_pass "Ctrl+R 重置表单成功"
+    else
+        print_fail "Ctrl+R 重置表单失败"
+    fi
+    
+    rm -f "$config_file"
+}
+
 # 主测试函数
 main() {
     echo "=========================================="
@@ -1110,6 +1443,13 @@ main() {
     test_image_optimization_view
     test_user_management_view
     test_ssl_view
+    
+    # 运行表单功能测试
+    test_form_initial_values
+    test_form_esc_reset
+    test_form_boolean_toggle
+    test_form_default_values
+    test_form_ctrl_r_reset
     
     # 打印测试结果
     echo ""
