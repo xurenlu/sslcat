@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.22] - 2025-11-04
+
+### 🛠️ 技术改进
+
+#### Terminal UI 表单系统优化
+- **初始值保存和恢复**: 编辑模式下自动保存表单初始值，按 `ESC` 键可恢复到编辑前的状态
+  - 所有表单管理器（后端服务器、路径前缀规则、认证用户、DNS 服务商等）统一支持初始值恢复
+  - 添加模式与编辑模式行为分离，提供更好的用户体验
+- **表单重置功能**: 新增 `resetForm()` 方法，支持重置到默认值或初始值
+  - 添加模式：重置到合理的默认值（端口 80、权重 1、优先级 0、启用 true 等）
+  - 编辑模式：恢复到编辑前的值
+  - 新增 `Ctrl+R` 快捷键快速重置表单
+- **布尔值输入优化**: 
+  - 支持空格键快速切换布尔值（true/false）
+  - 支持多种格式输入：`true/false`、`yes/no`、`1/0`、`y/n`
+  - 改进错误提示，明确可用的输入格式
+- **数字输入验证增强**:
+  - 端口号验证：范围 1-65535，提供清晰的错误提示
+  - 权重验证：必须是正整数
+  - 优先级验证：必须是整数
+  - 所有数字字段都有明确的 placeholder 提示预期范围
+- **帮助信息优化**: 统一更新所有表单的帮助信息，明确说明快捷键功能
+  - `Tab` / `Shift+Tab`: 切换字段
+  - `Enter`: 保存
+  - `Esc`: 取消（恢复到初始值）
+  - `空格键`: 切换布尔值
+  - `Ctrl+R`: 重置表单
+
+### 🧪 测试改进
+
+- **新增表单功能自动化测试**: 添加 5 个新的端到端测试用例
+  - `test_form_initial_values`: 测试表单初始值预填充（编辑模式）
+  - `test_form_esc_reset`: 测试 ESC 键恢复到初始值
+  - `test_form_boolean_toggle`: 测试空格键切换布尔值
+  - `test_form_default_values`: 测试添加模式默认值设置
+  - `test_form_ctrl_r_reset`: 测试 Ctrl+R 重置表单功能
+
+### 📚 文档更新
+
+- 更新测试文档，新增表单功能测试用例说明
+- 所有测试用例通过验证（27/27 通过）
+
+---
+
 ## [1.3.21-rc7] - 2025-11-03
 
 ### 🛠️ 技术改进
