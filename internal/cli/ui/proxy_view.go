@@ -59,9 +59,9 @@ func NewProxyModel(cfg *config.Config, configFile string) proxyModel {
 
 	formInputs[0].Placeholder = "域名 (例如: example.com)"
 	formInputs[1].Placeholder = "目标地址 (例如: 127.0.0.1)"
-	formInputs[2].Placeholder = "端口 (例如: 8080)"
-	formInputs[3].Placeholder = "启用 (true/false)"
-	formInputs[4].Placeholder = "SSL Only (true/false)"
+	formInputs[2].Placeholder = "端口 (1-65535，默认: 80)"
+	formInputs[3].Placeholder = "启用 (空格键切换 true/false)"
+	formInputs[4].Placeholder = "SSL Only (空格键切换 true/false)"
 
 	return proxyModel{
 		config:     cfg,
@@ -127,6 +127,24 @@ func (m proxyModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.editing = false
 				m.adding = false
 				m.resetForm()
+				return m, nil
+
+			case " ": // 空格键 - 用于切换布尔值字段
+				// 如果是启用字段（索引3）或 SSL Only 字段（索引4），切换 true/false
+				if m.formIndex == 3 || m.formIndex == 4 {
+					currentValue := strings.TrimSpace(m.formInputs[m.formIndex].Value())
+					newValue := "false"
+					if currentValue == "" || currentValue == "false" {
+						newValue = "true"
+					}
+					m.formInputs[m.formIndex].SetValue(newValue)
+					return m, textinput.Blink
+				}
+
+			case "ctrl+r":
+				// Ctrl+R 重置表单
+				m.resetForm()
+				m.message = "🔄 表单已重置"
 				return m, nil
 			}
 
@@ -298,7 +316,7 @@ func (m proxyModel) View() string {
 			fmt.Sprintf("启用: %s", m.formInputs[3].View()),
 			fmt.Sprintf("SSL Only: %s", m.formInputs[4].View()),
 			"",
-			helpStyle.Render("Tab: 切换字段 | Enter: 保存 | Esc: 取消"),
+			helpStyle.Render("Tab: 切换字段 | Enter: 保存 | Esc: 取消 | 空格键: 切换布尔值 | Ctrl+R: 重置"),
 		}
 
 		content = lipgloss.JoinVertical(lipgloss.Left, append([]string{title, ""}, formContent...)...)
@@ -381,27 +399,38 @@ func (m proxyModel) saveRule() error {
 	if portStr != "" {
 		p, err := strconv.Atoi(portStr)
 		if err != nil {
-			return fmt.Errorf("无效的端口号: %s", portStr)
+			return fmt.Errorf("无效的端口号: %s (必须是 1-65535 之间的整数)", portStr)
+		}
+		if p < 1 || p > 65535 {
+			return fmt.Errorf("端口号必须在 1-65535 之间，当前值: %d", p)
 		}
 		port = p
 	}
 
 	enabled := true
 	if enabledStr != "" {
-		e, err := strconv.ParseBool(enabledStr)
-		if err != nil {
-			return fmt.Errorf("无效的启用值: %s", enabledStr)
+		// 支持多种格式：true/false, yes/no, 1/0, y/n
+		enabledStrLower := strings.ToLower(enabledStr)
+		if enabledStrLower == "true" || enabledStrLower == "yes" || enabledStrLower == "1" || enabledStrLower == "y" {
+			enabled = true
+		} else if enabledStrLower == "false" || enabledStrLower == "no" || enabledStrLower == "0" || enabledStrLower == "n" {
+			enabled = false
+		} else {
+			return fmt.Errorf("无效的启用值: %s (请输入 true/false, yes/no, 1/0, 或按空格键切换)", enabledStr)
 		}
-		enabled = e
 	}
 
 	sslOnly := false
 	if sslOnlyStr != "" {
-		s, err := strconv.ParseBool(sslOnlyStr)
-		if err != nil {
-			return fmt.Errorf("无效的 SSL Only 值: %s", sslOnlyStr)
+		// 支持多种格式：true/false, yes/no, 1/0, y/n
+		sslOnlyStrLower := strings.ToLower(sslOnlyStr)
+		if sslOnlyStrLower == "true" || sslOnlyStrLower == "yes" || sslOnlyStrLower == "1" || sslOnlyStrLower == "y" {
+			sslOnly = true
+		} else if sslOnlyStrLower == "false" || sslOnlyStrLower == "no" || sslOnlyStrLower == "0" || sslOnlyStrLower == "n" {
+			sslOnly = false
+		} else {
+			return fmt.Errorf("无效的 SSL Only 值: %s (请输入 true/false, yes/no, 1/0, 或按空格键切换)", sslOnlyStr)
 		}
-		sslOnly = s
 	}
 
 	rule := config.ProxyRule{

@@ -21,6 +21,7 @@ type dnsModel struct {
 	formInputs []textinput.Model
 	formIndex  int
 	editingIndex int // -1 表示添加新服务商
+	initialValues []string // 保存编辑前的初始值，用于 ESC 恢复
 	width      int
 	height     int
 	message    string
@@ -66,8 +67,8 @@ func NewDNSModel(cfg *config.Config, configFile string) dnsModel {
 	formInputs[3].Placeholder = "API Secret (可选)"
 	formInputs[4].Placeholder = "Zone ID (可选)"
 	formInputs[5].Placeholder = "Endpoint (可选)"
-	formInputs[6].Placeholder = "优先级 (数字越小优先级越高，默认: 0)"
-	formInputs[7].Placeholder = "启用 (true/false)"
+	formInputs[6].Placeholder = "优先级 (整数，默认: 0)"
+	formInputs[7].Placeholder = "启用 (空格键切换 true/false)"
 
 	return dnsModel{
 		config:     cfg,
@@ -124,6 +125,7 @@ func (m dnsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.editing = false
 				m.adding = false
+				m.initialValues = nil
 				m.resetForm()
 				// 重新构建列表
 				m.refreshList()
@@ -134,6 +136,25 @@ func (m dnsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.editing = false
 				m.adding = false
 				m.resetForm()
+				m.initialValues = nil
+				return m, nil
+
+			case " ": // 空格键 - 用于切换布尔值字段
+				// 如果是启用字段（索引7），切换 true/false
+				if m.formIndex == 7 {
+					currentValue := strings.TrimSpace(m.formInputs[7].Value())
+					newValue := "false"
+					if currentValue == "" || currentValue == "false" {
+						newValue = "true"
+					}
+					m.formInputs[7].SetValue(newValue)
+					return m, textinput.Blink
+				}
+
+			case "ctrl+r":
+				// Ctrl+R 重置表单
+				m.resetForm()
+				m.message = "🔄 表单已重置"
 				return m, nil
 			}
 
@@ -164,7 +185,8 @@ func (m dnsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// 添加新服务商
 			m.adding = true
 			m.editingIndex = -1
-			m.resetForm()
+			m.initialValues = nil
+			m.resetForm() // 设置默认值
 			m.formInputs[0].Focus()
 			m.formIndex = 0
 			return m, textinput.Blink
@@ -183,6 +205,11 @@ func (m dnsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.editing = true
 				m.editingIndex = item.index
 				m.loadProviderToForm(item.provider)
+				// 保存编辑前的初始值
+				m.initialValues = make([]string, len(m.formInputs))
+				for i := range m.formInputs {
+					m.initialValues[i] = m.formInputs[i].Value()
+				}
 				m.formInputs[0].Focus()
 				m.formIndex = 0
 				return m, textinput.Blink
@@ -279,6 +306,8 @@ func (m dnsModel) View() string {
 			"Tab/Shift+Tab": "切换字段",
 			"Enter":         "保存",
 			"Esc":           "取消",
+			"空格键":         "切换布尔值",
+			"Ctrl+R":        "重置表单",
 		})
 
 		content = lipgloss.JoinVertical(
@@ -341,8 +370,24 @@ func (m dnsModel) View() string {
 }
 
 func (m *dnsModel) resetForm() {
+	if len(m.formInputs) == 0 {
+		return
+	}
+	
+	if m.editingIndex >= 0 && len(m.initialValues) == len(m.formInputs) {
+		// 编辑模式：恢复到编辑前的值
+		for i := range m.formInputs {
+			m.formInputs[i].SetValue(m.initialValues[i])
+		}
+	} else {
+		// 添加模式：设置默认值
+		for i := range m.formInputs {
+			m.formInputs[i].SetValue("")
+		}
+		m.formInputs[6].SetValue("0")     // 默认优先级
+		m.formInputs[7].SetValue("true") // 默认启用
+	}
 	for i := range m.formInputs {
-		m.formInputs[i].SetValue("")
 		m.formInputs[i].Blur()
 	}
 	m.formIndex = 0
@@ -385,16 +430,20 @@ func (m *dnsModel) saveProvider() error {
 		var err error
 		priority, err = strconv.Atoi(priorityStr)
 		if err != nil {
-			return fmt.Errorf("优先级必须是数字: %v", err)
+			return fmt.Errorf("优先级必须是整数: %v", err)
 		}
 	}
 
 	enabled := true
 	if enabledStr != "" {
-		var err error
-		enabled, err = strconv.ParseBool(enabledStr)
-		if err != nil {
-			return fmt.Errorf("启用值必须是 true 或 false: %v", err)
+		// 支持多种格式：true/false, yes/no, 1/0, y/n
+		enabledStrLower := strings.ToLower(enabledStr)
+		if enabledStrLower == "true" || enabledStrLower == "yes" || enabledStrLower == "1" || enabledStrLower == "y" {
+			enabled = true
+		} else if enabledStrLower == "false" || enabledStrLower == "no" || enabledStrLower == "0" || enabledStrLower == "n" {
+			enabled = false
+		} else {
+			return fmt.Errorf("无效的启用值: %s (请输入 true/false, yes/no, 1/0, 或按空格键切换)", enabledStr)
 		}
 	}
 

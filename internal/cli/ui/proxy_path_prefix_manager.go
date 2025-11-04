@@ -20,6 +20,7 @@ type pathPrefixRuleManager struct {
 	editingIndex  int // -1 表示添加新规则
 	formIndex     int
 	formInputs    []textinput.Model
+	initialValues []string // 保存编辑前的初始值，用于 ESC 恢复
 	message       string
 }
 
@@ -82,8 +83,33 @@ func (pm *pathPrefixRuleManager) initForm() {
 	pm.formInputs[0].Placeholder = "规则名称"
 	pm.formInputs[1].Placeholder = "规则描述"
 	pm.formInputs[2].Placeholder = "路径前缀（逗号分隔，如: /api/v1/,/api/v2/）"
-	pm.formInputs[3].Placeholder = "精确匹配 (true/false)"
-	pm.formInputs[4].Placeholder = "启用 (true/false)"
+	pm.formInputs[3].Placeholder = "精确匹配 (空格键切换 true/false)"
+	pm.formInputs[4].Placeholder = "启用 (空格键切换 true/false)"
+	pm.formIndex = 0
+	if len(pm.formInputs) > 0 {
+		pm.formInputs[0].Focus()
+	}
+}
+
+// resetForm 重置表单到默认值或初始值
+func (pm *pathPrefixRuleManager) resetForm() {
+	if len(pm.formInputs) == 0 {
+		pm.initForm()
+	}
+	
+	if pm.editingIndex >= 0 && len(pm.initialValues) == len(pm.formInputs) {
+		// 编辑模式：恢复到编辑前的值
+		for i := range pm.formInputs {
+			pm.formInputs[i].SetValue(pm.initialValues[i])
+		}
+	} else {
+		// 添加模式：设置默认值
+		for i := range pm.formInputs {
+			pm.formInputs[i].SetValue("")
+		}
+		pm.formInputs[3].SetValue("false") // 默认精确匹配
+		pm.formInputs[4].SetValue("true") // 默认启用
+	}
 	pm.formIndex = 0
 	if len(pm.formInputs) > 0 {
 		pm.formInputs[0].Focus()
@@ -123,20 +149,28 @@ func (pm *pathPrefixRuleManager) saveRule() error {
 
 	exact := false
 	if exactStr != "" {
-		e, err := strconv.ParseBool(exactStr)
-		if err != nil {
-			return fmt.Errorf("无效的精确匹配值: %s", exactStr)
+		// 支持多种格式：true/false, yes/no, 1/0, y/n
+		exactStrLower := strings.ToLower(exactStr)
+		if exactStrLower == "true" || exactStrLower == "yes" || exactStrLower == "1" || exactStrLower == "y" {
+			exact = true
+		} else if exactStrLower == "false" || exactStrLower == "no" || exactStrLower == "0" || exactStrLower == "n" {
+			exact = false
+		} else {
+			return fmt.Errorf("无效的精确匹配值: %s (请输入 true/false, yes/no, 1/0, 或按空格键切换)", exactStr)
 		}
-		exact = e
 	}
 
 	enabled := true
 	if enabledStr != "" {
-		e, err := strconv.ParseBool(enabledStr)
-		if err != nil {
-			return fmt.Errorf("无效的启用值: %s", enabledStr)
+		// 支持多种格式：true/false, yes/no, 1/0, y/n
+		enabledStrLower := strings.ToLower(enabledStr)
+		if enabledStrLower == "true" || enabledStrLower == "yes" || enabledStrLower == "1" || enabledStrLower == "y" {
+			enabled = true
+		} else if enabledStrLower == "false" || enabledStrLower == "no" || enabledStrLower == "0" || enabledStrLower == "n" {
+			enabled = false
+		} else {
+			return fmt.Errorf("无效的启用值: %s (请输入 true/false, yes/no, 1/0, 或按空格键切换)", enabledStr)
 		}
-		enabled = e
 	}
 
 	rule := config.PathPrefixRule{
@@ -186,7 +220,9 @@ func (pm *pathPrefixRuleManager) saveRule() error {
 func (pm *pathPrefixRuleManager) handleAdd() tea.Cmd {
 	pm.editing = true
 	pm.editingIndex = -1
+	pm.initialValues = nil // 清除初始值
 	pm.initForm()
+	pm.resetForm() // 设置默认值
 	return textinput.Blink
 }
 
@@ -198,6 +234,11 @@ func (pm *pathPrefixRuleManager) handleEdit() tea.Cmd {
 		pm.editingIndex = item.index
 		pm.initForm()
 		pm.loadRule(item.rule)
+		// 保存编辑前的初始值
+		pm.initialValues = make([]string, len(pm.formInputs))
+		for i := range pm.formInputs {
+			pm.initialValues[i] = pm.formInputs[i].Value()
+		}
 		return textinput.Blink
 	}
 	return nil
@@ -225,12 +266,16 @@ func (pm *pathPrefixRuleManager) handleFormInput(msg tea.KeyMsg) (tea.Cmd, bool)
 			return nil, false
 		}
 		pm.editing = false
+		pm.initialValues = nil // 清除初始值
 		pm.refreshList()
 		pm.message = "✅ 规则已保存"
 		return nil, true
 
 	case "esc":
+		// 恢复到编辑前的值
+		pm.resetForm()
 		pm.editing = false
+		pm.initialValues = nil
 		return nil, true
 
 	case "tab":
@@ -254,6 +299,24 @@ func (pm *pathPrefixRuleManager) handleFormInput(msg tea.KeyMsg) (tea.Cmd, bool)
 			}
 		}
 		return textinput.Blink, false
+
+	case " ": // 空格键 - 用于切换布尔值字段
+		// 如果是精确匹配字段（索引3）或启用字段（索引4），切换 true/false
+		if pm.formIndex == 3 || pm.formIndex == 4 {
+			currentValue := strings.TrimSpace(pm.formInputs[pm.formIndex].Value())
+			newValue := "false"
+			if currentValue == "" || currentValue == "false" {
+				newValue = "true"
+			}
+			pm.formInputs[pm.formIndex].SetValue(newValue)
+			return textinput.Blink, false
+		}
+
+	case "ctrl+r":
+		// Ctrl+R 重置表单
+		pm.resetForm()
+		pm.message = "🔄 表单已重置"
+		return nil, false
 	}
 
 	if pm.formIndex < len(pm.formInputs) {
@@ -270,6 +333,15 @@ func (pm *pathPrefixRuleManager) Update(msg tea.Msg, width, height int) tea.Cmd 
 	pm.list.SetHeight(height - 15)
 
 	if pm.editing {
+		// 确保表单已初始化
+		if len(pm.formInputs) == 0 {
+			pm.initForm()
+			// 如果是编辑模式，重新加载旧值
+			if pm.editingIndex >= 0 && pm.editingIndex < len(pm.rule.PathPrefixRules) {
+				pm.loadRule(&pm.rule.PathPrefixRules[pm.editingIndex])
+			}
+		}
+		
 		var cmd tea.Cmd
 		var done bool
 		switch msg := msg.(type) {
@@ -289,12 +361,29 @@ func (pm *pathPrefixRuleManager) Update(msg tea.Msg, width, height int) tea.Cmd 
 
 func (pm *pathPrefixRuleManager) View() string {
 	if pm.editing {
+		// 确保表单已初始化
+		if len(pm.formInputs) == 0 {
+			pm.initForm()
+			// 如果是编辑模式，重新加载旧值
+			if pm.editingIndex >= 0 && pm.editingIndex < len(pm.rule.PathPrefixRules) {
+				pm.loadRule(&pm.rule.PathPrefixRules[pm.editingIndex])
+			}
+		}
 		return pm.renderForm()
 	}
 	return pm.list.View()
 }
 
 func (pm *pathPrefixRuleManager) renderForm() string {
+	// 确保表单已初始化
+	if len(pm.formInputs) == 0 {
+		pm.initForm()
+		// 如果是编辑模式，重新加载旧值
+		if pm.editingIndex >= 0 && pm.editingIndex < len(pm.rule.PathPrefixRules) {
+			pm.loadRule(&pm.rule.PathPrefixRules[pm.editingIndex])
+		}
+	}
+	
 	action := "添加"
 	if pm.editingIndex >= 0 {
 		action = "编辑"
@@ -309,7 +398,7 @@ func (pm *pathPrefixRuleManager) renderForm() string {
 		fmt.Sprintf("精确匹配: %s", pm.formInputs[3].View()),
 		fmt.Sprintf("启用: %s", pm.formInputs[4].View()),
 		"",
-		helpStyle.Render("Tab: 切换字段 | Enter: 保存 | Esc: 取消"),
+		helpStyle.Render("Tab: 切换字段 | Enter: 保存 | Esc: 取消 | 空格键: 切换布尔值 | Ctrl+R: 重置"),
 	}
 
 	if pm.message != "" {

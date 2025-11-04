@@ -20,6 +20,7 @@ type backendManager struct {
 	formIndex     int
 	formInputs    []textinput.Model
 	editingIndex  int // -1 表示添加新后端
+	initialValues []string // 保存编辑前的初始值，用于 ESC 恢复
 	message       string
 }
 
@@ -93,10 +94,37 @@ func (bm *backendManager) initForm() {
 		textinput.New(),
 	}
 	bm.formInputs[0].Placeholder = "主机地址 (例如: 127.0.0.1)"
-	bm.formInputs[1].Placeholder = "端口 (例如: 8080)"
-	bm.formInputs[2].Placeholder = "权重 (例如: 1)"
-	bm.formInputs[3].Placeholder = "优先级 (例如: 0)"
-	bm.formInputs[4].Placeholder = "启用 (true/false)"
+	bm.formInputs[1].Placeholder = "端口 (1-65535，默认: 80)"
+	bm.formInputs[2].Placeholder = "权重 (整数，默认: 1)"
+	bm.formInputs[3].Placeholder = "优先级 (整数，默认: 0)"
+	bm.formInputs[4].Placeholder = "启用 (空格键切换 true/false)"
+	bm.formIndex = 0
+	if len(bm.formInputs) > 0 {
+		bm.formInputs[0].Focus()
+	}
+}
+
+// resetForm 重置表单到默认值或初始值
+func (bm *backendManager) resetForm() {
+	if len(bm.formInputs) == 0 {
+		bm.initForm()
+	}
+	
+	if bm.editingIndex >= 0 && len(bm.initialValues) == len(bm.formInputs) {
+		// 编辑模式：恢复到编辑前的值
+		for i := range bm.formInputs {
+			bm.formInputs[i].SetValue(bm.initialValues[i])
+		}
+	} else {
+		// 添加模式：设置默认值
+		for i := range bm.formInputs {
+			bm.formInputs[i].SetValue("")
+		}
+		bm.formInputs[1].SetValue("80")    // 默认端口
+		bm.formInputs[2].SetValue("1")     // 默认权重
+		bm.formInputs[3].SetValue("0")     // 默认优先级
+		bm.formInputs[4].SetValue("true")  // 默认启用
+	}
 	bm.formIndex = 0
 	if len(bm.formInputs) > 0 {
 		bm.formInputs[0].Focus()
@@ -138,7 +166,10 @@ func (bm *backendManager) saveBackend() error {
 	if portStr != "" {
 		p, err := strconv.Atoi(portStr)
 		if err != nil {
-			return fmt.Errorf("无效的端口号: %s", portStr)
+			return fmt.Errorf("无效的端口号: %s (必须是 1-65535 之间的整数)", portStr)
+		}
+		if p < 1 || p > 65535 {
+			return fmt.Errorf("端口号必须在 1-65535 之间，当前值: %d", p)
 		}
 		port = p
 	}
@@ -147,7 +178,10 @@ func (bm *backendManager) saveBackend() error {
 	if weightStr != "" {
 		w, err := strconv.Atoi(weightStr)
 		if err != nil {
-			return fmt.Errorf("无效的权重值: %s", weightStr)
+			return fmt.Errorf("无效的权重值: %s (必须是正整数)", weightStr)
+		}
+		if w < 1 {
+			return fmt.Errorf("权重必须大于 0，当前值: %d", w)
 		}
 		weight = w
 	}
@@ -163,11 +197,15 @@ func (bm *backendManager) saveBackend() error {
 
 	enabled := true
 	if enabledStr != "" {
-		e, err := strconv.ParseBool(enabledStr)
-		if err != nil {
-			return fmt.Errorf("无效的启用值: %s", enabledStr)
+		// 支持多种格式：true/false, yes/no, 1/0, y/n
+		enabledStrLower := strings.ToLower(enabledStr)
+		if enabledStrLower == "true" || enabledStrLower == "yes" || enabledStrLower == "1" || enabledStrLower == "y" {
+			enabled = true
+		} else if enabledStrLower == "false" || enabledStrLower == "no" || enabledStrLower == "0" || enabledStrLower == "n" {
+			enabled = false
+		} else {
+			return fmt.Errorf("无效的启用值: %s (请输入 true/false, yes/no, 1/0, 或按空格键切换)", enabledStr)
 		}
-		enabled = e
 	}
 
 	backend := config.ProxyBackend{
@@ -199,7 +237,9 @@ func (bm *backendManager) saveBackend() error {
 func (bm *backendManager) handleAdd() tea.Cmd {
 	bm.editing = true
 	bm.editingIndex = -1
+	bm.initialValues = nil // 清除初始值
 	bm.initForm()
+	bm.resetForm() // 设置默认值
 	return textinput.Blink
 }
 
@@ -211,6 +251,11 @@ func (bm *backendManager) handleEdit() tea.Cmd {
 		bm.editingIndex = item.index
 		bm.initForm()
 		bm.loadBackend(item.backend)
+		// 保存编辑前的初始值
+		bm.initialValues = make([]string, len(bm.formInputs))
+		for i := range bm.formInputs {
+			bm.initialValues[i] = bm.formInputs[i].Value()
+		}
 		return textinput.Blink
 	}
 	return nil
@@ -241,6 +286,13 @@ func (bm *backendManager) handleFormInput(msg tea.KeyMsg) (tea.Cmd, bool) {
 	// 确保表单已初始化
 	if len(bm.formInputs) == 0 {
 		bm.initForm()
+		// 如果是编辑模式，重新加载旧值
+		if bm.editingIndex >= 0 {
+			backends := bm.rule.GetEffectiveBackends()
+			if bm.editingIndex < len(backends) {
+				bm.loadBackend(&backends[bm.editingIndex])
+			}
+		}
 	}
 	
 	switch msg.String() {
@@ -250,12 +302,16 @@ func (bm *backendManager) handleFormInput(msg tea.KeyMsg) (tea.Cmd, bool) {
 			return nil, false
 		}
 		bm.editing = false
+		bm.initialValues = nil // 清除初始值
 		bm.refreshList()
 		bm.message = "✅ 后端已保存"
 		return nil, true
 
 	case "esc":
+		// 恢复到编辑前的值
+		bm.resetForm()
 		bm.editing = false
+		bm.initialValues = nil
 		return nil, true
 
 	case "tab":
@@ -279,6 +335,24 @@ func (bm *backendManager) handleFormInput(msg tea.KeyMsg) (tea.Cmd, bool) {
 			}
 		}
 		return textinput.Blink, false
+
+	case " ": // 空格键 - 用于切换布尔值字段
+		// 如果是启用字段（索引4），切换 true/false
+		if bm.formIndex == 4 {
+			currentValue := strings.TrimSpace(bm.formInputs[4].Value())
+			newValue := "false"
+			if currentValue == "" || currentValue == "false" {
+				newValue = "true"
+			}
+			bm.formInputs[4].SetValue(newValue)
+			return textinput.Blink, false
+		}
+
+	case "ctrl+r":
+		// Ctrl+R 重置表单
+		bm.resetForm()
+		bm.message = "🔄 表单已重置"
+		return nil, false
 	}
 
 	if bm.formIndex < len(bm.formInputs) {
@@ -301,6 +375,13 @@ func (bm *backendManager) Update(msg tea.Msg, width, height int) tea.Cmd {
 		// 确保表单已初始化
 		if len(bm.formInputs) == 0 {
 			bm.initForm()
+			// 如果是编辑模式，重新加载旧值
+			if bm.editingIndex >= 0 {
+				backends := bm.rule.GetEffectiveBackends()
+				if bm.editingIndex < len(backends) {
+					bm.loadBackend(&backends[bm.editingIndex])
+				}
+			}
 		}
 		
 		var cmd tea.Cmd
@@ -330,6 +411,13 @@ func (bm *backendManager) View() string {
 		// 确保表单已初始化
 		if len(bm.formInputs) == 0 {
 			bm.initForm()
+			// 如果是编辑模式，重新加载旧值
+			if bm.editingIndex >= 0 {
+				backends := bm.rule.GetEffectiveBackends()
+				if bm.editingIndex < len(backends) {
+					bm.loadBackend(&backends[bm.editingIndex])
+				}
+			}
 		}
 		return bm.renderForm()
 	}
@@ -340,6 +428,13 @@ func (bm *backendManager) renderForm() string {
 	// 确保表单已初始化
 	if len(bm.formInputs) == 0 {
 		bm.initForm()
+		// 如果是编辑模式，重新加载旧值
+		if bm.editingIndex >= 0 {
+			backends := bm.rule.GetEffectiveBackends()
+			if bm.editingIndex < len(backends) {
+				bm.loadBackend(&backends[bm.editingIndex])
+			}
+		}
 	}
 	
 	action := "添加"
@@ -356,7 +451,7 @@ func (bm *backendManager) renderForm() string {
 		fmt.Sprintf("优先级: %s", bm.formInputs[3].View()),
 		fmt.Sprintf("启用: %s", bm.formInputs[4].View()),
 		"",
-		helpStyle.Render("Tab: 切换字段 | Enter: 保存 | Esc: 取消"),
+		helpStyle.Render("Tab: 切换字段 | Enter: 保存 | Esc: 取消 | 空格键: 切换布尔值 | Ctrl+R: 重置"),
 	}
 
 	if bm.message != "" {

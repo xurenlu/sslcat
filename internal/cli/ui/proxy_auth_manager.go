@@ -19,6 +19,7 @@ type authManager struct {
 	editingIndex  int // -1 表示添加新用户
 	formIndex     int
 	formInputs    []textinput.Model
+	initialValues []string // 保存编辑前的初始值，用于 ESC 恢复
 	enabledInput  textinput.Model
 	timeoutInput  textinput.Model
 	cookieDomainInput textinput.Model
@@ -92,6 +93,29 @@ func (am *authManager) initForm() {
 	}
 }
 
+// resetForm 重置表单到默认值或初始值
+func (am *authManager) resetForm() {
+	if len(am.formInputs) == 0 {
+		am.initForm()
+	}
+	
+	if am.editingIndex >= 0 && len(am.initialValues) == len(am.formInputs) {
+		// 编辑模式：恢复到编辑前的值
+		for i := range am.formInputs {
+			am.formInputs[i].SetValue(am.initialValues[i])
+		}
+	} else {
+		// 添加模式：清空表单
+		for i := range am.formInputs {
+			am.formInputs[i].SetValue("")
+		}
+	}
+	am.formIndex = 0
+	if len(am.formInputs) > 0 {
+		am.formInputs[0].Focus()
+	}
+}
+
 func (am *authManager) loadUser(user *config.ProxyAuthUser) {
 	am.formInputs[0].SetValue(user.Username)
 	am.formInputs[1].SetValue(user.Password)
@@ -129,7 +153,9 @@ func (am *authManager) saveUser() error {
 func (am *authManager) handleAdd() tea.Cmd {
 	am.editing = true
 	am.editingIndex = -1
+	am.initialValues = nil // 清除初始值
 	am.initForm()
+	am.resetForm() // 设置默认值
 	return textinput.Blink
 }
 
@@ -141,6 +167,11 @@ func (am *authManager) handleEdit() tea.Cmd {
 		am.editingIndex = item.index
 		am.initForm()
 		am.loadUser(item.user)
+		// 保存编辑前的初始值
+		am.initialValues = make([]string, len(am.formInputs))
+		for i := range am.formInputs {
+			am.initialValues[i] = am.formInputs[i].Value()
+		}
 		return textinput.Blink
 	}
 	return nil
@@ -170,12 +201,16 @@ func (am *authManager) handleFormInput(msg tea.KeyMsg) (tea.Cmd, bool) {
 			return nil, false
 		}
 		am.editing = false
+		am.initialValues = nil // 清除初始值
 		am.refreshList()
 		am.message = "✅ 用户已保存"
 		return nil, true
 
 	case "esc":
+		// 恢复到编辑前的值
+		am.resetForm()
 		am.editing = false
+		am.initialValues = nil
 		return nil, true
 
 	case "tab":
@@ -199,6 +234,12 @@ func (am *authManager) handleFormInput(msg tea.KeyMsg) (tea.Cmd, bool) {
 			}
 		}
 		return textinput.Blink, false
+
+	case "ctrl+r":
+		// Ctrl+R 重置表单
+		am.resetForm()
+		am.message = "🔄 表单已重置"
+		return nil, false
 	}
 
 	if am.formIndex < len(am.formInputs) {
@@ -215,6 +256,15 @@ func (am *authManager) Update(msg tea.Msg, width, height int) tea.Cmd {
 	am.list.SetHeight(height - 20)
 
 	if am.editing {
+		// 确保表单已初始化
+		if len(am.formInputs) == 0 {
+			am.initForm()
+			// 如果是编辑模式，重新加载旧值
+			if am.editingIndex >= 0 && am.editingIndex < len(am.rule.AuthUsers) {
+				am.loadUser(&am.rule.AuthUsers[am.editingIndex])
+			}
+		}
+		
 		var cmd tea.Cmd
 		var done bool
 		switch msg := msg.(type) {
@@ -234,6 +284,14 @@ func (am *authManager) Update(msg tea.Msg, width, height int) tea.Cmd {
 
 func (am *authManager) View() string {
 	if am.editing {
+		// 确保表单已初始化
+		if len(am.formInputs) == 0 {
+			am.initForm()
+			// 如果是编辑模式，重新加载旧值
+			if am.editingIndex >= 0 && am.editingIndex < len(am.rule.AuthUsers) {
+				am.loadUser(&am.rule.AuthUsers[am.editingIndex])
+			}
+		}
 		return am.renderForm()
 	}
 
@@ -264,6 +322,15 @@ func (am *authManager) View() string {
 }
 
 func (am *authManager) renderForm() string {
+	// 确保表单已初始化
+	if len(am.formInputs) == 0 {
+		am.initForm()
+		// 如果是编辑模式，重新加载旧值
+		if am.editingIndex >= 0 && am.editingIndex < len(am.rule.AuthUsers) {
+			am.loadUser(&am.rule.AuthUsers[am.editingIndex])
+		}
+	}
+	
 	action := "添加"
 	if am.editingIndex >= 0 {
 		action = "编辑"
@@ -275,7 +342,7 @@ func (am *authManager) renderForm() string {
 		fmt.Sprintf("用户名: %s", am.formInputs[0].View()),
 		fmt.Sprintf("密码: %s", am.formInputs[1].View()),
 		"",
-		helpStyle.Render("Tab: 切换字段 | Enter: 保存 | Esc: 取消"),
+		helpStyle.Render("Tab: 切换字段 | Enter: 保存 | Esc: 取消 | Ctrl+R: 重置"),
 	}
 
 	if am.message != "" {
