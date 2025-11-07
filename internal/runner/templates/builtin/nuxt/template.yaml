@@ -1,0 +1,54 @@
+id: nuxt
+name: Nuxt.js
+category: cms
+subcategory: static
+tags: [nodejs, vue, static, ssg, nuxt]
+description: 基于 Vue.js 的框架，支持 SSR 和静态生成，适合构建现代 Web 应用。
+icon: nuxt
+version: 1.0.0
+author: SSLcat Team
+website: https://nuxt.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: NODE_VERSION
+    type: select
+    title: Node.js 版本
+    default: "20-alpine"
+    options: ["20-alpine", "18-alpine", "20"]
+    description: 选择 Node.js 版本
+  - name: NUXT_PORT
+    type: number
+    title: Nuxt 端口
+    default: 3000
+    min: 1024
+    max: 65535
+    description: Nuxt 开发服务器端口
+
+services:
+  - name: nuxt
+    type: web
+    description: Nuxt.js 应用服务器
+    ports:
+      - internal: 3000
+        external: null
+        public: true
+    volumes:
+      - name: nuxt_site
+        path: /app
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+

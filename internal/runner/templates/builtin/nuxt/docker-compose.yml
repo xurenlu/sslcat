@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  nuxt:
+    image: node:{{NODE_VERSION}}
+    container_name: {{APP_NAME}}_nuxt
+    restart: unless-stopped
+    ports:
+      - "{{NUXT_PORT}}:3000"
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 3000"
+    volumes:
+      - nuxt_site:/app
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  nuxt_site:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

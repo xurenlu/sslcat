@@ -1,0 +1,100 @@
+id: openproject
+name: OpenProject
+category: project
+subcategory: management
+tags: [ruby, postgresql, project, management, openproject]
+description: 开源项目管理工具，支持敏捷、看板、甘特图等多种视图。
+icon: openproject
+version: 1.0.0
+author: SSLcat Team
+website: https://www.openproject.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: OPENPROJECT_VERSION
+    type: select
+    title: OpenProject 版本
+    default: "latest"
+    options: ["latest", "13.0", "12.5"]
+    description: 选择 OpenProject 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "14", "16"]
+    description: 选择 PostgreSQL 版本
+  - name: OPENPROJECT_PORT
+    type: number
+    title: OpenProject 端口
+    default: 80
+    min: 1024
+    max: 65535
+    description: OpenProject Web 服务端口
+
+services:
+  - name: openproject
+    type: web
+    description: OpenProject 项目管理服务
+    depends_on: [postgres]
+    ports:
+      - internal: 80
+        external: null
+        public: true
+    volumes:
+      - name: openproject_data
+        path: /var/openproject/assets
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_openproject"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_openproject"
+  openproject:
+    secret_key_base:
+      pattern: random
+      length: 64
+
+connection_strings:
+  postgres: "postgresql://{username}:{password}@postgres:5432/{database}"
+
+healthcheck_global:
+  timeout: 20m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  default_admin_user: admin
+  default_admin_password: admin
+

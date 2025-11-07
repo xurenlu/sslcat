@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  gatsby:
+    image: node:{{NODE_VERSION}}
+    container_name: {{APP_NAME}}_gatsby
+    restart: unless-stopped
+    ports:
+      - "{{GATSBY_PORT}}:8000"
+    working_dir: /app
+    command: sh -c "npm install -g gatsby-cli && gatsby serve --host 0.0.0.0 --port 8000"
+    volumes:
+      - gatsby_site:/app
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  gatsby_site:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

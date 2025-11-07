@@ -1,0 +1,54 @@
+id: gatsby
+name: Gatsby
+category: cms
+subcategory: static
+tags: [nodejs, static, ssg, react, gatsby]
+description: 基于 React 的静态站点生成器，性能优秀，适合博客和文档网站。
+icon: gatsby
+version: 1.0.0
+author: SSLcat Team
+website: https://www.gatsbyjs.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: NODE_VERSION
+    type: select
+    title: Node.js 版本
+    default: "20-alpine"
+    options: ["20-alpine", "18-alpine", "20"]
+    description: 选择 Node.js 版本
+  - name: GATSBY_PORT
+    type: number
+    title: Gatsby 端口
+    default: 8000
+    min: 1024
+    max: 65535
+    description: Gatsby 开发服务器端口
+
+services:
+  - name: gatsby
+    type: web
+    description: Gatsby 静态站点服务器
+    ports:
+      - internal: 8000
+        external: null
+        public: true
+    volumes:
+      - name: gatsby_site
+        path: /app
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+
