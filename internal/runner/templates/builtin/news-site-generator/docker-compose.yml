@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  news-site-generator:
+    image: news-site-generator/server:{{NEWS_SITE_VERSION}}
+    container_name: {{APP_NAME}}_news_site_generator
+    restart: unless-stopped
+    ports:
+      - "{{NEWS_SITE_PORT}}:8080"
+    environment:
+      DATABASE_URL: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
+      REDIS_URL: redis://:{{REDIS_PASSWORD}}@redis:6379/0
+      SECRET_KEY: {{NEWS_SITE_SECRET_KEY}}
+      ENABLE_RSS: {{ENABLE_RSS}}
+      ENABLE_COMMENTS: {{ENABLE_COMMENTS}}
+      ENABLE_SEARCH: {{ENABLE_SEARCH}}
+    volumes:
+      - news_site_data:/app/data
+      - news_site_uploads:/app/uploads
+      - news_site_media:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  postgres:
+    image: postgres:{{POSTGRES_VERSION}}
+    container_name: {{APP_NAME}}_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: {{POSTGRES_DATABASE}}
+      POSTGRES_USER: {{POSTGRES_USERNAME}}
+      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:{{REDIS_VERSION}}
+    container_name: {{APP_NAME}}_redis
+    restart: unless-stopped
+    command: redis-server --requirepass {{REDIS_PASSWORD}}
+    volumes:
+      - redis_data:/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  news_site_data:
+    driver: local
+  news_site_uploads:
+    driver: local
+  news_site_media:
+    driver: local
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

@@ -1,0 +1,141 @@
+id: website-builder
+name: 官网快速生成器
+category: tools
+subcategory: web-builder
+tags: [nodejs, postgres, redis, website-builder, drag-drop, cms, site-generator]
+description: 拖拽式官网快速生成工具，支持可视化编辑、响应式设计、模板库、SEO优化、多语言、一键发布等功能。
+icon: website-builder
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/website-builder
+compose_file: docker-compose.yml
+
+variables:
+  - name: WEBSITE_BUILDER_VERSION
+    type: select
+    title: 官网生成器版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择官网生成器版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "16", "14"]
+    description: 选择 PostgreSQL 版本
+  - name: REDIS_VERSION
+    type: select
+    title: Redis 版本
+    default: "7"
+    options: ["7", "6", "alpine"]
+    description: 选择 Redis 版本
+  - name: WEBSITE_BUILDER_PORT
+    type: number
+    title: 官网生成器端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: 官网生成器 Web 服务端口
+  - name: MAX_FILE_SIZE
+    type: string
+    title: 最大文件大小
+    default: "50MB"
+    description: 上传文件最大大小
+    placeholder: "50MB"
+
+services:
+  - name: website-builder
+    type: web
+    description: 官网快速生成器服务
+    depends_on: [postgres, redis]
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: website_builder_data
+        path: /app/data
+        mode: rw
+      - name: website_builder_storage
+        path: /app/storage
+        mode: rw
+      - name: website_builder_templates
+        path: /app/templates
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{username}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  - name: redis
+    type: cache
+    description: Redis 缓存服务
+    ports:
+      - internal: 6379
+        external: null
+        public: false
+    volumes:
+      - name: redis_data
+        path: /data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_website_builder"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_website_builder"
+  redis:
+    password:
+      pattern: random
+      length: 16
+  website-builder:
+    secret_key:
+      pattern: random
+      length: 32
+
+connection_strings:
+  postgres: "postgres://{username}:{password}@postgres:5432/{database}"
+  redis: "redis://:{password}@redis:6379/0"
+
+healthcheck_global:
+  timeout: 20m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}:8080
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "拖拽式编辑,可视化设计,响应式布局,模板库,SEO优化,多语言支持,一键发布,域名绑定"
+
