@@ -73,9 +73,11 @@ const Settings: React.FC = () => {
     upstreamCacheRespectUpstream: true,
     
     // 通知设置
-    enableNotifications: true,
     notificationChannels: 'email,webhook',
     minNotificationLevel: 'info', // 最小通知级别
+    // 渠道启用状态
+    emailEnabled: false, // 邮箱通知是否启用
+    webhookEnabled: false, // Webhook通知是否启用
     // 邮件通知配置
     emailMethod: 'smtp', // 'smtp' | 'sendmail' | 'resend' | 'mailgun' | 'sendgrid'
     smtpHost: '',
@@ -168,8 +170,11 @@ const Settings: React.FC = () => {
           const config = data.config
           setSettings(prev => ({
             ...prev,
-            enableNotifications: config.enabled || false,
             minNotificationLevel: config.min_notification_level || 'info', // 加载最小通知级别
+            emailEnabled: config.channels?.email?.enabled || false, // 加载邮箱启用状态
+            webhookEnabled: config.channels?.webhook?.enabled || false, // 加载webhook启用状态
+            emailMethod: config.channels?.email?.method || 'smtp', // 加载邮件发送方式
+            // SMTP 配置
             smtpHost: config.channels?.email?.smtp_host || '',
             smtpPort: config.channels?.email?.smtp_port?.toString() || '587',
             smtpUsername: config.channels?.email?.username || '',
@@ -177,6 +182,22 @@ const Settings: React.FC = () => {
             smtpFrom: config.channels?.email?.from || '',
             smtpTo: config.channels?.email?.to?.join(',') || '',
             smtpUseTLS: config.channels?.email?.use_tls || true,
+            // Sendmail 配置
+            sendmailCommand: config.channels?.email?.sendmail_command || '/usr/sbin/sendmail',
+            sendmailArgs: config.channels?.email?.sendmail_args || '-t',
+            // Resend 配置
+            resendApiKey: config.channels?.email?.resend_api_key || '',
+            resendFrom: config.channels?.email?.resend_from || '',
+            resendTo: config.channels?.email?.resend_to || '',
+            // Mailgun 配置
+            mailgunApiKey: config.channels?.email?.mailgun_api_key || '',
+            mailgunDomain: config.channels?.email?.mailgun_domain || '',
+            mailgunFrom: config.channels?.email?.mailgun_from || '',
+            mailgunTo: config.channels?.email?.mailgun_to || '',
+            // SendGrid 配置
+            sendgridApiKey: config.channels?.email?.sendgrid_api_key || '',
+            sendgridFrom: config.channels?.email?.sendgrid_from || '',
+            sendgridTo: config.channels?.email?.sendgrid_to || '',
             webhookUrls: config.channels?.webhook?.urls || [config.channels?.webhook?.url || ''].filter(url => url !== ''),
           }))
         }
@@ -249,11 +270,12 @@ const Settings: React.FC = () => {
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({
-            enabled: settings.enableNotifications,
             min_notification_level: settings.minNotificationLevel,
             channels: {
               email: {
-                enabled: settings.smtpHost && settings.smtpUsername && settings.smtpPassword,
+                enabled: settings.emailEnabled, // 使用开关状态
+                method: settings.emailMethod || 'smtp', // 邮件发送方式
+                // SMTP 配置
                 smtp_host: settings.smtpHost,
                 smtp_port: parseInt(settings.smtpPort) || 587,
                 username: settings.smtpUsername,
@@ -261,9 +283,25 @@ const Settings: React.FC = () => {
                 from: settings.smtpFrom,
                 to: settings.smtpTo ? settings.smtpTo.split(',').map(email => email.trim()) : [],
                 use_tls: settings.smtpUseTLS,
+                // Sendmail 配置
+                sendmail_command: settings.sendmailCommand,
+                sendmail_args: settings.sendmailArgs,
+                // Resend 配置
+                resend_api_key: settings.resendApiKey,
+                resend_from: settings.resendFrom,
+                resend_to: settings.resendTo,
+                // Mailgun 配置
+                mailgun_api_key: settings.mailgunApiKey,
+                mailgun_domain: settings.mailgunDomain,
+                mailgun_from: settings.mailgunFrom,
+                mailgun_to: settings.mailgunTo,
+                // SendGrid 配置
+                sendgrid_api_key: settings.sendgridApiKey,
+                sendgrid_from: settings.sendgridFrom,
+                sendgrid_to: settings.sendgridTo,
               },
               webhook: {
-                enabled: settings.webhookUrls.some(url => url.trim() !== ''),
+                enabled: settings.webhookEnabled, // 使用开关状态
                 urls: settings.webhookUrls.filter(url => url.trim() !== ''),
                 headers: { 'Content-Type': 'application/json' },
                 timeout: 10,
@@ -367,9 +405,11 @@ const Settings: React.FC = () => {
       upstreamCacheMaxSize: 1024,
       upstreamCacheDefaultTTL: 3600,
       upstreamCacheRespectUpstream: true,
-      enableNotifications: true,
       notificationChannels: 'email,webhook',
       minNotificationLevel: 'info', // 最小通知级别
+      // 渠道启用状态
+      emailEnabled: false,
+      webhookEnabled: false,
       // 邮件通知配置
       emailMethod: 'smtp',
       smtpHost: '',
@@ -780,14 +820,6 @@ const Settings: React.FC = () => {
         </CardHeader>
         <CardBody>
           <VStack spacing={6} align="stretch">
-            <FormControl display="flex" alignItems="center">
-              <FormLabel mb="0">{t.settings.enableNotifications}</FormLabel>
-              <Switch
-                isChecked={settings.enableNotifications}
-                onChange={(e) => handleInputChange('enableNotifications', e.target.checked)}
-              />
-            </FormControl>
-            
             {/* 最小通知级别设置 */}
             <FormControl>
               <FormLabel>最小通知级别</FormLabel>
@@ -808,7 +840,16 @@ const Settings: React.FC = () => {
             
             {/* 邮件通知配置 */}
             <Box border="1px" borderColor="gray.200" borderRadius="md" p={4}>
-              <Heading size="sm" mb={4}>{t.settings.emailNotification}</Heading>
+              <HStack justify="space-between" mb={4}>
+                <Heading size="sm">{t.settings.emailNotification}</Heading>
+                <FormControl display="flex" alignItems="center" width="auto">
+                  <FormLabel mb="0" mr={2}>启用邮箱通知</FormLabel>
+                  <Switch
+                    isChecked={settings.emailEnabled}
+                    onChange={(e) => handleInputChange('emailEnabled', e.target.checked)}
+                  />
+                </FormControl>
+              </HStack>
               
               {/* 邮件发送方式选择 */}
               <FormControl mb={4}>
@@ -1030,7 +1071,16 @@ const Settings: React.FC = () => {
 
             {/* Webhook通知配置 */}
             <Box border="1px" borderColor="gray.200" borderRadius="md" p={4}>
-              <Heading size="sm" mb={4}>Webhook 通知渠道</Heading>
+              <HStack justify="space-between" mb={4}>
+                <Heading size="sm">Webhook 通知渠道</Heading>
+                <FormControl display="flex" alignItems="center" width="auto">
+                  <FormLabel mb="0" mr={2}>启用 Webhook 通知</FormLabel>
+                  <Switch
+                    isChecked={settings.webhookEnabled}
+                    onChange={(e) => handleInputChange('webhookEnabled', e.target.checked)}
+                  />
+                </FormControl>
+              </HStack>
               <Text fontSize="sm" color="gray.600" mb={4}>
                 支持多种平台的通知，包括 Slack、企业微信、飞书、钉钉、Discord、Telegram 等
               </Text>

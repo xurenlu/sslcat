@@ -226,7 +226,6 @@ func (s *Server) handleNotificationConfig(w http.ResponseWriter, r *http.Request
 	} else if r.Method == "POST" {
 		// 更新通知配置
 		var updateConfig struct {
-			Enabled               bool                              `json:"enabled"`
 			MinNotificationLevel string                            `json:"min_notification_level"`
 			Channels             map[string]map[string]interface{} `json:"channels"`
 		}
@@ -236,9 +235,6 @@ func (s *Server) handleNotificationConfig(w http.ResponseWriter, r *http.Request
 			return
 		}
 
-		// 更新配置
-		s.config.Notification.Enabled = updateConfig.Enabled
-		
 		// 更新最小通知级别
 		if updateConfig.MinNotificationLevel != "" {
 			s.config.Notification.MinNotificationLevel = updateConfig.MinNotificationLevel
@@ -249,6 +245,11 @@ func (s *Server) handleNotificationConfig(w http.ResponseWriter, r *http.Request
 			if enabled, ok := emailConfig["enabled"].(bool); ok {
 				s.config.Notification.Channels.Email.Enabled = enabled
 			}
+			// 邮件发送方式
+			if method, ok := emailConfig["method"].(string); ok {
+				s.config.Notification.Channels.Email.Method = method
+			}
+			// SMTP 配置
 			if host, ok := emailConfig["smtp_host"].(string); ok {
 				s.config.Notification.Channels.Email.SMTPHost = host
 			}
@@ -275,6 +276,46 @@ func (s *Server) handleNotificationConfig(w http.ResponseWriter, r *http.Request
 			}
 			if useTLS, ok := emailConfig["use_tls"].(bool); ok {
 				s.config.Notification.Channels.Email.UseTLS = useTLS
+			}
+			// Sendmail 配置
+			if sendmailCommand, ok := emailConfig["sendmail_command"].(string); ok {
+				s.config.Notification.Channels.Email.SendmailCommand = sendmailCommand
+			}
+			if sendmailArgs, ok := emailConfig["sendmail_args"].(string); ok {
+				s.config.Notification.Channels.Email.SendmailArgs = sendmailArgs
+			}
+			// Resend 配置
+			if resendAPIKey, ok := emailConfig["resend_api_key"].(string); ok {
+				s.config.Notification.Channels.Email.ResendAPIKey = resendAPIKey
+			}
+			if resendFrom, ok := emailConfig["resend_from"].(string); ok {
+				s.config.Notification.Channels.Email.ResendFrom = resendFrom
+			}
+			if resendTo, ok := emailConfig["resend_to"].(string); ok {
+				s.config.Notification.Channels.Email.ResendTo = resendTo
+			}
+			// Mailgun 配置
+			if mailgunAPIKey, ok := emailConfig["mailgun_api_key"].(string); ok {
+				s.config.Notification.Channels.Email.MailgunAPIKey = mailgunAPIKey
+			}
+			if mailgunDomain, ok := emailConfig["mailgun_domain"].(string); ok {
+				s.config.Notification.Channels.Email.MailgunDomain = mailgunDomain
+			}
+			if mailgunFrom, ok := emailConfig["mailgun_from"].(string); ok {
+				s.config.Notification.Channels.Email.MailgunFrom = mailgunFrom
+			}
+			if mailgunTo, ok := emailConfig["mailgun_to"].(string); ok {
+				s.config.Notification.Channels.Email.MailgunTo = mailgunTo
+			}
+			// SendGrid 配置
+			if sendgridAPIKey, ok := emailConfig["sendgrid_api_key"].(string); ok {
+				s.config.Notification.Channels.Email.SendGridAPIKey = sendgridAPIKey
+			}
+			if sendgridFrom, ok := emailConfig["sendgrid_from"].(string); ok {
+				s.config.Notification.Channels.Email.SendGridFrom = sendgridFrom
+			}
+			if sendgridTo, ok := emailConfig["sendgrid_to"].(string); ok {
+				s.config.Notification.Channels.Email.SendGridTo = sendgridTo
 			}
 		}
 

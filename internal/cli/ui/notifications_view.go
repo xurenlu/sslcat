@@ -215,11 +215,6 @@ func buildNotificationItems(cfg *config.Config) []notificationItem {
 	notif := &cfg.Notification
 
 	items = append(items, notificationItem{
-		key:   "notification.enabled",
-		value: strconv.FormatBool(notif.Enabled),
-	})
-
-	items = append(items, notificationItem{
 		key:   "notification.min_notification_level",
 		value: notif.MinNotificationLevel,
 	})
@@ -272,12 +267,6 @@ func (m notificationsModel) setNotificationValue(keyPath string, value string) e
 	if len(parts) == 2 {
 		// 直接字段
 		switch parts[1] {
-		case "enabled":
-			val, err := strconv.ParseBool(value)
-			if err != nil {
-				return fmt.Errorf("无效的布尔值: %v", err)
-			}
-			notif.Enabled = val
 		case "min_notification_level":
 			notif.MinNotificationLevel = value
 		default:

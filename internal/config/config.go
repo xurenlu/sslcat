@@ -1850,7 +1850,6 @@ func (c *Config) RemoveProxyRule(domain string) {
 
 // NotificationConfig 通知配置
 type NotificationConfig struct {
-	Enabled              bool           `json:"enabled"`                // 是否启用通知系统
 	MinNotificationLevel string         `json:"min_notification_level"` // 最小通知级别 (info|warning|error|critical)
 	Channels             ChannelsConfig `json:"channels"`               // 通知渠道配置
 }

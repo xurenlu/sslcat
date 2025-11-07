@@ -246,8 +246,8 @@ func simpleDiff[T comparable](key string, a, b T) []KeyChange {
 func compareNotificationConfigs(cur, prop NotificationConfig) []KeyChange {
 	var changes []KeyChange
 
-	// 基本配置
-	changes = append(changes, simpleDiff("notification.enabled", cur.Enabled, prop.Enabled)...)
+	// 最小通知级别
+	changes = append(changes, simpleDiff("notification.min_notification_level", cur.MinNotificationLevel, prop.MinNotificationLevel)...)
 
 	// 邮件配置
 	emailChanges := compareEmailChannelConfigs(cur.Channels.Email, prop.Channels.Email)
