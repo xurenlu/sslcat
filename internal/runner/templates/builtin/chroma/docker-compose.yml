@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  chroma:
+    image: chromadb/chroma:{{CHROMA_VERSION}}
+    container_name: {{APP_NAME}}_chroma
+    restart: unless-stopped
+    ports:
+      - "{{CHROMA_PORT}}:8000"
+    environment:
+      IS_PERSISTENT: "TRUE"
+      PERSIST_DIR: /chroma/chroma
+      ANONYMIZED_TELEMETRY: "FALSE"
+    volumes:
+      - chroma_data:/chroma/chroma
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  chroma_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

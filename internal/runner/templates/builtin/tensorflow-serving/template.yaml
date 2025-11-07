@@ -1,0 +1,66 @@
+id: tensorflow-serving
+name: TensorFlow Serving (模型服务)
+category: ai
+subcategory: model-serving
+tags: [cpp, ai, tensorflow, model-serving, gpu]
+description: TensorFlow 模型服务框架，高性能模型推理服务，需要 GPU。
+icon: tensorflow-serving
+version: 1.0.0
+author: SSLcat Team
+website: https://www.tensorflow.org/tfx/guide/serving
+compose_file: docker-compose.yml
+
+variables:
+  - name: TENSORFLOW_SERVING_VERSION
+    type: select
+    title: TensorFlow Serving 版本
+    default: "latest"
+    options: ["latest", "2.15", "2.14"]
+    description: 选择 TensorFlow Serving 版本
+  - name: TENSORFLOW_SERVING_PORT
+    type: number
+    title: TensorFlow Serving 端口
+    default: 8501
+    min: 1024
+    max: 65535
+    description: TensorFlow Serving REST API 端口
+  - name: MODEL_NAME
+    type: string
+    title: 模型名称
+    default: "my_model"
+    description: 要服务的模型名称
+    placeholder: "my_model"
+
+services:
+  - name: tensorflow-serving
+    type: api
+    description: TensorFlow Serving 模型服务
+    ports:
+      - internal: 8501
+        external: null
+        public: true
+    volumes:
+      - name: tensorflow_serving_data
+        path: /models
+        mode: rw
+    resources:
+      gpu: required
+    healthcheck:
+      type: http
+      path: /v1/models
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+healthcheck_global:
+  timeout: 20m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/v1/models"
+  features: "模型服务,高性能,版本管理,自动加载"
+  gpu_required: true
+
