@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  asterisk:
+    image: andrius/asterisk:{{ASTERISK_VERSION}}
+    container_name: {{APP_NAME}}_asterisk
+    restart: unless-stopped
+    ports:
+      - "{{ASTERISK_SIP_PORT}}:5060/udp"
+      - "{{ASTERISK_RTP_START}}:{{ASTERISK_RTP_START}}/udp"
+      - "{{ASTERISK_RTP_END}}:{{ASTERISK_RTP_END}}/udp"
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - asterisk_data:/etc/asterisk
+      - asterisk_logs:/var/log/asterisk
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "asterisk", "-rx", "core show version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  asterisk_data:
+    driver: local
+  asterisk_logs:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

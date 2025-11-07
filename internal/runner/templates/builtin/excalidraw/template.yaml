@@ -1,0 +1,56 @@
+id: excalidraw
+name: Excalidraw (白板工具)
+category: tools
+subcategory: collaboration
+tags: [nodejs, collaboration, excalidraw, whiteboard, drawing]
+description: 开源的虚拟白板工具，支持手绘风格的图表绘制，适合团队协作、头脑风暴、流程图绘制等场景。
+icon: excalidraw
+version: 1.0.0
+author: SSLcat Team
+website: https://excalidraw.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: EXCALIDRAW_VERSION
+    type: select
+    title: Excalidraw 版本
+    default: "latest"
+    options: ["latest", "v0.19", "v0.18"]
+    description: 选择 Excalidraw 版本
+  - name: EXCALIDRAW_PORT
+    type: number
+    title: Excalidraw 端口
+    default: 80
+    min: 1024
+    max: 65535
+    description: Excalidraw Web 服务端口
+
+services:
+  - name: excalidraw
+    type: web
+    description: Excalidraw 白板工具服务
+    ports:
+      - internal: 80
+        external: null
+        public: true
+    volumes:
+      - name: excalidraw_data
+        path: /app/data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "手绘风格,实时协作,图表绘制,流程图,团队白板"
+
