@@ -39,14 +39,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **GC 压力**: 降低 50-70%
 - **定时器泄露**: 完全消除
 
-### 📚 文档更新
-
-- 新增性能优化文档 (`docs/zh/troubleshooting/PERFORMANCE_OPTIMIZATION.md`)
-- 新增代码检查报告 (`docs/zh/troubleshooting/CODE_REVIEW_REPORT.md`)
-- 新增深度代码检查报告 (`docs/zh/troubleshooting/DEEP_CODE_REVIEW.md`)
-- 新增定时器泄露修复文档 (`docs/zh/troubleshooting/TIMER_LEAK_FIX.md`)
-- 新增长时间运行 CPU 问题修复文档 (`docs/zh/troubleshooting/LONGRUN_CPU_FIX.md`)
-
 ---
 
 ## [1.3.22] - 2025-11-04
