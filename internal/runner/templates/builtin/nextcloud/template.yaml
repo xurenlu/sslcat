@@ -1,0 +1,102 @@
+id: nextcloud
+name: Nextcloud
+category: collaboration
+subcategory: file-sharing
+tags: [cloud, storage, collaboration, file-sharing, php, mysql]
+description: Nextcloud 是一个开源的自托管云存储和协作平台，类似 Dropbox/Google Drive，但完全私有化。
+icon: nextcloud
+version: 1.0.0
+author: SSLcat Team
+website: https://nextcloud.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: NEXTCLOUD_VERSION
+    type: select
+    title: Nextcloud 版本
+    default: "latest"
+    options: ["latest", "28", "27"]
+    description: 选择 Nextcloud 版本
+  - name: MYSQL_VERSION
+    type: select
+    title: MySQL 版本
+    default: "8.0"
+    options: ["8.0", "8.1", "5.7"]
+    description: 选择 MySQL 版本
+  - name: NEXTCLOUD_PORT
+    type: number
+    title: Nextcloud 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: Nextcloud Web 服务端口
+
+services:
+  - name: nextcloud
+    type: web
+    description: Nextcloud 云存储平台
+    depends_on: [mysql]
+    ports:
+      - internal: 80
+        external: null
+        public: true
+    volumes:
+      - name: nextcloud_data
+        path: /var/www/html
+        mode: rw
+      - name: nextcloud_config
+        path: /var/www/html/config
+        mode: rw
+    healthcheck:
+      type: http
+      path: /status.php
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  - name: mysql
+    type: database
+    description: MySQL 数据库服务
+    ports:
+      - internal: 3306
+        external: null
+        public: false
+    volumes:
+      - name: mysql_data
+        path: /var/lib/mysql
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  mysql:
+    username:
+      pattern: "{app_name}_nc"
+    password:
+      pattern: random
+      length: 20
+      charset: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+    database:
+      pattern: "{app_name}_nextcloud"
+    root_password:
+      pattern: random
+      length: 24
+      charset: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+
+connection_strings:
+  mysql: "mysql://{username}:{password}@mysql:3306/{database}?charset=utf8mb4"
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  setup_url: http://{{PRIMARY_DOMAIN}}/index.php/setup
+  admin_required: true
+

@@ -1,0 +1,101 @@
+id: umami
+name: Umami
+category: analytics
+subcategory: web-analytics
+tags: [analytics, tracking, privacy, postgresql, nodejs]
+description: Umami 是一个简单、快速、注重隐私的网站分析工具，是 Google Analytics 的开源替代品。
+icon: umami
+version: 1.0.0
+author: SSLcat Team
+website: https://umami.is/
+compose_file: docker-compose.yml
+
+variables:
+  - name: UMAMI_VERSION
+    type: select
+    title: Umami 版本
+    default: "postgresql-latest"
+    options: ["postgresql-latest", "postgresql-2.4.0"]
+    description: 选择 Umami 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["16", "15", "14"]
+    description: 选择 PostgreSQL 版本
+  - name: UMAMI_PORT
+    type: number
+    title: Umami 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: Umami Web 服务端口
+
+services:
+  - name: umami
+    type: web
+    description: Umami 网站分析平台
+    depends_on: [postgres]
+    ports:
+      - internal: 3000
+        external: null
+        public: true
+    volumes:
+      - name: umami_data
+        path: /app/data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /api/health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_umami"
+    password:
+      pattern: random
+      length: 20
+      charset: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+    database:
+      pattern: "{app_name}_umami"
+  umami:
+    hash_salt:
+      pattern: random
+      length: 32
+      charset: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+connection_strings:
+  postgres: "postgresql://{username}:{password}@postgres:5432/{database}?sslmode=disable"
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  default_admin_user: admin
+  default_admin_password: umami
+  login_url: http://{{PRIMARY_DOMAIN}}/login
+

@@ -1,0 +1,77 @@
+id: minio
+name: MinIO
+category: storage
+subcategory: object-storage
+tags: [storage, s3, object-storage, file-storage]
+description: MinIO 是一个高性能的对象存储服务，兼容 Amazon S3 API，适合存储图片、视频、文档等。
+icon: minio
+version: 1.0.0
+author: SSLcat Team
+website: https://min.io/
+compose_file: docker-compose.yml
+
+variables:
+  - name: MINIO_VERSION
+    type: select
+    title: MinIO 版本
+    default: "latest"
+    options: ["latest", "RELEASE.2024-01-16T16-07-38Z"]
+    description: 选择 MinIO 版本
+  - name: MINIO_API_PORT
+    type: number
+    title: MinIO API 端口
+    default: 9000
+    min: 1024
+    max: 65535
+    description: MinIO S3 API 服务端口
+  - name: MINIO_CONSOLE_PORT
+    type: number
+    title: MinIO Console 端口
+    default: 9001
+    min: 1024
+    max: 65535
+    description: MinIO Web 管理控制台端口
+
+services:
+  - name: minio
+    type: storage
+    description: MinIO 对象存储服务
+    ports:
+      - internal: 9000
+        external: null
+        public: true
+      - internal: 9001
+        external: null
+        public: true
+    volumes:
+      - name: minio_data
+        path: /data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /minio/health/live
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+credentials:
+  minio:
+    root_user:
+      pattern: "{app_name}_admin"
+    root_password:
+      pattern: random
+      length: 24
+      charset: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+
+connection_strings:
+  minio: "s3://{root_user}:{root_password}@minio:9000"
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  console_url: http://{{PRIMARY_DOMAIN}}:{{MINIO_CONSOLE_PORT}}
+  api_endpoint: http://{{PRIMARY_DOMAIN}}:{{MINIO_API_PORT}}
+

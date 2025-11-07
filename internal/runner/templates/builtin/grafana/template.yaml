@@ -1,0 +1,67 @@
+id: grafana
+name: Grafana
+category: analytics
+subcategory: monitoring
+tags: [monitoring, visualization, metrics, dashboards, analytics]
+description: Grafana 是一个开源的数据可视化和监控平台，支持多种数据源，可以创建漂亮的仪表板和图表。
+icon: grafana
+version: 1.0.0
+author: SSLcat Team
+website: https://grafana.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: GRAFANA_VERSION
+    type: select
+    title: Grafana 版本
+    default: "latest"
+    options: ["latest", "10", "9"]
+    description: 选择 Grafana 版本
+  - name: GRAFANA_PORT
+    type: number
+    title: Grafana 端口
+    default: 3000
+    min: 1024
+    max: 65535
+    description: Grafana Web 服务端口
+
+services:
+  - name: grafana
+    type: web
+    description: Grafana 监控可视化平台
+    ports:
+      - internal: 3000
+        external: null
+        public: true
+    volumes:
+      - name: grafana_data
+        path: /var/lib/grafana
+        mode: rw
+      - name: grafana_config
+        path: /etc/grafana
+        mode: rw
+    healthcheck:
+      type: http
+      path: /api/health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+credentials:
+  grafana:
+    admin_user:
+      pattern: admin
+    admin_password:
+      pattern: random
+      length: 20
+      charset: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  default_login_url: http://{{PRIMARY_DOMAIN}}/login
+  default_user: admin
+

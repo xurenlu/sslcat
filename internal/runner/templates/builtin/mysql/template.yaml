@@ -1,0 +1,76 @@
+id: mysql
+name: MySQL
+category: database
+subcategory: relational
+tags: [database, mysql, sql, relational]
+description: MySQL 8.0 关系型数据库，支持事务、外键、存储过程等高级特性。
+icon: mysql
+version: 1.0.0
+author: SSLcat Team
+website: https://www.mysql.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: MYSQL_VERSION
+    type: select
+    title: MySQL 版本
+    default: "8.0"
+    options: ["8.0", "8.1", "5.7"]
+    description: 选择 MySQL 版本
+  - name: MYSQL_PORT
+    type: number
+    title: MySQL 端口
+    default: 3306
+    min: 1024
+    max: 65535
+    description: MySQL 服务端口
+
+services:
+  - name: mysql
+    type: database
+    description: MySQL 数据库服务
+    ports:
+      - internal: 3306
+        external: null
+        public: false
+    volumes:
+      - name: mysql_data
+        path: /var/lib/mysql
+        mode: rw
+      - name: mysql_config
+        path: /etc/mysql/conf.d
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  mysql:
+    username:
+      pattern: "{app_name}_user"
+    password:
+      pattern: random
+      length: 20
+      charset: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+    database:
+      pattern: "{app_name}_db"
+    root_password:
+      pattern: random
+      length: 24
+      charset: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+
+connection_strings:
+  mysql: "mysql://{username}:{password}@mysql:3306/{database}?charset=utf8mb4&collation=utf8mb4_unicode_ci"
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  default_charset: utf8mb4
+  default_collation: utf8mb4_unicode_ci
+

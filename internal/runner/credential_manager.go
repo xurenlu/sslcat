@@ -32,6 +32,17 @@ func (cm *CredentialManager) Generate(meta TemplateMeta, appName string) (map[st
 	for service, rule := range meta.Credentials {
 		values := make(map[string]string)
 
+		// 默认 host 为服务名（Docker Compose 网络中的服务名）
+		values["host"] = service
+
+		// 查找服务的端口
+		for _, svc := range meta.Services {
+			if svc.Name == service && len(svc.Ports) > 0 {
+				values["port"] = fmt.Sprintf("%d", svc.Ports[0].Internal)
+				break
+			}
+		}
+
 		if value, err := cm.renderPattern(rule.Username, appName); err == nil && value != "" {
 			values["username"] = value
 		} else if err != nil {

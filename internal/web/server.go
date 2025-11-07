@@ -949,6 +949,42 @@ func (s *Server) registerRunnerRoutes() {
 		s.mux.HandleFunc(templateBase+"/", templateAPI.HandleTemplateDetail)
 	}
 
+	// 模板部署 API 路由
+	if s.gitServer != nil && s.gitServer.GetDeployOrchestrator() != nil {
+		templateDeployAPI := NewTemplateDeployAPI(s.gitServer, s.log.Logger)
+		s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/templates/deploy", templateDeployAPI.DeployFromTemplate)
+		s.log.Info("模板部署 API 路由已注册")
+	} else {
+		s.log.Warn("GitServer 或 DeployOrchestrator 未启用，模板部署 API 路由未注册")
+	}
+
+	// 域名管理 API 路由
+	if s.gitServer != nil {
+		domainAPI := NewDomainAPI(s.gitServer, s.log.Logger)
+		s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/domains/add", domainAPI.AddDomain)
+		s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/domains/remove", domainAPI.RemoveDomain)
+		s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/domains", domainAPI.GetDomains)
+		s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/domains/verify-dns", domainAPI.VerifyDNS)
+		s.log.Info("域名管理 API 路由已注册")
+	}
+
+	// 服务管理 API 路由
+	if s.gitServer != nil {
+		serviceAPI := NewServiceAPI(s.gitServer, s.log.Logger)
+		s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/services/status", serviceAPI.GetServiceStatus)
+		s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/services/restart", serviceAPI.RestartService)
+		s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/services/stop", serviceAPI.StopService)
+		s.log.Info("服务管理 API 路由已注册")
+	}
+
+	// 凭证管理 API 路由
+	if s.gitServer != nil {
+		credentialAPI := NewCredentialAPI(s.gitServer, s.log.Logger)
+		s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/credentials", credentialAPI.GetCredentials)
+		s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/credentials/regenerate", credentialAPI.RegenerateCredential)
+		s.log.Info("凭证管理 API 路由已注册")
+	}
+
 	// Docker Registry API 路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/docker/images", gitAPI.GetDockerImages)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/docker/config", gitAPI.GetDockerConfig)

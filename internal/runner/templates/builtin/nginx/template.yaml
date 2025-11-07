@@ -1,0 +1,60 @@
+id: nginx
+name: Nginx
+category: web-server
+subcategory: http-server
+tags: [web-server, http, reverse-proxy, static]
+description: Nginx 是一个高性能的 Web 服务器和反向代理服务器，适合托管静态网站或作为反向代理。
+icon: nginx
+version: 1.0.0
+author: SSLcat Team
+website: https://nginx.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: NGINX_VERSION
+    type: select
+    title: Nginx 版本
+    default: "alpine"
+    options: ["alpine", "latest", "1.25"]
+    description: 选择 Nginx 版本
+  - name: NGINX_PORT
+    type: number
+    title: Nginx 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: Nginx Web 服务端口
+
+services:
+  - name: nginx
+    type: web
+    description: Nginx Web 服务器
+    ports:
+      - internal: 80
+        external: null
+        public: true
+    volumes:
+      - name: nginx_html
+        path: /usr/share/nginx/html
+        mode: rw
+      - name: nginx_config
+        path: /etc/nginx/conf.d
+        mode: rw
+      - name: nginx_logs
+        path: /var/log/nginx
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+healthcheck_global:
+  timeout: 2m
+  interval: 10s
+
+metadata:
+  default_html_path: /usr/share/nginx/html
+  config_path: /etc/nginx/conf.d
+

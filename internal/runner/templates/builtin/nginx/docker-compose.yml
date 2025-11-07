@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  nginx:
+    image: nginx:{{NGINX_VERSION}}
+    container_name: {{APP_NAME}}_nginx
+    restart: unless-stopped
+    ports:
+      - "{{NGINX_PORT}}:80"
+    volumes:
+      - nginx_html:/usr/share/nginx/html
+      - nginx_config:/etc/nginx/conf.d
+      - nginx_logs:/var/log/nginx
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  nginx_html:
+    driver: local
+  nginx_config:
+    driver: local
+  nginx_logs:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

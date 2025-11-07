@@ -1,0 +1,64 @@
+id: redis
+name: Redis
+category: database
+subcategory: cache
+tags: [database, redis, cache, nosql, key-value]
+description: Redis 7 高性能内存数据库，支持缓存、消息队列、会话存储等场景。
+icon: redis
+version: 1.0.0
+author: SSLcat Team
+website: https://redis.io/
+compose_file: docker-compose.yml
+
+variables:
+  - name: REDIS_VERSION
+    type: select
+    title: Redis 版本
+    default: "7-alpine"
+    options: ["7-alpine", "7", "6-alpine", "6"]
+    description: 选择 Redis 版本
+  - name: REDIS_PORT
+    type: number
+    title: Redis 端口
+    default: 6379
+    min: 1024
+    max: 65535
+    description: Redis 服务端口
+
+services:
+  - name: redis
+    type: database
+    description: Redis 缓存数据库
+    ports:
+      - internal: 6379
+        external: null
+        public: false
+    volumes:
+      - name: redis_data
+        path: /data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+credentials:
+  redis:
+    password:
+      pattern: random
+      length: 24
+      charset: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+connection_strings:
+  redis: "redis://:{password}@redis:6379/0"
+
+healthcheck_global:
+  timeout: 2m
+  interval: 10s
+
+metadata:
+  persistence: enabled
+  aof: enabled
+

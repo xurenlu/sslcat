@@ -1,0 +1,99 @@
+id: ghost
+name: Ghost
+category: blog
+subcategory: cms
+tags: [blog, cms, nodejs, mysql, markdown]
+description: Ghost 是一个现代化的开源发布平台，专注于博客和在线出版物。简洁优雅的编辑体验。
+icon: ghost
+version: 1.0.0
+author: SSLcat Team
+website: https://ghost.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: GHOST_VERSION
+    type: select
+    title: Ghost 版本
+    default: "5"
+    options: ["latest", "5", "4"]
+    description: 选择 Ghost 版本
+  - name: MYSQL_VERSION
+    type: select
+    title: MySQL 版本
+    default: "8.0"
+    options: ["8.0", "8.1", "5.7"]
+    description: 选择 MySQL 版本
+  - name: GHOST_PORT
+    type: number
+    title: Ghost 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: Ghost Web 服务端口
+
+services:
+  - name: ghost
+    type: web
+    description: Ghost 博客平台
+    depends_on: [mysql]
+    ports:
+      - internal: 2368
+        external: null
+        public: true
+    volumes:
+      - name: ghost_data
+        path: /var/lib/ghost/content
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  - name: mysql
+    type: database
+    description: MySQL 数据库服务
+    ports:
+      - internal: 3306
+        external: null
+        public: false
+    volumes:
+      - name: mysql_data
+        path: /var/lib/mysql
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  mysql:
+    username:
+      pattern: "{app_name}_ghost"
+    password:
+      pattern: random
+      length: 20
+      charset: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+    database:
+      pattern: "{app_name}_ghost"
+    root_password:
+      pattern: random
+      length: 24
+      charset: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+
+connection_strings:
+  mysql: "mysql://{username}:{password}@mysql:3306/{database}?charset=utf8mb4"
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  default_admin_url: http://{{PRIMARY_DOMAIN}}/ghost
+  setup_url: http://{{PRIMARY_DOMAIN}}/ghost/#/setup
+

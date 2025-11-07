@@ -30,6 +30,8 @@ import ImageOptimization from './pages/ImageOptimization'
 import FirstTimeSetup from './pages/FirstTimeSetup'
 import ClusterSettings from './pages/ClusterSettings'
 import ClusterStatus from './pages/ClusterStatus'
+import TemplateMarket from './pages/TemplateMarket'
+import TemplateDeploy from './pages/TemplateDeploy'
 
 const AppRoutes: React.FC = () => {
   const { adminPrefix, isLoading, error } = useConfig()
@@ -137,6 +139,16 @@ const AppRoutes: React.FC = () => {
       <Route path={`${adminPrefix}/git-server`} element={
         <AuthGuard>
           <GitServerManagement />
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/templates`} element={
+        <AuthGuard>
+          <TemplateMarket />
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/templates/deploy/:templateId`} element={
+        <AuthGuard>
+          <TemplateDeploy />
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/notifications`} element={

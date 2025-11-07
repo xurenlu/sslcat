@@ -775,6 +775,11 @@ func (dl *DeployLogger) Close() error {
 	return nil
 }
 
+// GetDeployID 返回部署ID
+func (dl *DeployLogger) GetDeployID() string {
+	return dl.deployID
+}
+
 // ==================== WebSocket 支持 ====================
 
 // HandleWebSocketLogsWS 处理 WebSocket 日志连接（真正的 WebSocket）- 增强panic恢复

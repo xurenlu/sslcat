@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  minio:
+    image: minio/minio:{{MINIO_VERSION}}
+    container_name: {{APP_NAME}}_minio
+    restart: unless-stopped
+    ports:
+      - "{{MINIO_API_PORT}}:9000"
+      - "{{MINIO_CONSOLE_PORT}}:9001"
+    environment:
+      MINIO_ROOT_USER: {{MINIO_ROOT_USER}}
+      MINIO_ROOT_PASSWORD: {{MINIO_ROOT_PASSWORD}}
+      MINIO_BROWSER_REDIRECT_URL: http://{{PRIMARY_DOMAIN}}
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  minio_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

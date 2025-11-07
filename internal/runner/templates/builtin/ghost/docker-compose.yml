@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  ghost:
+    image: ghost:{{GHOST_VERSION}}
+    container_name: {{APP_NAME}}_ghost
+    restart: unless-stopped
+    ports:
+      - "{{GHOST_PORT}}:2368"
+    environment:
+      database__client: mysql
+      database__connection__host: mysql
+      database__connection__port: 3306
+      database__connection__user: {{MYSQL_USERNAME}}
+      database__connection__password: {{MYSQL_PASSWORD}}
+      database__connection__database: {{MYSQL_DATABASE}}
+      url: http://{{PRIMARY_DOMAIN}}
+      NODE_ENV: production
+    volumes:
+      - ghost_data:/var/lib/ghost/content
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:2368', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  mysql:
+    image: mysql:{{MYSQL_VERSION}}
+    container_name: {{APP_NAME}}_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
+      MYSQL_DATABASE: {{MYSQL_DATABASE}}
+      MYSQL_USER: {{MYSQL_USERNAME}}
+      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    command: --default-authentication-plugin=mysql_native_password
+
+volumes:
+  ghost_data:
+    driver: local
+  mysql_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

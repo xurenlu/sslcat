@@ -1,0 +1,62 @@
+id: jellyfin
+name: Jellyfin
+category: media
+subcategory: streaming
+tags: [media, streaming, video, music, plex-alternative]
+description: Jellyfin 是一个开源的媒体服务器，类似 Plex，可以流式传输电影、电视节目、音乐等媒体内容。
+icon: jellyfin
+version: 1.0.0
+author: SSLcat Team
+website: https://jellyfin.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: JELLYFIN_VERSION
+    type: select
+    title: Jellyfin 版本
+    default: "latest"
+    options: ["latest", "10.9", "10.8"]
+    description: 选择 Jellyfin 版本
+  - name: JELLYFIN_PORT
+    type: number
+    title: Jellyfin 端口
+    default: 8096
+    min: 1024
+    max: 65535
+    description: Jellyfin Web 服务端口
+
+services:
+  - name: jellyfin
+    type: web
+    description: Jellyfin 媒体服务器
+    ports:
+      - internal: 8096
+        external: null
+        public: true
+    volumes:
+      - name: jellyfin_config
+        path: /config
+        mode: rw
+      - name: jellyfin_cache
+        path: /cache
+        mode: rw
+      - name: jellyfin_media
+        path: /media
+        mode: rw
+    healthcheck:
+      type: http
+      path: /health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  setup_url: http://{{PRIMARY_DOMAIN}}/web/index.html
+  first_run: true
+  media_path: /media
+

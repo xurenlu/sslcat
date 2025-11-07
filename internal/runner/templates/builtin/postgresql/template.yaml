@@ -1,0 +1,72 @@
+id: postgresql
+name: PostgreSQL
+category: database
+subcategory: relational
+tags: [database, postgresql, postgres, sql, relational]
+description: PostgreSQL 15 开源关系型数据库，支持 JSON、全文搜索、地理空间数据等高级特性。
+icon: postgresql
+version: 1.0.0
+author: SSLcat Team
+website: https://www.postgresql.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["16", "15", "14", "13"]
+    description: 选择 PostgreSQL 版本
+  - name: POSTGRES_PORT
+    type: number
+    title: PostgreSQL 端口
+    default: 5432
+    min: 1024
+    max: 65535
+    description: PostgreSQL 服务端口
+
+services:
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+      - name: postgres_config
+        path: /etc/postgresql/postgresql.conf
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_user"
+    password:
+      pattern: random
+      length: 20
+      charset: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+    database:
+      pattern: "{app_name}_db"
+
+connection_strings:
+  postgres: "postgresql://{username}:{password}@postgres:5432/{database}?sslmode=disable"
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  default_encoding: UTF8
+  default_locale: C
+

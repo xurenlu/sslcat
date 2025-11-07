@@ -1,0 +1,108 @@
+id: gitea
+name: Gitea
+category: devtools
+subcategory: git
+tags: [git, code, repository, devtools, self-hosted]
+description: Gitea 是一个轻量级的自托管 Git 服务，类似 GitHub/GitLab，但更轻量快速。
+icon: gitea
+version: 1.0.0
+author: SSLcat Team
+website: https://gitea.io/
+compose_file: docker-compose.yml
+
+variables:
+  - name: GITEA_VERSION
+    type: select
+    title: Gitea 版本
+    default: "latest"
+    options: ["latest", "1.21", "1.20"]
+    description: 选择 Gitea 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["16", "15", "14"]
+    description: 选择 PostgreSQL 版本
+  - name: GITEA_PORT
+    type: number
+    title: Gitea Web 端口
+    default: 3000
+    min: 1024
+    max: 65535
+    description: Gitea Web 服务端口
+  - name: GITEA_SSH_PORT
+    type: number
+    title: Gitea SSH 端口
+    default: 2222
+    min: 1024
+    max: 65535
+    description: Git SSH 服务端口
+
+services:
+  - name: gitea
+    type: web
+    description: Gitea Git 服务
+    depends_on: [postgres]
+    ports:
+      - internal: 3000
+        external: null
+        public: true
+      - internal: 22
+        external: null
+        public: false
+    volumes:
+      - name: gitea_data
+        path: /data
+        mode: rw
+      - name: gitea_config
+        path: /etc/gitea
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_gitea"
+    password:
+      pattern: random
+      length: 20
+      charset: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+    database:
+      pattern: "{app_name}_gitea"
+
+connection_strings:
+  postgres: "postgresql://{username}:{password}@postgres:5432/{database}?sslmode=disable"
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  default_admin_url: http://{{PRIMARY_DOMAIN}}/user/login
+  first_run: true
+

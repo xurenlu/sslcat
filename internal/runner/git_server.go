@@ -64,6 +64,8 @@ type GitServer struct {
 	composeGenerator  *ComposeGenerator
 	credentialManager *CredentialManager
 	domainManager     *DomainManager
+	dnsVerifier       *DNSVerifier
+	deployOrchestrator *DeployOrchestrator
 
 	// 部署数据库
 	deployDB *DeployDatabase
@@ -105,6 +107,56 @@ func (gs *GitServer) SetSSLManager(sslManager SSLManagerInterface) {
 // GetTemplateManager 返回模板管理器实例
 func (gs *GitServer) GetTemplateManager() *TemplateManager {
 	return gs.templateManager
+}
+
+// GetDeployOrchestrator 返回部署编排器实例
+func (gs *GitServer) GetDeployOrchestrator() *DeployOrchestrator {
+	return gs.deployOrchestrator
+}
+
+// GetConfig 返回配置实例
+func (gs *GitServer) GetConfig() *config.Config {
+	return gs.config
+}
+
+// GetDomainManager 返回域名管理器实例
+func (gs *GitServer) GetDomainManager() *DomainManager {
+	return gs.domainManager
+}
+
+// GetCredentialManager 返回凭证管理器实例
+func (gs *GitServer) GetCredentialManager() *CredentialManager {
+	return gs.credentialManager
+}
+
+// UpdateProxyRulesForApp 更新应用的代理规则（公共方法）
+func (gs *GitServer) UpdateProxyRulesForApp(app *GitApp) error {
+	return gs.addProxyRuleForApp(app)
+}
+
+// AddApp 添加应用到 GitServer
+func (gs *GitServer) AddApp(app *GitApp) error {
+	if app == nil {
+		return fmt.Errorf("应用不能为空")
+	}
+	if app.Name == "" {
+		return fmt.Errorf("应用名称不能为空")
+	}
+
+	gs.mutex.Lock()
+	defer gs.mutex.Unlock()
+
+	if _, exists := gs.apps[app.Name]; exists {
+		return fmt.Errorf("应用 %s 已存在", app.Name)
+	}
+
+	gs.apps[app.Name] = app
+	return nil
+}
+
+// SaveApps 保存应用到磁盘（公共方法）
+func (gs *GitServer) SaveApps() error {
+	return gs.saveApps()
 }
 
 // GitServerConfig Git 服务器配置
@@ -192,7 +244,8 @@ type GitApp struct {
 	TemplateType       string                          `json:"template_type,omitempty"`
 	TemplateParams     map[string]string               `json:"template_params,omitempty"`
 	Services           []AppServiceInfo                `json:"services,omitempty"`
-	ServiceCredentials map[string]AppServiceCredential `json:"service_credentials,omitempty"`
+	ServiceCredentials map[string]AppServiceCredential `json:"service_credentials,omitempty"` // 存储完整凭证（JSON 序列化时会保存）
+	ServiceCredentialsRaw map[string]map[string]string `json:"service_credentials_raw,omitempty"` // 原始凭证（用于完整显示）
 	ComposeFile        string                          `json:"compose_file,omitempty"`
 
 	// 分配的端口
@@ -267,6 +320,8 @@ type AppServiceCredential struct {
 	Token            string `json:"token,omitempty"`
 	Secret           string `json:"secret,omitempty"`
 	Endpoint         string `json:"endpoint,omitempty"`
+	Host             string `json:"host,omitempty"`
+	Port             int    `json:"port,omitempty"`
 	ConnectionString string `json:"connection_string,omitempty"`
 }
 
@@ -595,12 +650,26 @@ func NewGitServer(cfg *config.Config, translator *i18n.Translator) *GitServer {
 	gs.templateManager = templateManager
 	gs.credentialManager = NewCredentialManager(gs.logger)
 	gs.domainManager = NewDomainManager(gs.logger)
+	gs.dnsVerifier = NewDNSVerifier(gs.logger)
 
 	composeWorkDir := filepath.Join(templateDataDir, "compose-workdir")
 	if generator, err := NewComposeGenerator(templateManager, composeWorkDir, gs.logger); err != nil {
 		gs.logger.Warnf("初始化 Compose 生成器失败: %v", err)
 	} else {
 		gs.composeGenerator = generator
+	}
+
+	// 初始化部署编排器
+	if gs.composeGenerator != nil && gs.credentialManager != nil && gs.domainManager != nil {
+		gs.deployOrchestrator = NewDeployOrchestrator(
+			gs.composeGenerator,
+			gs.credentialManager,
+			gs.domainManager,
+			gs.logger,
+		)
+		gs.logger.Info("部署编排器已初始化")
+	} else {
+		gs.logger.Warn("部署编排器初始化失败：缺少必要的组件")
 	}
 
 	// 初始化 Builder Registry
