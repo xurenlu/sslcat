@@ -1,0 +1,61 @@
+id: collabora
+name: Collabora Online
+category: collaboration
+subcategory: office
+tags: [cpp, office, collaboration, collabora]
+description: 开源在线办公套件，基于 LibreOffice，支持在线编辑文档。
+icon: collabora
+version: 1.0.0
+author: SSLcat Team
+website: https://www.collaboraoffice.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: COLLABORA_VERSION
+    type: select
+    title: Collabora 版本
+    default: "latest"
+    options: ["latest", "23.05", "22.05"]
+    description: 选择 Collabora 版本
+  - name: COLLABORA_PORT
+    type: number
+    title: Collabora 端口
+    default: 9980
+    min: 1024
+    max: 65535
+    description: Collabora Web 服务端口
+
+services:
+  - name: collabora
+    type: web
+    description: Collabora Online 文档服务器
+    ports:
+      - internal: 9980
+        external: null
+        public: true
+    volumes:
+      - name: collabora_data
+        path: /var/www/collabora
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+credentials:
+  collabora:
+    admin_password:
+      pattern: random
+      length: 16
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_username: admin
+

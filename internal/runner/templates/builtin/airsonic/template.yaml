@@ -1,0 +1,60 @@
+id: airsonic
+name: Airsonic
+category: media
+subcategory: music
+tags: [java, music, streaming, airsonic]
+description: 开源音乐服务器，支持 Subsonic API，适合自建音乐流媒体服务。
+icon: airsonic
+version: 1.0.0
+author: SSLcat Team
+website: https://airsonic.github.io/
+compose_file: docker-compose.yml
+
+variables:
+  - name: AIRSONIC_VERSION
+    type: select
+    title: Airsonic 版本
+    default: "latest"
+    options: ["latest", "11.0", "10.6"]
+    description: 选择 Airsonic 版本
+  - name: AIRSONIC_PORT
+    type: number
+    title: Airsonic 端口
+    default: 4040
+    min: 1024
+    max: 65535
+    description: Airsonic Web 服务端口
+
+services:
+  - name: airsonic
+    type: web
+    description: Airsonic 音乐服务器
+    ports:
+      - internal: 4040
+        external: null
+        public: true
+    volumes:
+      - name: airsonic_data
+        path: /airsonic
+        mode: rw
+      - name: music_data
+        path: /music
+        mode: ro
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  default_admin_user: admin
+  default_admin_password: admin
+

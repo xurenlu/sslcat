@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  collabora:
+    image: collabora/code:{{COLLABORA_VERSION}}
+    container_name: {{APP_NAME}}_collabora
+    restart: unless-stopped
+    ports:
+      - "{{COLLABORA_PORT}}:9980"
+    environment:
+      domain: {{PRIMARY_DOMAIN}}
+      username: admin
+      password: {{ADMIN_PASSWORD}}
+      DONT_GEN_SSL_CERT: "true"
+    volumes:
+      - collabora_data:/var/www/collabora
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9980"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+volumes:
+  collabora_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

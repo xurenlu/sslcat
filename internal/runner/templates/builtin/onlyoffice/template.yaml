@@ -1,0 +1,97 @@
+id: onlyoffice
+name: OnlyOffice
+category: collaboration
+subcategory: office
+tags: [nodejs, postgresql, office, collaboration, onlyoffice]
+description: 开源办公套件，支持在线编辑 Word、Excel、PowerPoint 等文档。
+icon: onlyoffice
+version: 1.0.0
+author: SSLcat Team
+website: https://www.onlyoffice.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: ONLYOFFICE_VERSION
+    type: select
+    title: OnlyOffice 版本
+    default: "latest"
+    options: ["latest", "8.0", "7.5"]
+    description: 选择 OnlyOffice 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "14", "16"]
+    description: 选择 PostgreSQL 版本
+  - name: ONLYOFFICE_PORT
+    type: number
+    title: OnlyOffice 端口
+    default: 80
+    min: 1024
+    max: 65535
+    description: OnlyOffice Web 服务端口
+
+services:
+  - name: onlyoffice
+    type: web
+    description: OnlyOffice 文档服务器
+    depends_on: [postgres]
+    ports:
+      - internal: 80
+        external: null
+        public: true
+    volumes:
+      - name: onlyoffice_data
+        path: /var/www/onlyoffice/Data
+        mode: rw
+      - name: onlyoffice_logs
+        path: /var/log/onlyoffice
+        mode: rw
+    healthcheck:
+      type: http
+      path: /healthcheck
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_onlyoffice"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_onlyoffice"
+
+connection_strings:
+  postgres: "postgresql://{username}:{password}@postgres:5432/{database}"
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  api_url: http://{{PRIMARY_DOMAIN}}/web-apps/apps/api/documents/api.js
+
