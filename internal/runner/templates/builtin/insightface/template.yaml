@@ -1,0 +1,60 @@
+id: insightface
+name: InsightFace (人脸识别)
+category: ai
+subcategory: face-recognition
+tags: [python, ai, face-recognition, insightface, gpu]
+description: 强大的人脸识别和分析工具，支持人脸检测、识别、年龄性别估计等，需要 GPU。
+icon: insightface
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/deepinsight/insightface
+compose_file: docker-compose.yml
+
+variables:
+  - name: INSIGHTFACE_VERSION
+    type: select
+    title: InsightFace 版本
+    default: "latest"
+    options: ["latest", "v0.7", "v0.6"]
+    description: 选择 InsightFace 版本
+  - name: INSIGHTFACE_PORT
+    type: number
+    title: InsightFace 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: InsightFace API 服务端口
+
+services:
+  - name: insightface
+    type: api
+    description: InsightFace 人脸识别服务
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: insightface_data
+        path: /app/models
+        mode: rw
+    resources:
+      gpu: required
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/api/detect"
+  features: "人脸检测,人脸识别,年龄性别估计,人脸比对"
+  gpu_required: true
+

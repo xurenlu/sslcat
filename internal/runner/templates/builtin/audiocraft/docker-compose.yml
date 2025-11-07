@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  audiocraft:
+    image: facebookresearch/audiocraft:{{AUDIOCRAFT_VERSION}}
+    container_name: {{APP_NAME}}_audiocraft
+    restart: unless-stopped
+    ports:
+      - "{{AUDIOCRAFT_PORT}}:8080"
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    volumes:
+      - audiocraft_data:/app/models
+    networks:
+      - {{APP_NAME}}_network
+    runtime: nvidia
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 180s
+
+volumes:
+  audiocraft_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

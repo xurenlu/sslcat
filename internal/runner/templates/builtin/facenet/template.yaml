@@ -1,0 +1,60 @@
+id: facenet
+name: FaceNet (人脸识别)
+category: ai
+subcategory: face-recognition
+tags: [python, ai, face-recognition, facenet, gpu]
+description: Google 开源的人脸识别系统，高精度人脸识别和验证，需要 GPU。
+icon: facenet
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/davidsandberg/facenet
+compose_file: docker-compose.yml
+
+variables:
+  - name: FACENET_VERSION
+    type: select
+    title: FaceNet 版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择 FaceNet 版本
+  - name: FACENET_PORT
+    type: number
+    title: FaceNet 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: FaceNet API 服务端口
+
+services:
+  - name: facenet
+    type: api
+    description: FaceNet 人脸识别服务
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: facenet_data
+        path: /app/models
+        mode: rw
+    resources:
+      gpu: required
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/api/recognize"
+  features: "高精度识别,人脸验证,人脸聚类,实时识别"
+  gpu_required: true
+

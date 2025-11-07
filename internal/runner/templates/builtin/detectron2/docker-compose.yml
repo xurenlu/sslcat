@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  detectron2:
+    image: detectron2/server:{{DETECTRON2_VERSION}}
+    container_name: {{APP_NAME}}_detectron2
+    restart: unless-stopped
+    ports:
+      - "{{DETECTRON2_PORT}}:8080"
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    volumes:
+      - detectron2_data:/app/models
+    networks:
+      - {{APP_NAME}}_network
+    runtime: nvidia
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+volumes:
+  detectron2_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

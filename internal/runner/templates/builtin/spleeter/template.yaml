@@ -1,0 +1,59 @@
+id: spleeter
+name: Spleeter (音频分离)
+category: ai
+subcategory: audio-processing
+tags: [python, ai, audio-processing, spleeter, source-separation, gpu]
+description: Deezer 开源的音频分离工具，快速分离人声和乐器，需要 GPU。
+icon: spleeter
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/deezer/spleeter
+compose_file: docker-compose.yml
+
+variables:
+  - name: SPLEETER_VERSION
+    type: select
+    title: Spleeter 版本
+    default: "latest"
+    options: ["latest", "v2.3", "v2.2"]
+    description: 选择 Spleeter 版本
+  - name: SPLEETER_PORT
+    type: number
+    title: Spleeter 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: Spleeter API 服务端口
+
+services:
+  - name: spleeter
+    type: api
+    description: Spleeter 音频分离服务
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: spleeter_data
+        path: /app/models
+        mode: rw
+    resources:
+      gpu: optional
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+healthcheck_global:
+  timeout: 20m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/api/separate"
+  features: "音频分离,人声提取,乐器分离,快速处理"
+
