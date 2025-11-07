@@ -7,15 +7,12 @@ services:
     restart: unless-stopped
     ports:
       - "{{DOZZLE_PORT}}:8080"
-    environment:
-      DOZZLE_LEVEL: {{DOZZLE_LEVEL}}
-      TZ: Asia/Shanghai
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - {{APP_NAME}}_network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -24,4 +21,3 @@ services:
 networks:
   {{APP_NAME}}_network:
     driver: bridge
-

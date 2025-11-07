@@ -1,9 +1,9 @@
 id: postgrest
-name: PostgREST (REST API for PostgreSQL)
+name: PostgREST (REST API)
 category: tools
-subcategory: database-api
-tags: [postgresql, rest-api, database, postgrest, api]
-description: 为 PostgreSQL 数据库自动生成 RESTful API，无需编写代码即可通过 HTTP 接口操作数据库。
+subcategory: api
+tags: [haskell, postgres, api, postgrest, rest-api]
+description: 自动从 PostgreSQL 数据库生成 RESTful API，无需编写代码，直接暴露数据库为 REST API。
 icon: postgrest
 version: 1.0.0
 author: SSLcat Team
@@ -15,13 +15,13 @@ variables:
     type: select
     title: PostgREST 版本
     default: "latest"
-    options: ["latest", "12", "11"]
+    options: ["latest", "v12", "v11"]
     description: 选择 PostgREST 版本
   - name: POSTGRES_VERSION
     type: select
     title: PostgreSQL 版本
     default: "15"
-    options: ["15", "14", "16"]
+    options: ["15", "16", "14"]
     description: 选择 PostgreSQL 版本
   - name: POSTGREST_PORT
     type: number
@@ -29,24 +29,18 @@ variables:
     default: 3000
     min: 1024
     max: 65535
-    description: PostgREST API 服务端口
-  - name: POSTGREST_SCHEMA
+    description: PostgREST REST API 端口
+  - name: POSTGRES_ANON_ROLE
     type: string
-    title: 数据库 Schema
-    default: "public"
-    description: 暴露的数据库 Schema 名称
-    placeholder: "public"
-  - name: POSTGREST_ANON_ROLE
-    type: string
-    title: 匿名角色
+    title: PostgreSQL 匿名角色
     default: "anon"
-    description: 匿名访问的数据库角色名称
+    description: PostgreSQL 匿名用户角色名称
     placeholder: "anon"
 
 services:
   - name: postgrest
     type: api
-    description: PostgREST API 服务
+    description: PostgREST REST API 服务
     depends_on: [postgres]
     ports:
       - internal: 3000
@@ -73,7 +67,7 @@ services:
         mode: rw
     healthcheck:
       type: command
-      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
+      command: ["pg_isready", "-U", "{username}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -90,16 +84,14 @@ credentials:
       pattern: "{app_name}_postgrest"
 
 connection_strings:
-  postgres: "postgresql://{username}:{password}@postgres:5432/{database}"
-  api: "http://{{PRIMARY_DOMAIN}}"
+  postgres: "postgres://{username}:{password}@postgres:5432/{database}"
 
 healthcheck_global:
-  timeout: 5m
+  timeout: 15m
   interval: 10s
 
 metadata:
-  site_url: http://{{PRIMARY_DOMAIN}}
+  site_url: http://{{PRIMARY_DOMAIN}}:3000
   admin_email: admin@{{PRIMARY_DOMAIN}}
-  api_docs: "http://{{PRIMARY_DOMAIN}}/docs"
-  features: "自动REST API,数据库操作,查询过滤,权限控制"
-
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}:3000"
+  features: "REST API,自动生成,无需编码,权限控制"

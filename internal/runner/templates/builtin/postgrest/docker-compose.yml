@@ -9,17 +9,15 @@ services:
       - "{{POSTGREST_PORT}}:3000"
     environment:
       PGRST_DB_URI: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
-      PGRST_DB_SCHEMA: {{POSTGREST_SCHEMA}}
-      PGRST_DB_ANON_ROLE: {{POSTGREST_ANON_ROLE}}
-      PGRST_OPENAPI_SERVER_PROXY_URI: http://{{PRIMARY_DOMAIN}}
-      TZ: Asia/Shanghai
+      PGRST_DB_SCHEMA: public
+      PGRST_DB_ANON_ROLE: {{POSTGRES_ANON_ROLE}}
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - {{APP_NAME}}_network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -51,4 +49,3 @@ volumes:
 networks:
   {{APP_NAME}}_network:
     driver: bridge
-

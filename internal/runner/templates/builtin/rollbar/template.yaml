@@ -1,9 +1,9 @@
 id: rollbar
-name: Rollbar (前端错误跟踪)
-category: project
+name: Rollbar (错误追踪)
+category: tools
 subcategory: error-tracking
-tags: [javascript, error-tracking, monitoring, rollbar, frontend]
-description: 专业的前端错误跟踪和监控平台，支持 JavaScript、React、Vue、Angular 等前端框架的错误收集和分析。
+tags: [python, postgres, redis, error-tracking, rollbar, bug-tracking]
+description: 错误追踪和监控平台，实时捕获和追踪应用错误，支持多种编程语言和框架。
 icon: rollbar
 version: 1.0.0
 author: SSLcat Team
@@ -21,13 +21,13 @@ variables:
     type: select
     title: PostgreSQL 版本
     default: "15"
-    options: ["15", "14", "16"]
+    options: ["15", "16", "14"]
     description: 选择 PostgreSQL 版本
   - name: REDIS_VERSION
     type: select
     title: Redis 版本
     default: "7"
-    options: ["7", "6", "7-alpine"]
+    options: ["7", "6", "alpine"]
     description: 选择 Redis 版本
   - name: ROLLBAR_PORT
     type: number
@@ -36,17 +36,11 @@ variables:
     min: 1024
     max: 65535
     description: Rollbar Web 服务端口
-  - name: ROLLBAR_SECRET_KEY
-    type: string
-    title: Rollbar Secret Key
-    default: ""
-    description: Rollbar 密钥（留空将自动生成）
-    sensitive: true
 
 services:
-  - name: rollbar-web
+  - name: rollbar
     type: web
-    description: Rollbar Web 服务
+    description: Rollbar 错误追踪服务
     depends_on: [postgres, redis]
     ports:
       - internal: 8000
@@ -58,16 +52,11 @@ services:
         mode: rw
     healthcheck:
       type: http
-      path: /health
+      path: /
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
-
-  - name: rollbar-worker
-    type: worker
-    description: Rollbar 后台任务处理服务
-    depends_on: [rollbar-web]
+      retries: 5
+      start_period: 120s
 
   - name: postgres
     type: database
@@ -82,7 +71,7 @@ services:
         mode: rw
     healthcheck:
       type: command
-      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
+      command: ["pg_isready", "-U", "{username}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -116,24 +105,24 @@ credentials:
       length: 18
     database:
       pattern: "{app_name}_rollbar"
+  redis:
+    password:
+      pattern: random
+      length: 16
   rollbar:
     secret_key:
       pattern: random
-      length: 32
+      length: 50
 
 connection_strings:
-  postgres: "postgresql://{username}:{password}@postgres:5432/{database}"
-  redis: "redis://redis:6379/0"
-  api: "http://{{PRIMARY_DOMAIN}}/api"
+  postgres: "postgres://{username}:{password}@postgres:5432/{database}"
+  redis: "redis://:{password}@redis:6379/0"
 
 healthcheck_global:
-  timeout: 10m
+  timeout: 20m
   interval: 10s
 
 metadata:
-  site_url: http://{{PRIMARY_DOMAIN}}
+  site_url: http://{{PRIMARY_DOMAIN}}:8000
   admin_email: admin@{{PRIMARY_DOMAIN}}
-  api_endpoint: "http://{{PRIMARY_DOMAIN}}/api"
-  features: "前端错误跟踪,实时监控,错误分析,用户追踪,性能监控"
-  supported_frameworks: "JavaScript,React,Vue,Angular,Node.js"
-
+  features: "错误追踪,实时监控,多语言支持,告警通知"

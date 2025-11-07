@@ -1,9 +1,9 @@
 id: hasura
-name: Hasura GraphQL Engine
+name: Hasura (GraphQL引擎)
 category: tools
-subcategory: database-api
-tags: [graphql, postgresql, database, hasura, api]
-description: 强大的 GraphQL 引擎，为 PostgreSQL 数据库自动生成 GraphQL API，支持实时订阅和权限管理。
+subcategory: api
+tags: [haskell, postgres, api, hasura, graphql]
+description: 即时 GraphQL API 引擎，自动从 PostgreSQL 数据库生成 GraphQL API，支持实时订阅。
 icon: hasura
 version: 1.0.0
 author: SSLcat Team
@@ -16,12 +16,12 @@ variables:
     title: Hasura 版本
     default: "latest"
     options: ["latest", "v2.36", "v2.35"]
-    description: 选择 Hasura GraphQL Engine 版本
+    description: 选择 Hasura 版本
   - name: POSTGRES_VERSION
     type: select
     title: PostgreSQL 版本
     default: "15"
-    options: ["15", "14", "16"]
+    options: ["15", "16", "14"]
     description: 选择 PostgreSQL 版本
   - name: HASURA_PORT
     type: number
@@ -29,30 +29,28 @@ variables:
     default: 8080
     min: 1024
     max: 65535
-    description: Hasura GraphQL Engine 服务端口
-  - name: HASURA_ADMIN_SECRET
-    type: string
-    title: Hasura Admin Secret
-    default: ""
-    description: Hasura 管理员密钥（留空将自动生成）
-    sensitive: true
+    description: Hasura GraphQL API 端口
 
 services:
   - name: hasura
     type: api
-    description: Hasura GraphQL Engine 服务
+    description: Hasura GraphQL 引擎服务
     depends_on: [postgres]
     ports:
       - internal: 8080
         external: null
         public: true
+    volumes:
+      - name: hasura_data
+        path: /hasura-data
+        mode: rw
     healthcheck:
       type: http
       path: /healthz
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 60s
 
   - name: postgres
     type: database
@@ -67,7 +65,7 @@ services:
         mode: rw
     healthcheck:
       type: command
-      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
+      command: ["pg_isready", "-U", "{username}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -82,24 +80,17 @@ credentials:
       length: 18
     database:
       pattern: "{app_name}_hasura"
-  hasura:
-    admin_secret:
-      pattern: random
-      length: 32
 
 connection_strings:
-  postgres: "postgresql://{username}:{password}@postgres:5432/{database}"
-  graphql: "http://{{PRIMARY_DOMAIN}}/v1/graphql"
-  console: "http://{{PRIMARY_DOMAIN}}/console"
+  postgres: "postgres://{username}:{password}@postgres:5432/{database}"
 
 healthcheck_global:
-  timeout: 5m
+  timeout: 15m
   interval: 10s
 
 metadata:
-  site_url: http://{{PRIMARY_DOMAIN}}
+  site_url: http://{{PRIMARY_DOMAIN}}:8080
   admin_email: admin@{{PRIMARY_DOMAIN}}
-  graphql_endpoint: "http://{{PRIMARY_DOMAIN}}/v1/graphql"
-  console_url: "http://{{PRIMARY_DOMAIN}}/console"
-  features: "GraphQL API,实时订阅,权限管理,数据库操作,自动生成Schema"
-
+  console_url: "http://{{PRIMARY_DOMAIN}}:8080/console"
+  graphql_endpoint: "http://{{PRIMARY_DOMAIN}}:8080/v1/graphql"
+  features: "GraphQL API,自动生成,实时订阅,权限控制"

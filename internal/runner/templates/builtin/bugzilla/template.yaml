@@ -1,9 +1,9 @@
 id: bugzilla
-name: Bugzilla (Bug 追踪系统)
-category: project
-subcategory: issue-tracking
-tags: [bug-tracking, issue-management, bugzilla, perl, mysql]
-description: 经典的 Bug 追踪系统，功能强大，被 Mozilla、Apache 等大型项目广泛使用。
+name: Bugzilla (Bug追踪)
+category: tools
+subcategory: bug-tracking
+tags: [perl, mysql, bug-tracking, bugzilla, issue-tracking]
+description: Mozilla 开源的 Bug 追踪系统，功能强大的缺陷管理和追踪工具。
 icon: bugzilla
 version: 1.0.0
 author: SSLcat Team
@@ -15,13 +15,13 @@ variables:
     type: select
     title: Bugzilla 版本
     default: "latest"
-    options: ["latest", "5.2", "5.1"]
+    options: ["latest", "5.4", "5.3"]
     description: 选择 Bugzilla 版本
   - name: MYSQL_VERSION
     type: select
     title: MySQL 版本
     default: "8.0"
-    options: ["8.0", "8.1", "5.7"]
+    options: ["8.0", "5.7", "8.1"]
     description: 选择 MySQL 版本
   - name: BUGZILLA_PORT
     type: number
@@ -30,17 +30,11 @@ variables:
     min: 1024
     max: 65535
     description: Bugzilla Web 服务端口
-  - name: BUGZILLA_ADMIN_EMAIL
-    type: string
-    title: 管理员邮箱
-    default: "admin@{{PRIMARY_DOMAIN}}"
-    description: Bugzilla 管理员邮箱地址
-    placeholder: "admin@example.com"
 
 services:
   - name: bugzilla
     type: web
-    description: Bugzilla Web 服务
+    description: Bugzilla Bug追踪服务
     depends_on: [mysql]
     ports:
       - internal: 80
@@ -75,7 +69,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 60s
 
 credentials:
   mysql:
@@ -86,16 +80,18 @@ credentials:
       length: 18
     database:
       pattern: "{app_name}_bugzilla"
+    root_password:
+      pattern: random
+      length: 18
 
 connection_strings:
   mysql: "mysql://{username}:{password}@mysql:3306/{database}"
 
 healthcheck_global:
-  timeout: 10m
+  timeout: 20m
   interval: 10s
 
 metadata:
   site_url: http://{{PRIMARY_DOMAIN}}
-  admin_email: {{BUGZILLA_ADMIN_EMAIL}}
-  features: "Bug追踪,问题管理,邮件通知,权限管理,自定义字段,报表统计"
-
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "Bug追踪,缺陷管理,工作流,报告统计"

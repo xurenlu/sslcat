@@ -1,9 +1,9 @@
 id: dozzle
-name: Dozzle (日志查看工具)
-category: devops
-subcategory: logging
-tags: [logging, docker-logs, log-viewer, devops, dozzle]
-description: 轻量级的 Docker 容器日志查看工具，实时查看容器日志，支持搜索、过滤、高亮等功能。
+name: Dozzle (Docker日志)
+category: tools
+subcategory: monitoring
+tags: [go, docker, monitoring, dozzle, logs]
+description: Docker 容器日志查看工具，实时查看和管理 Docker 容器日志，无需 SSH。
 icon: dozzle
 version: 1.0.0
 author: SSLcat Team
@@ -15,7 +15,7 @@ variables:
     type: select
     title: Dozzle 版本
     default: "latest"
-    options: ["latest", "v4", "v3"]
+    options: ["latest", "v4.0", "v3.0"]
     description: 选择 Dozzle 版本
   - name: DOZZLE_PORT
     type: number
@@ -24,25 +24,15 @@ variables:
     min: 1024
     max: 65535
     description: Dozzle Web 服务端口
-  - name: DOZZLE_LEVEL
-    type: select
-    title: 日志级别
-    default: "info"
-    options: ["debug", "info", "warn", "error"]
-    description: 显示的日志级别
 
 services:
   - name: dozzle
     type: web
-    description: Dozzle 日志查看工具服务
+    description: Dozzle Docker 日志查看服务
     ports:
       - internal: 8080
         external: null
         public: true
-    volumes:
-      - name: docker_sock
-        path: /var/run/docker.sock
-        mode: ro
     healthcheck:
       type: http
       path: /
@@ -52,11 +42,10 @@ services:
       start_period: 10s
 
 healthcheck_global:
-  timeout: 5m
+  timeout: 10m
   interval: 10s
 
 metadata:
-  site_url: http://{{PRIMARY_DOMAIN}}
+  site_url: http://{{PRIMARY_DOMAIN}}:8080
   admin_email: admin@{{PRIMARY_DOMAIN}}
-  features: "实时日志查看,日志搜索,日志过滤,日志高亮,多容器支持"
-
+  features: "Docker日志,实时查看,日志搜索,容器管理"

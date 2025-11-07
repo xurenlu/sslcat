@@ -1,9 +1,9 @@
 id: bugsnag
-name: Bugsnag (App 崩溃收集)
-category: project
+name: Bugsnag (错误监控)
+category: tools
 subcategory: error-tracking
-tags: [error-tracking, crash-reporting, mobile, app-monitoring, bugsnag]
-description: 专业的移动应用和 Web 应用崩溃收集和错误监控平台，支持 iOS、Android、React Native 等平台。
+tags: [ruby, postgres, redis, error-tracking, bugsnag, bug-monitoring]
+description: 错误监控和追踪平台，实时捕获应用错误，支持多种编程语言，提供详细的错误报告。
 icon: bugsnag
 version: 1.0.0
 author: SSLcat Team
@@ -21,13 +21,13 @@ variables:
     type: select
     title: PostgreSQL 版本
     default: "15"
-    options: ["15", "14", "16"]
+    options: ["15", "16", "14"]
     description: 选择 PostgreSQL 版本
   - name: REDIS_VERSION
     type: select
     title: Redis 版本
     default: "7"
-    options: ["7", "6", "7-alpine"]
+    options: ["7", "6", "alpine"]
     description: 选择 Redis 版本
   - name: BUGSNAG_PORT
     type: number
@@ -36,17 +36,11 @@ variables:
     min: 1024
     max: 65535
     description: Bugsnag Web 服务端口
-  - name: BUGSNAG_SECRET_KEY
-    type: string
-    title: Bugsnag Secret Key
-    default: ""
-    description: Bugsnag 密钥（留空将自动生成）
-    sensitive: true
 
 services:
-  - name: bugsnag-web
+  - name: bugsnag
     type: web
-    description: Bugsnag Web 服务
+    description: Bugsnag 错误监控服务
     depends_on: [postgres, redis]
     ports:
       - internal: 3000
@@ -58,16 +52,11 @@ services:
         mode: rw
     healthcheck:
       type: http
-      path: /health
+      path: /
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
-
-  - name: bugsnag-worker
-    type: worker
-    description: Bugsnag 后台任务处理服务
-    depends_on: [bugsnag-web]
+      retries: 5
+      start_period: 120s
 
   - name: postgres
     type: database
@@ -82,7 +71,7 @@ services:
         mode: rw
     healthcheck:
       type: command
-      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
+      command: ["pg_isready", "-U", "{username}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -116,27 +105,24 @@ credentials:
       length: 18
     database:
       pattern: "{app_name}_bugsnag"
+  redis:
+    password:
+      pattern: random
+      length: 16
   bugsnag:
     secret_key:
       pattern: random
-      length: 32
-    api_key:
-      pattern: random
-      length: 32
+      length: 50
 
 connection_strings:
-  postgres: "postgresql://{username}:{password}@postgres:5432/{database}"
-  redis: "redis://redis:6379/0"
-  api: "http://{{PRIMARY_DOMAIN}}/api"
+  postgres: "postgres://{username}:{password}@postgres:5432/{database}"
+  redis: "redis://:{password}@redis:6379/0"
 
 healthcheck_global:
-  timeout: 10m
+  timeout: 20m
   interval: 10s
 
 metadata:
-  site_url: http://{{PRIMARY_DOMAIN}}
+  site_url: http://{{PRIMARY_DOMAIN}}:3000
   admin_email: admin@{{PRIMARY_DOMAIN}}
-  api_endpoint: "http://{{PRIMARY_DOMAIN}}/api"
-  features: "崩溃收集,错误监控,性能追踪,用户追踪,版本追踪,发布追踪"
-  supported_platforms: "iOS,Android,React Native,Flutter,Web,Node.js,Python,Java"
-
+  features: "错误监控,实时追踪,多语言支持,详细报告"

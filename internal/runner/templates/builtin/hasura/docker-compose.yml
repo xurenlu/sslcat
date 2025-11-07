@@ -10,11 +10,10 @@ services:
     environment:
       HASURA_GRAPHQL_DATABASE_URL: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
       HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
-      HASURA_GRAPHQL_DEV_MODE: "false"
+      HASURA_GRAPHQL_DEV_MODE: "true"
       HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
-      HASURA_GRAPHQL_ADMIN_SECRET: {{HASURA_ADMIN_SECRET}}
-      HASURA_GRAPHQL_UNAUTHORIZED_ROLE: anonymous
-      TZ: Asia/Shanghai
+    volumes:
+      - hasura_data:/hasura-data
     depends_on:
       postgres:
         condition: service_healthy
@@ -25,7 +24,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 60s
 
   postgres:
     image: postgres:{{POSTGRES_VERSION}}
@@ -47,10 +46,11 @@ services:
       start_period: 30s
 
 volumes:
+  hasura_data:
+    driver: local
   postgres_data:
     driver: local
 
 networks:
   {{APP_NAME}}_network:
     driver: bridge
-

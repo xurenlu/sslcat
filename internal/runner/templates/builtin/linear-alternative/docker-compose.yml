@@ -1,18 +1,17 @@
 version: '3.8'
 
 services:
-  bugsnag:
-    image: bugsnag/server:{{BUGSNAG_VERSION}}
-    container_name: {{APP_NAME}}_bugsnag
+  linear-alternative:
+    image: linear-alternative/server:{{LINEAR_ALT_VERSION}}
+    container_name: {{APP_NAME}}_linear_alternative
     restart: unless-stopped
     ports:
-      - "{{BUGSNAG_PORT}}:3000"
+      - "{{LINEAR_ALT_PORT}}:3000"
     environment:
       DATABASE_URL: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
       REDIS_URL: redis://:{{REDIS_PASSWORD}}@redis:6379/0
-      SECRET_KEY_BASE: {{BUGSNAG_SECRET_KEY}}
     volumes:
-      - bugsnag_data:/app/data
+      - linear_alt_data:/app/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -63,7 +62,7 @@ services:
       start_period: 10s
 
 volumes:
-  bugsnag_data:
+  linear_alt_data:
     driver: local
   postgres_data:
     driver: local
@@ -73,3 +72,4 @@ volumes:
 networks:
   {{APP_NAME}}_network:
     driver: bridge
+

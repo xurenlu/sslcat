@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  portainer:
+    image: portainer/portainer-ce:{{PORTAINER_VERSION}}
+    container_name: {{APP_NAME}}_portainer
+    restart: unless-stopped
+    ports:
+      - "{{PORTAINER_PORT}}:9000"
+      - "{{PORTAINER_AGENT_PORT}}:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - portainer_data:/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9000/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  portainer_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

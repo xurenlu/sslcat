@@ -1,18 +1,16 @@
 version: '3.8'
 
 services:
-  rollbar-web:
-    image: rollbar/rollbar:{{ROLLBAR_VERSION}}
-    container_name: {{APP_NAME}}_rollbar_web
+  rollbar:
+    image: rollbar/server:{{ROLLBAR_VERSION}}
+    container_name: {{APP_NAME}}_rollbar
     restart: unless-stopped
     ports:
       - "{{ROLLBAR_PORT}}:8000"
     environment:
       DATABASE_URL: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: redis://:{{REDIS_PASSWORD}}@redis:6379/0
       SECRET_KEY: {{ROLLBAR_SECRET_KEY}}
-      ROLLBAR_URL_PREFIX: http://{{PRIMARY_DOMAIN}}
-      TZ: Asia/Shanghai
     volumes:
       - rollbar_data:/app/data
     depends_on:
@@ -23,28 +21,11 @@ services:
     networks:
       - {{APP_NAME}}_network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
-
-  rollbar-worker:
-    image: rollbar/rollbar:{{ROLLBAR_VERSION}}
-    container_name: {{APP_NAME}}_rollbar_worker
-    restart: unless-stopped
-    environment:
-      DATABASE_URL: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
-      REDIS_URL: redis://redis:6379/0
-      SECRET_KEY: {{ROLLBAR_SECRET_KEY}}
-      TZ: Asia/Shanghai
-    volumes:
-      - rollbar_data:/app/data
-    depends_on:
-      - rollbar-web
-    networks:
-      - {{APP_NAME}}_network
-    command: ["worker"]
+      retries: 5
+      start_period: 120s
 
   postgres:
     image: postgres:{{POSTGRES_VERSION}}
@@ -69,12 +50,13 @@ services:
     image: redis:{{REDIS_VERSION}}
     container_name: {{APP_NAME}}_redis
     restart: unless-stopped
+    command: redis-server --requirepass {{REDIS_PASSWORD}}
     volumes:
       - redis_data:/data
     networks:
       - {{APP_NAME}}_network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -91,4 +73,3 @@ volumes:
 networks:
   {{APP_NAME}}_network:
     driver: bridge
-

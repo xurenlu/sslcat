@@ -1,22 +1,22 @@
-id: posthog
-name: PostHog (产品分析)
+id: linear-alternative
+name: Linear Alternative (项目管理)
 category: tools
-subcategory: analytics
-tags: [python, postgres, redis, analytics, posthog, product-analytics]
-description: 开源产品分析平台，支持事件追踪、用户分析、功能标志、会话录制等功能。
-icon: posthog
+subcategory: project-management
+tags: [nodejs, postgres, redis, project-management, linear-alternative, issue-tracking]
+description: Linear 的开源替代品，现代化的项目管理工具，支持 Issue 跟踪、看板、时间线等功能。
+icon: linear-alternative
 version: 1.0.0
 author: SSLcat Team
-website: https://posthog.com/
+website: https://github.com/linear-alternative
 compose_file: docker-compose.yml
 
 variables:
-  - name: POSTHOG_VERSION
+  - name: LINEAR_ALT_VERSION
     type: select
-    title: PostHog 版本
+    title: Linear Alternative 版本
     default: "latest"
-    options: ["latest", "1.50", "1.49"]
-    description: 选择 PostHog 版本
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择 Linear Alternative 版本
   - name: POSTGRES_VERSION
     type: select
     title: PostgreSQL 版本
@@ -29,26 +29,26 @@ variables:
     default: "7"
     options: ["7", "6", "alpine"]
     description: 选择 Redis 版本
-  - name: POSTHOG_PORT
+  - name: LINEAR_ALT_PORT
     type: number
-    title: PostHog 端口
-    default: 8000
+    title: Linear Alternative 端口
+    default: 3000
     min: 1024
     max: 65535
-    description: PostHog Web 服务端口
+    description: Linear Alternative Web 服务端口
 
 services:
-  - name: posthog
+  - name: linear-alternative
     type: web
-    description: PostHog 产品分析服务
+    description: Linear Alternative 项目管理服务
     depends_on: [postgres, redis]
     ports:
-      - internal: 8000
+      - internal: 3000
         external: null
         public: true
     volumes:
-      - name: posthog_data
-        path: /code
+      - name: linear_alt_data
+        path: /app/data
         mode: rw
     healthcheck:
       type: http
@@ -56,7 +56,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 180s
+      start_period: 120s
 
   - name: postgres
     type: database
@@ -99,30 +99,27 @@ services:
 credentials:
   postgres:
     username:
-      pattern: "{app_name}_posthog"
+      pattern: "{app_name}_linear"
     password:
       pattern: random
       length: 18
     database:
-      pattern: "{app_name}_posthog"
+      pattern: "{app_name}_linear"
   redis:
     password:
       pattern: random
       length: 16
-  posthog:
-    secret_key:
-      pattern: random
-      length: 50
 
 connection_strings:
   postgres: "postgres://{username}:{password}@postgres:5432/{database}"
   redis: "redis://:{password}@redis:6379/0"
 
 healthcheck_global:
-  timeout: 20m
+  timeout: 15m
   interval: 10s
 
 metadata:
-  site_url: http://{{PRIMARY_DOMAIN}}:8000
+  site_url: http://{{PRIMARY_DOMAIN}}:3000
   admin_email: admin@{{PRIMARY_DOMAIN}}
-  features: "产品分析,事件追踪,用户分析,功能标志,会话录制"
+  features: "项目管理,Issue跟踪,看板视图,时间线视图"
+
