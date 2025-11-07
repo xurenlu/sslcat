@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+  zammad:
+    image: zammad/zammad:{{ZAMMAD_VERSION}}
+    container_name: {{APP_NAME}}_zammad
+    restart: unless-stopped
+    ports:
+      - "{{ZAMMAD_PORT}}:80"
+    environment:
+      POSTGRESQL_HOST: postgres
+      POSTGRESQL_USER: {{POSTGRES_USERNAME}}
+      POSTGRESQL_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRESQL_DB: {{POSTGRES_DATABASE}}
+      ELASTICSEARCH_HOST: elasticsearch
+      ELASTICSEARCH_PORT: 9200
+      ELASTICSEARCH_SCHEMA: http
+      REDIS_URL: redis://redis:6379
+      ZAMMAD_RAILS_LOG_TO_STDOUT: "true"
+    volumes:
+      - zammad_data:/opt/zammad
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  postgres:
+    image: postgres:{{POSTGRES_VERSION}}
+    container_name: {{APP_NAME}}_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: {{POSTGRES_DATABASE}}
+      POSTGRES_USER: {{POSTGRES_USERNAME}}
+      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:{{REDIS_VERSION}}
+    container_name: {{APP_NAME}}_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:{{ELASTICSEARCH_VERSION}}
+    container_name: {{APP_NAME}}_elasticsearch
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      "ES_JAVA_OPTS": "-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  zammad_data:
+    driver: local
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  plausible:
+    image: plausible/analytics:{{PLAUSIBLE_VERSION}}
+    container_name: {{APP_NAME}}_plausible
+    restart: unless-stopped
+    ports:
+      - "{{PLAUSIBLE_PORT}}:8000"
+    environment:
+      BASE_URL: http://{{PRIMARY_DOMAIN}}
+      SECRET_KEY_BASE: {{SECRET_KEY_BASE}}
+      DISABLE_REGISTRATION: "false"
+      DATABASE_URL: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
+      CLICKHOUSE_DATABASE_URL: http://clickhouse:8123/{{CLICKHOUSE_DATABASE}}
+    volumes:
+      - plausible_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  postgres:
+    image: postgres:{{POSTGRES_VERSION}}
+    container_name: {{APP_NAME}}_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: {{POSTGRES_DATABASE}}
+      POSTGRES_USER: {{POSTGRES_USERNAME}}
+      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:{{CLICKHOUSE_VERSION}}
+    container_name: {{APP_NAME}}_clickhouse
+    restart: unless-stopped
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  plausible_data:
+    driver: local
+  postgres_data:
+    driver: local
+  clickhouse_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

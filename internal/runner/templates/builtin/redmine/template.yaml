@@ -1,0 +1,109 @@
+id: redmine
+name: Redmine
+category: project
+subcategory: issue-tracking
+tags: [ruby, mysql, project, issue-tracking, redmine]
+description: 开源项目管理和问题跟踪系统，功能强大，支持多项目、Wiki、时间跟踪等。
+icon: redmine
+version: 1.0.0
+author: SSLcat Team
+website: https://www.redmine.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: REDMINE_VERSION
+    type: select
+    title: Redmine 版本
+    default: "latest"
+    options: ["latest", "5.0", "4.2"]
+    description: 选择 Redmine 版本
+  - name: MYSQL_VERSION
+    type: select
+    title: MySQL 版本
+    default: "8.0"
+    options: ["8.0", "8.1", "5.7"]
+    description: 选择 MySQL 版本
+  - name: REDMINE_PORT
+    type: number
+    title: Redmine 端口
+    default: 3000
+    min: 1024
+    max: 65535
+    description: Redmine Web 服务端口
+
+services:
+  - name: redmine
+    type: web
+    description: Redmine 项目管理服务
+    depends_on: [mysql]
+    ports:
+      - internal: 3000
+        external: null
+        public: true
+    volumes:
+      - name: redmine_data
+        path: /usr/src/redmine/files
+        mode: rw
+      - name: redmine_plugins
+        path: /usr/src/redmine/plugins
+        mode: rw
+      - name: redmine_themes
+        path: /usr/src/redmine/public/themes
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  - name: mysql
+    type: database
+    description: MySQL 数据库服务
+    ports:
+      - internal: 3306
+        external: null
+        public: false
+    volumes:
+      - name: mysql_data
+        path: /var/lib/mysql
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  mysql:
+    username:
+      pattern: "{app_name}_redmine"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_redmine"
+    root_password:
+      pattern: random
+      length: 20
+  redmine:
+    secret_key_base:
+      pattern: random
+      length: 64
+
+connection_strings:
+  mysql: "mysql://{username}:{password}@mysql:3306/{database}?charset=utf8mb4"
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  default_admin_user: admin
+  default_admin_password: admin
+
