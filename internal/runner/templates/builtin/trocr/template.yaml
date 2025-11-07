@@ -1,0 +1,65 @@
+id: trocr
+name: TrOCR (图片文字识别翻译)
+category: ai
+subcategory: image-translation
+tags: [python, ai, ocr, translation, trocr, gpu]
+description: Transformer OCR 服务，支持图片文字识别和多语言翻译。
+icon: trocr
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/microsoft/unilm/tree/master/trocr
+compose_file: docker-compose.yml
+
+variables:
+  - name: TROCR_VERSION
+    type: select
+    title: TrOCR 版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择 TrOCR 版本
+  - name: TROCR_PORT
+    type: number
+    title: TrOCR 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: TrOCR API 服务端口
+  - name: TROCR_MODEL
+    type: select
+    title: TrOCR 模型
+    default: "base"
+    options: ["base", "large"]
+    description: 选择 TrOCR 模型大小
+
+services:
+  - name: trocr
+    type: api
+    description: TrOCR 图片文字识别翻译服务
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: trocr_data
+        path: /app/models
+        mode: rw
+    resources:
+      gpu: optional
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+healthcheck_global:
+  timeout: 20m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/api/ocr"
+  features: "OCR识别,多语言翻译,Transformer模型"
+

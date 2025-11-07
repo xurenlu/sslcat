@@ -1,0 +1,75 @@
+id: xtts
+name: XTTS (真人语音克隆)
+category: ai
+subcategory: voice-cloning
+tags: [python, ai, tts, voice-cloning, xtts, gpu]
+description: 高质量真人语音克隆服务，支持语音克隆和多语言合成，效果接近真人。
+icon: xtts
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/coqui-ai/TTS
+compose_file: docker-compose.yml
+
+variables:
+  - name: XTTS_VERSION
+    type: select
+    title: XTTS 版本
+    default: "latest"
+    options: ["latest", "v2", "v1"]
+    description: 选择 XTTS 版本
+  - name: XTTS_PORT
+    type: number
+    title: XTTS 端口
+    default: 8000
+    min: 1024
+    max: 65535
+    description: XTTS API 服务端口
+  - name: XTTS_MODEL
+    type: string
+    title: XTTS 模型
+    default: "tts_models/multilingual/multi-dataset/xtts_v2"
+    description: 使用的 XTTS 模型
+    placeholder: "tts_models/multilingual/multi-dataset/xtts_v2"
+  - name: XTTS_LANG
+    type: string
+    title: 语言
+    default: "zh"
+    description: 默认语言代码（如：zh, en, ja）
+    placeholder: "zh"
+
+services:
+  - name: xtts
+    type: api
+    description: XTTS 真人语音克隆服务
+    ports:
+      - internal: 8000
+        external: null
+        public: true
+    volumes:
+      - name: xtts_data
+        path: /app/models
+        mode: rw
+      - name: xtts_clones
+        path: /app/clones
+        mode: rw
+    resources:
+      gpu: required
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+healthcheck_global:
+  timeout: 20m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/api/tts"
+  features: "真人语音克隆,多语言,高质量合成"
+  gpu_required: true
+

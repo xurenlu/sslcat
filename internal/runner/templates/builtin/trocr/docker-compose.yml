@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  trocr:
+    image: trocr/server:{{TROCR_VERSION}}
+    container_name: {{APP_NAME}}_trocr
+    restart: unless-stopped
+    ports:
+      - "{{TROCR_PORT}}:8080"
+    environment:
+      TROCR_MODEL: {{TROCR_MODEL}}
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    volumes:
+      - trocr_data:/app/models
+    networks:
+      - {{APP_NAME}}_network
+    runtime: nvidia
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+volumes:
+  trocr_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  autosub:
+    image: abner/autosub:{{AUTOSUB_VERSION}}
+    container_name: {{APP_NAME}}_autosub
+    restart: unless-stopped
+    ports:
+      - "{{AUTOSUB_PORT}}:8080"
+    environment:
+      AUTOSUB_LANG: {{AUTOSUB_LANG}}
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    volumes:
+      - autosub_data:/app/data
+      - autosub_videos:/app/videos
+    networks:
+      - {{APP_NAME}}_network
+    runtime: nvidia
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  autosub_data:
+    driver: local
+  autosub_videos:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

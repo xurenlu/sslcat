@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  manga-translator:
+    image: zyddnys/manga-image-translator:{{MANGA_TRANSLATOR_VERSION}}
+    container_name: {{APP_NAME}}_manga_translator
+    restart: unless-stopped
+    ports:
+      - "{{MANGA_TRANSLATOR_PORT}}:5003"
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    volumes:
+      - manga_translator_data:/app/data
+      - manga_translator_output:/app/output
+    networks:
+      - {{APP_NAME}}_network
+    runtime: nvidia
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5003"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 180s
+
+volumes:
+  manga_translator_data:
+    driver: local
+  manga_translator_output:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

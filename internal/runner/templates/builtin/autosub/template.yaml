@@ -1,0 +1,67 @@
+id: autosub
+name: AutoSub (视频字幕生成)
+category: ai
+subcategory: video-translation
+tags: [python, ai, video, subtitle, translation, whisper, gpu]
+description: 自动视频字幕生成工具，使用 Whisper 进行语音识别并生成字幕文件。
+icon: autosub
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/abner/autosub
+compose_file: docker-compose.yml
+
+variables:
+  - name: AUTOSUB_VERSION
+    type: select
+    title: AutoSub 版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择 AutoSub 版本
+  - name: AUTOSUB_PORT
+    type: number
+    title: AutoSub 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: AutoSub Web 服务端口
+  - name: AUTOSUB_LANG
+    type: string
+    title: 默认语言
+    default: "zh"
+    description: 默认识别语言代码（如：zh, en, ja）
+    placeholder: "zh"
+
+services:
+  - name: autosub
+    type: web
+    description: AutoSub 视频字幕生成服务
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: autosub_data
+        path: /app/data
+        mode: rw
+      - name: autosub_videos
+        path: /app/videos
+        mode: rw
+    resources:
+      gpu: optional
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+healthcheck_global:
+  timeout: 20m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "视频字幕生成,多语言识别,SRT/VTT导出"
+

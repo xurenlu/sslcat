@@ -1,0 +1,110 @@
+id: sillytavern
+name: SillyTavern (语音对话)
+category: ai
+subcategory: chat
+tags: [nodejs, postgres, ai, chat, roleplay, character-ai, sillytavern]
+description: 角色扮演对话平台，支持自定义角色和语音对话，类似 Character.AI。
+icon: sillytavern
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/SillyTavern/SillyTavern
+compose_file: docker-compose.yml
+
+variables:
+  - name: SILLYTAVERN_VERSION
+    type: select
+    title: SillyTavern 版本
+    default: "latest"
+    options: ["latest", "v1.10", "v1.9"]
+    description: 选择 SillyTavern 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "16", "14"]
+    description: 选择 PostgreSQL 版本
+  - name: SILLYTAVERN_PORT
+    type: number
+    title: SillyTavern 端口
+    default: 8000
+    min: 1024
+    max: 65535
+    description: SillyTavern Web 服务端口
+  - name: OPENAI_API_KEY
+    type: string
+    title: OpenAI API Key
+    default: ""
+    description: OpenAI API 密钥（可选）
+    sensitive: true
+  - name: ANTHROPIC_API_KEY
+    type: string
+    title: Anthropic API Key
+    default: ""
+    description: Anthropic API 密钥（可选）
+    sensitive: true
+
+services:
+  - name: sillytavern
+    type: web
+    description: SillyTavern 角色扮演对话服务
+    depends_on: [postgres]
+    ports:
+      - internal: 8000
+        external: null
+        public: true
+    volumes:
+      - name: sillytavern_data
+        path: /app/data
+        mode: rw
+      - name: sillytavern_characters
+        path: /app/public/characters
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{username}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_sillytavern"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_sillytavern"
+
+connection_strings:
+  postgres: "postgres://{username}:{password}@postgres:5432/{database}"
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "角色扮演,语音对话,自定义角色,多模型支持"
+

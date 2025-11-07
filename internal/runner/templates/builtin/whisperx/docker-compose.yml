@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  whisperx:
+    image: m-bain/whisperx:{{WHISPERX_VERSION}}
+    container_name: {{APP_NAME}}_whisperx
+    restart: unless-stopped
+    ports:
+      - "{{WHISPERX_PORT}}:8000"
+    environment:
+      WHISPERX_MODEL: {{WHISPERX_MODEL}}
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    volumes:
+      - whisperx_data:/app/data
+      - whisperx_models:/app/models
+    networks:
+      - {{APP_NAME}}_network
+    runtime: nvidia
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+volumes:
+  whisperx_data:
+    driver: local
+  whisperx_models:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+
