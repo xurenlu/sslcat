@@ -1,0 +1,138 @@
+id: mailcow
+name: Mailcow
+category: tools
+subcategory: email
+tags: [docker, email, mail-server, mailcow]
+description: 完整的邮件服务器解决方案，包含 Web 界面、反垃圾邮件、防病毒等功能。
+icon: mailcow
+version: 1.0.0
+author: SSLcat Team
+website: https://mailcow.github.io/mailcow-dockerized-docs/
+compose_file: docker-compose.yml
+
+variables:
+  - name: MAILCOW_VERSION
+    type: select
+    title: Mailcow 版本
+    default: "latest"
+    options: ["latest", "2024-01", "2023-12"]
+    description: 选择 Mailcow 版本
+  - name: MAILCOW_PORT
+    type: number
+    title: Mailcow Web HTTP 端口
+    default: 80
+    min: 1024
+    max: 65535
+    description: Mailcow Web 界面 HTTP 端口
+  - name: MAILCOW_HTTPS_PORT
+    type: number
+    title: Mailcow Web HTTPS 端口
+    default: 443
+    min: 1024
+    max: 65535
+    description: Mailcow Web 界面 HTTPS 端口
+  - name: MAILCOW_SMTP_PORT
+    type: number
+    title: SMTP 端口
+    default: 25
+    min: 1024
+    max: 65535
+    description: SMTP 服务端口
+  - name: MAILCOW_SMTPS_PORT
+    type: number
+    title: SMTPS 端口
+    default: 465
+    min: 1024
+    max: 65535
+    description: SMTPS 服务端口
+  - name: MAILCOW_SUBMISSION_PORT
+    type: number
+    title: Submission 端口
+    default: 587
+    min: 1024
+    max: 65535
+    description: Submission 服务端口
+  - name: MAILCOW_IMAP_PORT
+    type: number
+    title: IMAP 端口
+    default: 143
+    min: 1024
+    max: 65535
+    description: IMAP 服务端口
+  - name: MAILCOW_IMAPS_PORT
+    type: number
+    title: IMAPS 端口
+    default: 993
+    min: 1024
+    max: 65535
+    description: IMAPS 服务端口
+  - name: MAILCOW_POP3_PORT
+    type: number
+    title: POP3 端口
+    default: 110
+    min: 1024
+    max: 65535
+    description: POP3 服务端口
+  - name: MAILCOW_POP3S_PORT
+    type: number
+    title: POP3S 端口
+    default: 995
+    min: 1024
+    max: 65535
+    description: POP3S 服务端口
+
+services:
+  - name: mailcow
+    type: web
+    description: Mailcow 邮件服务器
+    ports:
+      - internal: 80
+        external: null
+        public: true
+      - internal: 443
+        external: null
+        public: true
+      - internal: 25
+        external: null
+        public: true
+      - internal: 465
+        external: null
+        public: true
+      - internal: 587
+        external: null
+        public: true
+      - internal: 143
+        external: null
+        public: true
+      - internal: 993
+        external: null
+        public: true
+      - internal: 110
+        external: null
+        public: true
+      - internal: 995
+        external: null
+        public: true
+    volumes:
+      - name: mailcow_data
+        path: /var/lib/docker/volumes
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+
+healthcheck_global:
+  timeout: 20m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_url: https://{{PRIMARY_DOMAIN}}/admin
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  default_admin_user: admin
+  default_admin_password: moohoo
+

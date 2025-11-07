@@ -1,0 +1,125 @@
+id: iredmail
+name: iRedMail
+category: tools
+subcategory: email
+tags: [email, mail-server, iredmail]
+description: 企业级邮件服务器，基于开源组件，功能完整，易于部署。
+icon: iredmail
+version: 1.0.0
+author: SSLcat Team
+website: https://www.iredmail.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: IREDMAIL_VERSION
+    type: select
+    title: iRedMail 版本
+    default: "latest"
+    options: ["latest", "1.6", "1.5"]
+    description: 选择 iRedMail 版本
+  - name: IREDMAIL_PORT
+    type: number
+    title: iRedMail Web HTTP 端口
+    default: 80
+    min: 1024
+    max: 65535
+    description: iRedMail Web 界面 HTTP 端口
+  - name: IREDMAIL_HTTPS_PORT
+    type: number
+    title: iRedMail Web HTTPS 端口
+    default: 443
+    min: 1024
+    max: 65535
+    description: iRedMail Web 界面 HTTPS 端口
+  - name: IREDMAIL_SMTP_PORT
+    type: number
+    title: SMTP 端口
+    default: 25
+    min: 1024
+    max: 65535
+    description: SMTP 服务端口
+  - name: IREDMAIL_SMTPS_PORT
+    type: number
+    title: SMTPS 端口
+    default: 465
+    min: 1024
+    max: 65535
+    description: SMTPS 服务端口
+  - name: IREDMAIL_SUBMISSION_PORT
+    type: number
+    title: Submission 端口
+    default: 587
+    min: 1024
+    max: 65535
+    description: Submission 服务端口
+  - name: IREDMAIL_IMAP_PORT
+    type: number
+    title: IMAP 端口
+    default: 143
+    min: 1024
+    max: 65535
+    description: IMAP 服务端口
+  - name: IREDMAIL_IMAPS_PORT
+    type: number
+    title: IMAPS 端口
+    default: 993
+    min: 1024
+    max: 65535
+    description: IMAPS 服务端口
+
+services:
+  - name: iredmail
+    type: web
+    description: iRedMail 邮件服务器
+    ports:
+      - internal: 80
+        external: null
+        public: true
+      - internal: 443
+        external: null
+        public: true
+      - internal: 25
+        external: null
+        public: true
+      - internal: 465
+        external: null
+        public: true
+      - internal: 587
+        external: null
+        public: true
+      - internal: 143
+        external: null
+        public: true
+      - internal: 993
+        external: null
+        public: true
+    volumes:
+      - name: iredmail_data
+        path: /var/vmail
+        mode: rw
+      - name: iredmail_mysql
+        path: /var/lib/mysql
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+
+credentials:
+  iredmail:
+    admin_password:
+      pattern: random
+      length: 16
+
+healthcheck_global:
+  timeout: 20m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_url: https://{{PRIMARY_DOMAIN}}/iredadmin
+  admin_email: postmaster@{{PRIMARY_DOMAIN}}
+

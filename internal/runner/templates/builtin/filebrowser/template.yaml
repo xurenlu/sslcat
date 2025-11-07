@@ -1,0 +1,60 @@
+id: filebrowser
+name: FileBrowser
+category: tools
+subcategory: file-management
+tags: [go, file-management, filebrowser]
+description: 轻量级文件浏览器，支持文件上传、下载、编辑和管理。
+icon: filebrowser
+version: 1.0.0
+author: SSLcat Team
+website: https://filebrowser.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: FILEBROWSER_VERSION
+    type: select
+    title: FileBrowser 版本
+    default: "latest"
+    options: ["latest", "v2.23", "v2.22"]
+    description: 选择 FileBrowser 版本
+  - name: FILEBROWSER_PORT
+    type: number
+    title: FileBrowser 端口
+    default: 80
+    min: 1024
+    max: 65535
+    description: FileBrowser Web 服务端口
+
+services:
+  - name: filebrowser
+    type: web
+    description: FileBrowser 文件管理服务
+    ports:
+      - internal: 80
+        external: null
+        public: true
+    volumes:
+      - name: filebrowser_data
+        path: /srv
+        mode: rw
+      - name: filebrowser_database
+        path: /database
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  default_admin_user: admin
+  default_admin_password: admin
+

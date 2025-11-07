@@ -78,6 +78,7 @@ export interface Translation {
     imageOptimization: string
     cluster?: string
     clusterStatus?: string
+    tunnels?: string
   }
   
   // 仪表板
@@ -143,6 +144,61 @@ export interface Translation {
     lastConfigSync: string
     masterLastReachable: string
     lastError: string
+  }
+
+  // 隧道管理
+  tunnels?: {
+    title: string
+    description: string
+    addProvider: string
+    editProvider: string
+    deleteProvider: string
+    confirmDeleteProvider: string
+    addTunnel: string
+    editTunnel: string
+    deleteTunnel: string
+    confirmDeleteTunnel: string
+    providerType: string
+    providerName: string
+    descriptionLabel: string
+    enabled: string
+    autoStart: string
+    credentials: string
+    options: string
+    metadata: string
+    parameters: string
+    notes: string
+    key: string
+    value: string
+    addRow: string
+    removeRow: string
+    credentialPlaceholder: string
+    optionPlaceholder: string
+    secretStored: string
+    protocol: string
+    localAddress: string
+    localPort: string
+    publicHostname: string
+    publicPort: string
+    edgeRegion: string
+    status: string
+    lastError: string
+    lastUpdated: string
+    actions: string
+    startTunnel: string
+    stopTunnel: string
+    refresh: string
+    save: string
+    cancel: string
+    noProviders: string
+    createFirstProvider: string
+    statusConnected: string
+    statusDisconnected: string
+    statusError: string
+    statusUnknown: string
+    statusConnecting: string
+    providerBadgeAutoStart: string
+    providerBadgeDisabled: string
   }
   
   // 代理管理

@@ -36,6 +36,7 @@ import (
 	"github.com/xurenlu/sslcat/internal/ssl"
 	"github.com/xurenlu/sslcat/internal/statistics"
 	"github.com/xurenlu/sslcat/internal/tracing"
+	"github.com/xurenlu/sslcat/internal/tunnel"
 	"github.com/xurenlu/sslcat/internal/waf"
 
 	"io"
@@ -118,6 +119,9 @@ type Server struct {
 	// 慢请求管理器
 	slowRequestManager *slowrequest.Manager
 
+	// 隧道管理器
+	tunnelManager *tunnel.Manager
+
 	// Cluster runtime status
 	clusterLastConfigSyncAt      time.Time
 	clusterLastCertSyncAt        time.Time
@@ -156,6 +160,9 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 
 	// 初始化慢请求管理器（记录超过500ms的请求，最多保存1000条记录）
 	slowRequestManager := slowrequest.NewManager(1000, 500*time.Millisecond)
+
+	// 初始化隧道管理器
+	tunnelManager := tunnel.NewManager(cfg.Tunnels)
 
 	// 初始化图片优化器
 	imageOptConfig := &imageopt.Config{
@@ -243,6 +250,7 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		imageOptimizer:     imageOptimizer,
 		wafEngine:          wafEngine,
 		slowRequestManager: slowRequestManager,
+		tunnelManager:      tunnelManager,
 		log: logrus.WithFields(logrus.Fields{
 			"component": "web_server",
 		}),
@@ -399,6 +407,9 @@ func (s *Server) UpdateConfig(newConfig *config.Config) {
 	s.cleanupOldConfigResources(oldConfig, newConfig)
 
 	s.config = newConfig
+	if s.tunnelManager != nil {
+		s.tunnelManager.SyncFromConfig(newConfig.Tunnels)
+	}
 
 	// 更新压缩器配置
 	if s.compressor != nil {
@@ -810,6 +821,15 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/settings", s.handleAPISettings)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/settings/update", s.handleAPISettingsUpdate)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/settings/basic", s.handleAPISettingsBasic)
+
+	// 隧道管理 API
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/tunnels/providers", s.handleAPITunnelProviders)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/tunnels/providers/save", s.handleAPITunnelProvidersSave)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/tunnels/providers/delete", s.handleAPITunnelProvidersDelete)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/tunnels/delete", s.handleAPITunnelDelete)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/tunnels/start", s.handleAPITunnelStart)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/tunnels/stop", s.handleAPITunnelStop)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/tunnels/status", s.handleAPITunnelStatus)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/unblock", s.handleAPISecurityUnblock)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/static-sites", s.handleAPIStaticSites)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/static-sites/delete", s.handleAPIStaticSitesDelete)

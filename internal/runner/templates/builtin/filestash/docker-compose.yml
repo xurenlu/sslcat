@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  filestash:
+    image: machines/filestash:{{FILESTASH_VERSION}}
+    container_name: {{APP_NAME}}_filestash
+    restart: unless-stopped
+    ports:
+      - "{{FILESTASH_PORT}}:8334"
+    environment:
+      FILESTASH_URL: http://{{PRIMARY_DOMAIN}}
+    volumes:
+      - filestash_data:/app/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8334"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  filestash_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

@@ -47,6 +47,8 @@ type Config struct {
 	Monitoring MonitoringConfig `json:"monitoring"`
 	// 缓存预热配置
 	CacheWarmup CacheWarmupConfig `json:"cache_warmup"`
+	// 动态隧道配置
+	Tunnels TunnelManagerConfig `json:"tunnels"`
 }
 
 // ServerConfig 服务器配置
@@ -1138,11 +1140,11 @@ func (c *Config) GetSSLDomains() []string {
 func getDefaultConfig() *Config {
 	return &Config{
 		Server: ServerConfig{
-			Host:        "0.0.0.0",
-			Port:        443,
-			Debug:       false,
-			LogLevel:    "info",
-			EnablePprof: false,
+			Host:              "0.0.0.0",
+			Port:              443,
+			Debug:             false,
+			LogLevel:          "info",
+			EnablePprof:       false,
 			PortMode:          "standard",
 			CustomPort:        8080,
 			EnableHTTPS:       true,
@@ -1212,13 +1214,13 @@ func getDefaultConfig() *Config {
 			EnableDDOS:              true,
 			EnableCaptcha:           false,
 			MinFormMs:               800,
-			MaxAccessLogEntries:    3000,
-			MaxBlockedIPs:          1000,
-			MaxAttemptCounts:       1000,
-			MaxLastAttempts:        100,
-			UAInvalidMaxTotal:      500,
-			TLSFingerprintMaxTotal: 500,
-			CleanupIntervalMin:     5,
+			MaxAccessLogEntries:     3000,
+			MaxBlockedIPs:           1000,
+			MaxAttemptCounts:        1000,
+			MaxLastAttempts:         100,
+			UAInvalidMaxTotal:       500,
+			TLSFingerprintMaxTotal:  500,
+			CleanupIntervalMin:      5,
 		},
 		AdminPrefix: "/sslcat-panel",
 		Cluster: ClusterConfig{
@@ -1279,6 +1281,9 @@ func getDefaultConfig() *Config {
 			URLs:     []string{},
 			Interval: 60,
 			BaseURL:  "",
+		},
+		Tunnels: TunnelManagerConfig{
+			Providers: []TunnelProviderConfig{},
 		},
 		ImageOptimization: ImageOptimizationConfig{
 			Enabled:       false,
@@ -1344,7 +1349,7 @@ func diffMap(current, defaultVal map[string]interface{}, result map[string]inter
 		// 如果是嵌套的 map，递归比较
 		currentMap, currentIsMap := currentVal.(map[string]interface{})
 		defaultMap, defaultIsMap := defaultValForKey.(map[string]interface{})
-		
+
 		if currentIsMap && defaultIsMap {
 			// 都是 map，递归比较
 			nestedResult := make(map[string]interface{})
@@ -1835,6 +1840,54 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("服务器配置: 端口号必须在1-65535范围内")
 	}
 
+	// 验证隧道配置
+	providerIDs := make(map[string]struct{})
+	for i, provider := range c.Tunnels.Providers {
+		if strings.TrimSpace(provider.ID) == "" {
+			return fmt.Errorf("隧道提供商 %d: ID 不能为空", i)
+		}
+		if _, exists := providerIDs[provider.ID]; exists {
+			return fmt.Errorf("隧道提供商 %d: ID 重复", i)
+		}
+		providerIDs[provider.ID] = struct{}{}
+
+		providerType := strings.ToLower(strings.TrimSpace(provider.Type))
+		if providerType == "" {
+			return fmt.Errorf("隧道提供商 %d: 类型不能为空", i)
+		}
+		if !IsSupportedTunnelProvider(providerType) {
+			return fmt.Errorf("隧道提供商 %s: 不受支持的类型 %s", provider.Name, provider.Type)
+		}
+
+		tunnelIDs := make(map[string]struct{})
+		for j, tunnel := range provider.Tunnels {
+			if strings.TrimSpace(tunnel.ID) == "" {
+				return fmt.Errorf("隧道提供商 %s: 隧道 %d 缺少 ID", provider.Name, j)
+			}
+			if _, exists := tunnelIDs[tunnel.ID]; exists {
+				return fmt.Errorf("隧道提供商 %s: 隧道 ID %s 重复", provider.Name, tunnel.ID)
+			}
+			tunnelIDs[tunnel.ID] = struct{}{}
+
+			if strings.TrimSpace(tunnel.Name) == "" {
+				return fmt.Errorf("隧道提供商 %s: 隧道 %s 名称不能为空", provider.Name, tunnel.ID)
+			}
+
+			protocol := NormalizeTunnelProtocol(tunnel.Protocol)
+			if !IsSupportedTunnelProtocol(protocol) {
+				return fmt.Errorf("隧道提供商 %s: 隧道 %s 使用了不受支持的协议 %s", provider.Name, tunnel.Name, tunnel.Protocol)
+			}
+
+			if tunnel.LocalPort < 1 || tunnel.LocalPort > 65535 {
+				return fmt.Errorf("隧道提供商 %s: 隧道 %s 本地端口必须在1-65535之间", provider.Name, tunnel.Name)
+			}
+
+			if tunnel.PublicPort < 0 || tunnel.PublicPort > 65535 {
+				return fmt.Errorf("隧道提供商 %s: 隧道 %s 公网端口必须在0-65535之间", provider.Name, tunnel.Name)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -2238,4 +2291,80 @@ type CacheWarmupConfig struct {
 	URLs     []string `json:"urls"`     // 需要预热的URL列表
 	Interval int      `json:"interval"` // 预热间隔（分钟）
 	BaseURL  string   `json:"base_url"` // 基础URL（可选，默认自动检测）
+}
+
+// 内置支持的隧道提供商类型
+var supportedTunnelProviderTypes = map[string]struct{}{
+	"cloudflare": {},
+	"ngrok":      {},
+	"frp":        {},
+	"phddns":     {},
+}
+
+// 内置支持的隧道协议
+var supportedTunnelProtocols = map[string]struct{}{
+	"http":  {},
+	"https": {},
+	"tcp":   {},
+	"udp":   {},
+}
+
+// IsSupportedTunnelProvider 判断隧道服务提供商类型是否受支持
+func IsSupportedTunnelProvider(providerType string) bool {
+	providerType = strings.ToLower(strings.TrimSpace(providerType))
+	_, ok := supportedTunnelProviderTypes[providerType]
+	return ok
+}
+
+// IsSupportedTunnelProtocol 判断隧道协议是否受支持
+func IsSupportedTunnelProtocol(protocol string) bool {
+	protocol = strings.ToLower(strings.TrimSpace(protocol))
+	if protocol == "" {
+		protocol = "http"
+	}
+	_, ok := supportedTunnelProtocols[protocol]
+	return ok
+}
+
+// NormalizeTunnelProtocol 标准化协议字符串
+func NormalizeTunnelProtocol(protocol string) string {
+	protocol = strings.ToLower(strings.TrimSpace(protocol))
+	if protocol == "" {
+		return "http"
+	}
+	return protocol
+}
+
+// TunnelManagerConfig 隧道管理配置
+type TunnelManagerConfig struct {
+	Providers []TunnelProviderConfig `json:"providers"`
+}
+
+// TunnelProviderConfig 单个隧道提供商配置
+type TunnelProviderConfig struct {
+	ID          string             `json:"id"`
+	Name        string             `json:"name"`
+	Type        string             `json:"type"`
+	Enabled     bool               `json:"enabled"`
+	Description string             `json:"description,omitempty"`
+	AutoStart   bool               `json:"auto_start"`
+	Credentials map[string]string  `json:"credentials,omitempty"`
+	Options     map[string]string  `json:"options,omitempty"`
+	Tunnels     []TunnelDefinition `json:"tunnels,omitempty"`
+}
+
+// TunnelDefinition 单条隧道定义
+type TunnelDefinition struct {
+	ID             string            `json:"id"`
+	Name           string            `json:"name"`
+	Protocol       string            `json:"protocol"`
+	LocalAddress   string            `json:"local_address"`
+	LocalPort      int               `json:"local_port"`
+	PublicHostname string            `json:"public_hostname,omitempty"`
+	PublicPort     int               `json:"public_port,omitempty"`
+	EdgeRegion     string            `json:"edge_region,omitempty"`
+	AutoStart      bool              `json:"auto_start"`
+	Metadata       map[string]string `json:"metadata,omitempty"`
+	Parameters     map[string]string `json:"parameters,omitempty"`
+	Notes          string            `json:"notes,omitempty"`
 }

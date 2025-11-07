@@ -32,6 +32,7 @@ import ClusterSettings from './pages/ClusterSettings'
 import ClusterStatus from './pages/ClusterStatus'
 import TemplateMarket from './pages/TemplateMarket'
 import TemplateDeploy from './pages/TemplateDeploy'
+import Tunnels from './pages/Tunnels'
 
 const AppRoutes: React.FC = () => {
   const { adminPrefix, isLoading, error } = useConfig()
@@ -129,6 +130,11 @@ const AppRoutes: React.FC = () => {
       <Route path={`${adminPrefix}/dns`} element={
         <AuthGuard>
           <DNSManagement />
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/tunnels`} element={
+        <AuthGuard>
+          <Tunnels />
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/security`} element={

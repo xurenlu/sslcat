@@ -1,0 +1,56 @@
+id: paddleocr
+name: PaddleOCR
+category: tools
+subcategory: ocr
+tags: [python, ocr, text-recognition, chinese, paddleocr]
+description: 百度开源 OCR 工具，对中文识别效果优秀，支持多语言。
+icon: paddleocr
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/PaddlePaddle/PaddleOCR
+compose_file: docker-compose.yml
+
+variables:
+  - name: PADDLEOCR_VERSION
+    type: select
+    title: PaddleOCR 版本
+    default: "latest"
+    options: ["latest", "2.7", "2.6"]
+    description: 选择 PaddleOCR 版本
+  - name: PADDLEOCR_PORT
+    type: number
+    title: PaddleOCR 端口
+    default: 8866
+    min: 1024
+    max: 65535
+    description: PaddleOCR Web 服务端口
+
+services:
+  - name: paddleocr
+    type: web
+    description: PaddleOCR 中文 OCR 服务
+    ports:
+      - internal: 8866
+        external: null
+        public: true
+    volumes:
+      - name: paddleocr_data
+        path: /app/data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  chinese_support: 优秀
+

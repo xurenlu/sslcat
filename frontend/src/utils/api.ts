@@ -422,6 +422,20 @@ export const apiService = {
     api.post('/settings', settings),
   updateBasicSettings: (settings: Record<string, any>): Promise<any> => 
     api.post('/settings/basic', settings),
+
+  // 隧道管理
+  getTunnels: (): Promise<any> => 
+    api.get('/tunnels/providers'),
+  saveTunnelProvider: (payload: Record<string, any>): Promise<any> => 
+    api.post('/tunnels/providers/save', payload),
+  deleteTunnelProvider: (id: string): Promise<any> => 
+    api.post('/tunnels/providers/delete', { id }),
+  deleteTunnel: (providerId: string, tunnelId: string): Promise<any> => 
+    api.post('/tunnels/delete', { provider_id: providerId, tunnel_id: tunnelId }),
+  startTunnel: (providerId: string, tunnelId: string): Promise<any> => 
+    api.post('/tunnels/start', { provider_id: providerId, tunnel_id: tunnelId }),
+  stopTunnel: (providerId: string, tunnelId: string): Promise<any> => 
+    api.post('/tunnels/stop', { provider_id: providerId, tunnel_id: tunnelId }),
   
   // 云存储检测
   detectCloudStorage: (target: string): Promise<any> => 

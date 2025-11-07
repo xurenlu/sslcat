@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  paddleocr:
+    image: paddlepaddle/paddleocr:{{PADDLEOCR_VERSION}}
+    container_name: {{APP_NAME}}_paddleocr
+    restart: unless-stopped
+    ports:
+      - "{{PADDLEOCR_PORT}}:8866"
+    volumes:
+      - paddleocr_data:/app/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8866"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  paddleocr_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+
