@@ -1,0 +1,94 @@
+id: vikunja
+name: Vikunja
+category: project
+subcategory: todo
+tags: [go, postgresql, project, todo, task-management, vikunja]
+description: 开源待办事项和项目管理工具，界面美观，功能完整。
+icon: vikunja
+version: 1.0.0
+author: SSLcat Team
+website: https://vikunja.io/
+compose_file: docker-compose.yml
+
+variables:
+  - name: VIKUNJA_VERSION
+    type: select
+    title: Vikunja 版本
+    default: "latest"
+    options: ["latest", "0.23", "0.22"]
+    description: 选择 Vikunja 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "14", "16"]
+    description: 选择 PostgreSQL 版本
+  - name: VIKUNJA_PORT
+    type: number
+    title: Vikunja 端口
+    default: 3456
+    min: 1024
+    max: 65535
+    description: Vikunja Web 服务端口
+
+services:
+  - name: vikunja
+    type: web
+    description: Vikunja 待办事项服务
+    depends_on: [postgres]
+    ports:
+      - internal: 3456
+        external: null
+        public: true
+    volumes:
+      - name: vikunja_data
+        path: /app/vikunja/files
+        mode: rw
+    healthcheck:
+      type: http
+      path: /api/v1/info
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_vikunja"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_vikunja"
+
+connection_strings:
+  postgres: "postgresql://{username}:{password}@postgres:5432/{database}"
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+

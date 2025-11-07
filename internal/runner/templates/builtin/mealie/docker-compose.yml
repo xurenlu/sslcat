@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  mealie:
+    image: hkotel/mealie:{{MEALIE_VERSION}}
+    container_name: {{APP_NAME}}_mealie
+    restart: unless-stopped
+    ports:
+      - "{{MEALIE_PORT}}:9000"
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: UTC
+      MAX_WORKERS: 1
+      WEB_CONCURRENCY: 1
+      BASE_URL: http://{{PRIMARY_DOMAIN}}
+      DB_ENGINE: postgres
+      POSTGRES_USER: {{POSTGRES_USERNAME}}
+      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_SERVER: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: {{POSTGRES_DATABASE}}
+    volumes:
+      - mealie_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9000/api/app/about"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  postgres:
+    image: postgres:{{POSTGRES_VERSION}}
+    container_name: {{APP_NAME}}_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: {{POSTGRES_DATABASE}}
+      POSTGRES_USER: {{POSTGRES_USERNAME}}
+      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  mealie_data:
+    driver: local
+  postgres_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+
