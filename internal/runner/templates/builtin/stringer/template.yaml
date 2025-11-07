@@ -1,0 +1,98 @@
+id: stringer
+name: Stringer
+category: rss
+subcategory: reader
+tags: [ruby, postgresql, rss, feed, reader, stringer]
+description: 简洁的 RSS 阅读器，基于 Ruby，界面美观。
+icon: stringer
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/swanson/stringer
+compose_file: docker-compose.yml
+
+variables:
+  - name: STRINGER_VERSION
+    type: select
+    title: Stringer 版本
+    default: "latest"
+    options: ["latest"]
+    description: 选择 Stringer 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "14", "16"]
+    description: 选择 PostgreSQL 版本
+  - name: STRINGER_PORT
+    type: number
+    title: Stringer 端口
+    default: 5000
+    min: 1024
+    max: 65535
+    description: Stringer Web 服务端口
+
+services:
+  - name: stringer
+    type: web
+    description: Stringer RSS 阅读器服务
+    depends_on: [postgres]
+    ports:
+      - internal: 5000
+        external: null
+        public: true
+    volumes:
+      - name: stringer_data
+        path: /app/db
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_stringer"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_stringer"
+  stringer:
+    secret_token:
+      pattern: random
+      length: 32
+
+connection_strings:
+  postgres: "postgresql://{username}:{password}@postgres:5432/{database}"
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+

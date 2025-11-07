@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  selfoss:
+    image: mprasil/selfoss:{{SELFOSS_VERSION}}
+    container_name: {{APP_NAME}}_selfoss
+    restart: unless-stopped
+    ports:
+      - "{{SELFOSS_PORT}}:8888"
+    environment:
+      CRON_ENABLE: "true"
+      CRON_INTERVAL: "*/15"
+    volumes:
+      - selfoss_data:/var/www/selfoss/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8888"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  selfoss_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

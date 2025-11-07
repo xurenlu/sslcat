@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  countly-api:
+    image: countly/api:{{COUNTLY_VERSION}}
+    container_name: {{APP_NAME}}_countly_api
+    restart: unless-stopped
+    ports:
+      - "{{COUNTLY_PORT}}:3001"
+    environment:
+      COUNTLY_MONGODB: mongodb://{{MONGODB_USERNAME}}:{{MONGODB_PASSWORD}}@mongodb:27017/{{MONGODB_DATABASE}}?authSource=admin
+      COUNTLY_REDIS_HOST: redis
+      COUNTLY_REDIS_PORT: 6379
+    volumes:
+      - countly_data:/var/lib/countly
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/o"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  mongodb:
+    image: mongo:{{MONGODB_VERSION}}
+    container_name: {{APP_NAME}}_mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: {{MONGODB_ROOT_USERNAME}}
+      MONGO_INITDB_ROOT_PASSWORD: {{MONGODB_ROOT_PASSWORD}}
+      MONGO_INITDB_DATABASE: {{MONGODB_DATABASE}}
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:{{REDIS_VERSION}}
+    container_name: {{APP_NAME}}_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  countly_data:
+    driver: local
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+
