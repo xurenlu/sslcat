@@ -1,0 +1,74 @@
+id: replicate-real-esrgan
+name: Replicate Real-ESRGAN (图片放大)
+category: ai
+subcategory: image-enhancement
+tags: [replicate, ai, image-enhancement, upscaling, real-esrgan, gpu]
+description: Replicate 上的 Real-ESRGAN 模型，高质量图片放大和修复，需要 GPU。
+icon: replicate-real-esrgan
+version: 1.0.0
+author: SSLcat Team
+website: https://replicate.com/nightmareai/real-esrgan
+compose_file: docker-compose.yml
+
+variables:
+  - name: REPLICATE_REAL_ESRGAN_VERSION
+    type: select
+    title: Replicate Proxy 版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择 Replicate Proxy 版本
+  - name: REPLICATE_REAL_ESRGAN_PORT
+    type: number
+    title: Replicate Real-ESRGAN 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: Replicate Real-ESRGAN API 服务端口
+  - name: REPLICATE_API_TOKEN
+    type: string
+    title: Replicate API Token
+    default: ""
+    description: Replicate API Token（需要注册获取）
+    required: true
+    sensitive: true
+
+services:
+  - name: replicate-real-esrgan
+    type: api
+    description: Replicate Real-ESRGAN 图片放大服务
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: replicate_real_esrgan_data
+        path: /app/cache
+        mode: rw
+    resources:
+      gpu: required
+    healthcheck:
+      type: http
+      path: /health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+credentials:
+  replicate-real-esrgan:
+    api_token:
+      pattern: random
+      length: 32
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/api/upscale"
+  replicate_model: "nightmareai/real-esrgan"
+  features: "图片放大,图片修复,高质量增强"
+  gpu_required: true
+
