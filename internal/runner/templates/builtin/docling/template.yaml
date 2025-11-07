@@ -1,0 +1,63 @@
+id: docling
+name: Docling (智能文档处理)
+category: ai
+subcategory: document-processing
+tags: [python, ai, document-processing, pdf-parsing, docling]
+description: IBM 开源的智能文档处理工具，支持 PDF 解析、表格提取和文档理解。
+icon: docling
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/DS4SD/docling
+compose_file: docker-compose.yml
+
+variables:
+  - name: DOCLING_VERSION
+    type: select
+    title: Docling 版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择 Docling 版本
+  - name: DOCLING_PORT
+    type: number
+    title: Docling 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: Docling API 服务端口
+  - name: DOCLING_API_KEY
+    type: string
+    title: Docling API Key
+    default: ""
+    description: Docling API 密钥（可选）
+    sensitive: true
+
+services:
+  - name: docling
+    type: api
+    description: Docling 智能文档处理服务
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: docling_data
+        path: /app/data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/api/process"
+  features: "PDF解析,表格提取,文档理解,结构化输出"
+

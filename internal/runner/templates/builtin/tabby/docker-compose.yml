@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  tabby:
+    image: tabbyml/tabby:{{TABBY_VERSION}}
+    container_name: {{APP_NAME}}_tabby
+    restart: unless-stopped
+    ports:
+      - "{{TABBY_PORT}}:8080"
+    environment:
+      TABBY_API_KEY: {{TABBY_API_KEY}}
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    volumes:
+      - tabby_data:/app/models
+    networks:
+      - {{APP_NAME}}_network
+    runtime: nvidia
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 180s
+
+volumes:
+  tabby_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

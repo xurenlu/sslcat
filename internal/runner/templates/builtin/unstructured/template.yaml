@@ -1,0 +1,64 @@
+id: unstructured
+name: Unstructured (文档解析)
+category: ai
+subcategory: document-processing
+tags: [python, ai, document-processing, pdf-parsing, unstructured]
+description: 强大的文档解析工具，支持 PDF、Word、Excel 等多种格式的结构化提取。
+icon: unstructured
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/Unstructured-IO/unstructured
+compose_file: docker-compose.yml
+
+variables:
+  - name: UNSTRUCTURED_VERSION
+    type: select
+    title: Unstructured 版本
+    default: "latest"
+    options: ["latest", "v0.10", "v0.9"]
+    description: 选择 Unstructured 版本
+  - name: UNSTRUCTURED_PORT
+    type: number
+    title: Unstructured 端口
+    default: 8000
+    min: 1024
+    max: 65535
+    description: Unstructured API 服务端口
+  - name: UNSTRUCTURED_API_KEY
+    type: string
+    title: Unstructured API Key
+    default: ""
+    description: Unstructured API 密钥（可选）
+    sensitive: true
+
+services:
+  - name: unstructured
+    type: api
+    description: Unstructured 文档解析服务
+    ports:
+      - internal: 8000
+        external: null
+        public: true
+    volumes:
+      - name: unstructured_data
+        path: /app/data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/api/parse"
+  supported_formats: "PDF,Word,Excel,HTML,Markdown"
+  features: "文档解析,结构化提取,表格识别"
+

@@ -1,0 +1,60 @@
+id: table-transformer
+name: Table Transformer (表格识别)
+category: ai
+subcategory: document-processing
+tags: [python, ai, ocr, table-recognition, table-transformer, gpu]
+description: 强大的表格识别工具，从图片中提取表格并转换为 Excel/CSV，需要 GPU。
+icon: table-transformer
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/microsoft/table-transformer
+compose_file: docker-compose.yml
+
+variables:
+  - name: TABLE_TRANSFORMER_VERSION
+    type: select
+    title: Table Transformer 版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择 Table Transformer 版本
+  - name: TABLE_TRANSFORMER_PORT
+    type: number
+    title: Table Transformer 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: Table Transformer API 服务端口
+
+services:
+  - name: table-transformer
+    type: api
+    description: Table Transformer 表格识别服务
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: table_transformer_data
+        path: /app/models
+        mode: rw
+    resources:
+      gpu: required
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+healthcheck_global:
+  timeout: 20m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/api/recognize"
+  features: "表格识别,Excel导出,CSV导出,高精度识别"
+  gpu_required: true
+

@@ -1,0 +1,60 @@
+id: gfpgan
+name: GFPGAN (人脸修复增强)
+category: ai
+subcategory: image-enhancement
+tags: [python, ai, image-enhancement, face-restoration, gfpgan, gpu]
+description: 高质量人脸修复和增强工具，修复模糊、低分辨率的人脸照片，需要 GPU。
+icon: gfpgan
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/TencentARC/GFPGAN
+compose_file: docker-compose.yml
+
+variables:
+  - name: GFPGAN_VERSION
+    type: select
+    title: GFPGAN 版本
+    default: "latest"
+    options: ["latest", "v1.4", "v1.3"]
+    description: 选择 GFPGAN 版本
+  - name: GFPGAN_PORT
+    type: number
+    title: GFPGAN 端口
+    default: 5000
+    min: 1024
+    max: 65535
+    description: GFPGAN API 服务端口
+
+services:
+  - name: gfpgan
+    type: api
+    description: GFPGAN 人脸修复增强服务
+    ports:
+      - internal: 5000
+        external: null
+        public: true
+    volumes:
+      - name: gfpgan_data
+        path: /app/models
+        mode: rw
+    resources:
+      gpu: required
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/api/restore"
+  features: "人脸修复,老照片修复,高清增强,自然效果"
+  gpu_required: true
+

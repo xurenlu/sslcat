@@ -1,67 +1,64 @@
 id: paperless-ngx
-name: Paperless NGX
-category: collaboration
+name: Paperless-ngx (无纸化办公)
+category: tools
 subcategory: document-management
-tags: [python, postgresql, redis, document, management, paperless]
-description: 无纸化文档管理系统，支持 OCR 和智能分类，适合个人和团队使用。
+tags: [python, postgres, redis, document-management, ocr, paperless]
+description: 无纸化办公系统，自动 OCR 识别、分类和搜索文档，支持 PDF、图片等多种格式。
 icon: paperless-ngx
 version: 1.0.0
 author: SSLcat Team
-website: https://paperless-ngx.readthedocs.io/
+website: https://github.com/paperless-ngx/paperless-ngx
 compose_file: docker-compose.yml
 
 variables:
-  - name: PAPERLESS_VERSION
+  - name: PAPERLESS_NGX_VERSION
     type: select
-    title: Paperless NGX 版本
+    title: Paperless-ngx 版本
     default: "latest"
-    options: ["latest", "2.9", "2.8"]
-    description: 选择 Paperless NGX 版本
+    options: ["latest", "2.0", "1.10"]
+    description: 选择 Paperless-ngx 版本
   - name: POSTGRES_VERSION
     type: select
     title: PostgreSQL 版本
     default: "15"
-    options: ["15", "14", "16"]
+    options: ["15", "16", "14"]
     description: 选择 PostgreSQL 版本
   - name: REDIS_VERSION
     type: select
     title: Redis 版本
     default: "7"
-    options: ["7", "6", "7-alpine"]
+    options: ["7", "6", "alpine"]
     description: 选择 Redis 版本
-  - name: PAPERLESS_PORT
+  - name: PAPERLESS_NGX_PORT
     type: number
-    title: Paperless NGX 端口
+    title: Paperless-ngx 端口
     default: 8000
     min: 1024
     max: 65535
-    description: Paperless NGX Web 服务端口
+    description: Paperless-ngx Web 服务端口
 
 services:
   - name: paperless-ngx
     type: web
-    description: Paperless NGX 文档管理服务
+    description: Paperless-ngx 无纸化办公服务
     depends_on: [postgres, redis]
     ports:
       - internal: 8000
         external: null
         public: true
     volumes:
-      - name: paperless_data
+      - name: paperless_ngx_data
         path: /usr/src/paperless/data
         mode: rw
-      - name: paperless_media
+      - name: paperless_ngx_media
         path: /usr/src/paperless/media
         mode: rw
-      - name: paperless_export
+      - name: paperless_ngx_export
         path: /usr/src/paperless/export
-        mode: rw
-      - name: paperless_consume
-        path: /usr/src/paperless/consume
         mode: rw
     healthcheck:
       type: http
-      path: /api/
+      path: /
       interval: 30s
       timeout: 10s
       retries: 5
@@ -80,7 +77,7 @@ services:
         mode: rw
     healthcheck:
       type: command
-      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
+      command: ["pg_isready", "-U", "{username}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -114,17 +111,21 @@ credentials:
       length: 18
     database:
       pattern: "{app_name}_paperless"
-  paperless:
+  redis:
+    password:
+      pattern: random
+      length: 16
+  paperless-ngx:
     secret_key:
       pattern: random
-      length: 50
+      length: 32
 
 connection_strings:
-  postgres: "postgresql://{username}:{password}@postgres:5432/{database}"
-  redis: "redis://redis:6379/0"
+  postgres: "postgres://{username}:{password}@postgres:5432/{database}"
+  redis: "redis://:{password}@redis:6379/0"
 
 healthcheck_global:
-  timeout: 15m
+  timeout: 20m
   interval: 10s
 
 metadata:
@@ -132,4 +133,4 @@ metadata:
   admin_email: admin@{{PRIMARY_DOMAIN}}
   default_admin_user: admin
   default_admin_password: admin
-
+  features: "OCR识别,文档分类,全文搜索,标签管理"

@@ -1,0 +1,59 @@
+id: remove-bg
+name: Remove.bg (背景移除)
+category: ai
+subcategory: image-editing
+tags: [python, ai, image-editing, remove-background, rembg, gpu]
+description: 开源背景移除工具，支持人像、物体等多种场景的智能抠图，需要 GPU。
+icon: remove-bg
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/danielgatis/rembg
+compose_file: docker-compose.yml
+
+variables:
+  - name: REMOVE_BG_VERSION
+    type: select
+    title: Remove.bg 版本
+    default: "latest"
+    options: ["latest", "v2.0", "v1.0"]
+    description: 选择 Remove.bg 版本
+  - name: REMOVE_BG_PORT
+    type: number
+    title: Remove.bg 端口
+    default: 5000
+    min: 1024
+    max: 65535
+    description: Remove.bg API 服务端口
+
+services:
+  - name: remove-bg
+    type: api
+    description: Remove.bg 背景移除服务
+    ports:
+      - internal: 5000
+        external: null
+        public: true
+    volumes:
+      - name: remove_bg_data
+        path: /app/models
+        mode: rw
+    resources:
+      gpu: optional
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/api/remove"
+  features: "智能抠图,人像识别,物体识别,PNG透明背景"
+

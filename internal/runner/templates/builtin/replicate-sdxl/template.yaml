@@ -1,0 +1,74 @@
+id: replicate-sdxl
+name: Replicate SDXL (高清图片生成)
+category: ai
+subcategory: image-generation
+tags: [replicate, ai, image-generation, sdxl, gpu]
+description: Replicate 上的 Stable Diffusion XL 模型，生成更高分辨率的图片，需要 GPU。
+icon: replicate-sdxl
+version: 1.0.0
+author: SSLcat Team
+website: https://replicate.com/stability-ai/sdxl
+compose_file: docker-compose.yml
+
+variables:
+  - name: REPLICATE_SDXL_VERSION
+    type: select
+    title: Replicate Proxy 版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择 Replicate Proxy 版本
+  - name: REPLICATE_SDXL_PORT
+    type: number
+    title: Replicate SDXL 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: Replicate SDXL API 服务端口
+  - name: REPLICATE_API_TOKEN
+    type: string
+    title: Replicate API Token
+    default: ""
+    description: Replicate API Token（需要注册获取）
+    required: true
+    sensitive: true
+
+services:
+  - name: replicate-sdxl
+    type: api
+    description: Replicate SDXL 高清图片生成服务
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: replicate_sdxl_data
+        path: /app/cache
+        mode: rw
+    resources:
+      gpu: required
+    healthcheck:
+      type: http
+      path: /health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+credentials:
+  replicate-sdxl:
+    api_token:
+      pattern: random
+      length: 32
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/api/generate"
+  replicate_model: "stability-ai/sdxl"
+  features: "高清图片生成,1024x1024分辨率,高质量输出"
+  gpu_required: true
+

@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  replicate-remove-background:
+    image: replicate/proxy:{{REPLICATE_RMBG_VERSION}}
+    container_name: {{APP_NAME}}_replicate_remove_background
+    restart: unless-stopped
+    ports:
+      - "{{REPLICATE_RMBG_PORT}}:8080"
+    environment:
+      REPLICATE_API_TOKEN: {{REPLICATE_API_TOKEN}}
+      REPLICATE_MODEL: lucataco/remove-background
+    volumes:
+      - replicate_rmbg_data:/app/cache
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  replicate_rmbg_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

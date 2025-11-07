@@ -1,0 +1,74 @@
+id: replicate-face-restoration
+name: Replicate Face Restoration (人脸修复)
+category: ai
+subcategory: image-enhancement
+tags: [replicate, ai, image-enhancement, face-restoration, gpu]
+description: Replicate 上的人脸修复模型，修复模糊、低分辨率的人脸照片，需要 GPU。
+icon: replicate-face-restoration
+version: 1.0.0
+author: SSLcat Team
+website: https://replicate.com/logerzhu/face-restoration
+compose_file: docker-compose.yml
+
+variables:
+  - name: REPLICATE_FACE_RESTORE_VERSION
+    type: select
+    title: Replicate Proxy 版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择 Replicate Proxy 版本
+  - name: REPLICATE_FACE_RESTORE_PORT
+    type: number
+    title: Replicate Face Restoration 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: Replicate Face Restoration API 服务端口
+  - name: REPLICATE_API_TOKEN
+    type: string
+    title: Replicate API Token
+    default: ""
+    description: Replicate API Token（需要注册获取）
+    required: true
+    sensitive: true
+
+services:
+  - name: replicate-face-restoration
+    type: api
+    description: Replicate Face Restoration 人脸修复服务
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: replicate_face_restore_data
+        path: /app/cache
+        mode: rw
+    resources:
+      gpu: required
+    healthcheck:
+      type: http
+      path: /health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+credentials:
+  replicate-face-restoration:
+    api_token:
+      pattern: random
+      length: 32
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/api/restore-face"
+  replicate_model: "logerzhu/face-restoration"
+  features: "人脸修复,老照片修复,高清增强"
+  gpu_required: true
+
