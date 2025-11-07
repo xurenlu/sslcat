@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -102,27 +103,11 @@ func (api *TemplateDeployAPI) DeployFromTemplate(w http.ResponseWriter, r *http.
 		AutoSSL:       req.AutoSSL,
 	}
 
-	// 执行部署
-	orchestrator := api.gitServer.GetDeployOrchestrator()
-	if orchestrator == nil {
-		writeErrorJSON(w, "部署编排器未初始化", http.StatusInternalServerError)
-		return
-	}
+	// 设置应用初始状态
+	app.Status = "deploying"
+	app.LastDeploy = time.Now()
 
-	tm := api.gitServer.GetTemplateManager()
-	if tm == nil {
-		writeErrorJSON(w, "模板管理器未初始化", http.StatusInternalServerError)
-		return
-	}
-
-	result, err := orchestrator.DeployFromTemplate(r.Context(), tm, app, params, logger)
-	if err != nil {
-		logger.WriteLog("error", "deploy", fmt.Sprintf("部署失败: %v", err))
-		writeErrorJSON(w, fmt.Sprintf("部署失败: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	// 将应用添加到 GitServer
+	// 将应用添加到 GitServer（先添加，状态为 deploying）
 	if err := api.gitServer.AddApp(app); err != nil {
 		logger.WriteLog("error", "deploy", fmt.Sprintf("添加应用到 GitServer 失败: %v", err))
 		writeErrorJSON(w, fmt.Sprintf("添加应用失败: %v", err), http.StatusInternalServerError)
@@ -135,15 +120,61 @@ func (api *TemplateDeployAPI) DeployFromTemplate(w http.ResponseWriter, r *http.
 		// 不返回错误，因为应用已经在内存中
 	}
 
-	// 返回结果
+	// 获取部署编排器和模板管理器
+	orchestrator := api.gitServer.GetDeployOrchestrator()
+	if orchestrator == nil {
+		app.Status = "failed"
+		api.gitServer.SaveApps()
+		writeErrorJSON(w, "部署编排器未初始化", http.StatusInternalServerError)
+		return
+	}
+
+	tm := api.gitServer.GetTemplateManager()
+	if tm == nil {
+		app.Status = "failed"
+		api.gitServer.SaveApps()
+		writeErrorJSON(w, "模板管理器未初始化", http.StatusInternalServerError)
+		return
+	}
+
+	// 立即返回部署ID，后台异步执行部署
 	response := map[string]interface{}{
 		"success":         true,
-		"app":             app,
-		"services":        result.Services,
-		"credentials":     result.Credentials,
-		"deployment_uuid": result.DeploymentUUID,
+		"message":         "部署已启动，正在后台执行",
+		"app_name":        req.AppName,
+		"deployment_uuid": deployID,
+		"status":          "deploying",
+		"log_file":        logFile,
 	}
 
 	writeJSON(w, response)
+
+	// 在后台 goroutine 中执行部署（使用 Background context，避免 HTTP 请求超时）
+	go func() {
+		ctx := context.Background()
+		
+		logger.WriteLog("info", "deploy", "开始后台部署...")
+		result, err := orchestrator.DeployFromTemplate(ctx, tm, app, params, logger)
+		
+		if err != nil {
+			logger.WriteLog("error", "deploy", fmt.Sprintf("部署失败: %v", err))
+			app.Status = "failed"
+			api.gitServer.SaveApps()
+			return
+		}
+
+		// 部署成功，更新应用状态
+		app.Status = "running"
+		app.Services = result.Services
+		app.ServiceCredentials = result.Credentials
+		
+		// 保存应用
+		if err := api.gitServer.SaveApps(); err != nil {
+			logger.WriteLog("warn", "deploy", fmt.Sprintf("保存应用失败: %v", err))
+		}
+
+		logger.WriteLog("success", "deploy", "部署完成")
+		logger.Close()
+	}()
 }
 

@@ -133,11 +133,12 @@ const TemplateDeploy: React.FC = () => {
 
       if (response && response.success) {
         toast({
-          title: '部署成功',
-          description: `应用 ${formData.app_name} 部署成功`,
-          status: 'success',
+          title: '部署已启动',
+          description: response.message || `应用 ${formData.app_name} 正在后台部署中，请稍候查看状态`,
+          status: 'info',
           duration: 5000,
         })
+        // 跳转到应用列表页面，用户可以查看部署状态
         navigate(buildPath(adminPrefix, '/git-server'))
       }
     } catch (error: any) {
