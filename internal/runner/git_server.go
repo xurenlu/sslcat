@@ -59,6 +59,12 @@ type GitServer struct {
 	// Builder Registry
 	builderRegistry *BuilderRegistry
 
+	// 模板与部署助手
+	templateManager   *TemplateManager
+	composeGenerator  *ComposeGenerator
+	credentialManager *CredentialManager
+	domainManager     *DomainManager
+
 	// 部署数据库
 	deployDB *DeployDatabase
 	// 发布数据库（新版本）
@@ -72,6 +78,9 @@ type GitServer struct {
 
 	// 停止信号通道
 	stopChan chan struct{}
+
+	// 模板监听控制
+	templateWatchCancel context.CancelFunc
 
 	// 构建并发控制（防止内存暴增）
 	buildSemaphore      chan struct{}
@@ -91,6 +100,11 @@ type SSLManagerInterface interface {
 func (gs *GitServer) SetSSLManager(sslManager SSLManagerInterface) {
 	gs.sslManager = sslManager
 	gs.logger.Infof("SSL Manager 已注入到 Git Server")
+}
+
+// GetTemplateManager 返回模板管理器实例
+func (gs *GitServer) GetTemplateManager() *TemplateManager {
+	return gs.templateManager
 }
 
 // GitServerConfig Git 服务器配置
@@ -170,6 +184,16 @@ type GitApp struct {
 
 	// 分配的域名
 	Domain string `json:"domain"`
+	// 域名列表（包含主域名与别名）
+	Domains []string `json:"domains,omitempty"`
+
+	// 模板相关
+	TemplateID         string                          `json:"template_id,omitempty"`
+	TemplateType       string                          `json:"template_type,omitempty"`
+	TemplateParams     map[string]string               `json:"template_params,omitempty"`
+	Services           []AppServiceInfo                `json:"services,omitempty"`
+	ServiceCredentials map[string]AppServiceCredential `json:"service_credentials,omitempty"`
+	ComposeFile        string                          `json:"compose_file,omitempty"`
 
 	// 分配的端口
 	Port int `json:"port"`
@@ -223,6 +247,27 @@ type GitApp struct {
 	ContainerID     string `json:"container_id,omitempty"`     // 当前活跃容器ID
 	OldContainerID  string `json:"old_container_id,omitempty"` // 旧容器ID（等待停止）
 	ContainerStatus string `json:"container_status,omitempty"` // 容器状态
+}
+
+// AppServiceInfo 描述从模板部署的服务信息
+type AppServiceInfo struct {
+	Name        string `json:"name"`
+	Type        string `json:"type,omitempty"`
+	Description string `json:"description,omitempty"`
+	Port        int    `json:"port,omitempty"`
+	TargetPort  int    `json:"target_port,omitempty"`
+	Status      string `json:"status,omitempty"`
+}
+
+// AppServiceCredential 存储服务凭证（用于前端展示，默认脱敏）
+type AppServiceCredential struct {
+	Username         string `json:"username,omitempty"`
+	Password         string `json:"password,omitempty"`
+	Database         string `json:"database,omitempty"`
+	Token            string `json:"token,omitempty"`
+	Secret           string `json:"secret,omitempty"`
+	Endpoint         string `json:"endpoint,omitempty"`
+	ConnectionString string `json:"connection_string,omitempty"`
 }
 
 // AppDeployConfig 应用部署配置
@@ -503,15 +548,8 @@ func NewGitServer(cfg *config.Config, translator *i18n.Translator) *GitServer {
 	}
 
 	// 初始化通知管理器 - 从配置文件读取
-	var notificationMgr *notification.NotificationManager
-	if cfg.Notification.Enabled {
-		notificationMgr = notification.NewNotificationManagerFromConfig(cfg.Notification)
-		logrus.Infof("通知管理器已从配置文件初始化")
-	} else {
-		// 如果配置文件未启用，尝试从环境变量读取（向后兼容）
-		notificationMgr = notification.NewNotificationManager()
-		logrus.Infof("通知管理器已从环境变量初始化（向后兼容）")
-	}
+	notificationMgr := notification.NewNotificationManagerFromConfig(cfg.Notification)
+	logrus.Infof("通知管理器已从配置文件初始化")
 
 	// 构建并发控制配置
 	maxConcurrentBuilds := 3 // 最多3个并发构建
@@ -538,6 +576,31 @@ func NewGitServer(cfg *config.Config, translator *i18n.Translator) *GitServer {
 		maxConcurrentBuilds: maxConcurrentBuilds,
 		maxDeploymentLogs:   100,                 // 最多保留100个部署日志文件
 		maxDeploymentAge:    30 * 24 * time.Hour, // 最多保留30天
+	}
+
+	templateDataDir := cfg.Server.DataDir
+	if templateDataDir == "" {
+		templateDataDir = "./data"
+	}
+	if !filepath.IsAbs(templateDataDir) {
+		if abs, err := filepath.Abs(templateDataDir); err == nil {
+			templateDataDir = abs
+		}
+	}
+
+	templateManager := NewTemplateManager(gs.logger, templateDataDir)
+	if err := templateManager.LoadAll(); err != nil {
+		gs.logger.Warnf("加载部署模板失败: %v", err)
+	}
+	gs.templateManager = templateManager
+	gs.credentialManager = NewCredentialManager(gs.logger)
+	gs.domainManager = NewDomainManager(gs.logger)
+
+	composeWorkDir := filepath.Join(templateDataDir, "compose-workdir")
+	if generator, err := NewComposeGenerator(templateManager, composeWorkDir, gs.logger); err != nil {
+		gs.logger.Warnf("初始化 Compose 生成器失败: %v", err)
+	} else {
+		gs.composeGenerator = generator
 	}
 
 	// 初始化 Builder Registry
@@ -621,6 +684,16 @@ func (gs *GitServer) Start() error {
 	// 启动部署触发监听协程
 	go gs.WatchDeployTriggers()
 
+	if gs.templateManager != nil {
+		watchCtx, cancel := context.WithCancel(context.Background())
+		if err := gs.templateManager.Watch(watchCtx); err != nil {
+			gs.logger.Warnf("启动模板目录监听失败: %v", err)
+			cancel()
+		} else {
+			gs.templateWatchCancel = cancel
+		}
+	}
+
 	// 输出关键路径信息
 	gs.logger.Infof("authorized_keys 文件路径: %s", gs.authorizedKeysFile)
 	gs.logger.Infof("SSH 密钥目录: %s", gs.sshKeysDir)
@@ -637,6 +710,17 @@ func (gs *GitServer) Stop() {
 		// 已经关闭
 	default:
 		close(gs.stopChan)
+	}
+
+	if gs.templateWatchCancel != nil {
+		gs.templateWatchCancel()
+		gs.templateWatchCancel = nil
+	}
+
+	if gs.templateManager != nil {
+		if err := gs.templateManager.Close(); err != nil {
+			gs.logger.Warnf("关闭模板管理器失败: %v", err)
+		}
 	}
 	gs.logger.Info(gs.translator.T("git_server.stopped"))
 }
@@ -750,6 +834,7 @@ func (gs *GitServer) CreateApp(appName string, autoSSL bool) (*GitApp, error) {
 		BareRepo:    filepath.Join(gitPath, "repo.git"),
 		RepoDir:     filepath.Join(gitPath, "repo"),
 		Domain:      domain,
+		Domains:     filterEmptyDomains([]string{domain}),
 		Port:        port,
 		Status:      "idle",
 		LogsDir:     logsDir,
@@ -1016,7 +1101,23 @@ func (gs *GitServer) UpdateAppRouting(appName string, port int, domain string) e
 	gs.releasePort(app.Port)
 
 	app.Port = port
-	app.Domain = domain
+
+	if gs.domainManager != nil {
+		if domain != "" {
+			gs.domainManager.SetPrimaryDomain(app, domain)
+		} else {
+			app.Domain = ""
+			app.Domains = filterEmptyDomains(app.Domains)
+		}
+	} else {
+		app.Domain = domain
+		if domain != "" {
+			current := filterEmptyDomains(app.Domains)
+			app.Domains = append([]string{domain}, current...)
+		} else {
+			app.Domains = filterEmptyDomains(app.Domains)
+		}
+	}
 
 	if err := gs.saveApps(); err != nil {
 		return fmt.Errorf("保存应用信息失败: %w", err)
@@ -1828,6 +1929,17 @@ func (gs *GitServer) generateDomain(appName string) string {
 	return ""
 }
 
+func filterEmptyDomains(domains []string) []string {
+	result := make([]string, 0, len(domains))
+	for _, d := range domains {
+		d = strings.TrimSpace(d)
+		if d != "" {
+			result = append(result, d)
+		}
+	}
+	return result
+}
+
 // generateGitURL 生成Git推送地址
 func (gs *GitServer) generateGitURL(appName string) string {
 	// 使用域名后缀作为主机名，如果没有则使用localhost
@@ -2018,6 +2130,36 @@ func (gs *GitServer) loadApps() error {
 	workDir, _ := os.Getwd()
 
 	for _, app := range gs.apps {
+		if len(app.Domains) == 0 && app.Domain != "" {
+			app.Domains = []string{app.Domain}
+		} else if len(app.Domains) > 0 {
+			clean := filterEmptyDomains(app.Domains)
+			if app.Domain != "" {
+				found := false
+				for _, domain := range clean {
+					if strings.EqualFold(domain, app.Domain) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					clean = append([]string{app.Domain}, clean...)
+				} else {
+					clean = append([]string{}, clean...)
+					sort.SliceStable(clean, func(i, j int) bool {
+						if strings.EqualFold(clean[i], app.Domain) {
+							return true
+						}
+						if strings.EqualFold(clean[j], app.Domain) {
+							return false
+						}
+						return clean[i] < clean[j]
+					})
+				}
+			}
+			app.Domains = clean
+		}
+
 		// 修复 LogsDir 路径
 		if !filepath.IsAbs(app.LogsDir) {
 			// 先尝试基于工作目录的相对路径
@@ -3928,67 +4070,98 @@ func (gs *GitServer) WriteAppLog(appName, level, source, message string) error {
 
 // addProxyRuleForApp 为应用自动添加代理规则
 func (gs *GitServer) addProxyRuleForApp(app *GitApp) error {
-	// 检查代理规则是否已存在
-	for i, rule := range gs.config.Proxy.Rules {
-		// 如果已经存在该域名的规则
-		if rule.Domain == app.Domain {
-			// 如果是Git部署服务管理的规则，更新它
-			if rule.ManagedByGitDeploy && rule.GitDeployAppName == app.Name {
+	domains := filterEmptyDomains(append([]string{}, app.Domains...))
+	if len(domains) == 0 && app.Domain != "" {
+		domains = []string{app.Domain}
+	}
+
+	if len(domains) == 0 {
+		gs.logger.Warnf("应用 %s 没有可用于代理的域名", app.Name)
+		return nil
+	}
+
+	desired := make(map[string]struct{}, len(domains))
+	for _, domain := range domains {
+		desired[domain] = struct{}{}
+	}
+
+	sslEnabled := false
+	if app.DeployConfig != nil {
+		sslEnabled = app.DeployConfig.SSL.Enabled
+	}
+
+	changed := false
+
+	for i := 0; i < len(gs.config.Proxy.Rules); {
+		rule := gs.config.Proxy.Rules[i]
+		if rule.ManagedByGitDeploy && rule.GitDeployAppName == app.Name {
+			if _, ok := desired[rule.Domain]; ok {
 				gs.config.Proxy.Rules[i].Target = "127.0.0.1"
 				gs.config.Proxy.Rules[i].Port = app.Port
 				gs.config.Proxy.Rules[i].Enabled = true
-				gs.logger.Infof("更新应用 %s 的代理规则", app.Name)
-				return gs.config.Save(gs.config.ConfigFile)
+				gs.config.Proxy.Rules[i].SSLOnly = sslEnabled
+				delete(desired, rule.Domain)
+				changed = true
+				i++
+			} else {
+				gs.config.Proxy.Rules = append(gs.config.Proxy.Rules[:i], gs.config.Proxy.Rules[i+1:]...)
+				changed = true
+				continue
 			}
-			// 如果是手动创建的规则，不覆盖
-			gs.logger.Warnf("域名 %s 已存在代理规则，跳过自动添加", app.Domain)
-			return nil
+		} else {
+			i++
 		}
 	}
 
-	// 创建新的代理规则
-	rule := config.ProxyRule{
-		Domain:             app.Domain,
-		Target:             "127.0.0.1",
-		Port:               app.Port,
-		Enabled:            true,
-		SSLOnly:            app.DeployConfig.SSL.Enabled,
-		ManagedByGitDeploy: true,
-		GitDeployAppName:   app.Name,
-		GitDeployAppID:     app.Name, // 使用应用名称作为ID
+	for domain := range desired {
+		rule := config.ProxyRule{
+			Domain:             domain,
+			Target:             "127.0.0.1",
+			Port:               app.Port,
+			Enabled:            true,
+			SSLOnly:            sslEnabled,
+			ManagedByGitDeploy: true,
+			GitDeployAppName:   app.Name,
+			GitDeployAppID:     app.Name,
+		}
+		gs.config.Proxy.Rules = append(gs.config.Proxy.Rules, rule)
+		gs.logger.Infof("已为应用 %s 添加代理规则: %s -> 127.0.0.1:%d", app.Name, domain, app.Port)
+		changed = true
 	}
 
-	// 添加代理规则
-	gs.config.Proxy.Rules = append(gs.config.Proxy.Rules, rule)
+	if !changed {
+		return nil
+	}
 
-	// 保存配置
 	if err := gs.config.Save(gs.config.ConfigFile); err != nil {
 		return fmt.Errorf("保存配置失败: %w", err)
 	}
 
-	gs.logger.Infof("已为应用 %s 添加代理规则: %s -> 127.0.0.1:%d", app.Name, app.Domain, app.Port)
 	return nil
 }
 
 // removeProxyRuleForApp 删除应用的代理规则
 func (gs *GitServer) removeProxyRuleForApp(app *GitApp) error {
-	// 查找并删除该应用的代理规则
-	for i, rule := range gs.config.Proxy.Rules {
-		if rule.ManagedByGitDeploy && rule.GitDeployAppName == app.Name {
-			// 删除规则
+	removed := false
+	for i := 0; i < len(gs.config.Proxy.Rules); {
+		if gs.config.Proxy.Rules[i].ManagedByGitDeploy && gs.config.Proxy.Rules[i].GitDeployAppName == app.Name {
 			gs.config.Proxy.Rules = append(gs.config.Proxy.Rules[:i], gs.config.Proxy.Rules[i+1:]...)
-
-			// 保存配置
-			if err := gs.config.Save(gs.config.ConfigFile); err != nil {
-				return fmt.Errorf("保存配置失败: %w", err)
-			}
-
-			gs.logger.Infof("已删除应用 %s 的代理规则", app.Name)
-			return nil
+			removed = true
+			continue
 		}
+		i++
 	}
 
-	gs.logger.Infof("应用 %s 没有关联的代理规则", app.Name)
+	if !removed {
+		gs.logger.Infof("应用 %s 没有关联的代理规则", app.Name)
+		return nil
+	}
+
+	if err := gs.config.Save(gs.config.ConfigFile); err != nil {
+		return fmt.Errorf("保存配置失败: %w", err)
+	}
+
+	gs.logger.Infof("已删除应用 %s 的代理规则", app.Name)
 	return nil
 }
 

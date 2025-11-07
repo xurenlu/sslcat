@@ -546,7 +546,7 @@ func (s *Server) watchConfigFileLoop() {
 		// 非集群模式下，使用 30 秒间隔，减少 CPU 占用
 		interval = 30 * time.Second
 	}
-	
+
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for range ticker.C {
@@ -905,6 +905,8 @@ func (s *Server) registerRunnerRoutes() {
 	// 创建 API 处理器，传递 webServer 引用以支持 localhost 认证豁免
 	gitAPI := NewGitServerAPI(s.gitServer, s)
 	runtimeAPI := NewRuntimeDetectorAPI()
+	templateBase := s.config.AdminPrefix + "/api/git-server/templates"
+	templateAPI := NewTemplateAPI(s.gitServer.GetTemplateManager(), templateBase)
 
 	// Git 服务器 API 路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/apps", gitAPI.HandleApps) // GET: 列表, POST: 创建
@@ -940,6 +942,12 @@ func (s *Server) registerRunnerRoutes() {
 
 	// SSH 服务管理 API 路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/restart-sshd", gitAPI.RestartSSHD)
+
+	if templateAPI != nil {
+		s.mux.HandleFunc(templateBase, templateAPI.HandleTemplates)
+		s.mux.HandleFunc(templateBase+"/reload", templateAPI.HandleTemplateReload)
+		s.mux.HandleFunc(templateBase+"/", templateAPI.HandleTemplateDetail)
+	}
 
 	// Docker Registry API 路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/docker/images", gitAPI.GetDockerImages)
@@ -1647,7 +1655,7 @@ func (s *Server) refreshLEPreferredHost() {
 			ips, err := net.LookupIP(domain)
 			ch <- result{ips, err}
 		}()
-		
+
 		select {
 		case res := <-ch:
 			return res.ips, res.err
@@ -1655,7 +1663,7 @@ func (s *Server) refreshLEPreferredHost() {
 			return nil, fmt.Errorf("DNS 解析超时")
 		}
 	}()
-	
+
 	if err != nil {
 		s.log.Warnf("DNS 解析失败: %v", err)
 		s.leRedirectHost = ""
@@ -1682,27 +1690,27 @@ func (s *Server) fetchPublicIPv4() string {
 			}).DialContext,
 		},
 	}
-	
+
 	req, err := http.NewRequest("GET", "https://ip4.dev/myip", nil)
 	if err != nil {
 		return ""
 	}
-	
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return ""
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != 200 {
 		return ""
 	}
-	
+
 	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return ""
 	}
-	
+
 	ip := strings.TrimSpace(string(b))
 	if net.ParseIP(ip) == nil {
 		return ""
