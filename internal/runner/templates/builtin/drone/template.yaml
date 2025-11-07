@@ -1,0 +1,119 @@
+id: drone
+name: Drone CI
+category: devops
+subcategory: ci-cd
+tags: [go, postgresql, ci-cd, automation, drone]
+description: 基于容器的 CI/CD 平台，轻量快速，适合现代开发流程。
+icon: drone
+version: 1.0.0
+author: SSLcat Team
+website: https://www.drone.io/
+compose_file: docker-compose.yml
+
+variables:
+  - name: DRONE_VERSION
+    type: select
+    title: Drone Server 版本
+    default: "latest"
+    options: ["latest", "2.24", "2.23"]
+    description: 选择 Drone Server 版本
+  - name: DRONE_RUNNER_VERSION
+    type: select
+    title: Drone Runner 版本
+    default: "latest"
+    options: ["latest", "1.8", "1.7"]
+    description: 选择 Drone Runner 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "14", "16"]
+    description: 选择 PostgreSQL 版本
+  - name: DRONE_PORT
+    type: number
+    title: Drone 端口
+    default: 80
+    min: 1024
+    max: 65535
+    description: Drone Web 服务端口
+
+services:
+  - name: drone-server
+    type: web
+    description: Drone CI/CD 服务器
+    depends_on: [postgres]
+    ports:
+      - internal: 80
+        external: null
+        public: true
+    volumes:
+      - name: drone_data
+        path: /data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /healthz
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  - name: drone-runner
+    type: worker
+    description: Drone CI/CD Runner
+    depends_on: [drone-server]
+    volumes:
+      - name: docker_sock
+        path: /var/run/docker.sock
+        mode: rw
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_drone"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_drone"
+  drone:
+    rpc_secret:
+      pattern: random
+      length: 32
+    gitea_client_id:
+      pattern: random
+      length: 32
+    gitea_client_secret:
+      pattern: random
+      length: 32
+
+connection_strings:
+  postgres: "postgresql://{username}:{password}@postgres:5432/{database}"
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+

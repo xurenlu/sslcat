@@ -1,0 +1,102 @@
+id: sonarqube
+name: SonarQube
+category: devops
+subcategory: code-quality
+tags: [java, postgresql, code-quality, static-analysis, sonarqube]
+description: 代码质量分析平台，支持多种编程语言，帮助提升代码质量。
+icon: sonarqube
+version: 1.0.0
+author: SSLcat Team
+website: https://www.sonarqube.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: SONARQUBE_VERSION
+    type: select
+    title: SonarQube 版本
+    default: "community"
+    options: ["community", "latest", "lts-community"]
+    description: 选择 SonarQube 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "14", "16"]
+    description: 选择 PostgreSQL 版本
+  - name: SONARQUBE_PORT
+    type: number
+    title: SonarQube 端口
+    default: 9000
+    min: 1024
+    max: 65535
+    description: SonarQube Web 服务端口
+
+services:
+  - name: sonarqube
+    type: web
+    description: SonarQube 代码质量分析服务
+    depends_on: [postgres]
+    ports:
+      - internal: 9000
+        external: null
+        public: true
+    volumes:
+      - name: sonarqube_data
+        path: /opt/sonarqube/data
+        mode: rw
+      - name: sonarqube_extensions
+        path: /opt/sonarqube/extensions
+        mode: rw
+      - name: sonarqube_logs
+        path: /opt/sonarqube/logs
+        mode: rw
+    healthcheck:
+      type: http
+      path: /api/system/status
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_sonarqube"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_sonarqube"
+
+connection_strings:
+  postgres: "postgresql://{username}:{password}@postgres:5432/{database}"
+
+healthcheck_global:
+  timeout: 20m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  default_admin_user: admin
+  default_admin_password: admin
+

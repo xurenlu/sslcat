@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  wekan:
+    image: wekanteam/wekan:{{WEKAN_VERSION}}
+    container_name: {{APP_NAME}}_wekan
+    restart: unless-stopped
+    ports:
+      - "{{WEKAN_PORT}}:8080"
+    environment:
+      MONGO_URL: mongodb://{{MONGODB_USERNAME}}:{{MONGODB_PASSWORD}}@mongodb:27017/{{MONGODB_DATABASE}}
+      ROOT_URL: http://{{PRIMARY_DOMAIN}}
+      MAIL_URL: ""
+      MAIL_FROM: wekan@{{PRIMARY_DOMAIN}}
+    volumes:
+      - wekan_data:/data
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  mongodb:
+    image: mongo:{{MONGODB_VERSION}}
+    container_name: {{APP_NAME}}_mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: {{MONGODB_ROOT_USERNAME}}
+      MONGO_INITDB_ROOT_PASSWORD: {{MONGODB_ROOT_PASSWORD}}
+      MONGO_INITDB_DATABASE: {{MONGODB_DATABASE}}
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  wekan_data:
+    driver: local
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+
