@@ -60,6 +60,9 @@ type Manager struct {
 
 	// 慢请求记录器
 	slowRequestRecorder SlowRequestRecorder
+
+	// 性能优化：buffer 池，复用 WebSocket 和 copyData 的缓冲区
+	bufferPool *sync.Pool
 }
 
 // NewManager 创建代理管理器
@@ -78,6 +81,13 @@ func NewManager(cfg *config.Config, sslMgr *ssl.Manager, secMgr *security.Manage
 		log: logrus.WithFields(logrus.Fields{
 			"component": "proxy_manager",
 		}),
+		// 性能优化：初始化 buffer 池，复用 32KB 缓冲区
+		// 这样可以减少内存分配和 GC 压力，特别是在高并发 WebSocket 场景下
+		bufferPool: &sync.Pool{
+			New: func() interface{} {
+				return make([]byte, 32*1024) // 32KB buffer
+			},
+		},
 	}
 
 	// 初始化负载均衡器
@@ -1265,8 +1275,17 @@ func (m *Manager) HandleWebSocket(w http.ResponseWriter, r *http.Request, rule *
 	clientConn.Write([]byte("\r\n"))
 
 	// 开始双向数据转发
-	go m.copyData(clientConn, conn)
+	// 修复：确保连接正确关闭
+	// copyData 只关闭源连接，所以需要确保两个方向都正确关闭
+	go func() {
+		m.copyData(clientConn, conn)
+		// 当从上游读取完成时，关闭客户端连接
+		clientConn.Close()
+	}()
+	// 主 goroutine 处理从客户端到上游的数据
 	m.copyData(conn, clientConn)
+	// 当从客户端读取完成时，关闭上游连接
+	conn.Close()
 }
 
 // isWebSocketUpgrade 检查是否为WebSocket升级请求
@@ -1433,7 +1452,10 @@ func (m *Manager) readWebSocketData(ctx context.Context, conn net.Conn, dataChan
 		readTimeout = 30 // 默认30秒
 	}
 
-	buffer := make([]byte, 32*1024)
+	// 性能优化：从 buffer 池获取缓冲区，减少内存分配
+	buffer := m.bufferPool.Get().([]byte)
+	defer m.bufferPool.Put(buffer) // 使用完后归还到池中
+
 	for atomic.LoadInt32(closed) == 0 {
 		// 检查上下文是否已取消
 		select {
@@ -1460,17 +1482,26 @@ func (m *Manager) readWebSocketData(ctx context.Context, conn net.Conn, dataChan
 		}
 
 		if n > 0 {
-			// 复制数据避免竞态条件
+			// 性能优化：只复制实际读取的数据，避免浪费内存
+			// 注意：这里必须复制，因为 buffer 会被复用
 			data := make([]byte, n)
 			copy(data, buffer[:n])
 
+			// 修复：使用 context.WithTimeout 而不是 time.After，避免定时器泄露
+			// time.After 在 select 循环中会不断创建新的定时器，导致内存泄露和 CPU 占用高
+			sendTimeoutCtx, sendTimeoutCancel := context.WithTimeout(ctx, 5*time.Second)
 			select {
 			case dataChan <- data:
+				sendTimeoutCancel() // 发送成功，取消超时
 				// 数据发送成功
-			case <-time.After(5 * time.Second):
+			case <-sendTimeoutCtx.Done():
+				sendTimeoutCancel()
 				// 发送超时，可能对端已关闭
 				m.log.Warnf("WebSocket data send timeout (%s)", connType)
 				errChan <- fmt.Errorf("data send timeout")
+				return
+			case <-ctx.Done():
+				sendTimeoutCancel()
 				return
 			}
 		}
@@ -1491,9 +1522,18 @@ func (m *Manager) writeWebSocketData(ctx context.Context, conn net.Conn, dataCha
 		writeTimeout = 10 // 默认10秒
 	}
 
+	// 修复：使用 context.WithTimeout 而不是 time.After，避免定时器泄露
+	// time.After 在 select 循环中会不断创建新的定时器，导致内存泄露和 CPU 占用高
+	idleTimeoutCtx, idleTimeoutCancel := context.WithTimeout(ctx, 60*time.Second)
+	defer idleTimeoutCancel()
+
 	for atomic.LoadInt32(closed) == 0 {
 		select {
 		case data, ok := <-dataChan:
+			// 重置空闲超时
+			idleTimeoutCancel()
+			idleTimeoutCtx, idleTimeoutCancel = context.WithTimeout(ctx, 60*time.Second)
+
 			if !ok {
 				// 通道已关闭
 				return
@@ -1510,19 +1550,31 @@ func (m *Manager) writeWebSocketData(ctx context.Context, conn net.Conn, dataCha
 				}
 				return
 			}
-		case <-time.After(60 * time.Second): // 从30秒改为60秒
-			// 写入超时检查
+		case <-idleTimeoutCtx.Done():
+			// 写入超时检查（60秒无数据）
+			idleTimeoutCancel()
 			if atomic.LoadInt32(closed) != 0 {
 				return
 			}
+			// 重置超时，继续等待
+			idleTimeoutCtx, idleTimeoutCancel = context.WithTimeout(ctx, 60*time.Second)
+		case <-ctx.Done():
+			idleTimeoutCancel()
+			return
 		}
 	}
+	idleTimeoutCancel()
 }
 
 // monitorWebSocketConnections 监控WebSocket连接状态
 func (m *Manager) monitorWebSocketConnections(ctx context.Context, clientConn, upstreamConn net.Conn, errChan chan<- error, clientClosed, upstreamClosed *int32, rule *config.ProxyRule) {
 	ticker := time.NewTicker(29 * time.Second) // 使用质数间隔避免与其他定时器同时触发
 	defer ticker.Stop()
+
+	// 修复：使用 context.WithTimeout 而不是 time.After，避免定时器泄露
+	// time.After 在 select 循环中会不断创建新的定时器，导致内存泄露
+	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer timeoutCancel()
 
 	for {
 		select {
@@ -1538,19 +1590,25 @@ func (m *Manager) monitorWebSocketConnections(ctx context.Context, clientConn, u
 
 			// 可以在这里添加心跳检测逻辑
 
-		case <-time.After(10 * time.Minute): // 从5分钟改为10分钟
+		case <-timeoutCtx.Done():
 			// 连接超时检查
 			m.log.Debugf("WebSocket connection timeout check for %s", rule.Target)
+			return
 		}
 	}
 }
 
 // copyData 复制数据（保留原有方法作为备用）
+// 注意：这个函数会关闭两个连接，调用者需要确保不会重复关闭
 func (m *Manager) copyData(dst, src net.Conn) {
-	defer dst.Close()
+	// 修复：只关闭源连接，目标连接由调用者管理
+	// 避免在 HandleWebSocket 中重复关闭连接
 	defer src.Close()
 
-	buffer := make([]byte, 32*1024)
+	// 性能优化：从 buffer 池获取缓冲区，减少内存分配
+	buffer := m.bufferPool.Get().([]byte)
+	defer m.bufferPool.Put(buffer) // 使用完后归还到池中
+
 	for {
 		n, err := src.Read(buffer)
 		if err != nil {

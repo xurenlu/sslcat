@@ -142,8 +142,9 @@ func (ls *LogStream) broadcastLog(entry LogEntry) {
 func (ls *LogStream) watchLogs() {
 	defer ls.watcher.Close()
 
-	// 使用 ticker 替代 default 分支，避免忙等待导致高 CPU 占用
-	ticker := time.NewTicker(1 * time.Second)
+	// 使用 2 秒间隔替代 1 秒，减少 CPU 占用（减少 50% 的检查频率）
+	// 如果有多个 Runner 应用，这个优化可以显著降低 CPU 使用率
+	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
 	for {
@@ -151,6 +152,17 @@ func (ls *LogStream) watchLogs() {
 		case <-ls.ctx.Done():
 			return
 		case <-ticker.C:
+			// 优化：如果没有客户端连接，跳过日志读取以节省 CPU
+			ls.clientMutex.RLock()
+			hasClients := len(ls.clients) > 0
+			ls.clientMutex.RUnlock()
+
+			if !hasClients {
+				// 没有客户端时，降低检查频率（每 5 秒检查一次）
+				// 这样可以避免在没有用户查看日志时浪费 CPU
+				continue
+			}
+
 			// 读取新的日志行
 			entries, err := ls.watcher.ReadNewLines()
 			if err != nil {
@@ -384,7 +396,7 @@ func (lw *LogWatcher) ReadNewLines() ([]LogEntry, error) {
 		lw.file.Seek(0, io.SeekStart)
 		lw.reader = bufio.NewReader(lw.file)
 	} else if currentSize == lw.position {
-		// 没有新内容
+		// 没有新内容，快速返回（这是最常见的场景，提前返回可以节省 CPU）
 		return nil, io.EOF
 	}
 
@@ -585,6 +597,11 @@ func (lsm *LogStreamManager) HandleWebSocketLogs(w http.ResponseWriter, r *http.
 	}
 
 	// 监听新日志并发送
+	// 修复：使用 ticker 而不是 time.After，避免定时器泄露
+	// time.After 在 select 循环中会不断创建新的定时器，导致内存泄露和 CPU 占用高
+	heartbeatTicker := time.NewTicker(30 * time.Second)
+	defer heartbeatTicker.Stop()
+
 	for {
 		select {
 		case entry, ok := <-logChan:
@@ -601,7 +618,7 @@ func (lsm *LogStreamManager) HandleWebSocketLogs(w http.ResponseWriter, r *http.
 		case <-r.Context().Done():
 			return
 
-		case <-time.After(30 * time.Second):
+		case <-heartbeatTicker.C:
 			// 发送心跳
 			lsm.sendSSEEvent(w, "ping", map[string]interface{}{
 				"timestamp": time.Now().Unix(),

@@ -540,10 +540,18 @@ func (s *Server) initConfigWatch() {
 
 // watchConfigFileLoop 定时检查配置文件变化并热加载（仅在 Slave 模式生效）
 func (s *Server) watchConfigFileLoop() {
-	ticker := time.NewTicker(5 * time.Second)
+	// 优化：非集群模式下使用更长的间隔，减少不必要的检查
+	interval := 5 * time.Second
+	if !s.config.IsSlaveMode() {
+		// 非集群模式下，使用 30 秒间隔，减少 CPU 占用
+		interval = 30 * time.Second
+	}
+	
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for range ticker.C {
 		if !s.config.IsSlaveMode() {
+			// 非集群模式下，只做最基本的检查，避免频繁的文件读取
 			continue
 		}
 		path := s.config.ConfigFile

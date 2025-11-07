@@ -30,7 +30,7 @@ After running, it generates a directory containing all diagnostic data and analy
 
 ```bash
 # Method 1: Use API (requires admin privileges)
-curl -u admin:password "http://localhost/sslcat-panel/api/debug/pprof/goroutine?debug=1" | head -1
+curl -u admin:password "http://localhost/debug/pprof/goroutine?debug=1" | head -1
 
 # Method 2: Check process thread count
 ps -p $(pgrep sslcat) -o pid,nlwp
@@ -55,7 +55,7 @@ ps -eLf | grep sslcat | wc -l
 
 ```bash
 # Generate CPU profile
-curl -o cpu.prof "http://localhost/sslcat-panel/api/debug/pprof/profile?seconds=30"
+curl -o cpu.prof "http://localhost/debug/pprof/profile?seconds=30"
 
 # Analyze with go tool
 go tool pprof cpu.prof
@@ -70,7 +70,7 @@ go tool pprof cpu.prof
 
 ```bash
 # Get goroutine stack trace
-curl -o goroutine.txt "http://localhost/sslcat-panel/api/debug/pprof/goroutine?debug=1"
+curl -o goroutine.txt "http://localhost/debug/pprof/goroutine?debug=1"
 
 # Analyze goroutine distribution
 grep -c "goroutine" goroutine.txt
@@ -81,7 +81,7 @@ grep -c "runtime.gopark" goroutine.txt
 
 ```bash
 # Get memory profile
-curl -o mem.prof "http://localhost/sslcat-panel/api/debug/pprof/heap"
+curl -o mem.prof "http://localhost/debug/pprof/heap"
 
 # Analyze memory usage
 go tool pprof mem.prof
@@ -99,7 +99,7 @@ go tool pprof mem.prof
 **Diagnosis**:
 ```bash
 # Check goroutine count over time
-watch -n 1 'curl -s "http://localhost/sslcat-panel/api/debug/pprof/goroutine?debug=1" | head -1'
+watch -n 1 'curl -s "http://localhost/debug/pprof/goroutine?debug=1" | head -1'
 ```
 
 **Solution**:
@@ -311,7 +311,7 @@ chmod +x monitor_cpu.sh
 cat > monitor_goroutines.sh << 'EOF'
 #!/bin/bash
 while true; do
-    GOROUTINES=$(curl -s "http://localhost/sslcat-panel/api/debug/pprof/goroutine?debug=1" | head -1 | grep -o '[0-9]*' | head -1)
+    GOROUTINES=$(curl -s "http://localhost/debug/pprof/goroutine?debug=1" | head -1 | grep -o '[0-9]*' | head -1)
     if [ "$GOROUTINES" -gt 500 ]; then
         echo "High goroutine count: $GOROUTINES"
         # Send alert
@@ -372,7 +372,7 @@ go tool trace trace.out
 
 ```bash
 # Get memory profile
-curl -o mem.prof "http://localhost/sslcat-panel/api/debug/pprof/heap"
+curl -o mem.prof "http://localhost/debug/pprof/heap"
 
 # Analyze memory
 go tool pprof -http=:8080 mem.prof
@@ -382,7 +382,7 @@ go tool pprof -http=:8080 mem.prof
 
 ```bash
 # Get blocking profile
-curl -o block.prof "http://localhost/sslcat-panel/api/debug/pprof/block"
+curl -o block.prof "http://localhost/debug/pprof/block"
 
 # Analyze blocking
 go tool pprof block.prof

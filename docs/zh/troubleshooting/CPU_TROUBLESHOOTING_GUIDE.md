@@ -30,7 +30,7 @@ cd /path/to/sslcat
 
 ```bash
 # 方式 1: 使用 API（需要管理员权限）
-curl -u admin:password "http://localhost/sslcat-panel/api/debug/pprof/goroutine?debug=1" | head -1
+curl -u admin:password "http://localhost/debug/pprof/goroutine?debug=1" | head -1
 
 # 方式 2: 查看进程线程数
 ps -p $(pgrep sslcat) -o pid,nlwp
@@ -71,7 +71,7 @@ done | awk '{sum+=$1} END {print "Average CPU:", sum/NR "%"}'
 
 ```bash
 # 收集 30 秒的 CPU profile
-curl -u admin:password "http://localhost/sslcat-panel/api/debug/pprof/profile?seconds=30" > cpu.prof
+curl -u admin:password "http://localhost/debug/pprof/profile?seconds=30" > cpu.prof
 
 # 如果没有管理员密码，可以从日志中查找
 # 或者设置环境变量 SSLCAT_ADMIN_PASS
@@ -85,7 +85,7 @@ go tool pprof -text cpu.prof | head -20
 
 ```bash
 # 获取所有 goroutine 的堆栈
-curl -u admin:password "http://localhost/sslcat-panel/api/debug/pprof/goroutine?debug=2" > goroutines.txt
+curl -u admin:password "http://localhost/debug/pprof/goroutine?debug=2" > goroutines.txt
 
 # 统计 goroutine 数量
 grep -c "^goroutine " goroutines.txt
@@ -236,7 +236,7 @@ systemctl reload sslcat
 kill -HUP $(pgrep sslcat)
 
 # 3. 验证
-curl -u admin:password "http://localhost/sslcat-panel/api/debug/pprof/goroutine?debug=2" | grep -c "checkBackendHealth"
+curl -u admin:password "http://localhost/debug/pprof/goroutine?debug=2" | grep -c "checkBackendHealth"
 # 应该减少
 ```
 
@@ -543,7 +543,7 @@ groups:
 # /usr/local/bin/check-sslcat-health.sh
 
 CPU=$(ps -p $(pgrep sslcat) -o %cpu | tail -1 | tr -d ' ')
-GOROUTINES=$(curl -s "http://localhost/sslcat-panel/api/debug/pprof/goroutine?debug=1" | head -1 | grep -oE '[0-9]+' | head -1)
+GOROUTINES=$(curl -s "http://localhost/debug/pprof/goroutine?debug=1" | head -1 | grep -oE '[0-9]+' | head -1)
 
 echo "[$(date)] CPU: $CPU%, Goroutines: $GOROUTINES"
 
