@@ -1,0 +1,148 @@
+id: mastodon
+name: Mastodon
+category: media
+subcategory: social
+tags: [ruby, postgresql, redis, social, federated, mastodon]
+description: 去中心化的社交网络平台，支持 ActivityPub 协议，类似 Twitter。
+icon: mastodon
+version: 1.0.0
+author: SSLcat Team
+website: https://joinmastodon.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: MASTODON_VERSION
+    type: select
+    title: Mastodon 版本
+    default: "latest"
+    options: ["latest", "4.2", "4.1"]
+    description: 选择 Mastodon 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "14", "16"]
+    description: 选择 PostgreSQL 版本
+  - name: REDIS_VERSION
+    type: select
+    title: Redis 版本
+    default: "7"
+    options: ["7", "6", "7-alpine"]
+    description: 选择 Redis 版本
+  - name: MASTODON_PORT
+    type: number
+    title: Mastodon Web 端口
+    default: 3000
+    min: 1024
+    max: 65535
+    description: Mastodon Web 服务端口
+  - name: MASTODON_STREAMING_PORT
+    type: number
+    title: Mastodon Streaming 端口
+    default: 4000
+    min: 1024
+    max: 65535
+    description: Mastodon Streaming 服务端口
+
+services:
+  - name: mastodon-web
+    type: web
+    description: Mastodon Web 服务
+    depends_on: [postgres, redis]
+    ports:
+      - internal: 3000
+        external: null
+        public: true
+    volumes:
+      - name: mastodon_data
+        path: /mastodon/public/system
+        mode: rw
+    healthcheck:
+      type: http
+      path: /api/v1/instance
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+
+  - name: mastodon-sidekiq
+    type: worker
+    description: Mastodon 后台任务处理服务
+    depends_on: [mastodon-web]
+
+  - name: mastodon-streaming
+    type: web
+    description: Mastodon Streaming 服务
+    depends_on: [mastodon-web]
+    ports:
+      - internal: 4000
+        external: null
+        public: true
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  - name: redis
+    type: cache
+    description: Redis 缓存服务
+    ports:
+      - internal: 6379
+        external: null
+        public: false
+    volumes:
+      - name: redis_data
+        path: /data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_mastodon"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_mastodon"
+  mastodon:
+    secret_key_base:
+      pattern: random
+      length: 64
+    otp_secret:
+      pattern: random
+      length: 32
+
+connection_strings:
+  postgres: "postgresql://{username}:{password}@postgres:5432/{database}"
+  redis: "redis://redis:6379/0"
+
+healthcheck_global:
+  timeout: 20m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+

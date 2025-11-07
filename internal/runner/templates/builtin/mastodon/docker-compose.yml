@@ -1,0 +1,132 @@
+version: '3.8'
+
+services:
+  mastodon-web:
+    image: tootsuite/mastodon:{{MASTODON_VERSION}}
+    container_name: {{APP_NAME}}_mastodon_web
+    restart: unless-stopped
+    ports:
+      - "{{MASTODON_PORT}}:3000"
+    environment:
+      RAILS_ENV: production
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: {{POSTGRES_DATABASE}}
+      DB_USER: {{POSTGRES_USERNAME}}
+      DB_PASS: {{POSTGRES_PASSWORD}}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      SECRET_KEY_BASE: {{SECRET_KEY_BASE}}
+      OTP_SECRET: {{OTP_SECRET}}
+      LOCAL_DOMAIN: {{PRIMARY_DOMAIN}}
+    volumes:
+      - mastodon_data:/mastodon/public/system
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    command: bundle exec puma -C config/puma.rb
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/v1/instance"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+
+  mastodon-sidekiq:
+    image: tootsuite/mastodon:{{MASTODON_VERSION}}
+    container_name: {{APP_NAME}}_mastodon_sidekiq
+    restart: unless-stopped
+    environment:
+      RAILS_ENV: production
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: {{POSTGRES_DATABASE}}
+      DB_USER: {{POSTGRES_USERNAME}}
+      DB_PASS: {{POSTGRES_PASSWORD}}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      SECRET_KEY_BASE: {{SECRET_KEY_BASE}}
+      OTP_SECRET: {{OTP_SECRET}}
+    volumes:
+      - mastodon_data:/mastodon/public/system
+    depends_on:
+      - mastodon-web
+    networks:
+      - {{APP_NAME}}_network
+    command: bundle exec sidekiq
+
+  mastodon-streaming:
+    image: tootsuite/mastodon:{{MASTODON_VERSION}}
+    container_name: {{APP_NAME}}_mastodon_streaming
+    restart: unless-stopped
+    ports:
+      - "{{MASTODON_STREAMING_PORT}}:4000"
+    environment:
+      RAILS_ENV: production
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: {{POSTGRES_DATABASE}}
+      DB_USER: {{POSTGRES_USERNAME}}
+      DB_PASS: {{POSTGRES_PASSWORD}}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      SECRET_KEY_BASE: {{SECRET_KEY_BASE}}
+      OTP_SECRET: {{OTP_SECRET}}
+      NODE_ENV: production
+      PORT: 4000
+    depends_on:
+      - mastodon-web
+    networks:
+      - {{APP_NAME}}_network
+    command: node ./streaming
+
+  postgres:
+    image: postgres:{{POSTGRES_VERSION}}
+    container_name: {{APP_NAME}}_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: {{POSTGRES_DATABASE}}
+      POSTGRES_USER: {{POSTGRES_USERNAME}}
+      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:{{REDIS_VERSION}}
+    container_name: {{APP_NAME}}_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  mastodon_data:
+    driver: local
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

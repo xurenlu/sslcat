@@ -8,14 +8,12 @@ services:
     ports:
       - "{{GHOST_PORT}}:2368"
     environment:
+      url: http://{{PRIMARY_DOMAIN}}
       database__client: mysql
       database__connection__host: mysql
-      database__connection__port: 3306
       database__connection__user: {{MYSQL_USERNAME}}
       database__connection__password: {{MYSQL_PASSWORD}}
       database__connection__database: {{MYSQL_DATABASE}}
-      url: http://{{PRIMARY_DOMAIN}}
-      NODE_ENV: production
     volumes:
       - ghost_data:/var/lib/ghost/content
     depends_on:
@@ -24,11 +22,11 @@ services:
     networks:
       - {{APP_NAME}}_network
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:2368', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:2368"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 40s
+      retries: 5
+      start_period: 60s
 
   mysql:
     image: mysql:{{MYSQL_VERSION}}
@@ -62,4 +60,3 @@ volumes:
 networks:
   {{APP_NAME}}_network:
     driver: bridge
-

@@ -1,0 +1,98 @@
+id: plume
+name: Plume
+category: cms
+subcategory: blog
+tags: [rust, postgresql, blog, federated, plume]
+description: 去中心化的博客平台，支持 ActivityPub，类似 Medium。
+icon: plume
+version: 1.0.0
+author: SSLcat Team
+website: https://joinplu.me/
+compose_file: docker-compose.yml
+
+variables:
+  - name: PLUME_VERSION
+    type: select
+    title: Plume 版本
+    default: "latest"
+    options: ["latest", "0.6", "0.5"]
+    description: 选择 Plume 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "14", "16"]
+    description: 选择 PostgreSQL 版本
+  - name: PLUME_PORT
+    type: number
+    title: Plume 端口
+    default: 7878
+    min: 1024
+    max: 65535
+    description: Plume Web 服务端口
+
+services:
+  - name: plume
+    type: web
+    description: Plume 博客平台服务
+    depends_on: [postgres]
+    ports:
+      - internal: 7878
+        external: null
+        public: true
+    volumes:
+      - name: plume_data
+        path: /app/media
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_plume"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_plume"
+  plume:
+    rocket_secret_key:
+      pattern: random
+      length: 32
+
+connection_strings:
+  postgres: "postgresql://{username}:{password}@postgres:5432/{database}"
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+
