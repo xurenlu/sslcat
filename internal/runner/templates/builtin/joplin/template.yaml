@@ -1,0 +1,95 @@
+id: joplin
+name: Joplin Server
+category: tools
+subcategory: note-taking
+tags: [nodejs, postgres, note-taking, joplin]
+description: 开源笔记应用服务器，支持 Markdown、同步和多端访问。
+icon: joplin
+version: 1.0.0
+author: SSLcat Team
+website: https://joplinapp.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: JOPLIN_VERSION
+    type: select
+    title: Joplin Server 版本
+    default: "latest"
+    options: ["latest", "2.13", "2.12"]
+    description: 选择 Joplin Server 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "16", "14"]
+    description: 选择 PostgreSQL 版本
+  - name: JOPLIN_PORT
+    type: number
+    title: Joplin Server 端口
+    default: 22300
+    min: 1024
+    max: 65535
+    description: Joplin Server Web 服务端口
+
+services:
+  - name: joplin
+    type: web
+    description: Joplin Server 笔记同步服务
+    depends_on: [postgres]
+    ports:
+      - internal: 22300
+        external: null
+        public: true
+    volumes:
+      - name: joplin_data
+        path: /home/joplin/.config/joplin-server
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{username}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_joplin"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_joplin"
+
+connection_strings:
+  postgres: "postgres://{username}:{password}@postgres:5432/{database}"
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "Markdown,同步,多端访问"
+

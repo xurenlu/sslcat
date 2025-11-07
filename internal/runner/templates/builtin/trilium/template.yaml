@@ -1,0 +1,58 @@
+id: trilium
+name: Trilium Notes
+category: tools
+subcategory: note-taking
+tags: [nodejs, note-taking, knowledge-base, trilium]
+description: 分层笔记应用，支持 Markdown、代码高亮、关系图谱等功能。
+icon: trilium
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/zadam/trilium
+compose_file: docker-compose.yml
+
+variables:
+  - name: TRILIUM_VERSION
+    type: select
+    title: Trilium 版本
+    default: "latest"
+    options: ["latest", "0.60", "0.59"]
+    description: 选择 Trilium 版本
+  - name: TRILIUM_PORT
+    type: number
+    title: Trilium 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: Trilium Web 服务端口
+
+services:
+  - name: trilium
+    type: web
+    description: Trilium Notes 笔记服务
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: trilium_data
+        path: /home/node/trilium-data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  default_admin_user: admin
+  default_admin_password: admin
+  features: "Markdown,代码高亮,关系图谱"
+

@@ -1,0 +1,57 @@
+id: heimdall
+name: Heimdall
+category: tools
+subcategory: dashboard
+tags: [php, dashboard, homepage, heimdall]
+description: 应用启动页和仪表板，统一管理所有应用入口，美观实用。
+icon: heimdall
+version: 1.0.0
+author: SSLcat Team
+website: https://heimdall.site/
+compose_file: docker-compose.yml
+
+variables:
+  - name: HEIMDALL_VERSION
+    type: select
+    title: Heimdall 版本
+    default: "latest"
+    options: ["latest", "2.5", "2.4"]
+    description: 选择 Heimdall 版本
+  - name: HEIMDALL_PORT
+    type: number
+    title: Heimdall 端口
+    default: 80
+    min: 1024
+    max: 65535
+    description: Heimdall Web 服务端口
+
+services:
+  - name: heimdall
+    type: web
+    description: Heimdall 应用启动页服务
+    ports:
+      - internal: 80
+        external: null
+        public: true
+    volumes:
+      - name: heimdall_data
+        path: /config
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  default_admin_user: admin
+  default_admin_password: admin
+

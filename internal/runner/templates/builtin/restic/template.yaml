@@ -1,0 +1,75 @@
+id: restic
+name: Restic
+category: tools
+subcategory: backup
+tags: [go, backup, restic]
+description: 快速、安全、高效的备份工具，支持增量备份和加密。
+icon: restic
+version: 1.0.0
+author: SSLcat Team
+website: https://restic.net/
+compose_file: docker-compose.yml
+
+variables:
+  - name: RESTIC_VERSION
+    type: select
+    title: Restic 版本
+    default: "latest"
+    options: ["latest", "0.16", "0.15"]
+    description: 选择 Restic 版本
+  - name: RESTIC_PORT
+    type: number
+    title: Restic 端口
+    default: 8000
+    min: 1024
+    max: 65535
+    description: Restic Web 服务端口
+  - name: RESTIC_REPOSITORY
+    type: string
+    title: 备份仓库路径
+    default: "/data/backup"
+    description: Restic 备份仓库路径
+    placeholder: "/data/backup"
+  - name: RESTIC_PASSWORD
+    type: string
+    title: 备份密码
+    default: ""
+    description: Restic 备份仓库密码
+    required: true
+    sensitive: true
+
+services:
+  - name: restic
+    type: web
+    description: Restic 备份服务
+    ports:
+      - internal: 8000
+        external: null
+        public: true
+    volumes:
+      - name: restic_data
+        path: /data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+credentials:
+  restic:
+    password:
+      pattern: random
+      length: 20
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "增量备份,加密,去重"
+

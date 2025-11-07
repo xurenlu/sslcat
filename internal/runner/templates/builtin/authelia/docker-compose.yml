@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  authelia:
+    image: authelia/authelia:{{AUTHELIA_VERSION}}
+    container_name: {{APP_NAME}}_authelia
+    restart: unless-stopped
+    ports:
+      - "{{AUTHELIA_PORT}}:9091"
+    environment:
+      AUTHELIA_JWT_SECRET: {{JWT_SECRET}}
+      AUTHELIA_SESSION_SECRET: {{SESSION_SECRET}}
+      AUTHELIA_STORAGE_ENCRYPTION_KEY: {{ENCRYPTION_KEY}}
+      AUTHELIA_STORAGE_POSTGRES_HOST: postgres
+      AUTHELIA_STORAGE_POSTGRES_USER: {{POSTGRES_USERNAME}}
+      AUTHELIA_STORAGE_POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      AUTHELIA_STORAGE_POSTGRES_DATABASE: {{POSTGRES_DATABASE}}
+    volumes:
+      - authelia_data:/config
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9091/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  postgres:
+    image: postgres:{{POSTGRES_VERSION}}
+    container_name: {{APP_NAME}}_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: {{POSTGRES_DATABASE}}
+      POSTGRES_USER: {{POSTGRES_USERNAME}}
+      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  authelia_data:
+    driver: local
+  postgres_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+
