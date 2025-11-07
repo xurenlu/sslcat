@@ -1,0 +1,55 @@
+id: uptime-kuma
+name: Uptime Kuma
+category: devops
+subcategory: monitoring
+tags: [nodejs, monitoring, uptime, uptime-kuma]
+description: 现代化的网站监控工具，界面美观，支持多种监控类型。
+icon: uptime-kuma
+version: 1.0.0
+author: SSLcat Team
+website: https://uptime.kuma.pet/
+compose_file: docker-compose.yml
+
+variables:
+  - name: UPTIME_KUMA_VERSION
+    type: select
+    title: Uptime Kuma 版本
+    default: "latest"
+    options: ["latest", "1.23", "1.22"]
+    description: 选择 Uptime Kuma 版本
+  - name: UPTIME_KUMA_PORT
+    type: number
+    title: Uptime Kuma 端口
+    default: 3001
+    min: 1024
+    max: 65535
+    description: Uptime Kuma Web 服务端口
+
+services:
+  - name: uptime-kuma
+    type: web
+    description: Uptime Kuma 监控服务
+    ports:
+      - internal: 3001
+        external: null
+        public: true
+    volumes:
+      - name: uptime_kuma_data
+        path: /app/data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+

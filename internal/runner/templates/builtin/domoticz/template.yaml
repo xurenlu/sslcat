@@ -1,0 +1,57 @@
+id: domoticz
+name: Domoticz
+category: collaboration
+subcategory: iot
+tags: [cpp, iot, smart-home, domoticz]
+description: 轻量级智能家居自动化平台，支持多种协议和设备。
+icon: domoticz
+version: 1.0.0
+author: SSLcat Team
+website: https://www.domoticz.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: DOMOTICZ_VERSION
+    type: select
+    title: Domoticz 版本
+    default: "latest"
+    options: ["latest", "2024.1"]
+    description: 选择 Domoticz 版本
+  - name: DOMOTICZ_PORT
+    type: number
+    title: Domoticz 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: Domoticz Web 服务端口
+
+services:
+  - name: domoticz
+    type: web
+    description: Domoticz 智能家居服务
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: domoticz_data
+        path: /opt/domoticz
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  default_admin_user: admin
+  default_admin_password: domoticz
+

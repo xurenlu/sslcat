@@ -1,0 +1,61 @@
+id: glances
+name: Glances
+category: devops
+subcategory: monitoring
+tags: [python, monitoring, system, glances]
+description: 跨平台系统监控工具，界面简洁，适合快速查看系统状态。
+icon: glances
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/nicolargo/glances
+compose_file: docker-compose.yml
+
+variables:
+  - name: GLANCES_VERSION
+    type: select
+    title: Glances 版本
+    default: "latest"
+    options: ["latest", "4.0", "3.1"]
+    description: 选择 Glances 版本
+  - name: GLANCES_PORT
+    type: number
+    title: Glances 端口
+    default: 61208
+    min: 1024
+    max: 65535
+    description: Glances Web 服务端口
+
+services:
+  - name: glances
+    type: web
+    description: Glances 系统监控服务
+    ports:
+      - internal: 61208
+        external: null
+        public: true
+    volumes:
+      - name: docker_sock
+        path: /var/run/docker.sock
+        mode: ro
+      - name: proc
+        path: /host/proc
+        mode: ro
+      - name: sys
+        path: /host/sys
+        mode: ro
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+

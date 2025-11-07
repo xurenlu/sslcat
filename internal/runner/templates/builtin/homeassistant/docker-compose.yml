@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:{{HOMEASSISTANT_VERSION}}
+    container_name: {{APP_NAME}}_homeassistant
+    restart: unless-stopped
+    ports:
+      - "{{HOMEASSISTANT_PORT}}:8123"
+    environment:
+      TZ: UTC
+    volumes:
+      - homeassistant_data:/config
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+volumes:
+  homeassistant_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

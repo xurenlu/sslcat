@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  netdata:
+    image: netdata/netdata:{{NETDATA_VERSION}}
+    container_name: {{APP_NAME}}_netdata
+    restart: unless-stopped
+    ports:
+      - "{{NETDATA_PORT}}:19999"
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - netdata_data:/var/lib/netdata
+      - netdata_config:/etc/netdata
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:19999/api/v1/info"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  netdata_data:
+    driver: local
+  netdata_config:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

@@ -1,0 +1,55 @@
+id: homeassistant
+name: Home Assistant
+category: collaboration
+subcategory: iot
+tags: [python, iot, smart-home, homeassistant]
+description: 开源智能家居自动化平台，支持多种设备接入和控制。
+icon: homeassistant
+version: 1.0.0
+author: SSLcat Team
+website: https://www.home-assistant.io/
+compose_file: docker-compose.yml
+
+variables:
+  - name: HOMEASSISTANT_VERSION
+    type: select
+    title: Home Assistant 版本
+    default: "latest"
+    options: ["latest", "2024.1", "2023.12"]
+    description: 选择 Home Assistant 版本
+  - name: HOMEASSISTANT_PORT
+    type: number
+    title: Home Assistant 端口
+    default: 8123
+    min: 1024
+    max: 65535
+    description: Home Assistant Web 服务端口
+
+services:
+  - name: homeassistant
+    type: web
+    description: Home Assistant 智能家居服务
+    ports:
+      - internal: 8123
+        external: null
+        public: true
+    volumes:
+      - name: homeassistant_data
+        path: /config
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+

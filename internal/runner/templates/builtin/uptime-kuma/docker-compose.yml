@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:{{UPTIME_KUMA_VERSION}}
+    container_name: {{APP_NAME}}_uptime_kuma
+    restart: unless-stopped
+    ports:
+      - "{{UPTIME_KUMA_PORT}}:3001"
+    volumes:
+      - uptime_kuma_data:/app/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  uptime_kuma_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

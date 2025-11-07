@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  domoticz:
+    image: domoticz/domoticz:{{DOMOTICZ_VERSION}}
+    container_name: {{APP_NAME}}_domoticz
+    restart: unless-stopped
+    ports:
+      - "{{DOMOTICZ_PORT}}:8080"
+    environment:
+      TZ: UTC
+    volumes:
+      - domoticz_data:/opt/domoticz
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  domoticz_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+
