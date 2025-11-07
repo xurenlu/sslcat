@@ -1,0 +1,124 @@
+id: kutt
+name: Kutt
+category: tools
+subcategory: url-shortener
+tags: [nodejs, postgresql, redis, url-shortener, short-link, kutt]
+description: 现代化的短链接服务，界面美观，支持自定义域名和统计功能。
+icon: kutt
+version: 1.0.0
+author: SSLcat Team
+website: https://kutt.it/
+compose_file: docker-compose.yml
+
+variables:
+  - name: KUTT_VERSION
+    type: select
+    title: Kutt 版本
+    default: "latest"
+    options: ["latest", "2.8", "2.7"]
+    description: 选择 Kutt 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "14", "16"]
+    description: 选择 PostgreSQL 版本
+  - name: REDIS_VERSION
+    type: select
+    title: Redis 版本
+    default: "7"
+    options: ["7", "6", "7-alpine"]
+    description: 选择 Redis 版本
+  - name: KUTT_PORT
+    type: number
+    title: Kutt 端口
+    default: 3000
+    min: 1024
+    max: 65535
+    description: Kutt Web 服务端口
+
+services:
+  - name: kutt
+    type: web
+    description: Kutt 短链接服务
+    depends_on: [postgres, redis]
+    ports:
+      - internal: 3000
+        external: null
+        public: true
+    volumes:
+      - name: kutt_data
+        path: /app/data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  - name: redis
+    type: cache
+    description: Redis 缓存服务
+    ports:
+      - internal: 6379
+        external: null
+        public: false
+    volumes:
+      - name: redis_data
+        path: /data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_kutt"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_kutt"
+  kutt:
+    secret_key:
+      pattern: random
+      length: 32
+
+connection_strings:
+  postgres: "postgresql://{username}:{password}@postgres:5432/{database}"
+  redis: "redis://redis:6379/0"
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+

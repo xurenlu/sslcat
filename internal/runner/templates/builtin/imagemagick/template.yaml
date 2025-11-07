@@ -1,0 +1,55 @@
+id: imagemagick
+name: ImageMagick
+category: tools
+subcategory: image
+tags: [c, image, tools, conversion, imagemagick]
+description: 强大的图片处理工具，支持格式转换、缩放、裁剪、滤镜等操作。
+icon: imagemagick
+version: 1.0.0
+author: SSLcat Team
+website: https://imagemagick.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: IMAGEMAGICK_VERSION
+    type: select
+    title: ImageMagick 版本
+    default: "latest"
+    options: ["latest", "7.1", "7.0"]
+    description: 选择 ImageMagick 版本
+  - name: IMAGEMAGICK_PORT
+    type: number
+    title: ImageMagick 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: ImageMagick Web 服务端口
+
+services:
+  - name: imagemagick
+    type: web
+    description: ImageMagick 图片处理服务
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: imagemagick_data
+        path: /app/data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+

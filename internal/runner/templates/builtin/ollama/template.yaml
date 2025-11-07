@@ -1,0 +1,55 @@
+id: ollama
+name: Ollama
+category: ai
+subcategory: llm
+tags: [go, ai, llm, ollama]
+description: 本地运行大型语言模型，支持多种开源模型，适合企业内网使用。
+icon: ollama
+version: 1.0.0
+author: SSLcat Team
+website: https://ollama.ai/
+compose_file: docker-compose.yml
+
+variables:
+  - name: OLLAMA_VERSION
+    type: select
+    title: Ollama 版本
+    default: "latest"
+    options: ["latest", "0.1", "0.0"]
+    description: 选择 Ollama 版本
+  - name: OLLAMA_PORT
+    type: number
+    title: Ollama 端口
+    default: 11434
+    min: 1024
+    max: 65535
+    description: Ollama API 服务端口
+
+services:
+  - name: ollama
+    type: api
+    description: Ollama LLM 服务
+    ports:
+      - internal: 11434
+        external: null
+        public: true
+    volumes:
+      - name: ollama_data
+        path: /root/.ollama
+        mode: rw
+    healthcheck:
+      type: http
+      path: /api/tags
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  api_url: http://{{PRIMARY_DOMAIN}}:{{OLLAMA_PORT}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+

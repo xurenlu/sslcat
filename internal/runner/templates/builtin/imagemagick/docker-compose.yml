@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  imagemagick:
+    image: imagemagick/imagemagick:{{IMAGEMAGICK_VERSION}}
+    container_name: {{APP_NAME}}_imagemagick
+    restart: unless-stopped
+    ports:
+      - "{{IMAGEMAGICK_PORT}}:8080"
+    volumes:
+      - imagemagick_data:/app/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  imagemagick_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

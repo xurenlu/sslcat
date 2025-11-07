@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  send:
+    image: timvisee/send:{{SEND_VERSION}}
+    container_name: {{APP_NAME}}_send
+    restart: unless-stopped
+    ports:
+      - "{{SEND_PORT}}:1443"
+    environment:
+      BASE_URL: http://{{PRIMARY_DOMAIN}}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    volumes:
+      - send_data:/uploads
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:1443"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  redis:
+    image: redis:{{REDIS_VERSION}}
+    container_name: {{APP_NAME}}_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  send_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

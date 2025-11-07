@@ -1,0 +1,55 @@
+id: stirling-pdf
+name: Stirling PDF
+category: tools
+subcategory: pdf
+tags: [java, pdf, tools, conversion, stirling-pdf]
+description: 强大的 PDF 处理工具，支持合并、拆分、转换、OCR、压缩等功能。
+icon: stirling-pdf
+version: 1.0.0
+author: SSLcat Team
+website: https://www.stirlingpdf.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: STIRLING_PDF_VERSION
+    type: select
+    title: Stirling PDF 版本
+    default: "latest"
+    options: ["latest", "v1.0"]
+    description: 选择 Stirling PDF 版本
+  - name: STIRLING_PDF_PORT
+    type: number
+    title: Stirling PDF 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: Stirling PDF Web 服务端口
+
+services:
+  - name: stirling-pdf
+    type: web
+    description: Stirling PDF 处理服务
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: stirling_pdf_data
+        path: /tmp/stirling-pdf
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+

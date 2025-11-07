@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  stirling-pdf:
+    image: frooodle/s-pdf:{{STIRLING_PDF_VERSION}}
+    container_name: {{APP_NAME}}_stirling_pdf
+    restart: unless-stopped
+    ports:
+      - "{{STIRLING_PDF_PORT}}:8080"
+    environment:
+      DOCKER_ENABLE_SECURITY: "false"
+    volumes:
+      - stirling_pdf_data:/tmp/stirling-pdf
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  stirling_pdf_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

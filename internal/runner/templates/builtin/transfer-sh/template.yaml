@@ -1,0 +1,55 @@
+id: transfer-sh
+name: Transfer.sh
+category: tools
+subcategory: file-sharing
+tags: [go, file-sharing, transfer, transfer-sh]
+description: 简单快速的文件分享服务，支持大文件上传和下载。
+icon: transfer-sh
+version: 1.0.0
+author: SSLcat Team
+website: https://transfer.sh/
+compose_file: docker-compose.yml
+
+variables:
+  - name: TRANSFER_SH_VERSION
+    type: select
+    title: Transfer.sh 版本
+    default: "latest"
+    options: ["latest", "1.6", "1.5"]
+    description: 选择 Transfer.sh 版本
+  - name: TRANSFER_SH_PORT
+    type: number
+    title: Transfer.sh 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: Transfer.sh Web 服务端口
+
+services:
+  - name: transfer-sh
+    type: web
+    description: Transfer.sh 文件分享服务
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: transfer_sh_data
+        path: /tmp/transfers
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+

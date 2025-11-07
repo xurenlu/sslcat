@@ -1,0 +1,97 @@
+id: polr
+name: Polr
+category: tools
+subcategory: url-shortener
+tags: [php, mysql, url-shortener, short-link, polr]
+description: 开源短链接服务，支持自定义短链接、统计和分析功能。
+icon: polr
+version: 1.0.0
+author: SSLcat Team
+website: https://polrproject.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: POLR_VERSION
+    type: select
+    title: Polr 版本
+    default: "latest"
+    options: ["latest", "2.3", "2.2"]
+    description: 选择 Polr 版本
+  - name: MYSQL_VERSION
+    type: select
+    title: MySQL 版本
+    default: "8.0"
+    options: ["8.0", "8.1", "5.7"]
+    description: 选择 MySQL 版本
+  - name: POLR_PORT
+    type: number
+    title: Polr 端口
+    default: 80
+    min: 1024
+    max: 65535
+    description: Polr Web 服务端口
+
+services:
+  - name: polr
+    type: web
+    description: Polr 短链接服务
+    depends_on: [mysql]
+    ports:
+      - internal: 80
+        external: null
+        public: true
+    volumes:
+      - name: polr_data
+        path: /app/storage
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  - name: mysql
+    type: database
+    description: MySQL 数据库服务
+    ports:
+      - internal: 3306
+        external: null
+        public: false
+    volumes:
+      - name: mysql_data
+        path: /var/lib/mysql
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  mysql:
+    username:
+      pattern: "{app_name}_polr"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_polr"
+    root_password:
+      pattern: random
+      length: 20
+
+connection_strings:
+  mysql: "mysql://{username}:{password}@mysql:3306/{database}?charset=utf8mb4"
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+

@@ -1,0 +1,55 @@
+id: pdftk
+name: PDFtk Server
+category: tools
+subcategory: pdf
+tags: [java, pdf, tools, pdftk]
+description: PDF 处理工具，支持合并、拆分、旋转、加密等操作。
+icon: pdftk
+version: 1.0.0
+author: SSLcat Team
+website: https://www.pdflabs.com/tools/pdftk-server/
+compose_file: docker-compose.yml
+
+variables:
+  - name: PDFTK_VERSION
+    type: select
+    title: PDFtk 版本
+    default: "latest"
+    options: ["latest"]
+    description: 选择 PDFtk 版本
+  - name: PDFTK_PORT
+    type: number
+    title: PDFtk 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: PDFtk Web 服务端口
+
+services:
+  - name: pdftk
+    type: web
+    description: PDFtk PDF 处理服务
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: pdftk_data
+        path: /app/data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+
