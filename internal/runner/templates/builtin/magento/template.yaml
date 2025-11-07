@@ -1,0 +1,129 @@
+id: magento
+name: Magento
+category: ecommerce
+subcategory: shop
+tags: [php, mysql, redis, ecommerce, shop, magento]
+description: 强大的开源电商平台，功能完整，适合大型在线商店。
+icon: magento
+version: 1.0.0
+author: SSLcat Team
+website: https://magento.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: MAGENTO_VERSION
+    type: select
+    title: Magento 版本
+    default: "latest"
+    options: ["latest", "2.4", "2.3"]
+    description: 选择 Magento 版本
+  - name: MYSQL_VERSION
+    type: select
+    title: MySQL 版本
+    default: "8.0"
+    options: ["8.0", "8.1", "5.7"]
+    description: 选择 MySQL 版本
+  - name: REDIS_VERSION
+    type: select
+    title: Redis 版本
+    default: "7"
+    options: ["7", "6", "7-alpine"]
+    description: 选择 Redis 版本
+  - name: MAGENTO_PORT
+    type: number
+    title: Magento 端口
+    default: 80
+    min: 1024
+    max: 65535
+    description: Magento Web 服务端口
+
+services:
+  - name: magento
+    type: web
+    description: Magento 电商平台服务
+    depends_on: [mysql, redis]
+    ports:
+      - internal: 80
+        external: null
+        public: true
+    volumes:
+      - name: magento_data
+        path: /var/www/html
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+
+  - name: mysql
+    type: database
+    description: MySQL 数据库服务
+    ports:
+      - internal: 3306
+        external: null
+        public: false
+    volumes:
+      - name: mysql_data
+        path: /var/lib/mysql
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  - name: redis
+    type: cache
+    description: Redis 缓存服务
+    ports:
+      - internal: 6379
+        external: null
+        public: false
+    volumes:
+      - name: redis_data
+        path: /data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+credentials:
+  mysql:
+    username:
+      pattern: "{app_name}_magento"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_magento"
+    root_password:
+      pattern: random
+      length: 20
+  magento:
+    admin_password:
+      pattern: random
+      length: 16
+
+connection_strings:
+  mysql: "mysql://{username}:{password}@mysql:3306/{database}?charset=utf8mb4"
+  redis: "redis://redis:6379/0"
+
+healthcheck_global:
+  timeout: 20m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_url: http://{{PRIMARY_DOMAIN}}/admin
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  admin_username: admin
+

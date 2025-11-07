@@ -1,0 +1,98 @@
+id: osticket
+name: osTicket
+category: support
+subcategory: helpdesk
+tags: [php, mysql, support, helpdesk, osticket]
+description: 开源客服工单系统，功能完整，适合中小型团队使用。
+icon: osticket
+version: 1.0.0
+author: SSLcat Team
+website: https://osticket.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: OSTICKET_VERSION
+    type: select
+    title: osTicket 版本
+    default: "latest"
+    options: ["latest", "1.18", "1.17"]
+    description: 选择 osTicket 版本
+  - name: MYSQL_VERSION
+    type: select
+    title: MySQL 版本
+    default: "8.0"
+    options: ["8.0", "8.1", "5.7"]
+    description: 选择 MySQL 版本
+  - name: OSTICKET_PORT
+    type: number
+    title: osTicket 端口
+    default: 80
+    min: 1024
+    max: 65535
+    description: osTicket Web 服务端口
+
+services:
+  - name: osticket
+    type: web
+    description: osTicket 客服系统服务
+    depends_on: [mysql]
+    ports:
+      - internal: 80
+        external: null
+        public: true
+    volumes:
+      - name: osticket_data
+        path: /var/www/html
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  - name: mysql
+    type: database
+    description: MySQL 数据库服务
+    ports:
+      - internal: 3306
+        external: null
+        public: false
+    volumes:
+      - name: mysql_data
+        path: /var/lib/mysql
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  mysql:
+    username:
+      pattern: "{app_name}_osticket"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_osticket"
+    root_password:
+      pattern: random
+      length: 20
+
+connection_strings:
+  mysql: "mysql://{username}:{password}@mysql:3306/{database}?charset=utf8mb4"
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  install_url: http://{{PRIMARY_DOMAIN}}/setup
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+

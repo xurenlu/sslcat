@@ -1,0 +1,102 @@
+id: mantisbt
+name: MantisBT
+category: project
+subcategory: issue-tracking
+tags: [php, mysql, project, issue-tracking, mantisbt]
+description: 开源问题跟踪系统，功能完整，适合软件开发团队。
+icon: mantisbt
+version: 1.0.0
+author: SSLcat Team
+website: https://www.mantisbt.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: MANTISBT_VERSION
+    type: select
+    title: MantisBT 版本
+    default: "latest"
+    options: ["latest", "2.26", "2.25"]
+    description: 选择 MantisBT 版本
+  - name: MYSQL_VERSION
+    type: select
+    title: MySQL 版本
+    default: "8.0"
+    options: ["8.0", "8.1", "5.7"]
+    description: 选择 MySQL 版本
+  - name: MANTISBT_PORT
+    type: number
+    title: MantisBT 端口
+    default: 80
+    min: 1024
+    max: 65535
+    description: MantisBT Web 服务端口
+
+services:
+  - name: mantisbt
+    type: web
+    description: MantisBT 问题跟踪服务
+    depends_on: [mysql]
+    ports:
+      - internal: 80
+        external: null
+        public: true
+    volumes:
+      - name: mantisbt_data
+        path: /app
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  - name: mysql
+    type: database
+    description: MySQL 数据库服务
+    ports:
+      - internal: 3306
+        external: null
+        public: false
+    volumes:
+      - name: mysql_data
+        path: /var/lib/mysql
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  mysql:
+    username:
+      pattern: "{app_name}_mantisbt"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_mantisbt"
+    root_password:
+      pattern: random
+      length: 20
+  mantisbt:
+    admin_password:
+      pattern: random
+      length: 16
+
+connection_strings:
+  mysql: "mysql://{username}:{password}@mysql:3306/{database}?charset=utf8mb4"
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  admin_username: administrator
+
