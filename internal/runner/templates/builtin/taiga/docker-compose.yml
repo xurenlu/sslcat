@@ -1,0 +1,121 @@
+version: '3.8'
+
+services:
+  taiga-back:
+    image: taigaio/taiga-back:{{TAIGA_VERSION}}
+    container_name: {{APP_NAME}}_taiga_back
+    restart: unless-stopped
+    environment:
+      SECRET_KEY: {{SECRET_KEY}}
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: {{POSTGRES_DATABASE}}
+      POSTGRES_USER: {{POSTGRES_USERNAME}}
+      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: {{RABBITMQ_USERNAME}}
+      RABBITMQ_PASSWORD: {{RABBITMQ_PASSWORD}}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      TAIGA_SITES_SCHEME: http
+      TAIGA_SITES_DOMAIN: {{PRIMARY_DOMAIN}}
+    volumes:
+      - taiga_back_data:/taiga-back/media
+      - taiga_back_static:/taiga-back/static
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+
+  taiga-front:
+    image: taigaio/taiga-front:{{TAIGA_VERSION}}
+    container_name: {{APP_NAME}}_taiga_front
+    restart: unless-stopped
+    ports:
+      - "{{TAIGA_PORT}}:80"
+    environment:
+      TAIGA_API_URL: http://{{PRIMARY_DOMAIN}}/api
+      TAIGA_WS_URL: ws://{{PRIMARY_DOMAIN}}/ws
+    depends_on:
+      - taiga-back
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  postgres:
+    image: postgres:{{POSTGRES_VERSION}}
+    container_name: {{APP_NAME}}_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: {{POSTGRES_DATABASE}}
+      POSTGRES_USER: {{POSTGRES_USERNAME}}
+      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  rabbitmq:
+    image: rabbitmq:{{RABBITMQ_VERSION}}
+    container_name: {{APP_NAME}}_rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: {{RABBITMQ_USERNAME}}
+      RABBITMQ_DEFAULT_PASS: {{RABBITMQ_PASSWORD}}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:{{REDIS_VERSION}}
+    container_name: {{APP_NAME}}_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  taiga_back_data:
+    driver: local
+  taiga_back_static:
+    driver: local
+  postgres_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

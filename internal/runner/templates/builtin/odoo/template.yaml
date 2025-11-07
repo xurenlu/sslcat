@@ -1,0 +1,99 @@
+id: odoo
+name: Odoo
+category: crm
+subcategory: erp
+tags: [python, postgresql, crm, erp, odoo]
+description: 开源 ERP 和 CRM 系统，功能强大，支持销售、库存、会计、人力资源等模块。
+icon: odoo
+version: 1.0.0
+author: SSLcat Team
+website: https://www.odoo.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: ODOO_VERSION
+    type: select
+    title: Odoo 版本
+    default: "latest"
+    options: ["latest", "17.0", "16.0"]
+    description: 选择 Odoo 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "14", "16"]
+    description: 选择 PostgreSQL 版本
+  - name: ODOO_PORT
+    type: number
+    title: Odoo 端口
+    default: 8069
+    min: 1024
+    max: 65535
+    description: Odoo Web 服务端口
+
+services:
+  - name: odoo
+    type: web
+    description: Odoo ERP/CRM 服务
+    depends_on: [postgres]
+    ports:
+      - internal: 8069
+        external: null
+        public: true
+    volumes:
+      - name: odoo_data
+        path: /var/lib/odoo
+        mode: rw
+      - name: odoo_extra_addons
+        path: /mnt/extra-addons
+        mode: rw
+    healthcheck:
+      type: http
+      path: /web/health
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data/pgdata
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_odoo"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_odoo"
+
+connection_strings:
+  postgres: "postgresql://{username}:{password}@postgres:5432/{database}"
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  default_admin_user: admin
+  default_admin_password: admin
+

@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  odoo:
+    image: odoo:{{ODOO_VERSION}}
+    container_name: {{APP_NAME}}_odoo
+    restart: unless-stopped
+    ports:
+      - "{{ODOO_PORT}}:8069"
+    environment:
+      HOST: postgres
+      USER: {{POSTGRES_USERNAME}}
+      PASSWORD: {{POSTGRES_PASSWORD}}
+    volumes:
+      - odoo_data:/var/lib/odoo
+      - odoo_extra_addons:/mnt/extra-addons
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8069/web/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  postgres:
+    image: postgres:{{POSTGRES_VERSION}}
+    container_name: {{APP_NAME}}_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: {{POSTGRES_DATABASE}}
+      POSTGRES_USER: {{POSTGRES_USERNAME}}
+      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/pgdata
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  odoo_data:
+    driver: local
+  odoo_extra_addons:
+    driver: local
+  postgres_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

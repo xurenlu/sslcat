@@ -1,0 +1,74 @@
+id: gitlab
+name: GitLab
+category: devops
+subcategory: git
+tags: [ruby, postgresql, redis, git, ci-cd, devops, gitlab]
+description: 完整的 DevOps 平台，包含 Git 仓库、CI/CD、项目管理等功能。
+icon: gitlab
+version: 1.0.0
+author: SSLcat Team
+website: https://about.gitlab.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: GITLAB_VERSION
+    type: select
+    title: GitLab 版本
+    default: "latest"
+    options: ["latest", "16.8", "16.7"]
+    description: 选择 GitLab 版本
+  - name: GITLAB_PORT
+    type: number
+    title: GitLab Web 端口
+    default: 80
+    min: 1024
+    max: 65535
+    description: GitLab Web 服务端口
+  - name: GITLAB_SSH_PORT
+    type: number
+    title: GitLab SSH 端口
+    default: 2222
+    min: 1024
+    max: 65535
+    description: GitLab SSH 服务端口
+
+services:
+  - name: gitlab
+    type: web
+    description: GitLab 完整平台服务（包含 PostgreSQL、Redis 等）
+    ports:
+      - internal: 80
+        external: null
+        public: true
+      - internal: 22
+        external: null
+        public: true
+    volumes:
+      - name: gitlab_config
+        path: /etc/gitlab
+        mode: rw
+      - name: gitlab_logs
+        path: /var/log/gitlab
+        mode: rw
+      - name: gitlab_data
+        path: /var/opt/gitlab
+        mode: rw
+    healthcheck:
+      type: http
+      path: /-/health
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+
+healthcheck_global:
+  timeout: 20m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  ssh_url: ssh://git@{{PRIMARY_DOMAIN}}:{{GITLAB_SSH_PORT}}
+  admin_email: root@{{PRIMARY_DOMAIN}}
+  default_admin_user: root
+  default_admin_password: 查看容器日志获取初始密码
+

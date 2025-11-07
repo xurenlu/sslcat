@@ -1,0 +1,128 @@
+version: '3.8'
+
+services:
+  erpnext:
+    image: frappe/erpnext:{{ERPNext_VERSION}}
+    container_name: {{APP_NAME}}_erpnext
+    restart: unless-stopped
+    ports:
+      - "{{ERPNext_PORT}}:8080"
+    environment:
+      DB_HOST: mariadb
+      DB_PORT: 3306
+      DB_NAME: {{MARIADB_DATABASE}}
+      DB_USER: {{MARIADB_USERNAME}}
+      DB_PASSWORD: {{MARIADB_PASSWORD}}
+      REDIS_CACHE: redis-cache:6379
+      REDIS_QUEUE: redis-queue:6379
+      REDIS_SOCKETIO: redis-socketio:6379
+      SOCKETIO_PORT: 9000
+    volumes:
+      - erpnext_sites:/home/frappe/frappe-bench/sites
+      - erpnext_logs:/home/frappe/frappe-bench/logs
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+      redis-queue:
+        condition: service_healthy
+      redis-socketio:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/method/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+
+  mariadb:
+    image: mariadb:{{MARIADB_VERSION}}
+    container_name: {{APP_NAME}}_mariadb
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: {{MARIADB_ROOT_PASSWORD}}
+      MYSQL_DATABASE: {{MARIADB_DATABASE}}
+      MYSQL_USER: {{MARIADB_USERNAME}}
+      MYSQL_PASSWORD: {{MARIADB_PASSWORD}}
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MARIADB_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis-cache:
+    image: redis:{{REDIS_VERSION}}
+    container_name: {{APP_NAME}}_redis_cache
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_cache_data:/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis-queue:
+    image: redis:{{REDIS_VERSION}}
+    container_name: {{APP_NAME}}_redis_queue
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_queue_data:/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis-socketio:
+    image: redis:{{REDIS_VERSION}}
+    container_name: {{APP_NAME}}_redis_socketio
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_socketio_data:/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  erpnext_sites:
+    driver: local
+  erpnext_logs:
+    driver: local
+  mariadb_data:
+    driver: local
+  redis_cache_data:
+    driver: local
+  redis_queue_data:
+    driver: local
+  redis_socketio_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

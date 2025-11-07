@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  jenkins:
+    image: jenkins/jenkins:{{JENKINS_VERSION}}
+    container_name: {{APP_NAME}}_jenkins
+    restart: unless-stopped
+    ports:
+      - "{{JENKINS_PORT}}:8080"
+      - "{{JENKINS_AGENT_PORT}}:50000"
+    environment:
+      JENKINS_OPTS: --httpPort=8080
+    volumes:
+      - jenkins_data:/var/jenkins_home
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+volumes:
+  jenkins_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

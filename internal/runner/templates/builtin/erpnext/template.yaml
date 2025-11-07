@@ -1,0 +1,163 @@
+id: erpnext
+name: ERPNext
+category: crm
+subcategory: erp
+tags: [python, mariadb, redis, erp, erpnext]
+description: 开源 ERP 系统，基于 Frappe 框架，功能完整，适合中小企业。
+icon: erpnext
+version: 1.0.0
+author: SSLcat Team
+website: https://erpnext.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: ERPNext_VERSION
+    type: select
+    title: ERPNext 版本
+    default: "latest"
+    options: ["latest", "v14", "v13"]
+    description: 选择 ERPNext 版本
+  - name: MARIADB_VERSION
+    type: select
+    title: MariaDB 版本
+    default: "10.11"
+    options: ["10.11", "10.10", "10.9"]
+    description: 选择 MariaDB 版本
+  - name: REDIS_VERSION
+    type: select
+    title: Redis 版本
+    default: "7"
+    options: ["7", "6", "7-alpine"]
+    description: 选择 Redis 版本
+  - name: ERPNext_PORT
+    type: number
+    title: ERPNext 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: ERPNext Web 服务端口
+
+services:
+  - name: erpnext
+    type: web
+    description: ERPNext ERP 服务
+    depends_on: [mariadb, redis-cache, redis-queue, redis-socketio]
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: erpnext_sites
+        path: /home/frappe/frappe-bench/sites
+        mode: rw
+      - name: erpnext_logs
+        path: /home/frappe/frappe-bench/logs
+        mode: rw
+    healthcheck:
+      type: http
+      path: /api/method/ping
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+
+  - name: mariadb
+    type: database
+    description: MariaDB 数据库服务
+    ports:
+      - internal: 3306
+        external: null
+        public: false
+    volumes:
+      - name: mariadb_data
+        path: /var/lib/mysql
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  - name: redis-cache
+    type: cache
+    description: Redis 缓存服务
+    ports:
+      - internal: 6379
+        external: null
+        public: false
+    volumes:
+      - name: redis_cache_data
+        path: /data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  - name: redis-queue
+    type: message-queue
+    description: Redis 队列服务
+    ports:
+      - internal: 6379
+        external: null
+        public: false
+    volumes:
+      - name: redis_queue_data
+        path: /data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  - name: redis-socketio
+    type: cache
+    description: Redis Socket.IO 服务
+    ports:
+      - internal: 6379
+        external: null
+        public: false
+    volumes:
+      - name: redis_socketio_data
+        path: /data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+credentials:
+  mariadb:
+    username:
+      pattern: "{app_name}_erpnext"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_erpnext"
+    root_password:
+      pattern: random
+      length: 20
+
+connection_strings:
+  mariadb: "mysql://{username}:{password}@mariadb:3306/{database}?charset=utf8mb4"
+
+healthcheck_global:
+  timeout: 20m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: administrator@{{PRIMARY_DOMAIN}}
+

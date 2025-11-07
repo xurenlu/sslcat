@@ -1,0 +1,71 @@
+id: mongodb
+name: MongoDB
+category: database
+subcategory: nosql
+tags: [mongodb, nosql, database, document]
+description: 流行的 NoSQL 文档数据库，适合存储非结构化数据。
+icon: mongodb
+version: 1.0.0
+author: SSLcat Team
+website: https://www.mongodb.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: MONGODB_VERSION
+    type: select
+    title: MongoDB 版本
+    default: "latest"
+    options: ["latest", "7.0", "6.0"]
+    description: 选择 MongoDB 版本
+  - name: MONGODB_PORT
+    type: number
+    title: MongoDB 端口
+    default: 27017
+    min: 1024
+    max: 65535
+    description: MongoDB 服务端口
+
+services:
+  - name: mongodb
+    type: database
+    description: MongoDB 数据库服务
+    ports:
+      - internal: 27017
+        external: null
+        public: true
+    volumes:
+      - name: mongodb_data
+        path: /data/db
+        mode: rw
+      - name: mongodb_config
+        path: /data/configdb
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  mongodb:
+    root_username:
+      pattern: "admin"
+    root_password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_db"
+
+connection_strings:
+  mongodb: "mongodb://{{MONGODB_ROOT_USERNAME}}:{{MONGODB_ROOT_PASSWORD}}@mongodb:27017/{{MONGODB_DATABASE}}?authSource=admin"
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  admin_user: {{MONGODB_ROOT_USERNAME}}
+  admin_password: {{MONGODB_ROOT_PASSWORD}}
+

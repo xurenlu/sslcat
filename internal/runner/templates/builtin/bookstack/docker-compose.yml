@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  bookstack:
+    image: lscr.io/linuxserver/bookstack:{{BOOKSTACK_VERSION}}
+    container_name: {{APP_NAME}}_bookstack
+    restart: unless-stopped
+    ports:
+      - "{{BOOKSTACK_PORT}}:80"
+    environment:
+      PUID: 1000
+      PGID: 1000
+      APP_URL: http://{{PRIMARY_DOMAIN}}
+      DB_HOST: mysql
+      DB_USER: {{MYSQL_USERNAME}}
+      DB_PASS: {{MYSQL_PASSWORD}}
+      DB_DATABASE: {{MYSQL_DATABASE}}
+    volumes:
+      - bookstack_data:/config
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  mysql:
+    image: mysql:{{MYSQL_VERSION}}
+    container_name: {{APP_NAME}}_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
+      MYSQL_DATABASE: {{MYSQL_DATABASE}}
+      MYSQL_USER: {{MYSQL_USERNAME}}
+      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    command: --default-authentication-plugin=mysql_native_password
+
+volumes:
+  bookstack_data:
+    driver: local
+  mysql_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+
