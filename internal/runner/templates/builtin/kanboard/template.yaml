@@ -1,0 +1,102 @@
+id: kanboard
+name: Kanboard
+category: project
+subcategory: kanban
+tags: [php, mysql, project, kanban, kanboard]
+description: 简洁的看板项目管理工具，适合个人和小团队使用。
+icon: kanboard
+version: 1.0.0
+author: SSLcat Team
+website: https://kanboard.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: KANBOARD_VERSION
+    type: select
+    title: Kanboard 版本
+    default: "latest"
+    options: ["latest", "1.2.35"]
+    description: 选择 Kanboard 版本
+  - name: MYSQL_VERSION
+    type: select
+    title: MySQL 版本
+    default: "8.0"
+    options: ["8.0", "8.1", "5.7"]
+    description: 选择 MySQL 版本
+  - name: KANBOARD_PORT
+    type: number
+    title: Kanboard 端口
+    default: 80
+    min: 1024
+    max: 65535
+    description: Kanboard Web 服务端口
+
+services:
+  - name: kanboard
+    type: web
+    description: Kanboard 看板服务
+    depends_on: [mysql]
+    ports:
+      - internal: 80
+        external: null
+        public: true
+    volumes:
+      - name: kanboard_data
+        path: /var/www/app/data
+        mode: rw
+      - name: kanboard_plugins
+        path: /var/www/app/plugins
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  - name: mysql
+    type: database
+    description: MySQL 数据库服务
+    ports:
+      - internal: 3306
+        external: null
+        public: false
+    volumes:
+      - name: mysql_data
+        path: /var/lib/mysql
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  mysql:
+    username:
+      pattern: "{app_name}_kanboard"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_kanboard"
+    root_password:
+      pattern: random
+      length: 20
+
+connection_strings:
+  mysql: "mysql://{username}:{password}@mysql:3306/{database}?charset=utf8mb4"
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  default_admin_user: admin
+  default_admin_password: admin
+

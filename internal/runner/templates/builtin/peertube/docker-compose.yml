@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  peertube:
+    image: chocobozzz/peertube:{{PEERTUBE_VERSION}}
+    container_name: {{APP_NAME}}_peertube
+    restart: unless-stopped
+    ports:
+      - "{{PEERTUBE_PORT}}:9000"
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: {{POSTGRES_DATABASE}}
+      POSTGRES_USER: {{POSTGRES_USERNAME}}
+      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      REDIS_HOST: redis
+      PEERTUBE_WEBSERVER_HOSTNAME: {{PRIMARY_DOMAIN}}
+      PEERTUBE_WEBSERVER_PORT: 9000
+      PEERTUBE_WEBSERVER_HTTPS: "false"
+    volumes:
+      - peertube_data:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9000/api/v1/config"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  postgres:
+    image: postgres:{{POSTGRES_VERSION}}
+    container_name: {{APP_NAME}}_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: {{POSTGRES_DATABASE}}
+      POSTGRES_USER: {{POSTGRES_USERNAME}}
+      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:{{REDIS_VERSION}}
+    container_name: {{APP_NAME}}_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  peertube_data:
+    driver: local
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:{{ELASTICSEARCH_VERSION}}
+    container_name: {{APP_NAME}}_elasticsearch
+    restart: unless-stopped
+    ports:
+      - "{{ELASTICSEARCH_PORT}}:9200"
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      "ES_JAVA_OPTS": "-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  elasticsearch_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

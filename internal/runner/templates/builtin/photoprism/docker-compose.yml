@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  photoprism:
+    image: photoprism/photoprism:{{PHOTOPRISM_VERSION}}
+    container_name: {{APP_NAME}}_photoprism
+    restart: unless-stopped
+    ports:
+      - "{{PHOTOPRISM_PORT}}:2342"
+    environment:
+      PHOTOPRISM_ADMIN_USER: admin
+      PHOTOPRISM_ADMIN_PASSWORD: {{ADMIN_PASSWORD}}
+      PHOTOPRISM_DATABASE_DRIVER: sqlite
+      PHOTOPRISM_ORIGINALS_PATH: /photoprism/originals
+      PHOTOPRISM_STORAGE_PATH: /photoprism/storage
+      PHOTOPRISM_CACHE_PATH: /photoprism/cache
+      PHOTOPRISM_IMPORT_PATH: /photoprism/import
+    volumes:
+      - photoprism_originals:/photoprism/originals
+      - photoprism_storage:/photoprism/storage
+      - photoprism_import:/photoprism/import
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:2342/api/v1/config"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  photoprism_originals:
+    driver: local
+  photoprism_storage:
+    driver: local
+  photoprism_import:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

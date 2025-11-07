@@ -1,0 +1,67 @@
+id: photoprism
+name: PhotoPrism
+category: media
+subcategory: photo
+tags: [go, photo, gallery, ai, photoprism]
+description: AI 驱动的照片管理平台，支持人脸识别、地点标记等功能。
+icon: photoprism
+version: 1.0.0
+author: SSLcat Team
+website: https://www.photoprism.app/
+compose_file: docker-compose.yml
+
+variables:
+  - name: PHOTOPRISM_VERSION
+    type: select
+    title: PhotoPrism 版本
+    default: "latest"
+    options: ["latest", "231201"]
+    description: 选择 PhotoPrism 版本
+  - name: PHOTOPRISM_PORT
+    type: number
+    title: PhotoPrism 端口
+    default: 2342
+    min: 1024
+    max: 65535
+    description: PhotoPrism Web 服务端口
+
+services:
+  - name: photoprism
+    type: web
+    description: PhotoPrism 照片管理服务
+    ports:
+      - internal: 2342
+        external: null
+        public: true
+    volumes:
+      - name: photoprism_originals
+        path: /photoprism/originals
+        mode: rw
+      - name: photoprism_storage
+        path: /photoprism/storage
+        mode: rw
+      - name: photoprism_import
+        path: /photoprism/import
+        mode: rw
+    healthcheck:
+      type: http
+      path: /api/v1/config
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+credentials:
+  photoprism:
+    admin_password:
+      pattern: random
+      length: 16
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_user: admin
+
