@@ -90,6 +90,13 @@ type TemplateMeta struct {
 	Subcategory string            `yaml:"subcategory,omitempty"`
 	Variables   []TemplateVar     `yaml:"variables,omitempty"`
 	Services    []TemplateService `yaml:"services,omitempty"`
+	Healthcheck TemplateHealthcheck `yaml:"healthcheck_global,omitempty"`
+}
+
+// TemplateHealthcheck 健康检查配置
+type TemplateHealthcheck struct {
+	Timeout time.Duration `yaml:"timeout,omitempty"`
+	Interval time.Duration `yaml:"interval,omitempty"`
 }
 
 // TemplateVar 模板变量
@@ -97,6 +104,7 @@ type TemplateVar struct {
 	Name    string      `yaml:"name"`
 	Type    string      `yaml:"type"`
 	Default interface{} `yaml:"default,omitempty"`
+	Options []interface{} `yaml:"options,omitempty"`
 }
 
 // TemplateService 模板服务定义

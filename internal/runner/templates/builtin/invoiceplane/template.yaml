@@ -1,0 +1,98 @@
+id: invoiceplane
+name: InvoicePlane (发票管理)
+category: tools
+subcategory: finance
+tags: [php, mysql, finance, invoice, billing]
+description: 开源的发票管理系统，支持发票创建、客户管理、报价管理、付款追踪等功能。
+icon: invoiceplane
+version: 1.0.0
+author: SSLcat Team
+website: https://www.invoiceplane.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: INVOICEPLANE_VERSION
+    type: select
+    title: InvoicePlane 版本
+    default: "latest"
+    options: ["latest", "v1.6", "v1.5"]
+    description: 选择 InvoicePlane 版本
+  - name: MYSQL_VERSION
+    type: select
+    title: MySQL 版本
+    default: "8.0"
+    options: ["8.0", "5.7", "8.1"]
+    description: 选择 MySQL 版本
+  - name: INVOICEPLANE_PORT
+    type: number
+    title: InvoicePlane 端口
+    default: 80
+    min: 1024
+    max: 65535
+    description: InvoicePlane Web 服务端口
+
+services:
+  - name: invoiceplane
+    type: web
+    description: InvoicePlane 发票管理系统服务
+    depends_on: [mysql]
+    ports:
+      - internal: 80
+        external: null
+        public: true
+    volumes:
+      - name: invoiceplane_data
+        path: /var/www/html
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  - name: mysql
+    type: database
+    description: MySQL 数据库服务
+    ports:
+      - internal: 3306
+        external: null
+        public: false
+    volumes:
+      - name: mysql_data
+        path: /var/lib/mysql
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+credentials:
+  mysql:
+    username:
+      pattern: "{app_name}_invoiceplane"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_invoiceplane"
+    root_password:
+      pattern: random
+      length: 18
+
+connection_strings:
+  mysql: "mysql://{username}:{password}@mysql:3306/{database}"
+
+healthcheck_global:
+  timeout: 20m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "发票创建,客户管理,报价管理,付款追踪,报表统计"
+

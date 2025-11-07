@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
-	"strconv"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -237,7 +234,6 @@ func testTemplate(
 			}
 		}
 
-		allImagesExist := true
 		for _, image := range images {
 			replacedImage := ReplaceImageVariables(image, variables)
 			exists, err := imageChecker.CheckImage(replacedImage)
@@ -345,19 +341,42 @@ func testTemplate(
 	if len(ports) == 0 {
 		result.Warnings = append(result.Warnings, "未找到可检查的端口")
 	} else {
+		// 从生成的 compose 文件获取实际端口映射
+		portMap, err := composeGen.GetMappedPorts(workDir)
+		if err != nil {
+			result.Warnings = append(result.Warnings, fmt.Sprintf("获取端口映射失败: %v，使用默认端口", err))
+			portMap = make(map[string]int)
+			// 使用第一个服务的端口
+			if len(meta.Services) > 0 && len(meta.Services[0].Ports) > 0 {
+				portMap[meta.Services[0].Name] = testPort
+			}
+		}
+
 		allPortsOK := true
-		for _, port := range ports {
-			// 使用映射后的端口（testPort）
+		for i, service := range meta.Services {
+			if len(service.Ports) == 0 {
+				continue
+			}
+
+			// 获取该服务映射的外部端口
 			actualPort := testPort
-			if port != meta.Services[0].Ports[0].Internal {
-				// 如果有多个端口，需要从 compose 文件中获取实际映射的端口
+			if mappedPort, ok := portMap[service.Name]; ok {
+				actualPort = mappedPort
+			} else if i == 0 {
+				// 第一个服务使用 testPort
 				actualPort = testPort
 			}
 
-			ok, err := portChecker.CheckPort(actualPort, "tcp")
+			// 检查端口
+			protocol := "tcp"
+			if len(service.Ports) > 0 && service.Ports[0].Protocol != "" {
+				protocol = service.Ports[0].Protocol
+			}
+
+			ok, err := portChecker.CheckPort(actualPort, protocol)
 			if !ok {
 				allPortsOK = false
-				result.Errors = append(result.Errors, fmt.Sprintf("端口 %d 不可访问: %v", actualPort, err))
+				result.Errors = append(result.Errors, fmt.Sprintf("端口 %d (%s) 不可访问: %v", actualPort, service.Name, err))
 			}
 		}
 
@@ -383,20 +402,31 @@ func testTemplate(
 		stageStart = time.Now()
 		keywords := ExtractKeywords(template.Name)
 		if len(keywords) > 0 {
-			// 使用第一个端口进行 HTTP 检查
-			testURL := fmt.Sprintf("http://localhost:%d", testPort)
-			matched, matchedKeywords, err := contentValidator.Validate(testURL, keywords)
-			if err != nil {
-				result.Warnings = append(result.Warnings, fmt.Sprintf("内容验证失败: %v", err))
-			} else if !matched {
-				result.Warnings = append(result.Warnings, fmt.Sprintf("未找到关键词: %v", keywords))
-			} else {
-				result.Stages["content_validation"] = StageStatus{
-					Status:   StatusPassed,
-					Duration: time.Since(stageStart).String(),
-					Message:  fmt.Sprintf("匹配关键词: %v", matchedKeywords),
+			// 从端口映射获取实际端口
+			portMap, err := composeGen.GetMappedPorts(workDir)
+			if err == nil && len(portMap) > 0 {
+				// 使用第一个服务的端口
+				var testPortForHTTP int
+				for _, port := range portMap {
+					testPortForHTTP = port
+					break
 				}
-				PrintStageResult(template.Name, "内容验证", StatusPassed, time.Since(stageStart), nil)
+				testURL := fmt.Sprintf("http://localhost:%d", testPortForHTTP)
+				matched, matchedKeywords, err := contentValidator.Validate(testURL, keywords)
+				if err != nil {
+					result.Warnings = append(result.Warnings, fmt.Sprintf("内容验证失败: %v", err))
+				} else if !matched {
+					result.Warnings = append(result.Warnings, fmt.Sprintf("未找到关键词: %v", keywords))
+				} else {
+					result.Stages["content_validation"] = StageStatus{
+						Status:   StatusPassed,
+						Duration: time.Since(stageStart).String(),
+						Message:  fmt.Sprintf("匹配关键词: %v", matchedKeywords),
+					}
+					PrintStageResult(template.Name, "内容验证", StatusPassed, time.Since(stageStart), nil)
+				}
+			} else {
+				result.Warnings = append(result.Warnings, "无法获取端口映射，跳过内容验证")
 			}
 		}
 	}

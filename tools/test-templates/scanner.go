@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -46,21 +47,20 @@ func (s *Scanner) ScanTemplates() ([]TemplateInfo, error) {
 			return fmt.Errorf("解析 %s 失败: %w", templateYAML, err)
 		}
 
+		// 读取原始文件获取 compose_file
+		data, _ := os.ReadFile(templateYAML)
+		var rawMeta map[string]interface{}
+		yaml.Unmarshal(data, &rawMeta)
+		
 		composeFile := "docker-compose.yml"
-		if meta.ComposeFile != "" {
-			composeFile = meta.ComposeFile
+		if cf, ok := rawMeta["compose_file"].(string); ok && cf != "" {
+			composeFile = cf
 		}
 
 		// 检查 compose 文件是否存在
 		composePath := filepath.Join(path, composeFile)
 		if _, err := os.Stat(composePath); os.IsNotExist(err) {
 			return fmt.Errorf("模板 %s 缺少 compose 文件 %s", meta.ID, composeFile)
-		}
-
-		// 获取相对路径作为模板 ID
-		relPath, err := filepath.Rel(s.templatesDir, path)
-		if err != nil {
-			relPath = filepath.Base(path)
 		}
 
 		templates = append(templates, TemplateInfo{
@@ -86,9 +86,25 @@ func (s *Scanner) parseTemplateMeta(path string) (*TemplateMeta, error) {
 		return nil, err
 	}
 
+	// 先解析为 map 以便处理 duration 字符串
+	var rawMeta map[string]interface{}
+	if err := yaml.Unmarshal(data, &rawMeta); err != nil {
+		return nil, err
+	}
+
+	// 转换为 TemplateMeta
 	var meta TemplateMeta
 	if err := yaml.Unmarshal(data, &meta); err != nil {
 		return nil, err
+	}
+
+	// 处理 healthcheck_global 的 timeout（可能是字符串格式）
+	if hcRaw, ok := rawMeta["healthcheck_global"].(map[string]interface{}); ok {
+		if timeoutStr, ok := hcRaw["timeout"].(string); ok {
+			if timeout, err := time.ParseDuration(timeoutStr); err == nil {
+				meta.Healthcheck.Timeout = timeout
+			}
+		}
 	}
 
 	return &meta, nil

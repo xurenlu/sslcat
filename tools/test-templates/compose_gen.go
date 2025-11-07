@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -65,6 +66,36 @@ func (cg *ComposeGenerator) Generate(
 	return tempDir, nil
 }
 
+// GetMappedPorts 从生成的 compose 文件中提取端口映射
+func (cg *ComposeGenerator) GetMappedPorts(workDir string) (map[string]int, error) {
+	composePath := filepath.Join(workDir, "docker-compose.yml")
+	data, err := os.ReadFile(composePath)
+	if err != nil {
+		return nil, err
+	}
+
+	var compose ComposeFile
+	if err := yaml.Unmarshal(data, &compose); err != nil {
+		return nil, err
+	}
+
+	portMap := make(map[string]int)
+	for serviceName, service := range compose.Services {
+		for _, portMapping := range service.Ports {
+			// 解析端口映射格式 "外部端口:内部端口"
+			parts := strings.Split(portMapping, ":")
+			if len(parts) == 2 {
+				if externalPort, err := strconv.Atoi(parts[0]); err == nil {
+					portMap[serviceName] = externalPort
+					break // 只取第一个端口
+				}
+			}
+		}
+	}
+
+	return portMap, nil
+}
+
 // buildVariables 构建变量映射
 func (cg *ComposeGenerator) buildVariables(templateInfo *TemplateInfo, meta *TemplateMeta, testPort int) map[string]interface{} {
 	variables := make(map[string]interface{})
@@ -96,13 +127,28 @@ func (cg *ComposeGenerator) buildVariables(templateInfo *TemplateInfo, meta *Tem
 		}
 	}
 
-	// 处理端口变量
-	for key, value := range variables {
+	// 处理端口变量 - 如果端口变量没有默认值或值为0，使用 testPort
+	for _, v := range meta.Variables {
+		key := v.Name
 		if strings.HasSuffix(key, "_PORT") || strings.HasSuffix(key, "_SSH_PORT") || strings.HasSuffix(key, "_HTTPS_PORT") {
-			if port, ok := value.(int); ok && port > 0 {
-				// 保持原端口值
-			} else {
+			if value, exists := variables[key]; !exists || value == nil || value == "" {
 				variables[key] = testPort
+			} else {
+				// 尝试转换为 int
+				switch val := value.(type) {
+				case int:
+					if val == 0 {
+						variables[key] = testPort
+					}
+				case float64:
+					if val == 0 {
+						variables[key] = testPort
+					}
+				case string:
+					if val == "" || val == "0" {
+						variables[key] = testPort
+					}
+				}
 			}
 		}
 	}

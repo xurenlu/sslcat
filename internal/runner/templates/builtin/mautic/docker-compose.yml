@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  mautic:
+    image: mautic/mautic:{{MAUTIC_VERSION}}
+    container_name: {{APP_NAME}}_mautic
+    restart: unless-stopped
+    ports:
+      - "{{MAUTIC_PORT}}:80"
+    environment:
+      MAUTIC_DB_HOST: mysql
+      MAUTIC_DB_USER: {{MYSQL_USERNAME}}
+      MAUTIC_DB_PASSWORD: {{MYSQL_PASSWORD}}
+      MAUTIC_DB_NAME: {{MYSQL_DATABASE}}
+      MAUTIC_RUN_CRON_JOBS: "true"
+    volumes:
+      - mautic_data:/var/www/html
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+
+  mysql:
+    image: mysql:{{MYSQL_VERSION}}
+    container_name: {{APP_NAME}}_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: {{MYSQL_DATABASE}}
+      MYSQL_USER: {{MYSQL_USERNAME}}
+      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
+      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p{{MYSQL_ROOT_PASSWORD}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  mautic_data:
+    driver: local
+  mysql_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+
