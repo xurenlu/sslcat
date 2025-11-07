@@ -1,0 +1,60 @@
+id: calibre-web
+name: Calibre Web
+category: media
+subcategory: ebook
+tags: [python, ebook, library, calibre]
+description: 电子书库管理平台，基于 Calibre，支持在线阅读和管理电子书。
+icon: calibre-web
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/janeczku/calibre-web
+compose_file: docker-compose.yml
+
+variables:
+  - name: CALIBRE_WEB_VERSION
+    type: select
+    title: Calibre Web 版本
+    default: "latest"
+    options: ["latest", "0.6.20"]
+    description: 选择 Calibre Web 版本
+  - name: CALIBRE_WEB_PORT
+    type: number
+    title: Calibre Web 端口
+    default: 8083
+    min: 1024
+    max: 65535
+    description: Calibre Web 服务端口
+
+services:
+  - name: calibre-web
+    type: web
+    description: Calibre Web 电子书库服务
+    ports:
+      - internal: 8083
+        external: null
+        public: true
+    volumes:
+      - name: calibre_web_data
+        path: /config
+        mode: rw
+      - name: calibre_books
+        path: /books
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  default_admin_user: admin
+  default_admin_password: admin123
+

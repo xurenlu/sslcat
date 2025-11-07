@@ -61,4 +61,3 @@ volumes:
 networks:
   {{APP_NAME}}_network:
     driver: bridge
-
