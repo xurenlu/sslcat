@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  docusaurus:
+    image: node:{{NODE_VERSION}}
+    container_name: {{APP_NAME}}_docusaurus
+    restart: unless-stopped
+    ports:
+      - "{{DOCUSAURUS_PORT}}:3000"
+    working_dir: /app
+    command: sh -c "npm install && npm run start -- --host 0.0.0.0 --port 3000"
+    volumes:
+      - docusaurus_site:/app
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  docusaurus_site:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

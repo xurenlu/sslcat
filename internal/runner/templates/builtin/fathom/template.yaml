@@ -1,0 +1,98 @@
+id: fathom
+name: Fathom
+category: analytics
+subcategory: web-analytics
+tags: [go, postgresql, analytics, privacy, fathom]
+description: 隐私友好的网站分析工具，轻量快速，符合 GDPR。
+icon: fathom
+version: 1.0.0
+author: SSLcat Team
+website: https://usefathom.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: FATHOM_VERSION
+    type: select
+    title: Fathom 版本
+    default: "latest"
+    options: ["latest", "1.5.0"]
+    description: 选择 Fathom 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "14", "16"]
+    description: 选择 PostgreSQL 版本
+  - name: FATHOM_PORT
+    type: number
+    title: Fathom 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: Fathom Web 服务端口
+
+services:
+  - name: fathom
+    type: web
+    description: Fathom 分析服务
+    depends_on: [postgres]
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: fathom_data
+        path: /app/data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_fathom"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_fathom"
+  fathom:
+    secret:
+      pattern: random
+      length: 32
+
+connection_strings:
+  postgres: "postgresql://{username}:{password}@postgres:5432/{database}"
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+

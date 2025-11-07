@@ -1,0 +1,54 @@
+id: docusaurus
+name: Docusaurus
+category: cms
+subcategory: documentation
+tags: [nodejs, react, documentation, static, docusaurus]
+description: Facebook 开源的文档站点生成器，适合技术文档和博客。
+icon: docusaurus
+version: 1.0.0
+author: SSLcat Team
+website: https://docusaurus.io/
+compose_file: docker-compose.yml
+
+variables:
+  - name: NODE_VERSION
+    type: select
+    title: Node.js 版本
+    default: "20-alpine"
+    options: ["20-alpine", "18-alpine", "20"]
+    description: 选择 Node.js 版本
+  - name: DOCUSAURUS_PORT
+    type: number
+    title: Docusaurus 端口
+    default: 3000
+    min: 1024
+    max: 65535
+    description: Docusaurus 开发服务器端口
+
+services:
+  - name: docusaurus
+    type: web
+    description: Docusaurus 文档站点服务器
+    ports:
+      - internal: 3000
+        external: null
+        public: true
+    volumes:
+      - name: docusaurus_site
+        path: /app
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+
