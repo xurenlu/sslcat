@@ -1,9 +1,9 @@
 id: planka
-name: Planka (看板任务管理)
+name: Planka (看板管理)
 category: tools
-subcategory: todo
-tags: [todo, kanban, task-management, planka, trello-alternative]
-description: 开源的看板任务管理工具，类似 Trello，支持卡片、列表、看板等功能，界面美观。
+subcategory: project-management
+tags: [nodejs, postgres, project-management, planka, kanban, trello-alternative]
+description: Trello 的开源替代品，看板式项目管理工具，支持卡片、列表、标签等功能。
 icon: planka
 version: 1.0.0
 author: SSLcat Team
@@ -21,29 +21,23 @@ variables:
     type: select
     title: PostgreSQL 版本
     default: "15"
-    options: ["15", "14", "16"]
+    options: ["15", "16", "14"]
     description: 选择 PostgreSQL 版本
-  - name: REDIS_VERSION
-    type: select
-    title: Redis 版本
-    default: "7"
-    options: ["7", "6", "7-alpine"]
-    description: 选择 Redis 版本
   - name: PLANKA_PORT
     type: number
     title: Planka 端口
-    default: 1337
+    default: 3000
     min: 1024
     max: 65535
     description: Planka Web 服务端口
 
 services:
-  - name: planka-web
+  - name: planka
     type: web
-    description: Planka Web 服务
-    depends_on: [postgres, redis]
+    description: Planka 看板管理服务
+    depends_on: [postgres]
     ports:
-      - internal: 1337
+      - internal: 3000
         external: null
         public: true
     volumes:
@@ -55,13 +49,8 @@ services:
       path: /
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
-
-  - name: planka-worker
-    type: worker
-    description: Planka 后台任务处理服务
-    depends_on: [planka-web]
+      retries: 5
+      start_period: 120s
 
   - name: postgres
     type: database
@@ -76,30 +65,11 @@ services:
         mode: rw
     healthcheck:
       type: command
-      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
+      command: ["pg_isready", "-U", "{username}"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
-
-  - name: redis
-    type: cache
-    description: Redis 缓存服务
-    ports:
-      - internal: 6379
-        external: null
-        public: false
-    volumes:
-      - name: redis_data
-        path: /data
-        mode: rw
-    healthcheck:
-      type: command
-      command: ["redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
 
 credentials:
   postgres:
@@ -110,17 +80,19 @@ credentials:
       length: 18
     database:
       pattern: "{app_name}_planka"
+  planka:
+    secret_key:
+      pattern: random
+      length: 32
 
 connection_strings:
-  postgres: "postgresql://{username}:{password}@postgres:5432/{database}"
-  redis: "redis://redis:6379/0"
+  postgres: "postgres://{username}:{password}@postgres:5432/{database}"
 
 healthcheck_global:
-  timeout: 10m
+  timeout: 15m
   interval: 10s
 
 metadata:
-  site_url: http://{{PRIMARY_DOMAIN}}
+  site_url: http://{{PRIMARY_DOMAIN}}:3000
   admin_email: admin@{{PRIMARY_DOMAIN}}
-  features: "看板管理,卡片管理,列表管理,项目协作,附件上传,评论功能,标签系统"
-
+  features: "看板管理,卡片管理,列表管理,标签功能"

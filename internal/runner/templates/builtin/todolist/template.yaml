@@ -1,13 +1,13 @@
 id: todolist
 name: TodoList (待办事项)
 category: tools
-subcategory: todo
-tags: [todo, task-management, todolist, simple]
-description: 简洁的待办事项管理工具，界面清爽，专注于个人任务管理。
+subcategory: project-management
+tags: [nodejs, postgres, project-management, todolist, todo]
+description: 简洁的待办事项管理工具，支持任务列表、优先级、截止日期等功能。
 icon: todolist
 version: 1.0.0
 author: SSLcat Team
-website: https://github.com/huginn/huginn
+website: https://github.com/m1k1o/todolist
 compose_file: docker-compose.yml
 
 variables:
@@ -21,7 +21,7 @@ variables:
     type: select
     title: PostgreSQL 版本
     default: "15"
-    options: ["15", "14", "16"]
+    options: ["15", "16", "14"]
     description: 选择 PostgreSQL 版本
   - name: TODOLIST_PORT
     type: number
@@ -46,7 +46,7 @@ services:
         mode: rw
     healthcheck:
       type: http
-      path: /health
+      path: /
       interval: 30s
       timeout: 10s
       retries: 3
@@ -65,7 +65,7 @@ services:
         mode: rw
     healthcheck:
       type: command
-      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
+      command: ["pg_isready", "-U", "{username}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -82,14 +82,13 @@ credentials:
       pattern: "{app_name}_todolist"
 
 connection_strings:
-  postgres: "postgresql://{username}:{password}@postgres:5432/{database}"
+  postgres: "postgres://{username}:{password}@postgres:5432/{database}"
 
 healthcheck_global:
-  timeout: 10m
+  timeout: 15m
   interval: 10s
 
 metadata:
-  site_url: http://{{PRIMARY_DOMAIN}}
+  site_url: http://{{PRIMARY_DOMAIN}}:8080
   admin_email: admin@{{PRIMARY_DOMAIN}}
-  features: "待办事项,任务管理,优先级,标签分类,截止日期,提醒功能"
-
+  features: "待办事项,任务管理,优先级,截止日期"

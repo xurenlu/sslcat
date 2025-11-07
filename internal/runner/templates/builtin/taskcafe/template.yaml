@@ -1,13 +1,13 @@
 id: taskcafe
 name: TaskCafe (任务管理)
 category: tools
-subcategory: todo
-tags: [todo, task-management, taskcafe, kanban, gtd]
-description: 现代化的任务管理工具，支持看板视图、列表视图，界面美观，功能完整。
+subcategory: project-management
+tags: [go, postgres, project-management, taskcafe, task-management]
+description: 开源任务管理工具，支持看板、列表、日历等多种视图，类似 Trello。
 icon: taskcafe
 version: 1.0.0
 author: SSLcat Team
-website: https://github.com/jordanshumway/taskcafe
+website: https://github.com/JordanKnott/taskcafe
 compose_file: docker-compose.yml
 
 variables:
@@ -21,7 +21,7 @@ variables:
     type: select
     title: PostgreSQL 版本
     default: "15"
-    options: ["15", "14", "16"]
+    options: ["15", "16", "14"]
     description: 选择 PostgreSQL 版本
   - name: TASKCAFE_PORT
     type: number
@@ -42,15 +42,15 @@ services:
         public: true
     volumes:
       - name: taskcafe_data
-        path: /app/data
+        path: /app/uploads
         mode: rw
     healthcheck:
       type: http
-      path: /api/health
+      path: /
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 120s
 
   - name: postgres
     type: database
@@ -65,7 +65,7 @@ services:
         mode: rw
     healthcheck:
       type: command
-      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
+      command: ["pg_isready", "-U", "{username}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -80,16 +80,19 @@ credentials:
       length: 18
     database:
       pattern: "{app_name}_taskcafe"
+  taskcafe:
+    jwt_secret:
+      pattern: random
+      length: 32
 
 connection_strings:
-  postgres: "postgresql://{username}:{password}@postgres:5432/{database}"
+  postgres: "postgres://{username}:{password}@postgres:5432/{database}"
 
 healthcheck_global:
-  timeout: 10m
+  timeout: 15m
   interval: 10s
 
 metadata:
-  site_url: http://{{PRIMARY_DOMAIN}}
+  site_url: http://{{PRIMARY_DOMAIN}}:3333
   admin_email: admin@{{PRIMARY_DOMAIN}}
-  features: "任务管理,看板视图,列表视图,项目分类,标签系统,截止日期,优先级,评论功能"
-
+  features: "任务管理,看板视图,列表视图,日历视图"
