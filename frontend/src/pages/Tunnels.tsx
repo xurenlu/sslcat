@@ -40,6 +40,7 @@ import {
 	VStack,
 } from '@chakra-ui/react'
 import {
+	FiCopy,
 	FiEdit,
 	FiPlay,
 	FiPlus,
@@ -135,6 +136,14 @@ const fallbackTexts = {
 	lastError: 'Last Error',
 	lastUpdated: 'Last Updated',
 	actions: 'Actions',
+  logFile: 'Log File',
+  pid: 'Process PID',
+  restartCount: 'Restart Count',
+  lastStarted: 'Last Started',
+  lastStopped: 'Last Stopped',
+  copyLogPath: 'Copy Path',
+  copyLogPathSuccess: 'Log path copied',
+  copyLogPathFailed: 'Failed to copy log path',
 	startTunnel: 'Start',
 	stopTunnel: 'Stop',
 	refresh: 'Refresh',
@@ -221,6 +230,12 @@ const formatDateTime = (value?: string): string => {
 	}
 }
 
+const extractFileName = (path?: string): string => {
+	if (!path) return ''
+	const segments = path.split(/[/\\]/)
+	return segments[segments.length - 1] || path
+}
+
 const Tunnels: React.FC = () => {
 	const { t } = useTranslation()
 	const toast = useToast()
@@ -288,6 +303,33 @@ const Tunnels: React.FC = () => {
 	useEffect(() => {
 		refreshProviders()
 	}, [refreshProviders])
+
+	const handleCopyLogPath = useCallback(
+		async (path: string) => {
+			try {
+				if (!navigator?.clipboard?.writeText) {
+					throw new Error('Clipboard API unavailable')
+				}
+				await navigator.clipboard.writeText(path)
+				toast({
+					title: texts.copyLogPathSuccess,
+					status: 'success',
+					duration: 2000,
+					isClosable: true,
+				})
+			} catch (error: any) {
+				console.error('Failed to copy log path', error)
+				toast({
+					title: texts.copyLogPathFailed,
+					description: error?.message,
+					status: 'error',
+					duration: 4000,
+					isClosable: true,
+				})
+			}
+		},
+		[toast, texts.copyLogPathFailed, texts.copyLogPathSuccess],
+	)
 
 	const resetProviderForm = useCallback(
 		(defaultType?: string) => {

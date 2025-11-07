@@ -1,0 +1,117 @@
+id: dingtalk-bot
+name: 钉钉机器人
+category: tools
+subcategory: integration
+tags: [go, postgres, dingtalk, bot, integration]
+description: 钉钉机器人服务，支持消息推送、群聊机器人、工作通知、Webhook 等功能。
+icon: dingtalk-bot
+version: 1.0.0
+author: SSLcat Team
+website: https://open.dingtalk.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: DINGTALK_BOT_VERSION
+    type: select
+    title: 钉钉机器人版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择钉钉机器人版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "16", "14"]
+    description: 选择 PostgreSQL 版本
+  - name: DINGTALK_BOT_PORT
+    type: number
+    title: 钉钉机器人端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: 钉钉机器人 Web 服务端口
+  - name: DINGTALK_APP_KEY
+    type: string
+    title: 应用Key
+    default: ""
+    description: 钉钉应用的AppKey
+    required: true
+    placeholder: "dingxxxxxxxxxxxx"
+  - name: DINGTALK_APP_SECRET
+    type: string
+    title: 应用Secret
+    default: ""
+    description: 钉钉应用的AppSecret
+    required: true
+    sensitive: true
+
+services:
+  - name: dingtalk-bot
+    type: web
+    description: 钉钉机器人服务
+    depends_on: [postgres]
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: dingtalk_bot_data
+        path: /app/data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{username}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_dingtalk"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_dingtalk"
+  dingtalk-bot:
+    secret_key:
+      pattern: random
+      length: 32
+    app_key:
+      pattern: "{DINGTALK_APP_KEY}"
+    app_secret:
+      pattern: "{DINGTALK_APP_SECRET}"
+
+connection_strings:
+  postgres: "postgres://{username}:{password}@postgres:5432/{database}"
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}:8080
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "消息推送,群聊机器人,工作通知,Webhook,消息模板"
+

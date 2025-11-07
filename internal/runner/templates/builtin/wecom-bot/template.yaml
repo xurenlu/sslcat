@@ -1,0 +1,126 @@
+id: wecom-bot
+name: 企业微信机器人
+category: tools
+subcategory: integration
+tags: [go, postgres, wecom, wechat-work, bot, integration]
+description: 企业微信机器人服务，支持消息推送、群聊机器人、应用消息、Webhook 等功能。
+icon: wecom-bot
+version: 1.0.0
+author: SSLcat Team
+website: https://developer.work.weixin.qq.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: WECOM_BOT_VERSION
+    type: select
+    title: 企业微信机器人版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择企业微信机器人版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "16", "14"]
+    description: 选择 PostgreSQL 版本
+  - name: WECOM_BOT_PORT
+    type: number
+    title: 企业微信机器人端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: 企业微信机器人 Web 服务端口
+  - name: WECOM_CORP_ID
+    type: string
+    title: 企业ID
+    default: ""
+    description: 企业微信的企业ID（CorpID）
+    required: true
+    placeholder: "wwxxxxxxxxxxxxxxxx"
+  - name: WECOM_CORP_SECRET
+    type: string
+    title: 企业密钥
+    default: ""
+    description: 企业微信的企业密钥（CorpSecret）
+    required: true
+    sensitive: true
+  - name: WECOM_AGENT_ID
+    type: string
+    title: 应用ID
+    default: ""
+    description: 企业微信的应用ID（AgentID）
+    required: true
+    placeholder: "1000001"
+
+services:
+  - name: wecom-bot
+    type: web
+    description: 企业微信机器人服务
+    depends_on: [postgres]
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: wecom_bot_data
+        path: /app/data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{username}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_wecom"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_wecom"
+  wecom-bot:
+    secret_key:
+      pattern: random
+      length: 32
+    corp_id:
+      pattern: "{WECOM_CORP_ID}"
+    corp_secret:
+      pattern: "{WECOM_CORP_SECRET}"
+    agent_id:
+      pattern: "{WECOM_AGENT_ID}"
+
+connection_strings:
+  postgres: "postgres://{username}:{password}@postgres:5432/{database}"
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}:8080
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "消息推送,群聊机器人,应用消息,Webhook,消息模板"
+
