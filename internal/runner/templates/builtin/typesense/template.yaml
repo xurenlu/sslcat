@@ -1,0 +1,64 @@
+id: typesense
+name: Typesense
+category: database
+subcategory: search
+tags: [typesense, search, search-engine, typo-tolerant]
+description: 容错搜索引擎，支持拼写纠错、同义词搜索等功能。
+icon: typesense
+version: 1.0.0
+author: SSLcat Team
+website: https://typesense.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: TYPESENSE_VERSION
+    type: select
+    title: Typesense 版本
+    default: "latest"
+    options: ["latest", "26.0", "25.0"]
+    description: 选择 Typesense 版本
+  - name: TYPESENSE_PORT
+    type: number
+    title: Typesense 端口
+    default: 8108
+    min: 1024
+    max: 65535
+    description: Typesense HTTP API 端口
+
+services:
+  - name: typesense
+    type: database
+    description: Typesense 搜索引擎服务
+    ports:
+      - internal: 8108
+        external: null
+        public: true
+    volumes:
+      - name: typesense_data
+        path: /data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /health
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+credentials:
+  typesense:
+    api_key:
+      pattern: random
+      length: 32
+
+connection_strings:
+  typesense: "http://{{PRIMARY_DOMAIN}}:{{TYPESENSE_PORT}}"
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  api_url: http://{{PRIMARY_DOMAIN}}:{{TYPESENSE_PORT}}
+  api_key: {{API_KEY}}
+
