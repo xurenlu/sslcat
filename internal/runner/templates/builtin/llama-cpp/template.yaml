@@ -1,0 +1,60 @@
+id: llama-cpp
+name: llama.cpp (本地LLM推理)
+category: ai
+subcategory: llm
+tags: [cpp, ai, llm, llama, local-llm, gpu]
+description: 高性能本地 LLM 推理引擎，支持多种模型格式，可在 CPU/GPU 上运行，推荐 GPU。
+icon: llama-cpp
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/ggerganov/llama.cpp
+compose_file: docker-compose.yml
+
+variables:
+  - name: LLAMA_CPP_VERSION
+    type: select
+    title: llama.cpp 版本
+    default: "latest"
+    options: ["latest", "v0.9", "v0.8"]
+    description: 选择 llama.cpp 版本
+  - name: LLAMA_CPP_PORT
+    type: number
+    title: llama.cpp 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: llama.cpp API 服务端口
+
+services:
+  - name: llama-cpp
+    type: api
+    description: llama.cpp 本地 LLM 推理服务
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: llama_cpp_data
+        path: /app/models
+        mode: rw
+    resources:
+      gpu: optional
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 180s
+
+healthcheck_global:
+  timeout: 30m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/api/completion"
+  features: "本地推理,多种模型,高性能,隐私保护"
+  gpu_recommended: true
+

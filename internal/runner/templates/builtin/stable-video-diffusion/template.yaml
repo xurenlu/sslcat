@@ -1,0 +1,62 @@
+id: stable-video-diffusion
+name: Stable Video Diffusion (视频生成)
+category: ai
+subcategory: video-generation
+tags: [python, ai, video-generation, stable-video-diffusion, gpu]
+description: Stability AI 的视频生成模型，从图片生成高质量视频，需要 GPU。
+icon: stable-video-diffusion
+version: 1.0.0
+author: SSLcat Team
+website: https://stability.ai/
+compose_file: docker-compose.yml
+
+variables:
+  - name: STABLE_VIDEO_DIFFUSION_VERSION
+    type: select
+    title: Stable Video Diffusion 版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择 Stable Video Diffusion 版本
+  - name: STABLE_VIDEO_DIFFUSION_PORT
+    type: number
+    title: Stable Video Diffusion 端口
+    default: 7860
+    min: 1024
+    max: 65535
+    description: Stable Video Diffusion Web 服务端口
+
+services:
+  - name: stable-video-diffusion
+    type: web
+    description: Stable Video Diffusion 视频生成服务
+    ports:
+      - internal: 7860
+        external: null
+        public: true
+    volumes:
+      - name: stable_video_diffusion_data
+        path: /app/models
+        mode: rw
+      - name: stable_video_diffusion_output
+        path: /app/output
+        mode: rw
+    resources:
+      gpu: required
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+
+healthcheck_global:
+  timeout: 30m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "图片转视频,高质量视频,流畅动画"
+  gpu_required: true
+

@@ -1,0 +1,62 @@
+id: text-generation-webui
+name: Text Generation WebUI (本地LLM界面)
+category: ai
+subcategory: llm
+tags: [python, ai, llm, text-generation, local-llm, gpu]
+description: 强大的本地 LLM Web 界面，支持多种模型和插件，需要 GPU。
+icon: text-generation-webui
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/oobabooga/text-generation-webui
+compose_file: docker-compose.yml
+
+variables:
+  - name: TEXT_GENERATION_WEBUI_VERSION
+    type: select
+    title: Text Generation WebUI 版本
+    default: "latest"
+    options: ["latest", "v1.7", "v1.6"]
+    description: 选择 Text Generation WebUI 版本
+  - name: TEXT_GENERATION_WEBUI_PORT
+    type: number
+    title: Text Generation WebUI 端口
+    default: 7860
+    min: 1024
+    max: 65535
+    description: Text Generation WebUI Web 服务端口
+
+services:
+  - name: text-generation-webui
+    type: web
+    description: Text Generation WebUI 本地 LLM 界面服务
+    ports:
+      - internal: 7860
+        external: null
+        public: true
+    volumes:
+      - name: text_generation_webui_data
+        path: /app/models
+        mode: rw
+      - name: text_generation_webui_characters
+        path: /app/characters
+        mode: rw
+    resources:
+      gpu: required
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+
+healthcheck_global:
+  timeout: 30m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "本地LLM,多种模型,角色扮演,插件支持"
+  gpu_required: true
+
