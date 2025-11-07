@@ -22,6 +22,12 @@ export interface TunnelWithStatus {
   status: TunnelStatus
   last_error?: string
   updated_at?: string
+  log_path?: string
+  process_id?: string
+  pid?: number
+  restart_count: number
+  last_started_at?: string
+  last_stopped_at?: string
 }
 
 export interface TunnelProviderSummary {

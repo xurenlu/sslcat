@@ -25,19 +25,19 @@ type ProviderState struct {
 
 // TunnelRuntime 保存隧道的实时状态
 type TunnelRuntime struct {
-	ProviderID string
-	TunnelID   string
-	Config     config.TunnelDefinition
-	Status     Status
-	LastError  string
-	UpdatedAt  time.Time
-	LogPath    string
-	ProcessID  string
-	PID        int
+	ProviderID    string
+	TunnelID      string
+	Config        config.TunnelDefinition
+	Status        Status
+	LastError     string
+	UpdatedAt     time.Time
+	LogPath       string
+	ProcessID     string
+	PID           int
 	RestartCount  int
 	LastStartedAt time.Time
 	LastStoppedAt time.Time
-	process    *processHandle
+	process       *processHandle
 }
 
 // Clone 生成隧道运行状态的快照

@@ -118,4 +118,3 @@ func (a *ngrokAdapter) Prepare(provider config.TunnelProviderConfig, tunnel conf
 		WorkDir:    runtimeDir,
 	}, nil
 }
-

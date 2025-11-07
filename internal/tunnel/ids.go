@@ -28,3 +28,17 @@ func GenerateTunnelID(providerID string) string {
 
 	return fmt.Sprintf("%s-%d-%d", providerID, time.Now().UnixNano(), idCounter.Add(1))
 }
+
+// GenerateProcessID 生成隧道进程唯一 ID
+func GenerateProcessID(providerID, tunnelID string) string {
+	providerID = strings.TrimSpace(providerID)
+	if providerID == "" {
+		providerID = "provider"
+	}
+	tunnelID = strings.TrimSpace(tunnelID)
+	if tunnelID == "" {
+		tunnelID = "tunnel"
+	}
+
+	return fmt.Sprintf("%s-%s-%d-%d", providerID, tunnelID, time.Now().UnixNano(), idCounter.Add(1))
+}

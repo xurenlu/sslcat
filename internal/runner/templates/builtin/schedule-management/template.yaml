@@ -1,0 +1,99 @@
+id: schedule-management
+name: 排班管理系统
+category: tools
+subcategory: hr
+tags: [php, postgres, hr, schedule, shift-management]
+description: 企业排班管理系统，支持员工排班、班次管理、调班申请、考勤统计等功能。
+icon: schedule-management
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/schedule-management
+compose_file: docker-compose.yml
+
+variables:
+  - name: SCHEDULE_VERSION
+    type: select
+    title: 排班管理系统版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择排班管理系统版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "16", "14"]
+    description: 选择 PostgreSQL 版本
+  - name: SCHEDULE_PORT
+    type: number
+    title: 排班管理系统端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: 排班管理系统 Web 服务端口
+
+services:
+  - name: schedule
+    type: web
+    description: 排班管理系统服务
+    depends_on: [postgres]
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: schedule_data
+        path: /app/data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{username}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_schedule"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_schedule"
+  schedule:
+    secret_key:
+      pattern: random
+      length: 32
+
+connection_strings:
+  postgres: "postgres://{username}:{password}@postgres:5432/{database}"
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}:8080
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "员工排班,班次管理,调班申请,考勤统计,排班模板"
+

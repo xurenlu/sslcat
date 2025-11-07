@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -322,6 +323,17 @@ func (s *Server) handleAPITunnelStart(w http.ResponseWriter, r *http.Request) {
 
 	status, err := s.tunnelManager.StartTunnel(req.ProviderID, req.TunnelID)
 	if err != nil {
+		if errors.Is(err, tunnel.ErrAlreadyRunning) {
+			status, err = s.tunnelManager.GetTunnel(req.ProviderID, req.TunnelID)
+			if err == nil {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]interface{}{
+					"success": true,
+					"tunnel":  status,
+				})
+				return
+			}
+		}
 		s.writeJSONError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -356,6 +368,17 @@ func (s *Server) handleAPITunnelStop(w http.ResponseWriter, r *http.Request) {
 
 	status, err := s.tunnelManager.StopTunnel(req.ProviderID, req.TunnelID)
 	if err != nil {
+		if errors.Is(err, tunnel.ErrNotRunning) {
+			status, err = s.tunnelManager.GetTunnel(req.ProviderID, req.TunnelID)
+			if err == nil {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]interface{}{
+					"success": true,
+					"tunnel":  status,
+				})
+				return
+			}
+		}
 		s.writeJSONError(w, http.StatusBadRequest, err.Error())
 		return
 	}

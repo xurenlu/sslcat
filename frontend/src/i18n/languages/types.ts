@@ -185,6 +185,14 @@ export interface Translation {
     lastError: string
     lastUpdated: string
     actions: string
+        logFile: string
+        pid: string
+        restartCount: string
+        lastStarted: string
+        lastStopped: string
+        copyLogPath: string
+        copyLogPathSuccess: string
+        copyLogPathFailed: string
     startTunnel: string
     stopTunnel: string
     refresh: string

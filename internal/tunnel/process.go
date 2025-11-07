@@ -11,16 +11,16 @@ import (
 )
 
 type processHandle struct {
-	manager    *Manager
-	providerID string
-	tunnelID   string
-	cmd        *exec.Cmd
-	cancel     context.CancelFunc
-	logFile    *os.File
-	logPath    string
-	processID  string
-	done       chan struct{}
-	mu         sync.Mutex
+	manager       *Manager
+	providerID    string
+	tunnelID      string
+	cmd           *exec.Cmd
+	cancel        context.CancelFunc
+	logFile       *os.File
+	logPath       string
+	processID     string
+	done          chan struct{}
+	mu            sync.Mutex
 	stopRequested bool
 }
 
@@ -120,4 +120,3 @@ func (h *processHandle) wait() {
 	h.manager.onProcessExit(h, err)
 	close(h.done)
 }
-

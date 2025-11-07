@@ -14,4 +14,3 @@ type CommandSpec struct {
 type ProviderAdapter interface {
 	Prepare(provider config.TunnelProviderConfig, tunnel config.TunnelDefinition, runtimeDir string) (*CommandSpec, error)
 }
-

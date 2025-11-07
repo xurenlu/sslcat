@@ -577,17 +577,6 @@ func tunnelExists(tunnels []config.TunnelDefinition, tunnelID string) bool {
 	return false
 }
 
-func cloneStringMap(m map[string]string) map[string]string {
-	if m == nil {
-		return nil
-	}
-	cloned := make(map[string]string, len(m))
-	for k, v := range m {
-		cloned[k] = v
-	}
-	return cloned
-}
-
 func computeBackoff(attempt int) time.Duration {
 	if attempt < 1 {
 		attempt = 1
@@ -618,4 +607,3 @@ func dedupeTargets(targets []processTarget) []processTarget {
 	}
 	return result
 }
-
