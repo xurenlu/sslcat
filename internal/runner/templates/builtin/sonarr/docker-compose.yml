@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:{{SONARR_VERSION}}
+    container_name: {{APP_NAME}}_sonarr
+    restart: unless-stopped
+    ports:
+      - "{{SONARR_PORT}}:8989"
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: UTC
+    volumes:
+      - sonarr_data:/config
+      - sonarr_tv:/tv
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8989"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  sonarr_data:
+    driver: local
+  sonarr_tv:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

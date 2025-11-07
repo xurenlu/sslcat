@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  readarr:
+    image: lscr.io/linuxserver/readarr:{{READARR_VERSION}}
+    container_name: {{APP_NAME}}_readarr
+    restart: unless-stopped
+    ports:
+      - "{{READARR_PORT}}:8787"
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: UTC
+    volumes:
+      - readarr_data:/config
+      - readarr_books:/books
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8787"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  readarr_data:
+    driver: local
+  readarr_books:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

@@ -1,0 +1,57 @@
+id: ombi
+name: Ombi
+category: media
+subcategory: request
+tags: [csharp, media, request, automation, ombi]
+description: 媒体请求管理工具，支持 Plex、Jellyfin 等，方便用户请求内容。
+icon: ombi
+version: 1.0.0
+author: SSLcat Team
+website: https://ombi.io/
+compose_file: docker-compose.yml
+
+variables:
+  - name: OMBI_VERSION
+    type: select
+    title: Ombi 版本
+    default: "latest"
+    options: ["latest", "4.40", "4.39"]
+    description: 选择 Ombi 版本
+  - name: OMBI_PORT
+    type: number
+    title: Ombi 端口
+    default: 3579
+    min: 1024
+    max: 65535
+    description: Ombi Web 服务端口
+
+services:
+  - name: ombi
+    type: web
+    description: Ombi 媒体请求服务
+    ports:
+      - internal: 3579
+        external: null
+        public: true
+    volumes:
+      - name: ombi_data
+        path: /config
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  default_admin_user: admin
+  default_admin_password: admin
+

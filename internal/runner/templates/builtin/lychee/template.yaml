@@ -1,0 +1,97 @@
+id: lychee
+name: Lychee
+category: media
+subcategory: photo
+tags: [php, mysql, photo, gallery, lychee]
+description: 开源照片管理平台，界面美观，类似 Google Photos。
+icon: lychee
+version: 1.0.0
+author: SSLcat Team
+website: https://lycheeorg.github.io/
+compose_file: docker-compose.yml
+
+variables:
+  - name: LYCHEE_VERSION
+    type: select
+    title: Lychee 版本
+    default: "latest"
+    options: ["latest", "v5.0", "v4.7"]
+    description: 选择 Lychee 版本
+  - name: MYSQL_VERSION
+    type: select
+    title: MySQL 版本
+    default: "8.0"
+    options: ["8.0", "8.1", "5.7"]
+    description: 选择 MySQL 版本
+  - name: LYCHEE_PORT
+    type: number
+    title: Lychee 端口
+    default: 80
+    min: 1024
+    max: 65535
+    description: Lychee Web 服务端口
+
+services:
+  - name: lychee
+    type: web
+    description: Lychee 照片管理服务
+    depends_on: [mysql]
+    ports:
+      - internal: 80
+        external: null
+        public: true
+    volumes:
+      - name: lychee_data
+        path: /var/www/html/Lychee
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  - name: mysql
+    type: database
+    description: MySQL 数据库服务
+    ports:
+      - internal: 3306
+        external: null
+        public: false
+    volumes:
+      - name: mysql_data
+        path: /var/lib/mysql
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  mysql:
+    username:
+      pattern: "{app_name}_lychee"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_lychee"
+    root_password:
+      pattern: random
+      length: 20
+
+connection_strings:
+  mysql: "mysql://{username}:{password}@mysql:3306/{database}?charset=utf8mb4"
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+

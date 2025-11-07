@@ -1,0 +1,60 @@
+id: radarr
+name: Radarr
+category: media
+subcategory: automation
+tags: [csharp, media, automation, movies, radarr]
+description: 电影自动化管理工具，类似 Sonarr，支持自动下载和管理电影。
+icon: radarr
+version: 1.0.0
+author: SSLcat Team
+website: https://radarr.video/
+compose_file: docker-compose.yml
+
+variables:
+  - name: RADARR_VERSION
+    type: select
+    title: Radarr 版本
+    default: "latest"
+    options: ["latest", "5.2", "5.1"]
+    description: 选择 Radarr 版本
+  - name: RADARR_PORT
+    type: number
+    title: Radarr 端口
+    default: 7878
+    min: 1024
+    max: 65535
+    description: Radarr Web 服务端口
+
+services:
+  - name: radarr
+    type: web
+    description: Radarr 电影管理服务
+    ports:
+      - internal: 7878
+        external: null
+        public: true
+    volumes:
+      - name: radarr_data
+        path: /config
+        mode: rw
+      - name: radarr_movies
+        path: /movies
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  default_admin_user: admin
+  default_admin_password: admin
+

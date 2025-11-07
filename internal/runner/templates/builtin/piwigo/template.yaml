@@ -1,0 +1,57 @@
+id: piwigo
+name: Piwigo
+category: media
+subcategory: photo
+tags: [php, photo, gallery, piwigo]
+description: 开源照片库管理系统，功能完整，适合个人和团队使用。
+icon: piwigo
+version: 1.0.0
+author: SSLcat Team
+website: https://piwigo.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: PIWIGO_VERSION
+    type: select
+    title: Piwigo 版本
+    default: "latest"
+    options: ["latest", "14.0", "13.8"]
+    description: 选择 Piwigo 版本
+  - name: PIWIGO_PORT
+    type: number
+    title: Piwigo 端口
+    default: 80
+    min: 1024
+    max: 65535
+    description: Piwigo Web 服务端口
+
+services:
+  - name: piwigo
+    type: web
+    description: Piwigo 照片库服务
+    ports:
+      - internal: 80
+        external: null
+        public: true
+    volumes:
+      - name: piwigo_data
+        path: /config
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  default_admin_user: admin
+  default_admin_password: admin
+
