@@ -1,0 +1,122 @@
+id: librechat
+name: LibreChat
+category: ai
+subcategory: chat
+tags: [nodejs, mongodb, ai, chat, openai, anthropic, librechat]
+description: 开源 ChatGPT 替代方案，支持 OpenAI、Anthropic、Google 等多种 AI 模型。
+icon: librechat
+version: 1.0.0
+author: SSLcat Team
+website: https://librechat.ai/
+compose_file: docker-compose.yml
+
+variables:
+  - name: LIBRECHAT_VERSION
+    type: select
+    title: LibreChat 版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择 LibreChat 版本
+  - name: MONGO_VERSION
+    type: select
+    title: MongoDB 版本
+    default: "7"
+    options: ["7", "6", "5"]
+    description: 选择 MongoDB 版本
+  - name: LIBRECHAT_PORT
+    type: number
+    title: LibreChat 端口
+    default: 3080
+    min: 1024
+    max: 65535
+    description: LibreChat Web 服务端口
+  - name: OPENAI_API_KEY
+    type: string
+    title: OpenAI API Key
+    default: ""
+    description: OpenAI API 密钥（可选）
+    sensitive: true
+  - name: ANTHROPIC_API_KEY
+    type: string
+    title: Anthropic API Key
+    default: ""
+    description: Anthropic API 密钥（可选）
+    sensitive: true
+  - name: GOOGLE_API_KEY
+    type: string
+    title: Google API Key
+    default: ""
+    description: Google API 密钥（可选）
+    sensitive: true
+
+services:
+  - name: librechat
+    type: web
+    description: LibreChat AI 聊天服务
+    depends_on: [mongo]
+    ports:
+      - internal: 3080
+        external: null
+        public: true
+    volumes:
+      - name: librechat_data
+        path: /app/api/data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  - name: mongo
+    type: database
+    description: MongoDB 数据库服务
+    ports:
+      - internal: 27017
+        external: null
+        public: false
+    volumes:
+      - name: mongo_data
+        path: /data/db
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  mongo:
+    username:
+      pattern: "{app_name}_librechat"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_librechat"
+  librechat:
+    jwt_secret:
+      pattern: random
+      length: 32
+    jwt_refresh_secret:
+      pattern: random
+      length: 32
+
+connection_strings:
+  mongo: "mongodb://{username}:{password}@mongo:27017/{database}"
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  supported_models: "OpenAI,Anthropic,Google,Groq"
+  default_admin_user: admin
+  default_admin_password: admin
+

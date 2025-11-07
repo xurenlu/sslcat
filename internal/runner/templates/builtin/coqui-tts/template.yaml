@@ -1,0 +1,72 @@
+id: coqui-tts
+name: Coqui TTS
+category: ai
+subcategory: tts
+tags: [python, ai, tts, text-to-speech, coqui, gpu]
+description: 高质量文本转语音服务，支持多种语言和声音模型。
+icon: coqui-tts
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/coqui-ai/TTS
+compose_file: docker-compose.yml
+
+variables:
+  - name: COQUI_TTS_VERSION
+    type: select
+    title: Coqui TTS 版本
+    default: "latest"
+    options: ["latest", "v0.20", "v0.19"]
+    description: 选择 Coqui TTS 版本
+  - name: COQUI_TTS_PORT
+    type: number
+    title: Coqui TTS 端口
+    default: 5002
+    min: 1024
+    max: 65535
+    description: Coqui TTS API 服务端口
+  - name: TTS_MODEL
+    type: string
+    title: TTS 模型
+    default: "tts_models/en/ljspeech/tacotron2-DDC"
+    description: 使用的 TTS 模型
+    placeholder: "tts_models/en/ljspeech/tacotron2-DDC"
+  - name: TTS_LANG
+    type: string
+    title: 语言
+    default: "en"
+    description: TTS 语言代码（如：en, zh, ja）
+    placeholder: "en"
+
+services:
+  - name: coqui-tts
+    type: api
+    description: Coqui TTS 文本转语音服务
+    ports:
+      - internal: 5002
+        external: null
+        public: true
+    volumes:
+      - name: coqui_tts_data
+        path: /app/models
+        mode: rw
+    resources:
+      gpu: optional
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+healthcheck_global:
+  timeout: 20m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/api/tts"
+  supported_languages: "多语言支持"
+  features: "高质量语音,多语言,自定义声音"
+

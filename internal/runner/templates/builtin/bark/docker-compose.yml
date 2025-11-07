@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  bark:
+    image: ghcr.io/suno-ai/bark:{{BARK_VERSION}}
+    container_name: {{APP_NAME}}_bark
+    restart: unless-stopped
+    ports:
+      - "{{BARK_PORT}}:8000"
+    environment:
+      BARK_MODEL: {{BARK_MODEL}}
+    volumes:
+      - bark_data:/app/models
+    networks:
+      - {{APP_NAME}}_network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 180s
+
+volumes:
+  bark_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

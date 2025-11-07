@@ -1,0 +1,62 @@
+id: stable-diffusion-webui
+name: Stable Diffusion WebUI
+category: ai
+subcategory: image-generation
+tags: [python, ai, image-generation, stable-diffusion, gpu]
+description: 强大的 AI 图片生成工具，支持多种模型和插件，需要 GPU 支持。
+icon: stable-diffusion-webui
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/AUTOMATIC1111/stable-diffusion-webui
+compose_file: docker-compose.yml
+
+variables:
+  - name: SD_WEBUI_VERSION
+    type: select
+    title: Stable Diffusion WebUI 版本
+    default: "latest"
+    options: ["latest", "v1.6", "v1.5"]
+    description: 选择 Stable Diffusion WebUI 版本
+  - name: SD_WEBUI_PORT
+    type: number
+    title: Stable Diffusion WebUI 端口
+    default: 7860
+    min: 1024
+    max: 65535
+    description: Stable Diffusion WebUI Web 服务端口
+
+services:
+  - name: stable-diffusion-webui
+    type: web
+    description: Stable Diffusion WebUI AI 图片生成服务
+    ports:
+      - internal: 7860
+        external: null
+        public: true
+    volumes:
+      - name: sd_webui_data
+        path: /config
+        mode: rw
+      - name: sd_webui_models
+        path: /models
+        mode: rw
+    resources:
+      gpu: required
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+
+healthcheck_global:
+  timeout: 30m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  gpu_required: true
+  features: "图片生成,模型管理,插件支持"
+

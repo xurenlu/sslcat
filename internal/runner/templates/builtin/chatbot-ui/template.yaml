@@ -1,0 +1,114 @@
+id: chatbot-ui
+name: Chatbot UI
+category: ai
+subcategory: chat
+tags: [nodejs, postgres, ai, chat, chatbot-ui, huggingface]
+description: Hugging Face 开源聊天界面，支持多种 AI 模型和自定义配置。
+icon: chatbot-ui
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/huggingface/chat-ui
+compose_file: docker-compose.yml
+
+variables:
+  - name: CHATBOT_UI_VERSION
+    type: select
+    title: Chatbot UI 版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择 Chatbot UI 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "16", "14"]
+    description: 选择 PostgreSQL 版本
+  - name: CHATBOT_UI_PORT
+    type: number
+    title: Chatbot UI 端口
+    default: 3000
+    min: 1024
+    max: 65535
+    description: Chatbot UI Web 服务端口
+  - name: DEFAULT_MODEL
+    type: string
+    title: 默认模型
+    default: "gpt-3.5-turbo"
+    description: 默认使用的 AI 模型
+    placeholder: "gpt-3.5-turbo"
+  - name: OPENAI_API_KEY
+    type: string
+    title: OpenAI API Key
+    default: ""
+    description: OpenAI API 密钥（可选）
+    sensitive: true
+  - name: ANTHROPIC_API_KEY
+    type: string
+    title: Anthropic API Key
+    default: ""
+    description: Anthropic API 密钥（可选）
+    sensitive: true
+
+services:
+  - name: chatbot-ui
+    type: web
+    description: Chatbot UI AI 聊天服务
+    depends_on: [postgres]
+    ports:
+      - internal: 3000
+        external: null
+        public: true
+    volumes:
+      - name: chatbot_ui_data
+        path: /app/data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{username}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_chatbot"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_chatbot"
+
+connection_strings:
+  postgres: "postgres://{username}:{password}@postgres:5432/{database}"
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  supported_models: "OpenAI,Anthropic,HuggingFace"
+  features: "多模型支持,自定义配置,对话历史"
+

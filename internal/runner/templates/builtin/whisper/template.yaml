@@ -1,0 +1,66 @@
+id: whisper
+name: Whisper ASR
+category: ai
+subcategory: speech-recognition
+tags: [python, ai, asr, speech-recognition, whisper, gpu]
+description: OpenAI Whisper 语音识别服务，支持多语言和高精度转录。
+icon: whisper
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/openai/whisper
+compose_file: docker-compose.yml
+
+variables:
+  - name: WHISPER_VERSION
+    type: select
+    title: Whisper 版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择 Whisper 版本
+  - name: WHISPER_PORT
+    type: number
+    title: Whisper 端口
+    default: 9000
+    min: 1024
+    max: 65535
+    description: Whisper API 服务端口
+  - name: ASR_MODEL
+    type: select
+    title: ASR 模型
+    default: "base"
+    options: ["tiny", "base", "small", "medium", "large"]
+    description: 选择 Whisper 模型大小（越大越准确，但需要更多资源）
+
+services:
+  - name: whisper
+    type: api
+    description: Whisper 语音识别服务
+    ports:
+      - internal: 9000
+        external: null
+        public: true
+    volumes:
+      - name: whisper_data
+        path: /app/models
+        mode: rw
+    resources:
+      gpu: optional
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+healthcheck_global:
+  timeout: 20m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/asr"
+  supported_languages: "99+种语言"
+  features: "高精度转录,多语言,实时识别"
+

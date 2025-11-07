@@ -1,0 +1,64 @@
+id: piper-tts
+name: Piper TTS
+category: ai
+subcategory: tts
+tags: [cpp, ai, tts, text-to-speech, piper, fast]
+description: 快速、轻量级的文本转语音服务，支持多种语言，无需 GPU。
+icon: piper-tts
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/rhasspy/piper
+compose_file: docker-compose.yml
+
+variables:
+  - name: PIPER_TTS_VERSION
+    type: select
+    title: Piper TTS 版本
+    default: "latest"
+    options: ["latest", "v1.2", "v1.1"]
+    description: 选择 Piper TTS 版本
+  - name: PIPER_TTS_PORT
+    type: number
+    title: Piper TTS 端口
+    default: 5000
+    min: 1024
+    max: 65535
+    description: Piper TTS API 服务端口
+  - name: PIPER_MODEL
+    type: string
+    title: Piper 模型
+    default: "en_US-lessac-medium"
+    description: 使用的 Piper 模型
+    placeholder: "en_US-lessac-medium"
+
+services:
+  - name: piper-tts
+    type: api
+    description: Piper TTS 文本转语音服务
+    ports:
+      - internal: 5000
+        external: null
+        public: true
+    volumes:
+      - name: piper_tts_data
+        path: /app/models
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/api/tts"
+  supported_languages: "多语言支持"
+  features: "快速,轻量级,无需GPU"
+

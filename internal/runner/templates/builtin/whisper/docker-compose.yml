@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  whisper:
+    image: onerahmet/openai-whisper-asr-webservice:{{WHISPER_VERSION}}
+    container_name: {{APP_NAME}}_whisper
+    restart: unless-stopped
+    ports:
+      - "{{WHISPER_PORT}}:9000"
+    environment:
+      ASR_MODEL: {{ASR_MODEL}}
+      ASR_ENGINE: faster_whisper
+    volumes:
+      - whisper_data:/app/models
+    networks:
+      - {{APP_NAME}}_network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+volumes:
+  whisper_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

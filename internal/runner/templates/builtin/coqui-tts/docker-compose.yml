@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  coqui-tts:
+    image: ghcr.io/coqui-ai/tts:{{COQUI_TTS_VERSION}}
+    container_name: {{APP_NAME}}_coqui_tts
+    restart: unless-stopped
+    ports:
+      - "{{COQUI_TTS_PORT}}:5002"
+    environment:
+      TTS_MODEL: {{TTS_MODEL}}
+      TTS_LANG: {{TTS_LANG}}
+    volumes:
+      - coqui_tts_data:/app/models
+    networks:
+      - {{APP_NAME}}_network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5002"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+volumes:
+  coqui_tts_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

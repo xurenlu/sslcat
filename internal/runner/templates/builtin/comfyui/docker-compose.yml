@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  comfyui:
+    image: comfyui/comfyui:{{COMFYUI_VERSION}}
+    container_name: {{APP_NAME}}_comfyui
+    restart: unless-stopped
+    ports:
+      - "{{COMFYUI_PORT}}:8188"
+    environment:
+      COMFYUI_PORT: 8188
+    volumes:
+      - comfyui_data:/app/models
+      - comfyui_output:/app/output
+    networks:
+      - {{APP_NAME}}_network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8188"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+volumes:
+  comfyui_data:
+    driver: local
+  comfyui_output:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+
