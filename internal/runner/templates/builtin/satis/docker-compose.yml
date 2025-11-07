@@ -7,18 +7,12 @@ services:
     restart: unless-stopped
     ports:
       - "{{SATIS_PORT}}:80"
-    environment:
-      SATIS_NAME: {{SATIS_NAME}}
-      SATIS_HOMEPAGE: {{SATIS_HOMEPAGE}}
-      GIT_REPOSITORIES: {{GIT_REPOSITORIES}}
-      TZ: Asia/Shanghai
     volumes:
       - satis_data:/satis
     networks:
       - {{APP_NAME}}_network
-    command: ["sh", "-c", "satis build /satis/satis.json /satis/web && php -S 0.0.0.0:80 -t /satis/web"]
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -31,4 +25,3 @@ volumes:
 networks:
   {{APP_NAME}}_network:
     driver: bridge
-

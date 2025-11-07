@@ -1,9 +1,9 @@
 id: ntfy
-name: ntfy (推送通知服务)
-category: devops
+name: ntfy (推送通知)
+category: tools
 subcategory: notification
-tags: [notification, push, alerting, ntfy, devops]
-description: 简单的推送通知服务，支持 HTTP、WebSocket、邮件等多种通知方式，适合系统告警、监控通知等场景。
+tags: [go, notification, push, ntfy, webhook]
+description: 简单的推送通知服务，支持 HTTP、WebSocket、邮件等多种通知方式，无需注册即可使用。
 icon: ntfy
 version: 1.0.0
 author: SSLcat Team
@@ -15,7 +15,7 @@ variables:
     type: select
     title: ntfy 版本
     default: "latest"
-    options: ["latest", "v2", "v1"]
+    options: ["latest", "v2.9", "v2.8"]
     description: 选择 ntfy 版本
   - name: NTFY_PORT
     type: number
@@ -24,17 +24,6 @@ variables:
     min: 1024
     max: 65535
     description: ntfy Web 服务端口
-  - name: NTFY_BASE_URL
-    type: string
-    title: ntfy 基础 URL
-    default: "http://{{PRIMARY_DOMAIN}}"
-    description: ntfy 服务的公网访问地址
-    placeholder: "http://ntfy.example.com"
-  - name: ENABLE_AUTH
-    type: bool
-    title: 启用认证
-    default: true
-    description: 是否启用用户认证
 
 services:
   - name: ntfy
@@ -48,21 +37,23 @@ services:
       - name: ntfy_data
         path: /var/cache/ntfy
         mode: rw
+      - name: ntfy_config
+        path: /etc/ntfy
+        mode: rw
     healthcheck:
       type: http
-      path: /v1/health
+      path: /
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
 
 healthcheck_global:
-  timeout: 5m
+  timeout: 10m
   interval: 10s
 
 metadata:
   site_url: http://{{PRIMARY_DOMAIN}}
   admin_email: admin@{{PRIMARY_DOMAIN}}
-  api_url: "http://{{PRIMARY_DOMAIN}}/v1"
-  features: "推送通知,HTTP推送,WebSocket推送,邮件通知,主题订阅,认证保护"
-
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/docs"
+  features: "推送通知,HTTP推送,WebSocket,无需注册"

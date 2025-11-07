@@ -1,31 +1,29 @@
 version: '3.8'
 
 services:
-  better-uptime:
-    image: betterstack/better-uptime:{{BETTER_UPTIME_VERSION}}
-    container_name: {{APP_NAME}}_better_uptime
+  taskcafe:
+    image: taskcafe/taskcafe:{{TASKCAFE_VERSION}}
+    container_name: {{APP_NAME}}_taskcafe
     restart: unless-stopped
     ports:
-      - "{{BETTER_UPTIME_PORT}}:3000"
+      - "{{TASKCAFE_PORT}}:3333"
     environment:
       DATABASE_URL: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
-      REDIS_URL: redis://:{{REDIS_PASSWORD}}@redis:6379/0
-      SECRET_KEY_BASE: {{SECRET_KEY_BASE}}
+      SITE_URL: http://{{PRIMARY_DOMAIN}}
+      TZ: Asia/Shanghai
     volumes:
-      - better_uptime_data:/app/storage
+      - taskcafe_data:/app/data
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     networks:
       - {{APP_NAME}}_network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3333/api/health"]
       interval: 30s
       timeout: 10s
-      retries: 5
-      start_period: 120s
+      retries: 3
+      start_period: 60s
 
   postgres:
     image: postgres:{{POSTGRES_VERSION}}
@@ -46,30 +44,13 @@ services:
       retries: 5
       start_period: 30s
 
-  redis:
-    image: redis:{{REDIS_VERSION}}
-    container_name: {{APP_NAME}}_redis
-    restart: unless-stopped
-    command: redis-server --requirepass {{REDIS_PASSWORD}}
-    volumes:
-      - redis_data:/data
-    networks:
-      - {{APP_NAME}}_network
-    healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
 volumes:
-  better_uptime_data:
+  taskcafe_data:
     driver: local
   postgres_data:
-    driver: local
-  redis_data:
     driver: local
 
 networks:
   {{APP_NAME}}_network:
     driver: bridge
+

@@ -1,0 +1,59 @@
+id: nexus
+name: Nexus Repository (包管理仓库)
+category: tools
+subcategory: package-registry
+tags: [java, package-registry, nexus, maven, npm, docker]
+description: 企业级包管理仓库，支持 Maven、NPM、Docker、PyPI 等多种格式的包管理。
+icon: nexus
+version: 1.0.0
+author: SSLcat Team
+website: https://www.sonatype.com/products/nexus-repository
+compose_file: docker-compose.yml
+
+variables:
+  - name: NEXUS_VERSION
+    type: select
+    title: Nexus 版本
+    default: "latest"
+    options: ["latest", "3.61", "3.60"]
+    description: 选择 Nexus 版本
+  - name: NEXUS_PORT
+    type: number
+    title: Nexus 端口
+    default: 8081
+    min: 1024
+    max: 65535
+    description: Nexus Web 服务端口
+
+services:
+  - name: nexus
+    type: web
+    description: Nexus Repository 包管理仓库服务
+    ports:
+      - internal: 8081
+        external: null
+        public: true
+    volumes:
+      - name: nexus_data
+        path: /nexus-data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+
+healthcheck_global:
+  timeout: 30m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}:8081
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  default_admin_user: admin
+  default_admin_password: admin123
+  supported_formats: "Maven,NPM,Docker,PyPI,NuGet,RubyGems"
+  features: "包管理仓库,多格式支持,代理仓库,企业级"
+

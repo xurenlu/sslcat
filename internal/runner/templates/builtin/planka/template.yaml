@@ -1,62 +1,67 @@
-id: better-uptime
-name: Better Uptime (服务监控)
+id: planka
+name: Planka (看板任务管理)
 category: tools
-subcategory: monitoring
-tags: [ruby, postgres, redis, monitoring, uptime, status-page]
-description: 开源服务监控和状态页面工具，监控 HTTP、TCP、Ping 等服务，生成状态页面。
-icon: better-uptime
+subcategory: todo
+tags: [todo, kanban, task-management, planka, trello-alternative]
+description: 开源的看板任务管理工具，类似 Trello，支持卡片、列表、看板等功能，界面美观。
+icon: planka
 version: 1.0.0
 author: SSLcat Team
-website: https://github.com/betterstackhq/better-uptime
+website: https://planka.app/
 compose_file: docker-compose.yml
 
 variables:
-  - name: BETTER_UPTIME_VERSION
+  - name: PLANKA_VERSION
     type: select
-    title: Better Uptime 版本
+    title: Planka 版本
     default: "latest"
     options: ["latest", "v1.0", "v0.9"]
-    description: 选择 Better Uptime 版本
+    description: 选择 Planka 版本
   - name: POSTGRES_VERSION
     type: select
     title: PostgreSQL 版本
     default: "15"
-    options: ["15", "16", "14"]
+    options: ["15", "14", "16"]
     description: 选择 PostgreSQL 版本
   - name: REDIS_VERSION
     type: select
     title: Redis 版本
     default: "7"
-    options: ["7", "6", "alpine"]
+    options: ["7", "6", "7-alpine"]
     description: 选择 Redis 版本
-  - name: BETTER_UPTIME_PORT
+  - name: PLANKA_PORT
     type: number
-    title: Better Uptime 端口
-    default: 3000
+    title: Planka 端口
+    default: 1337
     min: 1024
     max: 65535
-    description: Better Uptime Web 服务端口
+    description: Planka Web 服务端口
 
 services:
-  - name: better-uptime
+  - name: planka-web
     type: web
-    description: Better Uptime 服务监控服务
+    description: Planka Web 服务
     depends_on: [postgres, redis]
     ports:
-      - internal: 3000
+      - internal: 1337
         external: null
         public: true
     volumes:
-      - name: better_uptime_data
-        path: /app/storage
+      - name: planka_data
+        path: /app/public/attachments
         mode: rw
     healthcheck:
       type: http
       path: /
       interval: 30s
       timeout: 10s
-      retries: 5
-      start_period: 120s
+      retries: 3
+      start_period: 60s
+
+  - name: planka-worker
+    type: worker
+    description: Planka 后台任务处理服务
+    depends_on: [planka-web]
 
   - name: postgres
     type: database
@@ -71,7 +76,7 @@ services:
         mode: rw
     healthcheck:
       type: command
-      command: ["pg_isready", "-U", "{username}"]
+      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -99,30 +104,23 @@ services:
 credentials:
   postgres:
     username:
-      pattern: "{app_name}_better_uptime"
+      pattern: "{app_name}_planka"
     password:
       pattern: random
       length: 18
     database:
-      pattern: "{app_name}_better_uptime"
-  redis:
-    password:
-      pattern: random
-      length: 16
-  better-uptime:
-    secret_key_base:
-      pattern: random
-      length: 64
+      pattern: "{app_name}_planka"
 
 connection_strings:
-  postgres: "postgres://{username}:{password}@postgres:5432/{database}"
-  redis: "redis://:{password}@redis:6379/0"
+  postgres: "postgresql://{username}:{password}@postgres:5432/{database}"
+  redis: "redis://redis:6379/0"
 
 healthcheck_global:
-  timeout: 20m
+  timeout: 10m
   interval: 10s
 
 metadata:
-  site_url: http://{{PRIMARY_DOMAIN}}:3000
+  site_url: http://{{PRIMARY_DOMAIN}}
   admin_email: admin@{{PRIMARY_DOMAIN}}
-  features: "服务监控,状态页面,HTTP/TCP/Ping监控,告警通知"
+  features: "看板管理,卡片管理,列表管理,项目协作,附件上传,评论功能,标签系统"
+

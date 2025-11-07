@@ -9,17 +9,13 @@ services:
       - "{{VERDACCIO_PORT}}:4873"
     environment:
       VERDACCIO_PROTOCOL: http
-      VERDACCIO_PORT: 4873
-      ENABLE_AUTH: {{ENABLE_AUTH}}
-      MAX_USERS: {{MAX_USERS}}
-      TZ: Asia/Shanghai
     volumes:
       - verdaccio_data:/verdaccio/storage
       - verdaccio_config:/verdaccio/conf
     networks:
       - {{APP_NAME}}_network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4873/"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4873"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -34,4 +30,3 @@ volumes:
 networks:
   {{APP_NAME}}_network:
     driver: bridge
-
