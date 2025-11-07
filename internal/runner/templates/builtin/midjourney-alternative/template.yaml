@@ -1,0 +1,66 @@
+id: midjourney-alternative
+name: Midjourney Alternative (艺术图片生成)
+category: ai
+subcategory: image-generation
+tags: [python, ai, image-generation, midjourney, art, gpu]
+description: Midjourney 风格的图片生成工具，生成艺术感强的图片，需要 GPU。
+icon: midjourney-alternative
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/midjourney-alternative
+compose_file: docker-compose.yml
+
+variables:
+  - name: MIDJOURNEY_ALT_VERSION
+    type: select
+    title: Midjourney Alternative 版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择 Midjourney Alternative 版本
+  - name: MIDJOURNEY_ALT_PORT
+    type: number
+    title: Midjourney Alternative 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: Midjourney Alternative API 服务端口
+  - name: OPENAI_API_KEY
+    type: string
+    title: OpenAI API Key
+    default: ""
+    description: OpenAI API 密钥（可选）
+    sensitive: true
+
+services:
+  - name: midjourney-alternative
+    type: api
+    description: Midjourney Alternative 艺术图片生成服务
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: midjourney_alt_data
+        path: /app/models
+        mode: rw
+    resources:
+      gpu: required
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 180s
+
+healthcheck_global:
+  timeout: 20m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/api/generate"
+  features: "艺术风格,高质量生成,多种艺术效果"
+  gpu_required: true
+

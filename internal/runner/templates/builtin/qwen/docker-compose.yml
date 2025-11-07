@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  qwen:
+    image: qwen/server:{{QWEN_VERSION}}
+    container_name: {{APP_NAME}}_qwen
+    restart: unless-stopped
+    ports:
+      - "{{QWEN_PORT}}:8000"
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    volumes:
+      - qwen_data:/app/models
+    networks:
+      - {{APP_NAME}}_network
+    runtime: nvidia
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 180s
+
+volumes:
+  qwen_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+
