@@ -1,9 +1,9 @@
 id: powerdns
-name: PowerDNS (内网 DNS 服务)
-category: infrastructure
+name: PowerDNS (DNS服务器)
+category: tools
 subcategory: dns
-tags: [dns, powerdns, infrastructure, internal-dns]
-description: 强大的 DNS 服务器，适合企业内网 DNS 服务，支持权威 DNS 和递归 DNS，提供 Web 管理界面。
+tags: [cpp, mysql, dns, powerdns, dns-server]
+description: 强大的 DNS 服务器，支持多种后端存储，提供 API 接口管理 DNS 记录。
 icon: powerdns
 version: 1.0.0
 author: SSLcat Team
@@ -17,75 +17,50 @@ variables:
     default: "latest"
     options: ["latest", "4.8", "4.7"]
     description: 选择 PowerDNS 版本
-  - name: POWERDNS_ADMIN_VERSION
-    type: select
-    title: PowerDNS Admin 版本
-    default: "latest"
-    options: ["latest", "v1.0", "v0.9"]
-    description: 选择 PowerDNS Admin Web 界面版本
   - name: MYSQL_VERSION
     type: select
     title: MySQL 版本
     default: "8.0"
-    options: ["8.0", "8.1", "5.7"]
+    options: ["8.0", "5.7", "8.1"]
     description: 选择 MySQL 版本
-  - name: POWERDNS_ADMIN_PORT
+  - name: POWERDNS_PORT
     type: number
-    title: PowerDNS Admin 端口
-    default: 8080
+    title: PowerDNS DNS 端口
+    default: 53
+    min: 1
+    max: 65535
+    description: PowerDNS DNS 服务端口
+  - name: POWERDNS_API_PORT
+    type: number
+    title: PowerDNS API 端口
+    default: 8081
     min: 1024
     max: 65535
-    description: PowerDNS Admin Web 管理界面端口
-  - name: POWERDNS_DNS_PORT
-    type: number
-    title: DNS 服务端口
-    default: 53
-    min: 53
-    max: 53
-    description: DNS 服务端口（标准端口 53）
-  - name: DOMAIN_NAME
-    type: string
-    title: 内网域名
-    default: "internal.local"
-    description: 内网域名后缀（如：internal.local, corp.local）
-    placeholder: "internal.local"
+    description: PowerDNS API 管理端口
 
 services:
-  - name: powerdns-admin
-    type: web
-    description: PowerDNS Admin Web 管理界面
-    depends_on: [powerdns, mysql]
-    ports:
-      - internal: 8080
-        external: null
-        public: true
-    healthcheck:
-      type: http
-      path: /
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-
   - name: powerdns
     type: service
     description: PowerDNS DNS 服务器
     depends_on: [mysql]
     ports:
       - internal: 53
-        external: 53
-        public: true
-      - internal: 53
         external: null
-        public: false
-        protocol: udp
+        public: true
+      - internal: 8081
+        external: null
+        public: true
+    volumes:
+      - name: powerdns_data
+        path: /var/lib/powerdns
+        mode: rw
     healthcheck:
       type: command
-      command: ["dig", "@localhost", "localhost"]
+      command: ["pdns_control", "ping"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 60s
 
   - name: mysql
     type: database
@@ -104,7 +79,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 60s
 
 credentials:
   mysql:
@@ -115,19 +90,24 @@ credentials:
       length: 18
     database:
       pattern: "{app_name}_powerdns"
+    root_password:
+      pattern: random
+      length: 18
+  powerdns:
+    api_key:
+      pattern: random
+      length: 32
 
 connection_strings:
   mysql: "mysql://{username}:{password}@mysql:3306/{database}"
-  dns: "{{PRIMARY_DOMAIN}}:53"
 
 healthcheck_global:
-  timeout: 10m
+  timeout: 20m
   interval: 10s
 
 metadata:
-  site_url: http://{{PRIMARY_DOMAIN}}
-  admin_email: admin@{{DOMAIN_NAME}}
-  admin_url: "http://{{PRIMARY_DOMAIN}}"
-  features: "DNS服务,内网域名解析,Web管理界面,区域管理,记录管理"
-  dns_domain: "{{DOMAIN_NAME}}"
-
+  site_url: http://{{PRIMARY_DOMAIN}}:8081
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}:8081/api"
+  dns_server: "{{PRIMARY_DOMAIN}}:53"
+  features: "DNS服务器,API管理,多种后端,高性能"

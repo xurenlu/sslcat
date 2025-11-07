@@ -8,21 +8,11 @@ services:
     ports:
       - "{{GRAFANA_PORT}}:3000"
     environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: {{GRAFANA_ADMIN_PASSWORD}}
-      GF_DATABASE_TYPE: postgres
-      GF_DATABASE_HOST: postgres:5432
-      GF_DATABASE_NAME: {{POSTGRES_DATABASE}}
-      GF_DATABASE_USER: {{POSTGRES_USERNAME}}
-      GF_DATABASE_PASSWORD: {{POSTGRES_PASSWORD}}
-      GF_SERVER_ROOT_URL: http://{{PRIMARY_DOMAIN}}
-      GF_SERVER_DOMAIN: {{PRIMARY_DOMAIN}}
-      TZ: Asia/Shanghai
+      GF_SECURITY_ADMIN_USER: {{GRAFANA_USERNAME}}
+      GF_SECURITY_ADMIN_PASSWORD: {{GRAFANA_PASSWORD}}
+      GF_INSTALL_PLUGINS: ""
     volumes:
       - grafana_data:/var/lib/grafana
-    depends_on:
-      postgres:
-        condition: service_healthy
     networks:
       - {{APP_NAME}}_network
     healthcheck:
@@ -32,32 +22,10 @@ services:
       retries: 3
       start_period: 60s
 
-  postgres:
-    image: postgres:{{POSTGRES_VERSION}}
-    container_name: {{APP_NAME}}_postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - {{APP_NAME}}_network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U {{POSTGRES_USERNAME}}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
 volumes:
   grafana_data:
-    driver: local
-  postgres_data:
     driver: local
 
 networks:
   {{APP_NAME}}_network:
     driver: bridge
-
