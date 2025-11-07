@@ -1,32 +1,31 @@
 version: '3.8'
 
 services:
-  matomo:
-    image: matomo:{{MATOMO_VERSION}}
-    container_name: {{APP_NAME}}_matomo
+  leantime:
+    image: leantime/leantime:{{LEANTIME_VERSION}}
+    container_name: {{APP_NAME}}_leantime
     restart: unless-stopped
     ports:
-      - "{{MATOMO_PORT}}:80"
+      - "{{LEANTIME_PORT}}:80"
     environment:
-      MATOMO_DATABASE_HOST: mysql
-      MATOMO_DATABASE_ADAPTER: mysql
-      MATOMO_DATABASE_TABLES_PREFIX: matomo_
-      MATOMO_DATABASE_USERNAME: {{MYSQL_USERNAME}}
-      MATOMO_DATABASE_PASSWORD: {{MYSQL_PASSWORD}}
-      MATOMO_DATABASE_DBNAME: {{MYSQL_DATABASE}}
+      LEANTIME_DB_HOST: mysql
+      LEANTIME_DB_USER: {{MYSQL_USERNAME}}
+      LEANTIME_DB_PASSWORD: {{MYSQL_PASSWORD}}
+      LEANTIME_DB_DATABASE: {{MYSQL_DATABASE}}
+      LEANTIME_SESSION_PASSWORD: {{SESSION_PASSWORD}}
     volumes:
-      - matomo_data:/var/www/html
+      - leantime_data:/var/www/html
     depends_on:
       mysql:
         condition: service_healthy
     networks:
       - {{APP_NAME}}_network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/index.php"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 120s
 
   mysql:
     image: mysql:{{MYSQL_VERSION}}
@@ -52,7 +51,7 @@ services:
     command: --default-authentication-plugin=mysql_native_password
 
 volumes:
-  matomo_data:
+  leantime_data:
     driver: local
   mysql_data:
     driver: local

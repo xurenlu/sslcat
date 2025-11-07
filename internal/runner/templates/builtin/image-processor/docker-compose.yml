@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  image-processor:
+    image: image-processor/server:{{IMAGE_PROCESSOR_VERSION}}
+    container_name: {{APP_NAME}}_image_processor
+    restart: unless-stopped
+    ports:
+      - "{{IMAGE_PROCESSOR_PORT}}:8080"
+    environment:
+      IMAGE_PROCESSOR_MAX_FILE_SIZE: {{MAX_FILE_SIZE}}
+      IMAGE_PROCESSOR_FORMATS: {{SUPPORTED_FORMATS}}
+    volumes:
+      - image_processor_data:/app/temp
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  image_processor_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

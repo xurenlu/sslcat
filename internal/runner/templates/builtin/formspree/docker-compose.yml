@@ -1,27 +1,29 @@
 version: '3.8'
 
 services:
-  kanboard:
-    image: kanboard/kanboard:{{KANBOARD_VERSION}}
-    container_name: {{APP_NAME}}_kanboard
+  formspree:
+    image: formspree/formspree:{{FORMSPREE_VERSION}}
+    container_name: {{APP_NAME}}_formspree
     restart: unless-stopped
     ports:
-      - "{{KANBOARD_PORT}}:80"
+      - "{{FORMSPREE_PORT}}:8080"
     environment:
-      DATABASE_URL: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
+      FORMSPREE_SITE_URL: http://{{PRIMARY_DOMAIN}}
+      FORMSPREE_DATABASE_URL: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
+      FORMSPREE_SECRET_KEY: {{SECRET_KEY}}
     volumes:
-      - kanboard_data:/var/www/app/data
+      - formspree_data:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - {{APP_NAME}}_network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080"]
       interval: 30s
       timeout: 10s
-      retries: 5
-      start_period: 60s
+      retries: 3
+      start_period: 30s
 
   postgres:
     image: postgres:{{POSTGRES_VERSION}}
@@ -43,7 +45,7 @@ services:
       start_period: 30s
 
 volumes:
-  kanboard_data:
+  formspree_data:
     driver: local
   postgres_data:
     driver: local
@@ -51,3 +53,4 @@ volumes:
 networks:
   {{APP_NAME}}_network:
     driver: bridge
+

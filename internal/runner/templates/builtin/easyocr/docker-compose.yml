@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  easyocr:
+    image: jaidedai/easyocr:{{EASYOCR_VERSION}}
+    container_name: {{APP_NAME}}_easyocr
+    restart: unless-stopped
+    ports:
+      - "{{EASYOCR_PORT}}:8080"
+    environment:
+      EASYOCR_LANG: {{EASYOCR_LANG}}
+    volumes:
+      - easyocr_data:/app/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  easyocr_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

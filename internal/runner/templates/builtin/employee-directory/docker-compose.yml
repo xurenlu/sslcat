@@ -1,26 +1,27 @@
 version: '3.8'
 
 services:
-  kanboard:
-    image: kanboard/kanboard:{{KANBOARD_VERSION}}
-    container_name: {{APP_NAME}}_kanboard
+  employee-directory:
+    image: employee-directory/app:{{EMPLOYEE_DIRECTORY_VERSION}}
+    container_name: {{APP_NAME}}_employee_directory
     restart: unless-stopped
     ports:
-      - "{{KANBOARD_PORT}}:80"
+      - "{{EMPLOYEE_DIRECTORY_PORT}}:3000"
     environment:
       DATABASE_URL: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
+      SECRET_KEY: {{SECRET_KEY}}
     volumes:
-      - kanboard_data:/var/www/app/data
+      - employee_directory_data:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - {{APP_NAME}}_network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
       interval: 30s
       timeout: 10s
-      retries: 5
+      retries: 3
       start_period: 60s
 
   postgres:
@@ -43,7 +44,7 @@ services:
       start_period: 30s
 
 volumes:
-  kanboard_data:
+  employee_directory_data:
     driver: local
   postgres_data:
     driver: local
@@ -51,3 +52,4 @@ volumes:
 networks:
   {{APP_NAME}}_network:
     driver: bridge
+

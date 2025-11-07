@@ -1,56 +1,56 @@
-id: kanboard
-name: Kanboard
-category: project-management
-subcategory: kanban
-tags: [php, postgres, kanban, kanboard]
-description: 简洁的看板工具，专注于任务管理，轻量高效。
-icon: kanboard
+id: formspree
+name: Formspree
+category: tools
+subcategory: form
+tags: [go, postgres, form, formspree]
+description: 开源表单后端服务，支持多种表单类型和邮件通知。
+icon: formspree
 version: 1.0.0
 author: SSLcat Team
-website: https://kanboard.org/
+website: https://formspree.io/
 compose_file: docker-compose.yml
 
 variables:
-  - name: KANBOARD_VERSION
+  - name: FORMSPREE_VERSION
     type: select
-    title: Kanboard 版本
+    title: Formspree 版本
     default: "latest"
-    options: ["latest", "1.2", "1.1"]
-    description: 选择 Kanboard 版本
+    options: ["latest", "v2", "v1"]
+    description: 选择 Formspree 版本
   - name: POSTGRES_VERSION
     type: select
     title: PostgreSQL 版本
     default: "15"
     options: ["15", "16", "14"]
     description: 选择 PostgreSQL 版本
-  - name: KANBOARD_PORT
+  - name: FORMSPREE_PORT
     type: number
-    title: Kanboard 端口
-    default: 80
+    title: Formspree 端口
+    default: 8080
     min: 1024
     max: 65535
-    description: Kanboard Web 服务端口
+    description: Formspree Web 服务端口
 
 services:
-  - name: kanboard
+  - name: formspree
     type: web
-    description: Kanboard 看板服务
+    description: Formspree 表单服务
     depends_on: [postgres]
     ports:
-      - internal: 80
+      - internal: 8080
         external: null
         public: true
     volumes:
-      - name: kanboard_data
-        path: /var/www/app/data
+      - name: formspree_data
+        path: /app/uploads
         mode: rw
     healthcheck:
       type: http
       path: /
       interval: 30s
       timeout: 10s
-      retries: 5
-      start_period: 60s
+      retries: 3
+      start_period: 30s
 
   - name: postgres
     type: database
@@ -74,12 +74,16 @@ services:
 credentials:
   postgres:
     username:
-      pattern: "{app_name}_kanboard"
+      pattern: "{app_name}_formspree"
     password:
       pattern: random
       length: 18
     database:
-      pattern: "{app_name}_kanboard"
+      pattern: "{app_name}_formspree"
+  formspree:
+    secret_key:
+      pattern: random
+      length: 32
 
 connection_strings:
   postgres: "postgres://{username}:{password}@postgres:5432/{database}"
@@ -91,5 +95,4 @@ healthcheck_global:
 metadata:
   site_url: http://{{PRIMARY_DOMAIN}}
   admin_email: admin@{{PRIMARY_DOMAIN}}
-  default_admin_user: admin
-  default_admin_password: admin
+

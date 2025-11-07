@@ -1,55 +1,55 @@
-id: kanboard
-name: Kanboard
-category: project-management
-subcategory: kanban
-tags: [php, postgres, kanban, kanboard]
-description: 简洁的看板工具，专注于任务管理，轻量高效。
-icon: kanboard
+id: approval-system
+name: Approval System
+category: tools
+subcategory: workflow
+tags: [workflow, approval, approval-system]
+description: 简单审批系统，支持请假、报销、采购等审批流程。
+icon: approval-system
 version: 1.0.0
 author: SSLcat Team
-website: https://kanboard.org/
+website: https://github.com/approval-system
 compose_file: docker-compose.yml
 
 variables:
-  - name: KANBOARD_VERSION
+  - name: APPROVAL_SYSTEM_VERSION
     type: select
-    title: Kanboard 版本
+    title: Approval System 版本
     default: "latest"
-    options: ["latest", "1.2", "1.1"]
-    description: 选择 Kanboard 版本
+    options: ["latest", "v1", "v2"]
+    description: 选择 Approval System 版本
   - name: POSTGRES_VERSION
     type: select
     title: PostgreSQL 版本
     default: "15"
     options: ["15", "16", "14"]
     description: 选择 PostgreSQL 版本
-  - name: KANBOARD_PORT
+  - name: APPROVAL_SYSTEM_PORT
     type: number
-    title: Kanboard 端口
-    default: 80
+    title: Approval System 端口
+    default: 8080
     min: 1024
     max: 65535
-    description: Kanboard Web 服务端口
+    description: Approval System Web 服务端口
 
 services:
-  - name: kanboard
+  - name: approval-system
     type: web
-    description: Kanboard 看板服务
+    description: Approval System 审批系统服务
     depends_on: [postgres]
     ports:
-      - internal: 80
+      - internal: 8080
         external: null
         public: true
     volumes:
-      - name: kanboard_data
-        path: /var/www/app/data
+      - name: approval_system_data
+        path: /app/data
         mode: rw
     healthcheck:
       type: http
       path: /
       interval: 30s
       timeout: 10s
-      retries: 5
+      retries: 3
       start_period: 60s
 
   - name: postgres
@@ -74,12 +74,16 @@ services:
 credentials:
   postgres:
     username:
-      pattern: "{app_name}_kanboard"
+      pattern: "{app_name}_approval"
     password:
       pattern: random
       length: 18
     database:
-      pattern: "{app_name}_kanboard"
+      pattern: "{app_name}_approval"
+  approval-system:
+    secret_key:
+      pattern: random
+      length: 32
 
 connection_strings:
   postgres: "postgres://{username}:{password}@postgres:5432/{database}"
@@ -93,3 +97,4 @@ metadata:
   admin_email: admin@{{PRIMARY_DOMAIN}}
   default_admin_user: admin
   default_admin_password: admin
+

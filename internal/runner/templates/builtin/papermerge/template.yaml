@@ -1,48 +1,51 @@
-id: kanboard
-name: Kanboard
-category: project-management
-subcategory: kanban
-tags: [php, postgres, kanban, kanboard]
-description: 简洁的看板工具，专注于任务管理，轻量高效。
-icon: kanboard
+id: papermerge
+name: Papermerge
+category: tools
+subcategory: document-management
+tags: [python, postgres, document-management, ocr, papermerge]
+description: 文档管理系统，支持 OCR 识别、文档分类和搜索。
+icon: papermerge
 version: 1.0.0
 author: SSLcat Team
-website: https://kanboard.org/
+website: https://www.papermerge.com/
 compose_file: docker-compose.yml
 
 variables:
-  - name: KANBOARD_VERSION
+  - name: PAPERMERGE_VERSION
     type: select
-    title: Kanboard 版本
+    title: Papermerge 版本
     default: "latest"
-    options: ["latest", "1.2", "1.1"]
-    description: 选择 Kanboard 版本
+    options: ["latest", "2.1", "2.0"]
+    description: 选择 Papermerge 版本
   - name: POSTGRES_VERSION
     type: select
     title: PostgreSQL 版本
     default: "15"
     options: ["15", "16", "14"]
     description: 选择 PostgreSQL 版本
-  - name: KANBOARD_PORT
+  - name: PAPERMERGE_PORT
     type: number
-    title: Kanboard 端口
-    default: 80
+    title: Papermerge 端口
+    default: 8000
     min: 1024
     max: 65535
-    description: Kanboard Web 服务端口
+    description: Papermerge Web 服务端口
 
 services:
-  - name: kanboard
+  - name: papermerge
     type: web
-    description: Kanboard 看板服务
+    description: Papermerge 文档管理服务
     depends_on: [postgres]
     ports:
-      - internal: 80
+      - internal: 8000
         external: null
         public: true
     volumes:
-      - name: kanboard_data
-        path: /var/www/app/data
+      - name: papermerge_data
+        path: /config
+        mode: rw
+      - name: papermerge_documents
+        path: /documents
         mode: rw
     healthcheck:
       type: http
@@ -50,7 +53,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 60s
+      start_period: 120s
 
   - name: postgres
     type: database
@@ -74,18 +77,22 @@ services:
 credentials:
   postgres:
     username:
-      pattern: "{app_name}_kanboard"
+      pattern: "{app_name}_papermerge"
     password:
       pattern: random
       length: 18
     database:
-      pattern: "{app_name}_kanboard"
+      pattern: "{app_name}_papermerge"
+  papermerge:
+    secret_key:
+      pattern: random
+      length: 32
 
 connection_strings:
   postgres: "postgres://{username}:{password}@postgres:5432/{database}"
 
 healthcheck_global:
-  timeout: 10m
+  timeout: 15m
   interval: 10s
 
 metadata:
@@ -93,3 +100,4 @@ metadata:
   admin_email: admin@{{PRIMARY_DOMAIN}}
   default_admin_user: admin
   default_admin_password: admin
+

@@ -1,56 +1,56 @@
-id: matomo
-name: Matomo
-category: analytics
-subcategory: web-analytics
-tags: [php, mysql, analytics, privacy, matomo]
-description: 开源网站分析平台，功能强大，隐私友好，是 Google Analytics 的开源替代品。
-icon: matomo
+id: leantime
+name: Leantime
+category: project-management
+subcategory: project-management
+tags: [php, mysql, project-management, leantime]
+description: 开源项目管理和协作工具，支持看板、时间跟踪和报告。
+icon: leantime
 version: 1.0.0
 author: SSLcat Team
-website: https://matomo.org/
+website: https://leantime.io/
 compose_file: docker-compose.yml
 
 variables:
-  - name: MATOMO_VERSION
+  - name: LEANTIME_VERSION
     type: select
-    title: Matomo 版本
+    title: Leantime 版本
     default: "latest"
-    options: ["latest", "5.0", "4.15"]
-    description: 选择 Matomo 版本
+    options: ["latest", "2.4", "2.3"]
+    description: 选择 Leantime 版本
   - name: MYSQL_VERSION
     type: select
     title: MySQL 版本
     default: "8.0"
     options: ["8.0", "8.1", "5.7"]
     description: 选择 MySQL 版本
-  - name: MATOMO_PORT
+  - name: LEANTIME_PORT
     type: number
-    title: Matomo 端口
+    title: Leantime 端口
     default: 80
     min: 1024
     max: 65535
-    description: Matomo Web 服务端口
+    description: Leantime Web 服务端口
 
 services:
-  - name: matomo
+  - name: leantime
     type: web
-    description: Matomo 分析平台服务
+    description: Leantime 项目管理服务
     depends_on: [mysql]
     ports:
       - internal: 80
         external: null
         public: true
     volumes:
-      - name: matomo_data
+      - name: leantime_data
         path: /var/www/html
         mode: rw
     healthcheck:
       type: http
-      path: /index.php
+      path: /
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 120s
 
   - name: mysql
     type: database
@@ -74,25 +74,30 @@ services:
 credentials:
   mysql:
     username:
-      pattern: "{app_name}_matomo"
+      pattern: "{app_name}_leantime"
     password:
       pattern: random
       length: 18
     database:
-      pattern: "{app_name}_matomo"
+      pattern: "{app_name}_leantime"
     root_password:
       pattern: random
       length: 20
+  leantime:
+    session_password:
+      pattern: random
+      length: 32
 
 connection_strings:
   mysql: "mysql://{username}:{password}@mysql:3306/{database}?charset=utf8mb4"
 
 healthcheck_global:
-  timeout: 10m
+  timeout: 15m
   interval: 10s
 
 metadata:
   site_url: http://{{PRIMARY_DOMAIN}}
-  install_url: http://{{PRIMARY_DOMAIN}}/index.php
   admin_email: admin@{{PRIMARY_DOMAIN}}
+  default_admin_user: admin
+  default_admin_password: admin
 

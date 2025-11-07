@@ -1,55 +1,55 @@
-id: kanboard
-name: Kanboard
-category: project-management
-subcategory: kanban
-tags: [php, postgres, kanban, kanboard]
-description: 简洁的看板工具，专注于任务管理，轻量高效。
-icon: kanboard
+id: typeform-alternative
+name: Typeform Alternative
+category: tools
+subcategory: form
+tags: [form, survey, typeform]
+description: Typeform 风格的表单工具，支持动态表单和美观的界面。
+icon: typeform
 version: 1.0.0
 author: SSLcat Team
-website: https://kanboard.org/
+website: https://www.typeform.com/
 compose_file: docker-compose.yml
 
 variables:
-  - name: KANBOARD_VERSION
+  - name: TYPEFORM_VERSION
     type: select
-    title: Kanboard 版本
+    title: Typeform 版本
     default: "latest"
-    options: ["latest", "1.2", "1.1"]
-    description: 选择 Kanboard 版本
+    options: ["latest", "v2", "v1"]
+    description: 选择 Typeform 版本
   - name: POSTGRES_VERSION
     type: select
     title: PostgreSQL 版本
     default: "15"
     options: ["15", "16", "14"]
     description: 选择 PostgreSQL 版本
-  - name: KANBOARD_PORT
+  - name: TYPEFORM_PORT
     type: number
-    title: Kanboard 端口
+    title: Typeform 端口
     default: 80
     min: 1024
     max: 65535
-    description: Kanboard Web 服务端口
+    description: Typeform Web 服务端口
 
 services:
-  - name: kanboard
+  - name: typeform
     type: web
-    description: Kanboard 看板服务
+    description: Typeform 表单服务
     depends_on: [postgres]
     ports:
       - internal: 80
         external: null
         public: true
     volumes:
-      - name: kanboard_data
-        path: /var/www/app/data
+      - name: typeform_data
+        path: /app/uploads
         mode: rw
     healthcheck:
       type: http
       path: /
       interval: 30s
       timeout: 10s
-      retries: 5
+      retries: 3
       start_period: 60s
 
   - name: postgres
@@ -74,12 +74,16 @@ services:
 credentials:
   postgres:
     username:
-      pattern: "{app_name}_kanboard"
+      pattern: "{app_name}_typeform"
     password:
       pattern: random
       length: 18
     database:
-      pattern: "{app_name}_kanboard"
+      pattern: "{app_name}_typeform"
+  typeform:
+    secret_key:
+      pattern: random
+      length: 32
 
 connection_strings:
   postgres: "postgres://{username}:{password}@postgres:5432/{database}"
@@ -91,5 +95,4 @@ healthcheck_global:
 metadata:
   site_url: http://{{PRIMARY_DOMAIN}}
   admin_email: admin@{{PRIMARY_DOMAIN}}
-  default_admin_user: admin
-  default_admin_password: admin
+

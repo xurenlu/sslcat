@@ -1,16 +1,17 @@
 version: '3.8'
 
 services:
-  kanboard:
-    image: kanboard/kanboard:{{KANBOARD_VERSION}}
-    container_name: {{APP_NAME}}_kanboard
+  typeform:
+    image: typeform/typeform:{{TYPEFORM_VERSION}}
+    container_name: {{APP_NAME}}_typeform
     restart: unless-stopped
     ports:
-      - "{{KANBOARD_PORT}}:80"
+      - "{{TYPEFORM_PORT}}:80"
     environment:
-      DATABASE_URL: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
+      TYPEFORM_DATABASE_URL: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
+      TYPEFORM_SECRET_KEY: {{SECRET_KEY}}
     volumes:
-      - kanboard_data:/var/www/app/data
+      - typeform_data:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -20,7 +21,7 @@ services:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost"]
       interval: 30s
       timeout: 10s
-      retries: 5
+      retries: 3
       start_period: 60s
 
   postgres:
@@ -43,7 +44,7 @@ services:
       start_period: 30s
 
 volumes:
-  kanboard_data:
+  typeform_data:
     driver: local
   postgres_data:
     driver: local
@@ -51,3 +52,4 @@ volumes:
 networks:
   {{APP_NAME}}_network:
     driver: bridge
+

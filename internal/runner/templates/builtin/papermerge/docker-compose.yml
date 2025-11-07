@@ -1,27 +1,35 @@
 version: '3.8'
 
 services:
-  kanboard:
-    image: kanboard/kanboard:{{KANBOARD_VERSION}}
-    container_name: {{APP_NAME}}_kanboard
+  papermerge:
+    image: linuxserver/papermerge:{{PAPERMERGE_VERSION}}
+    container_name: {{APP_NAME}}_papermerge
     restart: unless-stopped
     ports:
-      - "{{KANBOARD_PORT}}:80"
+      - "{{PAPERMERGE_PORT}}:8000"
     environment:
-      DATABASE_URL: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
+      PUID: 1000
+      PGID: 1000
+      TZ: Asia/Shanghai
+      PAPERMERGE_DB_HOST: postgres
+      PAPERMERGE_DB_NAME: {{POSTGRES_DATABASE}}
+      PAPERMERGE_DB_USER: {{POSTGRES_USERNAME}}
+      PAPERMERGE_DB_PASSWORD: {{POSTGRES_PASSWORD}}
+      PAPERMERGE_SECRET_KEY: {{SECRET_KEY}}
     volumes:
-      - kanboard_data:/var/www/app/data
+      - papermerge_data:/config
+      - papermerge_documents:/documents
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - {{APP_NAME}}_network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 60s
+      start_period: 120s
 
   postgres:
     image: postgres:{{POSTGRES_VERSION}}
@@ -43,7 +51,9 @@ services:
       start_period: 30s
 
 volumes:
-  kanboard_data:
+  papermerge_data:
+    driver: local
+  papermerge_documents:
     driver: local
   postgres_data:
     driver: local
@@ -51,3 +61,4 @@ volumes:
 networks:
   {{APP_NAME}}_network:
     driver: bridge
+

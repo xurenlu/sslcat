@@ -1,0 +1,62 @@
+id: pdf-tools
+name: PDF Tools
+category: tools
+subcategory: pdf-processing
+tags: [pdf, pdf-tools, document-processing]
+description: PDF 处理工具集，支持合并、拆分、转换、压缩等功能。
+icon: pdf-tools
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/pdf-tools
+compose_file: docker-compose.yml
+
+variables:
+  - name: PDF_TOOLS_VERSION
+    type: select
+    title: PDF Tools 版本
+    default: "latest"
+    options: ["latest", "v1", "v2"]
+    description: 选择 PDF Tools 版本
+  - name: PDF_TOOLS_PORT
+    type: number
+    title: PDF Tools 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: PDF Tools Web 服务端口
+  - name: MAX_FILE_SIZE
+    type: string
+    title: 最大文件大小
+    default: "100MB"
+    description: 单文件最大处理大小（如：100MB, 500MB）
+    placeholder: "100MB"
+
+services:
+  - name: pdf-tools
+    type: web
+    description: PDF Tools PDF 处理服务
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: pdf_tools_data
+        path: /app/temp
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "合并,拆分,转换,压缩,水印"
+

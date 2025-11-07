@@ -8,14 +8,12 @@ services:
     ports:
       - "{{WEKAN_PORT}}:8080"
     environment:
-      MONGO_URL: mongodb://{{MONGODB_USERNAME}}:{{MONGODB_PASSWORD}}@mongodb:27017/{{MONGODB_DATABASE}}
       ROOT_URL: http://{{PRIMARY_DOMAIN}}
-      MAIL_URL: ""
-      MAIL_FROM: wekan@{{PRIMARY_DOMAIN}}
+      MONGO_URL: mongodb://{{MONGO_USERNAME}}:{{MONGO_PASSWORD}}@mongo:27017/{{MONGO_DATABASE}}
     volumes:
       - wekan_data:/data
     depends_on:
-      mongodb:
+      mongo:
         condition: service_healthy
     networks:
       - {{APP_NAME}}_network
@@ -23,20 +21,19 @@ services:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
       start_period: 60s
 
-  mongodb:
-    image: mongo:{{MONGODB_VERSION}}
-    container_name: {{APP_NAME}}_mongodb
+  mongo:
+    image: mongo:{{MONGO_VERSION}}
+    container_name: {{APP_NAME}}_mongo
     restart: unless-stopped
     environment:
-      MONGO_INITDB_ROOT_USERNAME: {{MONGODB_ROOT_USERNAME}}
-      MONGO_INITDB_ROOT_PASSWORD: {{MONGODB_ROOT_PASSWORD}}
-      MONGO_INITDB_DATABASE: {{MONGODB_DATABASE}}
+      MONGO_INITDB_ROOT_USERNAME: {{MONGO_USERNAME}}
+      MONGO_INITDB_ROOT_PASSWORD: {{MONGO_PASSWORD}}
+      MONGO_INITDB_DATABASE: {{MONGO_DATABASE}}
     volumes:
-      - mongodb_data:/data/db
-      - mongodb_config:/data/configdb
+      - mongo_data:/data/db
     networks:
       - {{APP_NAME}}_network
     healthcheck:
@@ -49,12 +46,9 @@ services:
 volumes:
   wekan_data:
     driver: local
-  mongodb_data:
-    driver: local
-  mongodb_config:
+  mongo_data:
     driver: local
 
 networks:
   {{APP_NAME}}_network:
     driver: bridge
-

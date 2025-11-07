@@ -1,9 +1,9 @@
 id: wekan
 name: Wekan
-category: project
+category: project-management
 subcategory: kanban
-tags: [nodejs, mongodb, project, kanban, wekan]
-description: 开源看板项目管理工具，类似 Trello，界面简洁美观。
+tags: [nodejs, mongodb, kanban, wekan, trello-alternative]
+description: 开源看板工具，类似 Trello，支持多用户协作。
 icon: wekan
 version: 1.0.0
 author: SSLcat Team
@@ -17,11 +17,11 @@ variables:
     default: "latest"
     options: ["latest", "7.0", "6.0"]
     description: 选择 Wekan 版本
-  - name: MONGODB_VERSION
+  - name: MONGO_VERSION
     type: select
     title: MongoDB 版本
-    default: "latest"
-    options: ["latest", "7.0", "6.0"]
+    default: "7"
+    options: ["7", "6", "5"]
     description: 选择 MongoDB 版本
   - name: WEKAN_PORT
     type: number
@@ -35,7 +35,7 @@ services:
   - name: wekan
     type: web
     description: Wekan 看板服务
-    depends_on: [mongodb]
+    depends_on: [mongo]
     ports:
       - internal: 8080
         external: null
@@ -49,10 +49,10 @@ services:
       path: /
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
       start_period: 60s
 
-  - name: mongodb
+  - name: mongo
     type: database
     description: MongoDB 数据库服务
     ports:
@@ -60,11 +60,8 @@ services:
         external: null
         public: false
     volumes:
-      - name: mongodb_data
+      - name: mongo_data
         path: /data/db
-        mode: rw
-      - name: mongodb_config
-        path: /data/configdb
         mode: rw
     healthcheck:
       type: command
@@ -75,12 +72,7 @@ services:
       start_period: 30s
 
 credentials:
-  mongodb:
-    root_username:
-      pattern: "admin"
-    root_password:
-      pattern: random
-      length: 18
+  mongo:
     username:
       pattern: "{app_name}_wekan"
     password:
@@ -90,13 +82,14 @@ credentials:
       pattern: "{app_name}_wekan"
 
 connection_strings:
-  mongodb: "mongodb://{username}:{password}@mongodb:27017/{database}?authSource=admin"
+  mongo: "mongodb://{username}:{password}@mongo:27017/{database}"
 
 healthcheck_global:
-  timeout: 10m
+  timeout: 15m
   interval: 10s
 
 metadata:
   site_url: http://{{PRIMARY_DOMAIN}}
   admin_email: admin@{{PRIMARY_DOMAIN}}
-
+  default_admin_user: admin
+  default_admin_password: admin
