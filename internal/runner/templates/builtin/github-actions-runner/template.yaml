@@ -1,0 +1,73 @@
+id: github-actions-runner
+name: GitHub Actions Runner (自动化构建)
+category: devops
+subcategory: ci-cd
+tags: [ci-cd, github-actions, runner, automation, build]
+description: GitHub Actions 自托管运行器，支持在私有服务器上运行 GitHub Actions 工作流，适合自动化构建、测试、部署。
+icon: github-actions-runner
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/actions/runner
+compose_file: docker-compose.yml
+
+variables:
+  - name: RUNNER_VERSION
+    type: select
+    title: Runner 版本
+    default: "latest"
+    options: ["latest", "2.311", "2.310"]
+    description: 选择 GitHub Actions Runner 版本
+  - name: GITHUB_TOKEN
+    type: string
+    title: GitHub Token
+    default: ""
+    description: GitHub Personal Access Token 或 GitHub App Token（需要 repo 权限）
+    sensitive: true
+  - name: GITHUB_REPO
+    type: string
+    title: GitHub 仓库
+    default: ""
+    description: GitHub 仓库地址（格式：owner/repo，如：company/my-repo）
+    placeholder: "owner/repo"
+  - name: RUNNER_NAME
+    type: string
+    title: Runner 名称
+    default: "{{APP_NAME}}-runner"
+    description: Runner 的名称标识
+    placeholder: "my-runner"
+  - name: RUNNER_LABELS
+    type: string
+    title: Runner 标签
+    default: "self-hosted,linux,x64"
+    description: Runner 的标签，用逗号分隔
+    placeholder: "self-hosted,linux,x64,docker"
+
+services:
+  - name: runner
+    type: worker
+    description: GitHub Actions Runner 服务
+    volumes:
+      - name: runner_data
+        path: /runner
+        mode: rw
+      - name: docker_sock
+        path: /var/run/docker.sock
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["ps", "aux", "|", "grep", "Runner.Listener"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "GitHub Actions运行器,自动化构建,自动化测试,自动化部署,Docker支持"
+  supported_platforms: "Linux,Windows,macOS"
+

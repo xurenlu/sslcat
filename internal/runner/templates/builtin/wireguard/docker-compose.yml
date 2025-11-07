@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  wireguard-webui:
+    image: wg-easy/wg-easy:{{WIREGUARD_WEBUI_VERSION}}
+    container_name: {{APP_NAME}}_wireguard_webui
+    restart: unless-stopped
+    ports:
+      - "{{WIREGUARD_WEBUI_PORT}}:51821"
+    environment:
+      WG_HOST: {{WIREGUARD_DOMAIN}}
+      PASSWORD: {{WIREGUARD_PASSWORD}}
+      WG_PORT: {{WIREGUARD_PORT}}
+      WG_DEFAULT_ADDRESS: {{WIREGUARD_SUBNET}}
+      WG_DEFAULT_DNS: 1.1.1.1
+      TZ: Asia/Shanghai
+    volumes:
+      - wireguard_config:/etc/wireguard
+    depends_on:
+      - wireguard
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:51821/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  wireguard:
+    image: linuxserver/wireguard:{{WIREGUARD_VERSION}}
+    container_name: {{APP_NAME}}_wireguard
+    restart: unless-stopped
+    ports:
+      - "{{WIREGUARD_PORT}}:51820/udp"
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Asia/Shanghai
+      SERVERURL: {{WIREGUARD_DOMAIN}}
+      SERVERPORT: {{WIREGUARD_PORT}}
+      PEERS: 10
+      PEERDNS: 1.1.1.1
+      INTERNAL_SUBNET: {{WIREGUARD_SUBNET}}
+    volumes:
+      - wireguard_config:/config
+      - /lib/modules:/lib/modules:ro
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "ping", "-c", "1", "127.0.0.1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  wireguard_config:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+
+credentials:
+  wireguard:
+    password:
+      pattern: random
+      length: 16
+

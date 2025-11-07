@@ -1,0 +1,80 @@
+id: verdaccio
+name: Verdaccio (Node.js 私有仓库)
+category: devtools
+subcategory: package-registry
+tags: [nodejs, npm, package-registry, verdaccio, private-repository]
+description: 轻量级的私有 npm 包仓库，支持 npm、yarn、pnpm 等包管理器，提供 Web 界面和权限管理。
+icon: verdaccio
+version: 1.0.0
+author: SSLcat Team
+website: https://verdaccio.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: VERDACCIO_VERSION
+    type: select
+    title: Verdaccio 版本
+    default: "latest"
+    options: ["latest", "5.15", "5.14"]
+    description: 选择 Verdaccio 版本
+  - name: VERDACCIO_PORT
+    type: number
+    title: Verdaccio 端口
+    default: 4873
+    min: 1024
+    max: 65535
+    description: Verdaccio npm 仓库服务端口
+  - name: VERDACCIO_WEBUI_PORT
+    type: number
+    title: Web UI 端口
+    default: 4873
+    min: 1024
+    max: 65535
+    description: Verdaccio Web 管理界面端口（通常与主端口相同）
+  - name: ENABLE_AUTH
+    type: bool
+    title: 启用认证
+    default: true
+    description: 是否启用用户认证
+  - name: MAX_USERS
+    type: number
+    title: 最大用户数
+    default: 1000
+    min: 1
+    max: 10000
+    description: 允许的最大用户数量
+
+services:
+  - name: verdaccio
+    type: web
+    description: Verdaccio Node.js 私有包仓库服务
+    ports:
+      - internal: 4873
+        external: null
+        public: true
+    volumes:
+      - name: verdaccio_data
+        path: /verdaccio/storage
+        mode: rw
+      - name: verdaccio_config
+        path: /verdaccio/conf
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  registry_url: "http://{{PRIMARY_DOMAIN}}"
+  features: "npm私有仓库,yarn支持,pnpm支持,Web界面,权限管理,包版本管理"
+  usage: "设置 npm registry: npm config set registry http://{{PRIMARY_DOMAIN}}"
+

@@ -1,0 +1,112 @@
+version: '3.8'
+
+services:
+  jumpserver-core:
+    image: jumpserver/jms_all:{{JUMPSERVER_VERSION}}
+    container_name: {{APP_NAME}}_jumpserver_core
+    restart: unless-stopped
+    ports:
+      - "{{JUMPSERVER_PORT}}:80"
+      - "{{JUMPSERVER_SSH_PORT}}:2222"
+      - "{{JUMPSERVER_RDP_PORT}}:3389"
+    environment:
+      SECRET_KEY: {{JUMPSERVER_SECRET_KEY}}
+      BOOTSTRAP_TOKEN: {{JUMPSERVER_BOOTSTRAP_TOKEN}}
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: {{MYSQL_USERNAME}}
+      DB_PASSWORD: {{MYSQL_PASSWORD}}
+      DB_NAME: {{MYSQL_DATABASE}}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CORE_HOST: http://{{PRIMARY_DOMAIN}}
+      TZ: Asia/Shanghai
+    volumes:
+      - jumpserver_data:/opt/jumpserver/data
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  jumpserver-koko:
+    image: jumpserver/jms_koko:{{JUMPSERVER_VERSION}}
+    container_name: {{APP_NAME}}_jumpserver_koko
+    restart: unless-stopped
+    environment:
+      CORE_HOST: http://jumpserver-core
+      BOOTSTRAP_TOKEN: {{JUMPSERVER_BOOTSTRAP_TOKEN}}
+      TZ: Asia/Shanghai
+    depends_on:
+      - jumpserver-core
+    networks:
+      - {{APP_NAME}}_network
+
+  jumpserver-guacamole:
+    image: jumpserver/jms_guacamole:{{JUMPSERVER_VERSION}}
+    container_name: {{APP_NAME}}_jumpserver_guacamole
+    restart: unless-stopped
+    environment:
+      JUMPSERVER_SERVER: http://jumpserver-core
+      BOOTSTRAP_TOKEN: {{JUMPSERVER_BOOTSTRAP_TOKEN}}
+      TZ: Asia/Shanghai
+    depends_on:
+      - jumpserver-core
+    networks:
+      - {{APP_NAME}}_network
+
+  mysql:
+    image: mysql:{{MYSQL_VERSION}}
+    container_name: {{APP_NAME}}_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: {{MYSQL_DATABASE}}
+      MYSQL_USER: {{MYSQL_USERNAME}}
+      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
+      MYSQL_ROOT_PASSWORD: {{MYSQL_PASSWORD}}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:{{REDIS_VERSION}}
+    container_name: {{APP_NAME}}_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  jumpserver_data:
+    driver: local
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

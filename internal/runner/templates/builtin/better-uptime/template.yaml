@@ -1,0 +1,136 @@
+id: better-uptime
+name: Better Uptime (站点监控)
+category: devops
+subcategory: monitoring
+tags: [monitoring, uptime, status-page, alerting, better-uptime]
+description: 现代化的网站监控和状态页面工具，支持多种监控类型、告警通知、状态页面等功能。
+icon: better-uptime
+version: 1.0.0
+author: SSLcat Team
+website: https://betteruptime.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: BETTER_UPTIME_VERSION
+    type: select
+    title: Better Uptime 版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择 Better Uptime 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "14", "16"]
+    description: 选择 PostgreSQL 版本
+  - name: REDIS_VERSION
+    type: select
+    title: Redis 版本
+    default: "7"
+    options: ["7", "6", "7-alpine"]
+    description: 选择 Redis 版本
+  - name: BETTER_UPTIME_PORT
+    type: number
+    title: Better Uptime 端口
+    default: 3000
+    min: 1024
+    max: 65535
+    description: Better Uptime Web 服务端口
+  - name: BETTER_UPTIME_SECRET_KEY
+    type: string
+    title: Secret Key
+    default: ""
+    description: Better Uptime 密钥（留空将自动生成）
+    sensitive: true
+
+services:
+  - name: better-uptime-web
+    type: web
+    description: Better Uptime Web 服务
+    depends_on: [postgres, redis]
+    ports:
+      - internal: 3000
+        external: null
+        public: true
+    volumes:
+      - name: better_uptime_data
+        path: /app/data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  - name: better-uptime-worker
+    type: worker
+    description: Better Uptime 后台任务处理服务
+    depends_on: [better-uptime-web]
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  - name: redis
+    type: cache
+    description: Redis 缓存服务
+    ports:
+      - internal: 6379
+        external: null
+        public: false
+    volumes:
+      - name: redis_data
+        path: /data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_better_uptime"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_better_uptime"
+  better-uptime:
+    secret_key:
+      pattern: random
+      length: 32
+
+connection_strings:
+  postgres: "postgresql://{username}:{password}@postgres:5432/{database}"
+  redis: "redis://redis:6379/0"
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "网站监控,HTTP监控,HTTPS监控,ICMP监控,SSL证书监控,告警通知,状态页面,事件历史"
+

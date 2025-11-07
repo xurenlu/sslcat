@@ -1,0 +1,76 @@
+id: satis
+name: Satis (PHP 私有包仓库)
+category: devtools
+subcategory: package-registry
+tags: [php, composer, package-registry, satis, private-repository]
+description: Composer 的私有包仓库解决方案，支持搭建私有 PHP 包仓库，管理内部 PHP 库和依赖。
+icon: satis
+version: 1.0.0
+author: SSLcat Team
+website: https://getcomposer.org/doc/articles/handling-private-packages-with-satis.md
+compose_file: docker-compose.yml
+
+variables:
+  - name: SATIS_VERSION
+    type: select
+    title: Satis 版本
+    default: "latest"
+    options: ["latest", "2.0", "1.0"]
+    description: 选择 Satis 版本
+  - name: SATIS_PORT
+    type: number
+    title: Satis 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: Satis Web 服务端口
+  - name: SATIS_NAME
+    type: string
+    title: 仓库名称
+    default: "{{APP_NAME}} Private Repository"
+    description: 私有包仓库的名称
+    placeholder: "My Company Private Repository"
+  - name: SATIS_HOMEPAGE
+    type: string
+    title: 仓库主页
+    default: "http://{{PRIMARY_DOMAIN}}"
+    description: 私有包仓库的主页 URL
+    placeholder: "http://packages.example.com"
+  - name: GIT_REPOSITORIES
+    type: string
+    title: Git 仓库列表
+    default: ""
+    description: 要包含的 Git 仓库 URL 列表，用逗号分隔（可选）
+    placeholder: "git@github.com:company/package1.git,git@github.com:company/package2.git"
+
+services:
+  - name: satis
+    type: web
+    description: Satis PHP 私有包仓库服务
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: satis_data
+        path: /satis
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  repository_url: "http://{{PRIMARY_DOMAIN}}/packages.json"
+  features: "PHP包仓库,Composer支持,私有包管理,Git仓库集成,依赖解析"
+  usage: "在 composer.json 中添加: {\"repositories\": [{\"type\": \"composer\", \"url\": \"http://{{PRIMARY_DOMAIN}}\"}]}"
+

@@ -1,0 +1,62 @@
+id: stoplight
+name: Stoplight (API设计)
+category: tools
+subcategory: api-docs
+tags: [nodejs, api-docs, stoplight, openapi, api-design]
+description: API 设计和文档平台，支持 OpenAPI 规范，提供 API Mock 和测试功能。
+icon: stoplight
+version: 1.0.0
+author: SSLcat Team
+website: https://stoplight.io/
+compose_file: docker-compose.yml
+
+variables:
+  - name: STOPLIGHT_VERSION
+    type: select
+    title: Stoplight Prism 版本
+    default: "latest"
+    options: ["latest", "v5.0", "v4.0"]
+    description: 选择 Stoplight Prism 版本
+  - name: STOPLIGHT_PORT
+    type: number
+    title: Stoplight 端口
+    default: 4010
+    min: 1024
+    max: 65535
+    description: Stoplight API Mock 服务端口
+  - name: STOPLIGHT_SPEC_URL
+    type: string
+    title: OpenAPI 规范 URL
+    default: "/openapi.json"
+    description: OpenAPI/Swagger 规范文件 URL
+    placeholder: "/openapi.json"
+
+services:
+  - name: stoplight
+    type: api
+    description: Stoplight API Mock 服务
+    ports:
+      - internal: 4010
+        external: null
+        public: true
+    volumes:
+      - name: stoplight_data
+        path: /app/specs
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}:4010
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "API设计,OpenAPI支持,API Mock,测试功能"
+

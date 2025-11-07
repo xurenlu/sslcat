@@ -1,0 +1,77 @@
+id: statping
+name: StatPing (站点状态监控)
+category: devops
+subcategory: monitoring
+tags: [monitoring, uptime, status-page, statping, alerting]
+description: 开源的网站状态监控和状态页面工具，支持 HTTP、TCP、ICMP 等多种监控类型，提供美观的状态页面。
+icon: statping
+version: 1.0.0
+author: SSLcat Team
+website: https://statping.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: STATPING_VERSION
+    type: select
+    title: StatPing 版本
+    default: "latest"
+    options: ["latest", "v0.90", "v0.89"]
+    description: 选择 StatPing 版本
+  - name: STATPING_PORT
+    type: number
+    title: StatPing 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: StatPing Web 服务端口
+  - name: STATPING_ADMIN_USERNAME
+    type: string
+    title: 管理员用户名
+    default: "admin"
+    description: StatPing 管理员用户名
+    placeholder: "admin"
+  - name: STATPING_ADMIN_PASSWORD
+    type: string
+    title: 管理员密码
+    default: ""
+    description: StatPing 管理员密码（留空将自动生成）
+    sensitive: true
+
+services:
+  - name: statping
+    type: web
+    description: StatPing 站点状态监控服务
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: statping_data
+        path: /app
+        mode: rw
+    healthcheck:
+      type: http
+      path: /api/health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+credentials:
+  statping:
+    admin_password:
+      pattern: random
+      length: 16
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  admin_url: "http://{{PRIMARY_DOMAIN}}/dashboard"
+  status_page_url: "http://{{PRIMARY_DOMAIN}}/status"
+  features: "网站监控,HTTP监控,TCP监控,ICMP监控,状态页面,告警通知,API接口"
+  supported_monitors: "HTTP,HTTPS,TCP,ICMP,ICMPv6,DNS"
+

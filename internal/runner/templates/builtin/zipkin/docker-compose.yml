@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  zipkin:
+    image: openzipkin/zipkin:{{ZIPKIN_VERSION}}
+    container_name: {{APP_NAME}}_zipkin
+    restart: unless-stopped
+    ports:
+      - "{{ZIPKIN_PORT}}:9411"
+    environment:
+      STORAGE_TYPE: elasticsearch
+      ES_HOSTS: http://elasticsearch:9200
+    volumes:
+      - zipkin_data:/zipkin
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9411"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:{{ELASTICSEARCH_VERSION}}
+    container_name: {{APP_NAME}}_elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9200"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  zipkin_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

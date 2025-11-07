@@ -1,0 +1,62 @@
+id: element
+name: Element (去中心化聊天)
+category: tools
+subcategory: collaboration
+tags: [nodejs, collaboration, element, matrix, decentralized]
+description: 基于 Matrix 协议的去中心化聊天客户端，支持端到端加密、跨服务器通信。
+icon: element
+version: 1.0.0
+author: SSLcat Team
+website: https://element.io/
+compose_file: docker-compose.yml
+
+variables:
+  - name: ELEMENT_VERSION
+    type: select
+    title: Element 版本
+    default: "latest"
+    options: ["latest", "v1.11", "v1.10"]
+    description: 选择 Element 版本
+  - name: ELEMENT_PORT
+    type: number
+    title: Element 端口
+    default: 80
+    min: 1024
+    max: 65535
+    description: Element Web 服务端口
+  - name: MATRIX_SERVER_NAME
+    type: string
+    title: Matrix 服务器名称
+    default: "matrix.org"
+    description: Matrix 服务器地址（需要配置 Matrix 服务器）
+    placeholder: "matrix.org"
+
+services:
+  - name: element-web
+    type: web
+    description: Element 去中心化聊天客户端
+    ports:
+      - internal: 80
+        external: null
+        public: true
+    volumes:
+      - name: element_data
+        path: /app
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "去中心化聊天,端到端加密,跨服务器通信,Matrix协议"
+

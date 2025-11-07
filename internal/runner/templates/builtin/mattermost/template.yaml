@@ -1,0 +1,100 @@
+id: mattermost
+name: Mattermost (团队协作)
+category: tools
+subcategory: collaboration
+tags: [go, postgres, collaboration, mattermost, slack-alternative]
+description: Slack 的开源替代品，团队协作和实时聊天平台，支持频道、私聊、文件分享等。
+icon: mattermost
+version: 1.0.0
+author: SSLcat Team
+website: https://mattermost.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: MATTERMOST_VERSION
+    type: select
+    title: Mattermost 版本
+    default: "latest"
+    options: ["latest", "9.0", "8.1"]
+    description: 选择 Mattermost 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "16", "14"]
+    description: 选择 PostgreSQL 版本
+  - name: MATTERMOST_PORT
+    type: number
+    title: Mattermost 端口
+    default: 8065
+    min: 1024
+    max: 65535
+    description: Mattermost Web 服务端口
+
+services:
+  - name: mattermost
+    type: web
+    description: Mattermost 团队协作服务
+    depends_on: [postgres]
+    ports:
+      - internal: 8065
+        external: null
+        public: true
+    volumes:
+      - name: mattermost_data
+        path: /mattermost/data
+        mode: rw
+      - name: mattermost_config
+        path: /mattermost/config
+        mode: rw
+    healthcheck:
+      type: http
+      path: /api/v4/system/ping
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{username}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_mattermost"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_mattermost"
+
+connection_strings:
+  postgres: "postgres://{username}:{password}@postgres:5432/{database}?sslmode=disable"
+
+healthcheck_global:
+  timeout: 20m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}:8065
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  default_admin_user: admin
+  default_admin_password: admin
+  features: "团队协作,实时聊天,频道管理,文件分享"
+

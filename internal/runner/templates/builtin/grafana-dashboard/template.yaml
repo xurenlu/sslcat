@@ -1,0 +1,108 @@
+id: grafana-dashboard
+name: Grafana Dashboard (监控大屏)
+category: devops
+subcategory: monitoring
+tags: [monitoring, dashboard, grafana, visualization, devops]
+description: Grafana 监控大屏，支持多种数据源，提供丰富的可视化图表，适合运维监控、业务监控等场景。
+icon: grafana-dashboard
+version: 1.0.0
+author: SSLcat Team
+website: https://grafana.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: GRAFANA_VERSION
+    type: select
+    title: Grafana 版本
+    default: "latest"
+    options: ["latest", "10.0", "9.5"]
+    description: 选择 Grafana 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "14", "16"]
+    description: 选择 PostgreSQL 版本（用于存储 Grafana 数据）
+  - name: GRAFANA_PORT
+    type: number
+    title: Grafana 端口
+    default: 3000
+    min: 1024
+    max: 65535
+    description: Grafana Web 服务端口
+  - name: GRAFANA_ADMIN_PASSWORD
+    type: string
+    title: Grafana 管理员密码
+    default: ""
+    description: Grafana 管理员密码（留空将自动生成）
+    sensitive: true
+
+services:
+  - name: grafana
+    type: web
+    description: Grafana 监控大屏服务
+    depends_on: [postgres]
+    ports:
+      - internal: 3000
+        external: null
+        public: true
+    volumes:
+      - name: grafana_data
+        path: /var/lib/grafana
+        mode: rw
+    healthcheck:
+      type: http
+      path: /api/health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_grafana"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_grafana"
+  grafana:
+    admin_password:
+      pattern: random
+      length: 16
+
+connection_strings:
+  postgres: "postgresql://{username}:{password}@postgres:5432/{database}"
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  admin_url: "http://{{PRIMARY_DOMAIN}}"
+  default_admin_user: admin
+  features: "监控大屏,数据可视化,多数据源支持,告警规则,仪表板分享,用户权限管理"
+  supported_datasources: "Prometheus,InfluxDB,MySQL,PostgreSQL,Elasticsearch,CloudWatch"
+

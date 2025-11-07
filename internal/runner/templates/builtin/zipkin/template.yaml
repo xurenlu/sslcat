@@ -1,0 +1,85 @@
+id: zipkin
+name: Zipkin (分布式追踪)
+category: tools
+subcategory: monitoring
+tags: [java, elasticsearch, monitoring, tracing, zipkin, distributed-tracing]
+description: 分布式追踪系统，用于监控和排查微服务架构中的请求流程，Twitter 开源。
+icon: zipkin
+version: 1.0.0
+author: SSLcat Team
+website: https://zipkin.io/
+compose_file: docker-compose.yml
+
+variables:
+  - name: ZIPKIN_VERSION
+    type: select
+    title: Zipkin 版本
+    default: "latest"
+    options: ["latest", "2.24", "2.23"]
+    description: 选择 Zipkin 版本
+  - name: ELASTICSEARCH_VERSION
+    type: select
+    title: Elasticsearch 版本
+    default: "8.11.0"
+    options: ["8.11.0", "8.10", "7.17"]
+    description: 选择 Elasticsearch 版本
+  - name: ZIPKIN_PORT
+    type: number
+    title: Zipkin 端口
+    default: 9411
+    min: 1024
+    max: 65535
+    description: Zipkin Web UI 端口
+
+services:
+  - name: zipkin
+    type: web
+    description: Zipkin 分布式追踪服务
+    depends_on: [elasticsearch]
+    ports:
+      - internal: 9411
+        external: null
+        public: true
+    volumes:
+      - name: zipkin_data
+        path: /zipkin
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  - name: elasticsearch
+    type: database
+    description: Elasticsearch 搜索引擎服务
+    ports:
+      - internal: 9200
+        external: null
+        public: false
+    volumes:
+      - name: elasticsearch_data
+        path: /usr/share/elasticsearch/data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+connection_strings:
+  elasticsearch: "http://elasticsearch:9200"
+
+healthcheck_global:
+  timeout: 20m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}:9411
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "分布式追踪,请求追踪,性能分析,微服务监控"
+

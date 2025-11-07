@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  ntfy:
+    image: binwiederhier/ntfy:{{NTFY_VERSION}}
+    container_name: {{APP_NAME}}_ntfy
+    restart: unless-stopped
+    ports:
+      - "{{NTFY_PORT}}:80"
+    environment:
+      NTFY_BASE_URL: {{NTFY_BASE_URL}}
+      NTFY_AUTH_DEFAULT_ACCESS: "read-write"
+      NTFY_ENABLE_AUTH: {{ENABLE_AUTH}}
+      TZ: Asia/Shanghai
+    volumes:
+      - ntfy_data:/var/cache/ntfy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  ntfy_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

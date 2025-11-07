@@ -1,0 +1,88 @@
+id: jaeger
+name: Jaeger (分布式追踪)
+category: tools
+subcategory: monitoring
+tags: [go, monitoring, tracing, jaeger, distributed-tracing]
+description: 分布式追踪系统，用于监控和排查微服务架构中的请求流程，支持 OpenTracing 标准。
+icon: jaeger
+version: 1.0.0
+author: SSLcat Team
+website: https://www.jaegertracing.io/
+compose_file: docker-compose.yml
+
+variables:
+  - name: JAEGER_VERSION
+    type: select
+    title: Jaeger 版本
+    default: "latest"
+    options: ["latest", "1.50", "1.49"]
+    description: 选择 Jaeger 版本
+  - name: JAEGER_UI_PORT
+    type: number
+    title: Jaeger UI 端口
+    default: 16686
+    min: 1024
+    max: 65535
+    description: Jaeger Web UI 端口
+  - name: JAEGER_AGENT_PORT
+    type: number
+    title: Jaeger Agent UDP 端口
+    default: 6831
+    min: 1024
+    max: 65535
+    description: Jaeger Agent UDP 接收端口
+  - name: JAEGER_AGENT_PORT_2
+    type: number
+    title: Jaeger Agent UDP 端口 2
+    default: 6832
+    min: 1024
+    max: 65535
+    description: Jaeger Agent UDP 接收端口 2
+  - name: JAEGER_COLLECTOR_PORT
+    type: number
+    title: Jaeger Collector HTTP 端口
+    default: 14268
+    min: 1024
+    max: 65535
+    description: Jaeger Collector HTTP 接收端口
+
+services:
+  - name: jaeger
+    type: web
+    description: Jaeger 分布式追踪服务
+    ports:
+      - internal: 16686
+        external: null
+        public: true
+      - internal: 6831
+        external: null
+        public: true
+      - internal: 6832
+        external: null
+        public: true
+      - internal: 14268
+        external: null
+        public: true
+    volumes:
+      - name: jaeger_data
+        path: /badger
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}:16686
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  agent_endpoint: "{{PRIMARY_DOMAIN}}:6831"
+  collector_endpoint: "http://{{PRIMARY_DOMAIN}}:14268"
+  features: "分布式追踪,请求追踪,性能分析,微服务监控"
+

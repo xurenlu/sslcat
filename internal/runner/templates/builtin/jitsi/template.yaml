@@ -1,0 +1,109 @@
+id: jitsi
+name: Jitsi Meet (视频会议)
+category: collaboration
+subcategory: video-conference
+tags: [video-conference, jitsi, webex-alternative, zoom-alternative, collaboration]
+description: 开源的视频会议系统，支持音视频通话、屏幕共享、录制等功能，无需注册即可使用。
+icon: jitsi
+version: 1.0.0
+author: SSLcat Team
+website: https://jitsi.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: JITSI_VERSION
+    type: select
+    title: Jitsi 版本
+    default: "latest"
+    options: ["latest", "stable", "unstable"]
+    description: 选择 Jitsi 版本
+  - name: JITSI_WEB_PORT
+    type: number
+    title: Web 端口
+    default: 80
+    min: 1024
+    max: 65535
+    description: Jitsi Meet Web 界面端口
+  - name: JITSI_HTTPS_PORT
+    type: number
+    title: HTTPS 端口
+    default: 443
+    min: 1024
+    max: 65535
+    description: Jitsi Meet HTTPS 端口
+  - name: JITSI_DOMAIN
+    type: string
+    title: Jitsi 域名
+    default: "{{PRIMARY_DOMAIN}}"
+    description: Jitsi Meet 服务器域名
+    placeholder: "meet.example.com"
+  - name: ENABLE_RECORDING
+    type: bool
+    title: 启用录制功能
+    default: true
+    description: 是否启用会议录制功能
+
+services:
+  - name: web
+    type: web
+    description: Jitsi Meet Web 界面
+    depends_on: [prosody, jvb, jicofo]
+    ports:
+      - internal: 80
+        external: null
+        public: true
+      - internal: 443
+        external: null
+        public: true
+    volumes:
+      - name: jitsi_web
+        path: /config
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  - name: prosody
+    type: service
+    description: Prosody XMPP 服务器
+    volumes:
+      - name: prosody_data
+        path: /config
+        mode: rw
+
+  - name: jvb
+    type: service
+    description: Jitsi Videobridge 视频桥接服务
+    depends_on: [prosody]
+    ports:
+      - internal: 10000
+        external: null
+        public: true
+        protocol: udp
+
+  - name: jicofo
+    type: service
+    description: Jitsi Conference Focus 会议焦点服务
+    depends_on: [prosody]
+
+  - name: jibri
+    type: service
+    description: Jitsi Broadcasting Infrastructure 录制服务
+    depends_on: [prosody, jvb]
+    condition: ENABLE_RECORDING
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{JITSI_DOMAIN}}
+  meet_url: "https://{{JITSI_DOMAIN}}"
+  features: "视频会议,音频通话,屏幕共享,会议录制,聊天功能,密码保护"
+  supported_platforms: "Web,iOS,Android"
+

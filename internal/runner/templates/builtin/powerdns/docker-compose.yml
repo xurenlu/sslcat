@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  powerdns-admin:
+    image: powerdnsadmin/pda-legacy:{{POWERDNS_ADMIN_VERSION}}
+    container_name: {{APP_NAME}}_powerdns_admin
+    restart: unless-stopped
+    ports:
+      - "{{POWERDNS_ADMIN_PORT}}:8080"
+    environment:
+      PDNS_HOST: powerdns
+      PDNS_PORT: 8081
+      PDNS_API_KEY: {{POWERDNS_API_KEY}}
+      PDNS_PROTO: http
+      PDNS_VERSION: 4
+      SQLALCHEMY_DATABASE_URI: mysql://{{MYSQL_USERNAME}}:{{MYSQL_PASSWORD}}@mysql:3306/{{MYSQL_DATABASE}}
+      SECRET_KEY: {{POWERDNS_SECRET_KEY}}
+      TZ: Asia/Shanghai
+    depends_on:
+      - powerdns
+      - mysql
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  powerdns:
+    image: powerdns/pdns-auth-master:{{POWERDNS_VERSION}}
+    container_name: {{APP_NAME}}_powerdns
+    restart: unless-stopped
+    ports:
+      - "{{POWERDNS_DNS_PORT}}:53"
+      - "{{POWERDNS_DNS_PORT}}:53/udp"
+      - "8081:8081"
+    environment:
+      PDNS_launch: gmysql
+      PDNS_gmysql_host: mysql
+      PDNS_gmysql_port: 3306
+      PDNS_gmysql_user: {{MYSQL_USERNAME}}
+      PDNS_gmysql_password: {{MYSQL_PASSWORD}}
+      PDNS_gmysql_dbname: {{MYSQL_DATABASE}}
+      PDNS_api: yes
+      PDNS_api_key: {{POWERDNS_API_KEY}}
+      PDNS_webserver: yes
+      PDNS_webserver_address: 0.0.0.0
+      PDNS_webserver_port: 8081
+      TZ: Asia/Shanghai
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "dig", "@localhost", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  mysql:
+    image: mysql:{{MYSQL_VERSION}}
+    container_name: {{APP_NAME}}_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: {{MYSQL_DATABASE}}
+      MYSQL_USER: {{MYSQL_USERNAME}}
+      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
+      MYSQL_ROOT_PASSWORD: {{MYSQL_PASSWORD}}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+
+credentials:
+  powerdns:
+    api_key:
+      pattern: random
+      length: 32
+    secret_key:
+      pattern: random
+      length: 32
+

@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  runner:
+    image: myoung34/github-runner:{{RUNNER_VERSION}}
+    container_name: {{APP_NAME}}_github_actions_runner
+    restart: unless-stopped
+    environment:
+      RUNNER_NAME: {{RUNNER_NAME}}
+      RUNNER_TOKEN: {{GITHUB_TOKEN}}
+      RUNNER_REPO: {{GITHUB_REPO}}
+      RUNNER_LABELS: {{RUNNER_LABELS}}
+      RUNNER_WORKDIR: /runner/_work
+      TZ: Asia/Shanghai
+    volumes:
+      - runner_data:/runner
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "ps", "aux", "|", "grep", "-q", "Runner.Listener"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  runner_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

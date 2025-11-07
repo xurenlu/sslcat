@@ -1,0 +1,159 @@
+id: jumpserver
+name: JumpServer (堡垒机)
+category: security
+subcategory: bastion-host
+tags: [bastion-host, jumpserver, ssh, rdp, security, audit]
+description: 开源的堡垒机系统，提供 SSH、RDP、数据库等协议的跳板机功能，支持会话录制、审计日志、权限管理等。
+icon: jumpserver
+version: 1.0.0
+author: SSLcat Team
+website: https://www.jumpserver.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: JUMPSERVER_VERSION
+    type: select
+    title: JumpServer 版本
+    default: "latest"
+    options: ["latest", "v3.0", "v2.28"]
+    description: 选择 JumpServer 版本
+  - name: MYSQL_VERSION
+    type: select
+    title: MySQL 版本
+    default: "8.0"
+    options: ["8.0", "8.1", "5.7"]
+    description: 选择 MySQL 版本
+  - name: REDIS_VERSION
+    type: select
+    title: Redis 版本
+    default: "7"
+    options: ["7", "6", "7-alpine"]
+    description: 选择 Redis 版本
+  - name: JUMPSERVER_PORT
+    type: number
+    title: JumpServer Web 端口
+    default: 80
+    min: 1024
+    max: 65535
+    description: JumpServer Web 管理界面端口
+  - name: JUMPSERVER_SSH_PORT
+    type: number
+    title: SSH 端口
+    default: 2222
+    min: 1024
+    max: 65535
+    description: JumpServer SSH 服务端口
+  - name: JUMPSERVER_RDP_PORT
+    type: number
+    title: RDP 端口
+    default: 3389
+    min: 1024
+    max: 65535
+    description: JumpServer RDP 服务端口
+
+services:
+  - name: jumpserver-core
+    type: web
+    description: JumpServer 核心服务
+    depends_on: [mysql, redis]
+    ports:
+      - internal: 80
+        external: null
+        public: true
+      - internal: 2222
+        external: null
+        public: true
+      - internal: 3389
+        external: null
+        public: true
+    volumes:
+      - name: jumpserver_data
+        path: /opt/jumpserver/data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /api/health
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  - name: jumpserver-koko
+    type: service
+    description: JumpServer Koko SSH 服务
+    depends_on: [jumpserver-core]
+
+  - name: jumpserver-guacamole
+    type: service
+    description: JumpServer Guacamole RDP 服务
+    depends_on: [jumpserver-core]
+
+  - name: mysql
+    type: database
+    description: MySQL 数据库服务
+    ports:
+      - internal: 3306
+        external: null
+        public: false
+    volumes:
+      - name: mysql_data
+        path: /var/lib/mysql
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  - name: redis
+    type: cache
+    description: Redis 缓存服务
+    ports:
+      - internal: 6379
+        external: null
+        public: false
+    volumes:
+      - name: redis_data
+        path: /data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+credentials:
+  mysql:
+    username:
+      pattern: "{app_name}_jumpserver"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_jumpserver"
+  jumpserver:
+    secret_key:
+      pattern: random
+      length: 50
+    bootstrap_token:
+      pattern: random
+      length: 32
+
+connection_strings:
+  mysql: "mysql://{username}:{password}@mysql:3306/{database}"
+  redis: "redis://redis:6379/0"
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "堡垒机,SSH跳板,RDP跳板,会话录制,审计日志,权限管理,资产管理"
+  supported_protocols: "SSH,RDP,VNC,数据库协议"
+

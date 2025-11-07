@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  jaeger:
+    image: jaegertracing/all-in-one:{{JAEGER_VERSION}}
+    container_name: {{APP_NAME}}_jaeger
+    restart: unless-stopped
+    ports:
+      - "{{JAEGER_UI_PORT}}:16686"
+      - "{{JAEGER_AGENT_PORT}}:6831/udp"
+      - "{{JAEGER_AGENT_PORT_2}}:6832/udp"
+      - "{{JAEGER_COLLECTOR_PORT}}:14268"
+    environment:
+      COLLECTOR_ZIPKIN_HOST_PORT: :9411
+    volumes:
+      - jaeger_data:/badger
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:16686"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  jaeger_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

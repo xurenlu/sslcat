@@ -31,6 +31,13 @@ type TunnelRuntime struct {
 	Status     Status
 	LastError  string
 	UpdatedAt  time.Time
+	LogPath    string
+	ProcessID  string
+	PID        int
+	RestartCount  int
+	LastStartedAt time.Time
+	LastStoppedAt time.Time
+	process    *processHandle
 }
 
 // Clone 生成隧道运行状态的快照
@@ -56,6 +63,12 @@ func (r *TunnelRuntime) Clone() TunnelWithStatus {
 		Status:         r.Status,
 		LastError:      r.LastError,
 		UpdatedAt:      r.UpdatedAt,
+		LogPath:        r.LogPath,
+		ProcessID:      r.ProcessID,
+		PID:            r.PID,
+		RestartCount:   r.RestartCount,
+		LastStartedAt:  r.LastStartedAt,
+		LastStoppedAt:  r.LastStoppedAt,
 	}
 }
 
@@ -96,6 +109,12 @@ type TunnelWithStatus struct {
 	Status         Status            `json:"status"`
 	LastError      string            `json:"last_error,omitempty"`
 	UpdatedAt      time.Time         `json:"updated_at"`
+	LogPath        string            `json:"log_path,omitempty"`
+	ProcessID      string            `json:"process_id,omitempty"`
+	PID            int               `json:"pid,omitempty"`
+	RestartCount   int               `json:"restart_count"`
+	LastStartedAt  time.Time         `json:"last_started_at,omitempty"`
+	LastStoppedAt  time.Time         `json:"last_stopped_at,omitempty"`
 }
 
 func cloneStringMap(v map[string]string) map[string]string {

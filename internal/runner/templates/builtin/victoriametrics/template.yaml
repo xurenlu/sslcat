@@ -1,0 +1,58 @@
+id: victoriametrics
+name: VictoriaMetrics (时序数据库)
+category: database
+subcategory: time-series
+tags: [go, database, time-series, victoriametrics, prometheus-compatible]
+description: 高性能时序数据库，Prometheus 兼容，专为监控和指标存储设计，比 Prometheus 更高效。
+icon: victoriametrics
+version: 1.0.0
+author: SSLcat Team
+website: https://victoriametrics.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: VICTORIAMETRICS_VERSION
+    type: select
+    title: VictoriaMetrics 版本
+    default: "latest"
+    options: ["latest", "v1.100", "v1.99"]
+    description: 选择 VictoriaMetrics 版本
+  - name: VICTORIAMETRICS_PORT
+    type: number
+    title: VictoriaMetrics 端口
+    default: 8428
+    min: 1024
+    max: 65535
+    description: VictoriaMetrics API 端口
+
+services:
+  - name: victoriametrics
+    type: database
+    description: VictoriaMetrics 时序数据库服务
+    ports:
+      - internal: 8428
+        external: null
+        public: true
+    volumes:
+      - name: victoriametrics_data
+        path: /victoria-metrics-data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}:8428
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}:8428/api/v1"
+  prometheus_compatible: true
+  features: "时序数据库,Prometheus兼容,高性能,长期存储"
+

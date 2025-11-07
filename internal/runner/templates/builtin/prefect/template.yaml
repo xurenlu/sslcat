@@ -1,0 +1,96 @@
+id: prefect
+name: Prefect (工作流引擎)
+category: tools
+subcategory: workflow
+tags: [python, postgres, workflow, prefect, data-pipeline]
+description: 现代工作流引擎，用于数据管道编排和任务调度，支持 Python 原生工作流定义。
+icon: prefect
+version: 1.0.0
+author: SSLcat Team
+website: https://www.prefect.io/
+compose_file: docker-compose.yml
+
+variables:
+  - name: PREFECT_VERSION
+    type: select
+    title: Prefect 版本
+    default: "latest"
+    options: ["latest", "2.14", "2.13"]
+    description: 选择 Prefect 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "16", "14"]
+    description: 选择 PostgreSQL 版本
+  - name: PREFECT_PORT
+    type: number
+    title: Prefect 端口
+    default: 4200
+    min: 1024
+    max: 65535
+    description: Prefect Server API 端口
+
+services:
+  - name: prefect-server
+    type: api
+    description: Prefect Server 工作流引擎服务
+    depends_on: [postgres]
+    ports:
+      - internal: 4200
+        external: null
+        public: true
+    volumes:
+      - name: prefect_data
+        path: /root/.prefect
+        mode: rw
+    healthcheck:
+      type: http
+      path: /api/health
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{username}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_prefect"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_prefect"
+
+connection_strings:
+  postgres: "postgresql+asyncpg://{username}:{password}@postgres:5432/{database}"
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}:4200
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_url: "http://{{PRIMARY_DOMAIN}}:4200/api"
+  features: "工作流引擎,Python原生,任务调度,数据管道"
+
