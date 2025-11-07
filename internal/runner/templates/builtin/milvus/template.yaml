@@ -1,0 +1,119 @@
+id: milvus
+name: Milvus (向量数据库)
+category: database
+subcategory: vector-database
+tags: [go, etcd, minio, database, vector-database, milvus]
+description: 开源向量数据库，专为 AI 应用设计，支持大规模向量相似度搜索。
+icon: milvus
+version: 1.0.0
+author: SSLcat Team
+website: https://milvus.io/
+compose_file: docker-compose.yml
+
+variables:
+  - name: MILVUS_VERSION
+    type: select
+    title: Milvus 版本
+    default: "latest"
+    options: ["latest", "v2.3", "v2.2"]
+    description: 选择 Milvus 版本
+  - name: ETCD_VERSION
+    type: select
+    title: etcd 版本
+    default: "v3.5"
+    options: ["v3.5", "v3.4", "v3.3"]
+    description: 选择 etcd 版本
+  - name: MINIO_VERSION
+    type: select
+    title: MinIO 版本
+    default: "latest"
+    options: ["latest", "RELEASE.2024", "RELEASE.2023"]
+    description: 选择 MinIO 版本
+  - name: MILVUS_PORT
+    type: number
+    title: Milvus 端口
+    default: 19530
+    min: 1024
+    max: 65535
+    description: Milvus API 服务端口
+
+services:
+  - name: milvus
+    type: database
+    description: Milvus 向量数据库服务
+    depends_on: [etcd, minio]
+    ports:
+      - internal: 19530
+        external: null
+        public: true
+    volumes:
+      - name: milvus_data
+        path: /var/lib/milvus
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  - name: etcd
+    type: database
+    description: etcd 元数据存储服务
+    ports:
+      - internal: 2379
+        external: null
+        public: false
+    volumes:
+      - name: etcd_data
+        path: /etcd
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 30s
+
+  - name: minio
+    type: storage
+    description: MinIO 对象存储服务
+    ports:
+      - internal: 9000
+        external: null
+        public: false
+      - internal: 9001
+        external: null
+        public: false
+    volumes:
+      - name: minio_data
+        path: /data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /minio/health/live
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 30s
+
+credentials:
+  minio:
+    root_user:
+      pattern: "{app_name}_minio"
+    root_password:
+      pattern: random
+      length: 18
+
+healthcheck_global:
+  timeout: 20m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "{{PRIMARY_DOMAIN}}:19530"
+  features: "向量搜索,相似度检索,大规模支持,高性能"
+

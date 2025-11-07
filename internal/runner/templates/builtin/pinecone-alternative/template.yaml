@@ -1,0 +1,70 @@
+id: pinecone-alternative
+name: Pinecone Alternative (向量数据库)
+category: database
+subcategory: vector-database
+tags: [python, database, vector-database, pinecone]
+description: Pinecone 兼容的向量数据库，支持向量相似度搜索和索引管理。
+icon: pinecone-alternative
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/pinecone-alternative
+compose_file: docker-compose.yml
+
+variables:
+  - name: PINECONE_ALT_VERSION
+    type: select
+    title: Pinecone Alternative 版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择 Pinecone Alternative 版本
+  - name: PINECONE_ALT_PORT
+    type: number
+    title: Pinecone Alternative 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: Pinecone Alternative API 服务端口
+  - name: PINECONE_API_KEY
+    type: string
+    title: Pinecone API Key
+    default: ""
+    description: Pinecone API 密钥（可选）
+    sensitive: true
+
+services:
+  - name: pinecone-alternative
+    type: api
+    description: Pinecone Alternative 向量数据库服务
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: pinecone_alt_data
+        path: /app/data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+credentials:
+  pinecone-alternative:
+    api_key:
+      pattern: random
+      length: 32
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/api"
+  pinecone_compatible: true
+  features: "向量搜索,索引管理,Pinecone兼容,高性能"
+

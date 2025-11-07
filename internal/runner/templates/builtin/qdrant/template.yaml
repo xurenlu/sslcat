@@ -1,0 +1,57 @@
+id: qdrant
+name: Qdrant (向量数据库)
+category: database
+subcategory: vector-database
+tags: [rust, database, vector-database, qdrant]
+description: 高性能向量数据库，专为 AI 应用设计，支持快速向量相似度搜索。
+icon: qdrant
+version: 1.0.0
+author: SSLcat Team
+website: https://qdrant.tech/
+compose_file: docker-compose.yml
+
+variables:
+  - name: QDRANT_VERSION
+    type: select
+    title: Qdrant 版本
+    default: "latest"
+    options: ["latest", "v1.7", "v1.6"]
+    description: 选择 Qdrant 版本
+  - name: QDRANT_PORT
+    type: number
+    title: Qdrant 端口
+    default: 6333
+    min: 1024
+    max: 65535
+    description: Qdrant API 服务端口
+
+services:
+  - name: qdrant
+    type: database
+    description: Qdrant 向量数据库服务
+    ports:
+      - internal: 6333
+        external: null
+        public: true
+    volumes:
+      - name: qdrant_data
+        path: /qdrant/storage
+        mode: rw
+    healthcheck:
+      type: http
+      path: /health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/collections"
+  features: "向量搜索,相似度检索,高性能,易用API"
+
