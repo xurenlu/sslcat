@@ -1,0 +1,111 @@
+id: strapi
+name: Strapi
+category: cms
+subcategory: headless
+tags: [nodejs, postgresql, cms, headless, api, strapi]
+description: 开源无头 CMS，使用 Node.js 和 PostgreSQL，提供强大的内容管理 API。
+icon: strapi
+version: 1.0.0
+author: SSLcat Team
+website: https://strapi.io/
+compose_file: docker-compose.yml
+
+variables:
+  - name: STRAPI_VERSION
+    type: select
+    title: Strapi 版本
+    default: "4.18.5"
+    options: ["latest", "4.18.5", "4.17.0"]
+    description: 选择 Strapi 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "14", "16"]
+    description: 选择 PostgreSQL 版本
+  - name: STRAPI_PORT
+    type: number
+    title: Strapi 端口
+    default: 1337
+    min: 1024
+    max: 65535
+    description: Strapi API 服务端口
+
+services:
+  - name: strapi
+    type: web
+    description: Strapi API 服务
+    depends_on: [postgres]
+    ports:
+      - internal: 1337
+        external: null
+        public: true
+    volumes:
+      - name: strapi_data
+        path: /srv/app
+        mode: rw
+    healthcheck:
+      type: http
+      path: /_health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_strapi"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_strapi"
+  strapi:
+    jwt_secret:
+      pattern: random
+      length: 32
+    admin_jwt_secret:
+      pattern: random
+      length: 32
+    app_keys:
+      pattern: random
+      length: 32
+    api_token_salt:
+      pattern: random
+      length: 32
+    transfer_token_salt:
+      pattern: random
+      length: 32
+
+connection_strings:
+  postgres: "postgresql://{username}:{password}@postgres:5432/{database}"
+  strapi_api: "http://{{PRIMARY_DOMAIN}}/api"
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  admin_url: http://{{PRIMARY_DOMAIN}}/admin
+  api_url: http://{{PRIMARY_DOMAIN}}/api
+

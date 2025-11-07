@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  discourse:
+    image: bitnami/discourse:{{DISCOURSE_VERSION}}
+    container_name: {{APP_NAME}}_discourse
+    restart: unless-stopped
+    ports:
+      - "{{DISCOURSE_PORT}}:3000"
+    environment:
+      DISCOURSE_HOSTNAME: {{PRIMARY_DOMAIN}}
+      DISCOURSE_SITENAME: {{DISCOURSE_SITENAME}}
+      DISCOURSE_USERNAME: admin
+      DISCOURSE_PASSWORD: {{ADMIN_PASSWORD}}
+      DISCOURSE_EMAIL: admin@{{PRIMARY_DOMAIN}}
+      DISCOURSE_SKIP_INSTALL: "no"
+      POSTGRESQL_HOST: postgres
+      POSTGRESQL_PORT_NUMBER: 5432
+      POSTGRESQL_DATABASE: {{POSTGRES_DATABASE}}
+      POSTGRESQL_USERNAME: {{POSTGRES_USERNAME}}
+      POSTGRESQL_PASSWORD: {{POSTGRES_PASSWORD}}
+      REDIS_HOST: redis
+      REDIS_PORT_NUMBER: 6379
+      REDIS_PASSWORD: {{REDIS_PASSWORD}}
+    volumes:
+      - discourse_data:/bitnami/discourse
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  postgres:
+    image: postgres:{{POSTGRES_VERSION}}
+    container_name: {{APP_NAME}}_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: {{POSTGRES_DATABASE}}
+      POSTGRES_USER: {{POSTGRES_USERNAME}}
+      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:{{REDIS_VERSION}}
+    container_name: {{APP_NAME}}_redis
+    restart: unless-stopped
+    command: redis-server --requirepass {{REDIS_PASSWORD}}
+    volumes:
+      - redis_data:/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  discourse_data:
+    driver: local
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

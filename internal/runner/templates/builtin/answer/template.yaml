@@ -1,0 +1,102 @@
+id: answer
+name: Answer
+category: forum
+subcategory: qa
+tags: [go, mysql, qa, question-answer, answer]
+description: 现代化的问答平台，类似 Stack Overflow，界面简洁美观。
+icon: answer
+version: 1.0.0
+author: SSLcat Team
+website: https://answer.dev/
+compose_file: docker-compose.yml
+
+variables:
+  - name: ANSWER_VERSION
+    type: select
+    title: Answer 版本
+    default: "latest"
+    options: ["latest", "1.3.0"]
+    description: 选择 Answer 版本
+  - name: MYSQL_VERSION
+    type: select
+    title: MySQL 版本
+    default: "8.0"
+    options: ["8.0", "8.1", "5.7"]
+    description: 选择 MySQL 版本
+  - name: ANSWER_PORT
+    type: number
+    title: Answer 端口
+    default: 9080
+    min: 1024
+    max: 65535
+    description: Answer Web 服务端口
+  - name: ANSWER_SITE_NAME
+    type: string
+    title: 站点名称
+    default: "My Q&A Site"
+    description: 问答站点显示名称
+
+services:
+  - name: answer
+    type: web
+    description: Answer 问答平台服务
+    depends_on: [mysql]
+    ports:
+      - internal: 9080
+        external: null
+        public: true
+    volumes:
+      - name: answer_data
+        path: /data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  - name: mysql
+    type: database
+    description: MySQL 数据库服务
+    ports:
+      - internal: 3306
+        external: null
+        public: false
+    volumes:
+      - name: mysql_data
+        path: /var/lib/mysql
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  mysql:
+    username:
+      pattern: "{app_name}_answer"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_answer"
+    root_password:
+      pattern: random
+      length: 20
+
+connection_strings:
+  mysql: "mysql://{username}:{password}@mysql:3306/{database}?charset=utf8mb4"
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+

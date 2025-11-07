@@ -1,0 +1,63 @@
+id: freshrss
+name: FreshRSS
+category: rss
+subcategory: reader
+tags: [php, rss, feed, reader, freshrss]
+description: 自托管的 RSS 阅读器，功能强大，支持多用户。
+icon: freshrss
+version: 1.0.0
+author: SSLcat Team
+website: https://freshrss.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: FRESHRSS_VERSION
+    type: select
+    title: FreshRSS 版本
+    default: "latest"
+    options: ["latest", "1.23.0"]
+    description: 选择 FreshRSS 版本
+  - name: FRESHRSS_PORT
+    type: number
+    title: FreshRSS 端口
+    default: 80
+    min: 1024
+    max: 65535
+    description: FreshRSS Web 服务端口
+  - name: TIMEZONE
+    type: string
+    title: 时区
+    default: "Asia/Shanghai"
+    description: 服务器时区设置
+
+services:
+  - name: freshrss
+    type: web
+    description: FreshRSS RSS 阅读器服务
+    ports:
+      - internal: 80
+        external: null
+        public: true
+    volumes:
+      - name: freshrss_data
+        path: /var/www/FreshRSS/data
+        mode: rw
+      - name: freshrss_extensions
+        path: /var/www/FreshRSS/extensions
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  install_url: http://{{PRIMARY_DOMAIN}}/i/
+

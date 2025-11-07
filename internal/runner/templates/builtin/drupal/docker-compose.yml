@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  drupal:
+    image: drupal:{{DRUPAL_VERSION}}
+    container_name: {{APP_NAME}}_drupal
+    restart: unless-stopped
+    ports:
+      - "{{DRUPAL_PORT}}:80"
+    environment:
+      DRUPAL_DATABASE_HOST: mysql:3306
+      DRUPAL_DATABASE_USER: {{MYSQL_USERNAME}}
+      DRUPAL_DATABASE_PASSWORD: {{MYSQL_PASSWORD}}
+      DRUPAL_DATABASE_NAME: {{MYSQL_DATABASE}}
+    volumes:
+      - drupal_data:/var/www/html
+      - drupal_modules:/var/www/html/modules
+      - drupal_themes:/var/www/html/themes
+      - drupal_profiles:/var/www/html/profiles
+      - drupal_sites:/var/www/html/sites
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/core/install.php"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  mysql:
+    image: mysql:{{MYSQL_VERSION}}
+    container_name: {{APP_NAME}}_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
+      MYSQL_DATABASE: {{MYSQL_DATABASE}}
+      MYSQL_USER: {{MYSQL_USERNAME}}
+      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    command: --default-authentication-plugin=mysql_native_password
+
+volumes:
+  drupal_data:
+    driver: local
+  drupal_modules:
+    driver: local
+  drupal_themes:
+    driver: local
+  drupal_profiles:
+    driver: local
+  drupal_sites:
+    driver: local
+  mysql_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

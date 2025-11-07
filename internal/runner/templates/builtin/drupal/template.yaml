@@ -1,0 +1,105 @@
+id: drupal
+name: Drupal
+category: cms
+subcategory: enterprise
+tags: [php, mysql, cms, drupal, enterprise]
+description: 强大的企业级 CMS 平台，适合构建复杂的内容管理系统。
+icon: drupal
+version: 1.0.0
+author: SSLcat Team
+website: https://www.drupal.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: DRUPAL_VERSION
+    type: select
+    title: Drupal 版本
+    default: "10.2"
+    options: ["latest", "10.2", "10.1", "9.5"]
+    description: 选择 Drupal 版本
+  - name: MYSQL_VERSION
+    type: select
+    title: MySQL 版本
+    default: "8.0"
+    options: ["8.0", "8.1", "5.7"]
+    description: 选择 MySQL 版本
+  - name: DRUPAL_PORT
+    type: number
+    title: Drupal 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: Drupal Web 服务端口
+
+services:
+  - name: drupal
+    type: web
+    description: Drupal Web 服务
+    depends_on: [mysql]
+    ports:
+      - internal: 80
+        external: null
+        public: true
+    volumes:
+      - name: drupal_data
+        path: /var/www/html
+        mode: rw
+      - name: drupal_modules
+        path: /var/www/html/modules
+        mode: rw
+      - name: drupal_themes
+        path: /var/www/html/themes
+        mode: rw
+      - name: drupal_sites
+        path: /var/www/html/sites
+        mode: rw
+    healthcheck:
+      type: http
+      path: /core/install.php
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  - name: mysql
+    type: database
+    description: MySQL 数据库服务
+    ports:
+      - internal: 3306
+        external: null
+        public: false
+    volumes:
+      - name: mysql_data
+        path: /var/lib/mysql
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  mysql:
+    username:
+      pattern: "{app_name}_drupal"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_drupal"
+    root_password:
+      pattern: random
+      length: 20
+
+connection_strings:
+  mysql: "mysql://{username}:{password}@mysql:3306/{database}?charset=utf8mb4"
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  install_url: http://{{PRIMARY_DOMAIN}}/core/install.php
+
