@@ -1,0 +1,55 @@
+id: loki
+name: Loki
+category: devops
+subcategory: logging
+tags: [go, logging, log-aggregation, loki]
+description: 日志聚合系统，类似 Prometheus，专为日志设计。
+icon: loki
+version: 1.0.0
+author: SSLcat Team
+website: https://grafana.com/oss/loki/
+compose_file: docker-compose.yml
+
+variables:
+  - name: LOKI_VERSION
+    type: select
+    title: Loki 版本
+    default: "latest"
+    options: ["latest", "2.9", "2.8"]
+    description: 选择 Loki 版本
+  - name: LOKI_PORT
+    type: number
+    title: Loki 端口
+    default: 3100
+    min: 1024
+    max: 65535
+    description: Loki HTTP API 端口
+
+services:
+  - name: loki
+    type: database
+    description: Loki 日志聚合服务
+    ports:
+      - internal: 3100
+        external: null
+        public: true
+    volumes:
+      - name: loki_data
+        path: /loki
+        mode: rw
+    healthcheck:
+      type: http
+      path: /ready
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  api_url: http://{{PRIMARY_DOMAIN}}:{{LOKI_PORT}}
+  query_url: http://{{PRIMARY_DOMAIN}}:{{LOKI_PORT}}/loki/api/v1/query
+

@@ -1,0 +1,64 @@
+id: cassandra
+name: Apache Cassandra
+category: database
+subcategory: nosql
+tags: [cassandra, nosql, database, distributed]
+description: 分布式 NoSQL 数据库，高可用，适合大规模数据存储。
+icon: cassandra
+version: 1.0.0
+author: SSLcat Team
+website: https://cassandra.apache.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: CASSANDRA_VERSION
+    type: select
+    title: Cassandra 版本
+    default: "latest"
+    options: ["latest", "4.1", "4.0"]
+    description: 选择 Cassandra 版本
+  - name: CASSANDRA_PORT
+    type: number
+    title: Cassandra 端口
+    default: 9042
+    min: 1024
+    max: 65535
+    description: Cassandra CQL 协议端口
+
+services:
+  - name: cassandra
+    type: database
+    description: Apache Cassandra 数据库服务
+    ports:
+      - internal: 9042
+        external: null
+        public: true
+    volumes:
+      - name: cassandra_data
+        path: /var/lib/cassandra
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["nodetool", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+credentials:
+  cassandra:
+    cluster_name:
+      pattern: "{app_name}_cluster"
+
+connection_strings:
+  cassandra: "{{PRIMARY_DOMAIN}}:{{CASSANDRA_PORT}}"
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  cluster_name: {{CLUSTER_NAME}}
+  default_user: cassandra
+  default_password: cassandra
+

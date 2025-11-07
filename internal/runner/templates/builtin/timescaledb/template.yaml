@@ -1,0 +1,68 @@
+id: timescaledb
+name: TimescaleDB
+category: database
+subcategory: time-series
+tags: [postgresql, database, time-series, timescaledb]
+description: 基于 PostgreSQL 的时间序列数据库扩展，性能优秀。
+icon: timescaledb
+version: 1.0.0
+author: SSLcat Team
+website: https://www.timescale.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: TIMESCALEDB_VERSION
+    type: select
+    title: TimescaleDB 版本
+    default: "latest-pg15"
+    options: ["latest-pg15", "latest-pg14", "latest-pg16"]
+    description: 选择 TimescaleDB 版本
+  - name: TIMESCALEDB_PORT
+    type: number
+    title: TimescaleDB 端口
+    default: 5432
+    min: 1024
+    max: 65535
+    description: TimescaleDB 服务端口
+
+services:
+  - name: timescaledb
+    type: database
+    description: TimescaleDB 时间序列数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: true
+    volumes:
+      - name: timescaledb_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  timescaledb:
+    username:
+      pattern: "{app_name}_user"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_db"
+
+connection_strings:
+  timescaledb: "postgresql://{username}:{password}@timescaledb:5432/{database}"
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  admin_user: {{POSTGRES_USERNAME}}
+  admin_password: {{POSTGRES_PASSWORD}}
+

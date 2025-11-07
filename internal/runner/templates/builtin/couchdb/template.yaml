@@ -1,0 +1,70 @@
+id: couchdb
+name: CouchDB
+category: database
+subcategory: nosql
+tags: [couchdb, nosql, database, document]
+description: 文档数据库，支持多主复制，适合分布式应用。
+icon: couchdb
+version: 1.0.0
+author: SSLcat Team
+website: https://couchdb.apache.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: COUCHDB_VERSION
+    type: select
+    title: CouchDB 版本
+    default: "latest"
+    options: ["latest", "3.3", "3.2"]
+    description: 选择 CouchDB 版本
+  - name: COUCHDB_PORT
+    type: number
+    title: CouchDB 端口
+    default: 5984
+    min: 1024
+    max: 65535
+    description: CouchDB HTTP API 端口
+
+services:
+  - name: couchdb
+    type: database
+    description: CouchDB 文档数据库服务
+    ports:
+      - internal: 5984
+        external: null
+        public: true
+    volumes:
+      - name: couchdb_data
+        path: /opt/couchdb/data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /_up
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  couchdb:
+    username:
+      pattern: "{app_name}_user"
+    password:
+      pattern: random
+      length: 18
+    secret:
+      pattern: random
+      length: 32
+
+connection_strings:
+  couchdb: "http://{{COUCHDB_USERNAME}}:{{COUCHDB_PASSWORD}}@{{PRIMARY_DOMAIN}}:{{COUCHDB_PORT}}"
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  api_url: http://{{PRIMARY_DOMAIN}}:{{COUCHDB_PORT}}
+  admin_user: {{COUCHDB_USERNAME}}
+  admin_password: {{COUCHDB_PASSWORD}}
+

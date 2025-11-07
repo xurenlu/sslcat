@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  cassandra:
+    image: cassandra:{{CASSANDRA_VERSION}}
+    container_name: {{APP_NAME}}_cassandra
+    restart: unless-stopped
+    ports:
+      - "{{CASSANDRA_PORT}}:9042"
+    environment:
+      CASSANDRA_CLUSTER_NAME: {{CLUSTER_NAME}}
+      CASSANDRA_DC: datacenter1
+      CASSANDRA_RACK: rack1
+      CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD-SHELL", "nodetool status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  cassandra_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

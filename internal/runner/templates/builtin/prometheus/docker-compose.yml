@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  prometheus:
+    image: prom/prometheus:{{PROMETHEUS_VERSION}}
+    container_name: {{APP_NAME}}_prometheus
+    restart: unless-stopped
+    ports:
+      - "{{PROMETHEUS_PORT}}:9090"
+    volumes:
+      - prometheus_data:/prometheus
+      - prometheus_config:/etc/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  prometheus_data:
+    driver: local
+  prometheus_config:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

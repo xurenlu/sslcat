@@ -1,0 +1,58 @@
+id: prometheus
+name: Prometheus
+category: devops
+subcategory: monitoring
+tags: [go, monitoring, metrics, prometheus]
+description: 开源监控和告警系统，功能强大，适合云原生应用。
+icon: prometheus
+version: 1.0.0
+author: SSLcat Team
+website: https://prometheus.io/
+compose_file: docker-compose.yml
+
+variables:
+  - name: PROMETHEUS_VERSION
+    type: select
+    title: Prometheus 版本
+    default: "latest"
+    options: ["latest", "v2.48", "v2.47"]
+    description: 选择 Prometheus 版本
+  - name: PROMETHEUS_PORT
+    type: number
+    title: Prometheus 端口
+    default: 9090
+    min: 1024
+    max: 65535
+    description: Prometheus Web UI 端口
+
+services:
+  - name: prometheus
+    type: web
+    description: Prometheus 监控服务
+    ports:
+      - internal: 9090
+        external: null
+        public: true
+    volumes:
+      - name: prometheus_data
+        path: /prometheus
+        mode: rw
+      - name: prometheus_config
+        path: /etc/prometheus
+        mode: rw
+    healthcheck:
+      type: http
+      path: /-/healthy
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  api_url: http://{{PRIMARY_DOMAIN}}/api/v1
+
