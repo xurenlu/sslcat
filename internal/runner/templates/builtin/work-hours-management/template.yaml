@@ -1,0 +1,99 @@
+id: work-hours-management
+name: 工时管理系统
+category: tools
+subcategory: hr
+tags: [php, postgres, hr, work-hours, time-management]
+description: 员工工时管理系统，支持工时记录、工时统计、工时审批、工时报表等功能。
+icon: work-hours-management
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/work-hours-management
+compose_file: docker-compose.yml
+
+variables:
+  - name: WORK_HOURS_VERSION
+    type: select
+    title: 工时管理系统版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择工时管理系统版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "16", "14"]
+    description: 选择 PostgreSQL 版本
+  - name: WORK_HOURS_PORT
+    type: number
+    title: 工时管理系统端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: 工时管理系统 Web 服务端口
+
+services:
+  - name: work-hours-management
+    type: web
+    description: 工时管理系统服务
+    depends_on: [postgres]
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: work_hours_data
+        path: /app/data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{username}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_work_hours"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_work_hours"
+  work-hours-management:
+    secret_key:
+      pattern: random
+      length: 32
+
+connection_strings:
+  postgres: "postgres://{username}:{password}@postgres:5432/{database}"
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}:8080
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "工时记录,工时统计,工时审批,工时报表,工时分析"
+

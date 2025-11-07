@@ -1,0 +1,120 @@
+id: moodle
+name: Moodle (在线学习平台)
+category: tools
+subcategory: hr
+tags: [php, postgres, hr, moodle, lms, e-learning]
+description: 开源的在线学习平台（LMS），支持课程管理、在线学习、作业提交、考试评估、学习进度跟踪等功能。
+icon: moodle
+version: 1.0.0
+author: SSLcat Team
+website: https://moodle.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: MOODLE_VERSION
+    type: select
+    title: Moodle 版本
+    default: "latest"
+    options: ["latest", "4.3", "4.2"]
+    description: 选择 Moodle 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "16", "14"]
+    description: 选择 PostgreSQL 版本
+  - name: MOODLE_PORT
+    type: number
+    title: Moodle 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: Moodle Web 服务端口
+  - name: MOODLE_USERNAME
+    type: string
+    title: Moodle 管理员用户名
+    default: "admin"
+    description: Moodle 管理员用户名
+  - name: MOODLE_PASSWORD
+    type: string
+    title: Moodle 管理员密码
+    default: ""
+    description: Moodle 管理员密码
+    required: true
+    sensitive: true
+  - name: MOODLE_EMAIL
+    type: string
+    title: Moodle 管理员邮箱
+    default: "admin@{{PRIMARY_DOMAIN}}"
+    description: Moodle 管理员邮箱
+    placeholder: "admin@example.com"
+
+services:
+  - name: moodle
+    type: web
+    description: Moodle 在线学习平台服务
+    depends_on: [postgres]
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: moodle_data
+        path: /bitnami/moodle
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{username}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_moodle"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_moodle"
+  moodle:
+    username:
+      pattern: "{MOODLE_USERNAME}"
+    password:
+      pattern: "{MOODLE_PASSWORD}"
+    email:
+      pattern: "{MOODLE_EMAIL}"
+
+connection_strings:
+  postgres: "postgres://{username}:{password}@postgres:5432/{database}"
+
+healthcheck_global:
+  timeout: 30m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}:8080
+  admin_email: {{MOODLE_EMAIL}}
+  features: "课程管理,在线学习,作业提交,考试评估,学习进度跟踪"
+

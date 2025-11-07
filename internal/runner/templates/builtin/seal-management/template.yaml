@@ -1,0 +1,102 @@
+id: seal-management
+name: 印章管理系统
+category: tools
+subcategory: document-management
+tags: [php, postgres, document-management, seal-management, stamp-management]
+description: 企业印章管理系统，支持印章申请、印章审批、印章使用记录、印章防伪、印章统计等功能。
+icon: seal-management
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/seal-management
+compose_file: docker-compose.yml
+
+variables:
+  - name: SEAL_VERSION
+    type: select
+    title: 印章管理系统版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择印章管理系统版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "16", "14"]
+    description: 选择 PostgreSQL 版本
+  - name: SEAL_PORT
+    type: number
+    title: 印章管理系统端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: 印章管理系统 Web 服务端口
+
+services:
+  - name: seal-management
+    type: web
+    description: 印章管理系统服务
+    depends_on: [postgres]
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: seal_data
+        path: /app/data
+        mode: rw
+      - name: seal_images
+        path: /app/images
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{username}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_seal"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_seal"
+  seal-management:
+    secret_key:
+      pattern: random
+      length: 32
+
+connection_strings:
+  postgres: "postgres://{username}:{password}@postgres:5432/{database}"
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}:8080
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "印章申请,印章审批,印章使用记录,印章防伪,印章统计"
+
