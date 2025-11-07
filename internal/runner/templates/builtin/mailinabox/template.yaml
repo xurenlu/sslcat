@@ -1,9 +1,9 @@
 id: mailinabox
-name: Mail-in-a-Box (企业邮箱)
+name: Mail-in-a-Box (邮件服务器)
 category: tools
-subcategory: email
-tags: [email, mail-server, mailinabox, enterprise-mail]
-description: 一键部署的企业邮箱解决方案，包含邮件服务器、DNS 管理、Web 邮件客户端等功能，配置简单。
+subcategory: mail-server
+tags: [python, mail-server, mailinabox, email, dns]
+description: 一键式邮件服务器解决方案，自动配置邮件、DNS、SSL 等，适合个人和小型企业。
 icon: mailinabox
 version: 1.0.0
 author: SSLcat Team
@@ -15,63 +15,57 @@ variables:
     type: select
     title: Mail-in-a-Box 版本
     default: "latest"
-    options: ["latest", "v0.60", "v0.59"]
+    options: ["latest", "v0.54", "v0.53"]
     description: 选择 Mail-in-a-Box 版本
-  - name: MAILINABOX_PORT
+  - name: MAILINABOX_HTTP_PORT
     type: number
-    title: Mail-in-a-Box Web HTTP 端口
+    title: HTTP 端口
     default: 80
-    min: 1024
+    min: 1
     max: 65535
-    description: Mail-in-a-Box Web 界面 HTTP 端口
+    description: HTTP 端口
   - name: MAILINABOX_HTTPS_PORT
     type: number
-    title: Mail-in-a-Box Web HTTPS 端口
+    title: HTTPS 端口
     default: 443
-    min: 1024
+    min: 1
     max: 65535
-    description: Mail-in-a-Box Web 界面 HTTPS 端口
+    description: HTTPS 端口
   - name: MAILINABOX_SMTP_PORT
     type: number
     title: SMTP 端口
     default: 25
-    min: 1024
+    min: 1
     max: 65535
-    description: SMTP 服务端口
-  - name: MAILINABOX_SMTPS_PORT
-    type: number
-    title: SMTPS 端口
-    default: 465
-    min: 1024
-    max: 65535
-    description: SMTPS 服务端口
-  - name: MAILINABOX_SUBMISSION_PORT
-    type: number
-    title: Submission 端口
-    default: 587
-    min: 1024
-    max: 65535
-    description: Submission 服务端口
+    description: SMTP 邮件发送端口
   - name: MAILINABOX_IMAP_PORT
     type: number
     title: IMAP 端口
     default: 143
-    min: 1024
+    min: 1
     max: 65535
-    description: IMAP 服务端口
+    description: IMAP 邮件接收端口
   - name: MAILINABOX_IMAPS_PORT
     type: number
     title: IMAPS 端口
     default: 993
-    min: 1024
+    min: 1
     max: 65535
-    description: IMAPS 服务端口
-  - name: MAILINABOX_DOMAIN
-    type: string
-    title: 邮件域名
-    default: "{{PRIMARY_DOMAIN}}"
-    description: 邮件服务器的主域名
-    placeholder: "mail.example.com"
+    description: IMAPS 加密邮件接收端口
+  - name: MAILINABOX_POP3_PORT
+    type: number
+    title: POP3 端口
+    default: 110
+    min: 1
+    max: 65535
+    description: POP3 邮件接收端口
+  - name: MAILINABOX_POP3S_PORT
+    type: number
+    title: POP3S 端口
+    default: 995
+    min: 1
+    max: 65535
+    description: POP3S 加密邮件接收端口
 
 services:
   - name: mailinabox
@@ -87,16 +81,16 @@ services:
       - internal: 25
         external: null
         public: true
-      - internal: 465
-        external: null
-        public: true
-      - internal: 587
-        external: null
-        public: true
       - internal: 143
         external: null
         public: true
       - internal: 993
+        external: null
+        public: true
+      - internal: 110
+        external: null
+        public: true
+      - internal: 995
         external: null
         public: true
     volumes:
@@ -109,15 +103,13 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 120s
+      start_period: 180s
 
 healthcheck_global:
-  timeout: 15m
+  timeout: 30m
   interval: 10s
 
 metadata:
   site_url: http://{{PRIMARY_DOMAIN}}
-  admin_email: admin@{{MAILINABOX_DOMAIN}}
-  admin_url: "http://{{PRIMARY_DOMAIN}}/admin"
-  features: "企业邮箱,DNS管理,Web邮件客户端,反垃圾邮件,防病毒,自动SSL证书"
-
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "邮件服务器,自动配置,DNS管理,SSL证书"

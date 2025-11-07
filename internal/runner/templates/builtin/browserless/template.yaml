@@ -2,8 +2,8 @@ id: browserless
 name: Browserless (无头浏览器)
 category: tools
 subcategory: automation
-tags: [browser, puppeteer, playwright, headless, automation, scraping]
-description: 基于 Chrome/Chromium 的无头浏览器服务，提供 REST API 接口，支持 Puppeteer、Playwright 等自动化工具。
+tags: [nodejs, automation, browserless, puppeteer, headless-browser]
+description: 无头浏览器服务，支持 Puppeteer、Playwright 等，用于网页截图、PDF 生成、爬虫等场景。
 icon: browserless
 version: 1.0.0
 author: SSLcat Team
@@ -15,7 +15,7 @@ variables:
     type: select
     title: Browserless 版本
     default: "latest"
-    options: ["latest", "11.0", "10.0"]
+    options: ["latest", "v1.0", "v0.9"]
     description: 选择 Browserless 版本
   - name: BROWSERLESS_PORT
     type: number
@@ -28,22 +28,22 @@ variables:
     type: string
     title: Browserless Token
     default: ""
-    description: Browserless 访问令牌（可选，用于 API 认证）
+    description: Browserless 访问令牌（可选）
     sensitive: true
-  - name: MAX_CONCURRENT_SESSIONS
+  - name: BROWSERLESS_CONCURRENT
     type: number
-    title: 最大并发会话数
+    title: 并发数
     default: 10
     min: 1
     max: 100
-    description: 同时运行的最大浏览器会话数
-  - name: MAX_QUEUE_SIZE
+    description: 最大并发浏览器实例数
+  - name: BROWSERLESS_MAX_CONCURRENT
     type: number
-    title: 最大队列大小
-    default: 50
+    title: 最大并发数
+    default: 20
     min: 1
-    max: 500
-    description: 等待处理的最大任务队列大小
+    max: 100
+    description: 最大并发连接数
 
 services:
   - name: browserless
@@ -55,24 +55,27 @@ services:
         public: true
     volumes:
       - name: browserless_data
-        path: /app/data
+        path: /app/.local-data
         mode: rw
     healthcheck:
       type: http
-      path: /health
+      path: /
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
 
+credentials:
+  browserless:
+    token:
+      pattern: "{BROWSERLESS_TOKEN}"
+
 healthcheck_global:
-  timeout: 5m
+  timeout: 10m
   interval: 10s
 
 metadata:
-  site_url: http://{{PRIMARY_DOMAIN}}
+  site_url: http://{{PRIMARY_DOMAIN}}:3000
   admin_email: admin@{{PRIMARY_DOMAIN}}
-  api_endpoint: "http://{{PRIMARY_DOMAIN}}/api"
-  features: "无头浏览器,网页截图,PDF生成,自动化测试,网页爬虫"
-  supported_protocols: "Puppeteer,Playwright,Chrome DevTools Protocol"
-
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}:3000"
+  features: "无头浏览器,网页截图,PDF生成,爬虫支持"

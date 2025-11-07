@@ -1,52 +1,94 @@
 id: devtools-hub
-name: Developer Tools Hub (开发者工具集)
+name: DevTools Hub (开发工具集)
 category: tools
-subcategory: developer-tools
-tags: [developer-tools, tools-hub, base64, url-encode, hash, timestamp]
-description: 一站式开发者工具集，包含 Base64 编解码、URL 编解码、Hash 计算、时间戳转换、UUID 生成等常用工具。
+subcategory: dev-tools
+tags: [nodejs, postgres, dev-tools, devtools-hub, utilities]
+description: 开发工具集合，包含 JSON 格式化、正则测试、编码转换、哈希生成等多种实用工具。
 icon: devtools-hub
 version: 1.0.0
 author: SSLcat Team
-website: https://devtools.io/
+website: https://github.com/devtools-hub
 compose_file: docker-compose.yml
 
 variables:
-  - name: DEVTOOLS_VERSION
+  - name: DEVTOOLS_HUB_VERSION
     type: select
-    title: Developer Tools Hub 版本
+    title: DevTools Hub 版本
     default: "latest"
     options: ["latest", "v1.0", "v0.9"]
-    description: 选择 Developer Tools Hub 版本
-  - name: DEVTOOLS_PORT
+    description: 选择 DevTools Hub 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "16", "14"]
+    description: 选择 PostgreSQL 版本
+  - name: DEVTOOLS_HUB_PORT
     type: number
-    title: Developer Tools Hub 端口
-    default: 8080
+    title: DevTools Hub 端口
+    default: 3000
     min: 1024
     max: 65535
-    description: Developer Tools Hub Web 服务端口
+    description: DevTools Hub Web 服务端口
 
 services:
   - name: devtools-hub
     type: web
-    description: Developer Tools Hub 开发者工具集服务
+    description: DevTools Hub 开发工具集服务
+    depends_on: [postgres]
     ports:
-      - internal: 8080
+      - internal: 3000
         external: null
         public: true
+    volumes:
+      - name: devtools_hub_data
+        path: /app/data
+        mode: rw
     healthcheck:
       type: http
-      path: /health
+      path: /
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{username}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
       start_period: 30s
 
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_devtools"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_devtools"
+
+connection_strings:
+  postgres: "postgres://{username}:{password}@postgres:5432/{database}"
+
 healthcheck_global:
-  timeout: 5m
+  timeout: 15m
   interval: 10s
 
 metadata:
-  site_url: http://{{PRIMARY_DOMAIN}}
+  site_url: http://{{PRIMARY_DOMAIN}}:3000
   admin_email: admin@{{PRIMARY_DOMAIN}}
-  features: "Base64编解码,URL编解码,Hash计算,时间戳转换,UUID生成,颜色转换,二维码生成,JSON格式化"
-
+  features: "开发工具集,JSON格式化,正则测试,编码转换"

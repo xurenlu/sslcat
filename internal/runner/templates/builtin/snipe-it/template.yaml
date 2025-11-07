@@ -1,9 +1,9 @@
 id: snipe-it
-name: Snipe-IT (IT 资产管理)
-category: admin
+name: Snipe-IT (资产管理)
+category: tools
 subcategory: asset-management
-tags: [asset-management, it-assets, inventory, snipe-it, admin]
-description: 开源的 IT 资产管理系统，支持硬件资产、软件许可、配件、耗材等管理，适合 IT 部门和行政管理部门使用。
+tags: [php, mysql, asset-management, snipe-it, itam]
+description: 开源 IT 资产管理系统，管理硬件、软件、许可证等 IT 资产，支持资产追踪和报告。
 icon: snipe-it
 version: 1.0.0
 author: SSLcat Team
@@ -11,7 +11,7 @@ website: https://snipeitapp.com/
 compose_file: docker-compose.yml
 
 variables:
-  - name: SNIPEIT_VERSION
+  - name: SNIPE_IT_VERSION
     type: select
     title: Snipe-IT 版本
     default: "latest"
@@ -21,21 +21,15 @@ variables:
     type: select
     title: MySQL 版本
     default: "8.0"
-    options: ["8.0", "8.1", "5.7"]
+    options: ["8.0", "5.7", "8.1"]
     description: 选择 MySQL 版本
-  - name: SNIPEIT_PORT
+  - name: SNIPE_IT_PORT
     type: number
     title: Snipe-IT 端口
     default: 80
     min: 1024
     max: 65535
     description: Snipe-IT Web 服务端口
-  - name: SNIPEIT_ADMIN_EMAIL
-    type: string
-    title: 管理员邮箱
-    default: "admin@{{PRIMARY_DOMAIN}}"
-    description: Snipe-IT 管理员邮箱地址
-    placeholder: "admin@example.com"
 
 services:
   - name: snipe-it
@@ -47,8 +41,8 @@ services:
         external: null
         public: true
     volumes:
-      - name: snipeit_data
-        path: /var/www/html/storage
+      - name: snipe_it_data
+        path: /var/lib/snipeit
         mode: rw
     healthcheck:
       type: http
@@ -75,27 +69,35 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 60s
 
 credentials:
   mysql:
     username:
-      pattern: "{app_name}_snipeit"
+      pattern: "{app_name}_snipe"
     password:
       pattern: random
       length: 18
     database:
-      pattern: "{app_name}_snipeit"
+      pattern: "{app_name}_snipe"
+    root_password:
+      pattern: random
+      length: 18
+  snipe-it:
+    app_key:
+      pattern: random
+      length: 32
 
 connection_strings:
   mysql: "mysql://{username}:{password}@mysql:3306/{database}"
 
 healthcheck_global:
-  timeout: 10m
+  timeout: 20m
   interval: 10s
 
 metadata:
   site_url: http://{{PRIMARY_DOMAIN}}
-  admin_email: {{SNIPEIT_ADMIN_EMAIL}}
-  features: "IT资产管理,硬件资产,软件许可,配件管理,耗材管理,资产标签,报表统计,审批流程"
-
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  default_admin_user: admin
+  default_admin_password: password
+  features: "资产管理,硬件追踪,软件管理,许可证管理"

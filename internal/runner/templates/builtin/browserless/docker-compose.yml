@@ -9,16 +9,14 @@ services:
       - "{{BROWSERLESS_PORT}}:3000"
     environment:
       TOKEN: {{BROWSERLESS_TOKEN}}
-      MAX_CONCURRENT: {{MAX_CONCURRENT_SESSIONS}}
-      MAX_QUEUE: {{MAX_QUEUE_SIZE}}
-      TZ: Asia/Shanghai
+      CONCURRENT: {{BROWSERLESS_CONCURRENT}}
+      MAX_CONCURRENT: {{BROWSERLESS_MAX_CONCURRENT}}
     volumes:
-      - browserless_data:/app/data
+      - browserless_data:/app/.local-data
     networks:
       - {{APP_NAME}}_network
-    shm_size: 2gb
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -31,4 +29,3 @@ volumes:
 networks:
   {{APP_NAME}}_network:
     driver: bridge
-

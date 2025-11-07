@@ -161,8 +161,13 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	// 初始化慢请求管理器（记录超过500ms的请求，最多保存1000条记录）
 	slowRequestManager := slowrequest.NewManager(1000, 500*time.Millisecond)
 
+	dataDir := cfg.Server.DataDir
+	if dataDir == "" {
+		dataDir = "./data"
+	}
+
 	// 初始化隧道管理器
-	tunnelManager := tunnel.NewManager(cfg.Tunnels)
+	tunnelManager := tunnel.NewManager(cfg.Tunnels, dataDir, logrus.WithField("component", "tunnel_manager"))
 
 	// 初始化图片优化器
 	imageOptConfig := &imageopt.Config{
@@ -287,7 +292,9 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	if sessionStorage == "" {
 		sessionStorage = "file" // 默认使用文件存储
 	}
-	dataDir := cfg.Server.DataDir
+	if cfg.Server.DataDir != "" {
+		dataDir = cfg.Server.DataDir
+	}
 	if dataDir == "" {
 		dataDir = "./data" // 默认数据目录
 	}

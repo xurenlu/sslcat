@@ -2,28 +2,27 @@ version: '3.8'
 
 services:
   snipe-it:
-    image: snipe/snipe-it:{{SNIPEIT_VERSION}}
+    image: snipe/snipe-it:{{SNIPE_IT_VERSION}}
     container_name: {{APP_NAME}}_snipe_it
     restart: unless-stopped
     ports:
-      - "{{SNIPEIT_PORT}}:80"
+      - "{{SNIPE_IT_PORT}}:80"
     environment:
       DB_HOST: mysql
       DB_DATABASE: {{MYSQL_DATABASE}}
       DB_USERNAME: {{MYSQL_USERNAME}}
       DB_PASSWORD: {{MYSQL_PASSWORD}}
+      APP_KEY: {{SNIPE_IT_APP_KEY}}
       APP_URL: http://{{PRIMARY_DOMAIN}}
-      APP_ADMIN_EMAIL: {{SNIPEIT_ADMIN_EMAIL}}
-      TZ: Asia/Shanghai
     volumes:
-      - snipeit_data:/var/www/html/storage
+      - snipe_it_data:/var/lib/snipeit
     depends_on:
       mysql:
         condition: service_healthy
     networks:
       - {{APP_NAME}}_network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -37,20 +36,20 @@ services:
       MYSQL_DATABASE: {{MYSQL_DATABASE}}
       MYSQL_USER: {{MYSQL_USERNAME}}
       MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
-      MYSQL_ROOT_PASSWORD: {{MYSQL_PASSWORD}}
+      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
       - {{APP_NAME}}_network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p{{MYSQL_ROOT_PASSWORD}}"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 60s
 
 volumes:
-  snipeit_data:
+  snipe_it_data:
     driver: local
   mysql_data:
     driver: local
@@ -58,4 +57,3 @@ volumes:
 networks:
   {{APP_NAME}}_network:
     driver: bridge
-

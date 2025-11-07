@@ -2,23 +2,52 @@ version: '3.8'
 
 services:
   devtools-hub:
-    image: devtools-hub/server:{{DEVTOOLS_VERSION}}
+    image: devtools-hub/server:{{DEVTOOLS_HUB_VERSION}}
     container_name: {{APP_NAME}}_devtools_hub
     restart: unless-stopped
     ports:
-      - "{{DEVTOOLS_PORT}}:8080"
+      - "{{DEVTOOLS_HUB_PORT}}:3000"
     environment:
-      TZ: Asia/Shanghai
+      DATABASE_URL: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
+    volumes:
+      - devtools_hub_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - {{APP_NAME}}_network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
+
+  postgres:
+    image: postgres:{{POSTGRES_VERSION}}
+    container_name: {{APP_NAME}}_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: {{POSTGRES_DATABASE}}
+      POSTGRES_USER: {{POSTGRES_USERNAME}}
+      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
       start_period: 30s
+
+volumes:
+  devtools_hub_data:
+    driver: local
+  postgres_data:
+    driver: local
 
 networks:
   {{APP_NAME}}_network:
     driver: bridge
-
