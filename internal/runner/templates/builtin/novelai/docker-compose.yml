@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  novelai:
+    image: novelai/server:{{NOVELAI_VERSION}}
+    container_name: {{APP_NAME}}_novelai
+    restart: unless-stopped
+    ports:
+      - "{{NOVELAI_PORT}}:3000"
+    environment:
+      NOVELAI_API_KEY: {{NOVELAI_API_KEY}}
+      DATABASE_URL: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
+    volumes:
+      - novelai_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  postgres:
+    image: postgres:{{POSTGRES_VERSION}}
+    container_name: {{APP_NAME}}_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: {{POSTGRES_DATABASE}}
+      POSTGRES_USER: {{POSTGRES_USERNAME}}
+      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  novelai_data:
+    driver: local
+  postgres_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

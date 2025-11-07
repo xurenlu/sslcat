@@ -1,0 +1,101 @@
+id: novelai
+name: NovelAI
+category: ai
+subcategory: writing
+tags: [nodejs, postgres, ai, writing, novel, story-generation]
+description: AI 小说写作助手，支持长篇故事生成和角色设定。
+icon: novelai
+version: 1.0.0
+author: SSLcat Team
+website: https://novelai.net/
+compose_file: docker-compose.yml
+
+variables:
+  - name: NOVELAI_VERSION
+    type: select
+    title: NovelAI 版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择 NovelAI 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "16", "14"]
+    description: 选择 PostgreSQL 版本
+  - name: NOVELAI_PORT
+    type: number
+    title: NovelAI 端口
+    default: 3000
+    min: 1024
+    max: 65535
+    description: NovelAI Web 服务端口
+  - name: NOVELAI_API_KEY
+    type: string
+    title: NovelAI API Key
+    default: ""
+    description: NovelAI API 密钥（可选）
+    sensitive: true
+
+services:
+  - name: novelai
+    type: web
+    description: NovelAI 小说写作服务
+    depends_on: [postgres]
+    ports:
+      - internal: 3000
+        external: null
+        public: true
+    volumes:
+      - name: novelai_data
+        path: /app/data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{username}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_novelai"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_novelai"
+
+connection_strings:
+  postgres: "postgres://{username}:{password}@postgres:5432/{database}"
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "小说写作,故事生成,角色设定,长篇续写"
+

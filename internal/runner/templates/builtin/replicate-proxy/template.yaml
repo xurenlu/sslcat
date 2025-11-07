@@ -1,0 +1,77 @@
+id: replicate-proxy
+name: Replicate Proxy
+category: ai
+subcategory: api-aggregator
+tags: [nodejs, ai, api, replicate, proxy, model-access]
+description: Replicate 模型代理服务，快速访问 Replicate 平台上的各种 AI 模型。
+icon: replicate-proxy
+version: 1.0.0
+author: SSLcat Team
+website: https://replicate.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: REPLICATE_PROXY_VERSION
+    type: select
+    title: Replicate Proxy 版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择 Replicate Proxy 版本
+  - name: REPLICATE_PROXY_PORT
+    type: number
+    title: Replicate Proxy 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: Replicate Proxy API 服务端口
+  - name: REPLICATE_API_TOKEN
+    type: string
+    title: Replicate API Token
+    default: ""
+    description: Replicate API Token（需要注册获取）
+    required: true
+    sensitive: true
+  - name: CACHE_ENABLED
+    type: select
+    title: 启用缓存
+    default: "true"
+    options: ["true", "false"]
+    description: 是否启用响应缓存
+
+services:
+  - name: replicate-proxy
+    type: api
+    description: Replicate Proxy 模型代理服务
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: replicate_proxy_data
+        path: /app/cache
+        mode: rw
+    healthcheck:
+      type: http
+      path: /health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+credentials:
+  replicate-proxy:
+    api_token:
+      pattern: random
+      length: 32
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/v1"
+  replicate_url: "https://replicate.com"
+  features: "模型访问,API代理,响应缓存,统一接口"
+
