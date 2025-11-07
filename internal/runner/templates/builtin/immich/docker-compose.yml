@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  immich-server:
+    image: ghcr.io/immich-app/immich-server:{{IMMICH_VERSION}}
+    container_name: {{APP_NAME}}_immich_server
+    restart: unless-stopped
+    ports:
+      - "{{IMMICH_PORT}}:3001"
+    environment:
+      IMMICH_DATABASE_URL: postgresql://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
+      IMMICH_REDIS_HOST: redis
+      IMMICH_REDIS_PORT: 6379
+      IMMICH_UPLOAD_LOCATION: /usr/src/app/upload
+    volumes:
+      - immich_upload:/usr/src/app/upload
+      - immich_model_cache:/app/model-cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/server-info/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  immich-web:
+    image: ghcr.io/immich-app/immich-web:{{IMMICH_VERSION}}
+    container_name: {{APP_NAME}}_immich_web
+    restart: unless-stopped
+    ports:
+      - "{{IMMICH_WEB_PORT}}:3000"
+    environment:
+      REACT_APP_IMMICH_SERVER_URL: http://{{PRIMARY_DOMAIN}}:{{IMMICH_PORT}}
+    depends_on:
+      - immich-server
+    networks:
+      - {{APP_NAME}}_network
+
+  postgres:
+    image: postgres:{{POSTGRES_VERSION}}
+    container_name: {{APP_NAME}}_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: {{POSTGRES_DATABASE}}
+      POSTGRES_USER: {{POSTGRES_USERNAME}}
+      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:{{REDIS_VERSION}}
+    container_name: {{APP_NAME}}_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  immich_upload:
+    driver: local
+  immich_model_cache:
+    driver: local
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+
