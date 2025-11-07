@@ -1,0 +1,101 @@
+id: opencats
+name: OpenCATS (招聘管理系统)
+category: hr
+subcategory: recruitment
+tags: [hr, recruitment, hiring, opencats, applicant-tracking]
+description: 开源的招聘管理系统（ATS），支持职位发布、简历管理、候选人跟踪、面试安排等功能。
+icon: opencats
+version: 1.0.0
+author: SSLcat Team
+website: https://www.opencats.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: OPENCATS_VERSION
+    type: select
+    title: OpenCATS 版本
+    default: "latest"
+    options: ["latest", "0.9", "0.8"]
+    description: 选择 OpenCATS 版本
+  - name: MYSQL_VERSION
+    type: select
+    title: MySQL 版本
+    default: "8.0"
+    options: ["8.0", "8.1", "5.7"]
+    description: 选择 MySQL 版本
+  - name: OPENCATS_PORT
+    type: number
+    title: OpenCATS 端口
+    default: 80
+    min: 1024
+    max: 65535
+    description: OpenCATS Web 服务端口
+  - name: OPENCATS_ADMIN_EMAIL
+    type: string
+    title: 管理员邮箱
+    default: "admin@{{PRIMARY_DOMAIN}}"
+    description: OpenCATS 管理员邮箱地址
+    placeholder: "admin@example.com"
+
+services:
+  - name: opencats
+    type: web
+    description: OpenCATS 招聘管理系统服务
+    depends_on: [mysql]
+    ports:
+      - internal: 80
+        external: null
+        public: true
+    volumes:
+      - name: opencats_data
+        path: /var/www/html
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  - name: mysql
+    type: database
+    description: MySQL 数据库服务
+    ports:
+      - internal: 3306
+        external: null
+        public: false
+    volumes:
+      - name: mysql_data
+        path: /var/lib/mysql
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  mysql:
+    username:
+      pattern: "{app_name}_opencats"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_opencats"
+
+connection_strings:
+  mysql: "mysql://{username}:{password}@mysql:3306/{database}"
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: {{OPENCATS_ADMIN_EMAIL}}
+  features: "职位发布,简历管理,候选人跟踪,面试安排,邮件通知,报表统计"
+

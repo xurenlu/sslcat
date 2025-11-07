@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  bruno:
+    image: usebruno/bruno:{{BRUNO_VERSION}}
+    container_name: {{APP_NAME}}_bruno
+    restart: unless-stopped
+    ports:
+      - "{{BRUNO_PORT}}:3000"
+    environment:
+      SECRET_KEY: {{BRUNO_SECRET_KEY}}
+      TZ: Asia/Shanghai
+    volumes:
+      - bruno_data:/app/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  bruno_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

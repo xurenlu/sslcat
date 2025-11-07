@@ -1,0 +1,101 @@
+id: snipe-it
+name: Snipe-IT (IT 资产管理)
+category: admin
+subcategory: asset-management
+tags: [asset-management, it-assets, inventory, snipe-it, admin]
+description: 开源的 IT 资产管理系统，支持硬件资产、软件许可、配件、耗材等管理，适合 IT 部门和行政管理部门使用。
+icon: snipe-it
+version: 1.0.0
+author: SSLcat Team
+website: https://snipeitapp.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: SNIPEIT_VERSION
+    type: select
+    title: Snipe-IT 版本
+    default: "latest"
+    options: ["latest", "v6.0", "v5.4"]
+    description: 选择 Snipe-IT 版本
+  - name: MYSQL_VERSION
+    type: select
+    title: MySQL 版本
+    default: "8.0"
+    options: ["8.0", "8.1", "5.7"]
+    description: 选择 MySQL 版本
+  - name: SNIPEIT_PORT
+    type: number
+    title: Snipe-IT 端口
+    default: 80
+    min: 1024
+    max: 65535
+    description: Snipe-IT Web 服务端口
+  - name: SNIPEIT_ADMIN_EMAIL
+    type: string
+    title: 管理员邮箱
+    default: "admin@{{PRIMARY_DOMAIN}}"
+    description: Snipe-IT 管理员邮箱地址
+    placeholder: "admin@example.com"
+
+services:
+  - name: snipe-it
+    type: web
+    description: Snipe-IT 资产管理系统服务
+    depends_on: [mysql]
+    ports:
+      - internal: 80
+        external: null
+        public: true
+    volumes:
+      - name: snipeit_data
+        path: /var/www/html/storage
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  - name: mysql
+    type: database
+    description: MySQL 数据库服务
+    ports:
+      - internal: 3306
+        external: null
+        public: false
+    volumes:
+      - name: mysql_data
+        path: /var/lib/mysql
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  mysql:
+    username:
+      pattern: "{app_name}_snipeit"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_snipeit"
+
+connection_strings:
+  mysql: "mysql://{username}:{password}@mysql:3306/{database}"
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: {{SNIPEIT_ADMIN_EMAIL}}
+  features: "IT资产管理,硬件资产,软件许可,配件管理,耗材管理,资产标签,报表统计,审批流程"
+

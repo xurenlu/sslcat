@@ -1,0 +1,78 @@
+id: browserless
+name: Browserless (无头浏览器)
+category: tools
+subcategory: automation
+tags: [browser, puppeteer, playwright, headless, automation, scraping]
+description: 基于 Chrome/Chromium 的无头浏览器服务，提供 REST API 接口，支持 Puppeteer、Playwright 等自动化工具。
+icon: browserless
+version: 1.0.0
+author: SSLcat Team
+website: https://www.browserless.io/
+compose_file: docker-compose.yml
+
+variables:
+  - name: BROWSERLESS_VERSION
+    type: select
+    title: Browserless 版本
+    default: "latest"
+    options: ["latest", "11.0", "10.0"]
+    description: 选择 Browserless 版本
+  - name: BROWSERLESS_PORT
+    type: number
+    title: Browserless 端口
+    default: 3000
+    min: 1024
+    max: 65535
+    description: Browserless API 服务端口
+  - name: BROWSERLESS_TOKEN
+    type: string
+    title: Browserless Token
+    default: ""
+    description: Browserless 访问令牌（可选，用于 API 认证）
+    sensitive: true
+  - name: MAX_CONCURRENT_SESSIONS
+    type: number
+    title: 最大并发会话数
+    default: 10
+    min: 1
+    max: 100
+    description: 同时运行的最大浏览器会话数
+  - name: MAX_QUEUE_SIZE
+    type: number
+    title: 最大队列大小
+    default: 50
+    min: 1
+    max: 500
+    description: 等待处理的最大任务队列大小
+
+services:
+  - name: browserless
+    type: api
+    description: Browserless 无头浏览器服务
+    ports:
+      - internal: 3000
+        external: null
+        public: true
+    volumes:
+      - name: browserless_data
+        path: /app/data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/api"
+  features: "无头浏览器,网页截图,PDF生成,自动化测试,网页爬虫"
+  supported_protocols: "Puppeteer,Playwright,Chrome DevTools Protocol"
+

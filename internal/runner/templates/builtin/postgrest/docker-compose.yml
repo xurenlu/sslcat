@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  postgrest:
+    image: postgrest/postgrest:{{POSTGREST_VERSION}}
+    container_name: {{APP_NAME}}_postgrest
+    restart: unless-stopped
+    ports:
+      - "{{POSTGREST_PORT}}:3000"
+    environment:
+      PGRST_DB_URI: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
+      PGRST_DB_SCHEMA: {{POSTGREST_SCHEMA}}
+      PGRST_DB_ANON_ROLE: {{POSTGREST_ANON_ROLE}}
+      PGRST_OPENAPI_SERVER_PROXY_URI: http://{{PRIMARY_DOMAIN}}
+      TZ: Asia/Shanghai
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  postgres:
+    image: postgres:{{POSTGRES_VERSION}}
+    container_name: {{APP_NAME}}_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: {{POSTGRES_DATABASE}}
+      POSTGRES_USER: {{POSTGRES_USERNAME}}
+      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

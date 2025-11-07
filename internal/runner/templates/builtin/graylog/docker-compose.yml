@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  graylog:
+    image: graylog/graylog:{{GRAYLOG_VERSION}}
+    container_name: {{APP_NAME}}_graylog
+    restart: unless-stopped
+    ports:
+      - "{{GRAYLOG_PORT}}:9000"
+      - "{{GRAYLOG_SYSLOG_PORT}}:514/udp"
+      - "{{GRAYLOG_SYSLOG_PORT}}:514/tcp"
+    environment:
+      GRAYLOG_PASSWORD_SECRET: {{GRAYLOG_SECRET}}
+      GRAYLOG_ROOT_PASSWORD_SHA2: {{GRAYLOG_ROOT_PASSWORD_SHA2}}
+      GRAYLOG_HTTP_EXTERNAL_URI: http://{{PRIMARY_DOMAIN}}:9000/
+      GRAYLOG_MONGODB_URI: mongodb://{{MONGODB_USERNAME}}:{{MONGODB_PASSWORD}}@mongo:27017/{{MONGODB_DATABASE}}
+      GRAYLOG_ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    volumes:
+      - graylog_data:/usr/share/graylog/data
+    depends_on:
+      mongo:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9000/api"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+
+  mongo:
+    image: mongo:{{MONGODB_VERSION}}
+    container_name: {{APP_NAME}}_mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: {{MONGODB_USERNAME}}
+      MONGO_INITDB_ROOT_PASSWORD: {{MONGODB_PASSWORD}}
+      MONGO_INITDB_DATABASE: {{MONGODB_DATABASE}}
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:{{ELASTICSEARCH_VERSION}}
+    container_name: {{APP_NAME}}_elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9200"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  graylog_data:
+    driver: local
+  mongo_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

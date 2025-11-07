@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  adminer:
+    image: adminer:{{ADMINER_VERSION}}
+    container_name: {{APP_NAME}}_adminer
+    restart: unless-stopped
+    ports:
+      - "{{ADMINER_PORT}}:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: {{DATABASE_HOST}}
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge

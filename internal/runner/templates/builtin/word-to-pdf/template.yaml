@@ -1,0 +1,70 @@
+id: word-to-pdf
+name: Word to PDF Converter
+category: tools
+subcategory: document-conversion
+tags: [word, pdf, conversion, document, libreoffice]
+description: 在线 Word 文档转 PDF 工具，支持 DOC、DOCX 等格式转换为 PDF。
+icon: word-to-pdf
+version: 1.0.0
+author: SSLcat Team
+website: https://gotenberg.dev/
+compose_file: docker-compose.yml
+
+variables:
+  - name: LIBREOFFICE_VERSION
+    type: select
+    title: Gotenberg 版本
+    default: "8"
+    options: ["8", "7", "latest"]
+    description: 选择 Gotenberg（文档转换服务）版本
+  - name: CONVERTER_PORT
+    type: number
+    title: 转换服务端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: Word to PDF 转换服务端口
+  - name: MAX_FILE_SIZE
+    type: string
+    title: 最大文件大小
+    default: "50MB"
+    description: 单文件最大处理大小（如：50MB, 100MB）
+    placeholder: "50MB"
+  - name: TIMEOUT_SECONDS
+    type: number
+    title: 转换超时时间（秒）
+    default: 300
+    min: 60
+    max: 1800
+    description: 文档转换的最大超时时间
+
+services:
+  - name: word-to-pdf
+    type: web
+    description: Word to PDF 转换服务
+    ports:
+      - internal: 3000
+        external: null
+        public: true
+    volumes:
+      - name: converter_data
+        path: /tmp/converter
+        mode: rw
+    healthcheck:
+      type: http
+      path: /health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "Word转PDF,DOC转PDF,DOCX转PDF,批量转换"
+  supported_formats: "DOC,DOCX,ODT,RTF"
+

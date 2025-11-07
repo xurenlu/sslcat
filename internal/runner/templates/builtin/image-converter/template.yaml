@@ -1,0 +1,70 @@
+id: image-converter
+name: Image Format Converter
+category: tools
+subcategory: image-processing
+tags: [image, conversion, heic, avif, webp, format-converter]
+description: 强大的图片格式转换工具，支持 PNG、JPEG、HEIC、AVIF、WebP 等多种格式互转。
+icon: image-converter
+version: 1.0.0
+author: SSLcat Team
+website: https://github.com/libvips/libvips
+compose_file: docker-compose.yml
+
+variables:
+  - name: IMAGEMAGICK_VERSION
+    type: select
+    title: libvips 版本
+    default: "latest"
+    options: ["latest", "8.15", "8.14"]
+    description: 选择 libvips（高性能图片处理库）版本，支持 HEIC/AVIF
+  - name: CONVERTER_PORT
+    type: number
+    title: 转换服务端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: 图片格式转换服务端口
+  - name: MAX_FILE_SIZE
+    type: string
+    title: 最大文件大小
+    default: "50MB"
+    description: 单文件最大处理大小（如：50MB, 100MB）
+    placeholder: "50MB"
+  - name: QUALITY
+    type: number
+    title: 输出质量（1-100）
+    default: 90
+    min: 1
+    max: 100
+    description: 图片转换质量，数值越高质量越好但文件越大
+
+services:
+  - name: image-converter
+    type: web
+    description: 图片格式转换服务
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: converter_data
+        path: /tmp/converter
+        mode: rw
+    healthcheck:
+      type: http
+      path: /health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "格式转换,HEIC转换,AVIF转换,WebP转换,批量转换"
+  supported_formats: "PNG,JPEG,JPG,HEIC,AVIF,WEBP,GIF,BMP,TIFF"
+

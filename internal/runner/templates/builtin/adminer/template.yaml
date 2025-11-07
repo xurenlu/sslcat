@@ -1,0 +1,58 @@
+id: adminer
+name: Adminer (数据库管理)
+category: tools
+subcategory: database-admin
+tags: [php, database-admin, adminer, lightweight]
+description: 轻量级数据库管理工具，支持 MySQL、PostgreSQL、SQLite、MongoDB 等多种数据库。
+icon: adminer
+version: 1.0.0
+author: SSLcat Team
+website: https://www.adminer.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: ADMINER_VERSION
+    type: select
+    title: Adminer 版本
+    default: "latest"
+    options: ["latest", "4.8", "4.7"]
+    description: 选择 Adminer 版本
+  - name: ADMINER_PORT
+    type: number
+    title: Adminer 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: Adminer Web 服务端口
+  - name: DATABASE_HOST
+    type: string
+    title: 数据库主机
+    default: ""
+    description: 数据库服务器地址（可选，留空可手动输入）
+    placeholder: "mysql"
+
+services:
+  - name: adminer
+    type: web
+    description: Adminer 数据库管理工具
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  supported_databases: "MySQL,PostgreSQL,SQLite,MongoDB,MS SQL,Oracle"
+  features: "多数据库支持,轻量级,单文件,SQL执行"

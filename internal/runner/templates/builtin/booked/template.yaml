@@ -1,0 +1,101 @@
+id: booked
+name: Booked (会议室预订系统)
+category: admin
+subcategory: booking
+tags: [booking, room-booking, scheduling, admin, booked]
+description: 开源的会议室和资源预订系统，支持会议室预订、资源管理、日程安排、邮件通知等功能。
+icon: booked
+version: 1.0.0
+author: SSLcat Team
+website: https://www.bookedscheduler.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: BOOKED_VERSION
+    type: select
+    title: Booked 版本
+    default: "latest"
+    options: ["latest", "2.8", "2.7"]
+    description: 选择 Booked 版本
+  - name: MYSQL_VERSION
+    type: select
+    title: MySQL 版本
+    default: "8.0"
+    options: ["8.0", "8.1", "5.7"]
+    description: 选择 MySQL 版本
+  - name: BOOKED_PORT
+    type: number
+    title: Booked 端口
+    default: 80
+    min: 1024
+    max: 65535
+    description: Booked Web 服务端口
+  - name: BOOKED_ADMIN_EMAIL
+    type: string
+    title: 管理员邮箱
+    default: "admin@{{PRIMARY_DOMAIN}}"
+    description: Booked 管理员邮箱地址
+    placeholder: "admin@example.com"
+
+services:
+  - name: booked
+    type: web
+    description: Booked 会议室预订系统服务
+    depends_on: [mysql]
+    ports:
+      - internal: 80
+        external: null
+        public: true
+    volumes:
+      - name: booked_data
+        path: /var/www/html
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  - name: mysql
+    type: database
+    description: MySQL 数据库服务
+    ports:
+      - internal: 3306
+        external: null
+        public: false
+    volumes:
+      - name: mysql_data
+        path: /var/lib/mysql
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  mysql:
+    username:
+      pattern: "{app_name}_booked"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_booked"
+
+connection_strings:
+  mysql: "mysql://{username}:{password}@mysql:3306/{database}"
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: {{BOOKED_ADMIN_EMAIL}}
+  features: "会议室预订,资源管理,日程安排,邮件通知,权限管理,报表统计"
+

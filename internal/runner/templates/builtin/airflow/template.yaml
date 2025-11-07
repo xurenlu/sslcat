@@ -1,0 +1,136 @@
+id: airflow
+name: Apache Airflow (工作流调度)
+category: tools
+subcategory: workflow
+tags: [python, postgres, workflow, airflow, data-pipeline, scheduling]
+description: 强大的工作流调度平台，用于数据管道编排、任务调度和监控，支持复杂的工作流定义。
+icon: airflow
+version: 1.0.0
+author: SSLcat Team
+website: https://airflow.apache.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: AIRFLOW_VERSION
+    type: select
+    title: Airflow 版本
+    default: "latest"
+    options: ["latest", "2.8", "2.7"]
+    description: 选择 Airflow 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "16", "14"]
+    description: 选择 PostgreSQL 版本
+  - name: AIRFLOW_PORT
+    type: number
+    title: Airflow Web 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: Airflow Web UI 端口
+  - name: AIRFLOW_USERNAME
+    type: string
+    title: Airflow 用户名
+    default: "admin"
+    description: Airflow Web UI 登录用户名
+  - name: AIRFLOW_PASSWORD
+    type: string
+    title: Airflow 密码
+    default: ""
+    description: Airflow Web UI 登录密码
+    required: true
+    sensitive: true
+
+services:
+  - name: airflow-webserver
+    type: web
+    description: Airflow Web 服务器
+    depends_on: [postgres, airflow-init]
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    volumes:
+      - name: airflow_dags
+        path: /opt/airflow/dags
+        mode: rw
+      - name: airflow_logs
+        path: /opt/airflow/logs
+        mode: rw
+      - name: airflow_plugins
+        path: /opt/airflow/plugins
+        mode: rw
+    healthcheck:
+      type: http
+      path: /health
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  - name: airflow-scheduler
+    type: worker
+    description: Airflow 调度器
+    depends_on: [postgres, airflow-init]
+    volumes:
+      - name: airflow_dags
+        path: /opt/airflow/dags
+        mode: rw
+      - name: airflow_logs
+        path: /opt/airflow/logs
+        mode: rw
+      - name: airflow_plugins
+        path: /opt/airflow/plugins
+        mode: rw
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{username}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_airflow"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_airflow"
+  airflow:
+    username:
+      pattern: "{AIRFLOW_USERNAME}"
+    password:
+      pattern: "{AIRFLOW_PASSWORD}"
+    fernet_key:
+      pattern: random
+      length: 32
+
+connection_strings:
+  postgres: "postgresql+psycopg2://{username}:{password}@postgres:5432/{database}"
+
+healthcheck_global:
+  timeout: 20m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "工作流调度,数据管道,任务监控,复杂编排"
+

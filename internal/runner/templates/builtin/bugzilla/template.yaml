@@ -1,0 +1,101 @@
+id: bugzilla
+name: Bugzilla (Bug 追踪系统)
+category: project
+subcategory: issue-tracking
+tags: [bug-tracking, issue-management, bugzilla, perl, mysql]
+description: 经典的 Bug 追踪系统，功能强大，被 Mozilla、Apache 等大型项目广泛使用。
+icon: bugzilla
+version: 1.0.0
+author: SSLcat Team
+website: https://www.bugzilla.org/
+compose_file: docker-compose.yml
+
+variables:
+  - name: BUGZILLA_VERSION
+    type: select
+    title: Bugzilla 版本
+    default: "latest"
+    options: ["latest", "5.2", "5.1"]
+    description: 选择 Bugzilla 版本
+  - name: MYSQL_VERSION
+    type: select
+    title: MySQL 版本
+    default: "8.0"
+    options: ["8.0", "8.1", "5.7"]
+    description: 选择 MySQL 版本
+  - name: BUGZILLA_PORT
+    type: number
+    title: Bugzilla 端口
+    default: 80
+    min: 1024
+    max: 65535
+    description: Bugzilla Web 服务端口
+  - name: BUGZILLA_ADMIN_EMAIL
+    type: string
+    title: 管理员邮箱
+    default: "admin@{{PRIMARY_DOMAIN}}"
+    description: Bugzilla 管理员邮箱地址
+    placeholder: "admin@example.com"
+
+services:
+  - name: bugzilla
+    type: web
+    description: Bugzilla Web 服务
+    depends_on: [mysql]
+    ports:
+      - internal: 80
+        external: null
+        public: true
+    volumes:
+      - name: bugzilla_data
+        path: /var/www/html
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  - name: mysql
+    type: database
+    description: MySQL 数据库服务
+    ports:
+      - internal: 3306
+        external: null
+        public: false
+    volumes:
+      - name: mysql_data
+        path: /var/lib/mysql
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+credentials:
+  mysql:
+    username:
+      pattern: "{app_name}_bugzilla"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_bugzilla"
+
+connection_strings:
+  mysql: "mysql://{username}:{password}@mysql:3306/{database}"
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: {{BUGZILLA_ADMIN_EMAIL}}
+  features: "Bug追踪,问题管理,邮件通知,权限管理,自定义字段,报表统计"
+

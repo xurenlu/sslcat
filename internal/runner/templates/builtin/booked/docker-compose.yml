@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  booked:
+    image: booked/booked:{{BOOKED_VERSION}}
+    container_name: {{APP_NAME}}_booked
+    restart: unless-stopped
+    ports:
+      - "{{BOOKED_PORT}}:80"
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_DATABASE: {{MYSQL_DATABASE}}
+      MYSQL_USER: {{MYSQL_USERNAME}}
+      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
+      BOOKED_ADMIN_EMAIL: {{BOOKED_ADMIN_EMAIL}}
+      BOOKED_URL: http://{{PRIMARY_DOMAIN}}
+      TZ: Asia/Shanghai
+    volumes:
+      - booked_data:/var/www/html
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  mysql:
+    image: mysql:{{MYSQL_VERSION}}
+    container_name: {{APP_NAME}}_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: {{MYSQL_DATABASE}}
+      MYSQL_USER: {{MYSQL_USERNAME}}
+      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
+      MYSQL_ROOT_PASSWORD: {{MYSQL_PASSWORD}}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  booked_data:
+    driver: local
+  mysql_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

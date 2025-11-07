@@ -1,0 +1,76 @@
+id: syncthing
+name: Syncthing (文件同步)
+category: tools
+subcategory: file-sync
+tags: [go, file-sync, p2p, syncthing, backup]
+description: 点对点文件同步工具，支持多设备同步，端到端加密，无需中央服务器。
+icon: syncthing
+version: 1.0.0
+author: SSLcat Team
+website: https://syncthing.net/
+compose_file: docker-compose.yml
+
+variables:
+  - name: SYNCTHING_VERSION
+    type: select
+    title: Syncthing 版本
+    default: "latest"
+    options: ["latest", "v1.27", "v1.26"]
+    description: 选择 Syncthing 版本
+  - name: SYNCTHING_PORT
+    type: number
+    title: Syncthing Web 端口
+    default: 8384
+    min: 1024
+    max: 65535
+    description: Syncthing Web 管理界面端口
+  - name: SYNCTHING_SYNC_PORT
+    type: number
+    title: Syncthing 同步端口
+    default: 22000
+    min: 1024
+    max: 65535
+    description: Syncthing 文件同步端口
+  - name: SYNCTHING_DISCOVERY_PORT
+    type: number
+    title: Syncthing 发现端口
+    default: 21027
+    min: 1024
+    max: 65535
+    description: Syncthing 设备发现端口（UDP）
+
+services:
+  - name: syncthing
+    type: web
+    description: Syncthing 文件同步服务
+    ports:
+      - internal: 8384
+        external: null
+        public: true
+      - internal: 22000
+        external: null
+        public: true
+      - internal: 21027
+        external: null
+        public: true
+    volumes:
+      - name: syncthing_data
+        path: /var/syncthing
+        mode: rw
+    healthcheck:
+      type: http
+      path: /
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "文件同步,点对点,端到端加密,多设备支持"
+

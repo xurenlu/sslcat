@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  devtools-hub:
+    image: devtools-hub/server:{{DEVTOOLS_VERSION}}
+    container_name: {{APP_NAME}}_devtools_hub
+    restart: unless-stopped
+    ports:
+      - "{{DEVTOOLS_PORT}}:8080"
+    environment:
+      TZ: Asia/Shanghai
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

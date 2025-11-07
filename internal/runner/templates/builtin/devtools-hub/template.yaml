@@ -1,0 +1,52 @@
+id: devtools-hub
+name: Developer Tools Hub (开发者工具集)
+category: tools
+subcategory: developer-tools
+tags: [developer-tools, tools-hub, base64, url-encode, hash, timestamp]
+description: 一站式开发者工具集，包含 Base64 编解码、URL 编解码、Hash 计算、时间戳转换、UUID 生成等常用工具。
+icon: devtools-hub
+version: 1.0.0
+author: SSLcat Team
+website: https://devtools.io/
+compose_file: docker-compose.yml
+
+variables:
+  - name: DEVTOOLS_VERSION
+    type: select
+    title: Developer Tools Hub 版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择 Developer Tools Hub 版本
+  - name: DEVTOOLS_PORT
+    type: number
+    title: Developer Tools Hub 端口
+    default: 8080
+    min: 1024
+    max: 65535
+    description: Developer Tools Hub Web 服务端口
+
+services:
+  - name: devtools-hub
+    type: web
+    description: Developer Tools Hub 开发者工具集服务
+    ports:
+      - internal: 8080
+        external: null
+        public: true
+    healthcheck:
+      type: http
+      path: /health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "Base64编解码,URL编解码,Hash计算,时间戳转换,UUID生成,颜色转换,二维码生成,JSON格式化"
+

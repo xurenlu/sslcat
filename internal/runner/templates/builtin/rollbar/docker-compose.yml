@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  rollbar-web:
+    image: rollbar/rollbar:{{ROLLBAR_VERSION}}
+    container_name: {{APP_NAME}}_rollbar_web
+    restart: unless-stopped
+    ports:
+      - "{{ROLLBAR_PORT}}:8000"
+    environment:
+      DATABASE_URL: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: {{ROLLBAR_SECRET_KEY}}
+      ROLLBAR_URL_PREFIX: http://{{PRIMARY_DOMAIN}}
+      TZ: Asia/Shanghai
+    volumes:
+      - rollbar_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  rollbar-worker:
+    image: rollbar/rollbar:{{ROLLBAR_VERSION}}
+    container_name: {{APP_NAME}}_rollbar_worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: {{ROLLBAR_SECRET_KEY}}
+      TZ: Asia/Shanghai
+    volumes:
+      - rollbar_data:/app/data
+    depends_on:
+      - rollbar-web
+    networks:
+      - {{APP_NAME}}_network
+    command: ["worker"]
+
+  postgres:
+    image: postgres:{{POSTGRES_VERSION}}
+    container_name: {{APP_NAME}}_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: {{POSTGRES_DATABASE}}
+      POSTGRES_USER: {{POSTGRES_USERNAME}}
+      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:{{REDIS_VERSION}}
+    container_name: {{APP_NAME}}_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  rollbar_data:
+    driver: local
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

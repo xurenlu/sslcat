@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  bugzilla:
+    image: bugzilla/bugzilla:{{BUGZILLA_VERSION}}
+    container_name: {{APP_NAME}}_bugzilla
+    restart: unless-stopped
+    ports:
+      - "{{BUGZILLA_PORT}}:80"
+    environment:
+      BUGZILLA_DB_HOST: mysql
+      BUGZILLA_DB_NAME: {{MYSQL_DATABASE}}
+      BUGZILLA_DB_USER: {{MYSQL_USERNAME}}
+      BUGZILLA_DB_PASS: {{MYSQL_PASSWORD}}
+      BUGZILLA_ADMIN_EMAIL: {{BUGZILLA_ADMIN_EMAIL}}
+      BUGZILLA_URLBASE: http://{{PRIMARY_DOMAIN}}
+      TZ: Asia/Shanghai
+    volumes:
+      - bugzilla_data:/var/www/html
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  mysql:
+    image: mysql:{{MYSQL_VERSION}}
+    container_name: {{APP_NAME}}_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: {{MYSQL_DATABASE}}
+      MYSQL_USER: {{MYSQL_USERNAME}}
+      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
+      MYSQL_ROOT_PASSWORD: {{MYSQL_PASSWORD}}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  bugzilla_data:
+    driver: local
+  mysql_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+

@@ -1,0 +1,142 @@
+id: bugsnag
+name: Bugsnag (App 崩溃收集)
+category: project
+subcategory: error-tracking
+tags: [error-tracking, crash-reporting, mobile, app-monitoring, bugsnag]
+description: 专业的移动应用和 Web 应用崩溃收集和错误监控平台，支持 iOS、Android、React Native 等平台。
+icon: bugsnag
+version: 1.0.0
+author: SSLcat Team
+website: https://www.bugsnag.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: BUGSNAG_VERSION
+    type: select
+    title: Bugsnag 版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择 Bugsnag 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "14", "16"]
+    description: 选择 PostgreSQL 版本
+  - name: REDIS_VERSION
+    type: select
+    title: Redis 版本
+    default: "7"
+    options: ["7", "6", "7-alpine"]
+    description: 选择 Redis 版本
+  - name: BUGSNAG_PORT
+    type: number
+    title: Bugsnag 端口
+    default: 3000
+    min: 1024
+    max: 65535
+    description: Bugsnag Web 服务端口
+  - name: BUGSNAG_SECRET_KEY
+    type: string
+    title: Bugsnag Secret Key
+    default: ""
+    description: Bugsnag 密钥（留空将自动生成）
+    sensitive: true
+
+services:
+  - name: bugsnag-web
+    type: web
+    description: Bugsnag Web 服务
+    depends_on: [postgres, redis]
+    ports:
+      - internal: 3000
+        external: null
+        public: true
+    volumes:
+      - name: bugsnag_data
+        path: /app/data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  - name: bugsnag-worker
+    type: worker
+    description: Bugsnag 后台任务处理服务
+    depends_on: [bugsnag-web]
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  - name: redis
+    type: cache
+    description: Redis 缓存服务
+    ports:
+      - internal: 6379
+        external: null
+        public: false
+    volumes:
+      - name: redis_data
+        path: /data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_bugsnag"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_bugsnag"
+  bugsnag:
+    secret_key:
+      pattern: random
+      length: 32
+    api_key:
+      pattern: random
+      length: 32
+
+connection_strings:
+  postgres: "postgresql://{username}:{password}@postgres:5432/{database}"
+  redis: "redis://redis:6379/0"
+  api: "http://{{PRIMARY_DOMAIN}}/api"
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/api"
+  features: "崩溃收集,错误监控,性能追踪,用户追踪,版本追踪,发布追踪"
+  supported_platforms: "iOS,Android,React Native,Flutter,Web,Node.js,Python,Java"
+

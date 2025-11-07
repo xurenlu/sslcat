@@ -1,0 +1,165 @@
+id: posthog
+name: PostHog (用户行为分析)
+category: analytics
+subcategory: user-analytics
+tags: [analytics, user-tracking, posthog, behavior-analysis, product-analytics]
+description: 开源的产品分析和用户行为追踪平台，支持事件追踪、会话回放、功能标志、A/B 测试等功能。
+icon: posthog
+version: 1.0.0
+author: SSLcat Team
+website: https://posthog.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: POSTHOG_VERSION
+    type: select
+    title: PostHog 版本
+    default: "latest"
+    options: ["latest", "1.50", "1.49"]
+    description: 选择 PostHog 版本
+  - name: POSTGRES_VERSION
+    type: select
+    title: PostgreSQL 版本
+    default: "15"
+    options: ["15", "14", "16"]
+    description: 选择 PostgreSQL 版本
+  - name: REDIS_VERSION
+    type: select
+    title: Redis 版本
+    default: "7"
+    options: ["7", "6", "7-alpine"]
+    description: 选择 Redis 版本
+  - name: CLICKHOUSE_VERSION
+    type: select
+    title: ClickHouse 版本
+    default: "latest"
+    options: ["latest", "24", "23"]
+    description: 选择 ClickHouse 版本（用于事件存储）
+  - name: POSTHOG_PORT
+    type: number
+    title: PostHog 端口
+    default: 8000
+    min: 1024
+    max: 65535
+    description: PostHog Web 服务端口
+  - name: POSTHOG_SECRET_KEY
+    type: string
+    title: PostHog Secret Key
+    default: ""
+    description: PostHog 密钥（留空将自动生成）
+    sensitive: true
+
+services:
+  - name: posthog-web
+    type: web
+    description: PostHog Web 服务
+    depends_on: [postgres, redis, clickhouse]
+    ports:
+      - internal: 8000
+        external: null
+        public: true
+    volumes:
+      - name: posthog_data
+        path: /code
+        mode: rw
+    healthcheck:
+      type: http
+      path: /_health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  - name: posthog-worker
+    type: worker
+    description: PostHog 后台任务处理服务
+    depends_on: [posthog-web]
+
+  - name: postgres
+    type: database
+    description: PostgreSQL 数据库服务
+    ports:
+      - internal: 5432
+        external: null
+        public: false
+    volumes:
+      - name: postgres_data
+        path: /var/lib/postgresql/data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["pg_isready", "-U", "{{POSTGRES_USERNAME}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  - name: redis
+    type: cache
+    description: Redis 缓存服务
+    ports:
+      - internal: 6379
+        external: null
+        public: false
+    volumes:
+      - name: redis_data
+        path: /data
+        mode: rw
+    healthcheck:
+      type: command
+      command: ["redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  - name: clickhouse
+    type: database
+    description: ClickHouse 数据库服务（事件存储）
+    ports:
+      - internal: 8123
+        external: null
+        public: false
+    volumes:
+      - name: clickhouse_data
+        path: /var/lib/clickhouse
+        mode: rw
+    healthcheck:
+      type: http
+      path: /ping
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+credentials:
+  postgres:
+    username:
+      pattern: "{app_name}_posthog"
+    password:
+      pattern: random
+      length: 18
+    database:
+      pattern: "{app_name}_posthog"
+  posthog:
+    secret_key:
+      pattern: random
+      length: 50
+
+connection_strings:
+  postgres: "postgresql://{username}:{password}@postgres:5432/{database}"
+  redis: "redis://redis:6379/0"
+  clickhouse: "http://clickhouse:8123"
+  api: "http://{{PRIMARY_DOMAIN}}/api"
+
+healthcheck_global:
+  timeout: 15m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  api_endpoint: "http://{{PRIMARY_DOMAIN}}/api"
+  features: "用户行为追踪,事件分析,会话回放,功能标志,A/B测试,漏斗分析"
+  supported_platforms: "Web,iOS,Android,后端API"
+

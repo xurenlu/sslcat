@@ -1,0 +1,68 @@
+id: bruno
+name: Bruno (API 测试工具)
+category: tools
+subcategory: api-testing
+tags: [api-testing, rest-api, http-client, bruno, postman-alternative]
+description: 开源的 API 测试工具，Postman 的替代品，支持 REST API 测试、GraphQL、WebSocket 等，数据本地存储。
+icon: bruno
+version: 1.0.0
+author: SSLcat Team
+website: https://www.usebruno.com/
+compose_file: docker-compose.yml
+
+variables:
+  - name: BRUNO_VERSION
+    type: select
+    title: Bruno 版本
+    default: "latest"
+    options: ["latest", "v1.0", "v0.9"]
+    description: 选择 Bruno 版本
+  - name: BRUNO_PORT
+    type: number
+    title: Bruno 端口
+    default: 3000
+    min: 1024
+    max: 65535
+    description: Bruno Web 服务端口
+  - name: BRUNO_SECRET_KEY
+    type: string
+    title: Bruno Secret Key
+    default: ""
+    description: Bruno 密钥（留空将自动生成）
+    sensitive: true
+
+services:
+  - name: bruno
+    type: web
+    description: Bruno API 测试工具服务
+    ports:
+      - internal: 3000
+        external: null
+        public: true
+    volumes:
+      - name: bruno_data
+        path: /app/data
+        mode: rw
+    healthcheck:
+      type: http
+      path: /health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+credentials:
+  bruno:
+    secret_key:
+      pattern: random
+      length: 32
+
+healthcheck_global:
+  timeout: 5m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  features: "API测试,REST API,GraphQL,WebSocket,环境变量,集合管理,本地存储"
+

@@ -1,0 +1,83 @@
+id: pi-hole
+name: Pi-hole (广告拦截)
+category: tools
+subcategory: dns
+tags: [php, dns, ad-blocker, pi-hole, network]
+description: 网络级广告拦截和 DNS 服务器，可以拦截整个网络的广告和追踪。
+icon: pi-hole
+version: 1.0.0
+author: SSLcat Team
+website: https://pi-hole.net/
+compose_file: docker-compose.yml
+
+variables:
+  - name: PIHOLE_VERSION
+    type: select
+    title: Pi-hole 版本
+    default: "latest"
+    options: ["latest", "v5.20", "v5.19"]
+    description: 选择 Pi-hole 版本
+  - name: PIHOLE_PORT
+    type: number
+    title: Pi-hole Web 端口
+    default: 80
+    min: 1
+    max: 65535
+    description: Pi-hole Web 管理界面端口
+  - name: PIHOLE_DNS_PORT
+    type: number
+    title: Pi-hole DNS 端口
+    default: 53
+    min: 1
+    max: 65535
+    description: Pi-hole DNS 服务端口
+  - name: PIHOLE_PASSWORD
+    type: string
+    title: Pi-hole 密码
+    default: ""
+    description: Pi-hole Web 管理界面密码
+    required: true
+    sensitive: true
+
+services:
+  - name: pihole
+    type: web
+    description: Pi-hole 广告拦截服务
+    ports:
+      - internal: 80
+        external: null
+        public: true
+      - internal: 53
+        external: null
+        public: true
+    volumes:
+      - name: pihole_data
+        path: /etc/pihole
+        mode: rw
+      - name: pihole_dnsmasq
+        path: /etc/dnsmasq.d
+        mode: rw
+    healthcheck:
+      type: http
+      path: /admin
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+credentials:
+  pihole:
+    password:
+      pattern: "{PIHOLE_PASSWORD}"
+
+healthcheck_global:
+  timeout: 10m
+  interval: 10s
+
+metadata:
+  site_url: http://{{PRIMARY_DOMAIN}}
+  admin_email: admin@{{PRIMARY_DOMAIN}}
+  admin_url: "http://{{PRIMARY_DOMAIN}}/admin"
+  dns_server: "{{PRIMARY_DOMAIN}}:53"
+  features: "广告拦截,DNS服务器,网络监控,统计报告"
+

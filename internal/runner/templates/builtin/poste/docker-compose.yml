@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  poste:
+    image: analogic/poste.io:{{POSTE_VERSION}}
+    container_name: {{APP_NAME}}_poste
+    restart: unless-stopped
+    ports:
+      - "{{POSTE_PORT}}:80"
+      - "{{POSTE_HTTPS_PORT}}:443"
+      - "{{POSTE_SMTP_PORT}}:25"
+      - "{{POSTE_SMTPS_PORT}}:465"
+      - "{{POSTE_SUBMISSION_PORT}}:587"
+      - "{{POSTE_IMAP_PORT}}:143"
+      - "{{POSTE_IMAPS_PORT}}:993"
+      - "{{POSTE_POP3_PORT}}:110"
+      - "{{POSTE_POP3S_PORT}}:995"
+    environment:
+      TZ: Asia/Shanghai
+      LETSENCRYPT_EMAIL: admin@{{POSTE_DOMAIN}}
+    volumes:
+      - poste_data:/data
+    networks:
+      - {{APP_NAME}}_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  poste_data:
+    driver: local
+
+networks:
+  {{APP_NAME}}_network:
+    driver: bridge
+
