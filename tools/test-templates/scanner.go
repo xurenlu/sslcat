@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -86,16 +87,40 @@ func (s *Scanner) parseTemplateMeta(path string) (*TemplateMeta, error) {
 		return nil, err
 	}
 
-	// 先解析为 map 以便处理 duration 字符串
+	// 先解析为 map 以便处理 duration 字符串和模板变量
 	var rawMeta map[string]interface{}
 	if err := yaml.Unmarshal(data, &rawMeta); err != nil {
-		return nil, err
+		// 如果解析失败，尝试清理 metadata 中的模板变量
+		cleanedData := s.cleanTemplateVariables(data)
+		if err2 := yaml.Unmarshal(cleanedData, &rawMeta); err2 != nil {
+			return nil, fmt.Errorf("解析失败: %w (原始错误: %v)", err2, err)
+		}
+	}
+
+	// 清理 metadata 中的模板变量（如果存在）
+	if metadata, ok := rawMeta["metadata"].(map[string]interface{}); ok {
+		cleanedMetadata := make(map[string]interface{})
+		for k, v := range metadata {
+			if str, ok := v.(string); ok && (strings.Contains(str, "{{") || strings.Contains(str, "{")) {
+				// 替换模板变量为占位符
+				cleanedMetadata[k] = s.replaceTemplateVars(str)
+			} else {
+				cleanedMetadata[k] = v
+			}
+		}
+		rawMeta["metadata"] = cleanedMetadata
+	}
+
+	// 重新序列化为 YAML 再解析
+	cleanedYAML, err := yaml.Marshal(rawMeta)
+	if err != nil {
+		return nil, fmt.Errorf("重新序列化失败: %w", err)
 	}
 
 	// 转换为 TemplateMeta
 	var meta TemplateMeta
-	if err := yaml.Unmarshal(data, &meta); err != nil {
-		return nil, err
+	if err := yaml.Unmarshal(cleanedYAML, &meta); err != nil {
+		return nil, fmt.Errorf("解析 TemplateMeta 失败: %w", err)
 	}
 
 	// 处理 healthcheck_global 的 timeout（可能是字符串格式）
@@ -108,6 +133,57 @@ func (s *Scanner) parseTemplateMeta(path string) (*TemplateMeta, error) {
 	}
 
 	return &meta, nil
+}
+
+// cleanTemplateVariables 清理 YAML 中的模板变量
+func (s *Scanner) cleanTemplateVariables(data []byte) []byte {
+	content := string(data)
+	// 替换 metadata 中的 {{VAR}} 为占位符
+	lines := strings.Split(content, "\n")
+	var cleanedLines []string
+	inMetadata := false
+	for _, line := range lines {
+		if strings.HasPrefix(strings.TrimSpace(line), "metadata:") {
+			inMetadata = true
+			cleanedLines = append(cleanedLines, line)
+			continue
+		}
+		if inMetadata {
+			if strings.HasPrefix(strings.TrimSpace(line), "  ") || strings.HasPrefix(strings.TrimSpace(line), "- ") {
+				// 在 metadata 块内
+				cleanedLine := s.replaceTemplateVarsInLine(line)
+				cleanedLines = append(cleanedLines, cleanedLine)
+			} else if strings.TrimSpace(line) != "" && !strings.HasPrefix(strings.TrimSpace(line), "#") {
+				// 退出 metadata 块
+				inMetadata = false
+				cleanedLines = append(cleanedLines, line)
+			} else {
+				cleanedLines = append(cleanedLines, line)
+			}
+		} else {
+			cleanedLines = append(cleanedLines, line)
+		}
+	}
+	return []byte(strings.Join(cleanedLines, "\n"))
+}
+
+// replaceTemplateVarsInLine 替换行中的模板变量
+func (s *Scanner) replaceTemplateVarsInLine(line string) string {
+	// 匹配 {{VAR}} 或 {VAR} 格式
+	re := regexp.MustCompile(`\{\{([A-Z_]+)\}\}`)
+	line = re.ReplaceAllString(line, `"$1"`)
+	re2 := regexp.MustCompile(`\{([A-Z_]+)\}`)
+	line = re2.ReplaceAllString(line, `"$1"`)
+	return line
+}
+
+// replaceTemplateVars 替换字符串中的模板变量
+func (s *Scanner) replaceTemplateVars(str string) string {
+	re := regexp.MustCompile(`\{\{([A-Z_]+)\}\}`)
+	str = re.ReplaceAllString(str, `$1`)
+	re2 := regexp.MustCompile(`\{([A-Z_]+)\}`)
+	str = re2.ReplaceAllString(str, `$1`)
+	return str
 }
 
 // LoadTemplateMeta 加载模板元数据

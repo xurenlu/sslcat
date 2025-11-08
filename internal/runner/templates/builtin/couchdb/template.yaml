@@ -64,7 +64,7 @@ healthcheck_global:
   interval: 10s
 
 metadata:
-  api_url: http://{{PRIMARY_DOMAIN}}:{{COUCHDB_PORT}}
-  admin_user: {{COUCHDB_USERNAME}}
-  admin_password: {{COUCHDB_PASSWORD}}
+  api_url: "http://{PRIMARY_DOMAIN}:{COUCHDB_PORT}"
+  admin_user: "{app_name}_user"
+  admin_password: "随机生成"
 
