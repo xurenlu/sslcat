@@ -114,7 +114,7 @@ healthcheck_global:
   interval: 10s
 
 metadata:
-  site_url: http://{{PRIMARY_DOMAIN}}:8080
-  admin_email: {{MOODLE_EMAIL}}
+  site_url: "http://{{PRIMARY_DOMAIN}}:8080"
+  admin_email: "{{MOODLE_EMAIL}}"
   features: "课程管理,在线学习,作业提交,考试评估,学习进度跟踪"
 

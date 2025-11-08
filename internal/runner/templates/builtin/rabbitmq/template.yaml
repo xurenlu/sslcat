@@ -72,7 +72,7 @@ healthcheck_global:
   interval: 10s
 
 metadata:
-  management_url: http://{{PRIMARY_DOMAIN}}:{{RABBITMQ_MANAGEMENT_PORT}}
-  default_user: {{RABBITMQ_USERNAME}}
-  default_password: {{RABBITMQ_PASSWORD}}
+  management_url: "http://{{PRIMARY_DOMAIN}}:{{RABBITMQ_MANAGEMENT_PORT}}"
+  default_user: "{{RABBITMQ_USERNAME}}"
+  default_password: "{{RABBITMQ_PASSWORD}}"
 

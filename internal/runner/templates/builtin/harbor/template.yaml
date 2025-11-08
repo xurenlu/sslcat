@@ -122,9 +122,9 @@ healthcheck_global:
   interval: 10s
 
 metadata:
-  site_url: http://{{PRIMARY_DOMAIN}}
-  registry_url: {{PRIMARY_DOMAIN}}
-  admin_email: admin@{{PRIMARY_DOMAIN}}
+  site_url: "http://{{PRIMARY_DOMAIN}}"
+  registry_url: "{{PRIMARY_DOMAIN}}"
+  admin_email: "admin@{{PRIMARY_DOMAIN}}"
   default_admin_user: admin
   default_admin_password: Harbor12345
 

@@ -59,6 +59,6 @@ healthcheck_global:
   interval: 10s
 
 metadata:
-  api_url: http://{{PRIMARY_DOMAIN}}:{{MEILISEARCH_PORT}}
-  master_key: {{MASTER_KEY}}
+  api_url: "http://{{PRIMARY_DOMAIN}}:{{MEILISEARCH_PORT}}"
+  master_key: "{{MASTER_KEY}}"
 

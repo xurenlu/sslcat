@@ -116,6 +116,6 @@ healthcheck_global:
   interval: 10s
 
 metadata:
-  site_url: http://{{PRIMARY_DOMAIN}}
-  admin_email: {{LETSENCRYPT_EMAIL}}
+  site_url: "http://{{PRIMARY_DOMAIN}}"
+  admin_email: "{{LETSENCRYPT_EMAIL}}"
   features: "邮件服务器,Web邮件客户端,多域名支持,用户管理"

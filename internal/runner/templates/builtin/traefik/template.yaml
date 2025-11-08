@@ -76,8 +76,8 @@ healthcheck_global:
   interval: 10s
 
 metadata:
-  site_url: http://{{PRIMARY_DOMAIN}}
-  admin_email: {{ACME_EMAIL}}
+  site_url: "http://{{PRIMARY_DOMAIN}}"
+  admin_email: "{{ACME_EMAIL}}"
   dashboard_url: "http://{{PRIMARY_DOMAIN}}:8080"
   features: "反向代理,自动SSL,负载均衡,Docker发现"
 

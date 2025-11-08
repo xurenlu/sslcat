@@ -67,5 +67,5 @@ healthcheck_global:
 
 metadata:
   admin_user: root
-  admin_password: {{MARIADB_ROOT_PASSWORD}}
+  admin_password: "{{MARIADB_ROOT_PASSWORD}}"
 

@@ -68,7 +68,7 @@ healthcheck_global:
   interval: 10s
 
 metadata:
-  api_url: http://{{PRIMARY_DOMAIN}}:{{INFLUXDB_PORT}}
-  org: {{INFLUXDB_ORG}}
-  bucket: {{INFLUXDB_BUCKET}}
+  api_url: "http://{{PRIMARY_DOMAIN}}:{{INFLUXDB_PORT}}"
+  org: "{{INFLUXDB_ORG}}"
+  bucket: "{{INFLUXDB_BUCKET}}"
 

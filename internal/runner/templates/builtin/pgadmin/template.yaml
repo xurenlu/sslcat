@@ -70,7 +70,7 @@ healthcheck_global:
   interval: 10s
 
 metadata:
-  site_url: http://{{PRIMARY_DOMAIN}}
-  admin_email: {{PGADMIN_EMAIL}}
+  site_url: "http://{{PRIMARY_DOMAIN}}"
+  admin_email: "{{PGADMIN_EMAIL}}"
   features: "PostgreSQL管理,图形化界面,SQL执行,数据导入导出"
 

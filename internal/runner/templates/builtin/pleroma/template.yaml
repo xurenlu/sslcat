@@ -105,7 +105,7 @@ healthcheck_global:
   interval: 10s
 
 metadata:
-  site_url: http://{{PRIMARY_DOMAIN}}:4000
-  admin_email: {{PLEROMA_INSTANCE_EMAIL}}
+  site_url: "http://{{PRIMARY_DOMAIN}}:4000"
+  admin_email: "{{PLEROMA_INSTANCE_EMAIL}}"
   features: "联邦社交网络,ActivityPub协议,轻量级,Twitter替代"
 

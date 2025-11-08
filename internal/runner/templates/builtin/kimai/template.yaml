@@ -107,7 +107,7 @@ healthcheck_global:
   interval: 10s
 
 metadata:
-  site_url: http://{{PRIMARY_DOMAIN}}:8001
-  admin_email: {{KIMAI_ADMIN_EMAIL}}
+  site_url: "http://{{PRIMARY_DOMAIN}}:8001"
+  admin_email: "{{KIMAI_ADMIN_EMAIL}}"
   features: "项目时间记录,工时统计,客户计费,报表生成,时间追踪"
 

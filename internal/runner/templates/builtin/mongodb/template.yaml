@@ -66,6 +66,6 @@ healthcheck_global:
   interval: 10s
 
 metadata:
-  admin_user: {{MONGODB_ROOT_USERNAME}}
-  admin_password: {{MONGODB_ROOT_PASSWORD}}
+  admin_user: "{{MONGODB_ROOT_USERNAME}}"
+  admin_password: "{{MONGODB_ROOT_PASSWORD}}"
 

@@ -63,6 +63,6 @@ healthcheck_global:
   interval: 10s
 
 metadata:
-  admin_user: {{POSTGRES_USERNAME}}
-  admin_password: {{POSTGRES_PASSWORD}}
+  admin_user: "{{POSTGRES_USERNAME}}"
+  admin_password: "{{POSTGRES_PASSWORD}}"
 
