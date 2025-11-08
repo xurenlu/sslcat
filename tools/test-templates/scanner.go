@@ -215,14 +215,39 @@ func (s *Scanner) LoadComposeFile(template *TemplateInfo) (*ComposeFile, error) 
 // cleanComposeTemplateVariables 清理 docker-compose.yml 中的模板变量
 func (s *Scanner) cleanComposeTemplateVariables(data []byte) []byte {
 	content := string(data)
-	// 替换 {{VAR}} 格式的模板变量为占位符字符串
-	re := regexp.MustCompile(`\{\{([A-Z_]+)\}\}`)
-	content = re.ReplaceAllStringFunc(content, func(match string) string {
-		// 提取变量名并替换为带引号的占位符
-		varName := strings.Trim(match, "{}")
-		return `"` + varName + `"`
-	})
-	return []byte(content)
+	lines := strings.Split(content, "\n")
+	var cleanedLines []string
+	
+	for _, line := range lines {
+		cleanedLine := line
+		// 处理整行中的模板变量
+		// 匹配 key: {{VAR}} 或 key: value{{VAR}} 格式
+		re := regexp.MustCompile(`:\s*\{\{([A-Z_]+)\}\}`)
+		cleanedLine = re.ReplaceAllStringFunc(cleanedLine, func(match string) string {
+			// 提取变量名
+			varName := regexp.MustCompile(`\{\{([A-Z_]+)\}\}`).FindStringSubmatch(match)
+			if len(varName) > 1 {
+				return `: "` + varName[1] + `"`
+			}
+			return match
+		})
+		
+		// 处理 key: value{{VAR}}more 格式（在值中间）
+		re2 := regexp.MustCompile(`\{\{([A-Z_]+)\}\}`)
+		cleanedLine = re2.ReplaceAllStringFunc(cleanedLine, func(match string) string {
+			varName := strings.Trim(match, "{}")
+			// 如果不在引号内，添加引号
+			return `"` + varName + `"`
+		})
+		
+		// 处理 key: "{{VAR}}" 格式（已在引号内）
+		re3 := regexp.MustCompile(`"\{\{([A-Z_]+)\}\}"`)
+		cleanedLine = re3.ReplaceAllString(cleanedLine, `"$1"`)
+		
+		cleanedLines = append(cleanedLines, cleanedLine)
+	}
+	
+	return []byte(strings.Join(cleanedLines, "\n"))
 }
 
 // FilterByCategory 按分类过滤
