@@ -29,6 +29,7 @@ type TestResult struct {
 	TemplateName string                 `json:"template_name"`
 	Category     string                 `json:"category"`
 	Subcategory  string                 `json:"subcategory,omitempty"`
+	Priority     string                 `json:"priority,omitempty"` // high/medium/low
 	Status       TestStatus             `json:"status"`
 	Stages       map[string]StageStatus `json:"stages"`
 	Errors       []string               `json:"errors"`
@@ -36,6 +37,7 @@ type TestResult struct {
 	StartTime    time.Time              `json:"start_time"`
 	EndTime      time.Time              `json:"end_time"`
 	Duration     string                 `json:"duration"`
+	ImageNames   []string               `json:"image_names,omitempty"` // 使用的镜像名称
 }
 
 // TestSummary 测试汇总

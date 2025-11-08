@@ -1,0 +1,24 @@
+{
+  "test_config": {
+    "server": {
+      "host": "sg2.shifen.de",
+      "user": "root",
+      "ssh_key": "",
+      "work_dir": "/opt/sslcat-test"
+    },
+    "test_params": {
+      "parallel": 2,
+      "timeout": "10m",
+      "base_port": 20000,
+      "skip_image_check": false,
+      "skip_content_check": false,
+      "cleanup": true
+    },
+    "priority_order": ["high", "medium", "low"],
+    "output": {
+      "json_file": "test-results.json",
+      "report_dir": "./test-results"
+    }
+  }
+}
+

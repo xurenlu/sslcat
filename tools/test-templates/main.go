@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -13,16 +14,17 @@ import (
 )
 
 var (
-	templatesDir   = flag.String("templates-dir", "internal/runner/templates/builtin", "模板目录路径")
-	category       = flag.String("category", "", "按分类过滤（可选）")
-	templateID     = flag.String("template", "", "测试单个模板（可选）")
-	parallel       = flag.Int("parallel", 3, "并发数")
-	outputDir      = flag.String("output-dir", "./test-results", "输出目录")
-	timeoutStr     = flag.String("timeout", "5m", "容器启动超时（如：5m, 10m）")
+	templatesDir    = flag.String("templates-dir", "internal/runner/templates/builtin", "模板目录路径")
+	category        = flag.String("category", "", "按分类过滤（可选）")
+	templateID      = flag.String("template", "", "测试单个模板（可选）")
+	parallel        = flag.Int("parallel", 2, "并发数（默认2-3）")
+	outputDir       = flag.String("output-dir", "./test-results", "输出目录")
+	timeoutStr      = flag.String("timeout", "10m", "容器启动超时（如：5m, 10m）")
 	skipImageCheck = flag.Bool("skip-image-check", false, "跳过镜像检查")
 	skipContentCheck = flag.Bool("skip-content-check", false, "跳过内容验证")
-	basePort       = flag.Int("base-port", 20000, "测试端口起始值")
-	cleanup        = flag.Bool("cleanup", true, "测试后清理容器")
+	basePort        = flag.Int("base-port", 20000, "测试端口起始值")
+	cleanup         = flag.Bool("cleanup", true, "测试后清理容器（默认true）")
+	priorityOnly    = flag.String("priority", "", "只测试指定优先级（high/medium/low）")
 )
 
 func main() {
@@ -64,14 +66,56 @@ func main() {
 		fmt.Printf("🎯 按模板 ID '%s' 过滤后: %d 个模板\n", *templateID, len(templates))
 	}
 
+	// 按优先级过滤
+	if *priorityOnly != "" {
+		var targetPriority TemplatePriority
+		switch strings.ToLower(*priorityOnly) {
+		case "high":
+			targetPriority = PriorityHigh
+		case "medium":
+			targetPriority = PriorityMedium
+		case "low":
+			targetPriority = PriorityLow
+		default:
+			fmt.Printf("⚠️  无效的优先级: %s，使用全部模板\n", *priorityOnly)
+		}
+		if targetPriority > 0 {
+			filtered := []TemplateInfo{}
+			for _, tpl := range templates {
+				if GetTemplatePriority(&tpl) == targetPriority {
+					filtered = append(filtered, tpl)
+				}
+			}
+			templates = filtered
+			fmt.Printf("🎯 按优先级 '%s' 过滤后: %d 个模板\n", *priorityOnly, len(templates))
+		}
+	}
+
 	if len(templates) == 0 {
 		fmt.Println("⚠️  没有找到匹配的模板")
 		os.Exit(0)
 	}
 
-	// 按分类分组
+	// 按优先级排序
+	templates = SortTemplatesByPriority(templates)
+	
+	// 按优先级分组
+	priorityGroups := GroupTemplatesByPriority(templates)
+	fmt.Printf("📊 按优先级分组: ")
+	for priority, tpls := range priorityGroups {
+		priorityName := "低"
+		if priority == PriorityHigh {
+			priorityName = "高"
+		} else if priority == PriorityMedium {
+			priorityName = "中"
+		}
+		fmt.Printf("%s优先级(%d) ", priorityName, len(tpls))
+	}
+	fmt.Println()
+	
+	// 按分类分组（用于统计）
 	groups := GroupByCategory(templates)
-	fmt.Printf("📊 按分类分组: ")
+	fmt.Printf("📦 按分类分组: ")
 	for cat, tpls := range groups {
 		fmt.Printf("%s(%d) ", cat, len(tpls))
 	}
@@ -110,6 +154,10 @@ func main() {
 			defer func() {
 				<-semaphore
 				wg.Done()
+				// 确保清理资源，即使发生 panic
+				if r := recover(); r != nil {
+					fmt.Printf("❌ 模板 %s 测试时发生 panic: %v\n", tpl.Name, r)
+				}
 			}()
 
 			// 分配端口
@@ -118,6 +166,7 @@ func main() {
 			portCounter++
 			portMu.Unlock()
 
+			// 测试模板，失败时继续执行（不中断其他测试）
 			result := testTemplate(
 				&tpl,
 				scanner,
@@ -130,6 +179,7 @@ func main() {
 				timeout,
 			)
 
+			// 无论成功失败都记录结果
 			resultsMu.Lock()
 			results = append(results, result)
 			resultsMu.Unlock()
@@ -171,16 +221,26 @@ func testTemplate(
 	testPort int,
 	timeout time.Duration,
 ) TestResult {
+	priority := GetTemplatePriority(template)
+	priorityStr := "low"
+	if priority == PriorityHigh {
+		priorityStr = "high"
+	} else if priority == PriorityMedium {
+		priorityStr = "medium"
+	}
+
 	result := TestResult{
 		TemplateID:   template.ID,
 		TemplateName: template.Name,
 		Category:     template.Category,
 		Subcategory:  template.Subcategory,
+		Priority:     priorityStr,
 		Status:       StatusPending,
 		Stages:       make(map[string]StageStatus),
 		Errors:       []string{},
 		Warnings:     []string{},
 		StartTime:    time.Now(),
+		ImageNames:   []string{},
 	}
 
 	defer func() {
@@ -236,6 +296,7 @@ func testTemplate(
 
 		for _, image := range images {
 			replacedImage := ReplaceImageVariables(image, variables)
+			result.ImageNames = append(result.ImageNames, replacedImage)
 			exists, err := imageChecker.CheckImage(replacedImage)
 			if err != nil {
 				result.Warnings = append(result.Warnings, fmt.Sprintf("检查镜像 %s 失败: %v", replacedImage, err))
@@ -248,6 +309,7 @@ func testTemplate(
 					Duration: time.Since(stageStart).String(),
 					Error:    fmt.Sprintf("镜像不存在: %s", replacedImage),
 				}
+				// 失败时继续，不中断测试流程
 				return result
 			}
 		}
