@@ -46,13 +46,16 @@ func (cg *ComposeGenerator) Generate(
 		return "", fmt.Errorf("读取 compose 文件失败: %w", err)
 	}
 
-	// 替换变量
+	// 替换变量 - 先替换所有已知变量
 	composeContent := string(composeData)
 	for key, value := range variables {
 		placeholder := fmt.Sprintf("{{%s}}", key)
 		valueStr := fmt.Sprintf("%v", value)
 		composeContent = strings.ReplaceAll(composeContent, placeholder, valueStr)
 	}
+	
+	// 替换所有剩余的未定义变量（使用默认值）
+	composeContent = cg.replaceRemainingVariables(composeContent)
 
 	// 处理端口映射中的变量
 	composeContent = cg.replacePorts(composeContent, variables)
@@ -187,6 +190,54 @@ func (cg *ComposeGenerator) replacePorts(content string, variables map[string]in
 	}
 
 	return buf.String()
+}
+
+// replaceRemainingVariables 替换所有剩余的未定义变量
+func (cg *ComposeGenerator) replaceRemainingVariables(content string) string {
+	// 匹配所有 {{VAR}} 格式的变量
+	re := regexp.MustCompile(`\{\{([A-Z_]+)\}\}`)
+	
+	// 根据变量名推断默认值
+	content = re.ReplaceAllStringFunc(content, func(match string) string {
+		varName := strings.Trim(match, "{}")
+		
+		// 根据变量名模式推断默认值
+		if strings.Contains(varName, "VERSION") {
+			return "latest"
+		}
+		if strings.Contains(varName, "PORT") {
+			return "8080"
+		}
+		if strings.Contains(varName, "PASSWORD") || strings.Contains(varName, "SECRET") || strings.Contains(varName, "KEY") {
+			return "test-password-123"
+		}
+		if strings.Contains(varName, "USER") || strings.Contains(varName, "USERNAME") {
+			return "test-user"
+		}
+		if strings.Contains(varName, "DATABASE") || strings.Contains(varName, "DB") {
+			return "test-db"
+		}
+		if strings.Contains(varName, "NAME") || strings.Contains(varName, "DOMAIN") {
+			return "test-app"
+		}
+		if strings.Contains(varName, "EMAIL") {
+			return "test@example.com"
+		}
+		if strings.Contains(varName, "ORG") || strings.Contains(varName, "ORGANIZATION") {
+			return "test-org"
+		}
+		if strings.Contains(varName, "CLIENT") {
+			return "test-client-id"
+		}
+		if strings.Contains(varName, "COOKIE") {
+			return "test-cookie-secret"
+		}
+		
+		// 默认值
+		return "test-value"
+	})
+	
+	return content
 }
 
 // GenerateCredentials 生成凭证（如果需要）
