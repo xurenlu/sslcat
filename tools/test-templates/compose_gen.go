@@ -195,31 +195,34 @@ func (cg *ComposeGenerator) replacePorts(content string, variables map[string]in
 
 // replaceRemainingVariables 替换所有剩余的未定义变量
 func (cg *ComposeGenerator) replaceRemainingVariables(content string) string {
-	// 匹配所有 {{VAR}} 格式的变量
+	// 匹配所有 {{VAR}} 格式的变量（包括在字符串中的）
 	re := regexp.MustCompile(`\{\{([A-Z_]+)\}\}`)
 	
 	// 根据变量名推断默认值
 	content = re.ReplaceAllStringFunc(content, func(match string) string {
 		varName := strings.Trim(match, "{}")
 		
-		// 根据变量名模式推断默认值
+		// 根据变量名模式推断默认值（按优先级匹配）
 		if strings.Contains(varName, "VERSION") {
 			return "latest"
-		}
-		if strings.Contains(varName, "PORT") {
-			return "8080"
 		}
 		if strings.Contains(varName, "PASSWORD") || strings.Contains(varName, "SECRET") || strings.Contains(varName, "KEY") {
 			return "test-password-123"
 		}
-		if strings.Contains(varName, "USER") || strings.Contains(varName, "USERNAME") {
+		if strings.Contains(varName, "USERNAME") || strings.Contains(varName, "USER") {
 			return "test-user"
 		}
 		if strings.Contains(varName, "DATABASE") || strings.Contains(varName, "DB") {
 			return "test-db"
 		}
-		if strings.Contains(varName, "NAME") || strings.Contains(varName, "DOMAIN") {
+		if strings.Contains(varName, "PORT") {
+			return "8080"
+		}
+		if strings.Contains(varName, "NAME") && !strings.Contains(varName, "USERNAME") && !strings.Contains(varName, "DATABASE") {
 			return "test-app"
+		}
+		if strings.Contains(varName, "DOMAIN") {
+			return "test-app.local"
 		}
 		if strings.Contains(varName, "EMAIL") {
 			return "test@example.com"
