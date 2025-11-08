@@ -50,6 +50,6 @@ healthcheck_global:
   interval: 10s
 
 metadata:
-  api_url: http://{{PRIMARY_DOMAIN}}
-  cluster_name: {{APP_NAME}}_cluster
+  api_url: "http://{PRIMARY_DOMAIN}"
+  cluster_name: "{app_name}_cluster"
 
