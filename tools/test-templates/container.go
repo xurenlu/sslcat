@@ -24,11 +24,19 @@ func NewContainerManager(timeout time.Duration) *ContainerManager {
 
 // StartContainers 启动容器
 func (cm *ContainerManager) StartContainers(workDir string) error {
-	cmd := exec.Command("docker-compose", "-f", fmt.Sprintf("%s/docker-compose.yml", workDir), "up", "-d")
+	// 尝试使用 docker compose (v2)，如果失败则使用 docker-compose (v1)
+	cmd := exec.Command("docker", "compose", "-f", fmt.Sprintf("%s/docker-compose.yml", workDir), "up", "-d")
 	cmd.Dir = workDir
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("启动容器失败: %w, output: %s", err, string(output))
+		// 如果 docker compose 失败，尝试 docker-compose
+		cmd2 := exec.Command("docker-compose", "-f", fmt.Sprintf("%s/docker-compose.yml", workDir), "up", "-d")
+		cmd2.Dir = workDir
+		output2, err2 := cmd2.CombinedOutput()
+		if err2 != nil {
+			return fmt.Errorf("启动容器失败: %w, output: %s", err2, string(output2))
+		}
+		return nil
 	}
 	return nil
 }
@@ -55,11 +63,19 @@ func (cm *ContainerManager) WaitForHealthy(workDir string, timeout time.Duration
 
 // checkContainersHealthy 检查容器是否健康
 func (cm *ContainerManager) checkContainersHealthy(workDir string) bool {
-	cmd := exec.Command("docker-compose", "-f", fmt.Sprintf("%s/docker-compose.yml", workDir), "ps")
+	// 尝试使用 docker compose (v2)
+	cmd := exec.Command("docker", "compose", "-f", fmt.Sprintf("%s/docker-compose.yml", workDir), "ps")
 	cmd.Dir = workDir
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return false
+		// 如果失败，尝试 docker-compose (v1)
+		cmd2 := exec.Command("docker-compose", "-f", fmt.Sprintf("%s/docker-compose.yml", workDir), "ps")
+		cmd2.Dir = workDir
+		output2, err2 := cmd2.CombinedOutput()
+		if err2 != nil {
+			return false
+		}
+		output = output2
 	}
 
 	// 检查输出中是否有 "Up" 状态
@@ -79,11 +95,18 @@ func (cm *ContainerManager) checkContainersHealthy(workDir string) bool {
 
 // StopContainers 停止并清理容器
 func (cm *ContainerManager) StopContainers(workDir string) error {
-	cmd := exec.Command("docker-compose", "-f", fmt.Sprintf("%s/docker-compose.yml", workDir), "down", "-v", "--remove-orphans")
+	// 尝试使用 docker compose (v2)
+	cmd := exec.Command("docker", "compose", "-f", fmt.Sprintf("%s/docker-compose.yml", workDir), "down", "-v", "--remove-orphans")
 	cmd.Dir = workDir
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("停止容器失败: %w, output: %s", err, string(output))
+		// 如果失败，尝试 docker-compose (v1)
+		cmd2 := exec.Command("docker-compose", "-f", fmt.Sprintf("%s/docker-compose.yml", workDir), "down", "-v", "--remove-orphans")
+		cmd2.Dir = workDir
+		output2, err2 := cmd2.CombinedOutput()
+		if err2 != nil {
+			return fmt.Errorf("停止容器失败: %w, output: %s", err2, string(output2))
+		}
 	}
 	
 	// 清理临时目录
@@ -96,22 +119,38 @@ func (cm *ContainerManager) StopContainers(workDir string) error {
 
 // GetContainerLogs 获取容器日志
 func (cm *ContainerManager) GetContainerLogs(workDir string, serviceName string, lines int) (string, error) {
-	cmd := exec.Command("docker-compose", "-f", fmt.Sprintf("%s/docker-compose.yml", workDir), "logs", "--tail", fmt.Sprintf("%d", lines), serviceName)
+	// 尝试使用 docker compose (v2)
+	cmd := exec.Command("docker", "compose", "-f", fmt.Sprintf("%s/docker-compose.yml", workDir), "logs", "--tail", fmt.Sprintf("%d", lines), serviceName)
 	cmd.Dir = workDir
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("获取日志失败: %w", err)
+		// 如果失败，尝试 docker-compose (v1)
+		cmd2 := exec.Command("docker-compose", "-f", fmt.Sprintf("%s/docker-compose.yml", workDir), "logs", "--tail", fmt.Sprintf("%d", lines), serviceName)
+		cmd2.Dir = workDir
+		output2, err2 := cmd2.CombinedOutput()
+		if err2 != nil {
+			return "", fmt.Errorf("获取日志失败: %w", err2)
+		}
+		return string(output2), nil
 	}
 	return string(output), nil
 }
 
 // CheckContainerStatus 检查容器状态
 func (cm *ContainerManager) CheckContainerStatus(workDir string) (map[string]string, error) {
-	cmd := exec.Command("docker-compose", "-f", fmt.Sprintf("%s/docker-compose.yml", workDir), "ps", "--format", "json")
+	// 尝试使用 docker compose (v2)
+	cmd := exec.Command("docker", "compose", "-f", fmt.Sprintf("%s/docker-compose.yml", workDir), "ps", "--format", "json")
 	cmd.Dir = workDir
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("检查容器状态失败: %w", err)
+		// 如果失败，尝试 docker-compose (v1)
+		cmd2 := exec.Command("docker-compose", "-f", fmt.Sprintf("%s/docker-compose.yml", workDir), "ps", "--format", "json")
+		cmd2.Dir = workDir
+		output2, err2 := cmd2.CombinedOutput()
+		if err2 != nil {
+			return nil, fmt.Errorf("检查容器状态失败: %w", err2)
+		}
+		output = output2
 	}
 
 	status := make(map[string]string)
