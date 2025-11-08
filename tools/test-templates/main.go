@@ -437,6 +437,18 @@ func testTemplate(
 				continue
 			}
 
+			// 只检查 public: true 的端口
+			hasPublicPort := false
+			for _, portConfig := range service.Ports {
+				if portConfig.Public {
+					hasPublicPort = true
+					break
+				}
+			}
+			if !hasPublicPort {
+				continue // 跳过非公开端口的服务（如 postgres、redis 等内部服务）
+			}
+
 			// 获取该服务映射的外部端口
 			actualPort := testPort
 			if mappedPort, ok := portMap[service.Name]; ok {
