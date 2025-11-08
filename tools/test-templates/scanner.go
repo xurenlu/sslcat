@@ -45,7 +45,9 @@ func (s *Scanner) ScanTemplates() ([]TemplateInfo, error) {
 		// 解析 template.yaml 获取基本信息
 		meta, err := s.parseTemplateMeta(templateYAML)
 		if err != nil {
-			return fmt.Errorf("解析 %s 失败: %w", templateYAML, err)
+			// 如果解析失败，记录警告但继续处理其他模板
+			fmt.Printf("⚠️  警告: 跳过模板 %s (解析失败: %v)\n", templateYAML, err)
+			return nil // 跳过这个模板，继续处理其他模板
 		}
 
 		// 读取原始文件获取 compose_file
