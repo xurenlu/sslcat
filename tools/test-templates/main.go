@@ -25,6 +25,7 @@ var (
 	basePort        = flag.Int("base-port", 20000, "测试端口起始值")
 	cleanup         = flag.Bool("cleanup", true, "测试后清理容器（默认true）")
 	priorityOnly    = flag.String("priority", "", "只测试指定优先级（high/medium/low）")
+	skipPassed      = flag.Bool("skip-passed", false, "跳过已通过的模板（从之前的测试结果中读取）")
 )
 
 func main() {
@@ -91,8 +92,24 @@ func main() {
 		}
 	}
 
+	// 跳过已通过的模板
+	if *skipPassed {
+		resultsPath := fmt.Sprintf("%s/test-results.json", *outputDir)
+		passedMap, err := LoadPassedTemplates(resultsPath)
+		if err != nil {
+			fmt.Printf("⚠️  读取已通过模板列表失败: %v，继续测试所有模板\n", err)
+		} else {
+			beforeCount := len(templates)
+			templates = FilterPassedTemplates(templates, passedMap)
+			skippedCount := beforeCount - len(templates)
+			if skippedCount > 0 {
+				fmt.Printf("⏭️  跳过 %d 个已通过的模板，剩余 %d 个模板需要测试\n", skippedCount, len(templates))
+			}
+		}
+	}
+
 	if len(templates) == 0 {
-		fmt.Println("⚠️  没有找到匹配的模板")
+		fmt.Println("⚠️  没有找到需要测试的模板")
 		os.Exit(0)
 	}
 
