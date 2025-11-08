@@ -275,6 +275,54 @@ func FilterByTemplateID(templates []TemplateInfo, templateID string) []TemplateI
 	return filtered
 }
 
+// LoadPassedTemplates 从测试结果文件中加载已通过的模板ID列表
+func LoadPassedTemplates(resultsPath string) (map[string]bool, error) {
+	passed := make(map[string]bool)
+	
+	// 检查文件是否存在
+	if _, err := os.Stat(resultsPath); os.IsNotExist(err) {
+		return passed, nil // 文件不存在，返回空map
+	}
+	
+	// 读取JSON文件
+	data, err := os.ReadFile(resultsPath)
+	if err != nil {
+		return nil, fmt.Errorf("读取测试结果文件失败: %w", err)
+	}
+	
+	// 解析JSON
+	var report struct {
+		Results []struct {
+			TemplateID string `json:"template_id"`
+			Status      string `json:"status"`
+		} `json:"results"`
+	}
+	
+	if err := json.Unmarshal(data, &report); err != nil {
+		return nil, fmt.Errorf("解析测试结果文件失败: %w", err)
+	}
+	
+	// 提取已通过的模板ID
+	for _, result := range report.Results {
+		if result.Status == "passed" {
+			passed[result.TemplateID] = true
+		}
+	}
+	
+	return passed, nil
+}
+
+// FilterPassedTemplates 过滤掉已通过的模板
+func FilterPassedTemplates(templates []TemplateInfo, passedMap map[string]bool) []TemplateInfo {
+	var filtered []TemplateInfo
+	for _, tpl := range templates {
+		if !passedMap[tpl.ID] {
+			filtered = append(filtered, tpl)
+		}
+	}
+	return filtered
+}
+
 // GroupByCategory 按分类分组
 func GroupByCategory(templates []TemplateInfo) map[string][]TemplateInfo {
 	groups := make(map[string][]TemplateInfo)
