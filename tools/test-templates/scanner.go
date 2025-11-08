@@ -201,12 +201,28 @@ func (s *Scanner) LoadComposeFile(template *TemplateInfo) (*ComposeFile, error) 
 		return nil, err
 	}
 
+	// 清理模板变量以便解析
+	cleanedData := s.cleanComposeTemplateVariables(data)
+
 	var compose ComposeFile
-	if err := yaml.Unmarshal(data, &compose); err != nil {
-		return nil, err
+	if err := yaml.Unmarshal(cleanedData, &compose); err != nil {
+		return nil, fmt.Errorf("解析 Compose 文件失败: %w", err)
 	}
 
 	return &compose, nil
+}
+
+// cleanComposeTemplateVariables 清理 docker-compose.yml 中的模板变量
+func (s *Scanner) cleanComposeTemplateVariables(data []byte) []byte {
+	content := string(data)
+	// 替换 {{VAR}} 格式的模板变量为占位符字符串
+	re := regexp.MustCompile(`\{\{([A-Z_]+)\}\}`)
+	content = re.ReplaceAllStringFunc(content, func(match string) string {
+		// 提取变量名并替换为带引号的占位符
+		varName := strings.Trim(match, "{}")
+		return `"` + varName + `"`
+	})
+	return []byte(content)
 }
 
 // FilterByCategory 按分类过滤
