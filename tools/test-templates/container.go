@@ -27,14 +27,15 @@ func (cm *ContainerManager) StartContainers(workDir string) error {
 	// 尝试使用 docker compose (v2)，如果失败则使用 docker-compose (v1)
 	cmd := exec.Command("docker", "compose", "-f", fmt.Sprintf("%s/docker-compose.yml", workDir), "up", "-d")
 	cmd.Dir = workDir
-	_, err := cmd.CombinedOutput()
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// 如果 docker compose 失败，尝试 docker-compose
 		cmd2 := exec.Command("docker-compose", "-f", fmt.Sprintf("%s/docker-compose.yml", workDir), "up", "-d")
 		cmd2.Dir = workDir
 		output2, err2 := cmd2.CombinedOutput()
 		if err2 != nil {
-			return fmt.Errorf("启动容器失败: %w, output: %s", err2, string(output2))
+			// 返回第一个错误（docker compose v2）的详细信息
+			return fmt.Errorf("启动容器失败 (docker compose v2 错误: %w, output: %s; docker-compose v1 也失败: %w, output: %s)", err, string(output), err2, string(output2))
 		}
 		return nil
 	}
