@@ -58,7 +58,7 @@ healthcheck_global:
   interval: 10s
 
 metadata:
-  cluster_name: {{CLUSTER_NAME}}
+  cluster_name: "{app_name}_cluster"
   default_user: cassandra
   default_password: cassandra
 
