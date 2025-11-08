@@ -27,7 +27,7 @@ func (cm *ContainerManager) StartContainers(workDir string) error {
 	// 尝试使用 docker compose (v2)，如果失败则使用 docker-compose (v1)
 	cmd := exec.Command("docker", "compose", "-f", fmt.Sprintf("%s/docker-compose.yml", workDir), "up", "-d")
 	cmd.Dir = workDir
-	output, err := cmd.CombinedOutput()
+	_, err := cmd.CombinedOutput()
 	if err != nil {
 		// 如果 docker compose 失败，尝试 docker-compose
 		cmd2 := exec.Command("docker-compose", "-f", fmt.Sprintf("%s/docker-compose.yml", workDir), "up", "-d")
@@ -98,7 +98,7 @@ func (cm *ContainerManager) StopContainers(workDir string) error {
 	// 尝试使用 docker compose (v2)
 	cmd := exec.Command("docker", "compose", "-f", fmt.Sprintf("%s/docker-compose.yml", workDir), "down", "-v", "--remove-orphans")
 	cmd.Dir = workDir
-	output, err := cmd.CombinedOutput()
+	_, err := cmd.CombinedOutput()
 	if err != nil {
 		// 如果失败，尝试 docker-compose (v1)
 		cmd2 := exec.Command("docker-compose", "-f", fmt.Sprintf("%s/docker-compose.yml", workDir), "down", "-v", "--remove-orphans")
