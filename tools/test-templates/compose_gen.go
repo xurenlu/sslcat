@@ -81,7 +81,22 @@ func (cg *ComposeGenerator) GetMappedPorts(workDir string) (map[string]int, erro
 
 	portMap := make(map[string]int)
 	for serviceName, service := range compose.Services {
-		for _, portMapping := range service.Ports {
+		// 处理 Ports 字段（可能是 []string 或 map）
+		var ports []string
+		switch v := service.Ports.(type) {
+		case []interface{}:
+			for _, p := range v {
+				if str, ok := p.(string); ok {
+					ports = append(ports, str)
+				}
+			}
+		case []string:
+			ports = v
+		case string:
+			ports = []string{v}
+		}
+		
+		for _, portMapping := range ports {
 			// 解析端口映射格式 "外部端口:内部端口"
 			parts := strings.Split(portMapping, ":")
 			if len(parts) == 2 {

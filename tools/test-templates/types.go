@@ -69,11 +69,14 @@ type TemplateInfo struct {
 // ComposeService Docker Compose 服务定义
 type ComposeService struct {
 	Image       string                 `yaml:"image"`
-	Ports       []string               `yaml:"ports,omitempty"`
+	Ports       interface{}            `yaml:"ports,omitempty"`       // 可以是 []string 或 map
 	Environment map[string]interface{} `yaml:"environment,omitempty"`
-	Volumes     []string               `yaml:"volumes,omitempty"`
-	DependsOn   []string               `yaml:"depends_on,omitempty"`
+	Volumes     interface{}            `yaml:"volumes,omitempty"`      // 可以是 []string 或 map
+	DependsOn   interface{}            `yaml:"depends_on,omitempty"`   // 可以是 []string 或 map
+	Networks    interface{}            `yaml:"networks,omitempty"`    // 可以是 []string 或 map
 	Healthcheck map[string]interface{} `yaml:"healthcheck,omitempty"`
+	Restart     string                 `yaml:"restart,omitempty"`
+	ContainerName string               `yaml:"container_name,omitempty"`
 }
 
 // ComposeFile Docker Compose 文件结构
