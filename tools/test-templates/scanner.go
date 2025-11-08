@@ -215,39 +215,33 @@ func (s *Scanner) LoadComposeFile(template *TemplateInfo) (*ComposeFile, error) 
 // cleanComposeTemplateVariables 清理 docker-compose.yml 中的模板变量
 func (s *Scanner) cleanComposeTemplateVariables(data []byte) []byte {
 	content := string(data)
-	lines := strings.Split(content, "\n")
-	var cleanedLines []string
+	// 简单替换：将所有 {{VAR}} 替换为 "latest"（用于版本）或 "test"（用于其他）
+	// 先处理版本相关的变量
+	reVersion := regexp.MustCompile(`\{\{([A-Z_]*VERSION[A-Z_]*)\}\}`)
+	content = reVersion.ReplaceAllString(content, `latest`)
 	
-	for _, line := range lines {
-		cleanedLine := line
-		// 处理整行中的模板变量
-		// 匹配 key: {{VAR}} 或 key: value{{VAR}} 格式
-		re := regexp.MustCompile(`:\s*\{\{([A-Z_]+)\}\}`)
-		cleanedLine = re.ReplaceAllStringFunc(cleanedLine, func(match string) string {
-			// 提取变量名
-			varName := regexp.MustCompile(`\{\{([A-Z_]+)\}\}`).FindStringSubmatch(match)
-			if len(varName) > 1 {
-				return `: "` + varName[1] + `"`
-			}
-			return match
-		})
-		
-		// 处理 key: value{{VAR}}more 格式（在值中间）
-		re2 := regexp.MustCompile(`\{\{([A-Z_]+)\}\}`)
-		cleanedLine = re2.ReplaceAllStringFunc(cleanedLine, func(match string) string {
-			varName := strings.Trim(match, "{}")
-			// 如果不在引号内，添加引号
-			return `"` + varName + `"`
-		})
-		
-		// 处理 key: "{{VAR}}" 格式（已在引号内）
-		re3 := regexp.MustCompile(`"\{\{([A-Z_]+)\}\}"`)
-		cleanedLine = re3.ReplaceAllString(cleanedLine, `"$1"`)
-		
-		cleanedLines = append(cleanedLines, cleanedLine)
-	}
+	// 处理端口变量，替换为默认端口
+	rePort := regexp.MustCompile(`\{\{([A-Z_]*PORT[A-Z_]*)\}\}`)
+	content = rePort.ReplaceAllString(content, `8080`)
 	
-	return []byte(strings.Join(cleanedLines, "\n"))
+	// 处理其他变量，替换为简单的占位符
+	reOther := regexp.MustCompile(`\{\{([A-Z_]+)\}\}`)
+	content = reOther.ReplaceAllStringFunc(content, func(match string) string {
+		varName := strings.Trim(match, "{}")
+		// 根据变量类型返回合适的默认值
+		if strings.Contains(varName, "NAME") || strings.Contains(varName, "DOMAIN") {
+			return `test-app`
+		}
+		if strings.Contains(varName, "PASSWORD") || strings.Contains(varName, "SECRET") {
+			return `test-password`
+		}
+		if strings.Contains(varName, "USER") {
+			return `test-user`
+		}
+		return `test-value`
+	})
+	
+	return []byte(content)
 }
 
 // FilterByCategory 按分类过滤
