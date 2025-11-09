@@ -32,7 +32,7 @@ func (cm *ContainerManager) StartContainers(workDir string) error {
 		// 如果 docker compose 失败，尝试 docker-compose (v1) 作为后备
 		cmd2 := exec.Command("docker-compose", "-f", fmt.Sprintf("%s/docker-compose.yml", workDir), "up", "-d")
 		cmd2.Dir = workDir
-		output2, err2 := cmd2.CombinedOutput()
+		_, err2 := cmd2.CombinedOutput()
 		if err2 != nil {
 			// 只返回 docker compose v2 的错误（因为 v1 可能不存在）
 			return fmt.Errorf("启动容器失败: %w, output: %s", err, string(output))
