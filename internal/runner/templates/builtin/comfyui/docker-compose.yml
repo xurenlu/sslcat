@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   comfyui:
-    image: comfyui/comfyui:{{COMFYUI_VERSION}}
+    image: comfyanonymous/comfyui:{{COMFYUI_VERSION}}
     container_name: {{APP_NAME}}_comfyui
     restart: unless-stopped
     ports:

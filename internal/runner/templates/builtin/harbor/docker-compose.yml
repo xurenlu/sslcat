@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   harbor-core:
-    image: goharbor/harbor-core:{{HARBOR_VERSION}}
+    image: goharbor/harbor-core:v2.10.0
     container_name: {{APP_NAME}}_harbor_core
     restart: unless-stopped
     ports:

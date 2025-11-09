@@ -20,7 +20,7 @@ variables:
   - name: PGADMIN_PORT
     type: number
     title: pgAdmin 端口
-    default: 80
+    default: 5050
     min: 1024
     max: 65535
     description: pgAdmin Web 服务端口

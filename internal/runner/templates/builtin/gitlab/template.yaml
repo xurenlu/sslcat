@@ -20,7 +20,7 @@ variables:
   - name: GITLAB_PORT
     type: number
     title: GitLab Web 端口
-    default: 80
+    default: 3001
     min: 1024
     max: 65535
     description: GitLab Web 服务端口

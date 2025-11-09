@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   koboldcpp:
-    image: koboldcpp/koboldcpp:{{KOBOLDCPP_VERSION}}
+    image: ghcr.io/henk717/koboldcpp:{{KOBOLDCPP_VERSION}}
     container_name: {{APP_NAME}}_koboldcpp
     restart: unless-stopped
     ports:

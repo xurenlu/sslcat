@@ -2,11 +2,11 @@ version: '3.8'
 
 services:
   continue:
-    image: continue/server:{{CONTINUE_VERSION}}
+    image: nginx:alpine
     container_name: {{APP_NAME}}_continue
     restart: unless-stopped
     ports:
-      - "{{CONTINUE_PORT}}:3000"
+      - "{{CONTINUE_PORT}}:80"
     environment:
       OPENAI_API_KEY: {{OPENAI_API_KEY}}
       ANTHROPIC_API_KEY: {{ANTHROPIC_API_KEY}}
@@ -19,7 +19,7 @@ services:
     networks:
       - {{APP_NAME}}_network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost"]
       interval: 30s
       timeout: 10s
       retries: 3

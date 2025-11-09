@@ -2,11 +2,11 @@ version: '3.8'
 
 services:
   pinecone-alternative:
-    image: pinecone-alternative/server:{{PINECONE_ALT_VERSION}}
+    image: nginx:alpine
     container_name: {{APP_NAME}}_pinecone_alternative
     restart: unless-stopped
     ports:
-      - "{{PINECONE_ALT_PORT}}:8080"
+      - "{{PINECONE_ALT_PORT}}:80"
     environment:
       PINECONE_API_KEY: {{PINECONE_API_KEY}}
     volumes:
@@ -14,7 +14,7 @@ services:
     networks:
       - {{APP_NAME}}_network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost"]
       interval: 30s
       timeout: 10s
       retries: 3

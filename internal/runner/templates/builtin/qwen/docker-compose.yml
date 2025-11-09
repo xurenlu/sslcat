@@ -2,11 +2,11 @@ version: '3.8'
 
 services:
   qwen:
-    image: qwen/server:{{QWEN_VERSION}}
+    image: nginx:alpine
     container_name: {{APP_NAME}}_qwen
     restart: unless-stopped
     ports:
-      - "{{QWEN_PORT}}:8000"
+      - "{{QWEN_PORT}}:80"
     environment:
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
@@ -16,7 +16,7 @@ services:
       - {{APP_NAME}}_network
     runtime: nvidia
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost"]
       interval: 30s
       timeout: 10s
       retries: 3

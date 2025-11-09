@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   llama-cpp:
-    image: ghcr.io/ggerganov/llama.cpp:{{LLAMA_CPP_VERSION}}
+    image: ghcr.io/ggerganov/llama.cpp:server-{{LLAMA_CPP_VERSION}}
     container_name: {{APP_NAME}}_llama_cpp
     restart: unless-stopped
     ports:
