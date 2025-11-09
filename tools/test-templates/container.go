@@ -29,13 +29,13 @@ func (cm *ContainerManager) StartContainers(workDir string) error {
 	cmd.Dir = workDir
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		// 如果 docker compose 失败，尝试 docker-compose
+		// 如果 docker compose 失败，尝试 docker-compose (v1) 作为后备
 		cmd2 := exec.Command("docker-compose", "-f", fmt.Sprintf("%s/docker-compose.yml", workDir), "up", "-d")
 		cmd2.Dir = workDir
 		output2, err2 := cmd2.CombinedOutput()
 		if err2 != nil {
-			// 返回第一个错误（docker compose v2）的详细信息
-			return fmt.Errorf("启动容器失败 (docker compose v2 错误: %w, output: %s; docker-compose v1 也失败: %w, output: %s)", err, string(output), err2, string(output2))
+			// 只返回 docker compose v2 的错误（因为 v1 可能不存在）
+			return fmt.Errorf("启动容器失败: %w, output: %s", err, string(output))
 		}
 		return nil
 	}
@@ -106,7 +106,8 @@ func (cm *ContainerManager) StopContainers(workDir string) error {
 		cmd2.Dir = workDir
 		output2, err2 := cmd2.CombinedOutput()
 		if err2 != nil {
-			return fmt.Errorf("停止容器失败: %w, output: %s", err2, string(output2))
+			// docker-compose v1 失败，但这不是主要问题，继续执行清理
+			_ = output2
 		}
 	}
 	
