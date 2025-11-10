@@ -490,6 +490,24 @@ A: 参考模板开发文档，创建 `template.yaml` 和 `docker-compose.yml` �
 
 ## 相关文档
 
+### 详细分类文档
+- [模板市场详细文档索引](../templates/template-market-index.md) - 所有分类的详细文档索引
+- [AI 应用详细文档](../templates/template-market-ai.md) - 76 个 AI 应用模板详细说明
+- [数据库详细文档](../templates/template-market-database.md) - 21 个数据库模板详细说明
+- [DevOps 详细文档](../templates/template-market-devops.md) - 12 个 DevOps 工具详细说明
+- [CMS 详细文档](../templates/template-market-cms.md) - 12 个 CMS 模板详细说明
+- [企业工具详细文档](../templates/template-market-tools.md) - 159 个企业工具详细说明
+- [媒体服务详细文档](../templates/template-market-media.md) - 19 个媒体服务模板详细说明
+- [协作工具详细文档](../templates/template-market-collaboration.md) - 14 个协作工具详细说明
+- [分析工具详细文档](../templates/template-market-analytics.md) - 10 个分析工具详细说明
+- [CRM 详细文档](../templates/template-market-crm.md) - 5 个 CRM 系统详细说明
+- [客服系统详细文档](../templates/template-market-support.md) - 4 个客服系统详细说明
+- [安全工具详细文档](../templates/template-market-security.md) - 4 个安全工具详细说明
+- [RSS 阅读器详细文档](../templates/template-market-rss.md) - 5 个 RSS 阅读器详细说明
+- [论坛平台详细文档](../templates/template-market-forum.md) - 5 个论坛平台详细说明
+- [电商平台详细文档](../templates/template-market-ecommerce.md) - 5 个电商平台详细说明
+
+### 其他文档
 - [模板库统计报告](../templates/template-library-statistics.md)
 - [模板测试状态](../testing/template-test-status.md)
 - [Docker Compose 模板实现](../development/docker-compose-template-implementation.md)

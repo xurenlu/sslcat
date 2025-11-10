@@ -490,6 +490,24 @@ A: Refer to template development documentation, create `template.yaml` and `dock
 
 ## Related Documentation
 
+### Detailed Category Documentation
+- [Template Marketplace Detailed Documentation Index](../templates/template-market-index.md) - Index of all category detailed documentation
+- [AI Applications Detailed Documentation](../templates/template-market-ai.md) - Detailed description of 76 AI application templates
+- [Database Detailed Documentation](../templates/template-market-database.md) - Detailed description of 21 database templates
+- [DevOps Detailed Documentation](../templates/template-market-devops.md) - Detailed description of 12 DevOps tools
+- [CMS Detailed Documentation](../templates/template-market-cms.md) - Detailed description of 12 CMS templates
+- [Enterprise Tools Detailed Documentation](../templates/template-market-tools.md) - Detailed description of 159 enterprise tools
+- [Media Services Detailed Documentation](../templates/template-market-media.md) - Detailed description of 19 media service templates
+- [Collaboration Tools Detailed Documentation](../templates/template-market-collaboration.md) - Detailed description of 14 collaboration tools
+- [Analytics Tools Detailed Documentation](../templates/template-market-analytics.md) - Detailed description of 10 analytics tools
+- [CRM Detailed Documentation](../templates/template-market-crm.md) - Detailed description of 5 CRM systems
+- [Support Systems Detailed Documentation](../templates/template-market-support.md) - Detailed description of 4 support systems
+- [Security Tools Detailed Documentation](../templates/template-market-security.md) - Detailed description of 4 security tools
+- [RSS Readers Detailed Documentation](../templates/template-market-rss.md) - Detailed description of 5 RSS readers
+- [Forum Platforms Detailed Documentation](../templates/template-market-forum.md) - Detailed description of 5 forum platforms
+- [E-commerce Platforms Detailed Documentation](../templates/template-market-ecommerce.md) - Detailed description of 5 e-commerce platforms
+
+### Other Documentation
 - [Template Library Statistics](../templates/template-library-statistics.md)
 - [Template Test Status](../testing/template-test-status.md)
 - [Docker Compose Template Implementation](../development/docker-compose-template-implementation.md)
