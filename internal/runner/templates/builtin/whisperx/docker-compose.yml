@@ -1,7 +1,7 @@
 
 services:
   whisperx:
-    image: m-bain/whisperx:{{WHISPERX_VERSION}}
+    image: zhangkaifang/whisperx:{{WHISPERX_VERSION}}
     container_name: {{APP_NAME}}_whisperx
     restart: unless-stopped
     ports:

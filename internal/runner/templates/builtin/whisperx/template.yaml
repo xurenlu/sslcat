@@ -14,8 +14,8 @@ variables:
   - name: WHISPERX_VERSION
     type: select
     title: WhisperX 版本
-    default: "latest"
-    options: ["latest", "v3", "v2"]
+    default: "v1.0"
+    options: ["v1.0", "latest"]
     description: 选择 WhisperX 版本
   - name: WHISPERX_PORT
     type: number
