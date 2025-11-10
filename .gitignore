@@ -13,6 +13,13 @@ main
 # Test binary, built with `go test -c`
 *.test
 
+# Test tools binaries
+tools/test-templates/test-templates
+tools/test-templates/test-templates-*
+tools/test-templates/*.exe
+tools/test-templates/*.dylib
+tools/test-templates/*.so
+
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
