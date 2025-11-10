@@ -406,6 +406,10 @@ const Settings: React.FC = () => {
       enableAccessLog: false,
       enableErrorLog: true,
       logLevel: 'info',
+      // 缓存 & 内存设置
+      sharedCacheMaxSizeMB: 64,
+      memoryMaxUsagePercent: 20,
+      memoryReleaseCooldownSec: 300,
       // 压缩设置
       compressionEnabled: true,
       compressionAlgorithms: ['br', 'gzip'],
