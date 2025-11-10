@@ -2,10 +2,12 @@ package monitor
 
 import (
 	"runtime"
+	"runtime/debug"
 	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sys/unix"
 )
 
 // MemoryMonitor 内存监控器
@@ -33,6 +35,11 @@ type MemoryMonitor struct {
 	allocHistory   []uint64
 	sysHistory     []uint64
 	maxHistorySize int
+
+	// 系统级内存控制
+	maxSystemUsage float64
+	releaseCooldown time.Duration
+	lastReleaseTime time.Time
 }
 
 // NewMemoryMonitor 创建内存监控器
@@ -64,6 +71,8 @@ func NewMemoryMonitor(checkInterval time.Duration) *MemoryMonitor {
 		allocHistory:      make([]uint64, 0, 100),
 		sysHistory:        make([]uint64, 0, 100),
 		lastCheckTime:     time.Now(),
+		maxSystemUsage:    0.20,            // 默认不超过系统内存的20%
+		releaseCooldown:   5 * time.Minute, // 至少间隔5分钟
 	}
 }
 

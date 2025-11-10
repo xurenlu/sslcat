@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -485,8 +487,80 @@ func main() {
 	logrus.Info("SSLcat server stopped")
 }
 
+// filteredErrorLog 过滤频繁的 TLS handshake 错误日志
+type filteredErrorLog struct {
+	logger     *log.Logger
+	lastErrors map[string]time.Time
+	mutex      sync.RWMutex
+}
+
+func newFilteredErrorLog() *filteredErrorLog {
+	return &filteredErrorLog{
+		logger:     log.New(io.Discard, "", 0), // 默认丢弃所有日志
+		lastErrors: make(map[string]time.Time),
+	}
+}
+
+func (f *filteredErrorLog) Write(p []byte) (n int, err error) {
+	msg := string(p)
+	// 过滤 TLS handshake 错误，避免日志刷屏
+	if strings.Contains(msg, "TLS handshake error") {
+		// 提取域名（如果存在）
+		domain := extractDomainFromTLSError(msg)
+		if domain != "" {
+			f.mutex.Lock()
+			lastTime, exists := f.lastErrors[domain]
+			now := time.Now()
+			// 同一域名的错误每5分钟只记录一次
+			if !exists || now.Sub(lastTime) > 5*time.Minute {
+				f.lastErrors[domain] = now
+				f.mutex.Unlock()
+				// 使用 logrus 记录，但级别设为 Debug，避免刷屏
+				logrus.Debugf("TLS handshake error (filtered): %s", strings.TrimSpace(msg))
+			} else {
+				f.mutex.Unlock()
+			}
+		} else {
+			// 没有域名信息，每5分钟记录一次
+			f.mutex.Lock()
+			lastTime, exists := f.lastErrors["_general_"]
+			now := time.Now()
+			if !exists || now.Sub(lastTime) > 5*time.Minute {
+				f.lastErrors["_general_"] = now
+				f.mutex.Unlock()
+				logrus.Debugf("TLS handshake error (filtered): %s", strings.TrimSpace(msg))
+			} else {
+				f.mutex.Unlock()
+			}
+		}
+		return len(p), nil
+	}
+	// 其他错误正常记录
+	logrus.Debugf("HTTP server error: %s", strings.TrimSpace(msg))
+	return len(p), nil
+}
+
+// extractDomainFromTLSError 从 TLS 错误消息中提取域名
+func extractDomainFromTLSError(msg string) string {
+	// 查找 "no certificate available for" 后面的域名
+	if idx := strings.Index(msg, "no certificate available for"); idx != -1 {
+		start := idx + len("no certificate available for")
+		parts := strings.Fields(msg[start:])
+		if len(parts) > 0 {
+			domain := strings.TrimSpace(parts[0])
+			// 移除可能的标点符号
+			domain = strings.Trim(domain, ".,;:!?")
+			return domain
+		}
+	}
+	return ""
+}
+
 // startStandardMode 启动标准模式（监听 80 和 443 端口）
 func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *ssl.Manager, proxyManager *proxy.Manager, readTimeout, writeTimeout, idleTimeout time.Duration) {
+	// 创建过滤的 ErrorLog
+	filteredLog := newFilteredErrorLog()
+	
 	// 启动 HTTPS 服务器 (443)
 	if cfg.Server.EnableHTTPS {
 		httpsServer := &http.Server{
@@ -496,6 +570,7 @@ func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *s
 			WriteTimeout: writeTimeout,
 			IdleTimeout:  idleTimeout,
 			TLSConfig:    sslManager.GetTLSConfig(),
+			ErrorLog:     log.New(filteredLog, "", 0), // 使用过滤的 ErrorLog
 		}
 
 		// 配置 HTTP/2 支持
@@ -515,7 +590,8 @@ func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *s
 
 	// 启动 HTTP 重定向服务器 (80)
 	redirectServer := &http.Server{
-		Addr: fmt.Sprintf("%s:80", cfg.Server.Host),
+		Addr:     fmt.Sprintf("%s:80", cfg.Server.Host),
+		ErrorLog: log.New(filteredLog, "", 0), // 使用过滤的 ErrorLog,
 		Handler: sslManager.HTTPChallengeHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// 检查Host是否为IP地址，如果是IP则不重定向到HTTPS
 			if isIPHost(r.Host) {
@@ -594,12 +670,16 @@ func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *s
 
 // startCustomMode 启动自定义模式（监听单个端口）
 func startCustomMode(cfg *config.Config, webServer http.Handler, readTimeout, writeTimeout, idleTimeout time.Duration) {
+	// 创建过滤的 ErrorLog
+	filteredLog := newFilteredErrorLog()
+	
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.CustomPort),
 		Handler:      webServer,
 		ReadTimeout:  readTimeout,
 		WriteTimeout: writeTimeout,
 		IdleTimeout:  idleTimeout,
+		ErrorLog:     log.New(filteredLog, "", 0), // 使用过滤的 ErrorLog
 	}
 
 	go func() {

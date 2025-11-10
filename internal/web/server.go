@@ -135,11 +135,11 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	compressor := compression.NewCompressor(compression.FromConfig(cfg))
 
 	// 创建共享的内存缓存实例（合并压缩缓存和图片优化缓存）
-	// 总配置：400条目（200+200），300MB总大小（50MB+256MB），单个最大2MB
+	// 总配置：400条目（200+200），64MB总大小（按需扩展），单个最大2MB
 	sharedCache := cache.NewMemoryCache(&cache.MemoryCacheConfig{
 		Name:            "shared_cache",
 		MaxEntries:      400,               // 压缩200 + 图片200
-		MaxSizeBytes:    300 * 1024 * 1024, // 300MB (50MB + 256MB)
+		MaxSizeBytes:    64 * 1024 * 1024,  // 64MB 默认上限，可按需调节
 		MaxItemSize:     2 * 1024 * 1024,   // 2MB
 		DefaultTTL:      24 * time.Hour,    // 24小时
 		CleanupInterval: 5 * time.Minute,   // 统一使用5分钟清理间隔

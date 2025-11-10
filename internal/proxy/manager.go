@@ -63,6 +63,10 @@ type Manager struct {
 
 	// 性能优化：buffer 池，复用 WebSocket 和 copyData 的缓冲区
 	bufferPool *sync.Pool
+
+	// 性能优化：header key 规范化缓存，避免重复转换
+	headerKeyCache map[string]string
+	headerKeyMutex sync.RWMutex
 }
 
 // NewManager 创建代理管理器
@@ -88,6 +92,8 @@ func NewManager(cfg *config.Config, sslMgr *ssl.Manager, secMgr *security.Manage
 				return make([]byte, 32*1024) // 32KB buffer
 			},
 		},
+		// 性能优化：初始化 header key 缓存
+		headerKeyCache: make(map[string]string),
 	}
 
 	// 初始化负载均衡器
@@ -99,6 +105,60 @@ func NewManager(cfg *config.Config, sslMgr *ssl.Manager, secMgr *security.Manage
 // SetSlowRequestRecorder 设置慢请求记录器
 func (m *Manager) SetSlowRequestRecorder(recorder SlowRequestRecorder) {
 	m.slowRequestRecorder = recorder
+}
+
+// getCanonicalHeaderKey 获取规范化后的 header key（带缓存）
+func (m *Manager) getCanonicalHeaderKey(key string) string {
+	// 先检查缓存
+	m.headerKeyMutex.RLock()
+	if canonical, exists := m.headerKeyCache[key]; exists {
+		m.headerKeyMutex.RUnlock()
+		return canonical
+	}
+	m.headerKeyMutex.RUnlock()
+
+	// 缓存未命中，规范化并缓存
+	canonical := http.CanonicalHeaderKey(key)
+	m.headerKeyMutex.Lock()
+	// 限制缓存大小，避免内存泄漏（最多缓存1000个key）
+	if len(m.headerKeyCache) < 1000 {
+		m.headerKeyCache[key] = canonical
+	}
+	m.headerKeyMutex.Unlock()
+
+	return canonical
+}
+
+// deleteHeadersIfExist 批量删除 header（只在存在时删除，减少无效操作）
+func (m *Manager) deleteHeadersIfExist(headers http.Header, keys []string) {
+	for _, key := range keys {
+		// 使用规范化后的 key 检查是否存在（避免 headers.Del 内部的重复规范化）
+		canonicalKey := m.getCanonicalHeaderKey(key)
+		if _, exists := headers[canonicalKey]; exists {
+			// 直接使用规范化后的 key 删除，避免 headers.Del 再次规范化
+			delete(headers, canonicalKey)
+		}
+	}
+}
+
+// deleteHeadersBatch 批量删除 header（不检查是否存在，用于确定需要删除的场景）
+func (m *Manager) deleteHeadersBatch(headers http.Header, keys []string) {
+	// 使用规范化后的 key 直接删除，避免 headers.Del 内部的规范化开销
+	for _, key := range keys {
+		canonicalKey := m.getCanonicalHeaderKey(key)
+		delete(headers, canonicalKey)
+	}
+}
+
+// setHeadersBatch 批量设置 header
+func (m *Manager) setHeadersBatch(headers http.Header, headerMap map[string]string) {
+	for key, value := range headerMap {
+		if value == "" {
+			headers.Del(key)
+		} else {
+			headers.Set(key, value)
+		}
+	}
 }
 
 // SetResponseProcessor 设置响应处理器
@@ -405,24 +465,32 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 	traceHeaders := m.ExtractTraceHeaders(r)
 
 	// 在CDN模式或云存储模式下，预先清理可能存在的代理头部
+	// 性能优化：使用批量删除，减少函数调用和规范化开销
 	if cdnEnabled || isCloudStorage {
-		r.Header.Del("X-Forwarded-For")
-		r.Header.Del("X-Forwarded-Host")
-		r.Header.Del("X-Forwarded-Proto")
-		r.Header.Del("X-Forwarded-Port")
-		r.Header.Del("X-Real-IP")
-		r.Header.Del("X-Forwarded-Server")
-		r.Header.Del("X-Original-URI")
-		r.Header.Del("X-Original-Method")
+		// 基础代理头部列表
+		proxyHeaders := []string{
+			"X-Forwarded-For",
+			"X-Forwarded-Host",
+			"X-Forwarded-Proto",
+			"X-Forwarded-Port",
+			"X-Real-IP",
+			"X-Forwarded-Server",
+			"X-Original-URI",
+			"X-Original-Method",
+		}
+		m.deleteHeadersIfExist(r.Header, proxyHeaders)
 
 		// 对于云服务，进行更彻底的头部清理
 		if isCloudStorage {
-			r.Header.Del("X-Forwarded")
-			r.Header.Del("X-Client-IP")
-			r.Header.Del("X-Cluster-Client-IP")
-			r.Header.Del("Forwarded-For")
-			r.Header.Del("Forwarded")
-			r.Header.Del("CF-Connecting-IP")
+			cloudHeaders := []string{
+				"X-Forwarded",
+				"X-Client-IP",
+				"X-Cluster-Client-IP",
+				"Forwarded-For",
+				"Forwarded",
+				"CF-Connecting-IP",
+			}
+			m.deleteHeadersIfExist(r.Header, cloudHeaders)
 
 			// 处理可能导致防盗链问题的Referer
 			if referer := r.Header.Get("Referer"); referer != "" && strings.Contains(referer, "local.") {
@@ -436,21 +504,26 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 
 	if !cdnEnabled && !isCloudStorage {
 		// 非CDN且非云服务模式：设置标准的代理头部
-		r.Header.Set("X-Forwarded-Proto", scheme)
-		r.Header.Set("X-Forwarded-Host", r.Host)
-		r.Header.Set("X-Forwarded-Port", m.getPort(r))
-		r.Header.Set("X-Real-IP", clientIP)
+		// 性能优化：批量设置 header，减少函数调用
+		port := m.getPort(r)
+		proxyHeaders := map[string]string{
+			"X-Forwarded-Proto": scheme,
+			"X-Forwarded-Host":  r.Host,
+			"X-Forwarded-Port":  port,
+			"X-Real-IP":         clientIP,
+		}
+		m.setHeadersBatch(r.Header, proxyHeaders)
 
-		for key, value := range rule.UpstreamRequestHeaders {
-			trimmedKey := strings.TrimSpace(key)
-			if trimmedKey == "" {
-				continue
+		// 处理自定义上游请求头部
+		if len(rule.UpstreamRequestHeaders) > 0 {
+			upstreamHeaders := make(map[string]string, len(rule.UpstreamRequestHeaders))
+			for key, value := range rule.UpstreamRequestHeaders {
+				trimmedKey := strings.TrimSpace(key)
+				if trimmedKey != "" {
+					upstreamHeaders[trimmedKey] = value
+				}
 			}
-			if value == "" {
-				r.Header.Del(trimmedKey)
-				continue
-			}
-			r.Header.Set(trimmedKey, value)
+			m.setHeadersBatch(r.Header, upstreamHeaders)
 		}
 
 		// 正确处理 X-Forwarded-For 链
@@ -461,9 +534,12 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 		}
 
 		// 设置原始请求信息
-		r.Header.Set("X-Forwarded-Server", "sslcat")
-		r.Header.Set("X-Original-URI", r.RequestURI)
-		r.Header.Set("X-Original-Method", r.Method)
+		originalHeaders := map[string]string{
+			"X-Forwarded-Server": "sslcat",
+			"X-Original-URI":      r.RequestURI,
+			"X-Original-Method":   r.Method,
+		}
+		m.setHeadersBatch(r.Header, originalHeaders)
 
 		m.log.Debugf("Added proxy headers (non-CDN, non-cloud mode) for %s", r.Host)
 	}
@@ -518,27 +594,36 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 		}
 
 		// 移除可能的安全头，让目标服务器自己设置
-		resp.Header.Del("Strict-Transport-Security")
-		resp.Header.Del("X-Frame-Options")
-		resp.Header.Del("X-Content-Type-Options")
+		// 性能优化：批量删除
+		securityHeaders := []string{
+			"Strict-Transport-Security",
+			"X-Frame-Options",
+			"X-Content-Type-Options",
+		}
+		m.deleteHeadersBatch(resp.Header, securityHeaders)
 
 		// 添加代理标识和后端信息
 		resp.Header.Set("X-Proxy-By", "SSLcat/"+m.version)
 
-		for key, value := range rule.ResponseHeaders {
-			trimmedKey := strings.TrimSpace(key)
-			if trimmedKey == "" {
-				continue
+		// 处理自定义响应头部
+		if len(rule.ResponseHeaders) > 0 {
+			responseHeaders := make(map[string]string, len(rule.ResponseHeaders))
+			for key, value := range rule.ResponseHeaders {
+				trimmedKey := strings.TrimSpace(key)
+				if trimmedKey != "" {
+					responseHeaders[trimmedKey] = value
+				}
 			}
-			if value == "" {
-				resp.Header.Del(trimmedKey)
-				continue
-			}
-			resp.Header.Set(trimmedKey, value)
+			m.setHeadersBatch(resp.Header, responseHeaders)
 		}
-		resp.Header.Set("X-Backend-ID", backend.ID)
-		resp.Header.Set("X-Backend-Address", backend.GetAddress())
-		resp.Header.Set("X-Response-Time", responseTime.String())
+
+		// 设置后端信息
+		backendHeaders := map[string]string{
+			"X-Backend-ID":      backend.ID,
+			"X-Backend-Address": backend.GetAddress(),
+			"X-Response-Time":    responseTime.String(),
+		}
+		m.setHeadersBatch(resp.Header, backendHeaders)
 
 		// 上游缓存存储（仅对GET/HEAD请求的静态资源）
 		if m.upstreamCache != nil && (resp.Request.Method == "GET" || resp.Request.Method == "HEAD") {
@@ -705,24 +790,32 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 	isCloudStorage := m.isCloudStorageService(rule.Target)
 
 	// 在CDN模式或云存储模式下，预先清理可能存在的代理头部
+	// 性能优化：使用批量删除，减少函数调用和规范化开销
 	if cdnEnabled || isCloudStorage {
-		r.Header.Del("X-Forwarded-For")
-		r.Header.Del("X-Forwarded-Host")
-		r.Header.Del("X-Forwarded-Proto")
-		r.Header.Del("X-Forwarded-Port")
-		r.Header.Del("X-Real-IP")
-		r.Header.Del("X-Forwarded-Server")
-		r.Header.Del("X-Original-URI")
-		r.Header.Del("X-Original-Method")
+		// 基础代理头部列表
+		proxyHeaders := []string{
+			"X-Forwarded-For",
+			"X-Forwarded-Host",
+			"X-Forwarded-Proto",
+			"X-Forwarded-Port",
+			"X-Real-IP",
+			"X-Forwarded-Server",
+			"X-Original-URI",
+			"X-Original-Method",
+		}
+		m.deleteHeadersIfExist(r.Header, proxyHeaders)
 
 		// 对于云服务，进行更彻底的头部清理
 		if isCloudStorage {
-			r.Header.Del("X-Forwarded")
-			r.Header.Del("X-Client-IP")
-			r.Header.Del("X-Cluster-Client-IP")
-			r.Header.Del("Forwarded-For")
-			r.Header.Del("Forwarded")
-			r.Header.Del("CF-Connecting-IP")
+			cloudHeaders := []string{
+				"X-Forwarded",
+				"X-Client-IP",
+				"X-Cluster-Client-IP",
+				"Forwarded-For",
+				"Forwarded",
+				"CF-Connecting-IP",
+			}
+			m.deleteHeadersIfExist(r.Header, cloudHeaders)
 
 			// 处理可能导致防盗链问题的Referer
 			if referer := r.Header.Get("Referer"); referer != "" && strings.Contains(referer, "local.") {
@@ -736,21 +829,26 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 
 	if !cdnEnabled && !isCloudStorage {
 		// 非CDN且非云服务模式：设置标准的代理头部
-		r.Header.Set("X-Forwarded-Proto", scheme)
-		r.Header.Set("X-Forwarded-Host", r.Host)
-		r.Header.Set("X-Forwarded-Port", m.getPort(r))
-		r.Header.Set("X-Real-IP", clientIP)
+		// 性能优化：批量设置 header，减少函数调用
+		port := m.getPort(r)
+		proxyHeaders := map[string]string{
+			"X-Forwarded-Proto": scheme,
+			"X-Forwarded-Host":  r.Host,
+			"X-Forwarded-Port":  port,
+			"X-Real-IP":         clientIP,
+		}
+		m.setHeadersBatch(r.Header, proxyHeaders)
 
-		for key, value := range rule.UpstreamRequestHeaders {
-			trimmedKey := strings.TrimSpace(key)
-			if trimmedKey == "" {
-				continue
+		// 处理自定义上游请求头部
+		if len(rule.UpstreamRequestHeaders) > 0 {
+			upstreamHeaders := make(map[string]string, len(rule.UpstreamRequestHeaders))
+			for key, value := range rule.UpstreamRequestHeaders {
+				trimmedKey := strings.TrimSpace(key)
+				if trimmedKey != "" {
+					upstreamHeaders[trimmedKey] = value
+				}
 			}
-			if value == "" {
-				r.Header.Del(trimmedKey)
-				continue
-			}
-			r.Header.Set(trimmedKey, value)
+			m.setHeadersBatch(r.Header, upstreamHeaders)
 		}
 
 		// 正确处理 X-Forwarded-For 链
@@ -761,9 +859,12 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 		}
 
 		// 设置原始请求信息
-		r.Header.Set("X-Forwarded-Server", "sslcat")
-		r.Header.Set("X-Original-URI", r.RequestURI)
-		r.Header.Set("X-Original-Method", r.Method)
+		originalHeaders := map[string]string{
+			"X-Forwarded-Server": "sslcat",
+			"X-Original-URI":      r.RequestURI,
+			"X-Original-Method":   r.Method,
+		}
+		m.setHeadersBatch(r.Header, originalHeaders)
 
 		m.log.Debugf("Added proxy headers (non-CDN, non-cloud mode) for %s", r.Host)
 	} else {
@@ -790,21 +891,27 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 			}
 		}
 		// 移除可能的安全头，让目标服务器自己设置
-		resp.Header.Del("Strict-Transport-Security")
-		resp.Header.Del("X-Frame-Options")
-		resp.Header.Del("X-Content-Type-Options")
+		// 性能优化：批量删除
+		securityHeaders := []string{
+			"Strict-Transport-Security",
+			"X-Frame-Options",
+			"X-Content-Type-Options",
+		}
+		m.deleteHeadersBatch(resp.Header, securityHeaders)
+
 		// 添加代理标识
 		resp.Header.Set("X-Proxy-By", "SSLcat/"+m.version)
-		for key, value := range rule.ResponseHeaders {
-			trimmedKey := strings.TrimSpace(key)
-			if trimmedKey == "" {
-				continue
+
+		// 处理自定义响应头部
+		if len(rule.ResponseHeaders) > 0 {
+			responseHeaders := make(map[string]string, len(rule.ResponseHeaders))
+			for key, value := range rule.ResponseHeaders {
+				trimmedKey := strings.TrimSpace(key)
+				if trimmedKey != "" {
+					responseHeaders[trimmedKey] = value
+				}
 			}
-			if value == "" {
-				resp.Header.Del(trimmedKey)
-				continue
-			}
-			resp.Header.Set(trimmedKey, value)
+			m.setHeadersBatch(resp.Header, responseHeaders)
 		}
 
 		// 图片优化处理

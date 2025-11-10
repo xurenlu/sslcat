@@ -27,6 +27,13 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 )
 
+// certMetadata 证书元数据缓存
+type certMetadata struct {
+	exists      bool      // 证书文件是否存在
+	expiresAt   time.Time // 证书过期时间
+	lastChecked time.Time // 最后检查时间
+}
+
 // Manager SSL证书管理器
 type Manager struct {
 	config        *config.Config
@@ -45,9 +52,12 @@ type Manager struct {
 	dnsManager *DNSProviderManager
 	// 通知集成器
 	notificationIntegrator *notification.NotificationIntegrator
-	// 失败域名缓存：记录已知没有证书的域名，避免重复查找（TTL: 5分钟）
+	// 失败域名缓存：记录已知没有证书的域名，避免重复查找（TTL: 15分钟）
 	failedDomainCache map[string]time.Time
 	failedCacheMutex  sync.RWMutex
+	// 证书元数据缓存：缓存证书文件存在性和有效期，避免频繁磁盘查找
+	certMetadataCache map[string]*certMetadata
+	metadataMutex     sync.RWMutex
 }
 
 // NewManager 创建SSL管理器
@@ -66,6 +76,7 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 		tempAllowedDomains: make(map[string]time.Time),
 		dnsManager:         NewDNSProviderManager(log),
 		failedDomainCache:  make(map[string]time.Time),
+		certMetadataCache:  make(map[string]*certMetadata),
 	}
 
 	// 初始化一个默认自签证书（用于未允许域名回退，避免写盘）
@@ -114,6 +125,8 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 
 	// 启动失败缓存清理 goroutine
 	go manager.cleanFailedCache()
+	// 启动证书元数据缓存清理 goroutine
+	go manager.cleanCertMetadataCache()
 
 	return manager, nil
 }
@@ -273,6 +286,96 @@ func (m *Manager) cleanFailedCache() {
 	}
 }
 
+// cleanCertMetadataCache 定期清理过期的证书元数据缓存条目
+func (m *Manager) cleanCertMetadataCache() {
+	ticker := time.NewTicker(30 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			now := time.Now()
+			m.metadataMutex.Lock()
+			cleaned := 0
+			for domain, metadata := range m.certMetadataCache {
+				// 清理超过1小时未检查的元数据，或已过期的证书元数据
+				if now.Sub(metadata.lastChecked) > 1*time.Hour || now.After(metadata.expiresAt) {
+					delete(m.certMetadataCache, domain)
+					cleaned++
+				}
+			}
+			m.metadataMutex.Unlock()
+			if cleaned > 0 {
+				m.log.Debugf("Cleaned %d expired certificate metadata cache entries", cleaned)
+			}
+		case <-m.stopChan:
+			return
+		}
+	}
+}
+
+// getCertMetadata 获取证书元数据（优先从缓存，避免磁盘查找）
+func (m *Manager) getCertMetadata(domain string) *certMetadata {
+	m.metadataMutex.RLock()
+	metadata, exists := m.certMetadataCache[domain]
+	m.metadataMutex.RUnlock()
+
+	// 如果缓存存在且未过期（1小时内检查过），直接返回
+	if exists && time.Since(metadata.lastChecked) < 1*time.Hour {
+		return metadata
+	}
+
+	// 缓存不存在或已过期，检查磁盘
+	certPath := filepath.Join(m.config.SSL.CertDir, domain+".crt")
+	keyPath := filepath.Join(m.config.SSL.KeyDir, domain+".key")
+
+	metadata = &certMetadata{
+		exists:      false,
+		lastChecked: time.Now(),
+	}
+
+	// 检查文件是否存在
+	if _, err := os.Stat(certPath); err == nil {
+		if _, err := os.Stat(keyPath); err == nil {
+			metadata.exists = true
+			// 尝试读取证书获取过期时间（不加载完整证书，只解析元数据）
+			if certData, err := os.ReadFile(certPath); err == nil {
+				if block, _ := pem.Decode(certData); block != nil {
+					if x509Cert, err := x509.ParseCertificate(block.Bytes); err == nil {
+						metadata.expiresAt = x509Cert.NotAfter
+					}
+				}
+			}
+		}
+	}
+
+	// 更新缓存
+	m.metadataMutex.Lock()
+	m.certMetadataCache[domain] = metadata
+	m.metadataMutex.Unlock()
+
+	return metadata
+}
+
+// updateCertMetadata 更新证书元数据缓存（在证书加载/刷新时调用）
+func (m *Manager) updateCertMetadata(domain string, cert *tls.Certificate) {
+	if cert == nil || len(cert.Certificate) == 0 {
+		return
+	}
+
+	x509Cert, err := x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		return
+	}
+
+	m.metadataMutex.Lock()
+	m.certMetadataCache[domain] = &certMetadata{
+		exists:      true,
+		expiresAt:   x509Cert.NotAfter,
+		lastChecked: time.Now(),
+	}
+	m.metadataMutex.Unlock()
+}
+
 // expiryNotifier 定期检查证书到期，分别在15/7/3天提醒一次
 func (m *Manager) expiryNotifier() {
 	ticker := time.NewTicker(12 * time.Hour)
@@ -358,49 +461,45 @@ func (m *Manager) GetCertificate(domain string) (*tls.Certificate, error) {
 	}
 	m.certMutex.RUnlock()
 
-	// 尝试从文件加载证书
+	// 使用元数据缓存检查证书是否存在，避免频繁磁盘查找
+	metadata := m.getCertMetadata(domain)
+	if !metadata.exists {
+		// 证书不存在，添加到失败缓存
+		m.failedCacheMutex.Lock()
+		m.failedDomainCache[domain] = time.Now().Add(15 * time.Minute)
+		m.failedCacheMutex.Unlock()
+		return nil, fmt.Errorf("no certificate for %s", domain)
+	}
+
+	// 证书文件存在，从磁盘加载
 	certPath := filepath.Join(m.config.SSL.CertDir, domain+".crt")
 	keyPath := filepath.Join(m.config.SSL.KeyDir, domain+".key")
 
-	if _, err := os.Stat(certPath); err == nil {
-		if _, err := os.Stat(keyPath); err == nil {
-			cert, err := tls.LoadX509KeyPair(certPath, keyPath)
-			if err != nil {
-				m.log.Errorf("Failed to load certificate %s: %v", domain, err)
-			} else {
-				m.certMutex.Lock()
-				m.certCache[domain] = &cert
-				m.certMutex.Unlock()
-				// 清除失败缓存（如果存在）
-				m.failedCacheMutex.Lock()
-				delete(m.failedDomainCache, domain)
-				m.failedCacheMutex.Unlock()
-				return &cert, nil
-			}
+	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+	if err != nil {
+		m.log.Errorf("Failed to load certificate %s: %v", domain, err)
+		// 加载失败，更新元数据缓存标记为不存在
+		m.metadataMutex.Lock()
+		m.certMetadataCache[domain] = &certMetadata{
+			exists:      false,
+			lastChecked: time.Now(),
 		}
+		m.metadataMutex.Unlock()
+		return nil, err
 	}
 
-	// 检查是否有通配符证书
-	if wildcardCert := m.findWildcardCert(domain); wildcardCert != nil {
-		// 清除失败缓存（如果存在）
-		m.failedCacheMutex.Lock()
-		delete(m.failedDomainCache, domain)
-		m.failedCacheMutex.Unlock()
-		return wildcardCert, nil
-	}
+	// 加载成功，更新证书缓存和元数据缓存
+	m.certMutex.Lock()
+	m.certCache[domain] = &cert
+	m.certMutex.Unlock()
+	m.updateCertMetadata(domain, &cert)
 
-	// 如果没有证书
-	if m.config.SSL.DisableSelfSigned {
-		// 将失败结果缓存5分钟，避免重复查找
-		m.failedCacheMutex.Lock()
-		m.failedDomainCache[domain] = time.Now().Add(5 * time.Minute)
-		m.failedCacheMutex.Unlock()
-		m.log.Warnf("No certificate available for %s and self-signed fallback is disabled", domain)
-		return nil, fmt.Errorf("no certificate for %s and self-signed disabled", domain)
-	}
-	// 生成自签名证书作为临时方案
-	m.log.Infof("Generating self-signed certificate for domain %s", domain)
-	return m.generateSelfSignedCert(domain)
+	// 清除失败缓存（如果存在）
+	m.failedCacheMutex.Lock()
+	delete(m.failedDomainCache, domain)
+	m.failedCacheMutex.Unlock()
+
+	return &cert, nil
 }
 
 // generateSelfSignedCert 生成自签名证书
@@ -463,6 +562,7 @@ func (m *Manager) generateSelfSignedCert(domain string) (*tls.Certificate, error
 	m.certMutex.Lock()
 	m.certCache[domain] = &cert
 	m.certMutex.Unlock()
+	m.updateCertMetadata(domain, &cert) // 更新元数据缓存
 
 	m.log.Infof("Successfully generated and cached self-signed certificate for %s", domain)
 	return &cert, nil
@@ -1049,6 +1149,10 @@ func (m *Manager) GenerateMultiDomainCert(domains []string) (*tls.Certificate, e
 		m.certCache[domain] = &cert
 	}
 	m.certMutex.Unlock()
+	// 更新所有域名的元数据缓存
+	for _, domain := range domains {
+		m.updateCertMetadata(domain, &cert)
+	}
 
 	m.log.Infof("Successfully generated and cached multi-domain certificate: %v", domains)
 	return &cert, nil
@@ -1074,6 +1178,7 @@ func (m *Manager) LoadCertificateFromDisk(domain string) error {
 	m.certMutex.Lock()
 	m.certCache[domain] = &cert
 	m.certMutex.Unlock()
+	m.updateCertMetadata(domain, &cert) // 更新元数据缓存
 	m.log.Infof("Loaded certificate from disk into cache: %s", domain)
 	return nil
 }

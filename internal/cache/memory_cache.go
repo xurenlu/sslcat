@@ -1,8 +1,9 @@
 package cache
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/gob"
 	"fmt"
 	"time"
 
@@ -27,6 +28,12 @@ func (item *MemoryCacheItem) IsExpired() bool {
 		return false // 永不过期
 	}
 	return time.Now().After(item.ExpiresAt)
+}
+
+func init() {
+	gob.Register(MemoryCacheItem{})
+	gob.Register(&MemoryCacheItem{})
+	gob.Register(map[string]interface{}{})
 }
 
 // MemoryCacheConfig 统一的内存缓存配置
@@ -113,8 +120,8 @@ func (mc *MemoryCache) Get(key string) (*MemoryCacheItem, bool) {
 	}
 
 	// 反序列化缓存项
-	var item MemoryCacheItem
-	if err := json.Unmarshal(data, &item); err != nil {
+	item, err := unmarshalCacheItem(data)
+	if err != nil {
 		mc.misses++
 		mc.log.Errorf("Failed to unmarshal cache item: %v", err)
 		return nil, false
@@ -133,11 +140,14 @@ func (mc *MemoryCache) Get(key string) (*MemoryCacheItem, bool) {
 	item.AccessCount++
 
 	// 重新序列化并存储（更新访问时间）
-	updatedData, _ := json.Marshal(item)
-	mc.cache.Set(key, updatedData)
+	if updatedData, err := marshalCacheItem(item); err == nil {
+		_ = mc.cache.Set(key, updatedData)
+	} else {
+		mc.log.Errorf("Failed to re-marshal cache item: %v", err)
+	}
 
 	mc.hits++
-	return &item, true
+	return item, true
 }
 
 // Set 设置缓存项
@@ -174,7 +184,7 @@ func (mc *MemoryCache) SetWithMetadata(key string, data []byte, metadata map[str
 	}
 
 	// 序列化
-	itemData, err := json.Marshal(item)
+	itemData, err := marshalCacheItem(item)
 	if err != nil {
 		return fmt.Errorf("failed to marshal cache item: %w", err)
 	}
@@ -198,13 +208,19 @@ func (mc *MemoryCache) Clear() {
 // Stats 获取统计信息
 func (mc *MemoryCache) Stats() map[string]interface{} {
 	stats := mc.cache.Len()
+	totalRequests := mc.hits + mc.misses
+	hitRate := 0.0
+	if totalRequests > 0 {
+		hitRate = float64(mc.hits) / float64(totalRequests) * 100
+	}
+
 	return map[string]interface{}{
 		"entries":          stats,
 		"hits":             mc.hits,
 		"misses":           mc.misses,
 		"evictions":        mc.evictions,
 		"expired":          mc.expired,
-		"hit_rate":         float64(mc.hits) / float64(mc.hits+mc.misses) * 100,
+		"hit_rate":         hitRate,
 		"cache_size_bytes": int64(stats) * 1024, // 估算
 	}
 }
@@ -222,4 +238,23 @@ func (mc *MemoryCache) GetSize() int64 {
 func (mc *MemoryCache) Close() {
 	mc.cache.Close()
 	mc.log.Info("Memory cache closed")
+}
+
+func marshalCacheItem(item *MemoryCacheItem) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	if err := enc.Encode(item); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func unmarshalCacheItem(data []byte) (*MemoryCacheItem, error) {
+	buf := bytes.NewReader(data)
+	dec := gob.NewDecoder(buf)
+	var item MemoryCacheItem
+	if err := dec.Decode(&item); err != nil {
+		return nil, err
+	}
+	return &item, nil
 }

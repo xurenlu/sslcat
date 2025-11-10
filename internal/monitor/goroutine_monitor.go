@@ -152,13 +152,18 @@ func (gm *GoroutineMonitor) getTrend() string {
 	gm.mu.RLock()
 	defer gm.mu.RUnlock()
 
-	if len(gm.history) < 10 {
+	if len(gm.history) < 20 {
 		return "数据不足"
 	}
 
 	// 比较最近10次和之前10次的平均值
-	recent := gm.history[len(gm.history)-10:]
-	previous := gm.history[len(gm.history)-20 : len(gm.history)-10]
+	// 确保有足够的元素，避免 slice bounds out of range
+	historyLen := len(gm.history)
+	if historyLen < 20 {
+		return "数据不足"
+	}
+	recent := gm.history[historyLen-10:]
+	previous := gm.history[historyLen-20 : historyLen-10]
 
 	recentAvg := average(recent)
 	previousAvg := average(previous)

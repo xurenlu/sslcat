@@ -27,7 +27,8 @@ variables:
   - name: JITSI_HTTPS_PORT
     type: number
     title: HTTPS 端口
-    default: 8443    min: 1024
+    default: 8443
+    min: 1024
     max: 65535
     description: Jitsi Meet HTTPS 端口
   - name: JITSI_DOMAIN
