@@ -3,7 +3,7 @@ name: WhisperX (视频翻译)
 category: ai
 subcategory: video-translation
 tags: [python, ai, video, translation, whisperx, gpu]
-description: 强大的视频翻译工具，支持语音识别、时间戳对齐和翻译。
+description: [不可用] 镜像不存在 - 强大的视频翻译工具，支持语音识别、时间戳对齐和翻译。
 icon: whisperx
 version: 1.0.0
 author: SSLcat Team

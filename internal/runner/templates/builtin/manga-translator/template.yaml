@@ -3,7 +3,7 @@ name: Manga Translator (图片翻译)
 category: ai
 subcategory: image-translation
 tags: [python, ai, image, translation, ocr, manga, gpu]
-description: 漫画/图片翻译工具，支持 OCR 识别、文本翻译和图片修复，专为漫画优化。
+description: [不可用] 镜像不存在 - 漫画/图片翻译工具，支持 OCR 识别、文本翻译和图片修复，专为漫画优化。
 icon: manga-translator
 version: 1.0.0
 author: SSLcat Team
