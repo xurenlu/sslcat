@@ -217,29 +217,39 @@ func (s *Scanner) LoadComposeFile(template *TemplateInfo) (*ComposeFile, error) 
 func (s *Scanner) cleanComposeTemplateVariables(data []byte) []byte {
 	content := string(data)
 	// 简单替换：将所有 {{VAR}} 替换为 "latest"（用于版本）或 "test"（用于其他）
-	// 先处理版本相关的变量
-	reVersion := regexp.MustCompile(`\{\{([A-Z_]*VERSION[A-Z_]*)\}\}`)
+	// 先处理版本相关的变量（支持数字，如 N8N_VERSION）
+	reVersion := regexp.MustCompile(`\{\{([A-Z0-9_]*VERSION[A-Z0-9_]*)\}\}`)
 	content = reVersion.ReplaceAllString(content, `latest`)
 	
-	// 处理端口变量，替换为默认端口
-	rePort := regexp.MustCompile(`\{\{([A-Z_]*PORT[A-Z_]*)\}\}`)
+	// 处理端口变量，替换为默认端口（支持数字，如 N8N_PORT）
+	rePort := regexp.MustCompile(`\{\{([A-Z0-9_]*PORT[A-Z0-9_]*)\}\}`)
 	content = rePort.ReplaceAllString(content, `8080`)
 	
 	// 处理其他变量，替换为简单的占位符
-	reOther := regexp.MustCompile(`\{\{([A-Z_]+)\}\}`)
-	content = reOther.ReplaceAllStringFunc(content, func(match string) string {
-		varName := strings.Trim(match, "{}")
-		// 根据变量类型返回合适的默认值
-		if strings.Contains(varName, "NAME") || strings.Contains(varName, "DOMAIN") {
-			return `test-app`
+	// 使用更简单可靠的方式：先替换已知的常见变量，再处理其他变量
+	// 先处理版本和端口（已在上面处理）
+	
+	// 处理其他变量，使用正则表达式匹配 {{VAR}} 格式（支持数字，如 N8N_USERNAME）
+	reVar := regexp.MustCompile(`\{\{([A-Z0-9_]+)\}\}`)
+	content = reVar.ReplaceAllStringFunc(content, func(match string) string {
+		// 提取变量名：去掉 {{ 和 }}
+		varName := strings.TrimPrefix(strings.TrimSuffix(match, "}}"), "{{")
+		
+		// 根据变量类型返回合适的默认值（按优先级匹配）
+		var value string
+		if strings.Contains(varName, "PASSWORD") || strings.Contains(varName, "SECRET") || strings.Contains(varName, "KEY") {
+			value = `test-password`
+		} else if strings.Contains(varName, "USERNAME") || strings.Contains(varName, "USER") {
+			value = `test-user`
+		} else if strings.Contains(varName, "DATABASE") || strings.Contains(varName, "DB") {
+			value = `test-db`
+		} else if strings.Contains(varName, "NAME") || strings.Contains(varName, "DOMAIN") {
+			value = `test-app`
+		} else {
+			value = `test-value`
 		}
-		if strings.Contains(varName, "PASSWORD") || strings.Contains(varName, "SECRET") {
-			return `test-password`
-		}
-		if strings.Contains(varName, "USER") {
-			return `test-user`
-		}
-		return `test-value`
+		
+		return value
 	})
 	
 	return []byte(content)

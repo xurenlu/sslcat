@@ -1,7 +1,7 @@
 
 services:
   stable-diffusion-webui:
-    image: lscr.io/linuxserver/stable-diffusion-webui:{{SD_WEBUI_VERSION}}
+    image: universonic/stable-diffusion-webui:{{SD_WEBUI_VERSION}}
     container_name: {{APP_NAME}}_stable_diffusion_webui
     restart: unless-stopped
     ports:

@@ -9,14 +9,13 @@ services:
     environment:
       TTS_MODEL: "{{TTS_MODEL}}"
       TTS_LANG: "{{TTS_LANG}}"
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
     volumes:
       - coqui_tts_data:/app/models
     networks:
       - {{APP_NAME}}_network
     runtime: nvidia
-    environment:
-      NVIDIA_VISIBLE_DEVICES: all
-      NVIDIA_DRIVER_CAPABILITIES: compute,utility
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5002"]
       interval: 30s

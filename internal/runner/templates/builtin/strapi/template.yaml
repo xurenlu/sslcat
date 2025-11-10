@@ -14,8 +14,8 @@ variables:
   - name: STRAPI_VERSION
     type: select
     title: Strapi 版本
-    default: "4.18.5"
-    options: ["latest", "4.18.5", "4.17.0"]
+    default: "latest"
+    options: ["latest", "4.18.4", "4.17.0"]
     description: 选择 Strapi 版本
   - name: POSTGRES_VERSION
     type: select

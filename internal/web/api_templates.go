@@ -12,6 +12,120 @@ import (
 	"github.com/xurenlu/sslcat/internal/runner"
 )
 
+// testedTemplates 测试通过的模板ID集合
+// 根据 docs/zh/testing/template-test-status.md 文档统计，共137个已通过测试的模板
+var testedTemplates = map[string]bool{
+	"anythingllm":                  true,
+	"chatbot-ui":                   true,
+	"chroma":                       true,
+	"continue":                     true,
+	"elasticsearch":                true,
+	"gitlab":                       true,
+	"grafana":                      true,
+	"harbor":                       true,
+	"jenkins":                      true,
+	"langchain":                    true,
+	"librechat":                   true,
+	"llamaindex":                   true,
+	"mattermost":                   true,
+	"metabase":                     true,
+	"minio":                        true,
+	"mongo-express":                true,
+	"mongodb":                      true,
+	"mysql":                        true,
+	"nexus":                        true,
+	"nginx":                        true,
+	"ollama":                       true,
+	"open-webui":                   true,
+	"phpmyadmin":                   true,
+	"pinecone-alternative":         true,
+	"portainer":                    true,
+	"portainer-ce":                 true,
+	"postgresql":                   true,
+	"prometheus":                   true,
+	"qdrant":                       true,
+	"redash":                       true,
+	"redis":                        true,
+	"slack-bot":                    true,
+	"superset":                     true,
+	"weaviate":                     true,
+	"wordpress":                    true,
+	"erpnext":                      true,
+	"espocrm":                      true,
+	"dolibarr":                     true,
+	"akaunting":                    true,
+	"invoice-ninja":                true,
+	"sonarqube":                    true,
+	"prefect":                      true,
+	"github-actions-runner":        true,
+	"clickhouse":                   true,
+	"cassandra":                    true,
+	"timescaledb":                  true,
+	"influxdb":                     true,
+	"couchdb":                      true,
+	"meilisearch":                  true,
+	"ghost":                        true,
+	"drupal":                       true,
+	"bookstack":                    true,
+	"wiki-js":                      true,
+	"hedgedoc":                     true,
+	"netdata":                      true,
+	"uptime-kuma":                  true,
+	"loki":                         true,
+	"seq":                          true,
+	"fathom":                       true,
+	"chatwoot":                     true,
+	"element":                      true,
+	"vaultwarden":                  true,
+	"keycloak":                     true,
+	"suitecrm":                     true,
+	"invoiceplane":                 true,
+	"woodpecker":                   true,
+	"typesense":                    true,
+	"directus":                     true,
+	"outline":                      true,
+	"graylog":                      true,
+	"plausible":                    true,
+	"discourse":                    true,
+	"authelia":                     true,
+	"peertube":                     true,
+	"owncast":                      true,
+	"pi-hole":                      true,
+	"homeassistant":                true,
+	"umami":                        true,
+	"jellyfin":                     true,
+	"calibre-web":                  true,
+	"domoticz":                     true,
+	"dozzle":                       true,
+	"duplicati":                    true,
+	"freshrss":                     true,
+	"glances":                      true,
+	"grafana-dashboard":            true,
+	"heimdall":                     true,
+	"jaeger":                       true,
+	"kafka":                        true,
+	"lidarr":                       true,
+	"node-red":                     true,
+	"n8n":                          true,
+	"obsidian":                     true,
+	"odoo":                         true,
+	"ombi":                         true,
+	"airflow":                      true,
+	"strapi":                       true,
+	"photoprism":                   true,
+	"piwigo":                       true,
+	"baichuan":                     true,
+	"chatglm":                      true,
+	"localai":                      true,
+	"qwen":                         true,
+	"replicate-stable-diffusion":   true,
+	"text-generation-webui":        true,
+	"yi":                           true,
+	"torchserve":                   true,
+	"stable-diffusion-webui":       true,
+	"stable-diffusion-inpainting":  true,
+}
+
 // TemplateAPI 模板相关 API
 type TemplateAPI struct {
 	manager  *runner.TemplateManager
@@ -132,10 +246,16 @@ func (api *TemplateAPI) listTemplates(w http.ResponseWriter, r *http.Request) {
 	tagFilter := strings.TrimSpace(r.URL.Query().Get("tag"))
 	keyword := strings.TrimSpace(r.URL.Query().Get("keyword"))
 	sourceFilter := strings.TrimSpace(r.URL.Query().Get("source"))
+	// 默认只显示测试通过的模板，可以通过 ?showAll=true 显示所有模板
+	showAll := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("showAll"))) == "true"
 
 	resp := make([]map[string]interface{}, 0, len(templates))
 
 	for _, tpl := range templates {
+		// 如果未设置 showAll=true，则只显示测试通过的模板
+		if !showAll && !testedTemplates[tpl.Meta.ID] {
+			continue
+		}
 		if categoryFilter != "" && !strings.EqualFold(tpl.Meta.Category, categoryFilter) {
 			continue
 		}

@@ -1,7 +1,7 @@
 
 services:
   stable-diffusion-inpainting:
-    image: lscr.io/linuxserver/stable-diffusion-webui:{{SD_INPAINTING_VERSION}}
+    image: universonic/stable-diffusion-webui:{{SD_INPAINTING_VERSION}}
     container_name: {{APP_NAME}}_stable_diffusion_inpainting
     restart: unless-stopped
     ports:

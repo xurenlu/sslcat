@@ -1,7 +1,7 @@
 
 services:
   comfyui:
-    image: comfyanonymous/comfyui:{{COMFYUI_VERSION}}
+    image: obeliks/comfyui:{{COMFYUI_VERSION}}
     container_name: {{APP_NAME}}_comfyui
     restart: unless-stopped
     ports:
