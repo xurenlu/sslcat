@@ -43,6 +43,8 @@ interface Template {
   description: string
   variables?: TemplateVariable[]
   services?: any[]
+  gpu_required?: boolean
+  requires_ghcr_token?: boolean
 }
 
 const TemplateDeploy: React.FC = () => {
@@ -72,6 +74,8 @@ const TemplateDeploy: React.FC = () => {
           description: response.meta.description,
           variables: response.meta.variables || [],
           services: response.meta.services || [],
+          gpu_required: response.meta.gpu_required || false,
+          requires_ghcr_token: response.meta.requires_ghcr_token || false,
         })
 
         // 初始化表单数据
@@ -122,6 +126,17 @@ const TemplateDeploy: React.FC = () => {
         }
       })
 
+      // 验证 GitHub token（如果需要）
+      if (template?.requires_ghcr_token && !formData.github_token) {
+        toast({
+          title: '验证失败',
+          description: '此模板使用 ghcr.io 镜像，需要提供 GitHub Personal Access Token',
+          status: 'error',
+          duration: 3000,
+        })
+        return
+      }
+
       const response: any = await api.post('/git-server/templates/deploy', {
         app_name: formData.app_name,
         template_id: templateId,
@@ -129,6 +144,7 @@ const TemplateDeploy: React.FC = () => {
         domains: [],
         variables,
         auto_ssl: formData.auto_ssl || false,
+        github_token: formData.github_token || '',
       })
 
       if (response && response.success) {
@@ -185,6 +201,19 @@ const TemplateDeploy: React.FC = () => {
         <Heading size="lg">部署模板: {template.name}</Heading>
         <Text color="gray.600">{template.description}</Text>
 
+        {/* GPU 需求提示 */}
+        {template.gpu_required && (
+          <Alert status="warning">
+            <AlertIcon />
+            <Box>
+              <Text fontWeight="bold">此模板需要 GPU 支持</Text>
+              <Text fontSize="sm" mt={1}>
+                请确保您的服务器已安装 NVIDIA 驱动和 nvidia-container-toolkit。如果当前系统没有 GPU，此模板将无法运行。
+              </Text>
+            </Box>
+          </Alert>
+        )}
+
         <Card>
           <CardBody>
             <form onSubmit={handleSubmit}>
@@ -225,6 +254,23 @@ const TemplateDeploy: React.FC = () => {
                       自动申请 SSL 证书
                     </Checkbox>
                   </FormControl>
+
+                  {/* GitHub Token 输入（如果需要） */}
+                  {template.requires_ghcr_token && (
+                    <FormControl isRequired>
+                      <FormLabel>GitHub Personal Access Token</FormLabel>
+                      <Input
+                        type="password"
+                        value={formData.github_token || ''}
+                        onChange={(e) => handleChange('github_token', e.target.value)}
+                        placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                      />
+                      <Text fontSize="sm" color="gray.500" mt={1}>
+                        此模板使用 ghcr.io 镜像，需要 GitHub Personal Access Token 才能拉取镜像。
+                        请在 GitHub Settings → Developer settings → Personal access tokens 中创建 token，需要 read:packages 权限。
+                      </Text>
+                    </FormControl>
+                  )}
                 </VStack>
 
                 <Divider />

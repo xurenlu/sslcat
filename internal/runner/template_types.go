@@ -79,6 +79,7 @@ type TemplateServiceResourceHints struct {
 	CPU      string `yaml:"cpu,omitempty" json:"cpu,omitempty"`
 	Memory   string `yaml:"memory,omitempty" json:"memory,omitempty"`
 	Storage  string `yaml:"storage,omitempty" json:"storage,omitempty"`
+	GPU      string `yaml:"gpu,omitempty" json:"gpu,omitempty"`
 	Replicas int    `yaml:"replicas,omitempty" json:"replicas,omitempty"`
 }
 

@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"io/fs"
 	"net/http"
 	"sort"
 	"strings"
@@ -192,7 +193,52 @@ func (api *TemplateAPI) buildTemplateMeta(tpl *runner.AppTemplate) map[string]in
 		response["last_modified"] = tpl.LastModified.Format(time.RFC3339)
 	}
 
+	// 检测是否需要 GPU
+	if meta.Metadata != nil {
+		if gpuRequired, ok := meta.Metadata["gpu_required"]; ok && strings.ToLower(gpuRequired) == "true" {
+			response["gpu_required"] = true
+		} else {
+			// 检查 services 中是否有 gpu: required
+			for _, svc := range meta.Services {
+				if svc.Resources.GPU == "required" {
+					response["gpu_required"] = true
+					break
+				}
+			}
+		}
+	} else {
+		// 检查 services 中是否有 gpu: required
+		for _, svc := range meta.Services {
+			if svc.Resources.GPU == "required" {
+				response["gpu_required"] = true
+				break
+			}
+		}
+	}
+
+	// 检测是否使用 ghcr.io 镜像
+	response["requires_ghcr_token"] = api.checkRequiresGHCRToken(tpl)
+
 	return response
+}
+
+// checkRequiresGHCRToken 检查模板是否使用 ghcr.io 镜像
+func (api *TemplateAPI) checkRequiresGHCRToken(tpl *runner.AppTemplate) bool {
+	composePath := tpl.ComposePath
+	if composePath == "" {
+		composePath = "docker-compose.yml"
+	}
+
+	// 尝试读取 compose 文件
+	composeBytes, err := fs.ReadFile(tpl.RootFS, composePath)
+	if err != nil {
+		// 如果无法读取，返回 false（保守策略）
+		return false
+	}
+
+	composeContent := string(composeBytes)
+	// 检查是否包含 ghcr.io
+	return strings.Contains(composeContent, "ghcr.io/")
 }
 
 func (api *TemplateAPI) matchKeyword(tpl *runner.AppTemplate, keyword string) bool {

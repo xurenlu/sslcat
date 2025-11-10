@@ -43,6 +43,7 @@ type DeployFromTemplateParams struct {
 	Domains       []string
 	Variables     map[string]interface{}
 	AutoSSL       bool
+	GitHubToken   string
 }
 
 // DeployFromTemplateResult 部署结果
@@ -72,6 +73,15 @@ func (do *DeployOrchestrator) DeployFromTemplate(
 	}
 
 	logger.WriteLog("info", "orchestrator", fmt.Sprintf("开始从模板 %s 部署应用 %s", params.TemplateID, params.AppName))
+
+	// 检测 GPU 需求
+	if do.requiresGPU(tpl.Meta) {
+		logger.WriteLog("info", "orchestrator", "检测到模板需要 GPU，正在验证 GPU 可用性...")
+		if !do.checkGPUAvailable(logger) {
+			return nil, fmt.Errorf("此模板需要 GPU，但当前系统未检测到可用的 GPU。请确保已安装 NVIDIA 驱动和 nvidia-container-toolkit")
+		}
+		logger.WriteLog("success", "orchestrator", "GPU 检测通过")
+	}
 
 	// 生成凭证
 	logger.WriteLog("info", "orchestrator", "生成服务凭证...")
@@ -113,7 +123,7 @@ func (do *DeployOrchestrator) DeployFromTemplate(
 
 	// 执行部署
 	logger.WriteLog("info", "orchestrator", "开始执行 Docker Compose 部署...")
-	if err := do.executeComposeDeploy(ctx, result, logger); err != nil {
+	if err := do.executeComposeDeploy(ctx, result, params.GitHubToken, logger); err != nil {
 		return nil, fmt.Errorf("执行部署失败: %w", err)
 	}
 
@@ -159,7 +169,7 @@ func (do *DeployOrchestrator) DeployFromTemplate(
 	}, nil
 }
 
-func (do *DeployOrchestrator) executeComposeDeploy(ctx context.Context, result *ComposeRenderResult, logger *DeployLogger) error {
+func (do *DeployOrchestrator) executeComposeDeploy(ctx context.Context, result *ComposeRenderResult, githubToken string, logger *DeployLogger) error {
 	// 从变量中获取应用名称
 	appName := result.Variables["APP_NAME"]
 	if appName == "" {
@@ -176,6 +186,18 @@ func (do *DeployOrchestrator) executeComposeDeploy(ctx context.Context, result *
 	validateCmd.Dir = filepath.Dir(result.ComposeFile)
 	if err := validateCmd.Run(); err != nil {
 		return fmt.Errorf("Compose 配置验证失败: %w", err)
+	}
+
+	// 检查是否需要 GHCR 登录
+	if do.requiresGHCRToken(result.ComposeFile) {
+		if githubToken == "" {
+			return fmt.Errorf("此模板使用 ghcr.io 镜像，需要提供 GitHub Personal Access Token")
+		}
+		logger.WriteLog("info", "compose", "检测到 ghcr.io 镜像，正在登录 GitHub Container Registry...")
+		if err := do.loginGHCR(githubToken, logger); err != nil {
+			return fmt.Errorf("GHCR 登录失败: %w", err)
+		}
+		logger.WriteLog("success", "compose", "GHCR 登录成功")
 	}
 
 	// 拉取镜像
@@ -394,6 +416,68 @@ func maskPassword(pwd string) string {
 		return "****"
 	}
 	return pwd[:2] + "****" + pwd[len(pwd)-2:]
+}
+
+// requiresGPU 检查模板是否需要 GPU
+func (do *DeployOrchestrator) requiresGPU(meta TemplateMeta) bool {
+	// 检查 metadata.gpu_required
+	if meta.Metadata != nil {
+		if gpuRequired, ok := meta.Metadata["gpu_required"]; ok && strings.ToLower(gpuRequired) == "true" {
+			return true
+		}
+	}
+	// 检查 services 中是否有 gpu: required
+	for _, svc := range meta.Services {
+		if svc.Resources.GPU == "required" {
+			return true
+		}
+	}
+	return false
+}
+
+// checkGPUAvailable 检查 GPU 是否可用
+func (do *DeployOrchestrator) checkGPUAvailable(logger *DeployLogger) bool {
+	// 检查 nvidia-smi 命令是否可用
+	cmd := exec.Command("nvidia-smi")
+	if err := cmd.Run(); err != nil {
+		logger.WriteLog("warn", "gpu", "nvidia-smi 命令不可用，可能未安装 NVIDIA 驱动")
+		return false
+	}
+
+	// 检查 Docker 是否支持 GPU（通过运行一个简单的 GPU 测试容器）
+	testCmd := exec.Command("docker", "run", "--rm", "--gpus", "all", "nvidia/cuda:11.0-base", "nvidia-smi")
+	testCmd.Stdout = nil
+	testCmd.Stderr = nil
+	if err := testCmd.Run(); err != nil {
+		logger.WriteLog("warn", "gpu", "Docker GPU 测试失败，可能未安装 nvidia-container-toolkit")
+		return false
+	}
+
+	return true
+}
+
+// requiresGHCRToken 检查 Compose 文件是否使用 ghcr.io 镜像
+func (do *DeployOrchestrator) requiresGHCRToken(composeFile string) bool {
+	content, err := os.ReadFile(composeFile)
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(content), "ghcr.io/")
+}
+
+// loginGHCR 登录到 GitHub Container Registry
+func (do *DeployOrchestrator) loginGHCR(token string, logger *DeployLogger) error {
+	// 对于 ghcr.io，可以使用 token 作为用户名，或者使用 GitHub 用户名
+	// 这里使用 token 作为用户名（GitHub 允许这样做）
+	cmd := exec.Command("docker", "login", "-u", token, "--password-stdin", "ghcr.io")
+	cmd.Stdin = strings.NewReader(token)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		logger.WriteLog("error", "ghcr", fmt.Sprintf("GHCR 登录失败: %s", string(output)))
+		return fmt.Errorf("GHCR 登录失败: %w, output: %s", err, string(output))
+	}
+	logger.WriteLog("info", "ghcr", "GHCR 登录成功")
+	return nil
 }
 
 func sanitizeProjectName(name string) string {

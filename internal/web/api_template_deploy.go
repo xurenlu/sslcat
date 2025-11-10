@@ -35,6 +35,7 @@ type DeployFromTemplateRequest struct {
 	Domains       []string               `json:"domains,omitempty"`
 	Variables     map[string]interface{} `json:"variables,omitempty"`
 	AutoSSL       bool                   `json:"auto_ssl,omitempty"`
+	GitHubToken   string                 `json:"github_token,omitempty"`
 }
 
 // DeployFromTemplate 从模板部署应用
@@ -101,6 +102,7 @@ func (api *TemplateDeployAPI) DeployFromTemplate(w http.ResponseWriter, r *http.
 		Domains:       req.Domains,
 		Variables:     req.Variables,
 		AutoSSL:       req.AutoSSL,
+		GitHubToken:   req.GitHubToken,
 	}
 
 	// 设置应用初始状态
