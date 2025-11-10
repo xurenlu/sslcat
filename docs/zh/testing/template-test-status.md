@@ -14,6 +14,15 @@
 - **第三轮测试**: 50 个（高优先级模板）
   - **已通过**: 42 个
   - **未测试**: 10 个
+- **第四轮测试**: 50 个（不需要GPU的模板 - 第一批）
+  - **已通过**: 5 个 (10.0%)
+  - **失败/跳过**: 45 个 (90.0%)
+- **第五轮测试**: 50 个（不需要GPU的模板 - 第二批）
+  - **已通过**: 7 个 (14.0%)
+  - **失败/跳过**: 43 个 (86.0%)
+- **第六轮测试**: 50 个（不需要GPU的模板 - 第三批）
+  - **已通过**: 5 个 (10.0%)
+  - **失败/跳过**: 45 个 (90.0%)
 - **测试工具**: `tools/test-templates`
 
 ## 测试环境信息
@@ -22,7 +31,7 @@
 - **Docker版本**: Docker Compose v2.40.3
 - **测试方式**: 自动化测试（并行2个，超时10分钟）
 
-## 已通过模板列表 (106个)
+## 已通过模板列表 (123个)
 
 | 模板ID | 模板名称 | 分类 |
 |--------|----------|------|
@@ -104,6 +113,23 @@
 | pi-hole | Pi-hole (广告拦截) | tools |
 | homeassistant | Home Assistant | collaboration |
 | umami | Umami | analytics |
+| jellyfin | Jellyfin | media |
+| calibre-web | Calibre Web | media |
+| domoticz | Domoticz | collaboration |
+| dozzle | Dozzle (Docker日志) | tools |
+| duplicati | Duplicati | tools |
+| freshrss | FreshRSS | rss |
+| glances | Glances | tools |
+| grafana-dashboard | Grafana Dashboard | analytics |
+| heimdall | Heimdall | tools |
+| jaeger | Jaeger | tools |
+| kafka | Kafka | database |
+| lidarr | Lidarr | media |
+| node-red | Node-RED (流程编程) | tools |
+| obsidian | Obsidian (知识管理) | tools |
+| ombi | Ombi | media |
+| photoprism | PhotoPrism | media |
+| piwigo | Piwigo | media |
 
 ## 失败模板列表 (15个)
 
@@ -233,7 +259,7 @@
 
 ## 第三轮测试结果（50个高优先级模板）
 
-### 已通过模板 (44个)
+### 已通过模板 (49个)
 
 **企业应用和ERP** (7个):
 - ✅ erpnext, ✅ suitecrm, ✅ espocrm, ✅ dolibarr, ✅ akaunting, ✅ invoice-ninja, ✅ invoiceplane
@@ -250,19 +276,19 @@
 **监控和日志** (8个):
 - ✅ netdata, ✅ uptime-kuma, ✅ graylog, ✅ loki, ✅ seq, ✅ plausible, ✅ fathom, ✅ umami
 
-**协作和通信** (5个):
-- ✅ discourse, ✅ chatwoot, ✅ element, ✅ mattermost, ✅ homeassistant
+**协作和通信** (6个):
+- ✅ discourse, ✅ chatwoot, ✅ element, ✅ mattermost, ✅ homeassistant, ✅ domoticz
 
 **安全和身份认证** (3个):
 - ✅ vaultwarden, ✅ keycloak, ✅ authelia
 
-**媒体和流媒体** (2个):
-- ✅ peertube, ✅ owncast
+**媒体和流媒体** (4个):
+- ✅ peertube, ✅ owncast, ✅ jellyfin, ✅ calibre-web
 
-**其他实用工具** (1个):
-- ✅ pi-hole
+**其他实用工具** (3个):
+- ✅ pi-hole, ✅ dozzle, ✅ duplicati
 
-### 未测试模板 (10个)
+### 未测试模板 (9个)
 
 | 模板ID | 模板名称 | 分类 | 备注 |
 |--------|----------|------|------|
@@ -272,7 +298,6 @@
 | better-uptime | Better Uptime | devops | 网站监控 |
 | wireguard | WireGuard | security | VPN服务 |
 | immich | Immich | media | 照片库 |
-| jellyfin | Jellyfin | media | 媒体服务器 |
 | n8n | n8n | tools | 工作流自动化 |
 | traefik | Traefik | tools | 反向代理 |
 | adguard-home | AdGuard Home | tools | DNS和广告拦截 |
@@ -283,11 +308,13 @@
 
 ## 下一步计划
 
-1. 恢复测试进程，完成剩余10个模板的测试
+1. 恢复测试进程，完成剩余9个模板的测试
 2. 修复镜像问题，更新镜像名称
 3. 持续更新测试文档
 
-## 最新测试结果（5个模板重新测试通过）
+## 最新测试结果
+
+### 第一组测试（5个模板重新测试通过）
 
 以下模板在最新测试中通过：
 
@@ -298,6 +325,32 @@
 | open-webui | Open WebUI | ai | AI Web界面（重新测试） |
 | homeassistant | Home Assistant | collaboration | 智能家居平台 |
 | umami | Umami | analytics | 网站分析工具 |
+
+### 第二组测试（5个新模板通过）
+
+以下模板在最新测试中通过：
+
+| 模板ID | 模板名称 | 分类 | 备注 |
+|--------|----------|------|------|
+| jellyfin | Jellyfin | media | 媒体服务器 |
+| calibre-web | Calibre Web | media | 电子书管理 |
+| domoticz | Domoticz | collaboration | 智能家居 |
+| dozzle | Dozzle (Docker日志) | tools | Docker日志查看器 |
+| duplicati | Duplicati | tools | 备份工具 |
+
+### 第三组测试（7个新模板通过 - 第五轮测试）
+
+以下模板在第五轮测试中通过：
+
+| 模板ID | 模板名称 | 分类 | 备注 |
+|--------|----------|------|------|
+| freshrss | FreshRSS | rss | RSS阅读器 |
+| glances | Glances | tools | 系统监控 |
+| grafana-dashboard | Grafana Dashboard | analytics | 监控面板 |
+| heimdall | Heimdall | tools | 应用启动页 |
+| jaeger | Jaeger | tools | 分布式追踪 |
+| kafka | Kafka | database | 消息队列 |
+| lidarr | Lidarr | media | 音乐管理 |
 
 ## 第三轮新增通过模板（15个）
 
@@ -354,7 +407,168 @@
 | vaultwarden | Vaultwarden | security | 密码管理器 |
 | keycloak | Keycloak | security | 身份认证 |
 
+## 第四轮测试结果（50个不需要GPU的模板 - 第一批）
+
+### 测试概览
+
+- **测试日期**: 2025-11-10
+- **测试环境**: sg2.shifen.de
+- **测试数量**: 50 个模板
+- **测试类型**: 不需要GPU的模板
+
+### 测试结果统计
+
+| 状态 | 数量 | 占比 |
+|------|------|------|
+| ✅ 通过 | 5 | 10.0% |
+| ❌ 失败/跳过 | 45 | 90.0% |
+| **总计** | **50** | **100%** |
+
+### 已通过模板（5个）
+
+| 模板ID | 模板名称 | 分类 | 备注 |
+|--------|----------|------|------|
+| jellyfin | Jellyfin | media | 媒体服务器 |
+| calibre-web | Calibre Web | media | 电子书管理 |
+| domoticz | Domoticz | tools | 智能家居 |
+| dozzle | Dozzle (Docker日志) | tools | Docker日志查看器 |
+| duplicati | Duplicati | tools | 备份工具 |
+
+### 失败/跳过原因分析
+
+大部分模板失败的主要原因是：
+
+1. **Docker Hub 速率限制** - 未认证用户达到拉取速率限制
+   - 影响模板：odoo, airflow, strapi, better-uptime, wireguard, immich, n8n, traefik, adguard-home 等
+   - 解决方案：需要登录 Docker Hub 或使用镜像代理
+
+2. **镜像不存在或标签错误** - 镜像名称或标签不正确
+   - 影响模板：部分自定义模板
+
+3. **Compose 文件解析错误** - YAML 格式问题
+   - 影响模板：n8n（变量定义问题）
+
+### 测试的50个模板列表
+
+**未测试的高优先级模板（10个）**:
+- odoo, airflow, strapi, better-uptime, wireguard, immich, jellyfin ✅, n8n, traefik, adguard-home
+
+**企业应用和工具（20个）**:
+- ackee, adminer, answer, appflowy, appsmith, approval-system, archive-management, attendance-management, audit-management, booked, browserless, bruno, bugsnag, bugzilla, business-card-generator, calibre-web ✅, codeium, collabora, compliance-management, contract-management
+
+**CMS和内容管理（10个）**:
+- countly, customer-followup, devtools-hub, dingtalk-bot, docling, document-compliance, document-version-control, docusaurus, domoticz ✅, dormitory-management
+
+**其他实用工具（10个）**:
+- dozzle ✅, duplicati ✅, easyocr, employee-directory, exam-system, excalidraw, expense-management, favicon-generator, filebrowser, filestash
+
+## 第五轮测试结果（50个不需要GPU的模板 - 第二批）
+
+### 测试概览
+
+- **测试日期**: 2025-11-10
+- **测试环境**: sg2.shifen.de
+- **测试数量**: 50 个模板
+- **测试类型**: 不需要GPU的模板（第二批）
+
+### 测试结果统计
+
+| 状态 | 数量 | 占比 |
+|------|------|------|
+| ✅ 通过 | 7 | 14.0% |
+| ❌ 失败/跳过 | 43 | 86.0% |
+| **总计** | **50** | **100%** |
+
+### 已通过模板（7个）
+
+| 模板ID | 模板名称 | 分类 | 备注 |
+|--------|----------|------|------|
+| freshrss | FreshRSS | rss | RSS阅读器 |
+| glances | Glances | tools | 系统监控 |
+| grafana-dashboard | Grafana Dashboard | analytics | 监控面板 |
+| heimdall | Heimdall | tools | 应用启动页 |
+| jaeger | Jaeger | tools | 分布式追踪 |
+| kafka | Kafka | database | 消息队列 |
+| lidarr | Lidarr | media | 音乐管理 |
+
+### 失败/跳过原因分析
+
+大部分模板失败的主要原因是：
+
+1. **Docker Hub 速率限制** - 未认证用户达到拉取速率限制
+   - 影响模板：airsonic, apache-superset, asterisk, flarum, formspree, freescout, gitea, goatcounter, grocy, hasura, hexo, homer, huginn, hugo, image-compressor, image-converter, image-processor, imagemagick, inventory-management, iredmail, itsm, jasper, jitsi, jitsi-meet, joplin, json-formatter, jumpserver, kanboard, keystone, kimai, komga, kong, kutt, leantime, limesurvey, linear, linear-alternative, logo-generator, logseq, lychee, magento, mailcow, mailinabox 等
+
+2. **镜像不存在或标签错误** - 镜像名称或标签不正确
+
+3. **Compose 文件解析错误** - YAML 格式问题
+
+### 测试的50个模板列表
+
+**企业应用和工具（15个）**:
+- airsonic, apache-superset, asterisk, flarum, formspree, freescout, freshrss ✅, gitea, glances ✅, goatcounter, grafana-dashboard ✅, grocy, hasura, heimdall ✅, hexo
+
+**CMS和内容管理（10个）**:
+- homer, huginn, hugo, image-compressor, image-converter, image-processor, imagemagick, inventory-management, iredmail, itsm
+
+**开发工具（10个）**:
+- jaeger ✅, jasper, jitsi, jitsi-meet, joplin, json-formatter, jumpserver, kafka ✅, kanboard, keystone
+
+**其他实用工具（15个）**:
+- kimai, komga, kong, kutt, leantime, lidarr ✅, limesurvey, linear, linear-alternative, logo-generator, logseq, lychee, magento, mailcow, mailinabox
+
+## 第六轮测试结果（50个不需要GPU的模板 - 第三批）
+
+### 测试概览
+
+- **测试日期**: 2025-11-10
+- **测试环境**: sg2.shifen.de
+- **测试数量**: 50 个模板
+- **测试类型**: 不需要GPU的模板（第三批）
+
+### 测试结果统计
+
+| 状态 | 数量 | 占比 |
+|------|------|------|
+| ✅ 通过 | 5 | 10.0% |
+| ❌ 失败/跳过 | 45 | 90.0% |
+| **总计** | **50** | **100%** |
+
+### 已通过模板（5个）
+
+| 模板ID | 模板名称 | 分类 | 备注 |
+|--------|----------|------|------|
+| node-red | Node-RED (流程编程) | tools | 流程编程工具 |
+| obsidian | Obsidian (知识管理) | tools | 知识管理 |
+| ombi | Ombi | media | 媒体请求 |
+| photoprism | PhotoPrism | media | 照片管理 |
+| piwigo | Piwigo | media | 照片库 |
+
+### 失败/跳过原因分析
+
+大部分模板失败的主要原因是：
+
+1. **Docker Hub 速率限制** - 未认证用户达到拉取速率限制
+   - 影响模板：mailtrain, manga-translator, mantisbt, mariadb, mastodon, mathpix, mautic, mayan-edms, mealie, meeting-management, miniflux, misskey, moodle, navidrome, nextcloud, nodebb, ntfy, nuxt, onlyoffice, opencart, opencats, openedx, openproject, openrouter, osticket, paddleocr, paperless-ngx, papermerge, payroll-management, pdf-tools, pdftk, pixelfed, plane, planka, pleroma, plume, polr, poste, postgrest, posthog, powerdns, ppm, prestashop, procurement-portal, project-cost-management 等
+
+2. **镜像不存在或标签错误** - 镜像名称或标签不正确
+
+3. **Compose 文件解析错误** - YAML 格式问题
+
+### 测试的50个模板列表
+
+**企业应用和工具（15个）**:
+- mailtrain, manga-translator, mantisbt, mariadb, mastodon, mathpix, mautic, mayan-edms, mealie, meeting-management, miniflux, misskey, moodle, navidrome, nextcloud
+
+**CMS和内容管理（10个）**:
+- node-red ✅, nodebb, ntfy, nuxt, obsidian ✅, ombi ✅, onlyoffice, opencart, opencats, openedx
+
+**开发工具（10个）**:
+- openproject, openrouter, osticket, paddleocr, paperless-ngx, papermerge, payroll-management, pdf-tools, pdftk, photoprism ✅
+
+**其他实用工具（15个）**:
+- piwigo ✅, pixelfed, plane, planka, pleroma, plume, polr, poste, postgrest, posthog, powerdns, ppm, prestashop, procurement-portal, project-cost-management
+
 ## 最后更新时间
 
-2025-11-09（已更新第三轮测试结果）
+2025-11-10（已更新第六轮测试结果）
 
