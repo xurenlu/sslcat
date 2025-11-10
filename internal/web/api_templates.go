@@ -233,7 +233,16 @@ func (api *TemplateAPI) HandleTemplateReload(w http.ResponseWriter, r *http.Requ
 
 func (api *TemplateAPI) listTemplates(w http.ResponseWriter, r *http.Request) {
 	templates := api.manager.List()
+	
+	// 添加调试日志
+	api.logger.WithFields(logrus.Fields{
+		"total_templates": len(templates),
+		"manager_count":   api.manager.Count(),
+		"show_all":        r.URL.Query().Get("showAll"),
+	}).Info("模板列表请求")
+	
 	if len(templates) == 0 {
+		api.logger.Warn("模板列表为空，可能模板未正确加载")
 		api.writeJSON(w, map[string]interface{}{
 			"success": true,
 			"data":    []interface{}{},
@@ -250,10 +259,12 @@ func (api *TemplateAPI) listTemplates(w http.ResponseWriter, r *http.Request) {
 	showAll := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("showAll"))) == "true"
 
 	resp := make([]map[string]interface{}, 0, len(templates))
+	filteredCount := 0
 
 	for _, tpl := range templates {
 		// 如果未设置 showAll=true，则只显示测试通过的模板
 		if !showAll && !testedTemplates[tpl.Meta.ID] {
+			filteredCount++
 			continue
 		}
 		if categoryFilter != "" && !strings.EqualFold(tpl.Meta.Category, categoryFilter) {
@@ -283,6 +294,16 @@ func (api *TemplateAPI) listTemplates(w http.ResponseWriter, r *http.Request) {
 		return strings.ToLower(catI) < strings.ToLower(catJ)
 	})
 
+	api.logger.WithFields(logrus.Fields{
+		"total":         len(templates),
+		"filtered":     filteredCount,
+		"returned":      len(resp),
+		"show_all":      showAll,
+		"category":      categoryFilter,
+		"tag":           tagFilter,
+		"keyword":       keyword,
+	}).Info("模板列表返回")
+	
 	api.writeJSON(w, map[string]interface{}{
 		"success": true,
 		"data":    resp,

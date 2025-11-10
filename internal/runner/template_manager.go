@@ -185,6 +185,19 @@ func (tm *TemplateManager) watchLoop(ctx context.Context, watcher *fsnotify.Watc
 }
 
 func (tm *TemplateManager) loadBuiltinTemplates() error {
+	// 先检查 builtinTemplateFS 是否为空
+	entries, err := builtinTemplateFS.ReadDir("templates/builtin")
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			tm.logger.Warn("未找到内置模板目录，跳过加载")
+			return nil
+		}
+		tm.logger.WithError(err).Error("读取内置模板目录失败")
+		return fmt.Errorf("访问内置模板失败: %w", err)
+	}
+	
+	tm.logger.WithField("entries_count", len(entries)).Debug("开始加载内置模板")
+	
 	subFS, err := fs.Sub(builtinTemplateFS, "templates/builtin")
 	if err != nil {
 		// 若目录不存在，视为无内置模板
@@ -203,6 +216,7 @@ func (tm *TemplateManager) loadBuiltinTemplates() error {
 	tm.mutex.Lock()
 	defer tm.mutex.Unlock()
 	tm.builtinTemplates = tpls
+	tm.logger.WithField("loaded_count", len(tpls)).Info("内置模板加载完成")
 	return nil
 }
 
@@ -247,6 +261,11 @@ func (tm *TemplateManager) refreshCombined() {
 		"custom":  len(tm.customTemplates),
 		"total":   len(tm.combined),
 	}).Info("模板加载完成")
+	
+	// 如果加载的模板数量为0，记录警告
+	if len(tm.combined) == 0 {
+		tm.logger.Warn("警告：未加载任何模板，请检查模板目录和文件是否正确")
+	}
 }
 
 func (tm *TemplateManager) loadTemplatesFromFS(fsys fs.FS, source TemplateSource, rootPath string) (map[string]*AppTemplate, error) {
@@ -267,7 +286,9 @@ func (tm *TemplateManager) loadTemplatesFromFS(fsys fs.FS, source TemplateSource
 
 		tpl, err := tm.readTemplate(fsys, filepath.Dir(path), source, rootPath)
 		if err != nil {
-			return err
+			// 记录错误但继续加载其他模板，避免单个模板错误导致全部失败
+			tm.logger.WithError(err).WithField("path", path).Warn("加载模板失败，跳过")
+			return nil
 		}
 
 		if tpl == nil {

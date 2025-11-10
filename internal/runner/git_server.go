@@ -645,7 +645,13 @@ func NewGitServer(cfg *config.Config, translator *i18n.Translator) *GitServer {
 
 	templateManager := NewTemplateManager(gs.logger, templateDataDir)
 	if err := templateManager.LoadAll(); err != nil {
-		gs.logger.Warnf("加载部署模板失败: %v", err)
+		gs.logger.Errorf("加载部署模板失败: %v", err)
+	} else {
+		count := templateManager.Count()
+		gs.logger.Infof("模板加载成功，共加载 %d 个模板", count)
+		if count == 0 {
+			gs.logger.Warn("警告：未加载任何模板，请检查模板文件是否正确嵌入到二进制文件中")
+		}
 	}
 	gs.templateManager = templateManager
 	gs.credentialManager = NewCredentialManager(gs.logger)
