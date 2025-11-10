@@ -100,6 +100,12 @@ services:
       retries: 3
       start_period: 30s
 
+credentials:
+  wireguard:
+    password:
+      pattern: random
+      length: 16
+
 healthcheck_global:
   timeout: 5m
   interval: 10s

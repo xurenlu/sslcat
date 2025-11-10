@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   wireguard-webui:
@@ -66,10 +65,4 @@ volumes:
 networks:
   {{APP_NAME}}_network:
     driver: bridge
-
-credentials:
-  wireguard:
-    password:
-      pattern: random
-      length: 16
 

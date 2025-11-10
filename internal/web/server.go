@@ -64,6 +64,9 @@ type Server struct {
 	compressor       *compression.Compressor
 	compressionCache *CompressionCache
 
+	// 共享缓存
+	sharedCache *cache.MemoryCache
+
 	// 配置热重载
 	configWatcher   *config.ConfigWatcher
 	reloadManager   *config.ReloadManager
@@ -135,14 +138,22 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	compressor := compression.NewCompressor(compression.FromConfig(cfg))
 
 	// 创建共享的内存缓存实例（合并压缩缓存和图片优化缓存）
-	// 总配置：400条目（200+200），64MB总大小（按需扩展），单个最大2MB
+	sharedCacheSizeMB := cfg.Server.SharedCacheMaxSizeMB
+	if sharedCacheSizeMB <= 0 {
+		sharedCacheSizeMB = 64
+	}
+	if sharedCacheSizeMB < 8 {
+		sharedCacheSizeMB = 8
+	}
+	maxSharedCacheBytes := int64(sharedCacheSizeMB) * 1024 * 1024
+
 	sharedCache := cache.NewMemoryCache(&cache.MemoryCacheConfig{
 		Name:            "shared_cache",
-		MaxEntries:      400,               // 压缩200 + 图片200
-		MaxSizeBytes:    64 * 1024 * 1024,  // 64MB 默认上限，可按需调节
-		MaxItemSize:     2 * 1024 * 1024,   // 2MB
-		DefaultTTL:      24 * time.Hour,    // 24小时
-		CleanupInterval: 5 * time.Minute,   // 统一使用5分钟清理间隔
+		MaxEntries:      400, // 压缩200 + 图片200
+		MaxSizeBytes:    maxSharedCacheBytes,
+		MaxItemSize:     2 * 1024 * 1024, // 2MB
+		DefaultTTL:      24 * time.Hour,  // 24小时
+		CleanupInterval: 5 * time.Minute, // 统一使用5分钟清理间隔
 	})
 
 	// 使用共享缓存实例创建压缩缓存
@@ -256,6 +267,7 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		wafEngine:          wafEngine,
 		slowRequestManager: slowRequestManager,
 		tunnelManager:      tunnelManager,
+		sharedCache:        sharedCache,
 		log: logrus.WithFields(logrus.Fields{
 			"component": "web_server",
 		}),
@@ -340,7 +352,28 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 
 	// 初始化监控管理器（如果启用）
 	if cfg.Monitoring.Enabled {
-		server.monitorManager = monitor.NewManager(cfg.Monitoring.Enabled)
+		memoryUsagePercent := cfg.Monitoring.MemoryMaxUsagePercent
+		if memoryUsagePercent <= 0 {
+			memoryUsagePercent = 20
+		}
+		if memoryUsagePercent < 5 {
+			memoryUsagePercent = 5
+		}
+		if memoryUsagePercent > 90 {
+			memoryUsagePercent = 90
+		}
+		releaseCooldownSec := cfg.Monitoring.MemoryReleaseCooldownSec
+		if releaseCooldownSec < 60 {
+			releaseCooldownSec = 300
+		}
+		server.monitorManager = monitor.NewManager(monitor.ManagerOptions{
+			Enabled: cfg.Monitoring.Enabled,
+			Memory: monitor.MemoryMonitorOptions{
+				CheckInterval:       time.Minute,
+				MaxSystemUsageRatio: memoryUsagePercent / 100.0,
+				ReleaseCooldown:     time.Duration(releaseCooldownSec) * time.Second,
+			},
+		})
 		server.monitorManager.Start()
 		server.log.Info("监控管理器已启动")
 	}
@@ -1874,4 +1907,58 @@ func (s *Server) findMatchingProxyRule(r *http.Request) *config.ProxyRule {
 	}
 
 	return nil
+}
+
+func (s *Server) updateSharedCache(sizeMB int) {
+	if sizeMB < 8 {
+		sizeMB = 8
+	}
+	maxBytes := int64(sizeMB) * 1024 * 1024
+
+	s.log.Infof("更新共享缓存容量为 %d MB", sizeMB)
+
+	newCache := cache.NewMemoryCache(&cache.MemoryCacheConfig{
+		Name:            "shared_cache",
+		MaxEntries:      400,
+		MaxSizeBytes:    maxBytes,
+		MaxItemSize:     2 * 1024 * 1024,
+		DefaultTTL:      24 * time.Hour,
+		CleanupInterval: 5 * time.Minute,
+	})
+
+	oldCache := s.sharedCache
+	s.sharedCache = newCache
+
+	if s.compressionCache != nil {
+		s.compressionCache.SetMemoryCache(newCache)
+	}
+
+	if s.imageOptimizer != nil {
+		s.imageOptimizer.SetMemoryCache(newCache)
+	}
+
+	if oldCache != nil && oldCache != newCache {
+		oldCache.Close()
+	}
+}
+
+func (s *Server) updateMemoryMonitor(maxUsagePercent float64, cooldownSec int) {
+	if s.monitorManager == nil {
+		return
+	}
+	if maxUsagePercent < 5 {
+		maxUsagePercent = 5
+	}
+	if maxUsagePercent > 90 {
+		maxUsagePercent = 90
+	}
+	if cooldownSec < 60 {
+		cooldownSec = 60
+	}
+	opts := monitor.MemoryMonitorOptions{
+		CheckInterval:       time.Minute,
+		MaxSystemUsageRatio: maxUsagePercent / 100.0,
+		ReleaseCooldown:     time.Duration(cooldownSec) * time.Second,
+	}
+	s.monitorManager.UpdateMemoryMonitorOptions(opts)
 }

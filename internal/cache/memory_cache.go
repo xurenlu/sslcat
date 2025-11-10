@@ -3,7 +3,8 @@ package cache
 import (
 	"bytes"
 	"context"
-	"encoding/gob"
+	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -28,12 +29,6 @@ func (item *MemoryCacheItem) IsExpired() bool {
 		return false // 永不过期
 	}
 	return time.Now().After(item.ExpiresAt)
-}
-
-func init() {
-	gob.Register(MemoryCacheItem{})
-	gob.Register(&MemoryCacheItem{})
-	gob.Register(map[string]interface{}{})
 }
 
 // MemoryCacheConfig 统一的内存缓存配置
@@ -240,21 +235,160 @@ func (mc *MemoryCache) Close() {
 	mc.log.Info("Memory cache closed")
 }
 
+const cacheEncodingVersion = uint8(1)
+
 func marshalCacheItem(item *MemoryCacheItem) ([]byte, error) {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	if err := enc.Encode(item); err != nil {
+	metaBytes := []byte{}
+	if item.Metadata != nil && len(item.Metadata) > 0 {
+		var err error
+		metaBytes, err = json.Marshal(item.Metadata)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	dataLen := uint32(len(item.Data))
+	metaLen := uint32(len(metaBytes))
+
+	// 预估容量：头部 1 + 4*3 + 8*4 + len(data) + len(meta)
+	buf := bytes.NewBuffer(make([]byte, 0, int(dataLen)+int(metaLen)+64))
+	if err := buf.WriteByte(cacheEncodingVersion); err != nil {
 		return nil, err
 	}
+
+	// 写入固定字段
+	if err := binary.Write(buf, binary.LittleEndian, item.Size); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, dataLen); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, metaLen); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, encodeTime(item.CreatedAt)); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, encodeTime(item.ExpiresAt)); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, encodeTime(item.LastAccess)); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, item.AccessCount); err != nil {
+		return nil, err
+	}
+
+	if metaLen > 0 {
+		if _, err := buf.Write(metaBytes); err != nil {
+			return nil, err
+		}
+	}
+	if dataLen > 0 {
+		if _, err := buf.Write(item.Data); err != nil {
+			return nil, err
+		}
+	}
+
 	return buf.Bytes(), nil
 }
 
 func unmarshalCacheItem(data []byte) (*MemoryCacheItem, error) {
-	buf := bytes.NewReader(data)
-	dec := gob.NewDecoder(buf)
-	var item MemoryCacheItem
-	if err := dec.Decode(&item); err != nil {
+	reader := bytes.NewReader(data)
+
+	versionByte, err := reader.ReadByte()
+	if err != nil {
 		return nil, err
 	}
-	return &item, nil
+	if versionByte != cacheEncodingVersion {
+		return nil, fmt.Errorf("unsupported cache item version: %d", versionByte)
+	}
+
+	var (
+		size        int64
+		dataLen     uint32
+		metaLen     uint32
+		createdNano int64
+		expiresNano int64
+		lastNano    int64
+		accessCount int64
+	)
+
+	if err := binary.Read(reader, binary.LittleEndian, &size); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &dataLen); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &metaLen); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &createdNano); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &expiresNano); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &lastNano); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &accessCount); err != nil {
+		return nil, err
+	}
+
+	if dataLen > uint32(len(data)) || metaLen > uint32(len(data)) {
+		return nil, fmt.Errorf("invalid cache payload length")
+	}
+
+	metaBytes := make([]byte, metaLen)
+	if metaLen > 0 {
+		if _, err := reader.Read(metaBytes); err != nil {
+			return nil, err
+		}
+	}
+
+	itemData := make([]byte, dataLen)
+	if dataLen > 0 {
+		if _, err := reader.Read(itemData); err != nil {
+			return nil, err
+		}
+	}
+
+	var metadata map[string]interface{}
+	if metaLen > 0 {
+		if err := json.Unmarshal(metaBytes, &metadata); err != nil {
+			return nil, err
+		}
+	}
+
+	item := &MemoryCacheItem{
+		Data:        itemData,
+		Metadata:    metadata,
+		Size:        size,
+		CreatedAt:   decodeTime(createdNano),
+		ExpiresAt:   decodeTime(expiresNano),
+		LastAccess:  decodeTime(lastNano),
+		AccessCount: accessCount,
+	}
+
+	// 保证 Size 与 Data 长度一致
+	if item.Size == 0 && dataLen > 0 {
+		item.Size = int64(dataLen)
+	}
+
+	return item, nil
+}
+
+func encodeTime(t time.Time) int64 {
+	if t.IsZero() {
+		return -1
+	}
+	return t.UnixNano()
+}
+
+func decodeTime(ts int64) time.Time {
+	if ts <= 0 {
+		return time.Time{}
+	}
+	return time.Unix(0, ts)
 }

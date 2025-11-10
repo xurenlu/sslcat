@@ -7,8 +7,46 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"golang.org/x/sys/unix"
 )
+
+const (
+	minMemoryUsageRatio     = 0.05
+	defaultMemoryUsageRatio = 0.20
+	maxMemoryUsageRatio     = 0.90
+	minReleaseCooldown      = time.Minute
+)
+
+// MemoryMonitorOptions 内存监控选项
+type MemoryMonitorOptions struct {
+	CheckInterval       time.Duration
+	MaxSystemUsageRatio float64
+	ReleaseCooldown     time.Duration
+}
+
+func (o MemoryMonitorOptions) normalize() MemoryMonitorOptions {
+	if o.CheckInterval <= 0 {
+		o.CheckInterval = time.Minute
+	}
+	if o.CheckInterval < time.Minute {
+		o.CheckInterval = time.Minute
+	}
+	if o.MaxSystemUsageRatio <= 0 {
+		o.MaxSystemUsageRatio = defaultMemoryUsageRatio
+	}
+	if o.MaxSystemUsageRatio < minMemoryUsageRatio {
+		o.MaxSystemUsageRatio = minMemoryUsageRatio
+	}
+	if o.MaxSystemUsageRatio > maxMemoryUsageRatio {
+		o.MaxSystemUsageRatio = maxMemoryUsageRatio
+	}
+	if o.ReleaseCooldown <= 0 {
+		o.ReleaseCooldown = 5 * time.Minute
+	}
+	if o.ReleaseCooldown < minReleaseCooldown {
+		o.ReleaseCooldown = minReleaseCooldown
+	}
+	return o
+}
 
 // MemoryMonitor 内存监控器
 type MemoryMonitor struct {
@@ -37,18 +75,20 @@ type MemoryMonitor struct {
 	maxHistorySize int
 
 	// 系统级内存控制
-	maxSystemUsage float64
+	maxSystemUsage  float64
 	releaseCooldown time.Duration
 	lastReleaseTime time.Time
 }
 
 // NewMemoryMonitor 创建内存监控器
-func NewMemoryMonitor(checkInterval time.Duration) *MemoryMonitor {
+func NewMemoryMonitor(options MemoryMonitorOptions) *MemoryMonitor {
+	opts := options.normalize()
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 
 	// 使用质数间隔避免与其他定时器同时触发（59秒）
-	if checkInterval == 1*time.Minute {
+	checkInterval := opts.CheckInterval
+	if checkInterval == time.Minute {
 		checkInterval = 59 * time.Second
 	}
 
@@ -71,8 +111,8 @@ func NewMemoryMonitor(checkInterval time.Duration) *MemoryMonitor {
 		allocHistory:      make([]uint64, 0, 100),
 		sysHistory:        make([]uint64, 0, 100),
 		lastCheckTime:     time.Now(),
-		maxSystemUsage:    0.20,            // 默认不超过系统内存的20%
-		releaseCooldown:   5 * time.Minute, // 至少间隔5分钟
+		maxSystemUsage:    opts.MaxSystemUsageRatio,
+		releaseCooldown:   opts.ReleaseCooldown,
 	}
 }
 
@@ -120,6 +160,25 @@ func (mm *MemoryMonitor) check() {
 	mm.currentSys = m.Sys
 	mm.lastCheckTime = now
 
+	var (
+		totalMem      uint64
+		usageRatio    float64
+		shouldRelease bool
+	)
+
+	if tm, _, err := getSystemMemory(); err == nil && tm > 0 {
+		totalMem = tm
+		usageRatio = float64(m.Sys) / float64(tm)
+		if usageRatio >= mm.maxSystemUsage {
+			if now.Sub(mm.lastReleaseTime) >= mm.releaseCooldown {
+				shouldRelease = true
+				mm.lastReleaseTime = now
+			} else {
+				mm.log.Debugf("内存使用率达到 %.2f%%，但尚在冷却时间内，暂不释放 (上次释放: %v)", usageRatio*100, mm.lastReleaseTime)
+			}
+		}
+	}
+
 	// 更新峰值
 	if m.Alloc > mm.peakAlloc {
 		mm.peakAlloc = m.Alloc
@@ -157,6 +216,9 @@ func (mm *MemoryMonitor) check() {
 
 		// 建议执行GC
 		mm.log.Warn("建议执行手动GC以释放内存")
+		if shouldRelease {
+			mm.performMemoryRelease(&m, totalMem, usageRatio)
+		}
 		return
 	}
 
@@ -168,10 +230,17 @@ func (mm *MemoryMonitor) check() {
 			float64(mm.baselineAlloc)/(1024*1024),
 			float64(diff)/(1024*1024),
 			float64(mm.warningThreshold)/(1024*1024))
+		if shouldRelease {
+			mm.performMemoryRelease(&m, totalMem, usageRatio)
+		}
 		return
 	}
 
 	mm.mu.Unlock()
+
+	if shouldRelease {
+		mm.performMemoryRelease(&m, totalMem, usageRatio)
+	}
 
 	// 正常情况下，每10次检查输出一次信息
 	if mm.gcCount%10 == 0 {
@@ -182,6 +251,29 @@ func (mm *MemoryMonitor) check() {
 			m.NumGC,
 			mm.getTrend())
 	}
+}
+
+const megabyte = 1024 * 1024
+
+func (mm *MemoryMonitor) performMemoryRelease(m *runtime.MemStats, totalMem uint64, usageRatio float64) {
+	beforeAlloc := float64(m.Alloc) / megabyte
+	beforeSys := float64(m.Sys) / megabyte
+	systemTotalMB := float64(totalMem) / megabyte
+
+	mm.log.Warnf("触发内存释放: 使用率=%.2f%% (进程Sys=%.2f MB / 系统=%.2f MB)，执行 GC + FreeOSMemory()",
+		usageRatio*100, beforeSys, systemTotalMB)
+
+	runtime.GC()
+	debug.FreeOSMemory()
+
+	var after runtime.MemStats
+	runtime.ReadMemStats(&after)
+
+	afterAlloc := float64(after.Alloc) / megabyte
+	afterSys := float64(after.Sys) / megabyte
+
+	mm.log.Infof("内存释放完成: Alloc %.2f -> %.2f MB, Sys %.2f -> %.2f MB",
+		beforeAlloc, afterAlloc, beforeSys, afterSys)
 }
 
 // dumpMemoryStats 输出详细内存统计
@@ -274,12 +366,24 @@ func (mm *MemoryMonitor) ResetBaseline() {
 		float64(mm.baselineAlloc)/(1024*1024))
 }
 
+// UpdateOptions 更新运行时选项
+func (mm *MemoryMonitor) UpdateOptions(opts MemoryMonitorOptions) {
+	normalized := opts.normalize()
+	mm.mu.Lock()
+	mm.maxSystemUsage = normalized.MaxSystemUsageRatio
+	mm.releaseCooldown = normalized.ReleaseCooldown
+	mm.mu.Unlock()
+	mm.log.Infof("内存监控参数已更新: 最大系统占用 %.2f%%, 冷却时间 %v",
+		normalized.MaxSystemUsageRatio*100, normalized.ReleaseCooldown)
+}
+
 // ForceGC 强制执行GC
 func (mm *MemoryMonitor) ForceGC() {
 	mm.log.Info("执行手动GC...")
 	before := mm.currentAlloc
 
 	runtime.GC()
+	debug.FreeOSMemory()
 
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)

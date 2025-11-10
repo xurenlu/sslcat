@@ -54,7 +54,7 @@ func (cg *ComposeGenerator) Generate(
 		valueStr := fmt.Sprintf("%v", value)
 		composeContent = strings.ReplaceAll(composeContent, placeholder, valueStr)
 	}
-	
+
 	// 替换所有剩余的未定义变量（使用默认值）
 	composeContent = cg.replaceRemainingVariables(composeContent)
 
@@ -99,7 +99,7 @@ func (cg *ComposeGenerator) GetMappedPorts(workDir string) (map[string]int, erro
 		case string:
 			ports = []string{v}
 		}
-		
+
 		for _, portMapping := range ports {
 			// 解析端口映射格式 "外部端口:内部端口"
 			parts := strings.Split(portMapping, ":")
@@ -146,28 +146,34 @@ func (cg *ComposeGenerator) buildVariables(templateInfo *TemplateInfo, meta *Tem
 		}
 	}
 
-	// 处理端口变量 - 如果端口变量没有默认值或值为0，使用 testPort
+	// 处理端口变量 - 测试环境统一映射到 1024 以上的动态端口，避免占用系统保留端口
+	nextPort := testPort
+	if nextPort < 1024 {
+		nextPort = 1024
+	}
 	for _, v := range meta.Variables {
 		key := v.Name
 		if strings.HasSuffix(key, "_PORT") || strings.HasSuffix(key, "_SSH_PORT") || strings.HasSuffix(key, "_HTTPS_PORT") {
-			if value, exists := variables[key]; !exists || value == nil || value == "" {
-				variables[key] = testPort
+			assignedPort := nextPort
+			if assignedPort < 1024 {
+				assignedPort = 1024
+			}
+			if assignedPort > 65535 {
+				assignedPort = 65535
+			}
+
+			if strings.EqualFold(v.Type, "string") {
+				variables[key] = fmt.Sprintf("%d", assignedPort)
 			} else {
-				// 尝试转换为 int
-				switch val := value.(type) {
-				case int:
-					if val == 0 {
-						variables[key] = testPort
-					}
-				case float64:
-					if val == 0 {
-						variables[key] = testPort
-					}
-				case string:
-					if val == "" || val == "0" {
-						variables[key] = testPort
-					}
-				}
+				variables[key] = assignedPort
+			}
+
+			nextPort = assignedPort + 1
+			if nextPort <= 1024 {
+				nextPort = 1025
+			}
+			if nextPort > 65535 {
+				nextPort = 1024
 			}
 		}
 	}
@@ -197,11 +203,11 @@ func (cg *ComposeGenerator) replacePorts(content string, variables map[string]in
 func (cg *ComposeGenerator) replaceRemainingVariables(content string) string {
 	// 匹配所有 {{VAR}} 格式的变量（包括在字符串中的）
 	re := regexp.MustCompile(`\{\{([A-Z_]+)\}\}`)
-	
+
 	// 根据变量名推断默认值
 	content = re.ReplaceAllStringFunc(content, func(match string) string {
 		varName := strings.Trim(match, "{}")
-		
+
 		// 根据变量名模式推断默认值（按优先级匹配）
 		if strings.Contains(varName, "VERSION") {
 			return "latest"
@@ -236,11 +242,11 @@ func (cg *ComposeGenerator) replaceRemainingVariables(content string) string {
 		if strings.Contains(varName, "COOKIE") {
 			return "test-cookie-secret"
 		}
-		
+
 		// 默认值
 		return "test-value"
 	})
-	
+
 	return content
 }
 
@@ -253,4 +259,3 @@ func (cg *ComposeGenerator) GenerateCredentials(meta *TemplateMeta, appName stri
 
 	return credentials
 }
-

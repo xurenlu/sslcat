@@ -517,11 +517,11 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 		// 处理自定义上游请求头部
 		if len(rule.UpstreamRequestHeaders) > 0 {
 			upstreamHeaders := make(map[string]string, len(rule.UpstreamRequestHeaders))
-			for key, value := range rule.UpstreamRequestHeaders {
-				trimmedKey := strings.TrimSpace(key)
+		for key, value := range rule.UpstreamRequestHeaders {
+			trimmedKey := strings.TrimSpace(key)
 				if trimmedKey != "" {
 					upstreamHeaders[trimmedKey] = value
-				}
+			}
 			}
 			m.setHeadersBatch(r.Header, upstreamHeaders)
 		}
@@ -608,11 +608,11 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 		// 处理自定义响应头部
 		if len(rule.ResponseHeaders) > 0 {
 			responseHeaders := make(map[string]string, len(rule.ResponseHeaders))
-			for key, value := range rule.ResponseHeaders {
-				trimmedKey := strings.TrimSpace(key)
+		for key, value := range rule.ResponseHeaders {
+			trimmedKey := strings.TrimSpace(key)
 				if trimmedKey != "" {
 					responseHeaders[trimmedKey] = value
-				}
+			}
 			}
 			m.setHeadersBatch(resp.Header, responseHeaders)
 		}
@@ -842,11 +842,11 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 		// 处理自定义上游请求头部
 		if len(rule.UpstreamRequestHeaders) > 0 {
 			upstreamHeaders := make(map[string]string, len(rule.UpstreamRequestHeaders))
-			for key, value := range rule.UpstreamRequestHeaders {
-				trimmedKey := strings.TrimSpace(key)
+		for key, value := range rule.UpstreamRequestHeaders {
+			trimmedKey := strings.TrimSpace(key)
 				if trimmedKey != "" {
 					upstreamHeaders[trimmedKey] = value
-				}
+			}
 			}
 			m.setHeadersBatch(r.Header, upstreamHeaders)
 		}
@@ -905,11 +905,11 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 		// 处理自定义响应头部
 		if len(rule.ResponseHeaders) > 0 {
 			responseHeaders := make(map[string]string, len(rule.ResponseHeaders))
-			for key, value := range rule.ResponseHeaders {
-				trimmedKey := strings.TrimSpace(key)
+		for key, value := range rule.ResponseHeaders {
+			trimmedKey := strings.TrimSpace(key)
 				if trimmedKey != "" {
 					responseHeaders[trimmedKey] = value
-				}
+			}
 			}
 			m.setHeadersBatch(resp.Header, responseHeaders)
 		}

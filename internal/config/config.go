@@ -71,6 +71,9 @@ type ServerConfig struct {
 	AccessLogMaxSize  int64  `json:"access_log_max_size"` // bytes
 	AccessLogMaxFiles int    `json:"access_log_max_files"`
 
+	// 共享内存缓存
+	SharedCacheMaxSizeMB int `json:"shared_cache_max_size_mb"` // 共享缓存最大容量（MB）
+
 	// 客户端连接超时（秒）
 	ReadTimeoutSec  int `json:"read_timeout_sec"`
 	WriteTimeoutSec int `json:"write_timeout_sec"`
@@ -812,6 +815,7 @@ func Load(configFile string) (*Config, error) {
 			AccessLogPath:     "./data/access.log",
 			AccessLogMaxSize:  100 * 1024 * 1024,
 			AccessLogMaxFiles: 10,
+			SharedCacheMaxSizeMB: 64,
 			ReadTimeoutSec:    1800,     // 30分钟
 			WriteTimeoutSec:   1800,     // 30分钟
 			IdleTimeoutSec:    120,      // 2分钟（可调）
@@ -934,7 +938,9 @@ func Load(configFile string) (*Config, error) {
 			},
 		},
 		Monitoring: MonitoringConfig{
-			Enabled: true, // 默认启用监控
+			Enabled:                  true,  // 默认启用监控
+			MemoryMaxUsagePercent:    20.0,  // 默认20%
+			MemoryReleaseCooldownSec: 300,   // 默认5分钟
 		},
 		CacheWarmup: CacheWarmupConfig{
 			Enabled:  false, // 默认禁用缓存预热
@@ -2282,7 +2288,9 @@ func (rule *PathPrefixRule) GetMatchedPrefix(requestPath string) string {
 
 // MonitoringConfig 监控配置
 type MonitoringConfig struct {
-	Enabled bool `json:"enabled"`
+	Enabled                    bool    `json:"enabled"`
+	MemoryMaxUsagePercent      float64 `json:"memory_max_usage_percent"`       // 触发内存释放的系统占用百分比
+	MemoryReleaseCooldownSec   int     `json:"memory_release_cooldown_sec"`    // 内存释放冷却时间（秒）
 }
 
 // CacheWarmupConfig 缓存预热配置

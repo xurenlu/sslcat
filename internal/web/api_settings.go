@@ -90,15 +90,21 @@ func (s *Server) handleAPISettings(w http.ResponseWriter, r *http.Request) {
 			"block_duration":    s.config.Security.BlockDurationStr,
 		},
 		"server": map[string]interface{}{
-			"port":               s.config.Server.Port,
-			"access_log_enabled": s.config.Server.AccessLogEnabled,
-			"debug":              s.config.Server.Debug,
-			"log_level":          s.config.Server.LogLevel,
+			"port":                     s.config.Server.Port,
+			"access_log_enabled":       s.config.Server.AccessLogEnabled,
+			"debug":                    s.config.Server.Debug,
+			"log_level":                s.config.Server.LogLevel,
+			"shared_cache_max_size_mb": s.config.Server.SharedCacheMaxSizeMB,
 		},
 		"ssl": map[string]interface{}{
 			"email":               s.config.SSL.Email,
 			"disable_self_signed": s.config.SSL.DisableSelfSigned,
 			"auto_renew":          s.config.SSL.AutoRenew,
+		},
+		"monitoring": map[string]interface{}{
+			"enabled":                     s.config.Monitoring.Enabled,
+			"memory_max_usage_percent":    s.config.Monitoring.MemoryMaxUsagePercent,
+			"memory_release_cooldown_sec": s.config.Monitoring.MemoryReleaseCooldownSec,
 		},
 		"totp_enabled": s.config.Admin.EnableTOTP,
 		"server_info": map[string]interface{}{
@@ -135,6 +141,13 @@ func (s *Server) handleAPISettingsUpdate(w http.ResponseWriter, r *http.Request)
 			EnableUAFilter *bool `json:"enable_ua_filter,omitempty"`
 			MinFormMs      *int  `json:"min_form_ms,omitempty"`
 		} `json:"security,omitempty"`
+		Server struct {
+			SharedCacheMaxSizeMB *int `json:"shared_cache_max_size_mb,omitempty"`
+		} `json:"server,omitempty"`
+		Monitoring struct {
+			MemoryMaxUsagePercent    *float64 `json:"memory_max_usage_percent,omitempty"`
+			MemoryReleaseCooldownSec *int     `json:"memory_release_cooldown_sec,omitempty"`
+		} `json:"monitoring,omitempty"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -144,6 +157,8 @@ func (s *Server) handleAPISettingsUpdate(w http.ResponseWriter, r *http.Request)
 
 	// 记录旧前缀用于路由重建
 	oldPrefix := s.config.AdminPrefix
+	sharedCacheChanged := false
+	memoryOptionsChanged := false
 
 	// 更新配置（只更新提供的字段）
 	if req.AdminPrefix != "" {
@@ -182,10 +197,50 @@ func (s *Server) handleAPISettingsUpdate(w http.ResponseWriter, r *http.Request)
 		s.config.Security.MinFormMs = *req.Security.MinFormMs
 	}
 
+	if req.Server.SharedCacheMaxSizeMB != nil {
+		sizeMB := *req.Server.SharedCacheMaxSizeMB
+		if sizeMB < 8 {
+			sizeMB = 8
+		}
+		if sizeMB > 4096 {
+			sizeMB = 4096
+		}
+		s.config.Server.SharedCacheMaxSizeMB = sizeMB
+		sharedCacheChanged = true
+	}
+
+	if req.Monitoring.MemoryMaxUsagePercent != nil {
+		value := *req.Monitoring.MemoryMaxUsagePercent
+		if value < 5 {
+			value = 5
+		}
+		if value > 90 {
+			value = 90
+		}
+		s.config.Monitoring.MemoryMaxUsagePercent = value
+		memoryOptionsChanged = true
+	}
+
+	if req.Monitoring.MemoryReleaseCooldownSec != nil {
+		cooldown := *req.Monitoring.MemoryReleaseCooldownSec
+		if cooldown < 60 {
+			cooldown = 60
+		}
+		s.config.Monitoring.MemoryReleaseCooldownSec = cooldown
+		memoryOptionsChanged = true
+	}
+
 	// 保存配置
 	if err := s.config.Save(s.config.ConfigFile); err != nil {
 		s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to save configuration")
 		return
+	}
+
+	if sharedCacheChanged {
+		s.updateSharedCache(s.config.Server.SharedCacheMaxSizeMB)
+	}
+	if memoryOptionsChanged {
+		s.updateMemoryMonitor(s.config.Monitoring.MemoryMaxUsagePercent, s.config.Monitoring.MemoryReleaseCooldownSec)
 	}
 
 	// 如果管理前缀变化，重建路由并发送通知
@@ -216,18 +271,21 @@ func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var req struct {
-		AdminPrefix          string `json:"adminPrefix,omitempty"`
-		HTTPPort             string `json:"httpPort,omitempty"`
-		HTTPSPort            string `json:"httpsPort,omitempty"`
-		AutoSSL              *bool  `json:"autoSSL,omitempty"`
-		LetsEncryptEmail     string `json:"letsEncryptEmail,omitempty"`
-		SSLProvider          string `json:"sslProvider,omitempty"`
-		EnableDDoSProtection *bool  `json:"enableDDoSProtection,omitempty"`
-		MaxRequestsPerMinute string `json:"maxRequestsPerMinute,omitempty"`
-		EnableRateLimit      *bool  `json:"enableRateLimit,omitempty"`
-		EnableAccessLog      *bool  `json:"enableAccessLog,omitempty"`
-		EnableErrorLog       *bool  `json:"enableErrorLog,omitempty"`
-		LogLevel             string `json:"logLevel,omitempty"`
+		AdminPrefix              string   `json:"adminPrefix,omitempty"`
+		HTTPPort                 string   `json:"httpPort,omitempty"`
+		HTTPSPort                string   `json:"httpsPort,omitempty"`
+		AutoSSL                  *bool    `json:"autoSSL,omitempty"`
+		LetsEncryptEmail         string   `json:"letsEncryptEmail,omitempty"`
+		SSLProvider              string   `json:"sslProvider,omitempty"`
+		EnableDDoSProtection     *bool    `json:"enableDDoSProtection,omitempty"`
+		MaxRequestsPerMinute     string   `json:"maxRequestsPerMinute,omitempty"`
+		EnableRateLimit          *bool    `json:"enableRateLimit,omitempty"`
+		EnableAccessLog          *bool    `json:"enableAccessLog,omitempty"`
+		EnableErrorLog           *bool    `json:"enableErrorLog,omitempty"`
+		LogLevel                 string   `json:"logLevel,omitempty"`
+		SharedCacheMaxSizeMB     *int     `json:"sharedCacheMaxSizeMB,omitempty"`
+		MemoryMaxUsagePercent    *float64 `json:"memoryMaxUsagePercent,omitempty"`
+		MemoryReleaseCooldownSec *int     `json:"memoryReleaseCooldownSec,omitempty"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -237,6 +295,8 @@ func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) 
 
 	// 记录旧前缀用于路由重建
 	oldPrefix := s.config.AdminPrefix
+	sharedCacheChanged := false
+	memoryOptionsChanged := false
 
 	// 更新配置（只更新提供的字段）
 	if req.AdminPrefix != "" && req.AdminPrefix != oldPrefix {
@@ -275,11 +335,55 @@ func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) 
 		s.config.Server.LogLevel = req.LogLevel
 	}
 
+	if req.SharedCacheMaxSizeMB != nil {
+		sizeMB := *req.SharedCacheMaxSizeMB
+		if sizeMB < 8 {
+			sizeMB = 8
+		}
+		if sizeMB > 4096 {
+			sizeMB = 4096
+		}
+		s.config.Server.SharedCacheMaxSizeMB = sizeMB
+		sharedCacheChanged = true
+	}
+
+	if req.MemoryMaxUsagePercent != nil {
+		value := *req.MemoryMaxUsagePercent
+		if value < 5 {
+			value = 5
+		}
+		if value > 90 {
+			value = 90
+		}
+		s.config.Monitoring.MemoryMaxUsagePercent = value
+		memoryOptionsChanged = true
+	}
+
+	if req.MemoryReleaseCooldownSec != nil {
+		cooldown := *req.MemoryReleaseCooldownSec
+		if cooldown < 60 {
+			cooldown = 60
+		}
+		s.config.Monitoring.MemoryReleaseCooldownSec = cooldown
+		memoryOptionsChanged = true
+	}
+
+	if memoryOptionsChanged {
+		s.updateMemoryMonitor(s.config.Monitoring.MemoryMaxUsagePercent, s.config.Monitoring.MemoryReleaseCooldownSec)
+	}
+
 	// 保存配置
 	if err := s.config.Save(s.config.ConfigFile); err != nil {
 		s.log.Errorf("保存配置失败: %v", err)
 		s.writeErrorResponse(w, http.StatusInternalServerError, fmt.Sprintf("Failed to save configuration: %s", err.Error()))
 		return
+	}
+
+	if sharedCacheChanged {
+		s.updateSharedCache(s.config.Server.SharedCacheMaxSizeMB)
+	}
+	if memoryOptionsChanged {
+		s.updateMemoryMonitor(s.config.Monitoring.MemoryMaxUsagePercent, s.config.Monitoring.MemoryReleaseCooldownSec)
 	}
 
 	// 如果管理前缀变化，重建路由并发送通知

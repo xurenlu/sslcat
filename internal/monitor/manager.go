@@ -7,68 +7,76 @@ import (
 )
 
 // Manager 监控管理器（统一管理所有监控器）
+type ManagerOptions struct {
+	Enabled bool
+	Memory  MemoryMonitorOptions
+}
+
+// Manager 监控管理器（统一管理所有监控器）
 type Manager struct {
 	log                *logrus.Entry
 	goroutineMonitor   *GoroutineMonitor
 	memoryMonitor      *MemoryMonitor
 	performanceMonitor *PerformanceMonitor
-	enabled            bool
+	options            ManagerOptions
 }
 
 // NewManager 创建监控管理器
-func NewManager(enabled bool) *Manager {
+func NewManager(opts ManagerOptions) *Manager {
+	normalized := opts
+	normalized.Memory = normalized.Memory.normalize()
 	return &Manager{
 		log: logrus.WithFields(logrus.Fields{
 			"component": "monitor_manager",
 		}),
-		enabled: enabled,
+		options: normalized,
 	}
 }
 
 // Start 启动所有监控器
 func (m *Manager) Start() {
-	if !m.enabled {
+	if !m.options.Enabled {
 		m.log.Info("监控功能已禁用")
 		return
 	}
-	
+
 	m.log.Info("启动监控管理器...")
-	
+
 	// 启动Goroutine监控器（每1分钟检查一次）
 	m.goroutineMonitor = NewGoroutineMonitor(1 * time.Minute)
 	m.goroutineMonitor.Start()
-	
+
 	// 启动内存监控器（每1分钟检查一次）
-	m.memoryMonitor = NewMemoryMonitor(1 * time.Minute)
+	m.memoryMonitor = NewMemoryMonitor(m.options.Memory)
 	m.memoryMonitor.Start()
-	
+
 	// 启动性能监控器（每30秒检查一次）
 	m.performanceMonitor = NewPerformanceMonitor(30 * time.Second)
 	m.performanceMonitor.Start()
-	
+
 	m.log.Info("监控管理器已启动（Goroutine监控、内存监控、性能监控）")
 }
 
 // Stop 停止所有监控器
 func (m *Manager) Stop() {
-	if !m.enabled {
+	if !m.options.Enabled {
 		return
 	}
-	
+
 	m.log.Info("停止监控管理器...")
-	
+
 	if m.goroutineMonitor != nil {
 		m.goroutineMonitor.Stop()
 	}
-	
+
 	if m.memoryMonitor != nil {
 		m.memoryMonitor.Stop()
 	}
-	
+
 	if m.performanceMonitor != nil {
 		m.performanceMonitor.Stop()
 	}
-	
+
 	m.log.Info("监控管理器已停止")
 }
 
@@ -90,38 +98,45 @@ func (m *Manager) GetPerformanceMonitor() *PerformanceMonitor {
 // GetAllStats 获取所有监控统计
 func (m *Manager) GetAllStats() map[string]interface{} {
 	stats := make(map[string]interface{})
-	
+
 	if m.goroutineMonitor != nil {
 		stats["goroutine"] = m.goroutineMonitor.GetStats()
 	}
-	
+
 	if m.memoryMonitor != nil {
 		stats["memory"] = m.memoryMonitor.GetStats()
 	}
-	
+
 	if m.performanceMonitor != nil {
 		stats["performance"] = m.performanceMonitor.GetStats()
 	}
-	
+
 	return stats
+}
+
+// UpdateMemoryMonitorOptions 更新内存监控配置
+func (m *Manager) UpdateMemoryMonitorOptions(opts MemoryMonitorOptions) {
+	m.options.Memory = opts.normalize()
+	if m.memoryMonitor != nil {
+		m.memoryMonitor.UpdateOptions(m.options.Memory)
+	}
 }
 
 // ResetAllBaselines 重置所有基线
 func (m *Manager) ResetAllBaselines() {
 	m.log.Info("重置所有监控基线...")
-	
+
 	if m.goroutineMonitor != nil {
 		m.goroutineMonitor.ResetBaseline()
 	}
-	
+
 	if m.memoryMonitor != nil {
 		m.memoryMonitor.ResetBaseline()
 	}
-	
+
 	if m.performanceMonitor != nil {
 		m.performanceMonitor.ResetBaseline()
 	}
-	
+
 	m.log.Info("所有监控基线已重置")
 }
-

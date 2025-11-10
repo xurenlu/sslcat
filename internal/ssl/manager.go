@@ -475,9 +475,9 @@ func (m *Manager) GetCertificate(domain string) (*tls.Certificate, error) {
 	certPath := filepath.Join(m.config.SSL.CertDir, domain+".crt")
 	keyPath := filepath.Join(m.config.SSL.KeyDir, domain+".key")
 
-	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
-	if err != nil {
-		m.log.Errorf("Failed to load certificate %s: %v", domain, err)
+			cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+			if err != nil {
+				m.log.Errorf("Failed to load certificate %s: %v", domain, err)
 		// 加载失败，更新元数据缓存标记为不存在
 		m.metadataMutex.Lock()
 		m.certMetadataCache[domain] = &certMetadata{
@@ -489,15 +489,15 @@ func (m *Manager) GetCertificate(domain string) (*tls.Certificate, error) {
 	}
 
 	// 加载成功，更新证书缓存和元数据缓存
-	m.certMutex.Lock()
-	m.certCache[domain] = &cert
-	m.certMutex.Unlock()
+				m.certMutex.Lock()
+				m.certCache[domain] = &cert
+				m.certMutex.Unlock()
 	m.updateCertMetadata(domain, &cert)
 
-	// 清除失败缓存（如果存在）
-	m.failedCacheMutex.Lock()
-	delete(m.failedDomainCache, domain)
-	m.failedCacheMutex.Unlock()
+		// 清除失败缓存（如果存在）
+		m.failedCacheMutex.Lock()
+		delete(m.failedDomainCache, domain)
+		m.failedCacheMutex.Unlock()
 
 	return &cert, nil
 }

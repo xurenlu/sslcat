@@ -141,6 +141,14 @@ func NewOptimizerWithCache(config *Config, sharedCache *cache.MemoryCache) *Opti
 	return opt
 }
 
+// SetMemoryCache 替换底层缓存实例
+func (o *Optimizer) SetMemoryCache(newCache *cache.MemoryCache) {
+	if newCache == nil {
+		return
+	}
+	o.memCache = newCache
+}
+
 // ShouldOptimize 判断是否应该优化这个请求
 func (o *Optimizer) ShouldOptimize(path string) bool {
 	if !o.Config.Enabled {

@@ -117,6 +117,14 @@ func (c *CompressionCache) Close() {
 	c.memCache.Close()
 }
 
+// SetMemoryCache 替换底层缓存实例
+func (c *CompressionCache) SetMemoryCache(newCache *cache.MemoryCache) {
+	if newCache == nil {
+		return
+	}
+	c.memCache = newCache
+}
+
 // makeKey 生成缓存键（添加前缀以区分不同缓存类型）
 func (c *CompressionCache) makeKey(filepath string, algorithm CompressionAlgorithm) string {
 	return fmt.Sprintf("compression:%s:%s", filepath, algorithm)

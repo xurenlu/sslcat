@@ -57,6 +57,11 @@ const Settings: React.FC = () => {
     enableAccessLog: false,
     enableErrorLog: true,
     logLevel: 'info',
+
+    // 缓存 & 内存设置
+    sharedCacheMaxSizeMB: 64,
+    memoryMaxUsagePercent: 20,
+    memoryReleaseCooldownSec: 300,
     
     // 压缩设置
     compressionEnabled: true,
@@ -149,6 +154,11 @@ const Settings: React.FC = () => {
               // 日志设置
               enableAccessLog: config.server?.access_log_enabled || false,
               logLevel: config.server?.log_level || 'info',
+
+              // 缓存 & 内存
+              sharedCacheMaxSizeMB: config.server?.shared_cache_max_size_mb || 64,
+              memoryMaxUsagePercent: config.monitoring?.memory_max_usage_percent || 20,
+              memoryReleaseCooldownSec: config.monitoring?.memory_release_cooldown_sec || 300,
             }))
           }
         }
@@ -262,6 +272,9 @@ const Settings: React.FC = () => {
             upstreamCacheMaxSize: settings.upstreamCacheMaxSize,
             upstreamCacheDefaultTTL: settings.upstreamCacheDefaultTTL,
             upstreamCacheRespectUpstream: settings.upstreamCacheRespectUpstream,
+            sharedCacheMaxSizeMB: settings.sharedCacheMaxSizeMB,
+            memoryMaxUsagePercent: settings.memoryMaxUsagePercent,
+            memoryReleaseCooldownSec: settings.memoryReleaseCooldownSec,
           }),
         }),
         // 保存通知设置
@@ -809,6 +822,73 @@ const Settings: React.FC = () => {
                 </Text>
               </>
             )}
+          </VStack>
+        </CardBody>
+      </Card>
+
+      {/* 内存与缓存设置 */}
+      <Card mt={6}>
+        <CardHeader>
+          <Heading size="md">内存与缓存设置</Heading>
+        </CardHeader>
+        <CardBody>
+          <VStack spacing={4} align="stretch">
+            <FormControl>
+              <FormLabel>共享缓存最大容量 (MB)</FormLabel>
+              <Input
+                type="number"
+                min={8}
+                max={4096}
+                value={settings.sharedCacheMaxSizeMB}
+                onChange={(e) =>
+                  handleInputChange(
+                    'sharedCacheMaxSizeMB',
+                    parseInt(e.target.value) || settings.sharedCacheMaxSizeMB
+                  )
+                }
+              />
+              <Text fontSize="sm" color="gray.500">
+                建议不低于 8 MB，根据实际业务流量可适当增大。
+              </Text>
+            </FormControl>
+
+            <FormControl>
+              <FormLabel>内存释放阈值 (占系统内存百分比)</FormLabel>
+              <Input
+                type="number"
+                min={5}
+                max={90}
+                step={1}
+                value={settings.memoryMaxUsagePercent}
+                onChange={(e) =>
+                  handleInputChange(
+                    'memoryMaxUsagePercent',
+                    parseFloat(e.target.value) || settings.memoryMaxUsagePercent
+                  )
+                }
+              />
+              <Text fontSize="sm" color="gray.500">
+                达到该占用比例时会执行 GC 并归还内存给操作系统，范围 5% ~ 90%。
+              </Text>
+            </FormControl>
+
+            <FormControl>
+              <FormLabel>内存释放冷却时间 (秒)</FormLabel>
+              <Input
+                type="number"
+                min={60}
+                value={settings.memoryReleaseCooldownSec}
+                onChange={(e) =>
+                  handleInputChange(
+                    'memoryReleaseCooldownSec',
+                    parseInt(e.target.value) || settings.memoryReleaseCooldownSec
+                  )
+                }
+              />
+              <Text fontSize="sm" color="gray.500">
+                最小 60 秒，避免内存释放过于频繁导致性能抖动。
+              </Text>
+            </FormControl>
           </VStack>
         </CardBody>
       </Card>
