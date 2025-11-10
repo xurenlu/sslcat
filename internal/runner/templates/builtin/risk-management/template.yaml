@@ -32,7 +32,7 @@ variables:
   - name: RISK_PORT
     type: number
     title: 风险管理系统端口
-    default: 808080
+    default: 8080
     min: 1024
     max: 65535
     description: 风险管理系统 Web 服务端口

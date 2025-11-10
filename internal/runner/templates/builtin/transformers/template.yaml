@@ -20,7 +20,7 @@ variables:
   - name: TRANSFORMERS_PORT
     type: number
     title: Transformers 端口
-    default: 808080
+    default: 8080
     min: 1024
     max: 65535
     description: Transformers API 服务端口

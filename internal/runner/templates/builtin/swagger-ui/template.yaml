@@ -20,7 +20,7 @@ variables:
   - name: SWAGGER_UI_PORT
     type: number
     title: Swagger UI 端口
-    default: 808080
+    default: 8080
     min: 1024
     max: 65535
     description: Swagger UI Web 服务端口

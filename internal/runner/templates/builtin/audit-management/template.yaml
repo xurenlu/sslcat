@@ -32,7 +32,7 @@ variables:
   - name: AUDIT_PORT
     type: number
     title: 审计管理系统端口
-    default: 808080
+    default: 8080
     min: 1024
     max: 65535
     description: 审计管理系统 Web 服务端口

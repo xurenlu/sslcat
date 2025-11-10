@@ -20,7 +20,7 @@ variables:
   - name: WEAVIATE_PORT
     type: number
     title: Weaviate 端口
-    default: 808080
+    default: 8080
     min: 1024
     max: 65535
     description: Weaviate API 服务端口

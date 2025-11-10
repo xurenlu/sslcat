@@ -26,7 +26,7 @@ variables:
   - name: SHUTTLE_PORT
     type: number
     title: 班车管理系统端口
-    default: 808080
+    default: 8080
     min: 1024
     max: 65535
     description: 班车管理系统 Web 服务端口

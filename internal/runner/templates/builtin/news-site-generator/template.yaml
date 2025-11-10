@@ -32,7 +32,7 @@ variables:
   - name: NEWS_SITE_PORT
     type: number
     title: 新闻站生成器端口
-    default: 808080
+    default: 8080
     min: 1024
     max: 65535
     description: 新闻站生成器 Web 服务端口

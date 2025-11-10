@@ -20,7 +20,7 @@ variables:
   - name: LLAMA_CPP_PORT
     type: number
     title: llama.cpp 端口
-    default: 808080
+    default: 8080
     min: 1024
     max: 65535
     description: llama.cpp API 服务端口

@@ -20,14 +20,14 @@ variables:
   - name: JITSI_PORT
     type: number
     title: Jitsi HTTP 端口
-    default: 808080
+    default: 8080
     min: 1
     max: 65535
     description: Jitsi Web HTTP 端口
   - name: JITSI_HTTPS_PORT
     type: number
     title: Jitsi HTTPS 端口
-    default: 8443HTTPS    min: 1
+    default: 8443    min: 1
     max: 65535
     description: Jitsi Web HTTPS 端口
   - name: JVB_PORT

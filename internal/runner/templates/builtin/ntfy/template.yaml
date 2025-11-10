@@ -20,7 +20,7 @@ variables:
   - name: NTFY_PORT
     type: number
     title: ntfy 端口
-    default: 808080
+    default: 8080
     min: 1024
     max: 65535
     description: ntfy Web 服务端口

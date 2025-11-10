@@ -20,14 +20,14 @@ variables:
   - name: POSTE_HTTP_PORT
     type: number
     title: HTTP 端口
-    default: 808080
+    default: 8080
     min: 1
     max: 65535
     description: HTTP 端口
   - name: POSTE_HTTPS_PORT
     type: number
     title: HTTPS 端口
-    default: 8443HTTPS    min: 1
+    default: 8443    min: 1
     max: 65535
     description: HTTPS 端口
   - name: POSTE_SMTP_PORT

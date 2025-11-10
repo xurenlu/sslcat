@@ -26,7 +26,7 @@ variables:
   - name: DOC_COMPLIANCE_PORT
     type: number
     title: 文档合规系统端口
-    default: 808080
+    default: 8080
     min: 1024
     max: 65535
     description: 文档合规系统 Web 服务端口
