@@ -19,6 +19,7 @@
 
 ### 第三部分：功能特性
 - [v1.3.17 新特性](FEATURES_v1.3.17.md) - v1.3.17 版本新特性总览 ⭐ NEW
+- [模板市场](features/template-market.md) - 362+ 个企业级应用模板，一键部署 ⭐ NEW
 - [监控系统](features/monitoring.md) - 内置监控系统（Goroutine、内存、性能）⭐ NEW
 - [压缩缓存指南](features/COMPRESSION_CACHE_GUIDE.md) - 压缩和缓存功能
 - [HTTP/2实现](features/HTTP2_IMPLEMENTATION.md) - HTTP/2支持实现

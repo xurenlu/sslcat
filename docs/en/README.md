@@ -19,6 +19,7 @@ Welcome to the comprehensive documentation for SSLcat - the enterprise-grade SSL
 
 ### Part III: Features
 - [v1.3.17 New Features](FEATURES_v1.3.17.md) - v1.3.17 Release Overview ⭐ NEW
+- [Template Market](features/template-market.md) - 362+ Enterprise Application Templates, One-Click Deployment ⭐ NEW
 - [Monitoring System](features/monitoring.md) - Built-in Monitoring (Goroutine, Memory, Performance) ⭐ NEW
 - [SSL Termination](features/ssl-termination.md) - SSL/TLS handling
 - [Reverse Proxy](features/reverse-proxy.md) - Proxy functionality
