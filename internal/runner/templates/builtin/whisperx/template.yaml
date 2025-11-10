@@ -14,9 +14,9 @@ variables:
   - name: WHISPERX_VERSION
     type: select
     title: WhisperX 版本
-    default: "v1.0"
-    options: ["v1.0", "latest"]
-    description: 选择 WhisperX 版本
+    default: "cpu"
+    options: ["cpu", "cuda118"]
+    description: 选择 WhisperX 版本（cpu 仅使用 CPU，cuda118 需要 GPU）
   - name: WHISPERX_PORT
     type: number
     title: WhisperX 端口
