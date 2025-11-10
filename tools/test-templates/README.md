@@ -57,6 +57,8 @@ go run . --skip-content-check
 
 - `TEST_BASE_PORT`: 测试端口起始值（默认：20000）
 - `TEST_DOMAIN_SUFFIX`: 测试域名后缀（默认：`.test.local`）
+- `GITHUB_TOKEN` 或 `GITHUB_PAT`: GitHub Personal Access Token（用于访问 ghcr.io 私有镜像）
+- `GITHUB_USERNAME`: GitHub 用户名（可选，如果未设置则使用 token 作为用户名）
 
 ## 测试流程
 
@@ -75,10 +77,40 @@ go run . --skip-content-check
 - `test-results.json` - 详细的 JSON 格式测试报告
 - 控制台输出 - 实时测试进度和汇总统计
 
+## GitHub Container Registry (ghcr.io) 认证
+
+如果模板使用了 `ghcr.io` 的镜像，可能需要 GitHub Personal Access Token 才能访问：
+
+### 创建 GitHub Personal Access Token
+
+1. 访问 GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
+2. 点击 "Generate new token (classic)"
+3. 设置权限：
+   - `read:packages` - 读取 GitHub Packages
+4. 生成并复制 token
+
+### 使用 Token
+
+```bash
+# 方式1: 使用 GITHUB_TOKEN 环境变量
+export GITHUB_TOKEN=your_github_pat_token
+go run .
+
+# 方式2: 使用 GITHUB_PAT 环境变量
+export GITHUB_PAT=your_github_pat_token
+go run .
+
+# 可选：设置 GitHub 用户名（如果不设置，会使用 token 作为用户名）
+export GITHUB_USERNAME=your_github_username
+```
+
+测试工具会在检测到 `ghcr.io` 镜像时自动尝试登录，如果设置了 token，会自动处理认证。
+
 ## 注意事项
 
 - 需要 Docker 和 docker-compose 已安装并运行
 - 需要足够的磁盘空间和内存
 - 建议在专用测试服务器上运行
 - 测试会创建临时容器和网络，测试完成后会自动清理
+- 对于 ghcr.io 私有镜像，需要设置 `GITHUB_TOKEN` 或 `GITHUB_PAT` 环境变量
 
