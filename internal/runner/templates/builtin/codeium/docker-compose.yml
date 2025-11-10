@@ -7,8 +7,8 @@ services:
     ports:
       - "{{CODEIUM_PORT}}:8080"
     environment:
-      CODEIUM_API_KEY: {{CODEIUM_API_KEY}}
-      DATABASE_URL: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
+      CODEIUM_API_KEY: "{{CODEIUM_API_KEY}}"
+      DATABASE_URL: "postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}"
     volumes:
       - codeium_data:/app/data
     depends_on:
@@ -28,9 +28,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

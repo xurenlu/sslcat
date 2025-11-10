@@ -7,7 +7,7 @@ services:
     ports:
       - "{{WHISPER_PORT}}:9000"
     environment:
-      ASR_MODEL: {{ASR_MODEL}}
+      ASR_MODEL: "{{ASR_MODEL}}"
       ASR_ENGINE: faster_whisper
     volumes:
       - whisper_data:/app/models

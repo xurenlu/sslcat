@@ -7,7 +7,7 @@ services:
     ports:
       - "{{PINECONE_ALT_PORT}}:80"
     environment:
-      PINECONE_API_KEY: {{PINECONE_API_KEY}}
+      PINECONE_API_KEY: "{{PINECONE_API_KEY}}"
     volumes:
       - pinecone_alt_data:/app/data
     networks:

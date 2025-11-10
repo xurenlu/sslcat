@@ -8,10 +8,10 @@ services:
       - "{{OSTICKET_PORT}}:80"
     environment:
       MYSQL_HOST: mysql
-      MYSQL_DATABASE: {{MYSQL_DATABASE}}
-      MYSQL_USER: {{MYSQL_USERNAME}}
-      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
-      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
+      MYSQL_DATABASE: "{{MYSQL_DATABASE}}"
+      MYSQL_USER: "{{MYSQL_USERNAME}}"
+      MYSQL_PASSWORD: "{{MYSQL_PASSWORD}}"
+      MYSQL_ROOT_PASSWORD: "{{MYSQL_ROOT_PASSWORD}}"
     volumes:
       - osticket_data:/var/www/html
     depends_on:
@@ -31,10 +31,10 @@ services:
     container_name: {{APP_NAME}}_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
-      MYSQL_DATABASE: {{MYSQL_DATABASE}}
-      MYSQL_USER: {{MYSQL_USERNAME}}
-      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
+      MYSQL_ROOT_PASSWORD: "{{MYSQL_ROOT_PASSWORD}}"
+      MYSQL_DATABASE: "{{MYSQL_DATABASE}}"
+      MYSQL_USER: "{{MYSQL_USERNAME}}"
+      MYSQL_PASSWORD: "{{MYSQL_PASSWORD}}"
       MYSQL_CHARACTER_SET_SERVER: utf8mb4
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
     volumes:

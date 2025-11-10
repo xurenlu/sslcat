@@ -7,7 +7,7 @@ services:
     ports:
       - "{{REDOC_PORT}}:8080"
     environment:
-      SPEC_URL: {{SPEC_URL}}
+      SPEC_URL: "{{SPEC_URL}}"
     networks:
       - {{APP_NAME}}_network
     healthcheck:

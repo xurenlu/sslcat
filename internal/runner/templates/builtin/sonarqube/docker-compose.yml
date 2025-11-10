@@ -7,9 +7,9 @@ services:
     ports:
       - "{{SONARQUBE_PORT}}:9000"
     environment:
-      SONAR_JDBC_URL: jdbc:postgresql://postgres:5432/{{POSTGRES_DATABASE}}
-      SONAR_JDBC_USERNAME: {{POSTGRES_USERNAME}}
-      SONAR_JDBC_PASSWORD: {{POSTGRES_PASSWORD}}
+      SONAR_JDBC_URL: "jdbc:postgresql://postgres:5432/{{POSTGRES_DATABASE}}"
+      SONAR_JDBC_USERNAME: "{{POSTGRES_USERNAME}}"
+      SONAR_JDBC_PASSWORD: "{{POSTGRES_PASSWORD}}"
       SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
     volumes:
       - sonarqube_data:/opt/sonarqube/data
@@ -32,9 +32,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

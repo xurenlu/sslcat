@@ -7,11 +7,11 @@ services:
     ports:
       - "{{TYK_PORT}}:8080"
     environment:
-      TYK_GW_SECRET: {{TYK_SECRET}}
+      TYK_GW_SECRET: "{{TYK_SECRET}}"
       TYK_GW_STORAGE_HOST: redis
       TYK_GW_STORAGE_PORT: 6379
-      TYK_GW_STORAGE_PASSWORD: {{REDIS_PASSWORD}}
-      TYK_GW_DBAPPCONFOPTIONS_CONNECTIONSTRING: mongodb://{{MONGODB_USERNAME}}:{{MONGODB_PASSWORD}}@mongo:27017/{{MONGODB_DATABASE}}
+      TYK_GW_STORAGE_PASSWORD: "{{REDIS_PASSWORD}}"
+      TYK_GW_DBAPPCONFOPTIONS_CONNECTIONSTRING: "mongodb://{{MONGODB_USERNAME}}:{{MONGODB_PASSWORD}}@mongo:27017/{{MONGODB_DATABASE}}"
     volumes:
       - tyk_data:/opt/tyk-gateway
     depends_on:
@@ -47,9 +47,9 @@ services:
     container_name: {{APP_NAME}}_mongo
     restart: unless-stopped
     environment:
-      MONGO_INITDB_ROOT_USERNAME: {{MONGODB_USERNAME}}
-      MONGO_INITDB_ROOT_PASSWORD: {{MONGODB_PASSWORD}}
-      MONGO_INITDB_DATABASE: {{MONGODB_DATABASE}}
+      MONGO_INITDB_ROOT_USERNAME: "{{MONGODB_USERNAME}}"
+      MONGO_INITDB_ROOT_PASSWORD: "{{MONGODB_PASSWORD}}"
+      MONGO_INITDB_DATABASE: "{{MONGODB_DATABASE}}"
     volumes:
       - mongo_data:/data/db
     networks:

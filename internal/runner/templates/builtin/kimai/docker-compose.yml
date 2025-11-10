@@ -7,9 +7,9 @@ services:
     ports:
       - "{{KIMAI_PORT}}:8001"
     environment:
-      DATABASE_URL: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
-      ADMINMAIL: {{KIMAI_ADMIN_EMAIL}}
-      ADMINPASS: {{KIMAI_ADMIN_PASSWORD}}
+      DATABASE_URL: "postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}"
+      ADMINMAIL: "{{KIMAI_ADMIN_EMAIL}}"
+      ADMINPASS: "{{KIMAI_ADMIN_PASSWORD}}"
     volumes:
       - kimai_data:/opt/kimai/var
     depends_on:
@@ -29,9 +29,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

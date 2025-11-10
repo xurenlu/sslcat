@@ -8,8 +8,8 @@ services:
       - "{{ODOO_PORT}}:8069"
     environment:
       HOST: postgres
-      USER: {{POSTGRES_USERNAME}}
-      PASSWORD: {{POSTGRES_PASSWORD}}
+      USER: "{{POSTGRES_USERNAME}}"
+      PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - odoo_data:/var/lib/odoo
       - odoo_extra_addons:/mnt/extra-addons
@@ -30,9 +30,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres_data:/var/lib/postgresql/data/pgdata

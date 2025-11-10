@@ -7,13 +7,13 @@ services:
     ports:
       - "{{POSTHOG_PORT}}:8000"
     environment:
-      POSTHOG_DB_NAME: {{POSTGRES_DATABASE}}
+      POSTHOG_DB_NAME: "{{POSTGRES_DATABASE}}"
       POSTHOG_POSTGRES_HOST: postgres
-      POSTHOG_POSTGRES_DATABASE: {{POSTGRES_DATABASE}}
-      POSTHOG_POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTHOG_POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTHOG_POSTGRES_DATABASE: "{{POSTGRES_DATABASE}}"
+      POSTHOG_POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTHOG_POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
       POSTHOG_REDIS_HOST: redis
-      POSTHOG_SECRET_KEY: {{POSTHOG_SECRET_KEY}}
+      POSTHOG_SECRET_KEY: "{{POSTHOG_SECRET_KEY}}"
     volumes:
       - posthog_data:/code
     depends_on:
@@ -35,9 +35,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

@@ -7,10 +7,10 @@ services:
     ports:
       - "{{PREFECT_PORT}}:4200"
     environment:
-      PREFECT_API_URL: http://{{PRIMARY_DOMAIN}}:4200/api
+      PREFECT_API_URL: "http://{{PRIMARY_DOMAIN}}:4200/api"
       PREFECT_SERVER_API_HOST: 0.0.0.0
       PREFECT_SERVER_API_PORT: 4200
-      PREFECT_SERVER_DB_CONNECTION_URL: postgresql+asyncpg://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
+      PREFECT_SERVER_DB_CONNECTION_URL: "postgresql+asyncpg://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}"
     volumes:
       - prefect_data:/root/.prefect
     depends_on:
@@ -31,9 +31,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

@@ -7,9 +7,9 @@ services:
     ports:
       - "{{POSTGREST_PORT}}:3000"
     environment:
-      PGRST_DB_URI: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
+      PGRST_DB_URI: "postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}"
       PGRST_DB_SCHEMA: public
-      PGRST_DB_ANON_ROLE: {{POSTGRES_ANON_ROLE}}
+      PGRST_DB_ANON_ROLE: "{{POSTGRES_ANON_ROLE}}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -27,9 +27,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

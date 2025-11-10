@@ -10,9 +10,9 @@ services:
       PYTHONUNBUFFERED: 0
       REDASH_LOG_LEVEL: INFO
       REDASH_REDIS_URL: redis://redis:6379/0
-      REDASH_DATABASE_URL: postgresql://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
-      REDASH_COOKIE_SECRET: {{COOKIE_SECRET}}
-      REDASH_SECRET_KEY: {{SECRET_KEY}}
+      REDASH_DATABASE_URL: "postgresql://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}"
+      REDASH_COOKIE_SECRET: "{{COOKIE_SECRET}}"
+      REDASH_SECRET_KEY: "{{SECRET_KEY}}"
     volumes:
       - redash_data:/app
     depends_on:
@@ -34,9 +34,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

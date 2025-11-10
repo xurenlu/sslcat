@@ -14,7 +14,7 @@ services:
       - "{{POSTE_POP3S_PORT}}:995"
     environment:
       TZ: Asia/Shanghai
-      LETSENCRYPT_EMAIL: {{LETSENCRYPT_EMAIL}}
+      LETSENCRYPT_EMAIL: "{{LETSENCRYPT_EMAIL}}"
     volumes:
       - poste_data:/data
     networks:

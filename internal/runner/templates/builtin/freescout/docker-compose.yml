@@ -8,11 +8,11 @@ services:
       - "{{FREESCOUT_PORT}}:80"
     environment:
       DB_HOST: mysql
-      DB_DATABASE: {{MYSQL_DATABASE}}
-      DB_USERNAME: {{MYSQL_USERNAME}}
-      DB_PASSWORD: {{MYSQL_PASSWORD}}
-      APP_URL: http://{{PRIMARY_DOMAIN}}
-      APP_KEY: {{APP_KEY}}
+      DB_DATABASE: "{{MYSQL_DATABASE}}"
+      DB_USERNAME: "{{MYSQL_USERNAME}}"
+      DB_PASSWORD: "{{MYSQL_PASSWORD}}"
+      APP_URL: "http://{{PRIMARY_DOMAIN}}"
+      APP_KEY: "{{APP_KEY}}"
     volumes:
       - freescout_data:/var/www/html/storage
     depends_on:
@@ -32,10 +32,10 @@ services:
     container_name: {{APP_NAME}}_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
-      MYSQL_DATABASE: {{MYSQL_DATABASE}}
-      MYSQL_USER: {{MYSQL_USERNAME}}
-      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
+      MYSQL_ROOT_PASSWORD: "{{MYSQL_ROOT_PASSWORD}}"
+      MYSQL_DATABASE: "{{MYSQL_DATABASE}}"
+      MYSQL_USER: "{{MYSQL_USERNAME}}"
+      MYSQL_PASSWORD: "{{MYSQL_PASSWORD}}"
       MYSQL_CHARACTER_SET_SERVER: utf8mb4
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
     volumes:

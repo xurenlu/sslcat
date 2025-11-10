@@ -7,17 +7,17 @@ services:
     ports:
       - "{{DIRECTUS_PORT}}:8055"
     environment:
-      KEY: {{DIRECTUS_KEY}}
-      SECRET: {{DIRECTUS_SECRET}}
+      KEY: "{{DIRECTUS_KEY}}"
+      SECRET: "{{DIRECTUS_SECRET}}"
       DB_CLIENT: postgres
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_DATABASE: {{POSTGRES_DATABASE}}
-      DB_USER: {{POSTGRES_USERNAME}}
-      DB_PASSWORD: {{POSTGRES_PASSWORD}}
-      ADMIN_EMAIL: admin@{{PRIMARY_DOMAIN}}
-      ADMIN_PASSWORD: {{ADMIN_PASSWORD}}
-      PUBLIC_URL: http://{{PRIMARY_DOMAIN}}
+      DB_DATABASE: "{{POSTGRES_DATABASE}}"
+      DB_USER: "{{POSTGRES_USERNAME}}"
+      DB_PASSWORD: "{{POSTGRES_PASSWORD}}"
+      ADMIN_EMAIL: "admin@{{PRIMARY_DOMAIN}}"
+      ADMIN_PASSWORD: "{{ADMIN_PASSWORD}}"
+      PUBLIC_URL: "http://{{PRIMARY_DOMAIN}}"
     volumes:
       - directus_uploads:/directus/uploads
       - directus_extensions:/directus/extensions
@@ -38,9 +38,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
       POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
     volumes:
       - postgres_data:/var/lib/postgresql/data

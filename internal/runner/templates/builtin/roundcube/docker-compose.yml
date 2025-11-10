@@ -7,13 +7,13 @@ services:
     ports:
       - "{{ROUNDCUBE_PORT}}:80"
     environment:
-      ROUNDCUBE_DEFAULT_HOST: {{MAIL_HOST}}
-      ROUNDCUBE_SMTP_SERVER: {{SMTP_HOST}}
+      ROUNDCUBE_DEFAULT_HOST: "{{MAIL_HOST}}"
+      ROUNDCUBE_SMTP_SERVER: "{{SMTP_HOST}}"
       ROUNDCUBE_DB_TYPE: mysql
       ROUNDCUBE_DB_HOST: mysql
-      ROUNDCUBE_DB_NAME: {{MYSQL_DATABASE}}
-      ROUNDCUBE_DB_USER: {{MYSQL_USERNAME}}
-      ROUNDCUBE_DB_PASSWORD: {{MYSQL_PASSWORD}}
+      ROUNDCUBE_DB_NAME: "{{MYSQL_DATABASE}}"
+      ROUNDCUBE_DB_USER: "{{MYSQL_USERNAME}}"
+      ROUNDCUBE_DB_PASSWORD: "{{MYSQL_PASSWORD}}"
     volumes:
       - roundcube_data:/var/www/html
     depends_on:
@@ -33,10 +33,10 @@ services:
     container_name: {{APP_NAME}}_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
-      MYSQL_DATABASE: {{MYSQL_DATABASE}}
-      MYSQL_USER: {{MYSQL_USERNAME}}
-      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
+      MYSQL_ROOT_PASSWORD: "{{MYSQL_ROOT_PASSWORD}}"
+      MYSQL_DATABASE: "{{MYSQL_DATABASE}}"
+      MYSQL_USER: "{{MYSQL_USERNAME}}"
+      MYSQL_PASSWORD: "{{MYSQL_PASSWORD}}"
       MYSQL_CHARACTER_SET_SERVER: utf8mb4
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
     volumes:

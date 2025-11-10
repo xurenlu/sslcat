@@ -7,7 +7,7 @@ services:
     ports:
       - "{{REPLICATE_RMBG_PORT}}:8080"
     environment:
-      REPLICATE_API_TOKEN: {{REPLICATE_API_TOKEN}}
+      REPLICATE_API_TOKEN: "{{REPLICATE_API_TOKEN}}"
       REPLICATE_MODEL: lucataco/remove-background
     volumes:
       - replicate_rmbg_data:/app/cache

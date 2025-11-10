@@ -7,7 +7,7 @@ services:
     ports:
       - "{{STOPLIGHT_PORT}}:4010"
     environment:
-      SPEC_URL: {{STOPLIGHT_SPEC_URL}}
+      SPEC_URL: "{{STOPLIGHT_SPEC_URL}}"
     volumes:
       - stoplight_data:/app/specs
     networks:

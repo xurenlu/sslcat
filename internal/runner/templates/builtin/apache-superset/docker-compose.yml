@@ -8,9 +8,9 @@ services:
       - "{{SUPERSET_PORT}}:8088"
     environment:
       SUPERSET_CONFIG_PATH: /app/superset_config.py
-      SUPERSET_SECRET_KEY: {{SUPERSET_SECRET_KEY}}
-      DATABASE_URL: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
-      REDIS_URL: redis://:{{REDIS_PASSWORD}}@redis:6379/0
+      SUPERSET_SECRET_KEY: "{{SUPERSET_SECRET_KEY}}"
+      DATABASE_URL: "postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}"
+      REDIS_URL: "redis://:{{REDIS_PASSWORD}}@redis:6379/0"
     volumes:
       - superset_data:/app/superset_home
     depends_on:
@@ -32,9 +32,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

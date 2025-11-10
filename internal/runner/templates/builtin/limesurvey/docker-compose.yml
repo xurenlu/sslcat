@@ -9,13 +9,13 @@ services:
     environment:
       DB_TYPE: mysql
       DB_HOST: mysql
-      DB_NAME: {{MYSQL_DATABASE}}
-      DB_USER: {{MYSQL_USERNAME}}
-      DB_PASSWORD: {{MYSQL_PASSWORD}}
+      DB_NAME: "{{MYSQL_DATABASE}}"
+      DB_USER: "{{MYSQL_USERNAME}}"
+      DB_PASSWORD: "{{MYSQL_PASSWORD}}"
       ADMIN_USER: admin
-      ADMIN_PASSWORD: {{ADMIN_PASSWORD}}
+      ADMIN_PASSWORD: "{{ADMIN_PASSWORD}}"
       ADMIN_NAME: Administrator
-      ADMIN_EMAIL: admin@{{PRIMARY_DOMAIN}}
+      ADMIN_EMAIL: "admin@{{PRIMARY_DOMAIN}}"
     volumes:
       - limesurvey_data:/var/www/html/upload
     depends_on:
@@ -35,10 +35,10 @@ services:
     container_name: {{APP_NAME}}_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
-      MYSQL_DATABASE: {{MYSQL_DATABASE}}
-      MYSQL_USER: {{MYSQL_USERNAME}}
-      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
+      MYSQL_ROOT_PASSWORD: "{{MYSQL_ROOT_PASSWORD}}"
+      MYSQL_DATABASE: "{{MYSQL_DATABASE}}"
+      MYSQL_USER: "{{MYSQL_USERNAME}}"
+      MYSQL_PASSWORD: "{{MYSQL_PASSWORD}}"
       MYSQL_CHARACTER_SET_SERVER: utf8mb4
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
     volumes:

@@ -7,7 +7,7 @@ services:
     ports:
       - "{{PIPER_TTS_PORT}}:5000"
     environment:
-      PIPER_MODEL: {{PIPER_MODEL}}
+      PIPER_MODEL: "{{PIPER_MODEL}}"
     volumes:
       - piper_tts_data:/app/models
     networks:

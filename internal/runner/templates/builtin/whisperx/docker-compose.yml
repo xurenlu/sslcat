@@ -7,7 +7,7 @@ services:
     ports:
       - "{{WHISPERX_PORT}}:8000"
     environment:
-      WHISPERX_MODEL: {{WHISPERX_MODEL}}
+      WHISPERX_MODEL: "{{WHISPERX_MODEL}}"
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
     volumes:

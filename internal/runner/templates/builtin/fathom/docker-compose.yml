@@ -9,11 +9,11 @@ services:
     environment:
       FATHOM_SERVER_ADDR: ":8080"
       FATHOM_DATABASE_DRIVER: postgres
-      FATHOM_DATABASE_NAME: {{POSTGRES_DATABASE}}
-      FATHOM_DATABASE_USER: {{POSTGRES_USERNAME}}
-      FATHOM_DATABASE_PASSWORD: {{POSTGRES_PASSWORD}}
+      FATHOM_DATABASE_NAME: "{{POSTGRES_DATABASE}}"
+      FATHOM_DATABASE_USER: "{{POSTGRES_USERNAME}}"
+      FATHOM_DATABASE_PASSWORD: "{{POSTGRES_PASSWORD}}"
       FATHOM_DATABASE_HOST: postgres:5432
-      FATHOM_SECRET: {{FATHOM_SECRET}}
+      FATHOM_SECRET: "{{FATHOM_SECRET}}"
     volumes:
       - fathom_data:/app/data
     depends_on:
@@ -33,9 +33,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

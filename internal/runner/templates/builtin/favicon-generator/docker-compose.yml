@@ -7,9 +7,9 @@ services:
     ports:
       - "{{GENERATOR_PORT}}:8080"
     environment:
-      MAX_FILE_SIZE: {{MAX_FILE_SIZE}}
-      DEFAULT_SIZES: {{DEFAULT_SIZES}}
-      SUPPORT_PLATFORMS: {{SUPPORT_PLATFORMS}}
+      MAX_FILE_SIZE: "{{MAX_FILE_SIZE}}"
+      DEFAULT_SIZES: "{{DEFAULT_SIZES}}"
+      SUPPORT_PLATFORMS: "{{SUPPORT_PLATFORMS}}"
       TZ: Asia/Shanghai
     volumes:
       - generator_data:/tmp/generator

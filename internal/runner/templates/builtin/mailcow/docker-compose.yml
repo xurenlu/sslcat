@@ -15,7 +15,7 @@ services:
       - "{{MAILCOW_POP3_PORT}}:110"
       - "{{MAILCOW_POP3S_PORT}}:995"
     environment:
-      MAILCOW_HOSTNAME: {{PRIMARY_DOMAIN}}
+      MAILCOW_HOSTNAME: "{{PRIMARY_DOMAIN}}"
       ADDITIONAL_SAN: ""
       SKIP_LETS_ENCRYPT: "n"
       SKIP_SOLR: "y"

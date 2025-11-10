@@ -7,7 +7,7 @@ services:
     ports:
       - "{{REPLICATE_FACE_RESTORE_PORT}}:8080"
     environment:
-      REPLICATE_API_TOKEN: {{REPLICATE_API_TOKEN}}
+      REPLICATE_API_TOKEN: "{{REPLICATE_API_TOKEN}}"
       REPLICATE_MODEL: logerzhu/face-restoration
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility

@@ -7,7 +7,7 @@ services:
     ports:
       - "{{SEND_PORT}}:1443"
     environment:
-      BASE_URL: http://{{PRIMARY_DOMAIN}}
+      BASE_URL: "http://{{PRIMARY_DOMAIN}}"
       REDIS_HOST: redis
       REDIS_PORT: 6379
     volumes:

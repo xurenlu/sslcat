@@ -8,10 +8,10 @@ services:
       - "{{METABASE_PORT}}:3000"
     environment:
       MB_DB_TYPE: postgres
-      MB_DB_DBNAME: {{POSTGRES_DATABASE}}
+      MB_DB_DBNAME: "{{POSTGRES_DATABASE}}"
       MB_DB_PORT: 5432
-      MB_DB_USER: {{POSTGRES_USERNAME}}
-      MB_DB_PASS: {{POSTGRES_PASSWORD}}
+      MB_DB_USER: "{{POSTGRES_USERNAME}}"
+      MB_DB_PASS: "{{POSTGRES_PASSWORD}}"
       MB_DB_HOST: postgres
     volumes:
       - metabase_data:/metabase-data
@@ -32,9 +32,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

@@ -7,14 +7,14 @@ services:
     ports:
       - "{{DRONE_PORT}}:80"
     environment:
-      DRONE_GITEA_SERVER: http://{{PRIMARY_DOMAIN}}
-      DRONE_GITEA_CLIENT_ID: {{GITEA_CLIENT_ID}}
-      DRONE_GITEA_CLIENT_SECRET: {{GITEA_CLIENT_SECRET}}
-      DRONE_RPC_SECRET: {{RPC_SECRET}}
-      DRONE_SERVER_HOST: {{PRIMARY_DOMAIN}}
+      DRONE_GITEA_SERVER: "http://{{PRIMARY_DOMAIN}}"
+      DRONE_GITEA_CLIENT_ID: "{{GITEA_CLIENT_ID}}"
+      DRONE_GITEA_CLIENT_SECRET: "{{GITEA_CLIENT_SECRET}}"
+      DRONE_RPC_SECRET: "{{RPC_SECRET}}"
+      DRONE_SERVER_HOST: "{{PRIMARY_DOMAIN}}"
       DRONE_SERVER_PROTO: http
       DRONE_DATABASE_DRIVER: postgres
-      DRONE_DATABASE_DATASOURCE: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}?sslmode=disable
+      DRONE_DATABASE_DATASOURCE: "postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}?sslmode=disable"
     volumes:
       - drone_data:/data
     depends_on:
@@ -36,7 +36,7 @@ services:
     environment:
       DRONE_RPC_PROTO: http
       DRONE_RPC_HOST: drone-server:80
-      DRONE_RPC_SECRET: {{RPC_SECRET}}
+      DRONE_RPC_SECRET: "{{RPC_SECRET}}"
       DRONE_RUNNER_CAPACITY: 2
       DRONE_RUNNER_NAME: {{APP_NAME}}_runner
     volumes:
@@ -52,9 +52,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

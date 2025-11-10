@@ -8,12 +8,12 @@ services:
       - "{{SENTRY_PORT}}:9000"
     environment:
       SENTRY_POSTGRES_HOST: postgres
-      SENTRY_DB_USER: {{POSTGRES_USERNAME}}
-      SENTRY_DB_PASSWORD: {{POSTGRES_PASSWORD}}
-      SENTRY_DB_NAME: {{POSTGRES_DATABASE}}
+      SENTRY_DB_USER: "{{POSTGRES_USERNAME}}"
+      SENTRY_DB_PASSWORD: "{{POSTGRES_PASSWORD}}"
+      SENTRY_DB_NAME: "{{POSTGRES_DATABASE}}"
       SENTRY_REDIS_HOST: redis
-      SENTRY_SECRET_KEY: {{SECRET_KEY}}
-      SENTRY_URL_PREFIX: http://{{PRIMARY_DOMAIN}}
+      SENTRY_SECRET_KEY: "{{SECRET_KEY}}"
+      SENTRY_URL_PREFIX: "http://{{PRIMARY_DOMAIN}}"
     volumes:
       - sentry_data:/data
     depends_on:
@@ -37,11 +37,11 @@ services:
     restart: unless-stopped
     environment:
       SENTRY_POSTGRES_HOST: postgres
-      SENTRY_DB_USER: {{POSTGRES_USERNAME}}
-      SENTRY_DB_PASSWORD: {{POSTGRES_PASSWORD}}
-      SENTRY_DB_NAME: {{POSTGRES_DATABASE}}
+      SENTRY_DB_USER: "{{POSTGRES_USERNAME}}"
+      SENTRY_DB_PASSWORD: "{{POSTGRES_PASSWORD}}"
+      SENTRY_DB_NAME: "{{POSTGRES_DATABASE}}"
       SENTRY_REDIS_HOST: redis
-      SENTRY_SECRET_KEY: {{SECRET_KEY}}
+      SENTRY_SECRET_KEY: "{{SECRET_KEY}}"
     volumes:
       - sentry_data:/data
     depends_on:
@@ -56,11 +56,11 @@ services:
     restart: unless-stopped
     environment:
       SENTRY_POSTGRES_HOST: postgres
-      SENTRY_DB_USER: {{POSTGRES_USERNAME}}
-      SENTRY_DB_PASSWORD: {{POSTGRES_PASSWORD}}
-      SENTRY_DB_NAME: {{POSTGRES_DATABASE}}
+      SENTRY_DB_USER: "{{POSTGRES_USERNAME}}"
+      SENTRY_DB_PASSWORD: "{{POSTGRES_PASSWORD}}"
+      SENTRY_DB_NAME: "{{POSTGRES_DATABASE}}"
       SENTRY_REDIS_HOST: redis
-      SENTRY_SECRET_KEY: {{SECRET_KEY}}
+      SENTRY_SECRET_KEY: "{{SECRET_KEY}}"
     volumes:
       - sentry_data:/data
     depends_on:
@@ -74,9 +74,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

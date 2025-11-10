@@ -8,10 +8,10 @@ services:
       - "{{PRESTASHOP_PORT}}:80"
     environment:
       DB_SERVER: mysql
-      DB_NAME: {{MYSQL_DATABASE}}
-      DB_USER: {{MYSQL_USERNAME}}
-      DB_PASSWD: {{MYSQL_PASSWORD}}
-      PS_DOMAIN: {{PRIMARY_DOMAIN}}
+      DB_NAME: "{{MYSQL_DATABASE}}"
+      DB_USER: "{{MYSQL_USERNAME}}"
+      DB_PASSWD: "{{MYSQL_PASSWORD}}"
+      PS_DOMAIN: "{{PRIMARY_DOMAIN}}"
       PS_FOLDER_ADMIN: admin
       PS_FOLDER_INSTALL: install
     volumes:
@@ -33,10 +33,10 @@ services:
     container_name: {{APP_NAME}}_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
-      MYSQL_DATABASE: {{MYSQL_DATABASE}}
-      MYSQL_USER: {{MYSQL_USERNAME}}
-      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
+      MYSQL_ROOT_PASSWORD: "{{MYSQL_ROOT_PASSWORD}}"
+      MYSQL_DATABASE: "{{MYSQL_DATABASE}}"
+      MYSQL_USER: "{{MYSQL_USERNAME}}"
+      MYSQL_PASSWORD: "{{MYSQL_PASSWORD}}"
       MYSQL_CHARACTER_SET_SERVER: utf8mb4
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
     volumes:

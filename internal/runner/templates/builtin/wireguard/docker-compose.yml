@@ -7,10 +7,10 @@ services:
     ports:
       - "{{WIREGUARD_WEBUI_PORT}}:51821"
     environment:
-      WG_HOST: {{WIREGUARD_DOMAIN}}
-      PASSWORD: {{WIREGUARD_PASSWORD}}
-      WG_PORT: {{WIREGUARD_PORT}}
-      WG_DEFAULT_ADDRESS: {{WIREGUARD_SUBNET}}
+      WG_HOST: "{{WIREGUARD_DOMAIN}}"
+      PASSWORD: "{{WIREGUARD_PASSWORD}}"
+      WG_PORT: "{{WIREGUARD_PORT}}"
+      WG_DEFAULT_ADDRESS: "{{WIREGUARD_SUBNET}}"
       WG_DEFAULT_DNS: 1.1.1.1
       TZ: Asia/Shanghai
     volumes:
@@ -36,11 +36,11 @@ services:
       PUID: 1000
       PGID: 1000
       TZ: Asia/Shanghai
-      SERVERURL: {{WIREGUARD_DOMAIN}}
-      SERVERPORT: {{WIREGUARD_PORT}}
+      SERVERURL: "{{WIREGUARD_DOMAIN}}"
+      SERVERPORT: "{{WIREGUARD_PORT}}"
       PEERS: 10
       PEERDNS: 1.1.1.1
-      INTERNAL_SUBNET: {{WIREGUARD_SUBNET}}
+      INTERNAL_SUBNET: "{{WIREGUARD_SUBNET}}"
     volumes:
       - wireguard_config:/config
       - /lib/modules:/lib/modules:ro

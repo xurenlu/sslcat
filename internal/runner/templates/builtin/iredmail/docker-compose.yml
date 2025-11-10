@@ -13,9 +13,9 @@ services:
       - "{{IREDMAIL_IMAP_PORT}}:143"
       - "{{IREDMAIL_IMAPS_PORT}}:993"
     environment:
-      HOSTNAME: {{PRIMARY_DOMAIN}}
-      FIRST_MAIL_DOMAIN: {{PRIMARY_DOMAIN}}
-      FIRST_MAIL_DOMAIN_ADMIN_PASSWORD: {{ADMIN_PASSWORD}}
+      HOSTNAME: "{{PRIMARY_DOMAIN}}"
+      FIRST_MAIL_DOMAIN: "{{PRIMARY_DOMAIN}}"
+      FIRST_MAIL_DOMAIN_ADMIN_PASSWORD: "{{ADMIN_PASSWORD}}"
     volumes:
       - iredmail_data:/var/vmail
       - iredmail_mysql:/var/lib/mysql

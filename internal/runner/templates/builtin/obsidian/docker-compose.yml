@@ -10,7 +10,7 @@ services:
       PUID: 1000
       PGID: 1000
       TZ: Asia/Shanghai
-      PASSWORD: {{OBSIDIAN_PASSWORD}}
+      PASSWORD: "{{OBSIDIAN_PASSWORD}}"
     volumes:
       - obsidian_data:/config
       - obsidian_vault:/vault

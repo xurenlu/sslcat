@@ -7,10 +7,10 @@ services:
     ports:
       - "{{BUSINESS_CARD_PORT}}:8080"
     environment:
-      DATABASE_URL: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
-      REDIS_URL: redis://:{{REDIS_PASSWORD}}@redis:6379/0
-      SECRET_KEY: {{BUSINESS_CARD_SECRET_KEY}}
-      QR_CODE_ENABLED: {{QR_CODE_ENABLED}}
+      DATABASE_URL: "postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}"
+      REDIS_URL: "redis://:{{REDIS_PASSWORD}}@redis:6379/0"
+      SECRET_KEY: "{{BUSINESS_CARD_SECRET_KEY}}"
+      QR_CODE_ENABLED: "{{QR_CODE_ENABLED}}"
     volumes:
       - business_card_data:/app/data
       - business_card_templates:/app/templates
@@ -34,9 +34,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

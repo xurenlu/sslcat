@@ -7,10 +7,10 @@ services:
     ports:
       - "{{DINGTALK_BOT_PORT}}:8080"
     environment:
-      DATABASE_URL: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
-      DINGTALK_APP_KEY: {{DINGTALK_APP_KEY}}
-      DINGTALK_APP_SECRET: {{DINGTALK_APP_SECRET}}
-      SECRET_KEY: {{DINGTALK_BOT_SECRET_KEY}}
+      DATABASE_URL: "postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}"
+      DINGTALK_APP_KEY: "{{DINGTALK_APP_KEY}}"
+      DINGTALK_APP_SECRET: "{{DINGTALK_APP_SECRET}}"
+      SECRET_KEY: "{{DINGTALK_BOT_SECRET_KEY}}"
     volumes:
       - dingtalk_bot_data:/app/data
     depends_on:
@@ -30,9 +30,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

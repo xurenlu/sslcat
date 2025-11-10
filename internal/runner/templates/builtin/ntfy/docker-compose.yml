@@ -7,7 +7,7 @@ services:
     ports:
       - "{{NTFY_PORT}}:80"
     environment:
-      NTFY_BASE_URL: http://{{PRIMARY_DOMAIN}}
+      NTFY_BASE_URL: "http://{{PRIMARY_DOMAIN}}"
       NTFY_AUTH_DEFAULT_ACCESS: "read-write"
     volumes:
       - ntfy_data:/var/cache/ntfy

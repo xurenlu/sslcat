@@ -7,8 +7,8 @@ services:
     ports:
       - "{{LOGSEQ_PORT}}:3000"
     environment:
-      LOGSEQ_APP_USER: {{LOGSEQ_USERNAME}}
-      LOGSEQ_APP_PASSWORD: {{LOGSEQ_PASSWORD}}
+      LOGSEQ_APP_USER: "{{LOGSEQ_USERNAME}}"
+      LOGSEQ_APP_PASSWORD: "{{LOGSEQ_PASSWORD}}"
     volumes:
       - logseq_data:/logseq
     networks:

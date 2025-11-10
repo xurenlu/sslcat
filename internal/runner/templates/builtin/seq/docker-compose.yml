@@ -9,8 +9,8 @@ services:
       - "{{SEQ_INGESTION_PORT}}:5341"
     environment:
       ACCEPT_EULA: Y
-      SEQ_FIRSTRUN_ADMINUSERNAME: {{SEQ_USERNAME}}
-      SEQ_FIRSTRUN_ADMINPASSWORDHASH: {{SEQ_PASSWORD_HASH}}
+      SEQ_FIRSTRUN_ADMINUSERNAME: "{{SEQ_USERNAME}}"
+      SEQ_FIRSTRUN_ADMINPASSWORDHASH: "{{SEQ_PASSWORD_HASH}}"
     volumes:
       - seq_data:/data
     networks:

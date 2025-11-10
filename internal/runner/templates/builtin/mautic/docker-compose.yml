@@ -8,9 +8,9 @@ services:
       - "{{MAUTIC_PORT}}:80"
     environment:
       MAUTIC_DB_HOST: mysql
-      MAUTIC_DB_USER: {{MYSQL_USERNAME}}
-      MAUTIC_DB_PASSWORD: {{MYSQL_PASSWORD}}
-      MAUTIC_DB_NAME: {{MYSQL_DATABASE}}
+      MAUTIC_DB_USER: "{{MYSQL_USERNAME}}"
+      MAUTIC_DB_PASSWORD: "{{MYSQL_PASSWORD}}"
+      MAUTIC_DB_NAME: "{{MYSQL_DATABASE}}"
       MAUTIC_RUN_CRON_JOBS: "true"
     volumes:
       - mautic_data:/var/www/html
@@ -31,10 +31,10 @@ services:
     container_name: {{APP_NAME}}_mysql
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: {{MYSQL_DATABASE}}
-      MYSQL_USER: {{MYSQL_USERNAME}}
-      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
-      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
+      MYSQL_DATABASE: "{{MYSQL_DATABASE}}"
+      MYSQL_USER: "{{MYSQL_USERNAME}}"
+      MYSQL_PASSWORD: "{{MYSQL_PASSWORD}}"
+      MYSQL_ROOT_PASSWORD: "{{MYSQL_ROOT_PASSWORD}}"
     volumes:
       - mysql_data:/var/lib/mysql
     networks:

@@ -7,7 +7,7 @@ services:
     ports:
       - "{{FRESHRSS_PORT}}:80"
     environment:
-      TZ: {{TIMEZONE}}
+      TZ: "{{TIMEZONE}}"
       CRON_MIN: "*/15"
     volumes:
       - freshrss_data:/var/www/FreshRSS/data

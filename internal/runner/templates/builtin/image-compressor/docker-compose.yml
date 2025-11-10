@@ -7,9 +7,9 @@ services:
     ports:
       - "{{COMPRESSOR_PORT}}:8080"
     environment:
-      MAX_FILE_SIZE: {{MAX_FILE_SIZE}}
-      COMPRESSION_LEVEL: {{COMPRESSION_LEVEL}}
-      PRESERVE_METADATA: {{PRESERVE_METADATA}}
+      MAX_FILE_SIZE: "{{MAX_FILE_SIZE}}"
+      COMPRESSION_LEVEL: "{{COMPRESSION_LEVEL}}"
+      PRESERVE_METADATA: "{{PRESERVE_METADATA}}"
       TZ: Asia/Shanghai
     volumes:
       - compressor_data:/tmp/compressor

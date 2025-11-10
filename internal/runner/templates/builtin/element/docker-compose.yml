@@ -7,7 +7,7 @@ services:
     ports:
       - "{{ELEMENT_PORT}}:80"
     environment:
-      DEFAULT_SERVER_NAME: {{MATRIX_SERVER_NAME}}
+      DEFAULT_SERVER_NAME: "{{MATRIX_SERVER_NAME}}"
       INTEGRATION_MANAGER_URL: ""
     volumes:
       - element_data:/app

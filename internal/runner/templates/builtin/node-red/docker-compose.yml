@@ -7,7 +7,7 @@ services:
     ports:
       - "{{NODE_RED_PORT}}:1880"
     environment:
-      NODE_RED_CREDENTIAL_SECRET: {{NODE_RED_SECRET}}
+      NODE_RED_CREDENTIAL_SECRET: "{{NODE_RED_SECRET}}"
     volumes:
       - node_red_data:/data
     networks:

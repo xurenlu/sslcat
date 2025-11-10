@@ -7,10 +7,10 @@ services:
     ports:
       - "{{TYPEFORM_PORT}}:3000"
     environment:
-      DATABASE_URL: postgresql://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
+      DATABASE_URL: "postgresql://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}"
       REDIS_URL: redis://redis:6379
-      SECRET_KEY: {{SECRET_KEY}}
-      BASE_URL: http://{{PRIMARY_DOMAIN}}
+      SECRET_KEY: "{{SECRET_KEY}}"
+      BASE_URL: "http://{{PRIMARY_DOMAIN}}"
     volumes:
       - typeform_data:/app/data
     depends_on:
@@ -32,9 +32,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

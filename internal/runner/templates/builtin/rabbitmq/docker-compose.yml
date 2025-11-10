@@ -8,8 +8,8 @@ services:
       - "{{RABBITMQ_PORT}}:5672"
       - "{{RABBITMQ_MANAGEMENT_PORT}}:15672"
     environment:
-      RABBITMQ_DEFAULT_USER: {{RABBITMQ_USERNAME}}
-      RABBITMQ_DEFAULT_PASS: {{RABBITMQ_PASSWORD}}
+      RABBITMQ_DEFAULT_USER: "{{RABBITMQ_USERNAME}}"
+      RABBITMQ_DEFAULT_PASS: "{{RABBITMQ_PASSWORD}}"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:

@@ -7,9 +7,9 @@ services:
     ports:
       - "{{SHOPWARE_PORT}}:80"
     environment:
-      DATABASE_URL: mysql://{{MYSQL_USERNAME}}:{{MYSQL_PASSWORD}}@mysql:3306/{{MYSQL_DATABASE}}
+      DATABASE_URL: "mysql://{{MYSQL_USERNAME}}:{{MYSQL_PASSWORD}}@mysql:3306/{{MYSQL_DATABASE}}"
       APP_ENV: prod
-      APP_SECRET: {{APP_SECRET}}
+      APP_SECRET: "{{APP_SECRET}}"
       SHOPWARE_ES_ENABLED: "false"
     volumes:
       - shopware_data:/var/www/html
@@ -30,10 +30,10 @@ services:
     container_name: {{APP_NAME}}_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
-      MYSQL_DATABASE: {{MYSQL_DATABASE}}
-      MYSQL_USER: {{MYSQL_USERNAME}}
-      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
+      MYSQL_ROOT_PASSWORD: "{{MYSQL_ROOT_PASSWORD}}"
+      MYSQL_DATABASE: "{{MYSQL_DATABASE}}"
+      MYSQL_USER: "{{MYSQL_USERNAME}}"
+      MYSQL_PASSWORD: "{{MYSQL_PASSWORD}}"
       MYSQL_CHARACTER_SET_SERVER: utf8mb4
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
     volumes:

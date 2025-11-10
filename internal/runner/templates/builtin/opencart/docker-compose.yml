@@ -7,12 +7,12 @@ services:
     ports:
       - "{{OPENCART_PORT}}:8080"
     environment:
-      OPENCART_HOST: {{PRIMARY_DOMAIN}}
+      OPENCART_HOST: "{{PRIMARY_DOMAIN}}"
       OPENCART_DATABASE_HOST: mysql
       OPENCART_DATABASE_PORT_NUMBER: 3306
-      OPENCART_DATABASE_USER: {{MYSQL_USERNAME}}
-      OPENCART_DATABASE_PASSWORD: {{MYSQL_PASSWORD}}
-      OPENCART_DATABASE_NAME: {{MYSQL_DATABASE}}
+      OPENCART_DATABASE_USER: "{{MYSQL_USERNAME}}"
+      OPENCART_DATABASE_PASSWORD: "{{MYSQL_PASSWORD}}"
+      OPENCART_DATABASE_NAME: "{{MYSQL_DATABASE}}"
     volumes:
       - opencart_data:/bitnami/opencart
     depends_on:
@@ -32,10 +32,10 @@ services:
     container_name: {{APP_NAME}}_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
-      MYSQL_DATABASE: {{MYSQL_DATABASE}}
-      MYSQL_USER: {{MYSQL_USERNAME}}
-      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
+      MYSQL_ROOT_PASSWORD: "{{MYSQL_ROOT_PASSWORD}}"
+      MYSQL_DATABASE: "{{MYSQL_DATABASE}}"
+      MYSQL_USER: "{{MYSQL_USERNAME}}"
+      MYSQL_PASSWORD: "{{MYSQL_PASSWORD}}"
       MYSQL_CHARACTER_SET_SERVER: utf8mb4
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
     volumes:

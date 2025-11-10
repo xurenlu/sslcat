@@ -7,16 +7,16 @@ services:
     ports:
       - "{{CHATWOOT_PORT}}:3000"
     environment:
-      INSTALLATION_NAME: {{CHATWOOT_NAME}}
+      INSTALLATION_NAME: "{{CHATWOOT_NAME}}"
       ENVIRONMENT: production
-      FRONTEND_URL: http://{{PRIMARY_DOMAIN}}
+      FRONTEND_URL: "http://{{PRIMARY_DOMAIN}}"
       FORCE_SSL: "false"
-      SECRET_KEY_BASE: {{SECRET_KEY_BASE}}
+      SECRET_KEY_BASE: "{{SECRET_KEY_BASE}}"
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      POSTGRES_DATABASE: {{POSTGRES_DATABASE}}
-      POSTGRES_USERNAME: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DATABASE: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USERNAME: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
       REDIS_URL: redis://redis:6379
       RAILS_ENV: production
       RAILS_LOG_TO_STDOUT: "true"
@@ -42,9 +42,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

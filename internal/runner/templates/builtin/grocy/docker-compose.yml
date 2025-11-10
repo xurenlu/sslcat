@@ -12,9 +12,9 @@ services:
       TZ: UTC
       GROCY_DB_TYPE: mysql
       GROCY_DB_HOST: mysql
-      GROCY_DB_NAME: {{MYSQL_DATABASE}}
-      GROCY_DB_USER: {{MYSQL_USERNAME}}
-      GROCY_DB_PASSWORD: {{MYSQL_PASSWORD}}
+      GROCY_DB_NAME: "{{MYSQL_DATABASE}}"
+      GROCY_DB_USER: "{{MYSQL_USERNAME}}"
+      GROCY_DB_PASSWORD: "{{MYSQL_PASSWORD}}"
     volumes:
       - grocy_data:/config
     depends_on:
@@ -34,10 +34,10 @@ services:
     container_name: {{APP_NAME}}_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
-      MYSQL_DATABASE: {{MYSQL_DATABASE}}
-      MYSQL_USER: {{MYSQL_USERNAME}}
-      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
+      MYSQL_ROOT_PASSWORD: "{{MYSQL_ROOT_PASSWORD}}"
+      MYSQL_DATABASE: "{{MYSQL_DATABASE}}"
+      MYSQL_USER: "{{MYSQL_USERNAME}}"
+      MYSQL_PASSWORD: "{{MYSQL_PASSWORD}}"
       MYSQL_CHARACTER_SET_SERVER: utf8mb4
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
     volumes:

@@ -7,11 +7,11 @@ services:
     ports:
       - "{{JOPLIN_PORT}}:22300"
     environment:
-      APP_BASE_URL: http://{{PRIMARY_DOMAIN}}
+      APP_BASE_URL: "http://{{PRIMARY_DOMAIN}}"
       DB_CLIENT: postgres
-      POSTGRES_DATABASE: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DATABASE: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
     volumes:
@@ -33,9 +33,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

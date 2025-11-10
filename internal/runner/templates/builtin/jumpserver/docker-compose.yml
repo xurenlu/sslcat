@@ -8,17 +8,17 @@ services:
       - "{{JUMPSERVER_PORT}}:80"
       - "{{JUMPSERVER_SSH_PORT}}:2222"
     environment:
-      SECRET_KEY: {{JUMPSERVER_SECRET_KEY}}
-      BOOTSTRAP_TOKEN: {{JUMPSERVER_BOOTSTRAP_TOKEN}}
+      SECRET_KEY: "{{JUMPSERVER_SECRET_KEY}}"
+      BOOTSTRAP_TOKEN: "{{JUMPSERVER_BOOTSTRAP_TOKEN}}"
       DB_ENGINE: mysql
       DB_HOST: mysql
       DB_PORT: 3306
-      DB_USER: {{MYSQL_USERNAME}}
-      DB_PASSWORD: {{MYSQL_PASSWORD}}
-      DB_NAME: {{MYSQL_DATABASE}}
+      DB_USER: "{{MYSQL_USERNAME}}"
+      DB_PASSWORD: "{{MYSQL_PASSWORD}}"
+      DB_NAME: "{{MYSQL_DATABASE}}"
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_PASSWORD: {{REDIS_PASSWORD}}
+      REDIS_PASSWORD: "{{REDIS_PASSWORD}}"
     volumes:
       - jumpserver_data:/opt/jumpserver/data
     depends_on:
@@ -40,10 +40,10 @@ services:
     container_name: {{APP_NAME}}_mysql
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: {{MYSQL_DATABASE}}
-      MYSQL_USER: {{MYSQL_USERNAME}}
-      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
-      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
+      MYSQL_DATABASE: "{{MYSQL_DATABASE}}"
+      MYSQL_USER: "{{MYSQL_USERNAME}}"
+      MYSQL_PASSWORD: "{{MYSQL_PASSWORD}}"
+      MYSQL_ROOT_PASSWORD: "{{MYSQL_ROOT_PASSWORD}}"
     volumes:
       - mysql_data:/var/lib/mysql
     networks:

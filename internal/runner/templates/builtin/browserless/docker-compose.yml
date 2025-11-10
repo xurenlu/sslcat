@@ -7,9 +7,9 @@ services:
     ports:
       - "{{BROWSERLESS_PORT}}:3000"
     environment:
-      TOKEN: {{BROWSERLESS_TOKEN}}
-      CONCURRENT: {{BROWSERLESS_CONCURRENT}}
-      MAX_CONCURRENT: {{BROWSERLESS_MAX_CONCURRENT}}
+      TOKEN: "{{BROWSERLESS_TOKEN}}"
+      CONCURRENT: "{{BROWSERLESS_CONCURRENT}}"
+      MAX_CONCURRENT: "{{BROWSERLESS_MAX_CONCURRENT}}"
     volumes:
       - browserless_data:/app/.local-data
     networks:

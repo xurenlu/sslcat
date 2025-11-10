@@ -9,10 +9,10 @@ services:
     environment:
       DB_TYPE: postgres
       DB_HOST: postgres
-      DB_NAME: {{POSTGRES_DATABASE}}
-      DB_USER: {{POSTGRES_USERNAME}}
-      DB_PWD: {{POSTGRES_PASSWORD}}
-      JWT_SECRET: {{ONLYOFFICE_JWT_SECRET}}
+      DB_NAME: "{{POSTGRES_DATABASE}}"
+      DB_USER: "{{POSTGRES_USERNAME}}"
+      DB_PWD: "{{POSTGRES_PASSWORD}}"
+      JWT_SECRET: "{{ONLYOFFICE_JWT_SECRET}}"
       JWT_ENABLED: "true"
     volumes:
       - onlyoffice_data:/var/www/onlyoffice/Data
@@ -33,9 +33,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

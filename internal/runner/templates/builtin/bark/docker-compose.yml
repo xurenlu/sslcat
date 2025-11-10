@@ -7,7 +7,7 @@ services:
     ports:
       - "{{BARK_PORT}}:8000"
     environment:
-      BARK_MODEL: {{BARK_MODEL}}
+      BARK_MODEL: "{{BARK_MODEL}}"
     volumes:
       - bark_data:/app/models
     networks:

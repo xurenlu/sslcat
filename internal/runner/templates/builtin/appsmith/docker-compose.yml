@@ -7,8 +7,8 @@ services:
     ports:
       - "{{APPSMITH_PORT}}:80"
     environment:
-      APPSMITH_MONGODB_URI: mongodb://{{MONGODB_USERNAME}}:{{MONGODB_PASSWORD}}@mongo:27017/{{MONGODB_DATABASE}}
-      APPSMITH_REDIS_URL: redis://:{{REDIS_PASSWORD}}@redis:6379
+      APPSMITH_MONGODB_URI: "mongodb://{{MONGODB_USERNAME}}:{{MONGODB_PASSWORD}}@mongo:27017/{{MONGODB_DATABASE}}"
+      APPSMITH_REDIS_URL: "redis://:{{REDIS_PASSWORD}}@redis:6379"
     volumes:
       - appsmith_data:/appsmith-stacks
     depends_on:
@@ -30,9 +30,9 @@ services:
     container_name: {{APP_NAME}}_mongo
     restart: unless-stopped
     environment:
-      MONGO_INITDB_ROOT_USERNAME: {{MONGODB_USERNAME}}
-      MONGO_INITDB_ROOT_PASSWORD: {{MONGODB_PASSWORD}}
-      MONGO_INITDB_DATABASE: {{MONGODB_DATABASE}}
+      MONGO_INITDB_ROOT_USERNAME: "{{MONGODB_USERNAME}}"
+      MONGO_INITDB_ROOT_PASSWORD: "{{MONGODB_PASSWORD}}"
+      MONGO_INITDB_DATABASE: "{{MONGODB_DATABASE}}"
     volumes:
       - mongo_data:/data/db
     networks:

@@ -8,7 +8,7 @@ services:
       - "{{OWNCAST_PORT}}:8080"
       - "{{OWNCAST_RTMP_PORT}}:1935"
     environment:
-      OWNCAST_STREAMING_KEY: {{STREAMING_KEY}}
+      OWNCAST_STREAMING_KEY: "{{STREAMING_KEY}}"
     volumes:
       - owncast_data:/app/data
     networks:

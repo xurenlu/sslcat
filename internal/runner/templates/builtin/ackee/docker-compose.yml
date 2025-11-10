@@ -7,9 +7,9 @@ services:
     ports:
       - "{{ACKEE_PORT}}:3000"
     environment:
-      ACKEE_MONGODB: mongodb://{{MONGODB_USERNAME}}:{{MONGODB_PASSWORD}}@mongodb:27017/{{MONGODB_DATABASE}}?authSource=admin
+      ACKEE_MONGODB: "mongodb://{{MONGODB_USERNAME}}:{{MONGODB_PASSWORD}}@mongodb:27017/{{MONGODB_DATABASE}}?authSource=admin"
       ACKEE_USERNAME: admin
-      ACKEE_PASSWORD: {{ADMIN_PASSWORD}}
+      ACKEE_PASSWORD: "{{ADMIN_PASSWORD}}"
     volumes:
       - ackee_data:/app/data
     depends_on:
@@ -29,9 +29,9 @@ services:
     container_name: {{APP_NAME}}_mongodb
     restart: unless-stopped
     environment:
-      MONGO_INITDB_ROOT_USERNAME: {{MONGODB_ROOT_USERNAME}}
-      MONGO_INITDB_ROOT_PASSWORD: {{MONGODB_ROOT_PASSWORD}}
-      MONGO_INITDB_DATABASE: {{MONGODB_DATABASE}}
+      MONGO_INITDB_ROOT_USERNAME: "{{MONGODB_ROOT_USERNAME}}"
+      MONGO_INITDB_ROOT_PASSWORD: "{{MONGODB_ROOT_PASSWORD}}"
+      MONGO_INITDB_DATABASE: "{{MONGODB_DATABASE}}"
     volumes:
       - mongodb_data:/data/db
       - mongodb_config:/data/configdb

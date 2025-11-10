@@ -10,14 +10,14 @@ services:
       RAILS_ENV: production
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: {{POSTGRES_DATABASE}}
-      DB_USER: {{POSTGRES_USERNAME}}
-      DB_PASS: {{POSTGRES_PASSWORD}}
+      DB_NAME: "{{POSTGRES_DATABASE}}"
+      DB_USER: "{{POSTGRES_USERNAME}}"
+      DB_PASS: "{{POSTGRES_PASSWORD}}"
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      SECRET_KEY_BASE: {{SECRET_KEY_BASE}}
-      OTP_SECRET: {{OTP_SECRET}}
-      LOCAL_DOMAIN: {{PRIMARY_DOMAIN}}
+      SECRET_KEY_BASE: "{{SECRET_KEY_BASE}}"
+      OTP_SECRET: "{{OTP_SECRET}}"
+      LOCAL_DOMAIN: "{{PRIMARY_DOMAIN}}"
     volumes:
       - mastodon_data:/mastodon/public/system
     depends_on:
@@ -43,13 +43,13 @@ services:
       RAILS_ENV: production
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: {{POSTGRES_DATABASE}}
-      DB_USER: {{POSTGRES_USERNAME}}
-      DB_PASS: {{POSTGRES_PASSWORD}}
+      DB_NAME: "{{POSTGRES_DATABASE}}"
+      DB_USER: "{{POSTGRES_USERNAME}}"
+      DB_PASS: "{{POSTGRES_PASSWORD}}"
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      SECRET_KEY_BASE: {{SECRET_KEY_BASE}}
-      OTP_SECRET: {{OTP_SECRET}}
+      SECRET_KEY_BASE: "{{SECRET_KEY_BASE}}"
+      OTP_SECRET: "{{OTP_SECRET}}"
     volumes:
       - mastodon_data:/mastodon/public/system
     depends_on:
@@ -68,13 +68,13 @@ services:
       RAILS_ENV: production
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: {{POSTGRES_DATABASE}}
-      DB_USER: {{POSTGRES_USERNAME}}
-      DB_PASS: {{POSTGRES_PASSWORD}}
+      DB_NAME: "{{POSTGRES_DATABASE}}"
+      DB_USER: "{{POSTGRES_USERNAME}}"
+      DB_PASS: "{{POSTGRES_PASSWORD}}"
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      SECRET_KEY_BASE: {{SECRET_KEY_BASE}}
-      OTP_SECRET: {{OTP_SECRET}}
+      SECRET_KEY_BASE: "{{SECRET_KEY_BASE}}"
+      OTP_SECRET: "{{OTP_SECRET}}"
       NODE_ENV: production
       PORT: 4000
     depends_on:
@@ -88,9 +88,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

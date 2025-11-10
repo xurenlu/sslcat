@@ -7,8 +7,8 @@ services:
     ports:
       - "{{XTTS_PORT}}:8000"
     environment:
-      XTTS_MODEL: {{XTTS_MODEL}}
-      XTTS_LANG: {{XTTS_LANG}}
+      XTTS_MODEL: "{{XTTS_MODEL}}"
+      XTTS_LANG: "{{XTTS_LANG}}"
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
     volumes:

@@ -7,12 +7,12 @@ services:
     ports:
       - "{{LIBRECHAT_PORT}}:3080"
     environment:
-      OPENAI_API_KEY: {{OPENAI_API_KEY}}
-      ANTHROPIC_API_KEY: {{ANTHROPIC_API_KEY}}
-      GOOGLE_API_KEY: {{GOOGLE_API_KEY}}
-      DATABASE_URL: mongodb://{{MONGO_USERNAME}}:{{MONGO_PASSWORD}}@mongo:27017/{{MONGO_DATABASE}}
-      JWT_SECRET: {{JWT_SECRET}}
-      JWT_REFRESH_SECRET: {{JWT_REFRESH_SECRET}}
+      OPENAI_API_KEY: "{{OPENAI_API_KEY}}"
+      ANTHROPIC_API_KEY: "{{ANTHROPIC_API_KEY}}"
+      GOOGLE_API_KEY: "{{GOOGLE_API_KEY}}"
+      DATABASE_URL: "mongodb://{{MONGO_USERNAME}}:{{MONGO_PASSWORD}}@mongo:27017/{{MONGO_DATABASE}}"
+      JWT_SECRET: "{{JWT_SECRET}}"
+      JWT_REFRESH_SECRET: "{{JWT_REFRESH_SECRET}}"
     volumes:
       - librechat_data:/app/api/data
     depends_on:
@@ -32,9 +32,9 @@ services:
     container_name: {{APP_NAME}}_mongo
     restart: unless-stopped
     environment:
-      MONGO_INITDB_ROOT_USERNAME: {{MONGO_USERNAME}}
-      MONGO_INITDB_ROOT_PASSWORD: {{MONGO_PASSWORD}}
-      MONGO_INITDB_DATABASE: {{MONGO_DATABASE}}
+      MONGO_INITDB_ROOT_USERNAME: "{{MONGO_USERNAME}}"
+      MONGO_INITDB_ROOT_PASSWORD: "{{MONGO_PASSWORD}}"
+      MONGO_INITDB_DATABASE: "{{MONGO_DATABASE}}"
     volumes:
       - mongo_data:/data/db
     networks:

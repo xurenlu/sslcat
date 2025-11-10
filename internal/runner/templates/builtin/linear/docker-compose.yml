@@ -7,10 +7,10 @@ services:
     ports:
       - "{{LINEAR_PORT}}:3000"
     environment:
-      DATABASE_URL: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
+      DATABASE_URL: "postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}"
       REDIS_URL: redis://redis:6379/0
-      SECRET_KEY: {{LINEAR_SECRET_KEY}}
-      SITE_URL: http://{{PRIMARY_DOMAIN}}
+      SECRET_KEY: "{{LINEAR_SECRET_KEY}}"
+      SITE_URL: "http://{{PRIMARY_DOMAIN}}"
       TZ: Asia/Shanghai
     volumes:
       - linear_data:/app/data
@@ -33,9 +33,9 @@ services:
     container_name: {{APP_NAME}}_linear_worker
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
+      DATABASE_URL: "postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}"
       REDIS_URL: redis://redis:6379/0
-      SECRET_KEY: {{LINEAR_SECRET_KEY}}
+      SECRET_KEY: "{{LINEAR_SECRET_KEY}}"
       TZ: Asia/Shanghai
     volumes:
       - linear_data:/app/data
@@ -50,9 +50,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

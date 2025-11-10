@@ -8,15 +8,15 @@ services:
       - "{{N8N_PORT}}:5678"
     environment:
       N8N_BASIC_AUTH_ACTIVE: "true"
-      N8N_BASIC_AUTH_USER: {{N8N_USERNAME}}
-      N8N_BASIC_AUTH_PASSWORD: {{N8N_PASSWORD}}
-      N8N_HOST: {{PRIMARY_DOMAIN}}
+      N8N_BASIC_AUTH_USER: "{{N8N_USERNAME}}"
+      N8N_BASIC_AUTH_PASSWORD: "{{N8N_PASSWORD}}"
+      N8N_HOST: "{{PRIMARY_DOMAIN}}"
       N8N_PROTOCOL: https
       DB_TYPE: postgresdb
       DB_POSTGRESDB_HOST: postgres
-      DB_POSTGRESDB_DATABASE: {{POSTGRES_DATABASE}}
-      DB_POSTGRESDB_USER: {{POSTGRES_USERNAME}}
-      DB_POSTGRESDB_PASSWORD: {{POSTGRES_PASSWORD}}
+      DB_POSTGRESDB_DATABASE: "{{POSTGRES_DATABASE}}"
+      DB_POSTGRESDB_USER: "{{POSTGRES_USERNAME}}"
+      DB_POSTGRESDB_PASSWORD: "{{POSTGRES_PASSWORD}}"
       DB_POSTGRESDB_PORT: 5432
     volumes:
       - n8n_data:/home/node/.n8n
@@ -37,9 +37,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

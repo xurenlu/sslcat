@@ -8,12 +8,12 @@ services:
       - "{{YOURLS_PORT}}:80"
     environment:
       YOURLS_DB_HOST: mysql
-      YOURLS_DB_USER: {{MYSQL_USERNAME}}
-      YOURLS_DB_PASS: {{MYSQL_PASSWORD}}
-      YOURLS_DB_NAME: {{MYSQL_DATABASE}}
-      YOURLS_SITE: http://{{PRIMARY_DOMAIN}}
+      YOURLS_DB_USER: "{{MYSQL_USERNAME}}"
+      YOURLS_DB_PASS: "{{MYSQL_PASSWORD}}"
+      YOURLS_DB_NAME: "{{MYSQL_DATABASE}}"
+      YOURLS_SITE: "http://{{PRIMARY_DOMAIN}}"
       YOURLS_USER: admin
-      YOURLS_PASS: {{ADMIN_PASSWORD}}
+      YOURLS_PASS: "{{ADMIN_PASSWORD}}"
     volumes:
       - yourls_data:/var/www/html
     depends_on:
@@ -33,10 +33,10 @@ services:
     container_name: {{APP_NAME}}_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
-      MYSQL_DATABASE: {{MYSQL_DATABASE}}
-      MYSQL_USER: {{MYSQL_USERNAME}}
-      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
+      MYSQL_ROOT_PASSWORD: "{{MYSQL_ROOT_PASSWORD}}"
+      MYSQL_DATABASE: "{{MYSQL_DATABASE}}"
+      MYSQL_USER: "{{MYSQL_USERNAME}}"
+      MYSQL_PASSWORD: "{{MYSQL_PASSWORD}}"
       MYSQL_CHARACTER_SET_SERVER: utf8mb4
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
     volumes:

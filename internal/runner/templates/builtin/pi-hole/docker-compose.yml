@@ -10,7 +10,7 @@ services:
       - "{{PIHOLE_DNS_PORT}}:53/udp"
     environment:
       TZ: Asia/Shanghai
-      WEBPASSWORD: {{PIHOLE_PASSWORD}}
+      WEBPASSWORD: "{{PIHOLE_PASSWORD}}"
       DNS1: 8.8.8.8
       DNS2: 8.8.4.4
     volumes:

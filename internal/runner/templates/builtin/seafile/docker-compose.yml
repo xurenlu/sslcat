@@ -8,12 +8,12 @@ services:
       - "{{SEAFILE_PORT}}:80"
     environment:
       DB_HOST: mysql
-      DB_ROOT_PASSWD: {{MYSQL_ROOT_PASSWORD}}
-      DB_USER: {{MYSQL_USERNAME}}
-      DB_PASSWD: {{MYSQL_PASSWORD}}
-      SEAFILE_ADMIN_EMAIL: admin@{{PRIMARY_DOMAIN}}
-      SEAFILE_ADMIN_PASSWORD: {{ADMIN_PASSWORD}}
-      SEAFILE_SERVER_HOSTNAME: {{PRIMARY_DOMAIN}}
+      DB_ROOT_PASSWD: "{{MYSQL_ROOT_PASSWORD}}"
+      DB_USER: "{{MYSQL_USERNAME}}"
+      DB_PASSWD: "{{MYSQL_PASSWORD}}"
+      SEAFILE_ADMIN_EMAIL: "admin@{{PRIMARY_DOMAIN}}"
+      SEAFILE_ADMIN_PASSWORD: "{{ADMIN_PASSWORD}}"
+      SEAFILE_SERVER_HOSTNAME: "{{PRIMARY_DOMAIN}}"
     volumes:
       - seafile_data:/shared
     depends_on:
@@ -33,10 +33,10 @@ services:
     container_name: {{APP_NAME}}_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
-      MYSQL_DATABASE: {{MYSQL_DATABASE}}
-      MYSQL_USER: {{MYSQL_USERNAME}}
-      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
+      MYSQL_ROOT_PASSWORD: "{{MYSQL_ROOT_PASSWORD}}"
+      MYSQL_DATABASE: "{{MYSQL_DATABASE}}"
+      MYSQL_USER: "{{MYSQL_USERNAME}}"
+      MYSQL_PASSWORD: "{{MYSQL_PASSWORD}}"
       MYSQL_CHARACTER_SET_SERVER: utf8mb4
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
     volumes:

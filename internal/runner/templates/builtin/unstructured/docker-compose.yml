@@ -7,7 +7,7 @@ services:
     ports:
       - "{{UNSTRUCTURED_PORT}}:8000"
     environment:
-      UNSTRUCTURED_API_KEY: {{UNSTRUCTURED_API_KEY}}
+      UNSTRUCTURED_API_KEY: "{{UNSTRUCTURED_API_KEY}}"
     volumes:
       - unstructured_data:/app/data
     networks:

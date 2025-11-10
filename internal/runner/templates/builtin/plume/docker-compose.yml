@@ -7,9 +7,9 @@ services:
     ports:
       - "{{PLUME_PORT}}:7878"
     environment:
-      DATABASE_URL: postgresql://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
-      BASE_URL: http://{{PRIMARY_DOMAIN}}
-      ROCKET_SECRET_KEY: {{ROCKET_SECRET_KEY}}
+      DATABASE_URL: "postgresql://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}"
+      BASE_URL: "http://{{PRIMARY_DOMAIN}}"
+      ROCKET_SECRET_KEY: "{{ROCKET_SECRET_KEY}}"
     volumes:
       - plume_data:/app/media
     depends_on:
@@ -29,9 +29,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

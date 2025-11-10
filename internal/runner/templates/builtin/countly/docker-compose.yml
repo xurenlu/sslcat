@@ -7,7 +7,7 @@ services:
     ports:
       - "{{COUNTLY_PORT}}:3001"
     environment:
-      COUNTLY_MONGODB: mongodb://{{MONGODB_USERNAME}}:{{MONGODB_PASSWORD}}@mongodb:27017/{{MONGODB_DATABASE}}?authSource=admin
+      COUNTLY_MONGODB: "mongodb://{{MONGODB_USERNAME}}:{{MONGODB_PASSWORD}}@mongodb:27017/{{MONGODB_DATABASE}}?authSource=admin"
       COUNTLY_REDIS_HOST: redis
       COUNTLY_REDIS_PORT: 6379
     volumes:
@@ -31,9 +31,9 @@ services:
     container_name: {{APP_NAME}}_mongodb
     restart: unless-stopped
     environment:
-      MONGO_INITDB_ROOT_USERNAME: {{MONGODB_ROOT_USERNAME}}
-      MONGO_INITDB_ROOT_PASSWORD: {{MONGODB_ROOT_PASSWORD}}
-      MONGO_INITDB_DATABASE: {{MONGODB_DATABASE}}
+      MONGO_INITDB_ROOT_USERNAME: "{{MONGODB_ROOT_USERNAME}}"
+      MONGO_INITDB_ROOT_PASSWORD: "{{MONGODB_ROOT_PASSWORD}}"
+      MONGO_INITDB_DATABASE: "{{MONGODB_DATABASE}}"
     volumes:
       - mongodb_data:/data/db
       - mongodb_config:/data/configdb

@@ -8,11 +8,11 @@ services:
       - "{{SNIPE_IT_PORT}}:80"
     environment:
       DB_HOST: mysql
-      DB_DATABASE: {{MYSQL_DATABASE}}
-      DB_USERNAME: {{MYSQL_USERNAME}}
-      DB_PASSWORD: {{MYSQL_PASSWORD}}
-      APP_KEY: {{SNIPE_IT_APP_KEY}}
-      APP_URL: http://{{PRIMARY_DOMAIN}}
+      DB_DATABASE: "{{MYSQL_DATABASE}}"
+      DB_USERNAME: "{{MYSQL_USERNAME}}"
+      DB_PASSWORD: "{{MYSQL_PASSWORD}}"
+      APP_KEY: "{{SNIPE_IT_APP_KEY}}"
+      APP_URL: "http://{{PRIMARY_DOMAIN}}"
     volumes:
       - snipe_it_data:/var/lib/snipeit
     depends_on:
@@ -32,10 +32,10 @@ services:
     container_name: {{APP_NAME}}_mysql
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: {{MYSQL_DATABASE}}
-      MYSQL_USER: {{MYSQL_USERNAME}}
-      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
-      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
+      MYSQL_DATABASE: "{{MYSQL_DATABASE}}"
+      MYSQL_USER: "{{MYSQL_USERNAME}}"
+      MYSQL_PASSWORD: "{{MYSQL_PASSWORD}}"
+      MYSQL_ROOT_PASSWORD: "{{MYSQL_ROOT_PASSWORD}}"
     volumes:
       - mysql_data:/var/lib/mysql
     networks:

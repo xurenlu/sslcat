@@ -7,10 +7,10 @@ services:
     ports:
       - "{{TALKYARD_PORT}}:9000"
     environment:
-      TALKYARD_SITE_ID: {{SITE_ID}}
-      TALKYARD_CANONICAL_HOST: {{PRIMARY_DOMAIN}}
-      TALKYARD_ORIGIN: http://{{PRIMARY_DOMAIN}}
-      TALKYARD_DATABASE_URL: postgresql://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
+      TALKYARD_SITE_ID: "{{SITE_ID}}"
+      TALKYARD_CANONICAL_HOST: "{{PRIMARY_DOMAIN}}"
+      TALKYARD_ORIGIN: "http://{{PRIMARY_DOMAIN}}"
+      TALKYARD_DATABASE_URL: "postgresql://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}"
       TALKYARD_REDIS_HOST: redis
       TALKYARD_REDIS_PORT: 6379
     volumes:
@@ -34,9 +34,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

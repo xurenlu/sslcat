@@ -9,14 +9,14 @@ services:
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_PASS: {{REDIS_PASSWORD}}
-      SECRET_KEY: {{MISSKEY_SECRET_KEY}}
-      URL: http://{{PRIMARY_DOMAIN}}:3000
+      REDIS_PASS: "{{REDIS_PASSWORD}}"
+      SECRET_KEY: "{{MISSKEY_SECRET_KEY}}"
+      URL: "http://{{PRIMARY_DOMAIN}}:3000"
     volumes:
       - misskey_data:/misskey/files
     depends_on:
@@ -38,9 +38,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

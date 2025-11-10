@@ -9,10 +9,10 @@ services:
     environment:
       MAYAN_DATABASE_ENGINE: postgresql
       MAYAN_DATABASE_HOST: postgres
-      MAYAN_DATABASE_NAME: {{POSTGRES_DATABASE}}
-      MAYAN_DATABASE_USER: {{POSTGRES_USERNAME}}
-      MAYAN_DATABASE_PASSWORD: {{POSTGRES_PASSWORD}}
-      MAYAN_SECRET_KEY: {{SECRET_KEY}}
+      MAYAN_DATABASE_NAME: "{{POSTGRES_DATABASE}}"
+      MAYAN_DATABASE_USER: "{{POSTGRES_USERNAME}}"
+      MAYAN_DATABASE_PASSWORD: "{{POSTGRES_PASSWORD}}"
+      MAYAN_SECRET_KEY: "{{SECRET_KEY}}"
     volumes:
       - mayan_data:/var/lib/mayan
     depends_on:
@@ -34,9 +34,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

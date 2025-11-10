@@ -9,9 +9,9 @@ services:
     environment:
       DB_HOST: mariadb
       DB_PORT: 3306
-      DB_NAME: {{MARIADB_DATABASE}}
-      DB_USER: {{MARIADB_USERNAME}}
-      DB_PASSWORD: {{MARIADB_PASSWORD}}
+      DB_NAME: "{{MARIADB_DATABASE}}"
+      DB_USER: "{{MARIADB_USERNAME}}"
+      DB_PASSWORD: "{{MARIADB_PASSWORD}}"
       REDIS_CACHE: redis-cache:6379
       REDIS_QUEUE: redis-queue:6379
       REDIS_SOCKETIO: redis-socketio:6379
@@ -42,10 +42,10 @@ services:
     container_name: {{APP_NAME}}_mariadb
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: {{MARIADB_ROOT_PASSWORD}}
-      MYSQL_DATABASE: {{MARIADB_DATABASE}}
-      MYSQL_USER: {{MARIADB_USERNAME}}
-      MYSQL_PASSWORD: {{MARIADB_PASSWORD}}
+      MYSQL_ROOT_PASSWORD: "{{MARIADB_ROOT_PASSWORD}}"
+      MYSQL_DATABASE: "{{MARIADB_DATABASE}}"
+      MYSQL_USER: "{{MARIADB_USERNAME}}"
+      MYSQL_PASSWORD: "{{MARIADB_PASSWORD}}"
       MYSQL_CHARACTER_SET_SERVER: utf8mb4
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
     volumes:

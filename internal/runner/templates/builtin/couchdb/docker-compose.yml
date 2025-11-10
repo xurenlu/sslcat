@@ -7,9 +7,9 @@ services:
     ports:
       - "{{COUCHDB_PORT}}:5984"
     environment:
-      COUCHDB_USER: {{COUCHDB_USERNAME}}
-      COUCHDB_PASSWORD: {{COUCHDB_PASSWORD}}
-      COUCHDB_SECRET: {{COUCHDB_SECRET}}
+      COUCHDB_USER: "{{COUCHDB_USERNAME}}"
+      COUCHDB_PASSWORD: "{{COUCHDB_PASSWORD}}"
+      COUCHDB_SECRET: "{{COUCHDB_SECRET}}"
     volumes:
       - couchdb_data:/opt/couchdb/data
     networks:

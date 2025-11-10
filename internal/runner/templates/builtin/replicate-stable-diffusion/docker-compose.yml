@@ -7,7 +7,7 @@ services:
     ports:
       - "{{REPLICATE_SD_PORT}}:80"
     environment:
-      REPLICATE_API_TOKEN: {{REPLICATE_API_TOKEN}}
+      REPLICATE_API_TOKEN: "{{REPLICATE_API_TOKEN}}"
       REPLICATE_MODEL: stability-ai/stable-diffusion
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility

@@ -10,15 +10,15 @@ services:
       DATABASE_CLIENT: postgres
       DATABASE_HOST: postgres
       DATABASE_PORT: 5432
-      DATABASE_NAME: {{POSTGRES_DATABASE}}
-      DATABASE_USERNAME: {{POSTGRES_USERNAME}}
-      DATABASE_PASSWORD: {{POSTGRES_PASSWORD}}
+      DATABASE_NAME: "{{POSTGRES_DATABASE}}"
+      DATABASE_USERNAME: "{{POSTGRES_USERNAME}}"
+      DATABASE_PASSWORD: "{{POSTGRES_PASSWORD}}"
       DATABASE_SSL: "false"
-      JWT_SECRET: {{JWT_SECRET}}
-      ADMIN_JWT_SECRET: {{ADMIN_JWT_SECRET}}
-      APP_KEYS: {{APP_KEYS}}
-      API_TOKEN_SALT: {{API_TOKEN_SALT}}
-      TRANSFER_TOKEN_SALT: {{TRANSFER_TOKEN_SALT}}
+      JWT_SECRET: "{{JWT_SECRET}}"
+      ADMIN_JWT_SECRET: "{{ADMIN_JWT_SECRET}}"
+      APP_KEYS: "{{APP_KEYS}}"
+      API_TOKEN_SALT: "{{API_TOKEN_SALT}}"
+      TRANSFER_TOKEN_SALT: "{{TRANSFER_TOKEN_SALT}}"
     volumes:
       - strapi_data:/srv/app
     depends_on:
@@ -38,9 +38,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
       POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
     volumes:
       - postgres_data:/var/lib/postgresql/data

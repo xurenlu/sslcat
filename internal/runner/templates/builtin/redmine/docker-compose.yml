@@ -8,10 +8,10 @@ services:
       - "{{REDMINE_PORT}}:3000"
     environment:
       REDMINE_DB_MYSQL: mysql
-      REDMINE_DB_DATABASE: {{MYSQL_DATABASE}}
-      REDMINE_DB_USERNAME: {{MYSQL_USERNAME}}
-      REDMINE_DB_PASSWORD: {{MYSQL_PASSWORD}}
-      REDMINE_SECRET_KEY_BASE: {{SECRET_KEY_BASE}}
+      REDMINE_DB_DATABASE: "{{MYSQL_DATABASE}}"
+      REDMINE_DB_USERNAME: "{{MYSQL_USERNAME}}"
+      REDMINE_DB_PASSWORD: "{{MYSQL_PASSWORD}}"
+      REDMINE_SECRET_KEY_BASE: "{{SECRET_KEY_BASE}}"
       REDMINE_PLUGINS_MIGRATE: "true"
     volumes:
       - redmine_data:/usr/src/redmine/files
@@ -34,10 +34,10 @@ services:
     container_name: {{APP_NAME}}_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
-      MYSQL_DATABASE: {{MYSQL_DATABASE}}
-      MYSQL_USER: {{MYSQL_USERNAME}}
-      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
+      MYSQL_ROOT_PASSWORD: "{{MYSQL_ROOT_PASSWORD}}"
+      MYSQL_DATABASE: "{{MYSQL_DATABASE}}"
+      MYSQL_USER: "{{MYSQL_USERNAME}}"
+      MYSQL_PASSWORD: "{{MYSQL_PASSWORD}}"
       MYSQL_CHARACTER_SET_SERVER: utf8mb4
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
     volumes:

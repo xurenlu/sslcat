@@ -7,7 +7,7 @@ services:
     ports:
       - "{{MEILISEARCH_PORT}}:7700"
     environment:
-      MEILI_MASTER_KEY: {{MASTER_KEY}}
+      MEILI_MASTER_KEY: "{{MASTER_KEY}}"
       MEILI_ENV: production
     volumes:
       - meilisearch_data:/meili_data

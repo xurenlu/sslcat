@@ -9,12 +9,12 @@ services:
     environment:
       STORAGE_DIR: /app/server/storage
       SERVER_PORT: 3001
-      API_KEY: {{API_KEY}}
-      JWT_SECRET: {{JWT_SECRET}}
+      API_KEY: "{{API_KEY}}"
+      JWT_SECRET: "{{JWT_SECRET}}"
       DATABASE_TYPE: postgresql
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
     volumes:
@@ -36,9 +36,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

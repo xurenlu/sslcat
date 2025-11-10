@@ -7,7 +7,7 @@ services:
     ports:
       - "{{FILESTASH_PORT}}:8334"
     environment:
-      FILESTASH_URL: http://{{PRIMARY_DOMAIN}}
+      FILESTASH_URL: "http://{{PRIMARY_DOMAIN}}"
     volumes:
       - filestash_data:/app/data
     networks:

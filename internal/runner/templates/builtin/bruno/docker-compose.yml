@@ -7,7 +7,7 @@ services:
     ports:
       - "{{BRUNO_PORT}}:3000"
     environment:
-      SECRET_KEY: {{BRUNO_SECRET_KEY}}
+      SECRET_KEY: "{{BRUNO_SECRET_KEY}}"
       TZ: Asia/Shanghai
     volumes:
       - bruno_data:/app/data

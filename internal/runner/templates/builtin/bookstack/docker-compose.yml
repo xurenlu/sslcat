@@ -9,11 +9,11 @@ services:
     environment:
       PUID: 1000
       PGID: 1000
-      APP_URL: http://{{PRIMARY_DOMAIN}}
+      APP_URL: "http://{{PRIMARY_DOMAIN}}"
       DB_HOST: mysql
-      DB_USER: {{MYSQL_USERNAME}}
-      DB_PASS: {{MYSQL_PASSWORD}}
-      DB_DATABASE: {{MYSQL_DATABASE}}
+      DB_USER: "{{MYSQL_USERNAME}}"
+      DB_PASS: "{{MYSQL_PASSWORD}}"
+      DB_DATABASE: "{{MYSQL_DATABASE}}"
     volumes:
       - bookstack_data:/config
     depends_on:
@@ -33,10 +33,10 @@ services:
     container_name: {{APP_NAME}}_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
-      MYSQL_DATABASE: {{MYSQL_DATABASE}}
-      MYSQL_USER: {{MYSQL_USERNAME}}
-      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
+      MYSQL_ROOT_PASSWORD: "{{MYSQL_ROOT_PASSWORD}}"
+      MYSQL_DATABASE: "{{MYSQL_DATABASE}}"
+      MYSQL_USER: "{{MYSQL_USERNAME}}"
+      MYSQL_PASSWORD: "{{MYSQL_PASSWORD}}"
       MYSQL_CHARACTER_SET_SERVER: utf8mb4
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
     volumes:

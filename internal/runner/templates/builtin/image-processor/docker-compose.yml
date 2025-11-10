@@ -7,8 +7,8 @@ services:
     ports:
       - "{{IMAGE_PROCESSOR_PORT}}:8080"
     environment:
-      IMAGE_PROCESSOR_MAX_FILE_SIZE: {{MAX_FILE_SIZE}}
-      IMAGE_PROCESSOR_FORMATS: {{SUPPORTED_FORMATS}}
+      IMAGE_PROCESSOR_MAX_FILE_SIZE: "{{MAX_FILE_SIZE}}"
+      IMAGE_PROCESSOR_FORMATS: "{{SUPPORTED_FORMATS}}"
     volumes:
       - image_processor_data:/app/temp
     networks:

@@ -8,13 +8,13 @@ services:
       - "{{ANSWER_PORT}}:9080"
     environment:
       ANSWER_DB_TYPE: mysql
-      ANSWER_DB_USERNAME: {{MYSQL_USERNAME}}
-      ANSWER_DB_PASSWORD: {{MYSQL_PASSWORD}}
+      ANSWER_DB_USERNAME: "{{MYSQL_USERNAME}}"
+      ANSWER_DB_PASSWORD: "{{MYSQL_PASSWORD}}"
       ANSWER_DB_HOST: mysql:3306
-      ANSWER_DB_NAME: {{MYSQL_DATABASE}}
-      ANSWER_SITE_URL: http://{{PRIMARY_DOMAIN}}
-      ANSWER_SITE_NAME: {{ANSWER_SITE_NAME}}
-      ANSWER_CONTACT_EMAIL: admin@{{PRIMARY_DOMAIN}}
+      ANSWER_DB_NAME: "{{MYSQL_DATABASE}}"
+      ANSWER_SITE_URL: "http://{{PRIMARY_DOMAIN}}"
+      ANSWER_SITE_NAME: "{{ANSWER_SITE_NAME}}"
+      ANSWER_CONTACT_EMAIL: "admin@{{PRIMARY_DOMAIN}}"
     volumes:
       - answer_data:/data
     depends_on:
@@ -34,10 +34,10 @@ services:
     container_name: {{APP_NAME}}_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
-      MYSQL_DATABASE: {{MYSQL_DATABASE}}
-      MYSQL_USER: {{MYSQL_USERNAME}}
-      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
+      MYSQL_ROOT_PASSWORD: "{{MYSQL_ROOT_PASSWORD}}"
+      MYSQL_DATABASE: "{{MYSQL_DATABASE}}"
+      MYSQL_USER: "{{MYSQL_USERNAME}}"
+      MYSQL_PASSWORD: "{{MYSQL_PASSWORD}}"
       MYSQL_CHARACTER_SET_SERVER: utf8mb4
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
     volumes:

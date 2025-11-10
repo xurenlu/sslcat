@@ -8,16 +8,16 @@ services:
       - "{{MAGENTO_PORT}}:80"
     environment:
       MYSQL_HOST: mysql
-      MYSQL_DATABASE: {{MYSQL_DATABASE}}
-      MYSQL_USER: {{MYSQL_USERNAME}}
-      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
-      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
-      MAGENTO_URL: http://{{PRIMARY_DOMAIN}}
+      MYSQL_DATABASE: "{{MYSQL_DATABASE}}"
+      MYSQL_USER: "{{MYSQL_USERNAME}}"
+      MYSQL_PASSWORD: "{{MYSQL_PASSWORD}}"
+      MYSQL_ROOT_PASSWORD: "{{MYSQL_ROOT_PASSWORD}}"
+      MAGENTO_URL: "http://{{PRIMARY_DOMAIN}}"
       MAGENTO_ADMIN_FIRSTNAME: Admin
       MAGENTO_ADMIN_LASTNAME: User
-      MAGENTO_ADMIN_EMAIL: admin@{{PRIMARY_DOMAIN}}
+      MAGENTO_ADMIN_EMAIL: "admin@{{PRIMARY_DOMAIN}}"
       MAGENTO_ADMIN_USERNAME: admin
-      MAGENTO_ADMIN_PASSWORD: {{ADMIN_PASSWORD}}
+      MAGENTO_ADMIN_PASSWORD: "{{ADMIN_PASSWORD}}"
     volumes:
       - magento_data:/var/www/html
     depends_on:
@@ -39,10 +39,10 @@ services:
     container_name: {{APP_NAME}}_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
-      MYSQL_DATABASE: {{MYSQL_DATABASE}}
-      MYSQL_USER: {{MYSQL_USERNAME}}
-      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
+      MYSQL_ROOT_PASSWORD: "{{MYSQL_ROOT_PASSWORD}}"
+      MYSQL_DATABASE: "{{MYSQL_DATABASE}}"
+      MYSQL_USER: "{{MYSQL_USERNAME}}"
+      MYSQL_PASSWORD: "{{MYSQL_PASSWORD}}"
       MYSQL_CHARACTER_SET_SERVER: utf8mb4
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
     volumes:

@@ -7,8 +7,8 @@ services:
     ports:
       - "{{GRAFANA_PORT}}:3000"
     environment:
-      GF_SECURITY_ADMIN_USER: {{GRAFANA_USERNAME}}
-      GF_SECURITY_ADMIN_PASSWORD: {{GRAFANA_PASSWORD}}
+      GF_SECURITY_ADMIN_USER: "{{GRAFANA_USERNAME}}"
+      GF_SECURITY_ADMIN_PASSWORD: "{{GRAFANA_PASSWORD}}"
       GF_INSTALL_PLUGINS: ""
     volumes:
       - grafana_data:/var/lib/grafana

@@ -7,8 +7,8 @@ services:
     ports:
       - "{{RESTIC_PORT}}:8000"
     environment:
-      RESTIC_REPOSITORY: {{RESTIC_REPOSITORY}}
-      RESTIC_PASSWORD: {{RESTIC_PASSWORD}}
+      RESTIC_REPOSITORY: "{{RESTIC_REPOSITORY}}"
+      RESTIC_PASSWORD: "{{RESTIC_PASSWORD}}"
     volumes:
       - restic_data:/data
     networks:

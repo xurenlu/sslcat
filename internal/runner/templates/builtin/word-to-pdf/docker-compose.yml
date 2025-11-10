@@ -8,8 +8,8 @@ services:
       - "{{CONVERTER_PORT}}:3000"
     command: ["gotenberg", "--api-timeout=300s"]
     environment:
-      MAX_FILE_SIZE: {{MAX_FILE_SIZE}}
-      TIMEOUT_SECONDS: {{TIMEOUT_SECONDS}}
+      MAX_FILE_SIZE: "{{MAX_FILE_SIZE}}"
+      TIMEOUT_SECONDS: "{{TIMEOUT_SECONDS}}"
       TZ: Asia/Shanghai
     volumes:
       - converter_data:/tmp/converter

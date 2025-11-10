@@ -7,11 +7,11 @@ services:
     ports:
       - "{{PLANE_PORT}}:8000"
     environment:
-      DATABASE_URL: postgresql://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
+      DATABASE_URL: "postgresql://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}"
       REDIS_URL: redis://redis:6379
-      SECRET_KEY: {{SECRET_KEY}}
-      NEXT_PUBLIC_API_URL: http://{{PRIMARY_DOMAIN}}/api
-      NEXT_PUBLIC_DEPLOY_URL: http://{{PRIMARY_DOMAIN}}
+      SECRET_KEY: "{{SECRET_KEY}}"
+      NEXT_PUBLIC_API_URL: "http://{{PRIMARY_DOMAIN}}/api"
+      NEXT_PUBLIC_DEPLOY_URL: "http://{{PRIMARY_DOMAIN}}"
     volumes:
       - plane_data:/app/data
     depends_on:
@@ -33,9 +33,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

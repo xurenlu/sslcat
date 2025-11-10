@@ -7,7 +7,7 @@ services:
     ports:
       - "{{IMMICH_PORT}}:3001"
     environment:
-      IMMICH_DATABASE_URL: postgresql://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
+      IMMICH_DATABASE_URL: "postgresql://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}"
       IMMICH_REDIS_HOST: redis
       IMMICH_REDIS_PORT: 6379
       IMMICH_UPLOAD_LOCATION: /usr/src/app/upload
@@ -35,7 +35,7 @@ services:
     ports:
       - "{{IMMICH_WEB_PORT}}:3000"
     environment:
-      REACT_APP_IMMICH_SERVER_URL: http://{{PRIMARY_DOMAIN}}:{{IMMICH_PORT}}
+      REACT_APP_IMMICH_SERVER_URL: "http://{{PRIMARY_DOMAIN}}:{{IMMICH_PORT}}"
     depends_on:
       - immich-server
     networks:
@@ -46,9 +46,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

@@ -11,9 +11,9 @@ services:
     environment:
       KONG_DATABASE: postgres
       KONG_PG_HOST: postgres
-      KONG_PG_DATABASE: {{POSTGRES_DATABASE}}
-      KONG_PG_USER: {{POSTGRES_USERNAME}}
-      KONG_PG_PASSWORD: {{POSTGRES_PASSWORD}}
+      KONG_PG_DATABASE: "{{POSTGRES_DATABASE}}"
+      KONG_PG_USER: "{{POSTGRES_USERNAME}}"
+      KONG_PG_PASSWORD: "{{POSTGRES_PASSWORD}}"
       KONG_PROXY_ACCESS_LOG: /dev/stdout
       KONG_ADMIN_ACCESS_LOG: /dev/stdout
       KONG_PROXY_ERROR_LOG: /dev/stderr
@@ -38,9 +38,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

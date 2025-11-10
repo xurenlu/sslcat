@@ -7,8 +7,8 @@ services:
     ports:
       - "{{HEDGEDOC_PORT}}:3000"
     environment:
-      CMD_DB_URL: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}
-      CMD_DOMAIN: http://{{PRIMARY_DOMAIN}}
+      CMD_DB_URL: "postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}"
+      CMD_DOMAIN: "http://{{PRIMARY_DOMAIN}}"
       CMD_PORT: 3000
       CMD_PROTOCOL_USESSL: "false"
     volumes:
@@ -30,9 +30,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

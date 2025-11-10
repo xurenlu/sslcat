@@ -10,16 +10,16 @@ services:
       UID: 1000
       GID: 1000
       DEBUG: "false"
-      FORUM_URL: http://{{PRIMARY_DOMAIN}}
+      FORUM_URL: "http://{{PRIMARY_DOMAIN}}"
       DB_HOST: mysql
-      DB_NAME: {{MYSQL_DATABASE}}
-      DB_USER: {{MYSQL_USERNAME}}
-      DB_PASS: {{MYSQL_PASSWORD}}
+      DB_NAME: "{{MYSQL_DATABASE}}"
+      DB_USER: "{{MYSQL_USERNAME}}"
+      DB_PASS: "{{MYSQL_PASSWORD}}"
       DB_PREF: flarum_
       FLARUM_ADMIN_USER: admin
-      FLARUM_ADMIN_PASS: {{ADMIN_PASSWORD}}
-      FLARUM_ADMIN_MAIL: admin@{{PRIMARY_DOMAIN}}
-      FLARUM_TITLE: {{FLARUM_TITLE}}
+      FLARUM_ADMIN_PASS: "{{ADMIN_PASSWORD}}"
+      FLARUM_ADMIN_MAIL: "admin@{{PRIMARY_DOMAIN}}"
+      FLARUM_TITLE: "{{FLARUM_TITLE}}"
     volumes:
       - flarum_data:/flarum/app/public
       - flarum_extensions:/flarum/app/extensions
@@ -40,10 +40,10 @@ services:
     container_name: {{APP_NAME}}_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
-      MYSQL_DATABASE: {{MYSQL_DATABASE}}
-      MYSQL_USER: {{MYSQL_USERNAME}}
-      MYSQL_PASSWORD: {{MYSQL_PASSWORD}}
+      MYSQL_ROOT_PASSWORD: "{{MYSQL_ROOT_PASSWORD}}"
+      MYSQL_DATABASE: "{{MYSQL_DATABASE}}"
+      MYSQL_USER: "{{MYSQL_USERNAME}}"
+      MYSQL_PASSWORD: "{{MYSQL_PASSWORD}}"
       MYSQL_CHARACTER_SET_SERVER: utf8mb4
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
     volumes:

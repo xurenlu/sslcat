@@ -8,10 +8,10 @@ services:
       - "{{VIKUNJA_PORT}}:3456"
     environment:
       VIKUNJA_DATABASE_HOST: postgres
-      VIKUNJA_DATABASE_USER: {{POSTGRES_USERNAME}}
-      VIKUNJA_DATABASE_PASSWORD: {{POSTGRES_PASSWORD}}
-      VIKUNJA_DATABASE_DATABASE: {{POSTGRES_DATABASE}}
-      VIKUNJA_SERVICE_ROOTPATH: http://{{PRIMARY_DOMAIN}}
+      VIKUNJA_DATABASE_USER: "{{POSTGRES_USERNAME}}"
+      VIKUNJA_DATABASE_PASSWORD: "{{POSTGRES_PASSWORD}}"
+      VIKUNJA_DATABASE_DATABASE: "{{POSTGRES_DATABASE}}"
+      VIKUNJA_SERVICE_ROOTPATH: "http://{{PRIMARY_DOMAIN}}"
     volumes:
       - vikunja_data:/app/vikunja/files
     depends_on:
@@ -31,9 +31,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

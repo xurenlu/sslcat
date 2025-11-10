@@ -7,11 +7,11 @@ services:
     ports:
       - "{{PHPMYADMIN_PORT}}:80"
     environment:
-      PMA_HOST: {{MYSQL_HOST}}
-      PMA_PORT: {{MYSQL_PORT}}
-      PMA_USER: {{MYSQL_USERNAME}}
-      PMA_PASSWORD: {{MYSQL_PASSWORD}}
-      MYSQL_ROOT_PASSWORD: {{MYSQL_ROOT_PASSWORD}}
+      PMA_HOST: "{{MYSQL_HOST}}"
+      PMA_PORT: "{{MYSQL_PORT}}"
+      PMA_USER: "{{MYSQL_USERNAME}}"
+      PMA_PASSWORD: "{{MYSQL_PASSWORD}}"
+      MYSQL_ROOT_PASSWORD: "{{MYSQL_ROOT_PASSWORD}}"
     networks:
       - {{APP_NAME}}_network
     healthcheck:

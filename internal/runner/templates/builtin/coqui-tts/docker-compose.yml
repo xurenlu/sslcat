@@ -7,8 +7,8 @@ services:
     ports:
       - "{{COQUI_TTS_PORT}}:5002"
     environment:
-      TTS_MODEL: {{TTS_MODEL}}
-      TTS_LANG: {{TTS_LANG}}
+      TTS_MODEL: "{{TTS_MODEL}}"
+      TTS_LANG: "{{TTS_LANG}}"
     volumes:
       - coqui_tts_data:/app/models
     networks:

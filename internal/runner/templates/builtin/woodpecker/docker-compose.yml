@@ -7,13 +7,13 @@ services:
     ports:
       - "{{WOODPECKER_PORT}}:8000"
     environment:
-      WOODPECKER_HOST: http://{{PRIMARY_DOMAIN}}
-      WOODPECKER_GITEA_URL: http://{{PRIMARY_DOMAIN}}
-      WOODPECKER_GITEA_CLIENT_ID: {{GITEA_CLIENT_ID}}
-      WOODPECKER_GITEA_CLIENT_SECRET: {{GITEA_CLIENT_SECRET}}
-      WOODPECKER_AGENT_SECRET: {{AGENT_SECRET}}
+      WOODPECKER_HOST: "http://{{PRIMARY_DOMAIN}}"
+      WOODPECKER_GITEA_URL: "http://{{PRIMARY_DOMAIN}}"
+      WOODPECKER_GITEA_CLIENT_ID: "{{GITEA_CLIENT_ID}}"
+      WOODPECKER_GITEA_CLIENT_SECRET: "{{GITEA_CLIENT_SECRET}}"
+      WOODPECKER_AGENT_SECRET: "{{AGENT_SECRET}}"
       WOODPECKER_DATABASE_DRIVER: postgres
-      WOODPECKER_DATABASE_DATASOURCE: postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}?sslmode=disable
+      WOODPECKER_DATABASE_DATASOURCE: "postgres://{{POSTGRES_USERNAME}}:{{POSTGRES_PASSWORD}}@postgres:5432/{{POSTGRES_DATABASE}}?sslmode=disable"
     volumes:
       - woodpecker_data:/var/lib/woodpecker
     depends_on:
@@ -34,7 +34,7 @@ services:
     restart: unless-stopped
     environment:
       WOODPECKER_SERVER: http://woodpecker-server:8000
-      WOODPECKER_AGENT_SECRET: {{AGENT_SECRET}}
+      WOODPECKER_AGENT_SECRET: "{{AGENT_SECRET}}"
       WOODPECKER_BACKEND: docker
       WOODPECKER_MAX_WORKFLOWS: 2
     volumes:
@@ -50,9 +50,9 @@ services:
     container_name: {{APP_NAME}}_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{POSTGRES_DATABASE}}
-      POSTGRES_USER: {{POSTGRES_USERNAME}}
-      POSTGRES_PASSWORD: {{POSTGRES_PASSWORD}}
+      POSTGRES_DB: "{{POSTGRES_DATABASE}}"
+      POSTGRES_USER: "{{POSTGRES_USERNAME}}"
+      POSTGRES_PASSWORD: "{{POSTGRES_PASSWORD}}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
