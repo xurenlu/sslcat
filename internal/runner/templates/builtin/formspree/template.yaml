@@ -26,7 +26,7 @@ variables:
   - name: FORMSPREE_PORT
     type: number
     title: Formspree 端口
-    default: 8080
+    default: 808080
     min: 1024
     max: 65535
     description: Formspree Web 服务端口

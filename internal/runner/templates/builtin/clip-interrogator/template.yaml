@@ -20,7 +20,7 @@ variables:
   - name: CLIP_INTERROGATOR_PORT
     type: number
     title: CLIP Interrogator 端口
-    default: 8080
+    default: 808080
     min: 1024
     max: 65535
     description: CLIP Interrogator API 服务端口

@@ -20,7 +20,7 @@ variables:
   - name: PDFTK_PORT
     type: number
     title: PDFtk 端口
-    default: 8080
+    default: 808080
     min: 1024
     max: 65535
     description: PDFtk Web 服务端口

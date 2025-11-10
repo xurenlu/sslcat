@@ -20,7 +20,7 @@ variables:
   - name: JELLYFIN_PORT
     type: number
     title: Jellyfin 端口
-    default: 8096
+    default: 808096
     min: 1024
     max: 65535
     description: Jellyfin Web 服务端口

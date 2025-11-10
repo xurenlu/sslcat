@@ -20,7 +20,7 @@ variables:
   - name: RESTIC_PORT
     type: number
     title: Restic 端口
-    default: 8000
+    default: 808000
     min: 1024
     max: 65535
     description: Restic Web 服务端口

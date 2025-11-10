@@ -20,7 +20,7 @@ variables:
   - name: XTTS_PORT
     type: number
     title: XTTS 端口
-    default: 8000
+    default: 808000
     min: 1024
     max: 65535
     description: XTTS API 服务端口

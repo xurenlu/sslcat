@@ -20,7 +20,7 @@ variables:
   - name: PIHOLE_PORT
     type: number
     title: Pi-hole Web 端口
-    default: 80
+    default: 808080
     min: 1
     max: 65535
     description: Pi-hole Web 管理界面端口

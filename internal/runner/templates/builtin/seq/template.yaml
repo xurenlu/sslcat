@@ -20,7 +20,7 @@ variables:
   - name: SEQ_PORT
     type: number
     title: Seq Web 端口
-    default: 80
+    default: 808080
     min: 1024
     max: 65535
     description: Seq Web UI 端口

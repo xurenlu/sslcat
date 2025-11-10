@@ -32,7 +32,7 @@ variables:
   - name: HARBOR_PORT
     type: number
     title: Harbor 端口
-    default: 8080
+    default: 808080
     min: 1024
     max: 65535
     description: Harbor Web 服务端口

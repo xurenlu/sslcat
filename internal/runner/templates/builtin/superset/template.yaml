@@ -32,7 +32,7 @@ variables:
   - name: SUPERSET_PORT
     type: number
     title: Superset 端口
-    default: 8088
+    default: 808088
     min: 1024
     max: 65535
     description: Superset Web 服务端口

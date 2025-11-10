@@ -20,7 +20,7 @@ variables:
   - name: CONVERTER_PORT
     type: number
     title: 转换服务端口
-    default: 8080
+    default: 808080
     min: 1024
     max: 65535
     description: 图片格式转换服务端口

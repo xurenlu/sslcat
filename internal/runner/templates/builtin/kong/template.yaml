@@ -26,21 +26,21 @@ variables:
   - name: KONG_PORT
     type: number
     title: Kong 代理端口
-    default: 8000
+    default: 808000
     min: 1024
     max: 65535
     description: Kong API 代理端口
   - name: KONG_ADMIN_PORT
     type: number
     title: Kong 管理端口
-    default: 8001
+    default: 808001
     min: 1024
     max: 65535
     description: Kong Admin API 端口
   - name: KONG_ADMIN_GUI_PORT
     type: number
     title: Kong 管理界面端口
-    default: 8002
+    default: 808002
     min: 1024
     max: 65535
     description: Kong Admin GUI 端口

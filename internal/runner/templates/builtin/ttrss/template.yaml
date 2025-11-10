@@ -26,7 +26,7 @@ variables:
   - name: TTRSS_PORT
     type: number
     title: Tiny Tiny RSS 端口
-    default: 80
+    default: 808080
     min: 1024
     max: 65535
     description: Tiny Tiny RSS Web 服务端口

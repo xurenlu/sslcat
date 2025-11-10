@@ -26,7 +26,7 @@ variables:
   - name: SILLYTAVERN_PORT
     type: number
     title: SillyTavern 端口
-    default: 8000
+    default: 808000
     min: 1024
     max: 65535
     description: SillyTavern Web 服务端口

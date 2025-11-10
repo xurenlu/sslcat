@@ -26,7 +26,7 @@ variables:
   - name: MATTERMOST_PORT
     type: number
     title: Mattermost 端口
-    default: 8065
+    default: 808065
     min: 1024
     max: 65535
     description: Mattermost Web 服务端口

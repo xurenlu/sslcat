@@ -26,7 +26,7 @@ variables:
   - name: TWITTER_ARCHIVE_PORT
     type: number
     title: Twitter归档工具端口
-    default: 8080
+    default: 808080
     min: 1024
     max: 65535
     description: Twitter归档工具 Web 服务端口

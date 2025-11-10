@@ -20,15 +20,14 @@ variables:
   - name: IREDMAIL_PORT
     type: number
     title: iRedMail Web HTTP 端口
-    default: 80
+    default: 808080
     min: 1024
     max: 65535
     description: iRedMail Web 界面 HTTP 端口
   - name: IREDMAIL_HTTPS_PORT
     type: number
     title: iRedMail Web HTTPS 端口
-    default: 443
-    min: 1024
+    default: 8443HTTPS    min: 1024
     max: 65535
     description: iRedMail Web 界面 HTTPS 端口
   - name: IREDMAIL_SMTP_PORT

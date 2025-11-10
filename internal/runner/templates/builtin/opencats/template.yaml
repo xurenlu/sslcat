@@ -26,7 +26,7 @@ variables:
   - name: OPENCATS_PORT
     type: number
     title: OpenCATS 端口
-    default: 80
+    default: 808080
     min: 1024
     max: 65535
     description: OpenCATS Web 服务端口

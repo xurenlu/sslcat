@@ -26,7 +26,7 @@ variables:
   - name: ODOO_PORT
     type: number
     title: Odoo 端口
-    default: 8069
+    default: 808069
     min: 1024
     max: 65535
     description: Odoo Web 服务端口

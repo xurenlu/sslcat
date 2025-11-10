@@ -20,7 +20,7 @@ variables:
   - name: MONGO_EXPRESS_PORT
     type: number
     title: mongo-express 端口
-    default: 8081
+    default: 808081
     min: 1024
     max: 65535
     description: mongo-express Web 服务端口

@@ -20,15 +20,14 @@ variables:
   - name: MAILCOW_PORT
     type: number
     title: Mailcow Web HTTP 端口
-    default: 80
+    default: 808080
     min: 1024
     max: 65535
     description: Mailcow Web 界面 HTTP 端口
   - name: MAILCOW_HTTPS_PORT
     type: number
     title: Mailcow Web HTTPS 端口
-    default: 443
-    min: 1024
+    default: 8443HTTPS    min: 1024
     max: 65535
     description: Mailcow Web 界面 HTTPS 端口
   - name: MAILCOW_SMTP_PORT

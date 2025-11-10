@@ -20,7 +20,7 @@ variables:
   - name: PIWIGO_PORT
     type: number
     title: Piwigo 端口
-    default: 80
+    default: 808080
     min: 1024
     max: 65535
     description: Piwigo Web 服务端口

@@ -20,7 +20,7 @@ variables:
   - name: INFLUXDB_PORT
     type: number
     title: InfluxDB 端口
-    default: 8086
+    default: 808086
     min: 1024
     max: 65535
     description: InfluxDB HTTP API 端口

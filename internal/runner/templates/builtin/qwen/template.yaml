@@ -20,7 +20,7 @@ variables:
   - name: QWEN_PORT
     type: number
     title: Qwen 端口
-    default: 8000
+    default: 808000
     min: 1024
     max: 65535
     description: Qwen API 服务端口

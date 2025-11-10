@@ -26,7 +26,7 @@ variables:
   - name: SHOPWARE_PORT
     type: number
     title: Shopware 端口
-    default: 80
+    default: 808080
     min: 1024
     max: 65535
     description: Shopware Web 服务端口

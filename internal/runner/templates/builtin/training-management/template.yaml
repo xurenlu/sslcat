@@ -32,7 +32,7 @@ variables:
   - name: TRAINING_PORT
     type: number
     title: 培训管理系统端口
-    default: 8080
+    default: 808080
     min: 1024
     max: 65535
     description: 培训管理系统 Web 服务端口

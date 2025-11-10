@@ -26,7 +26,7 @@ variables:
   - name: KIMAI_PORT
     type: number
     title: Kimai 端口
-    default: 8001
+    default: 808001
     min: 1024
     max: 65535
     description: Kimai Web 服务端口

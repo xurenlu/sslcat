@@ -27,7 +27,7 @@ variables:
   - name: PORTAINER_AGENT_PORT
     type: number
     title: Portainer Agent 端口
-    default: 8000
+    default: 808000
     min: 1024
     max: 65535
     description: Portainer Agent 端口

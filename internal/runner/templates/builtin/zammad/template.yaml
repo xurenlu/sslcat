@@ -38,7 +38,7 @@ variables:
   - name: ZAMMAD_PORT
     type: number
     title: Zammad 端口
-    default: 80
+    default: 808080
     min: 1024
     max: 65535
     description: Zammad Web 服务端口

@@ -32,7 +32,7 @@ variables:
   - name: PAPERLESS_NGX_PORT
     type: number
     title: Paperless-ngx 端口
-    default: 8000
+    default: 808000
     min: 1024
     max: 65535
     description: Paperless-ngx Web 服务端口

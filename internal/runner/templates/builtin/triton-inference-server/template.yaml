@@ -20,21 +20,21 @@ variables:
   - name: TRITON_PORT
     type: number
     title: Triton HTTP 端口
-    default: 8000
+    default: 808000
     min: 1024
     max: 65535
     description: Triton HTTP API 端口
   - name: TRITON_GRPC_PORT
     type: number
     title: Triton gRPC 端口
-    default: 8001
+    default: 808001
     min: 1024
     max: 65535
     description: Triton gRPC API 端口
   - name: TRITON_METRICS_PORT
     type: number
     title: Triton 指标端口
-    default: 8002
+    default: 808002
     min: 1024
     max: 65535
     description: Triton 指标 API 端口

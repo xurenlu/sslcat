@@ -32,7 +32,7 @@ variables:
   - name: POSTHOG_PORT
     type: number
     title: PostHog 端口
-    default: 8000
+    default: 808000
     min: 1024
     max: 65535
     description: PostHog Web 服务端口

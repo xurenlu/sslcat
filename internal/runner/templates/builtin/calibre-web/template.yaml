@@ -20,7 +20,7 @@ variables:
   - name: CALIBRE_WEB_PORT
     type: number
     title: Calibre Web 端口
-    default: 8083
+    default: 808083
     min: 1024
     max: 65535
     description: Calibre Web 服务端口

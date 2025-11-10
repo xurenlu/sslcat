@@ -26,7 +26,7 @@ variables:
   - name: LYCHEE_PORT
     type: number
     title: Lychee 端口
-    default: 80
+    default: 808080
     min: 1024
     max: 65535
     description: Lychee Web 服务端口
