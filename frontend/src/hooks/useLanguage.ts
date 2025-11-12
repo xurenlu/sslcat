@@ -10,14 +10,11 @@ export interface Language {
 
 export const supportedLanguages: Language[] = [
   { code: 'zh-CN', name: '简体中文', nativeName: '简体中文', flag: '🇨🇳' },
-  { code: 'zh-TW', name: '繁體中文', nativeName: '繁體中文', flag: '🇹🇼' },
   { code: 'en-US', name: 'English', nativeName: 'English', flag: '🇺🇸' },
   { code: 'ja-JP', name: '日本語', nativeName: '日本語', flag: '🇯🇵' },
-  { code: 'ko-KR', name: '한국어', nativeName: '한국어', flag: '🇰🇷' },
   { code: 'es-ES', name: 'Español', nativeName: 'Español', flag: '🇪🇸' },
   { code: 'fr-FR', name: 'Français', nativeName: 'Français', flag: '🇫🇷' },
   { code: 'de-DE', name: 'Deutsch', nativeName: 'Deutsch', flag: '🇩🇪' },
-  { code: 'ru-RU', name: 'Русский', nativeName: 'Русский', flag: '🇷🇺' },
 ]
 
 // 创建语言上下文
@@ -54,12 +51,10 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [])
 
   const changeLanguage = (languageCode: string) => {
-    console.log('Language changing from', currentLanguage, 'to', languageCode)
     setCurrentLanguage(languageCode)
     setTranslation(getTranslation(languageCode))
     localStorage.setItem('withssl-language', languageCode)
     
-    console.log('Language changed to:', languageCode)
     // 触发全局重新渲染
     window.dispatchEvent(new CustomEvent('languageChanged', { 
       detail: { language: languageCode } 

@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useConfig } from '../contexts/ConfigContext'
 import { useNavigate } from 'react-router-dom'
 import { useEffect } from 'react'
+import { useTranslation } from '../hooks/useLanguage'
 
 interface AuthGuardProps {
   children: React.ReactNode
@@ -13,6 +14,7 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth()
   const { adminPrefix } = useConfig()
   const navigate = useNavigate()
+  const t = useTranslation()
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -31,7 +33,7 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   if (!isAuthenticated) {
     return (
       <Center h="100vh">
-        <Text>重定向到登录页面...</Text>
+        <Text>{t.common.redirectingToLogin || 'Redirecting to login...'}</Text>
       </Center>
     )
   }

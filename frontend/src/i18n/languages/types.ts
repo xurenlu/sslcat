@@ -54,6 +54,18 @@ export interface Translation {
     unknownError?: string
     creating: string
     saving: string
+    apiError: string
+    operationFailed: string
+    redirectingToLogin: string
+    fieldRequired: string
+    minLengthError: string
+    maxLengthError: string
+    invalidFormat: string
+    portRangeError: string
+    passwordMinLength8: string
+    passwordMustContainLowercase: string
+    passwordMustContainUppercase: string
+    passwordMustContainNumber: string
   }
   
   // 导航菜单
@@ -966,6 +978,115 @@ export interface Translation {
     autoDomain: string
     save: string
     cancel: string
+    configUpdated: string
+    needRedeploy: string
+    serverStatus: string
+    serverRunning: string
+    serverDisabled: string
+    needRestartSSH: string
+    restartSSHDescription: string
+    autoRestartSSH: string
+    gitApps: string
+    runningApps: string
+    configuredKeys: string
+    totalCommits: string
+    allAppsCommits: string
+    autoSSLApps: string
+    realtimeLogs: string
+    dockerImages: string
+    deployHistory: string
+    pushHistory: string
+    selectAppFirst: string
+    manageDockerImages: string
+    viewDeployHistory: string
+    viewPushHistory: string
+    statusActive: string
+    statusDeploying: string
+    statusInactive: string
+    statusError: string
+    allStatuses: string
+    searchPlaceholder: string
+    noAppsFound: string
+    noGitApps: string
+    sortByName: string
+    sortByStatus: string
+    sortByLastDeploy: string
+    createFirstApp: string
+    select: string
+    selected: string
+    commits: string
+    domain: string
+    unassigned: string
+    pushToAddress: string
+    waitingConfig: string
+    lastDeploy: string
+    notDeployed: string
+    createAppTitle: string
+    createAppDescription: string
+    appNamePlaceholder: string
+    appNameHint: string
+    previewInfo: string
+    gitAddress: string
+    accessDomain: string
+    autoAssignPort: string
+    enableAutoSSL: string
+    createApp: string
+    appCreatedSuccess: string
+    gitAddressFormat: string
+    pushCodeToApp: string
+    executeInProjectDir: string
+    copyCommand: string
+    envVarsTitle: string
+    envVarsDescription: string
+    varName: string
+    varValue: string
+    addVar: string
+    envVarsUpdated: string
+    needRedeployForEnvVars: string
+    routingTitle: string
+    routingDescription: string
+    customDomain: string
+    domainPlaceholder: string
+    portLabel: string
+    routingUpdated: string
+    sshKeyTitle: string
+    addSSHKey: string
+    publicKeyPlaceholder: string
+    autoExtractName: string
+    sshKeyAdded: string
+    sshKeyDeleted: string
+    noSSHKeys: string
+    addFirstSSHKey: string
+    neverUsed: string
+    enableGitServer: string
+    sshPort: string
+    webhookUrl: string
+    webhookDescription: string
+    defaultBranchDescription: string
+    defaultAutoSSL: string
+    domainSuffixDescription: string
+    portRangeDescription: string
+    welcomeMessageDescription: string
+    buildTimeoutDescription: string
+    configUpdatedSuccess: string
+    sshRestartSuccess: string
+    sshRestartDescription: string
+    appDeletedSuccess: string
+    redeployStarted: string
+    redeployDescription: string
+    deployFailed: string
+    copyToClipboard: string
+    pushHistoryFailed: string
+    networkError: string
+    cannotGetPushHistory: string
+    deployHistoryLoadFailed: string
+    deployHistoryLoadError: string
+    rollbackSuccess: string
+    rollbackSuccessDescription: string
+    rollbackFailed: string
+    rollbackFailedDescription: string
+    dockerImagesLoadFailed: string
+    dockerImagesLoadError: string
   }
 
 

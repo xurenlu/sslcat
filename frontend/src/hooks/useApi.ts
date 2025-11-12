@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useToast } from '@chakra-ui/react'
+import { useTranslation } from './useLanguage'
+import { TOAST_DURATION } from '../constants'
 
 interface UseApiOptions {
   immediate?: boolean
@@ -15,6 +17,7 @@ export function useApi<T = any>(
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
   const toast = useToast()
+  const t = useTranslation()
 
   const { immediate = true, onSuccess, onError } = options
 
@@ -27,21 +30,21 @@ export function useApi<T = any>(
       onSuccess?.(result)
       return result
     } catch (err) {
-      const error = err as Error
+      const error = err instanceof Error ? err : new Error(String(err))
       setError(error)
       onError?.(error)
       toast({
-        title: 'API 错误',
+        title: t.common.apiError || 'API Error',
         description: error.message,
         status: 'error',
-        duration: 5000,
+        duration: TOAST_DURATION.MEDIUM,
         isClosable: true,
       })
       throw error
     } finally {
       setLoading(false)
     }
-  }, [apiFunction, onSuccess, onError, toast])
+  }, [apiFunction, onSuccess, onError, toast, t])
 
   useEffect(() => {
     if (immediate) {
@@ -66,6 +69,7 @@ export function useMutation<T = any, P = any>(
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
   const toast = useToast()
+  const t = useTranslation()
 
   const { onSuccess, onError } = options
 
@@ -78,21 +82,21 @@ export function useMutation<T = any, P = any>(
       onSuccess?.(result)
       return result
     } catch (err) {
-      const error = err as Error
+      const error = err instanceof Error ? err : new Error(String(err))
       setError(error)
       onError?.(error)
       toast({
-        title: '操作失败',
+        title: t.common.operationFailed || 'Operation Failed',
         description: error.message,
         status: 'error',
-        duration: 5000,
+        duration: TOAST_DURATION.MEDIUM,
         isClosable: true,
       })
       throw error
     } finally {
       setLoading(false)
     }
-  }, [mutationFunction, onSuccess, onError, toast])
+  }, [mutationFunction, onSuccess, onError, toast, t])
 
   return {
     data,

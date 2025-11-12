@@ -57,6 +57,7 @@ import {
 } from 'react-icons/fi'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
 import { useTranslation } from '../hooks/useLanguage'
+import { TOAST_DURATION } from '../constants'
 
 interface DockerImage {
   name: string
@@ -122,10 +123,10 @@ const DockerImageManager: React.FC<DockerImageManagerProps> = ({ appName }) => {
     } catch (error) {
       console.error('Failed to load images:', error)
       toast({
-        title: '加载失败',
-        description: '无法加载Docker镜像列表',
+        title: t.gitServer.dockerImagesLoadFailed || 'Load Failed',
+        description: t.gitServer.dockerImagesLoadError || 'Unable to load Docker images list',
         status: 'error',
-        duration: 3000,
+        duration: TOAST_DURATION.MEDIUM,
         isClosable: true,
       })
     } finally {

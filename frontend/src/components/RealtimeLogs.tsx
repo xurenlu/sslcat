@@ -37,6 +37,7 @@ import {
   FiInfo,
 } from 'react-icons/fi'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
+import { websocketManager } from '../services/websocketManager'
 
 interface LogEntry {
   timestamp: string
@@ -96,10 +97,7 @@ const RealtimeLogs: React.FC<RealtimeLogsProps> = ({
   
   const logsEndRef = useRef<HTMLDivElement>(null)
   const eventSourceRef = useRef<EventSource | null>(null)
-  const websocketRef = useRef<WebSocket | null>(null)
-  const shouldReconnectRef = useRef<boolean>(false)
-  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const reconnectAttemptsRef = useRef<number>(0)
+  const wsKeyRef = useRef<string>(`logs-${appName}`)
   const logIdsRef = useRef<Set<string>>(new Set()) // 用于去重
   
   const bgColor = useColorModeValue('gray.50', 'gray.900')
@@ -114,15 +112,8 @@ const RealtimeLogs: React.FC<RealtimeLogsProps> = ({
 
   // 连接 WebSocket 日志流
   const connectWebSocket = () => {
-    if (websocketRef.current) {
-      websocketRef.current.close()
-    }
-
-    // 清理之前的重连定时器
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current)
-      reconnectTimeoutRef.current = null
-    }
+    // 断开之前的连接
+    websocketManager.disconnect(wsKeyRef.current)
 
     // 构建 WebSocket URL
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -134,19 +125,16 @@ const RealtimeLogs: React.FC<RealtimeLogsProps> = ({
     
     const path = buildApiPath(adminPrefix, `/api/git-server/logs/stream-ws?app=${appName}`)
     const url = `${protocol}//${host}${path}`
-    
-    console.log('WebSocket URL:', url, '(开发模式:', isDevelopment, ')')
 
-    const ws = new WebSocket(url)
-
-    ws.onopen = () => {
-      setIsConnected(true)
-      setIsStreaming(true)
-      reconnectAttemptsRef.current = 0 // 重置重连次数
-      console.log('WebSocket connected')
-    }
-
-    ws.onmessage = (event) => {
+    websocketManager.connect(wsKeyRef.current, url, {
+      maxReconnectAttempts: 5,
+      reconnectDelay: 1000,
+      onOpen: () => {
+        setIsConnected(true)
+        setIsStreaming(true)
+        console.log('WebSocket connected')
+      },
+      onMessage: (event) => {
       try {
         const message: WebSocketMessage = JSON.parse(event.data)
         
@@ -216,60 +204,24 @@ const RealtimeLogs: React.FC<RealtimeLogsProps> = ({
             })
             // 如果是日志流不存在的错误，停止重连
             if (message.error && message.error.includes('日志流不存在')) {
-              shouldReconnectRef.current = false // 禁止自动重连
-              if (websocketRef.current) {
-                websocketRef.current.close()
-              }
+              websocketManager.disconnect(wsKeyRef.current)
             }
             break
         }
       } catch (error) {
         console.error('Failed to parse WebSocket message:', error)
       }
-    }
-
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error)
-      setIsConnected(false)
-      // onerror 后通常会触发 onclose，所以这里不重复提示
-    }
-
-    ws.onclose = (event) => {
-      console.log('WebSocket closed', event.code, event.reason)
-      setIsConnected(false)
-      setIsStreaming(false)
-      
-      // 只在非正常关闭时提示错误
-      if (event.code !== 1000 && event.code !== 1005) {
-        const reason = event.reason || `连接关闭 (代码: ${event.code})`
-        toast({
-          title: 'WebSocket 连接断开',
-          description: reason,
-          status: 'warning',
-          duration: 4000,
-          isClosable: true,
-        })
-      }
-      
-      // 自动重连（只在主动连接时重连，不在手动断开时重连）
-      if (shouldReconnectRef.current) {
-        reconnectAttemptsRef.current++
-        
-        // 指数退避策略：3秒、6秒、12秒...最多30秒
-        const delay = Math.min(3000 * Math.pow(2, reconnectAttemptsRef.current - 1), 30000)
-        
-        console.log(`WebSocket will reconnect in ${delay}ms (attempt ${reconnectAttemptsRef.current})`)
-        
-        reconnectTimeoutRef.current = setTimeout(() => {
-          if (shouldReconnectRef.current) {
-            console.log('Reconnecting WebSocket...')
-            connectWebSocket()
-          }
-        }, delay)
-      }
-    }
-
-    websocketRef.current = ws
+      },
+      onError: (error) => {
+        console.error('WebSocket error:', error)
+        setIsConnected(false)
+      },
+      onClose: () => {
+        console.log('WebSocket closed')
+        setIsConnected(false)
+        setIsStreaming(false)
+      },
+    })
   }
 
   // 连接 SSE 日志流
@@ -324,9 +276,6 @@ const RealtimeLogs: React.FC<RealtimeLogsProps> = ({
 
   // 连接实时日志流
   const connectLogStream = () => {
-    shouldReconnectRef.current = true // 标记允许自动重连
-    reconnectAttemptsRef.current = 0
-    
     if (connectionType === 'websocket') {
       connectWebSocket()
     } else {
@@ -336,18 +285,7 @@ const RealtimeLogs: React.FC<RealtimeLogsProps> = ({
 
   // 断开日志流
   const disconnectLogStream = () => {
-    shouldReconnectRef.current = false // 禁止自动重连
-    
-    // 清理重连定时器
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current)
-      reconnectTimeoutRef.current = null
-    }
-    
-    if (websocketRef.current) {
-      websocketRef.current.close()
-      websocketRef.current = null
-    }
+    websocketManager.disconnect(wsKeyRef.current)
     if (eventSourceRef.current) {
       eventSourceRef.current.close()
       eventSourceRef.current = null

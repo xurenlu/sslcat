@@ -880,16 +880,24 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 
 	// 执行代理
 	// 在 ModifyResponse 中做缓存落盘（全局或域名启用）
-	originalModify := proxy.ModifyResponse
-	proxy.ModifyResponse = func(resp *http.Response) error {
-		// 记录响应详情
-		m.logResponseDetails(resp, rule)
-
-		if originalModify != nil {
-			if err := originalModify(resp); err != nil {
-				return err
+	// 修复：避免重复设置 ModifyResponse，防止递归调用链
+	// 如果 ModifyResponse 已经被设置过，使用 context 传递请求特定信息
+	if proxy.ModifyResponse == nil {
+		// 只在第一次设置 ModifyResponse
+		proxy.ModifyResponse = func(resp *http.Response) error {
+			// 从 context 获取请求特定信息
+			ctx := resp.Request.Context()
+			ruleFromCtx, _ := ctx.Value("proxyRule").(*config.ProxyRule)
+			if ruleFromCtx == nil {
+				ruleFromCtx = rule
 			}
-		}
+			cdnEnabledFromCtx, _ := ctx.Value("cdnEnabled").(bool)
+			if !cdnEnabledFromCtx {
+				cdnEnabledFromCtx = m.config.CDNCache.Enabled || (ruleFromCtx != nil && ruleFromCtx.CDNEnabled)
+			}
+
+			// 记录响应详情
+			m.logResponseDetails(resp, ruleFromCtx)
 		// 移除可能的安全头，让目标服务器自己设置
 		// 性能优化：批量删除
 		securityHeaders := []string{
@@ -957,25 +965,32 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 
 		// CDN 缓存落盘（全局或域名启用）
 		// 使用之前定义的cdnEnabled变量
-		if m.cdnCache != nil && cdnEnabled {
-			if rule != nil && rule.CDNDefaultTTLSeconds > 0 {
-				resp.Header.Set("X-SSLcat-CDN-Default-TTL", strconv.Itoa(rule.CDNDefaultTTLSeconds))
+		if m.cdnCache != nil && cdnEnabledFromCtx {
+			if ruleFromCtx != nil && ruleFromCtx.CDNDefaultTTLSeconds > 0 {
+				resp.Header.Set("X-SSLcat-CDN-Default-TTL", strconv.Itoa(ruleFromCtx.CDNDefaultTTLSeconds))
 			}
 			// 临时修改请求Host为后端域名，确保缓存路径一致性
 			originalHost := resp.Request.Host
-			if rule != nil {
-				backendHost := m.extractHostFromTarget(rule.Target, rule.Port)
+			if ruleFromCtx != nil {
+				backendHost := m.extractHostFromTarget(ruleFromCtx.Target, ruleFromCtx.Port)
 				resp.Request.Host = backendHost
 			}
-			m.cdnCache.MaybeStoreWithConfig(resp, cdnEnabled)
+			m.cdnCache.MaybeStoreWithConfig(resp, cdnEnabledFromCtx)
 			// 恢复原始Host
 			resp.Request.Host = originalHost
-			if rule != nil {
+			if ruleFromCtx != nil {
 				resp.Header.Del("X-SSLcat-CDN-Default-TTL")
 			}
 		}
 		return nil
 	}
+	}
+
+	// 将请求特定信息放入 context
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, "proxyRule", rule)
+	ctx = context.WithValue(ctx, "cdnEnabled", cdnEnabled)
+	r = r.WithContext(ctx)
 
 	proxy.ServeHTTP(w, r)
 }
