@@ -457,6 +457,12 @@ func (s *Server) UpdateConfig(newConfig *config.Config) {
 		s.log.Info("Updated compressor configuration")
 	}
 
+	// 更新通知管理器配置（配置重载时总是重新加载，确保配置完全同步）
+	if s.notificationIntegrator != nil {
+		s.log.Info("Reloading notification manager configuration")
+		s.notificationIntegrator.ReloadFromConfig(newConfig.Notification)
+	}
+
 	// 如果管理面板前缀发生变化，需要重新设置路由
 	if oldConfig.AdminPrefix != newConfig.AdminPrefix {
 		s.log.Infof("Admin prefix changed: %s -> %s", oldConfig.AdminPrefix, newConfig.AdminPrefix)

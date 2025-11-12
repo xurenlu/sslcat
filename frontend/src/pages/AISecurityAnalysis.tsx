@@ -516,7 +516,7 @@ const AISecurityAnalysis: React.FC = () => {
                   </FormControl>
                 </SimpleGrid>
 
-                {/* 操作按钮 */}
+                {/* 测试连接按钮 */}
                 <HStack justify="flex-end" mt={4}>
                   <Button
                     leftIcon={<FiCheckCircle />}
@@ -528,18 +528,22 @@ const AISecurityAnalysis: React.FC = () => {
                   >
                     {t.aiSecurity.testConnection}
                   </Button>
-                  <Button
-                    leftIcon={<FiSave />}
-                    onClick={saveConfig}
-                    isLoading={loading}
-                    loadingText={t.aiSecurity.saving}
-                    colorScheme="purple"
-                  >
-                    {t.aiSecurity.saveConfig}
-                  </Button>
                 </HStack>
               </>
             )}
+
+            {/* 保存按钮 - 始终显示，即使开关关闭时也可以保存关闭状态 */}
+            <HStack justify="flex-end" mt={4}>
+              <Button
+                leftIcon={<FiSave />}
+                onClick={saveConfig}
+                isLoading={loading}
+                loadingText={t.aiSecurity.saving}
+                colorScheme="purple"
+              >
+                {t.aiSecurity.saveConfig}
+              </Button>
+            </HStack>
           </VStack>
         </CardBody>
       </Card>

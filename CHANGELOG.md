@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.24-rc2] - 2025-11-11
+
+### 🐛 Bug 修复
+
+#### AI 安全分析页面
+- **修复保存按钮显示问题**: 修复关闭"启用 AI 智能安全分析"开关后保存按钮消失的问题，现在保存按钮始终可见，可以正常保存关闭状态
+
+#### 通知管理器配置
+- **配置实时生效**: 修复通知配置保存后需要重启才能生效的问题，现在保存配置后立即重新加载通知管理器，使新配置实时生效
+- **配置同步优化**: 在服务器配置更新时自动重新加载通知管理器配置，确保配置完全同步
+
 ## [1.3.24-rc1] - 2025-11-11
 
 ### 🎉 模板市场功能

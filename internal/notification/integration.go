@@ -36,6 +36,27 @@ func (ni *NotificationIntegrator) GetManager() *NotificationManager {
 	return ni.manager
 }
 
+// ReloadFromConfig 从配置重新加载通知管理器
+func (ni *NotificationIntegrator) ReloadFromConfig(notificationConfig config.NotificationConfig) {
+	ni.log.Info("重新加载通知管理器配置")
+	oldChannelCount := 0
+	if ni.manager != nil {
+		// 统计旧渠道数量
+		for range ni.manager.channels {
+			oldChannelCount++
+		}
+	}
+	
+	newManager := NewNotificationManagerFromConfig(notificationConfig)
+	newChannelCount := 0
+	for range newManager.channels {
+		newChannelCount++
+	}
+	
+	ni.manager = newManager
+	ni.log.Infof("通知管理器已重新加载，渠道数: %d -> %d", oldChannelCount, newChannelCount)
+}
+
 // AttackInfo 攻击信息（避免直接依赖ddos包）
 type AttackInfo struct {
 	ClientIP  string
