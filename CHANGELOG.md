@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.24-rc3] - 2025-11-12
+
+### 🐛 Bug 修复
+
+#### 代理管理器性能优化
+- **修复递归调用问题**: 修复 `ProxyRequest` 和 `proxyToBackend` 方法中重复设置 `ModifyResponse` 导致的递归调用链问题，解决了高 CPU 和内存占用问题
+- **避免内存泄漏**: 通过 context 传递请求特定信息，避免每次请求都重新设置 `ModifyResponse`，防止形成递归调用链
+- **代码质量优化**: 添加类型安全的 context key，移除不安全的回退逻辑，提高代码健壮性
+
+### 🔧 代码优化
+
+#### 代理管理器
+- **类型安全的 context key**: 使用类型安全的 context key 替代字符串 key，避免潜在冲突
+- **统一的错误处理**: 统一两个方法中对 nil 值的处理，添加适当的警告日志
+- **防御性编程**: 添加完善的 nil 检查和警告日志，提高代码可维护性
+
 ## [1.3.24-rc2] - 2025-11-11
 
 ### 🐛 Bug 修复

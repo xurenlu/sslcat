@@ -26,6 +26,16 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// contextKey 类型安全的 context key
+type contextKey string
+
+const (
+	proxyRuleKey      contextKey = "proxyRule"
+	proxyBackendKey   contextKey = "proxyBackend"
+	proxyStartTimeKey contextKey = "proxyStartTime"
+	cdnEnabledKey     contextKey = "cdnEnabled"
+)
+
 // loggingTransport 包装Transport以记录实际发送的请求
 type loggingTransport struct {
 	base   http.RoundTripper
@@ -549,140 +559,191 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 
 	// 执行代理
 	// 在 ModifyResponse 中做缓存落盘（全局或域名启用）
-	originalModify := proxy.ModifyResponse
-	proxy.ModifyResponse = func(resp *http.Response) error {
-		// 计算响应时间
-		responseTime := time.Since(startTime)
-		backend.UpdateResponseTime(responseTime)
+	// 修复：避免重复设置 ModifyResponse，防止递归调用链
+	// 如果 ModifyResponse 已经被设置过，使用 context 传递请求特定信息
+	if proxy.ModifyResponse == nil {
+		// 只在第一次设置 ModifyResponse
+		proxy.ModifyResponse = func(resp *http.Response) error {
+			// 从 context 获取请求特定信息
+			ctx := resp.Request.Context()
+			ruleFromCtx, _ := ctx.Value(proxyRuleKey).(*config.ProxyRule)
+			backendFromCtx, _ := ctx.Value(proxyBackendKey).(*loadbalancer.Backend)
+			startTimeFromCtx, _ := ctx.Value(proxyStartTimeKey).(time.Time)
+			cdnEnabledFromCtx, _ := ctx.Value(cdnEnabledKey).(bool)
 
-		// 记录响应详情
-		m.logResponseDetails(resp, rule)
-
-		// 检查并记录慢请求
-		if m.slowRequestRecorder.IsSlowRequest(responseTime) {
-			// 获取内容大小
-			contentSize := int64(0)
-			if resp.ContentLength > 0 {
-				contentSize = resp.ContentLength
+			// 验证关键信息是否存在
+			if ruleFromCtx == nil {
+				m.log.Warnf("proxyRule not found in context, this should not happen for request %s %s", resp.Request.Method, resp.Request.URL.Path)
+			}
+			if backendFromCtx == nil {
+				m.log.Warnf("proxyBackend not found in context, this should not happen for request %s %s", resp.Request.Method, resp.Request.URL.Path)
 			}
 
-			// 获取规则名称（使用Domain作为规则名）
-			ruleName := ""
-			if rule != nil {
-				ruleName = rule.Domain
+			// 计算响应时间
+			var responseTime time.Duration
+			if !startTimeFromCtx.IsZero() {
+				responseTime = time.Since(startTimeFromCtx)
 			}
 
-			// 记录慢请求
-			m.slowRequestRecorder.RecordSlowRequest(
-				resp.Request,
-				resp.StatusCode,
-				responseTime,
-				backend.ID,
-				backend.GetAddress(),
-				rule.Target,
-				ruleName,
-				contentSize,
-				nil, // 这里可以传递错误信息
-			)
-		}
-
-		if originalModify != nil {
-			if err := originalModify(resp); err != nil {
-				backend.IncrementFailures()
-				return err
+			// 更新后端响应时间
+			if backendFromCtx != nil {
+				backendFromCtx.UpdateResponseTime(responseTime)
 			}
-		}
 
-		// 移除可能的安全头，让目标服务器自己设置
-		// 性能优化：批量删除
-		securityHeaders := []string{
-			"Strict-Transport-Security",
-			"X-Frame-Options",
-			"X-Content-Type-Options",
-		}
-		m.deleteHeadersBatch(resp.Header, securityHeaders)
+			// 记录响应详情
+			m.logResponseDetails(resp, ruleFromCtx)
 
-		// 添加代理标识和后端信息
-		resp.Header.Set("X-Proxy-By", "SSLcat/"+m.version)
-
-		// 处理自定义响应头部
-		if len(rule.ResponseHeaders) > 0 {
-			responseHeaders := make(map[string]string, len(rule.ResponseHeaders))
-		for key, value := range rule.ResponseHeaders {
-			trimmedKey := strings.TrimSpace(key)
-				if trimmedKey != "" {
-					responseHeaders[trimmedKey] = value
-			}
-			}
-			m.setHeadersBatch(resp.Header, responseHeaders)
-		}
-
-		// 设置后端信息
-		backendHeaders := map[string]string{
-			"X-Backend-ID":      backend.ID,
-			"X-Backend-Address": backend.GetAddress(),
-			"X-Response-Time":    responseTime.String(),
-		}
-		m.setHeadersBatch(resp.Header, backendHeaders)
-
-		// 上游缓存存储（仅对GET/HEAD请求的静态资源）
-		if m.upstreamCache != nil && (resp.Request.Method == "GET" || resp.Request.Method == "HEAD") {
-			// 异步存储到上游缓存，避免影响响应性能
-			go func() {
-				if err := m.upstreamCache.Store(resp.Request, resp); err != nil {
-					m.log.Debugf("Failed to store upstream cache for %s: %v", resp.Request.URL.String(), err)
+			// 检查并记录慢请求
+			if m.slowRequestRecorder.IsSlowRequest(responseTime) {
+				// 获取内容大小
+				contentSize := int64(0)
+				if resp.ContentLength > 0 {
+					contentSize = resp.ContentLength
 				}
-			}()
-		}
 
-		// CDN 缓存落盘（全局或域名启用）
-		if m.cdnCache != nil && cdnEnabled {
-			if rule != nil && rule.CDNDefaultTTLSeconds > 0 {
-				resp.Header.Set("X-SSLcat-CDN-Default-TTL", strconv.Itoa(rule.CDNDefaultTTLSeconds))
-			}
-			// 临时修改请求Host为后端域名，确保缓存路径一致性
-			originalHost := resp.Request.Host
-			if rule != nil {
-				backendHost := m.extractHostFromTarget(rule.Target, rule.Port)
-				resp.Request.Host = backendHost
-			}
-			m.cdnCache.MaybeStoreWithConfig(resp, cdnEnabled)
-			// 恢复原始Host
-			resp.Request.Host = originalHost
-			if rule != nil {
-				resp.Header.Del("X-SSLcat-CDN-Default-TTL")
-			}
-		}
+				// 获取规则名称（使用Domain作为规则名）
+				ruleName := ""
+				if ruleFromCtx != nil {
+					ruleName = ruleFromCtx.Domain
+				}
 
-		return nil
+				// 记录慢请求
+				if backendFromCtx != nil && ruleFromCtx != nil {
+					m.slowRequestRecorder.RecordSlowRequest(
+						resp.Request,
+						resp.StatusCode,
+						responseTime,
+						backendFromCtx.ID,
+						backendFromCtx.GetAddress(),
+						ruleFromCtx.Target,
+						ruleName,
+						contentSize,
+						nil, // 这里可以传递错误信息
+					)
+				}
+			}
+
+			// 移除可能的安全头，让目标服务器自己设置
+			// 性能优化：批量删除
+			securityHeaders := []string{
+				"Strict-Transport-Security",
+				"X-Frame-Options",
+				"X-Content-Type-Options",
+			}
+			m.deleteHeadersBatch(resp.Header, securityHeaders)
+
+			// 添加代理标识和后端信息
+			resp.Header.Set("X-Proxy-By", "SSLcat/"+m.version)
+
+			// 处理自定义响应头部
+			if ruleFromCtx != nil && len(ruleFromCtx.ResponseHeaders) > 0 {
+				responseHeaders := make(map[string]string, len(ruleFromCtx.ResponseHeaders))
+			for key, value := range ruleFromCtx.ResponseHeaders {
+				trimmedKey := strings.TrimSpace(key)
+					if trimmedKey != "" {
+						responseHeaders[trimmedKey] = value
+				}
+				}
+				m.setHeadersBatch(resp.Header, responseHeaders)
+			}
+
+			// 设置后端信息
+			if backendFromCtx != nil {
+				backendHeaders := map[string]string{
+					"X-Backend-ID":      backendFromCtx.ID,
+					"X-Backend-Address": backendFromCtx.GetAddress(),
+					"X-Response-Time":    responseTime.String(),
+				}
+				m.setHeadersBatch(resp.Header, backendHeaders)
+			}
+
+			// 上游缓存存储（仅对GET/HEAD请求的静态资源）
+			if m.upstreamCache != nil && (resp.Request.Method == "GET" || resp.Request.Method == "HEAD") {
+				// 异步存储到上游缓存，避免影响响应性能
+				go func() {
+					if err := m.upstreamCache.Store(resp.Request, resp); err != nil {
+						m.log.Debugf("Failed to store upstream cache for %s: %v", resp.Request.URL.String(), err)
+					}
+				}()
+			}
+
+			// CDN 缓存落盘（全局或域名启用）
+			if m.cdnCache != nil && cdnEnabledFromCtx {
+				if ruleFromCtx != nil && ruleFromCtx.CDNDefaultTTLSeconds > 0 {
+					resp.Header.Set("X-SSLcat-CDN-Default-TTL", strconv.Itoa(ruleFromCtx.CDNDefaultTTLSeconds))
+				}
+				// 临时修改请求Host为后端域名，确保缓存路径一致性
+				originalHost := resp.Request.Host
+				if ruleFromCtx != nil {
+					backendHost := m.extractHostFromTarget(ruleFromCtx.Target, ruleFromCtx.Port)
+					resp.Request.Host = backendHost
+				}
+				m.cdnCache.MaybeStoreWithConfig(resp, cdnEnabledFromCtx)
+				// 恢复原始Host
+				resp.Request.Host = originalHost
+				if ruleFromCtx != nil {
+					resp.Header.Del("X-SSLcat-CDN-Default-TTL")
+				}
+			}
+
+			return nil
+		}
 	}
 
+	// 将请求特定信息放入 context
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, proxyRuleKey, rule)
+	ctx = context.WithValue(ctx, proxyBackendKey, backend)
+	ctx = context.WithValue(ctx, proxyStartTimeKey, startTime)
+	ctx = context.WithValue(ctx, cdnEnabledKey, cdnEnabled)
+	r = r.WithContext(ctx)
+
 	// 设置错误处理
-	originalErrorHandler := proxy.ErrorHandler
-	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-		backend.IncrementFailures()
-		backend.DecrementConnections() // 确保连接计数正确
+	// 修复：避免重复设置 ErrorHandler，防止递归调用链
+	if proxy.ErrorHandler == nil {
+		proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+			// 从 context 获取后端信息
+			ctx := r.Context()
+			backendFromCtx, _ := ctx.Value(proxyBackendKey).(*loadbalancer.Backend)
 
-		m.log.Errorf("Proxy error to backend %s (%s): %v", backend.ID, backend.GetAddress(), err)
+			if backendFromCtx != nil {
+				backendFromCtx.IncrementFailures()
+				backendFromCtx.DecrementConnections() // 确保连接计数正确
+				m.log.Errorf("Proxy error to backend %s (%s): %v", backendFromCtx.ID, backendFromCtx.GetAddress(), err)
 
-		if originalErrorHandler != nil {
-			originalErrorHandler(w, r, err)
-		} else {
-			// 默认错误处理
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			w.WriteHeader(http.StatusBadGateway)
-			fmt.Fprintf(w, `
-			<html>
-			<head><title>Proxy Error</title></head>
-			<body>
-				<h1>502 Bad Gateway</h1>
-				<p>Unable to connect to backend %s (%s)</p>
-				<p>Error: %v</p>
-				<hr>
-				<p><small>Powered by sslcat-%s</small></p>
-			</body>
-			</html>
-			`, backend.ID, backend.GetAddress(), err, m.version)
+				// 默认错误处理
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				w.WriteHeader(http.StatusBadGateway)
+				fmt.Fprintf(w, `
+				<html>
+				<head><title>Proxy Error</title></head>
+				<body>
+					<h1>502 Bad Gateway</h1>
+					<p>Unable to connect to backend %s (%s)</p>
+					<p>Error: %v</p>
+					<hr>
+					<p><small>Powered by sslcat-%s</small></p>
+				</body>
+				</html>
+				`, backendFromCtx.ID, backendFromCtx.GetAddress(), err, m.version)
+			} else {
+				// 如果没有后端信息，使用通用错误处理
+				m.log.Errorf("Proxy error: %v", err)
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				w.WriteHeader(http.StatusBadGateway)
+				fmt.Fprintf(w, `
+				<html>
+				<head><title>Proxy Error</title></head>
+				<body>
+					<h1>502 Bad Gateway</h1>
+					<p>Unable to connect to upstream server</p>
+					<p>Error: %v</p>
+					<hr>
+					<p><small>Powered by sslcat-%s</small></p>
+				</body>
+				</html>
+				`, err, m.version)
+			}
 		}
 	}
 
@@ -887,11 +948,13 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 		proxy.ModifyResponse = func(resp *http.Response) error {
 			// 从 context 获取请求特定信息
 			ctx := resp.Request.Context()
-			ruleFromCtx, _ := ctx.Value("proxyRule").(*config.ProxyRule)
+			ruleFromCtx, _ := ctx.Value(proxyRuleKey).(*config.ProxyRule)
 			if ruleFromCtx == nil {
-				ruleFromCtx = rule
+				// 这不应该发生，因为我们总是在调用前设置 context
+				// 记录警告但不使用不安全的回退
+				m.log.Warnf("proxyRule not found in context, this should not happen for request %s %s", resp.Request.Method, resp.Request.URL.Path)
 			}
-			cdnEnabledFromCtx, _ := ctx.Value("cdnEnabled").(bool)
+			cdnEnabledFromCtx, _ := ctx.Value(cdnEnabledKey).(bool)
 			if !cdnEnabledFromCtx {
 				cdnEnabledFromCtx = m.config.CDNCache.Enabled || (ruleFromCtx != nil && ruleFromCtx.CDNEnabled)
 			}
@@ -911,9 +974,9 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 		resp.Header.Set("X-Proxy-By", "SSLcat/"+m.version)
 
 		// 处理自定义响应头部
-		if len(rule.ResponseHeaders) > 0 {
-			responseHeaders := make(map[string]string, len(rule.ResponseHeaders))
-		for key, value := range rule.ResponseHeaders {
+		if ruleFromCtx != nil && len(ruleFromCtx.ResponseHeaders) > 0 {
+			responseHeaders := make(map[string]string, len(ruleFromCtx.ResponseHeaders))
+		for key, value := range ruleFromCtx.ResponseHeaders {
 			trimmedKey := strings.TrimSpace(key)
 				if trimmedKey != "" {
 					responseHeaders[trimmedKey] = value
@@ -988,8 +1051,8 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 
 	// 将请求特定信息放入 context
 	ctx := r.Context()
-	ctx = context.WithValue(ctx, "proxyRule", rule)
-	ctx = context.WithValue(ctx, "cdnEnabled", cdnEnabled)
+	ctx = context.WithValue(ctx, proxyRuleKey, rule)
+	ctx = context.WithValue(ctx, cdnEnabledKey, cdnEnabled)
 	r = r.WithContext(ctx)
 
 	proxy.ServeHTTP(w, r)
@@ -1208,24 +1271,28 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 	}
 
 	// 自定义错误处理
-	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-		m.log.Errorf("Proxy error %s -> %s: %v", r.Host, targetURL, err)
+	// 注意：这里是在创建新 proxy 时设置，所以 ErrorHandler 应该是 nil
+	// 但为了代码健壮性，还是添加检查
+	if proxy.ErrorHandler == nil {
+		proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+			m.log.Errorf("Proxy error %s -> %s: %v", r.Host, targetURL, err)
 
-		// 返回错误页面
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.WriteHeader(http.StatusBadGateway)
-		fmt.Fprintf(w, `
-		<html>
-		<head><title>Proxy Error</title></head>
-		<body>
-			<h1>502 Bad Gateway</h1>
-			<p>Unable to connect to upstream: %s</p>
-			<p>Error: %v</p>
-			<hr>
-			<p><small>Powered by sslcat-%s</small></p>
-		</body>
-		</html>
-		`, targetURL, err, m.version)
+			// 返回错误页面
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.WriteHeader(http.StatusBadGateway)
+			fmt.Fprintf(w, `
+			<html>
+			<head><title>Proxy Error</title></head>
+			<body>
+				<h1>502 Bad Gateway</h1>
+				<p>Unable to connect to upstream: %s</p>
+				<p>Error: %v</p>
+				<hr>
+				<p><small>Powered by sslcat-%s</small></p>
+			</body>
+			</html>
+			`, targetURL, err, m.version)
+		}
 	}
 
 	// 修改响应
