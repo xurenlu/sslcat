@@ -147,57 +147,11 @@ type CertificateInfo struct {
 	Issuer     string    `json:"issuer"`
 }
 
-// GetCertificateList 获取证书列表
+// GetCertificateList 获取证书列表（内存缓存+磁盘聚合）
 func (m *Manager) GetCertificateList() []CertificateInfo {
-	m.certMutex.RLock()
-	defer m.certMutex.RUnlock()
-
-	var certs []CertificateInfo
-	for domain, cert := range m.certCache {
-		if cert != nil && len(cert.Certificate) > 0 {
-			// 解析证书信息
-			x509Cert, err := x509.ParseCertificate(cert.Certificate[0])
-			if err != nil {
-				continue
-			}
-
-			status := "有效"
-			if time.Now().After(x509Cert.NotAfter) {
-				status = "过期"
-			} else if time.Now().Add(30 * 24 * time.Hour).After(x509Cert.NotAfter) {
-				status = "即将过期"
-			}
-
-			selfSigned := x509Cert.Issuer.String() == x509Cert.Subject.String()
-
-			// 获取颁发机构名称
-			issuer := "未知"
-			if selfSigned {
-				issuer = "自签名证书"
-			} else {
-				// 尝试从证书中提取颁发机构名称
-				if len(x509Cert.Issuer.Organization) > 0 {
-					issuer = x509Cert.Issuer.Organization[0]
-				} else if len(x509Cert.Issuer.CommonName) > 0 {
-					issuer = x509Cert.Issuer.CommonName
-				} else {
-					issuer = "Let's Encrypt" // 默认假设是 Let's Encrypt
-				}
-			}
-
-			certs = append(certs, CertificateInfo{
-				Domain:     domain,
-				IssuedAt:   x509Cert.NotBefore,
-				ExpiresAt:  x509Cert.NotAfter,
-				Status:     status,
-				IsWildcard: strings.HasPrefix(domain, "*."),
-				SelfSigned: selfSigned,
-				Issuer:     issuer,
-			})
-		}
-	}
-
-	return certs
+	// 使用 ListCertificatesFromDisk 来获取所有证书（包括磁盘和内存缓存）
+	// 这样可以确保显示所有存在的证书文件，而不仅仅是内存缓存中的
+	return m.ListCertificatesFromDisk()
 }
 
 // DeleteCertificate 删除证书
@@ -1293,6 +1247,22 @@ func (m *Manager) ListCertificatesFromDisk() []CertificateInfo {
 			status = "即将过期"
 		}
 		selfSigned := x509Cert.Issuer.String() == x509Cert.Subject.String()
+
+		// 获取颁发机构名称
+		issuer := "未知"
+		if selfSigned {
+			issuer = "自签名证书"
+		} else {
+			// 尝试从证书中提取颁发机构名称
+			if len(x509Cert.Issuer.Organization) > 0 {
+				issuer = x509Cert.Issuer.Organization[0]
+			} else if len(x509Cert.Issuer.CommonName) > 0 {
+				issuer = x509Cert.Issuer.CommonName
+			} else {
+				issuer = "Let's Encrypt" // 默认假设是 Let's Encrypt
+			}
+		}
+
 		certs = append(certs, CertificateInfo{
 			Domain:     domain,
 			IssuedAt:   x509Cert.NotBefore,
@@ -1300,6 +1270,7 @@ func (m *Manager) ListCertificatesFromDisk() []CertificateInfo {
 			Status:     status,
 			IsWildcard: strings.HasPrefix(domain, "*."),
 			SelfSigned: selfSigned,
+			Issuer:     issuer,
 		})
 	}
 	m.certMutex.RUnlock()
