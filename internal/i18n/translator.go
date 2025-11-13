@@ -22,6 +22,7 @@ const (
 	LangEsES SupportedLanguage = "es-ES" // 西班牙语
 	LangFrFR SupportedLanguage = "fr-FR" // 法语
 	LangDeDE SupportedLanguage = "de-DE" // 德语
+	LangRuRU SupportedLanguage = "ru-RU" // 俄语
 )
 
 // LanguageInfo 语言信息
@@ -132,6 +133,15 @@ func (t *Translator) initLanguages() {
 			Enabled:    true,
 			Progress:   85.0,
 		},
+		LangRuRU: {
+			Code:       LangRuRU,
+			Name:       "Russian",
+			NativeName: "Русский",
+			Flag:       "🇷🇺",
+			RTL:        false,
+			Enabled:    true,
+			Progress:   85.0,
+		},
 	}
 }
 
@@ -142,6 +152,7 @@ func (t *Translator) initFallbacks() {
 		LangEsES: LangEnUS, // 西班牙语回退到英语
 		LangFrFR: LangEnUS, // 法语回退到英语
 		LangDeDE: LangEnUS, // 德语回退到英语
+		LangRuRU: LangEnUS, // 俄语回退到英语
 	}
 }
 
