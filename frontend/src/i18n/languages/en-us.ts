@@ -76,6 +76,7 @@ export const enUS: Translation = {
     pushSize: 'Push Size',
     startTime: 'Start Time',
     endTime: 'End Time',
+    auto: 'Auto Detect',
   },
   navigation: {
     dashboard: 'Dashboard',

@@ -76,6 +76,7 @@ export const zhCN: Translation = {
     pushSize: '推送大小',
     startTime: '开始时间',
     endTime: '结束时间',
+    auto: '自动检测',
   },
   navigation: {
     dashboard: '仪表板',

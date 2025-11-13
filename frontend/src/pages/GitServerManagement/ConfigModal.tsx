@@ -29,7 +29,7 @@ import { GitServerConfig } from './types'
 interface ConfigModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (config: GitServerConfig) => Promise<void>
+  onSave: (config: GitServerConfig) => Promise<GitServerConfig>
   config: GitServerConfig
   loading?: boolean
 }

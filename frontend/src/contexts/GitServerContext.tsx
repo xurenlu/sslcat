@@ -23,7 +23,7 @@ interface GitServerContextValue {
   addSSHKey: (name: string, publicKey: string) => Promise<void>
   deleteSSHKey: (fingerprint: string) => Promise<void>
   // Config methods
-  updateConfig: (config: Partial<GitServerConfig>) => Promise<void>
+  updateConfig: (config: GitServerConfig) => Promise<GitServerConfig>
   restartSSHD: () => Promise<void>
 }
 

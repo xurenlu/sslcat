@@ -66,6 +66,17 @@ export interface Translation {
     passwordMustContainLowercase: string
     passwordMustContainUppercase: string
     passwordMustContainNumber: string
+    time: string
+    duration: string
+    user: string
+    commitHash: string
+    commitMessage: string
+    pusherInfo: string
+    pushSize: string
+    startTime: string
+    endTime: string
+    info: string
+    auto: string
   }
   
   // 导航菜单

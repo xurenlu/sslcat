@@ -7,6 +7,8 @@ interface ErrorHandlerOptions {
   context?: string
   showToast?: boolean
   logToSentry?: boolean
+  title?: string
+  description?: string
 }
 
 /**
@@ -40,8 +42,8 @@ export const useErrorHandler = () => {
       // 显示 Toast 提示
       if (showToast) {
         toast({
-          title: `${context}失败`,
-          description: errorMessage,
+          title: options.title || `${context}失败`,
+          description: options.description || errorMessage,
           status: 'error',
           duration: TOAST_DURATION.MEDIUM,
           isClosable: true,

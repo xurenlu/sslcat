@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.24-rc4] - 2025-11-12
+
+### 🐛 Bug 修复
+
+#### 前端编译错误修复
+- **修复 TypeScript 编译错误**: 修复 `PushHistory.tsx` 中 `ErrorHandlerOptions` 类型缺少 `title` 和 `description` 属性的问题
+- **修复翻译类型定义**: 添加缺失的翻译字段（`time`, `duration`, `user`, `commitHash`, `commitMessage`, `pusherInfo`, `pushSize`, `startTime`, `endTime`, `info`, `auto`）
+- **修复 GitServerContext 类型**: 修正 `updateConfig` 方法的返回类型，从 `Promise<void>` 改为 `Promise<GitServerConfig>`
+- **完善语言文件**: 为所有支持的语言文件添加缺失的翻译字段
+
+### 🌐 国际化调整
+
+#### 语言支持
+- **移除未使用的语言**: 移除韩语（ko-kr）和繁体中文（zh-tw）支持，这些语言文件未被实际使用
+- **保留支持的语言**: 简体中文（zh-CN）、英语（en-US）、日语（ja-JP）、西班牙语（es-ES）、法语（fr-FR）、德语（de-DE）、俄语（ru-RU）
+
 ## [1.3.24-rc3] - 2025-11-12
 
 ### 🐛 Bug 修复
