@@ -1,0 +1,40 @@
+{
+  "summary": {
+    "total": 1,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 1,
+    "duration": "7.006010583s"
+  },
+  "results": [
+    {
+      "template_id": "bark",
+      "template_name": "Bark",
+      "category": "ai",
+      "subcategory": "tts",
+      "priority": "low",
+      "status": "skipped",
+      "stages": {
+        "image_check": {
+          "status": "skipped",
+          "duration": "7.005287375s",
+          "error": "镜像不存在: ghcr.io/suno-ai/bark:latest"
+        },
+        "load": {
+          "status": "passed",
+          "duration": "610.958µs"
+        }
+      },
+      "errors": [
+        "镜像不存在: ghcr.io/suno-ai/bark:latest"
+      ],
+      "warnings": [],
+      "start_time": "2025-11-11T00:38:59.405341+08:00",
+      "end_time": "0001-01-01T00:00:00Z",
+      "duration": "",
+      "image_names": [
+        "ghcr.io/suno-ai/bark:latest"
+      ]
+    }
+  ]
+}

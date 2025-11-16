@@ -32,8 +32,6 @@ services:
       JVB_PORT: 10000
       JVB_TCP_PORT: 4443
       JVB_TCP_MAPPED_PORT: 4443
-      JVB_BREWERY_MUC: jvbbrewery
-      JVB_ENABLE_APIS: rest,colibri
     volumes:
       - jitsi_web:/config
     depends_on:
