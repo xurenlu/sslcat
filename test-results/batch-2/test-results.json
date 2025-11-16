@@ -1,0 +1,40 @@
+{
+  "summary": {
+    "total": 1,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 1,
+    "duration": "2.356983184s"
+  },
+  "results": [
+    {
+      "template_id": "koboldcpp",
+      "template_name": "KoboldCpp (本地LLM API)",
+      "category": "ai",
+      "subcategory": "llm",
+      "priority": "high",
+      "status": "skipped",
+      "stages": {
+        "image_check": {
+          "status": "skipped",
+          "duration": "2.355585554s",
+          "error": "镜像不存在: ghcr.io/henk717/koboldcpp:latest"
+        },
+        "load": {
+          "status": "passed",
+          "duration": "1.24028ms"
+        }
+      },
+      "errors": [
+        "镜像不存在: ghcr.io/henk717/koboldcpp:latest"
+      ],
+      "warnings": [],
+      "start_time": "2025-11-16T13:41:37.493227892Z",
+      "end_time": "0001-01-01T00:00:00Z",
+      "duration": "",
+      "image_names": [
+        "ghcr.io/henk717/koboldcpp:latest"
+      ]
+    }
+  ]
+}

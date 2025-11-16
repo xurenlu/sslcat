@@ -970,7 +970,7 @@ func (s *Server) setupRoutes() {
 func (s *Server) registerRunnerRoutes() {
 	// 创建 API 处理器，传递 webServer 引用以支持 localhost 认证豁免
 	gitAPI := NewGitServerAPI(s.gitServer, s)
-	runtimeAPI := NewRuntimeDetectorAPI()
+	runtimeAPI := NewRuntimeDetectorAPI(s)
 	templateBase := s.config.AdminPrefix + "/api/git-server/templates"
 	templateAPI := NewTemplateAPI(s.gitServer.GetTemplateManager(), templateBase)
 

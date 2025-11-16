@@ -1,0 +1,40 @@
+{
+  "summary": {
+    "total": 1,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 1,
+    "duration": "6.963943727s"
+  },
+  "results": [
+    {
+      "template_id": "replicate-sdxl",
+      "template_name": "Replicate SDXL (高清图片生成)",
+      "category": "ai",
+      "subcategory": "image-generation",
+      "priority": "low",
+      "status": "skipped",
+      "stages": {
+        "image_check": {
+          "status": "skipped",
+          "duration": "6.962428983s",
+          "error": "镜像不存在: replicate/proxy:latest"
+        },
+        "load": {
+          "status": "passed",
+          "duration": "1.359396ms"
+        }
+      },
+      "errors": [
+        "镜像不存在: replicate/proxy:latest"
+      ],
+      "warnings": [],
+      "start_time": "2025-11-16T13:58:53.997822426Z",
+      "end_time": "0001-01-01T00:00:00Z",
+      "duration": "",
+      "image_names": [
+        "replicate/proxy:latest"
+      ]
+    }
+  ]
+}

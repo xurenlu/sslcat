@@ -31,6 +31,7 @@ import {
 } from 'react-icons/fi'
 import { useConfig } from '../contexts/ConfigContext'
 import { useTranslation } from '../hooks/useLanguage'
+import { TOAST_DURATION } from '../constants'
 
 const Settings: React.FC = () => {
   const { adminPrefix, refreshConfig, changeAdminPrefix } = useConfig()
@@ -339,7 +340,7 @@ const Settings: React.FC = () => {
       toast({
         title: t.settings.save_success,
         status: 'success',
-        duration: 3000,
+        duration: TOAST_DURATION.SHORT,
         isClosable: true,
       })
       
@@ -359,7 +360,7 @@ const Settings: React.FC = () => {
               title: t.settings.admin_prefix_change_success,
               description: `${t.settings.admin_prefix_changed}: ${newPrefix}，${t.settings.notification_sent}`,
               status: 'success',
-              duration: 5000,
+              duration: TOAST_DURATION.MEDIUM,
               isClosable: true,
             })
           },
@@ -369,7 +370,7 @@ const Settings: React.FC = () => {
               title: t.settings.admin_prefix_change_failed,
               description: error.message,
               status: 'error',
-              duration: 5000,
+              duration: TOAST_DURATION.MEDIUM,
               isClosable: true,
             })
           }
@@ -380,7 +381,7 @@ const Settings: React.FC = () => {
         title: t.settings.save_failed,
         description: error instanceof Error ? error.message : t.common.unknownError,
         status: 'error',
-        duration: 3000,
+        duration: TOAST_DURATION.SHORT,
         isClosable: true,
       })
     } finally {

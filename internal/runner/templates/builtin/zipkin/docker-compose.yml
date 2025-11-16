@@ -28,9 +28,9 @@ services:
     container_name: {{APP_NAME}}_elasticsearch
     restart: unless-stopped
     environment:
-      - discovery.type=single-node
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-      - xpack.security.enabled=false
+      discovery.type: single-node
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+      xpack.security.enabled: "false"
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
     networks:

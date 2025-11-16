@@ -1,0 +1,33 @@
+{
+  "summary": {
+    "total": 1,
+    "passed": 0,
+    "failed": 1,
+    "skipped": 0,
+    "duration": "3.512897ms"
+  },
+  "results": [
+    {
+      "template_id": "zipkin",
+      "template_name": "Zipkin (分布式追踪)",
+      "category": "tools",
+      "subcategory": "monitoring",
+      "priority": "low",
+      "status": "failed",
+      "stages": {
+        "load_compose": {
+          "status": "failed",
+          "duration": "3.252818ms",
+          "error": "解析 Compose 文件失败: yaml: unmarshal errors:\n  line 31: cannot unmarshal !!seq into map[string]interface {}"
+        }
+      },
+      "errors": [
+        "加载 Compose 文件失败: 解析 Compose 文件失败: yaml: unmarshal errors:\n  line 31: cannot unmarshal !!seq into map[string]interface {}"
+      ],
+      "warnings": [],
+      "start_time": "2025-11-16T16:10:13.178888321Z",
+      "end_time": "0001-01-01T00:00:00Z",
+      "duration": ""
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "summary": {
+    "total": 1,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 1,
+    "duration": "7.153786744s"
+  },
+  "results": [
+    {
+      "template_id": "openrouter",
+      "template_name": "OpenRouter Proxy",
+      "category": "ai",
+      "subcategory": "api-aggregator",
+      "priority": "medium",
+      "status": "skipped",
+      "stages": {
+        "image_check": {
+          "status": "skipped",
+          "duration": "7.151460921s",
+          "error": "镜像不存在: openrouter/openrouter-proxy:latest"
+        },
+        "load": {
+          "status": "passed",
+          "duration": "2.109657ms"
+        }
+      },
+      "errors": [
+        "镜像不存在: openrouter/openrouter-proxy:latest"
+      ],
+      "warnings": [],
+      "start_time": "2025-11-16T13:49:35.855824139Z",
+      "end_time": "0001-01-01T00:00:00Z",
+      "duration": "",
+      "image_names": [
+        "openrouter/openrouter-proxy:latest"
+      ]
+    }
+  ]
+}

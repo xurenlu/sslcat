@@ -53,6 +53,7 @@ import {
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
 import RealtimeLogs from './RealtimeLogs'
 import { useTranslation } from '../hooks/useLanguage'
+import { TOAST_DURATION } from '../constants'
 
 interface DeployRecord {
   id: string
@@ -113,12 +114,11 @@ const DeployHistory: React.FC<DeployHistoryProps> = ({ appName }) => {
         }
       }
     } catch (error) {
-      console.error('Failed to load deploy history:', error)
       toast({
-        title: '加载失败',
-        description: '无法加载部署历史',
+        title: t.gitServer.deployHistoryLoadFailed || 'Failed to load deploy history',
+        description: t.gitServer.deployHistoryLoadError || 'Unable to load deploy history',
         status: 'error',
-        duration: 3000,
+        duration: TOAST_DURATION.MEDIUM,
         isClosable: true,
       })
     } finally {
@@ -147,10 +147,10 @@ const DeployHistory: React.FC<DeployHistoryProps> = ({ appName }) => {
         const data = await response.json()
         if (data.success) {
           toast({
-            title: '回滚成功',
-            description: `应用已回滚到部署版本 ${deployId.slice(-8)}`,
+            title: t.gitServer.rollbackSuccess || 'Rollback successful',
+            description: t.gitServer.rollbackSuccessDescription?.replace('{deployId}', deployId.slice(-8)) || `App rolled back to deploy version ${deployId.slice(-8)}`,
             status: 'success',
-            duration: 3000,
+            duration: TOAST_DURATION.MEDIUM,
             isClosable: true,
           })
           
@@ -161,12 +161,11 @@ const DeployHistory: React.FC<DeployHistoryProps> = ({ appName }) => {
         }
       }
     } catch (error) {
-      console.error('Failed to rollback:', error)
       toast({
-        title: '回滚失败',
-        description: '无法回滚到指定版本',
+        title: t.gitServer.rollbackFailed || 'Rollback failed',
+        description: t.gitServer.rollbackFailedDescription || 'Unable to rollback to specified version',
         status: 'error',
-        duration: 3000,
+        duration: TOAST_DURATION.MEDIUM,
         isClosable: true,
       })
     } finally {

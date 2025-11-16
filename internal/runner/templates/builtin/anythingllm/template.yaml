@@ -2,8 +2,8 @@ id: anythingllm
 name: AnythingLLM
 category: ai
 subcategory: rag
-tags: [nodejs, postgres, ai, rag, llm, anythingllm]
-description: 企业级 RAG 应用，支持文档上传、向量搜索和 AI 问答。
+tags: [nodejs, postgres, ai, rag, llm, anythingllm, chat, chinese]
+description: 企业级 RAG 应用，支持文档上传、向量搜索、AI 问答和智能聊天。支持中文界面和中文内容处理。
 icon: anythingllm
 version: 1.0.0
 author: SSLcat Team
@@ -30,6 +30,24 @@ variables:
     min: 1024
     max: 65535
     description: AnythingLLM Web 服务端口
+  - name: OPENAI_API_KEY
+    type: string
+    title: OpenAI API Key
+    default: ""
+    description: OpenAI API 密钥（可选，用于 GPT 模型，支持中文）
+    sensitive: true
+  - name: ANTHROPIC_API_KEY
+    type: string
+    title: Anthropic API Key
+    default: ""
+    description: Anthropic API 密钥（可选，用于 Claude 模型）
+    sensitive: true
+  - name: GOOGLE_API_KEY
+    type: string
+    title: Google API Key
+    default: ""
+    description: Google API 密钥（可选，用于 Gemini 模型，支持中文）
+    sensitive: true
 
 services:
   - name: anythingllm
@@ -98,5 +116,5 @@ healthcheck_global:
 metadata:
   site_url: http://{{PRIMARY_DOMAIN}}
   admin_email: admin@{{PRIMARY_DOMAIN}}
-  features: "RAG,向量搜索,文档问答"
+  features: "RAG,向量搜索,文档问答,智能聊天,中文支持,多模型支持"
 

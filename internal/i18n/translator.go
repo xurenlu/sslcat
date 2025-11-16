@@ -17,14 +17,12 @@ type SupportedLanguage string
 
 const (
 	LangZhCN SupportedLanguage = "zh-CN" // 中文简体
-	LangZhTW SupportedLanguage = "zh-TW" // 中文繁体
 	LangEnUS SupportedLanguage = "en-US" // 英语
 	LangJaJP SupportedLanguage = "ja-JP" // 日语
 	LangEsES SupportedLanguage = "es-ES" // 西班牙语
 	LangFrFR SupportedLanguage = "fr-FR" // 法语
-	LangRuRU SupportedLanguage = "ru-RU" // 俄语
-	LangKoKR SupportedLanguage = "ko-KR" // 韩语
 	LangDeDE SupportedLanguage = "de-DE" // 德语
+	LangRuRU SupportedLanguage = "ru-RU" // 俄语
 )
 
 // LanguageInfo 语言信息
@@ -90,15 +88,6 @@ func (t *Translator) initLanguages() {
 			Enabled:    true,
 			Progress:   100.0,
 		},
-		LangZhTW: {
-			Code:       LangZhTW,
-			Name:       "Chinese Traditional",
-			NativeName: "繁體中文",
-			Flag:       "🇹🇼",
-			RTL:        false,
-			Enabled:    true,
-			Progress:   90.0,
-		},
 		LangEnUS: {
 			Code:       LangEnUS,
 			Name:       "English",
@@ -135,6 +124,15 @@ func (t *Translator) initLanguages() {
 			Enabled:    true,
 			Progress:   85.0,
 		},
+		LangDeDE: {
+			Code:       LangDeDE,
+			Name:       "German",
+			NativeName: "Deutsch",
+			Flag:       "🇩🇪",
+			RTL:        false,
+			Enabled:    true,
+			Progress:   85.0,
+		},
 		LangRuRU: {
 			Code:       LangRuRU,
 			Name:       "Russian",
@@ -142,25 +140,7 @@ func (t *Translator) initLanguages() {
 			Flag:       "🇷🇺",
 			RTL:        false,
 			Enabled:    true,
-			Progress:   80.0,
-		},
-		LangKoKR: {
-			Code:       LangKoKR,
-			Name:       "Korean",
-			NativeName: "한국어",
-			Flag:       "🇰🇷",
-			RTL:        false,
-			Enabled:    false,
-			Progress:   60.0,
-		},
-		LangDeDE: {
-			Code:       LangDeDE,
-			Name:       "German",
-			NativeName: "Deutsch",
-			Flag:       "🇩🇪",
-			RTL:        false,
-			Enabled:    false,
-			Progress:   60.0,
+			Progress:   85.0,
 		},
 	}
 }
@@ -168,13 +148,11 @@ func (t *Translator) initLanguages() {
 // initFallbacks 初始化回退语言
 func (t *Translator) initFallbacks() {
 	t.fallbacks = map[SupportedLanguage]SupportedLanguage{
-		LangZhTW: LangZhCN, // 繁体中文回退到简体中文
 		LangJaJP: LangEnUS, // 日语回退到英语
 		LangEsES: LangEnUS, // 西班牙语回退到英语
 		LangFrFR: LangEnUS, // 法语回退到英语
-		LangRuRU: LangEnUS, // 俄语回退到英语
-		LangKoKR: LangEnUS, // 韩语回退到英语
 		LangDeDE: LangEnUS, // 德语回退到英语
+		LangRuRU: LangEnUS, // 俄语回退到英语
 	}
 }
 

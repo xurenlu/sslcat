@@ -1,0 +1,42 @@
+{
+  "summary": {
+    "total": 1,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 1,
+    "duration": "7.740265587s"
+  },
+  "results": [
+    {
+      "template_id": "docusaurus",
+      "template_name": "Docusaurus",
+      "category": "cms",
+      "subcategory": "documentation",
+      "priority": "medium",
+      "status": "skipped",
+      "stages": {
+        "image_check": {
+          "status": "skipped",
+          "duration": "7.7389024s",
+          "error": "镜像不存在: node:latest"
+        },
+        "load": {
+          "status": "passed",
+          "duration": "1.171954ms"
+        }
+      },
+      "errors": [
+        "镜像不存在: node:latest"
+      ],
+      "warnings": [
+        "检查镜像 node:latest 失败: 检查镜像失败: exit status 1, output: toomanyrequests: You have reached your unauthenticated pull rate limit. https://www.docker.com/increase-rate-limit\n"
+      ],
+      "start_time": "2025-11-16T13:15:50.207237553Z",
+      "end_time": "0001-01-01T00:00:00Z",
+      "duration": "",
+      "image_names": [
+        "node:latest"
+      ]
+    }
+  ]
+}

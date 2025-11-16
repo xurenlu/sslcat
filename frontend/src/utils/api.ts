@@ -1,11 +1,12 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { ApiResponse } from '../types'
 import { addBreadcrumb, captureError } from './sentry'
+import { API_TIMEOUT as API_TIMEOUT_CONSTANTS } from '../constants'
 
 // 常量定义
 const FALLBACK_ADMIN_PREFIX = '/sslcat-panel' // 仅作为最后的备用选项
 const ADMIN_PREFIX_STORAGE_KEY = 'adminPrefix'
-const API_TIMEOUT = 10000
+const API_TIMEOUT = API_TIMEOUT_CONSTANTS.DEFAULT
 
 // 动态获取 API baseURL
 const getApiBaseURL = (): string => {
@@ -43,7 +44,7 @@ const api = createApiInstance()
 export const updateApiBaseURL = (newPrefix: string): void => {
   const newBaseURL = `${newPrefix}/api`
   api.defaults.baseURL = newBaseURL
-  console.log('Updated API baseURL to:', newBaseURL)
+  // API baseURL updated
 }
 
 // 请求拦截器
@@ -95,8 +96,7 @@ api.interceptors.response.use(
     return response.data
   },
   (error) => {
-    console.error('API Error:', error)
-    
+    // 错误已通过 Sentry 记录，这里不再输出 console.error
     // 准备错误上下文
     const errorContext: Record<string, any> = {
       url: error.config?.url,
@@ -306,44 +306,56 @@ export const validators = {
     return emailRegex.test(email)
   },
   
-  // 验证密码强度
-  validatePassword: (password: string): { valid: boolean; message: string } => {
+  // 验证密码强度（支持多语言）
+  validatePassword: (password: string, t?: {
+    passwordMinLength8: string
+    passwordMustContainLowercase: string
+    passwordMustContainUppercase: string
+    passwordMustContainNumber: string
+  }): { valid: boolean; message: string } => {
+    const messages = t || {
+      passwordMinLength8: '密码长度至少8位',
+      passwordMustContainLowercase: '密码必须包含小写字母',
+      passwordMustContainUppercase: '密码必须包含大写字母',
+      passwordMustContainNumber: '密码必须包含数字',
+    }
+    
     if (password.length < 8) {
-      return { valid: false, message: '密码长度至少8位' }
+      return { valid: false, message: messages.passwordMinLength8 }
     }
     if (!/(?=.*[a-z])/.test(password)) {
-      return { valid: false, message: '密码必须包含小写字母' }
+      return { valid: false, message: messages.passwordMustContainLowercase }
     }
     if (!/(?=.*[A-Z])/.test(password)) {
-      return { valid: false, message: '密码必须包含大写字母' }
+      return { valid: false, message: messages.passwordMustContainUppercase }
     }
     if (!/(?=.*\d)/.test(password)) {
-      return { valid: false, message: '密码必须包含数字' }
+      return { valid: false, message: messages.passwordMustContainNumber }
     }
     return { valid: true, message: '密码强度符合要求' }
   }
 }
 
-// API 方法 - 使用更严格的类型定义和缓存优化
+// API 方法 - 使用更严格的类型定义和缓存优化，并根据操作类型设置不同的超时时间
 export const apiService = {
-  // 仪表板 - 带缓存
+  // 仪表板 - 快速操作（5秒超时）
   getStats: async (): Promise<any> => {
     const cacheKey = 'stats'
     const cached = apiCache.get(cacheKey)
     if (cached) return cached
     
-    const result = await api.get('/stats')
+    const result = await api.get('/stats', { timeout: API_TIMEOUT_CONSTANTS.QUICK })
     apiCache.set(cacheKey, result, 60000) // 1分钟缓存
     return result
   },
   
-  // 代理规则 - 带缓存
+  // 代理规则 - 默认超时（10秒）
   getProxyRules: async (): Promise<any> => {
     const cacheKey = 'proxy-rules'
     const cached = apiCache.get(cacheKey)
     if (cached) return cached
     
-    const result = await api.get('/proxy')
+    const result = await api.get('/proxy', { timeout: API_TIMEOUT_CONSTANTS.DEFAULT })
     apiCache.set(cacheKey, result, 300000) // 5分钟缓存
     return result
   },
@@ -366,25 +378,27 @@ export const apiService = {
     return result
   },
   
-  // SSL证书 - 带缓存
+  // SSL证书 - 带缓存，证书操作使用长超时
   getCertificates: async (): Promise<any> => {
     const cacheKey = 'ssl-certificates'
     const cached = apiCache.get(cacheKey)
     if (cached) return cached
     
-    const result = await api.get('/ssl')
+    const result = await api.get('/ssl', { timeout: API_TIMEOUT_CONSTANTS.DEFAULT })
     apiCache.set(cacheKey, result, 600000) // 10分钟缓存
     return result
   },
   
   createCertificate: async (cert: Omit<SSLCertificate, 'id'>): Promise<any> => {
-    const result = await api.post('/ssl', cert)
+    // 证书申请可能需要较长时间，使用证书专用超时
+    const result = await api.post('/ssl', cert, { timeout: API_TIMEOUT_CONSTANTS.CERTIFICATE })
     apiCache.delete('ssl-certificates') // 清除缓存
     return result
   },
   
   renewCertificate: async (id: string): Promise<any> => {
-    const result = await api.post(`/ssl/${id}/renew`)
+    // 证书续期可能需要较长时间，使用证书专用超时
+    const result = await api.post(`/ssl/${id}/renew`, {}, { timeout: API_TIMEOUT_CONSTANTS.CERTIFICATE })
     apiCache.delete('ssl-certificates') // 清除缓存
     return result
   },
@@ -471,7 +485,7 @@ export const cacheUtils = {
         apiService.getCertificates()
       ])
     } catch (error) {
-      console.warn('预加载数据失败:', error)
+      // Preload data failed (non-critical)
     }
   }
 }

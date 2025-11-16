@@ -40,6 +40,8 @@ import {
 } from 'react-icons/fi'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
 import { useTranslation } from '../hooks/useLanguage'
+import { useErrorHandler } from '../hooks/useErrorHandler'
+import { TOAST_DURATION } from '../constants'
 
 interface PushRecord {
   id: string
@@ -67,6 +69,7 @@ interface PushHistoryProps {
 const PushHistory: React.FC<PushHistoryProps> = ({ appName, limit = 50 }) => {
   const { adminPrefix } = useConfig()
   const t = useTranslation()
+  const { handleError } = useErrorHandler()
   const [pushHistory, setPushHistory] = useState<PushRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedPush, setSelectedPush] = useState<PushRecord | null>(null)
@@ -83,19 +86,15 @@ const PushHistory: React.FC<PushHistoryProps> = ({ appName, limit = 50 }) => {
       if (data.success) {
         setPushHistory(data.data || [])
       } else {
-        toast({
-          title: '获取推送历史失败',
-          description: data.error || '未知错误',
-          status: 'error',
-          duration: 3000,
+        handleError(new Error(data.error || t.gitServer.pushHistoryFailed), {
+          title: t.gitServer.pushHistoryFailed,
+          description: data.error || t.common.unknownError,
         })
       }
     } catch (error) {
-      toast({
-        title: '网络错误',
-        description: '无法获取推送历史',
-        status: 'error',
-        duration: 3000,
+      handleError(error, {
+        title: t.gitServer.networkError,
+        description: t.gitServer.cannotGetPushHistory,
       })
     } finally {
       setLoading(false)
@@ -112,11 +111,11 @@ const PushHistory: React.FC<PushHistoryProps> = ({ appName, limit = 50 }) => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'success':
-        return <Badge colorScheme="green">成功</Badge>
+        return <Badge colorScheme="green">{t.common.success}</Badge>
       case 'failed':
-        return <Badge colorScheme="red">失败</Badge>
+        return <Badge colorScheme="red">{t.common.failed}</Badge>
       case 'pending':
-        return <Badge colorScheme="yellow">进行中</Badge>
+        return <Badge colorScheme="yellow">{t.common.pending}</Badge>
       default:
         return <Badge>{status}</Badge>
     }
@@ -138,7 +137,7 @@ const PushHistory: React.FC<PushHistoryProps> = ({ appName, limit = 50 }) => {
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '-'
     const date = new Date(dateStr)
-    return date.toLocaleString('zh-CN')
+    return date.toLocaleString()
   }
 
   const formatDuration = (ms: number) => {
@@ -146,9 +145,9 @@ const PushHistory: React.FC<PushHistoryProps> = ({ appName, limit = 50 }) => {
     const seconds = Math.floor(ms / 1000)
     const minutes = Math.floor(seconds / 60)
     if (minutes > 0) {
-      return `${minutes}分${seconds % 60}秒`
+      return `${minutes}m ${seconds % 60}s`
     }
-    return `${seconds}秒`
+    return `${seconds}s`
   }
 
   const formatSize = (bytes: number) => {
@@ -178,7 +177,7 @@ const PushHistory: React.FC<PushHistoryProps> = ({ appName, limit = 50 }) => {
     return (
       <Box textAlign="center" py={8}>
         <Icon as={FiGitCommit} boxSize={12} color="gray.400" mb={4} />
-        <Text color="gray.500">暂无推送记录</Text>
+        <Text color="gray.500">{t.gitServer.pushHistory}</Text>
       </Box>
     )
   }
@@ -189,13 +188,13 @@ const PushHistory: React.FC<PushHistoryProps> = ({ appName, limit = 50 }) => {
         <Table variant="simple">
           <Thead>
             <Tr>
-              <Th>时间</Th>
-              <Th>提交</Th>
-              <Th>分支</Th>
-              <Th>状态</Th>
-              <Th>耗时</Th>
-              <Th>推送者</Th>
-              <Th>操作</Th>
+              <Th>{t.common.time}</Th>
+              <Th>{t.gitServer.commits}</Th>
+              <Th>{t.gitServer.defaultBranch}</Th>
+              <Th>{t.gitServer.status}</Th>
+              <Th>{t.common.duration}</Th>
+              <Th>{t.common.user}</Th>
+              <Th>{t.gitServer.actions}</Th>
             </Tr>
           </Thead>
           <Tbody>
@@ -211,7 +210,7 @@ const PushHistory: React.FC<PushHistoryProps> = ({ appName, limit = 50 }) => {
                   <VStack align="start" spacing={1}>
                     <Code fontSize="xs">{push.commit_hash?.substring(0, 7) || '-'}</Code>
                     <Text fontSize="sm" noOfLines={1} maxW="200px">
-                      {push.commit_message || '无提交消息'}
+                      {push.commit_message || '-'}
                     </Text>
                   </VStack>
                 </Td>
@@ -253,7 +252,7 @@ const PushHistory: React.FC<PushHistoryProps> = ({ appName, limit = 50 }) => {
           <ModalHeader>
             <HStack>
               <Icon as={getStatusIcon(selectedPush?.status || '')} />
-              <Text>推送详情</Text>
+              <Text>{t.pushHistory.view_details}</Text>
             </HStack>
           </ModalHeader>
           <ModalCloseButton />
@@ -261,32 +260,32 @@ const PushHistory: React.FC<PushHistoryProps> = ({ appName, limit = 50 }) => {
             {selectedPush && (
               <VStack align="stretch" spacing={4}>
                 <Box>
-                  <Text fontWeight="bold" mb={2}>基本信息</Text>
+                  <Text fontWeight="bold" mb={2}>{t.pathPrefixRules.basicInfo}</Text>
                   <VStack align="stretch" spacing={2} fontSize="sm">
                     <HStack justify="space-between">
-                      <Text color="gray.600">推送ID:</Text>
+                      <Text color="gray.600">ID:</Text>
                       <Code>{selectedPush.id}</Code>
                     </HStack>
                     <HStack justify="space-between">
-                      <Text color="gray.600">应用名称:</Text>
+                      <Text color="gray.600">{t.gitServer.appName}:</Text>
                       <Text>{selectedPush.app_name}</Text>
                     </HStack>
                     <HStack justify="space-between">
-                      <Text color="gray.600">状态:</Text>
+                      <Text color="gray.600">{t.gitServer.status}:</Text>
                       {getStatusBadge(selectedPush.status)}
                     </HStack>
                     <HStack justify="space-between">
-                      <Text color="gray.600">开始时间:</Text>
+                      <Text color="gray.600">{t.common.startTime}:</Text>
                       <Text>{formatDate(selectedPush.start_time)}</Text>
                     </HStack>
                     {selectedPush.end_time && (
                       <HStack justify="space-between">
-                        <Text color="gray.600">结束时间:</Text>
+                        <Text color="gray.600">{t.common.endTime}:</Text>
                         <Text>{formatDate(selectedPush.end_time)}</Text>
                       </HStack>
                     )}
                     <HStack justify="space-between">
-                      <Text color="gray.600">耗时:</Text>
+                      <Text color="gray.600">{t.common.duration}:</Text>
                       <Text>{formatDuration(selectedPush.duration)}</Text>
                     </HStack>
                   </VStack>
@@ -295,20 +294,20 @@ const PushHistory: React.FC<PushHistoryProps> = ({ appName, limit = 50 }) => {
                 <Divider />
 
                 <Box>
-                  <Text fontWeight="bold" mb={2}>Git 信息</Text>
+                  <Text fontWeight="bold" mb={2}>Git {t.common.info}</Text>
                   <VStack align="stretch" spacing={2} fontSize="sm">
                     <HStack justify="space-between">
-                      <Text color="gray.600">提交哈希:</Text>
+                      <Text color="gray.600">{t.common.commitHash}:</Text>
                       <Code>{selectedPush.commit_hash || '-'}</Code>
                     </HStack>
                     <Box>
-                      <Text color="gray.600" mb={1}>提交消息:</Text>
+                      <Text color="gray.600" mb={1}>{t.common.commitMessage}:</Text>
                       <Code p={2} borderRadius="md" display="block" whiteSpace="pre-wrap">
-                        {selectedPush.commit_message || '无提交消息'}
+                        {selectedPush.commit_message || '-'}
                       </Code>
                     </Box>
                     <HStack justify="space-between">
-                      <Text color="gray.600">分支:</Text>
+                      <Text color="gray.600">{t.gitServer.defaultBranch}:</Text>
                       <Badge colorScheme="blue">
                         {selectedPush.ref_name?.replace('refs/heads/', '') || '-'}
                       </Badge>
@@ -319,20 +318,20 @@ const PushHistory: React.FC<PushHistoryProps> = ({ appName, limit = 50 }) => {
                 <Divider />
 
                 <Box>
-                  <Text fontWeight="bold" mb={2}>推送者信息</Text>
+                  <Text fontWeight="bold" mb={2}>{t.common.pusherInfo}</Text>
                   <VStack align="stretch" spacing={2} fontSize="sm">
                     <HStack justify="space-between">
-                      <Text color="gray.600">客户端IP:</Text>
+                      <Text color="gray.600">{t.statistics.ipAddress}:</Text>
                       <Text>{selectedPush.client_ip || '-'}</Text>
                     </HStack>
                     <Box>
-                      <Text color="gray.600" mb={1}>SSH密钥指纹:</Text>
+                      <Text color="gray.600" mb={1}>{t.gitServer.fingerprint}:</Text>
                       <Code fontSize="xs" display="block" p={2} borderRadius="md">
                         {selectedPush.pusher_key || '-'}
                       </Code>
                     </Box>
                     <HStack justify="space-between">
-                      <Text color="gray.600">推送大小:</Text>
+                      <Text color="gray.600">{t.common.pushSize}:</Text>
                       <Text>{formatSize(selectedPush.push_size)}</Text>
                     </HStack>
                   </VStack>
@@ -342,7 +341,7 @@ const PushHistory: React.FC<PushHistoryProps> = ({ appName, limit = 50 }) => {
                   <>
                     <Divider />
                     <Box>
-                      <Text fontWeight="bold" mb={2} color="red.500">错误信息</Text>
+                      <Text fontWeight="bold" mb={2} color="red.500">{t.common.error}</Text>
                       <Code
                         p={3}
                         borderRadius="md"
@@ -360,7 +359,7 @@ const PushHistory: React.FC<PushHistoryProps> = ({ appName, limit = 50 }) => {
                   <>
                     <Divider />
                     <Box>
-                      <Text fontWeight="bold" mb={2}>日志文件</Text>
+                      <Text fontWeight="bold" mb={2}>{t.tunnels.logFile}</Text>
                       <Code fontSize="xs">{selectedPush.log_file}</Code>
                     </Box>
                   </>
@@ -369,7 +368,7 @@ const PushHistory: React.FC<PushHistoryProps> = ({ appName, limit = 50 }) => {
             )}
           </ModalBody>
           <ModalFooter>
-            <Button onClick={onClose}>关闭</Button>
+            <Button onClick={onClose}>{t.common.close}</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

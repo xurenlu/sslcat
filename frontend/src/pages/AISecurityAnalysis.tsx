@@ -51,6 +51,7 @@ import {
 import { FaRobot } from 'react-icons/fa'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
 import { useTranslation } from '../hooks/useLanguage'
+import { TOAST_DURATION } from '../constants'
 
 interface AISecurityConfig {
   enabled: boolean
@@ -187,7 +188,7 @@ const AISecurityAnalysis: React.FC = () => {
         toast({
           title: t.common.success,
           status: 'success',
-          duration: 3000,
+          duration: TOAST_DURATION.SHORT,
           isClosable: true,
         })
         loadConfig()
@@ -196,7 +197,7 @@ const AISecurityAnalysis: React.FC = () => {
           title: t.common.error,
           description: data.error || t.common.error,
           status: 'error',
-          duration: 5000,
+          duration: TOAST_DURATION.MEDIUM,
           isClosable: true,
         })
       }
@@ -219,7 +220,7 @@ const AISecurityAnalysis: React.FC = () => {
       toast({
         title: t.common.warning,
         status: 'warning',
-        duration: 3000,
+        duration: TOAST_DURATION.SHORT,
       })
       return
     }
@@ -250,7 +251,7 @@ const AISecurityAnalysis: React.FC = () => {
           title: `✅ ${t.common.success}`,
           description: `${t.aiSecurity.model}: ${data.model}`,
           status: 'success',
-          duration: 5000,
+          duration: TOAST_DURATION.MEDIUM,
           isClosable: true,
         })
       } else {
@@ -258,7 +259,7 @@ const AISecurityAnalysis: React.FC = () => {
           title: `❌ ${t.common.error}`,
           description: data.error || t.common.error,
           status: 'error',
-          duration: 5000,
+          duration: TOAST_DURATION.MEDIUM,
           isClosable: true,
         })
       }
@@ -290,7 +291,7 @@ const AISecurityAnalysis: React.FC = () => {
           title: `✅ ${t.common.success}`,
           description: `${t.aiSecurity.threatLevel}: ${data.threat_level}\n${t.aiSecurity.aiConfidence}: ${Math.round(data.confidence * 100)}%`,
           status: 'success',
-          duration: 5000,
+          duration: TOAST_DURATION.MEDIUM,
           isClosable: true,
         })
         // 重新加载分析结果
@@ -300,7 +301,7 @@ const AISecurityAnalysis: React.FC = () => {
           title: t.common.error,
           description: data.error || t.common.error,
           status: 'error',
-          duration: 5000,
+          duration: TOAST_DURATION.MEDIUM,
           isClosable: true,
         })
       }
@@ -534,16 +535,16 @@ const AISecurityAnalysis: React.FC = () => {
 
             {/* 保存按钮 - 始终显示，即使开关关闭时也可以保存关闭状态 */}
             <HStack justify="flex-end" mt={4}>
-              <Button
-                leftIcon={<FiSave />}
-                onClick={saveConfig}
-                isLoading={loading}
-                loadingText={t.aiSecurity.saving}
-                colorScheme="purple"
-              >
-                {t.aiSecurity.saveConfig}
-              </Button>
-            </HStack>
+                  <Button
+                    leftIcon={<FiSave />}
+                    onClick={saveConfig}
+                    isLoading={loading}
+                    loadingText={t.aiSecurity.saving}
+                    colorScheme="purple"
+                  >
+                    {t.aiSecurity.saveConfig}
+                  </Button>
+                </HStack>
           </VStack>
         </CardBody>
       </Card>

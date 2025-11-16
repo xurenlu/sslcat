@@ -2,11 +2,13 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/sirupsen/logrus"
+	"github.com/xurenlu/sslcat/internal/i18n"
 	"github.com/xurenlu/sslcat/internal/runner"
 )
 
@@ -58,6 +60,14 @@ func (api *GitServerAPI) checkAuthWithLocalhostBypass(w http.ResponseWriter, r *
 	return true
 }
 
+// getTranslator 获取翻译器
+func (api *GitServerAPI) getTranslator() *i18n.Translator {
+	if api.webServer != nil {
+		return api.webServer.translator
+	}
+	return nil
+}
+
 // HandleApps 处理应用列表的GET和POST请求
 func (api *GitServerAPI) HandleApps(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
@@ -66,7 +76,7 @@ func (api *GitServerAPI) HandleApps(w http.ResponseWriter, r *http.Request) {
 	case "POST":
 		api.CreateApp(w, r)
 	default:
-		api.writeError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		api.writeTranslatedError(w, "git_server.method_not_allowed", http.StatusMethodNotAllowed)
 	}
 }
 
@@ -126,13 +136,13 @@ func (api *GitServerAPI) ListApps(w http.ResponseWriter, r *http.Request) {
 func (api *GitServerAPI) GetApp(w http.ResponseWriter, r *http.Request) {
 	appName := r.URL.Query().Get("name")
 	if appName == "" {
-		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.app_name_required", http.StatusBadRequest)
 		return
 	}
 
 	app, err := api.server.GetApp(appName)
 	if err != nil {
-		api.writeError(w, err.Error(), http.StatusNotFound)
+		api.writeTranslatedError(w, "git_server.app_not_exists", http.StatusNotFound, err.Error())
 		return
 	}
 
@@ -170,7 +180,7 @@ func (api *GitServerAPI) CreateApp(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		api.logger.Errorf("解析创建应用请求失败: %v", err)
-		api.writeError(w, "解析请求失败: "+err.Error(), http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.parse_request_failed", http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -186,14 +196,14 @@ func (api *GitServerAPI) CreateApp(w http.ResponseWriter, r *http.Request) {
 	// 验证必填字段
 	if req.Name == "" {
 		api.logger.Warn("应用名称为空")
-		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.app_name_required", http.StatusBadRequest)
 		return
 	}
 
 	// 检查 Git 服务器是否为 nil（未启用）
 	if api.server == nil {
 		api.logger.Error("Git Deploy 服务未启用，无法创建应用")
-		api.writeError(w, "Git Deploy 服务未启用，请在配置文件中启用 runners.git.enabled", http.StatusServiceUnavailable)
+		api.writeTranslatedError(w, "git_server.service_not_enabled", http.StatusServiceUnavailable)
 		return
 	}
 
@@ -206,7 +216,7 @@ func (api *GitServerAPI) CreateApp(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(errMsg, "目录") || strings.Contains(errMsg, "directory") {
 			errMsg = "创建应用目录失败，请检查 runners.git.repos_dir 配置和目录权限: " + errMsg
 		}
-		api.writeError(w, "创建应用失败: "+errMsg, http.StatusInternalServerError)
+		api.writeTranslatedError(w, "git_server.create_app_failed", http.StatusInternalServerError, errMsg)
 		return
 	}
 
@@ -238,12 +248,12 @@ func (api *GitServerAPI) CreateApp(w http.ResponseWriter, r *http.Request) {
 func (api *GitServerAPI) DeleteApp(w http.ResponseWriter, r *http.Request) {
 	appName := r.URL.Query().Get("name")
 	if appName == "" {
-		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.app_name_required", http.StatusBadRequest)
 		return
 	}
 
 	if err := api.server.DeleteApp(appName); err != nil {
-		api.writeError(w, "删除应用失败: "+err.Error(), http.StatusInternalServerError)
+		api.writeTranslatedError(w, "git_server.delete_app_failed", http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -263,7 +273,7 @@ func (api *GitServerAPI) HandleServerConfig(w http.ResponseWriter, r *http.Reque
 	case "PUT":
 		api.UpdateServerConfig(w, r)
 	default:
-		api.writeError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		api.writeTranslatedError(w, "git_server.method_not_allowed", http.StatusMethodNotAllowed)
 	}
 }
 
@@ -284,12 +294,12 @@ func (api *GitServerAPI) UpdateServerConfig(w http.ResponseWriter, r *http.Reque
 	var config runner.GitServerConfig
 
 	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
-		api.writeError(w, "解析请求失败: "+err.Error(), http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.parse_request_failed", http.StatusBadRequest, err.Error())
 		return
 	}
 
 	if err := api.server.UpdateServerConfig(&config); err != nil {
-		api.writeError(w, "更新服务器配置失败: "+err.Error(), http.StatusInternalServerError)
+		api.writeTranslatedError(w, "git_server.update_config_failed", http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -305,7 +315,7 @@ func (api *GitServerAPI) UpdateServerConfig(w http.ResponseWriter, r *http.Reque
 func (api *GitServerAPI) UpdateAppEnv(w http.ResponseWriter, r *http.Request) {
 	appName := r.URL.Query().Get("name")
 	if appName == "" {
-		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.app_name_required", http.StatusBadRequest)
 		return
 	}
 
@@ -314,17 +324,17 @@ func (api *GitServerAPI) UpdateAppEnv(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		api.writeError(w, "解析请求失败: "+err.Error(), http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.parse_request_failed", http.StatusBadRequest, err.Error())
 		return
 	}
 
 	if req.EnvVars == nil {
-		api.writeError(w, "env_vars 字段不能为空", http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.env_vars_required", http.StatusBadRequest)
 		return
 	}
 
 	if err := api.server.UpdateAppEnv(appName, req.EnvVars); err != nil {
-		api.writeError(w, "更新环境变量失败: "+err.Error(), http.StatusInternalServerError)
+		api.writeTranslatedError(w, "git_server.update_env_vars_failed", http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -341,12 +351,12 @@ func (api *GitServerAPI) UpdateAppEnv(w http.ResponseWriter, r *http.Request) {
 func (api *GitServerAPI) RedeployApp(w http.ResponseWriter, r *http.Request) {
 	appName := r.URL.Query().Get("name")
 	if appName == "" {
-		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.app_name_required", http.StatusBadRequest)
 		return
 	}
 
 	if err := api.server.RedeployApp(appName); err != nil {
-		api.writeError(w, "触发重新部署失败: "+err.Error(), http.StatusInternalServerError)
+		api.writeTranslatedError(w, "git_server.trigger_deploy_failed", http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -368,7 +378,7 @@ func (api *GitServerAPI) HandleSSHKeys(w http.ResponseWriter, r *http.Request) {
 	case "POST":
 		api.AddSSHKey(w, r)
 	default:
-		api.writeError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		api.writeTranslatedError(w, "git_server.method_not_allowed", http.StatusMethodNotAllowed)
 	}
 }
 
@@ -376,7 +386,7 @@ func (api *GitServerAPI) HandleSSHKeys(w http.ResponseWriter, r *http.Request) {
 func (api *GitServerAPI) ListSSHKeys(w http.ResponseWriter, r *http.Request) {
 	keys, err := api.server.ListSSHKeys()
 	if err != nil {
-		api.writeError(w, "获取 SSH 密钥失败: "+err.Error(), http.StatusInternalServerError)
+		api.writeTranslatedError(w, "git_server.get_ssh_keys_failed", http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -392,7 +402,7 @@ func (api *GitServerAPI) ListSSHKeys(w http.ResponseWriter, r *http.Request) {
 func (api *GitServerAPI) UpdateAppRouting(w http.ResponseWriter, r *http.Request) {
 	appName := r.URL.Query().Get("name")
 	if appName == "" {
-		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.app_name_required", http.StatusBadRequest)
 		return
 	}
 
@@ -402,12 +412,12 @@ func (api *GitServerAPI) UpdateAppRouting(w http.ResponseWriter, r *http.Request
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		api.writeError(w, "解析请求失败: "+err.Error(), http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.parse_request_failed", http.StatusBadRequest, err.Error())
 		return
 	}
 
 	if err := api.server.UpdateAppRouting(appName, req.Port, req.Domain); err != nil {
-		api.writeError(w, "更新域名/端口失败: "+err.Error(), http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.update_routing_failed", http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -428,7 +438,7 @@ func (api *GitServerAPI) AddSSHKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		api.writeError(w, "解析请求失败: "+err.Error(), http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.parse_request_failed", http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -439,7 +449,7 @@ func (api *GitServerAPI) AddSSHKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Name == "" || publicKey == "" {
-		api.writeError(w, "密钥名称和公钥不能为空", http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.key_name_required", http.StatusBadRequest)
 		return
 	}
 
@@ -447,7 +457,7 @@ func (api *GitServerAPI) AddSSHKey(w http.ResponseWriter, r *http.Request) {
 	publicKey = strings.TrimSpace(publicKey)
 
 	if err := api.server.AddSSHKey(req.Name, publicKey); err != nil {
-		api.writeError(w, "添加 SSH 密钥失败: "+err.Error(), http.StatusInternalServerError)
+		api.writeTranslatedError(w, "git_server.add_ssh_key_failed", http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -463,12 +473,12 @@ func (api *GitServerAPI) AddSSHKey(w http.ResponseWriter, r *http.Request) {
 func (api *GitServerAPI) RemoveSSHKey(w http.ResponseWriter, r *http.Request) {
 	fingerprint := r.URL.Query().Get("fingerprint")
 	if fingerprint == "" {
-		api.writeError(w, "密钥指纹不能为空", http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.key_fingerprint_required", http.StatusBadRequest)
 		return
 	}
 
 	if err := api.server.RemoveSSHKey(fingerprint); err != nil {
-		api.writeError(w, "删除 SSH 密钥失败: "+err.Error(), http.StatusInternalServerError)
+		api.writeTranslatedError(w, "git_server.delete_ssh_key_failed", http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -488,7 +498,7 @@ func (api *GitServerAPI) GetAppLogs(w http.ResponseWriter, r *http.Request) {
 	linesStr := r.URL.Query().Get("lines")
 
 	if appName == "" {
-		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.app_name_required", http.StatusBadRequest)
 		return
 	}
 
@@ -501,7 +511,7 @@ func (api *GitServerAPI) GetAppLogs(w http.ResponseWriter, r *http.Request) {
 
 	logs, err := api.server.GetAppLogs(appName, lines)
 	if err != nil {
-		api.writeError(w, "获取应用日志失败: "+err.Error(), http.StatusInternalServerError)
+		api.writeTranslatedError(w, "git_server.get_logs_failed", http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -518,13 +528,13 @@ func (api *GitServerAPI) GetAppLogFiles(w http.ResponseWriter, r *http.Request) 
 	appName := r.URL.Query().Get("app")
 
 	if appName == "" {
-		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.app_name_required", http.StatusBadRequest)
 		return
 	}
 
 	files, err := api.server.GetAppLogFiles(appName)
 	if err != nil {
-		api.writeError(w, "获取日志文件列表失败: "+err.Error(), http.StatusInternalServerError)
+		api.writeTranslatedError(w, "git_server.get_log_files_failed", http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -543,14 +553,14 @@ func (api *GitServerAPI) GetAppLogsStream(w http.ResponseWriter, r *http.Request
 
 	if appName == "" {
 		api.logger.Warn("SSE 请求缺少应用名称参数")
-		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.app_name_required", http.StatusBadRequest)
 		return
 	}
 
 	// 检查 Git 服务器是否启用
 	if api.server == nil {
 		api.logger.Error("❌ Git Deploy 服务未启用，无法建立 SSE 连接")
-		api.writeError(w, "Git Deploy 服务未启用", http.StatusServiceUnavailable)
+		api.writeTranslatedError(w, "git_server.service_not_enabled", http.StatusServiceUnavailable)
 		return
 	}
 
@@ -558,7 +568,7 @@ func (api *GitServerAPI) GetAppLogsStream(w http.ResponseWriter, r *http.Request
 	_, err := api.server.GetApp(appName)
 	if err != nil {
 		api.logger.Errorf("❌ 应用 %s 不存在: %v", appName, err)
-		api.writeError(w, "应用不存在: "+err.Error(), http.StatusNotFound)
+		api.writeTranslatedError(w, "git_server.app_not_exists", http.StatusNotFound, err.Error())
 		return
 	}
 
@@ -575,14 +585,14 @@ func (api *GitServerAPI) GetAppLogsStreamWS(w http.ResponseWriter, r *http.Reque
 
 	if appName == "" {
 		api.logger.Warn("WebSocket 请求缺少应用名称参数")
-		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.app_name_required", http.StatusBadRequest)
 		return
 	}
 
 	// 检查 Git 服务器是否启用
 	if api.server == nil {
 		api.logger.Error("❌ Git Deploy 服务未启用，无法建立 WebSocket 连接")
-		api.writeError(w, "Git Deploy 服务未启用", http.StatusServiceUnavailable)
+		api.writeTranslatedError(w, "git_server.service_not_enabled", http.StatusServiceUnavailable)
 		return
 	}
 
@@ -590,7 +600,7 @@ func (api *GitServerAPI) GetAppLogsStreamWS(w http.ResponseWriter, r *http.Reque
 	_, err := api.server.GetApp(appName)
 	if err != nil {
 		api.logger.Errorf("❌ 应用 %s 不存在: %v", appName, err)
-		api.writeError(w, "应用不存在: "+err.Error(), http.StatusNotFound)
+		api.writeTranslatedError(w, "git_server.app_not_exists", http.StatusNotFound, err.Error())
 		return
 	}
 
@@ -604,7 +614,7 @@ func (api *GitServerAPI) GetAppLogsStreamWS(w http.ResponseWriter, r *http.Reque
 func (api *GitServerAPI) GetAppLogsHistory(w http.ResponseWriter, r *http.Request) {
 	appName := r.URL.Query().Get("app")
 	if appName == "" {
-		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.app_name_required", http.StatusBadRequest)
 		return
 	}
 
@@ -619,14 +629,14 @@ func (api *GitServerAPI) GetAppLogsHistory(w http.ResponseWriter, r *http.Reques
 	// 获取日志流
 	stream := api.server.GetLogStreamManager().GetStream(appName)
 	if stream == nil {
-		api.writeError(w, "日志流不存在", http.StatusNotFound)
+		api.writeTranslatedError(w, "git_server.log_stream_not_found", http.StatusNotFound)
 		return
 	}
 
 	// 获取历史日志
 	logs, err := stream.GetHistoryLogs(limit)
 	if err != nil {
-		api.writeError(w, "获取历史日志失败: "+err.Error(), http.StatusInternalServerError)
+		api.writeTranslatedError(w, "git_server.get_history_logs_failed", http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -645,13 +655,13 @@ func (api *GitServerAPI) GetAppLogsHistory(w http.ResponseWriter, r *http.Reques
 func (api *GitServerAPI) GetDockerImages(w http.ResponseWriter, r *http.Request) {
 	appName := r.URL.Query().Get("app")
 	if appName == "" {
-		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.app_name_required", http.StatusBadRequest)
 		return
 	}
 
 	images, err := api.server.GetDockerRegistry().ListImages(appName)
 	if err != nil {
-		api.writeError(w, "获取Docker镜像失败: "+err.Error(), http.StatusInternalServerError)
+		api.writeTranslatedError(w, "git_server.get_docker_images_failed", http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -681,13 +691,13 @@ func (api *GitServerAPI) UpdateDockerConfig(w http.ResponseWriter, r *http.Reque
 	var config runner.DockerRegistryConfig
 
 	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
-		api.writeError(w, "解析请求失败: "+err.Error(), http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.parse_request_failed", http.StatusBadRequest, err.Error())
 		return
 	}
 
 	// 更新配置
 	if err := api.server.UpdateDockerRegistryConfig(&config); err != nil {
-		api.writeError(w, "更新配置失败: "+err.Error(), http.StatusInternalServerError)
+		api.writeTranslatedError(w, "git_server.update_config_failed", http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -755,7 +765,7 @@ func (api *GitServerAPI) TestDockerConnection(w http.ResponseWriter, r *http.Req
 func (api *GitServerAPI) GetPushHistory(w http.ResponseWriter, r *http.Request) {
 	appName := r.URL.Query().Get("app")
 	if appName == "" {
-		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.app_name_required", http.StatusBadRequest)
 		return
 	}
 
@@ -769,7 +779,7 @@ func (api *GitServerAPI) GetPushHistory(w http.ResponseWriter, r *http.Request) 
 
 	history, err := api.server.GetPushHistory(appName, limit)
 	if err != nil {
-		api.writeError(w, "获取推送历史失败: "+err.Error(), http.StatusInternalServerError)
+		api.writeTranslatedError(w, "git_server.get_push_history_failed", http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -792,17 +802,17 @@ func (api *GitServerAPI) BindKeyToApp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		api.writeError(w, "解析请求失败: "+err.Error(), http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.parse_request_failed", http.StatusBadRequest, err.Error())
 		return
 	}
 
 	if req.AppName == "" || req.KeyFingerprint == "" {
-		api.writeError(w, "应用名称和密钥指纹不能为空", http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.app_name_and_key_required", http.StatusBadRequest)
 		return
 	}
 
 	if err := api.server.BindKeyToApp(req.AppName, req.KeyFingerprint); err != nil {
-		api.writeError(w, "绑定SSH密钥失败: "+err.Error(), http.StatusInternalServerError)
+		api.writeTranslatedError(w, "git_server.bind_key_failed", http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -822,17 +832,17 @@ func (api *GitServerAPI) UnbindKeyFromApp(w http.ResponseWriter, r *http.Request
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		api.writeError(w, "解析请求失败: "+err.Error(), http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.parse_request_failed", http.StatusBadRequest, err.Error())
 		return
 	}
 
 	if req.AppName == "" || req.KeyFingerprint == "" {
-		api.writeError(w, "应用名称和密钥指纹不能为空", http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.app_name_and_key_required", http.StatusBadRequest)
 		return
 	}
 
 	if err := api.server.UnbindKeyFromApp(req.AppName, req.KeyFingerprint); err != nil {
-		api.writeError(w, "解绑SSH密钥失败: "+err.Error(), http.StatusInternalServerError)
+		api.writeTranslatedError(w, "git_server.unbind_key_failed", http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -846,29 +856,53 @@ func (api *GitServerAPI) UnbindKeyFromApp(w http.ResponseWriter, r *http.Request
 
 // RuntimeDetectorAPI 运行时检测器 API
 type RuntimeDetectorAPI struct {
-	detector *runner.RuntimeDetector
-	logger   *logrus.Logger
+	detector  *runner.RuntimeDetector
+	logger    *logrus.Logger
+	webServer *Server // 添加对 web server 的引用，用于访问翻译器
 }
 
 // NewRuntimeDetectorAPI 创建新的运行时检测器 API
-func NewRuntimeDetectorAPI() *RuntimeDetectorAPI {
+func NewRuntimeDetectorAPI(webServer *Server) *RuntimeDetectorAPI {
 	return &RuntimeDetectorAPI{
-		detector: runner.NewRuntimeDetector(),
-		logger:   logrus.WithField("component", "runtime_detector_api").Logger,
+		detector:  runner.NewRuntimeDetector(),
+		logger:    logrus.WithField("component", "runtime_detector_api").Logger,
+		webServer: webServer,
 	}
+}
+
+// getTranslator 获取翻译器
+func (api *RuntimeDetectorAPI) getTranslator() *i18n.Translator {
+	if api.webServer != nil {
+		return api.webServer.translator
+	}
+	return nil
+}
+
+// writeTranslatedError 写入翻译后的错误消息
+func (api *RuntimeDetectorAPI) writeTranslatedError(w http.ResponseWriter, key string, statusCode int, args ...interface{}) {
+	translator := api.getTranslator()
+	message := key
+	if translator != nil {
+		message = translator.T(key)
+		// 支持参数替换
+		if len(args) > 0 {
+			message = fmt.Sprintf(message, args...)
+		}
+	}
+	api.writeError(w, message, statusCode)
 }
 
 // DetectProject 检测项目类型
 func (api *RuntimeDetectorAPI) DetectProject(w http.ResponseWriter, r *http.Request) {
 	projectPath := r.URL.Query().Get("path")
 	if projectPath == "" {
-		api.writeError(w, "项目路径不能为空", http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.project_path_required", http.StatusBadRequest)
 		return
 	}
 
 	info, err := api.detector.DetectProjectType(projectPath)
 	if err != nil {
-		api.writeError(w, "检测项目类型失败: "+err.Error(), http.StatusInternalServerError)
+		api.writeTranslatedError(w, "git_server.detect_project_type_failed", http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -892,6 +926,20 @@ func (api *GitServerAPI) writeError(w http.ResponseWriter, message string, statu
 		"success": false,
 		"error":   message,
 	})
+}
+
+// writeTranslatedError 写入翻译后的错误消息
+func (api *GitServerAPI) writeTranslatedError(w http.ResponseWriter, key string, statusCode int, args ...interface{}) {
+	translator := api.getTranslator()
+	message := key
+	if translator != nil {
+		message = translator.T(key)
+		// 支持参数替换
+		if len(args) > 0 {
+			message = fmt.Sprintf(message, args...)
+		}
+	}
+	api.writeError(w, message, statusCode)
 }
 
 func (api *RuntimeDetectorAPI) writeJSON(w http.ResponseWriter, data interface{}) {
@@ -963,14 +1011,14 @@ func (s *Server) handleGitServer(w http.ResponseWriter, r *http.Request) {
 // RestartSSHD 重启 SSH 服务
 func (api *GitServerAPI) RestartSSHD(w http.ResponseWriter, r *http.Request) {
 	if api.server == nil {
-		api.writeError(w, "Git Deploy 服务未启用", http.StatusServiceUnavailable)
+		api.writeTranslatedError(w, "git_server.service_not_enabled", http.StatusServiceUnavailable)
 		return
 	}
 
 	// 调用 GitServer 的 restartSSHD 方法
 	if err := api.server.RestartSSHD(); err != nil {
 		api.logger.Errorf("重启 SSH 服务失败: %v", err)
-		api.writeError(w, "重启 SSH 服务失败: "+err.Error(), http.StatusInternalServerError)
+		api.writeTranslatedError(w, "git_server.restart_sshd_failed", http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -984,12 +1032,12 @@ func (api *GitServerAPI) RestartSSHD(w http.ResponseWriter, r *http.Request) {
 // HandleDeployNotification 处理部署通知（内部 API，由 hook 调用）
 func (api *GitServerAPI) HandleDeployNotification(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		api.writeError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		api.writeTranslatedError(w, "git_server.method_not_allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	if api.server == nil {
-		api.writeError(w, "Git Deploy 服务未启用", http.StatusServiceUnavailable)
+		api.writeTranslatedError(w, "git_server.service_not_enabled", http.StatusServiceUnavailable)
 		return
 	}
 
@@ -1007,7 +1055,7 @@ func (api *GitServerAPI) HandleDeployNotification(w http.ResponseWriter, r *http
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		api.logger.Errorf("解析部署通知请求失败: %v", err)
-		api.writeError(w, "解析请求失败", http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.parse_request_failed", http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -1015,7 +1063,7 @@ func (api *GitServerAPI) HandleDeployNotification(w http.ResponseWriter, r *http
 	if err := api.server.SendDeployNotification(req.Type, req.AppName, req.CommitSHA, req.CommitMsg,
 		req.IdleDuration, req.Duration, req.Reason, req.ErrorDetails, req.Domain); err != nil {
 		api.logger.Errorf("发送部署通知失败: %v", err)
-		api.writeError(w, "发送通知失败: "+err.Error(), http.StatusInternalServerError)
+		api.writeTranslatedError(w, "git_server.send_notification_failed", http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -1034,18 +1082,18 @@ func (api *GitServerAPI) ReinstallHooks(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if r.Method != "POST" {
-		api.writeError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		api.writeTranslatedError(w, "git_server.method_not_allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	appName := r.URL.Query().Get("name")
 	if appName == "" {
-		api.writeError(w, "应用名称不能为空", http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.app_name_required", http.StatusBadRequest)
 		return
 	}
 
 	if api.server == nil {
-		api.writeError(w, "Git Deploy 服务未启用", http.StatusServiceUnavailable)
+		api.writeTranslatedError(w, "git_server.service_not_enabled", http.StatusServiceUnavailable)
 		return
 	}
 
@@ -1054,14 +1102,14 @@ func (api *GitServerAPI) ReinstallHooks(w http.ResponseWriter, r *http.Request) 
 	// 获取应用（注意：这里获取的是副本）
 	app, err := api.server.GetApp(appName)
 	if err != nil || app == nil {
-		api.writeError(w, "应用不存在: "+appName, http.StatusNotFound)
+		api.writeTranslatedError(w, "git_server.app_not_exists", http.StatusNotFound, appName)
 		return
 	}
 
 	// 重新安装 hooks（会更新 app.BareRepo）
 	if err := api.server.SetupGitHooksForApp(app); err != nil {
 		api.logger.Errorf("重新安装 hooks 失败: %v", err)
-		api.writeError(w, "重新安装 hooks 失败: "+err.Error(), http.StatusInternalServerError)
+		api.writeTranslatedError(w, "git_server.reinstall_hooks_failed", http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -1100,7 +1148,7 @@ func (api *GitServerAPI) HandleAppAction(w http.ResponseWriter, r *http.Request)
 	}
 
 	if appsIndex == -1 || len(parts) < appsIndex+3 {
-		api.writeError(w, "Invalid URL path", http.StatusBadRequest)
+		api.writeTranslatedError(w, "git_server.invalid_url_path", http.StatusBadRequest)
 		return
 	}
 
@@ -1113,7 +1161,7 @@ func (api *GitServerAPI) HandleAppAction(w http.ResponseWriter, r *http.Request)
 	case "deploy":
 		api.TriggerDeploy(w, r, appName)
 	default:
-		api.writeError(w, "Unknown action: "+action, http.StatusNotFound)
+		api.writeTranslatedError(w, "git_server.unknown_action", http.StatusNotFound, action)
 	}
 }
 
@@ -1125,7 +1173,7 @@ func (api *GitServerAPI) TriggerDeploy(w http.ResponseWriter, r *http.Request, a
 	}
 
 	if r.Method != "POST" {
-		api.writeError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		api.writeTranslatedError(w, "git_server.method_not_allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -1143,14 +1191,14 @@ func (api *GitServerAPI) TriggerDeploy(w http.ResponseWriter, r *http.Request, a
 	api.logger.Infof("触发应用部署: %s (commit: %s, ref: %s)", appName, req.Commit, req.Ref)
 
 	if api.server == nil {
-		api.writeError(w, "Git Deploy 服务未启用", http.StatusServiceUnavailable)
+		api.writeTranslatedError(w, "git_server.service_not_enabled", http.StatusServiceUnavailable)
 		return
 	}
 
 	// 获取应用
 	app, err := api.server.GetApp(appName)
 	if err != nil || app == nil {
-		api.writeError(w, "应用不存在: "+appName, http.StatusNotFound)
+		api.writeTranslatedError(w, "git_server.app_not_exists", http.StatusNotFound, appName)
 		return
 	}
 
