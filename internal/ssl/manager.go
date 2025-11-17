@@ -840,7 +840,15 @@ func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error
 
 		attemptDuration := time.Since(attemptStart)
 		lastErr = err
-		m.log.Warnf("HTTP-01 validation failed for %s (attempt %d, 耗时: %v): %v", domain, attempt, attemptDuration, err)
+		
+		// 提供更详细的错误信息
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "missing certificate") {
+			m.log.Warnf("HTTP-01 validation failed for %s (attempt %d, 耗时: %v): %v", domain, attempt, attemptDuration, err)
+			m.log.Warnf("可能原因: 1) 域名DNS未解析到此服务器 2) 防火墙阻止80端口 3) 服务器未在standard模式监听80端口 4) Let's Encrypt无法访问验证端点")
+		} else {
+			m.log.Warnf("HTTP-01 validation failed for %s (attempt %d, 耗时: %v): %v", domain, attempt, attemptDuration, err)
+		}
 
 		// 如果HTTP-01失败且配置了DNS服务商，尝试DNS-01验证
 		if m.supportsDNSChallenge() && m.hasAvailableDNSProvider() {
@@ -873,10 +881,21 @@ func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error
 
 	totalDuration := time.Since(startTime)
 	m.log.Errorf("All certificate request attempts failed for domain: %s, last error: %v (总耗时: %v)", domain, lastErr, totalDuration)
+	
+	// 提供诊断建议
+	errMsg := lastErr.Error()
+	var diagnosticTips string
+	if strings.Contains(errMsg, "missing certificate") {
+		diagnosticTips = "诊断建议: 1) 检查域名DNS解析: nslookup " + domain + " 2) 检查80端口可访问性: curl -I http://" + domain + "/.well-known/acme-challenge/test 3) 确认服务器在standard模式监听80/443端口 4) 检查防火墙规则"
+		m.log.Warnf("证书申请失败诊断: %s", diagnosticTips)
+	}
 
 	// 发送证书申请失败通知
 	if m.notificationIntegrator != nil {
 		reason := fmt.Sprintf("申请失败，尝试了%d次，总耗时%v，最后错误: %v", maxRetries, totalDuration, lastErr)
+		if diagnosticTips != "" {
+			reason += " | " + diagnosticTips
+		}
 		m.notificationIntegrator.SendCertFailedNotification(domain, reason)
 	}
 
@@ -1018,12 +1037,35 @@ func (m *Manager) isAllowedDomain(host string) bool {
 			return true
 		}
 	}
-	// 代理规则中启用的域名
+	// 代理规则中的域名（无论是否启用，只要存在就允许申请证书）
 	for _, r := range m.config.Proxy.Rules {
-		if !r.Enabled {
+		d := strings.ToLower(strings.TrimSpace(r.Domain))
+		if d == "" {
 			continue
 		}
-		d := strings.ToLower(strings.TrimSpace(r.Domain))
+		if host == d || matchDomain(host, d) {
+			return true
+		}
+	}
+	// 静态站点中启用的域名
+	for _, s := range m.config.StaticSites {
+		if !s.Enabled {
+			continue
+		}
+		d := strings.ToLower(strings.TrimSpace(s.Domain))
+		if d == "" {
+			continue
+		}
+		if host == d || matchDomain(host, d) {
+			return true
+		}
+	}
+	// PHP 站点中启用的域名
+	for _, p := range m.config.PHPSites {
+		if !p.Enabled {
+			continue
+		}
+		d := strings.ToLower(strings.TrimSpace(p.Domain))
 		if d == "" {
 			continue
 		}

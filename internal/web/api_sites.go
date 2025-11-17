@@ -83,6 +83,13 @@ func (s *Server) handleAPIStaticSites(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// 尝试为该域名预取/申请证书（若启用 ACME）
+		if s.sslManager != nil {
+			if err := s.sslManager.EnsureDomainCert(req.Domain); err != nil {
+				s.log.Warnf("Failed to prefetch certificate for static site %s: %v", req.Domain, err)
+			}
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": true,
@@ -248,6 +255,13 @@ func (s *Server) handleAPIPHPSites(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]string{"error": "failed to save config"})
 			return
+		}
+
+		// 尝试为该域名预取/申请证书（若启用 ACME）
+		if s.sslManager != nil {
+			if err := s.sslManager.EnsureDomainCert(req.Domain); err != nil {
+				s.log.Warnf("Failed to prefetch certificate for PHP site %s: %v", req.Domain, err)
+			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")
