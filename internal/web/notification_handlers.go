@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -358,6 +359,20 @@ func (s *Server) handleNotificationConfig(w http.ResponseWriter, r *http.Request
 			if timeout, ok := webhookConfig["timeout"].(float64); ok {
 				s.config.Notification.Channels.Webhook.Timeout = int(timeout)
 			}
+		}
+
+		// 如果环境变量存在，清空配置文件中的敏感字段，避免泄露
+		if os.Getenv("RESEND_API_KEY") != "" {
+			s.config.Notification.Channels.Email.ResendAPIKey = ""
+		}
+		if os.Getenv("MAILGUN_API_KEY") != "" {
+			s.config.Notification.Channels.Email.MailgunAPIKey = ""
+		}
+		if os.Getenv("SENDGRID_API_KEY") != "" {
+			s.config.Notification.Channels.Email.SendGridAPIKey = ""
+		}
+		if os.Getenv("NOTIFICATION_SMTP_PASSWORD") != "" {
+			s.config.Notification.Channels.Email.Password = ""
 		}
 
 		// 保存配置到文件

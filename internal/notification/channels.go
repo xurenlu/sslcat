@@ -89,34 +89,34 @@ func NewEmailChannelFromConfig(cfg config.EmailChannelConfig) *EmailChannel {
 		enabled: cfg.Enabled,
 		method:  cfg.Method,
 		
-		// SMTP 配置
-		smtpHost: cfg.SMTPHost,
-		smtpPort: fmt.Sprintf("%d", cfg.SMTPPort),
-		username: cfg.Username,
-		password: cfg.Password,
-		from:     cfg.From,
+		// SMTP 配置（优先使用环境变量）
+		smtpHost: getEnvOrDefault("NOTIFICATION_SMTP_HOST", cfg.SMTPHost),
+		smtpPort: getEnvOrDefault("NOTIFICATION_SMTP_PORT", fmt.Sprintf("%d", cfg.SMTPPort)),
+		username: getEnvOrDefault("NOTIFICATION_SMTP_USERNAME", cfg.Username),
+		password: getEnvOrDefault("NOTIFICATION_SMTP_PASSWORD", cfg.Password),
+		from:     getEnvOrDefault("NOTIFICATION_SMTP_FROM", cfg.From),
 		to:       cfg.To,
 		useTLS:   cfg.UseTLS,
 		
 		// Sendmail 配置
-		sendmailCommand: cfg.SendmailCommand,
-		sendmailArgs:    cfg.SendmailArgs,
+		sendmailCommand: getEnvOrDefault("NOTIFICATION_SENDMAIL_COMMAND", cfg.SendmailCommand),
+		sendmailArgs:    getEnvOrDefault("NOTIFICATION_SENDMAIL_ARGS", cfg.SendmailArgs),
 		
-		// Resend 配置
-		resendAPIKey: cfg.ResendAPIKey,
-		resendFrom:   cfg.ResendFrom,
-		resendTo:     cfg.ResendTo,
+		// Resend 配置（优先使用环境变量）
+		resendAPIKey: getEnvOrDefault("RESEND_API_KEY", cfg.ResendAPIKey),
+		resendFrom:   getEnvOrDefault("RESEND_FROM", cfg.ResendFrom),
+		resendTo:     getEnvOrDefault("RESEND_TO", cfg.ResendTo),
 		
-		// Mailgun 配置
-		mailgunAPIKey: cfg.MailgunAPIKey,
-		mailgunDomain: cfg.MailgunDomain,
-		mailgunFrom:   cfg.MailgunFrom,
-		mailgunTo:     cfg.MailgunTo,
+		// Mailgun 配置（优先使用环境变量）
+		mailgunAPIKey: getEnvOrDefault("MAILGUN_API_KEY", cfg.MailgunAPIKey),
+		mailgunDomain: getEnvOrDefault("MAILGUN_DOMAIN", cfg.MailgunDomain),
+		mailgunFrom:   getEnvOrDefault("MAILGUN_FROM", cfg.MailgunFrom),
+		mailgunTo:     getEnvOrDefault("MAILGUN_TO", cfg.MailgunTo),
 		
-		// SendGrid 配置
-		sendgridAPIKey: cfg.SendGridAPIKey,
-		sendgridFrom:   cfg.SendGridFrom,
-		sendgridTo:     cfg.SendGridTo,
+		// SendGrid 配置（优先使用环境变量）
+		sendgridAPIKey: getEnvOrDefault("SENDGRID_API_KEY", cfg.SendGridAPIKey),
+		sendgridFrom:   getEnvOrDefault("SENDGRID_FROM", cfg.SendGridFrom),
+		sendgridTo:     getEnvOrDefault("SENDGRID_TO", cfg.SendGridTo),
 		
 		log: logrus.WithFields(logrus.Fields{"component": "email_channel"}),
 	}
@@ -781,4 +781,12 @@ func (cc *ConsoleChannel) IsEnabled() bool {
 // GetName 获取渠道名称
 func (cc *ConsoleChannel) GetName() string {
 	return "console"
+}
+
+// getEnvOrDefault 获取环境变量，如果不存在则返回默认值
+func getEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }

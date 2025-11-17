@@ -489,11 +489,6 @@ func (s *Server) needFirstTimeSetup() bool {
 		return false
 	}
 
-	// 检查 FirstRun 配置
-	if s.config.Admin.FirstRun {
-		return true
-	}
-
 	// 1. 检查密码文件
 	passFile := s.config.Admin.PasswordFile
 	if passFile == "" {
@@ -792,9 +787,6 @@ func (s *Server) handleFirstTimeSetup(w http.ResponseWriter, r *http.Request) {
 		}
 		s.config.Proxy.Rules = append(s.config.Proxy.Rules, newRule)
 	}
-
-	// 设置 FirstRun 为 false
-	s.config.Admin.FirstRun = false
 
 	// 保存配置（不包含密码）
 	if err := s.config.Save(s.config.ConfigFile); err != nil {
