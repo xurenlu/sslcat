@@ -1766,6 +1766,8 @@ func (m *Manager) saveCertificate(domain string, certDER [][]byte, privateKey *r
 	m.certCache[domain] = &cert
 	m.certMutex.Unlock()
 
+	m.updateCertMetadata(domain, &cert) // 更新元数据缓存
+
 	return nil
 }
 

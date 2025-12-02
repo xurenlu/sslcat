@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -36,6 +37,29 @@ func parsePortFromTarget(target string) int {
 	default:
 		return 0
 	}
+}
+
+// isHTTPSURL 检查后端主机是否为HTTPS URL（非IP地址）
+func isHTTPSURL(host string) bool {
+	// 检查是否以 https:// 开头
+	if !strings.HasPrefix(strings.ToLower(host), "https://") {
+		return false
+	}
+	
+	// 解析URL
+	parsedURL, err := url.Parse(host)
+	if err != nil {
+		return false
+	}
+	
+	// 提取主机名（去除端口）
+	hostname := parsedURL.Hostname()
+	if hostname == "" {
+		return false
+	}
+	
+	// 检查主机名是否为IP地址
+	return net.ParseIP(hostname) == nil
 }
 
 // handleAPIProxyRulesPost 添加或更新代理规则
@@ -138,8 +162,13 @@ func (s *Server) handleAPIProxyRulesPost(w http.ResponseWriter, r *http.Request)
 	}
 
 	// 自动解析端口号
+	// 如果target是完整URL，从URL中提取端口，忽略req.Port字段
 	port := req.Port
-	if port == 0 {
+	if strings.HasPrefix(strings.ToLower(req.Target), "http://") || strings.HasPrefix(strings.ToLower(req.Target), "https://") {
+		// 完整URL，从URL中提取端口
+		port = parsePortFromTarget(req.Target)
+	} else if port == 0 {
+		// 非完整URL且端口为0，尝试从target解析
 		port = parsePortFromTarget(req.Target)
 	}
 
@@ -341,15 +370,29 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// 验证后端配置的有效性
+		hasHTTPSURLBackend := false
 		for i, backend := range req.Backends {
 			if backend.Host == "" {
 				http.Error(w, fmt.Sprintf("backend %d: host is required", i), http.StatusBadRequest)
 				return
 			}
-			if backend.Port <= 0 || backend.Port > 65535 {
-				http.Error(w, fmt.Sprintf("backend %d: invalid port: %d", i, backend.Port), http.StatusBadRequest)
-				return
+			// 检查是否为HTTPS URL后端（非IP地址）
+			if isHTTPSURL(backend.Host) {
+				hasHTTPSURLBackend = true
 			}
+			// 对于HTTPS URL后端，端口验证可以放宽（因为端口在URL中）
+			if !isHTTPSURL(backend.Host) {
+				if backend.Port <= 0 || backend.Port > 65535 {
+					http.Error(w, fmt.Sprintf("backend %d: invalid port: %d", i, backend.Port), http.StatusBadRequest)
+					return
+				}
+			}
+		}
+		
+		// 如果存在HTTPS URL后端，限制只能配置一个后端
+		if hasHTTPSURLBackend && len(req.Backends) > 1 {
+			http.Error(w, "HTTPS URL后端仅支持单后端配置，不支持负载均衡", http.StatusBadRequest)
+			return
 		}
 
 		// 检查是否已存在
@@ -563,4 +606,80 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+// handleAPIProxyRulesRename 重命名代理规则域名
+func (s *Server) handleAPIProxyRulesRename(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizeAPI(w, r, false) {
+		return
+	}
+
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		OldDomain string `json:"old_domain"`
+		NewDomain string `json:"new_domain"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
+		return
+	}
+
+	if req.OldDomain == "" || req.NewDomain == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "old_domain and new_domain are required"})
+		return
+	}
+
+	if req.OldDomain == req.NewDomain {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "old_domain and new_domain cannot be the same"})
+		return
+	}
+
+	// 检查新域名是否已存在
+	for _, rule := range s.config.Proxy.Rules {
+		if rule.Domain == req.NewDomain {
+			w.WriteHeader(http.StatusConflict)
+			json.NewEncoder(w).Encode(map[string]string{"error": "new domain already exists"})
+			return
+		}
+	}
+
+	// 查找旧域名规则
+	targetIndex := -1
+	for i, rule := range s.config.Proxy.Rules {
+		if rule.Domain == req.OldDomain {
+			targetIndex = i
+			break
+		}
+	}
+
+	if targetIndex < 0 {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "rule not found"})
+		return
+	}
+
+	// 更新域名
+	s.config.Proxy.Rules[targetIndex].Domain = req.NewDomain
+
+	if err := s.config.Save(s.config.ConfigFile); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "failed to save config"})
+		return
+	}
+
+	s.log.Infof("Renamed proxy rule from %s to %s", req.OldDomain, req.NewDomain)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"rule":    s.config.Proxy.Rules[targetIndex],
+	})
 }

@@ -848,6 +848,7 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/proxy/rule", s.handleAPIProxyRule)   // 单个代理规则操作
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/proxy-rules/manage", s.handleAPIProxyRulesPost)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/proxy-rules/delete", s.handleAPIProxyRulesDelete)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/proxy-rules/rename", s.handleAPIProxyRulesRename)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl-certs", s.handleAPISSLCerts)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl/generate", s.handleAPISSLGenerate)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl/retry", s.handleAPISSLRetry)
@@ -879,8 +880,10 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/unblock", s.handleAPISecurityUnblock)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/static-sites", s.handleAPIStaticSites)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/static-sites/delete", s.handleAPIStaticSitesDelete)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/static-sites/rename", s.handleAPIStaticSitesRename)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/php-sites", s.handleAPIPHPSites)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/php-sites/delete", s.handleAPIPHPSitesDelete)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/php-sites/rename", s.handleAPIPHPSitesRename)
 	// PHP 安全功能 API
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/php-security/status", s.handleAPIPHPSecurityStatus)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/php-security/scan", s.handleAPIPHPSecurityScan)

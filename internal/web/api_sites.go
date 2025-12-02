@@ -453,3 +453,155 @@ func (s *Server) handleAPIPHPSitesDelete(w http.ResponseWriter, r *http.Request)
 		"deleted_site": deletedSite,
 	})
 }
+
+// handleAPIStaticSitesRename 重命名静态站点域名
+func (s *Server) handleAPIStaticSitesRename(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizeAPI(w, r, false) {
+		return
+	}
+
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		OldDomain string `json:"old_domain"`
+		NewDomain string `json:"new_domain"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
+		return
+	}
+
+	if req.OldDomain == "" || req.NewDomain == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "old_domain and new_domain are required"})
+		return
+	}
+
+	if req.OldDomain == req.NewDomain {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "old_domain and new_domain cannot be the same"})
+		return
+	}
+
+	// 检查新域名是否已存在
+	for _, site := range s.config.StaticSites {
+		if site.Domain == req.NewDomain {
+			w.WriteHeader(http.StatusConflict)
+			json.NewEncoder(w).Encode(map[string]string{"error": "new domain already exists"})
+			return
+		}
+	}
+
+	// 查找旧域名站点
+	targetIndex := -1
+	for i, site := range s.config.StaticSites {
+		if site.Domain == req.OldDomain {
+			targetIndex = i
+			break
+		}
+	}
+
+	if targetIndex < 0 {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "site not found"})
+		return
+	}
+
+	// 更新域名
+	s.config.StaticSites[targetIndex].Domain = req.NewDomain
+
+	if err := s.config.Save(s.config.ConfigFile); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "failed to save config"})
+		return
+	}
+
+	s.log.Infof("Renamed static site from %s to %s", req.OldDomain, req.NewDomain)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"site":    s.config.StaticSites[targetIndex],
+	})
+}
+
+// handleAPIPHPSitesRename 重命名PHP站点域名
+func (s *Server) handleAPIPHPSitesRename(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizeAPI(w, r, false) {
+		return
+	}
+
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		OldDomain string `json:"old_domain"`
+		NewDomain string `json:"new_domain"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
+		return
+	}
+
+	if req.OldDomain == "" || req.NewDomain == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "old_domain and new_domain are required"})
+		return
+	}
+
+	if req.OldDomain == req.NewDomain {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "old_domain and new_domain cannot be the same"})
+		return
+	}
+
+	// 检查新域名是否已存在
+	for _, site := range s.config.PHPSites {
+		if site.Domain == req.NewDomain {
+			w.WriteHeader(http.StatusConflict)
+			json.NewEncoder(w).Encode(map[string]string{"error": "new domain already exists"})
+			return
+		}
+	}
+
+	// 查找旧域名站点
+	targetIndex := -1
+	for i, site := range s.config.PHPSites {
+		if site.Domain == req.OldDomain {
+			targetIndex = i
+			break
+		}
+	}
+
+	if targetIndex < 0 {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "site not found"})
+		return
+	}
+
+	// 更新域名
+	s.config.PHPSites[targetIndex].Domain = req.NewDomain
+
+	if err := s.config.Save(s.config.ConfigFile); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "failed to save config"})
+		return
+	}
+
+	s.log.Infof("Renamed PHP site from %s to %s", req.OldDomain, req.NewDomain)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"site":    s.config.PHPSites[targetIndex],
+	})
+}
