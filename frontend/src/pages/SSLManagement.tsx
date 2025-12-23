@@ -211,31 +211,45 @@ const SSLManagement: React.FC = () => {
 
   const renewCertificate = async (domain: string) => {
     try {
-      // TODO: 实际的 API 调用
       toast({
         title: '证书更新已启动',
-        description: `正在为域名 ${domain} 申请新证书`,
+        description: `正在为域名 ${domain} 申请新证书，请稍候...`,
         status: 'info',
         duration: 3000,
         isClosable: true,
       })
 
-      // 模拟更新状态
-      setCertificates(certs => certs.map(c => 
-        c.domain === domain ? { ...c, status: '有效' } : c
-      ))
+      // 调用后端 API 重新申请证书
+      const response = await fetch(buildApiPath(adminPrefix, '/ssl/retry'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ domain }),
+      })
 
-      // 延迟显示成功消息
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
+      }
+
+      const result = await response.json()
+      
+      toast({
+        title: '证书更新成功',
+        description: `域名 ${domain} 的证书已成功更新`,
+        status: 'success',
+        duration: 4000,
+        isClosable: true,
+      })
+
+      // 3秒后刷新证书列表以显示新证书信息
       setTimeout(() => {
-        toast({
-          title: '证书更新成功',
-          description: `域名 ${domain} 的证书已成功更新`,
-          status: 'success',
-          duration: 4000,
-          isClosable: true,
-        })
-      }, 2000)
+        refreshCertificates()
+      }, 3000)
     } catch (error) {
+      console.error('证书更新失败:', error)
       toast({
         title: '证书更新失败',
         description: error instanceof Error ? error.message : '未知错误',

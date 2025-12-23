@@ -198,28 +198,28 @@ docker-cgo-fast:
 .PHONY: docker-cgo-zig
 docker-cgo-zig:
 	@echo "使用 Zig 交叉编译 AMD64 CGO 二进制文件..."
-	@./build-cgo-zig.sh
+	@./build-scripts/build-zig.sh
 	@echo "✅ CGO二进制文件已提取到 $(BUILD_DIR)/sslcat-linux-amd64-cgo"
 
 # 使用 Zig + Alpine 快速编译静态链接版本（最快、最小）
 .PHONY: build-zig-alpine
 build-zig-alpine:
 	@echo "使用 Zig + Alpine 快速编译静态链接版本..."
-	@./build-zig-alpine.sh
+	@./build-scripts/build-zig-alpine.sh
 	@echo "✅ 静态链接二进制文件已提取到 $(BUILD_DIR)/sslcat-linux-amd64-static"
 
 # 使用 Zig + Debian 编译 GLIBC 兼容版本
 .PHONY: build-zig-cgo
 build-zig-cgo:
 	@echo "使用 Zig + Debian 编译 GLIBC 兼容版本..."
-	@./build-zig-cgo.sh
+	@./build-scripts/build-zig-cgo.sh
 	@echo "✅ GLIBC 兼容二进制文件已提取到 $(BUILD_DIR)/sslcat-linux-amd64-cgo"
 
 # 构建 ARM64 CGO 版本（适用于 ARM64 Linux 服务器）
 .PHONY: docker-cgo-arm64
 docker-cgo-arm64:
 	@echo "构建 ARM64 CGO 二进制文件..."
-	@./build-cgo-arm64.sh
+	@./build-scripts/build-cgo-arm64.sh
 	@echo "✅ ARM64 CGO二进制文件已提取到 $(BUILD_DIR)/sslcat-linux-arm64-cgo"
 
 # 运行Docker容器
