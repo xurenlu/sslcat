@@ -48,6 +48,7 @@ const Settings: React.FC = () => {
     autoSSL: true,
     letsEncryptEmail: 'admin@example.com',
     sslProvider: 'letsencrypt',
+    sslStaging: false, // 是否使用 staging 环境
     
     // 安全设置
     enableDDoSProtection: true,
@@ -146,6 +147,7 @@ const Settings: React.FC = () => {
               // SSL设置
               autoSSL: !config.ssl?.disable_self_signed || true,
               letsEncryptEmail: config.ssl?.email || '',
+              sslStaging: config.ssl?.staging || false,
               
               // 安全设置
               enableDDoSProtection: config.security?.enable_ddos || false,
@@ -255,6 +257,7 @@ const Settings: React.FC = () => {
             autoSSL: settings.autoSSL,
             letsEncryptEmail: settings.letsEncryptEmail,
             sslProvider: settings.sslProvider,
+            sslStaging: settings.sslStaging,
             enableDDoSProtection: settings.enableDDoSProtection,
             maxRequestsPerMinute: settings.maxRequestsPerMinute,
             enableRateLimit: settings.enableRateLimit,
@@ -401,6 +404,7 @@ const Settings: React.FC = () => {
       autoSSL: true,
       letsEncryptEmail: 'admin@example.com',
       sslProvider: 'letsencrypt',
+      sslStaging: false,
       enableDDoSProtection: true,
       maxRequestsPerMinute: '1000',
       enableRateLimit: true,
@@ -622,6 +626,17 @@ const Settings: React.FC = () => {
                   type="email"
                 />
               </FormControl>
+
+              <FormControl display="flex" alignItems="center">
+                <FormLabel mb="0">使用 Staging 环境（测试）</FormLabel>
+                <Switch
+                  isChecked={settings.sslStaging}
+                  onChange={(e) => handleInputChange('sslStaging', e.target.checked)}
+                />
+              </FormControl>
+              <Text fontSize="sm" color="orange.600">
+                ⚠️ Staging 环境签发的证书不被浏览器信任，仅用于测试。正式使用请关闭此选项。
+              </Text>
               
             </VStack>
           </CardBody>

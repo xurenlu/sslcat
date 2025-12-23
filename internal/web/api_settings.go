@@ -277,6 +277,7 @@ func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) 
 		AutoSSL                  *bool    `json:"autoSSL,omitempty"`
 		LetsEncryptEmail         string   `json:"letsEncryptEmail,omitempty"`
 		SSLProvider              string   `json:"sslProvider,omitempty"`
+		SSLStaging               *bool    `json:"sslStaging,omitempty"`
 		EnableDDoSProtection     *bool    `json:"enableDDoSProtection,omitempty"`
 		MaxRequestsPerMinute     string   `json:"maxRequestsPerMinute,omitempty"`
 		EnableRateLimit          *bool    `json:"enableRateLimit,omitempty"`
@@ -311,6 +312,10 @@ func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) 
 
 	if req.LetsEncryptEmail != "" {
 		s.config.SSL.Email = req.LetsEncryptEmail
+	}
+
+	if req.SSLStaging != nil {
+		s.config.SSL.Staging = *req.SSLStaging
 	}
 
 	if req.EnableDDoSProtection != nil {
