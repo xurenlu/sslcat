@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -212,15 +213,26 @@ func (v *ConfigValidator) validateProxyRule(rule *ProxyRule, index int) {
 
 	// 验证后端服务器
 	enabledBackends := 0
+	hasHTTPSURLBackend := false
 	for j, backend := range effectiveBackends {
 		v.validateBackend(&backend, prefix, j)
 		if backend.Enabled {
 			enabledBackends++
 		}
+		// 检查是否为HTTPS URL后端（非IP地址）
+		if v.isHTTPSURL(backend.Host) {
+			hasHTTPSURLBackend = true
+		}
 	}
 
 	if enabledBackends == 0 {
 		v.addError(prefix+".backends", "至少需要一个启用的后端服务器", strconv.Itoa(enabledBackends))
+	}
+
+	// 如果存在HTTPS URL后端，限制只能配置一个后端
+	if hasHTTPSURLBackend && len(effectiveBackends) > 1 {
+		v.addError(prefix+".backends", "HTTPS URL后端仅支持单后端配置，不支持负载均衡", fmt.Sprintf("%d backends", len(effectiveBackends)))
+		return // 提前返回，避免继续验证负载均衡相关配置
 	}
 
 	// 验证负载均衡算法（多后端时）
@@ -460,6 +472,29 @@ func (v *ConfigValidator) contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+// isHTTPSURL 检查后端主机是否为HTTPS URL（非IP地址）
+func (v *ConfigValidator) isHTTPSURL(host string) bool {
+	// 检查是否以 https:// 开头
+	if !strings.HasPrefix(strings.ToLower(host), "https://") {
+		return false
+	}
+	
+	// 解析URL
+	parsedURL, err := url.Parse(host)
+	if err != nil {
+		return false
+	}
+	
+	// 提取主机名（去除端口）
+	hostname := parsedURL.Hostname()
+	if hostname == "" {
+		return false
+	}
+	
+	// 检查主机名是否为IP地址
+	return net.ParseIP(hostname) == nil
 }
 
 func (v *ConfigValidator) isValidHostOrIP(host string) bool {

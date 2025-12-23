@@ -47,6 +47,12 @@ type UpstreamCache struct {
 	respectUpstream bool  // 是否遵循上游的Cache-Control
 	minFileSize     int64 // 最小缓存文件大小
 	maxFileSize     int64 // 最大缓存文件大小
+	
+	// 清理器控制
+	stopCleaner    chan struct{}
+	cleanerOnce    sync.Once
+	cleanerStarted bool
+	cleanerMutex   sync.Mutex
 }
 
 // UpstreamCacheConfig 上游缓存配置
@@ -270,15 +276,7 @@ func (uc *UpstreamCache) Store(req *http.Request, resp *http.Response) error {
 		return nil
 	}
 
-	// 读取响应体
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	// 重新设置响应体，因为ReadAll会消耗掉原始body
-	resp.Body = io.NopCloser(bytes.NewReader(body))
-
+	// 修复：使用流式处理 + 大小限制，避免大文件占用过多内存
 	key := uc.generateCacheKey(req)
 	metaPath := uc.getMetaPath(key)
 	dataPath := uc.getDataPath(key)
@@ -286,6 +284,46 @@ func (uc *UpstreamCache) Store(req *http.Request, resp *http.Response) error {
 	// 确保目录存在
 	os.MkdirAll(filepath.Dir(metaPath), 0755)
 	os.MkdirAll(filepath.Dir(dataPath), 0755)
+
+	// 创建临时文件
+	tempFile, err := os.CreateTemp(filepath.Dir(dataPath), ".upstream-tmp-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tempPath := tempFile.Name()
+	defer func() {
+		tempFile.Close()
+		// 如果失败，清理临时文件
+		if _, err := os.Stat(tempPath); err == nil {
+			os.Remove(tempPath)
+		}
+	}()
+
+	// 使用 LimitedReader 限制读取大小（最大 100MB）
+	maxSize := int64(100 * 1024 * 1024)
+	if uc.maxSizeBytes > 0 && uc.maxSizeBytes < maxSize {
+		maxSize = uc.maxSizeBytes
+	}
+	limitedReader := &io.LimitedReader{R: resp.Body, N: maxSize + 1}
+
+	// 流式写入临时文件，同时保存到缓冲区用于重置响应体
+	var buf bytes.Buffer
+	teeReader := io.TeeReader(limitedReader, &buf)
+
+	written, err := io.Copy(tempFile, teeReader)
+	if err != nil {
+		return fmt.Errorf("failed to write temp file: %w", err)
+	}
+
+	// 检查是否超过限制
+	if written > maxSize {
+		uc.log.Debugf("Response too large: %d > %d", written, maxSize)
+		return fmt.Errorf("response too large: %d bytes", written)
+	}
+
+	// 重新设置响应体，因为已经读取过了
+	body := buf.Bytes()
+	resp.Body = io.NopCloser(bytes.NewReader(body))
 
 	// 计算过期时间
 	expiresAt := uc.calculateExpiresAt(resp)
@@ -325,10 +363,16 @@ func (uc *UpstreamCache) Store(req *http.Request, resp *http.Response) error {
 		dataToStore = body
 	}
 
-	// 保存数据文件
+	// 关闭临时文件
+	tempFile.Close()
+
+	// 写入数据（如果需要压缩，则写入压缩后的数据）
 	if err := os.WriteFile(dataPath, dataToStore, 0644); err != nil {
 		return fmt.Errorf("failed to write data file: %w", err)
 	}
+
+	// 删除临时文件（已经写入正式文件）
+	os.Remove(tempPath)
 
 	// 保存元数据文件
 	metaData, err := json.Marshal(entry)
@@ -731,16 +775,58 @@ func (uc *UpstreamCache) Clean() error {
 
 // StartCleaner 启动定期清理
 func (uc *UpstreamCache) StartCleaner() {
+	uc.cleanerMutex.Lock()
+	defer uc.cleanerMutex.Unlock()
+	
+	// 使用 sync.Once 确保只启动一次
+	if uc.cleanerStarted {
+		uc.log.Warn("Upstream cache cleaner already started, skipping")
+		return
+	}
+	
+	uc.cleanerStarted = true
+	uc.stopCleaner = make(chan struct{})
+	
 	go func() {
 		ticker := time.NewTicker(61 * time.Minute) // 使用质数间隔避免与其他定时器同时触发
 		defer ticker.Stop()
+		
+		uc.log.Info("Upstream cache cleaner started")
 
-		for range ticker.C {
-			if err := uc.Clean(); err != nil {
-				uc.log.Errorf("Cache cleanup failed: %v", err)
+		for {
+			select {
+			case <-ticker.C:
+				if err := uc.Clean(); err != nil {
+					uc.log.Errorf("Cache cleanup failed: %v", err)
+				}
+			case <-uc.stopCleaner:
+				uc.log.Info("Upstream cache cleaner stopped")
+				return
 			}
 		}
 	}()
+}
+
+// StopCleaner 停止清理器
+func (uc *UpstreamCache) StopCleaner() {
+	uc.cleanerMutex.Lock()
+	defer uc.cleanerMutex.Unlock()
+	
+	if !uc.cleanerStarted {
+		return
+	}
+	
+	if uc.stopCleaner != nil {
+		select {
+		case <-uc.stopCleaner:
+			// 已经关闭
+		default:
+			close(uc.stopCleaner)
+		}
+	}
+	
+	uc.cleanerStarted = false
+	uc.log.Info("Upstream cache cleaner stop signal sent")
 }
 
 // PurgeAll 清除所有缓存

@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -797,6 +798,12 @@ func (gs *GitServer) Stop() {
 			gs.logger.Warnf("关闭模板管理器失败: %v", err)
 		}
 	}
+
+	// 修复：停止日志流管理器，防止 goroutine 和 ticker 泄漏
+	if gs.logStreamManager != nil {
+		gs.logStreamManager.StopAll()
+	}
+
 	gs.logger.Info(gs.translator.T("git_server.stopped"))
 }
 
@@ -3314,6 +3321,7 @@ func (lm *LogManager) WriteLog(appName, level, source, message string) error {
 }
 
 // GetLogs 获取应用日志
+// 修复：对于大日志文件，使用尾部读取策略，避免将整个文件加载到内存
 func (lm *LogManager) GetLogs(appName string, lines int) ([]LogEntry, error) {
 	appLogsDir := filepath.Join(lm.logsDir, appName)
 
@@ -3331,15 +3339,69 @@ func (lm *LogManager) GetLogs(appName string, lines int) ([]LogEntry, error) {
 	sort.Strings(logFiles)
 	latestLogFile := logFiles[len(logFiles)-1]
 
-	// 读取日志文件
-	content, err := os.ReadFile(latestLogFile)
+	// 打开日志文件
+	file, err := os.Open(latestLogFile)
 	if err != nil {
-		return nil, fmt.Errorf("读取日志文件失败: %w", err)
+		return nil, fmt.Errorf("打开日志文件失败: %w", err)
+	}
+	defer file.Close()
+
+	// 获取文件大小
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("获取日志文件信息失败: %w", err)
+	}
+
+	fileSize := fileInfo.Size()
+	var logLines []string
+
+	// 如果文件很小（< 1MB），直接读取全部
+	if fileSize < 1024*1024 {
+		content, err := os.ReadFile(latestLogFile)
+		if err != nil {
+			return nil, fmt.Errorf("读取日志文件失败: %w", err)
+		}
+		logLines = strings.Split(string(content), "\n")
+	} else {
+		// 对于大文件，使用尾部读取策略
+		// 估算每行平均长度为 200 字节
+		if lines <= 0 {
+			lines = 100 // 默认100行
+		}
+		estimatedBytes := int64(lines * 300)
+		if estimatedBytes > fileSize {
+			estimatedBytes = fileSize
+		}
+
+		// 从文件末尾向前读取
+		offset := fileSize - estimatedBytes
+		if offset < 0 {
+			offset = 0
+		}
+
+		_, err = file.Seek(offset, 0)
+		if err != nil {
+			return nil, fmt.Errorf("定位日志文件失败: %w", err)
+		}
+
+		scanner := bufio.NewScanner(file)
+		// 跳过第一行（可能不完整）
+		if offset > 0 && scanner.Scan() {
+			// 丢弃第一行
+		}
+
+		// 读取剩余行
+		for scanner.Scan() {
+			logLines = append(logLines, scanner.Text())
+		}
+
+		if err := scanner.Err(); err != nil {
+			return nil, fmt.Errorf("扫描日志文件失败: %w", err)
+		}
 	}
 
 	// 解析日志
 	var entries []LogEntry
-	logLines := strings.Split(string(content), "\n")
 
 	// 如果指定了行数，只取最后几行
 	startLine := 0

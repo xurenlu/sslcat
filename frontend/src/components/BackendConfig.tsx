@@ -157,6 +157,11 @@ const BackendConfig: React.FC<BackendConfigProps> = ({
   }
 
   const status = getBackendStatus(backends.length)
+  
+  // 检查是否存在HTTPS URL后端
+  const hasHTTPSURLBackend = backends.some(backend => 
+    backend.host.toLowerCase().startsWith('https://')
+  )
 
   return (
     <Box>
@@ -176,6 +181,18 @@ const BackendConfig: React.FC<BackendConfigProps> = ({
             </Text>
           </Box>
         </Alert>
+
+        {hasHTTPSURLBackend && (
+          <Alert status="warning" mb={4}>
+            <AlertIcon />
+            <Box>
+              <Text fontWeight="medium">HTTPS URL后端限制</Text>
+              <Text fontSize="sm">
+                HTTPS URL后端仅支持单后端配置，不支持负载均衡。如果已配置HTTPS URL后端，将无法添加更多后端。
+              </Text>
+            </Box>
+          </Alert>
+        )}
 
         <Text fontSize="sm" color={status.color} fontWeight="medium" mb={4}>
           {status.text}
@@ -217,15 +234,21 @@ const BackendConfig: React.FC<BackendConfigProps> = ({
                         onChange={(e) => onBackendChange(index, 'host', e.target.value)}
                         placeholder={t.backend.server_placeholder}
                       />
+                      {backend.host.toLowerCase().startsWith('https://') && (
+                        <Text fontSize="sm" color="blue.500" mt={1}>
+                          💡 HTTPS URL后端：端口字段将被忽略，将从URL中自动提取端口
+                        </Text>
+                      )}
                     </FormControl>
 
-                    <FormControl isRequired>
+                    <FormControl isRequired={!backend.host.toLowerCase().startsWith('https://')}>
                       <FormLabel>端口</FormLabel>
                       <NumberInput
                         value={backend.port}
                         onChange={(_, value) => onBackendChange(index, 'port', value)}
                         min={1}
                         max={65535}
+                        isDisabled={backend.host.toLowerCase().startsWith('https://')}
                       >
                         <NumberInputField />
                         <NumberInputStepper>
@@ -233,6 +256,11 @@ const BackendConfig: React.FC<BackendConfigProps> = ({
                           <NumberDecrementStepper />
                         </NumberInputStepper>
                       </NumberInput>
+                      {backend.host.toLowerCase().startsWith('https://') && (
+                        <Text fontSize="sm" color="gray.500" mt={1}>
+                          端口将从HTTPS URL中自动提取
+                        </Text>
+                      )}
                     </FormControl>
 
                     <FormControl>
@@ -294,9 +322,16 @@ const BackendConfig: React.FC<BackendConfigProps> = ({
             variant="outline"
             onClick={onAddBackend}
             size="lg"
+            isDisabled={hasHTTPSURLBackend}
+            title={hasHTTPSURLBackend ? "HTTPS URL后端仅支持单后端配置" : ""}
           >
             添加后端服务器
           </Button>
+          {hasHTTPSURLBackend && (
+            <Text fontSize="sm" color="orange.500" textAlign="center">
+              ⚠️ HTTPS URL后端模式下无法添加更多后端服务器
+            </Text>
+          )}
         </VStack>
       </Box>
 

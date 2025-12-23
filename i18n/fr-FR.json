@@ -204,47 +204,5 @@
   "frontend.delete_app_cancelled": "Opération de suppression annulée",
   "frontend.manual_deploy_not_supported": "Le déploiement manuel n'est pas encore pris en charge. Veuillez déclencher le déploiement via Git push.",
   "frontend.ssh_key_notice": "Vous avez activé le serveur Git mais n'avez pas encore configuré de clés SSH. Veuillez ajouter au moins une clé SSH dans l'onglet \"Clés SSH\" pour permettre le push Git.",
-  "frontend.select_ssh_key": "Sélectionner une clé SSH",
-  "common": {
-    "creating": "Creating...",
-    "saving": "Saving..."
-  },
-  "proxy": {
-    "username": "Username",
-    "password": "Password",
-    "performance_monitoring": "Performance Monitoring",
-    "enable_tracing": "Enable Request Tracing",
-    "enable_metrics": "Enable Metrics Collection",
-    "tracing_warning": "⚠️ Enabling will significantly increase CPU usage, recommended for debugging only",
-    "metrics_warning": "⚠️ Enabling will increase CPU usage, recommended for monitoring only"
-  },
-  "sites": {
-    "edit": "Edit",
-    "delete": "Delete"
-  },
-  "dns": {
-    "cloudflare_name_placeholder": "My Cloudflare",
-    "api_key_placeholder": "API Key",
-    "zone_id_placeholder": "Zone ID (required for Cloudflare etc.)",
-    "api_key_update_placeholder": "API Key (leave empty to not update)"
-  },
-  "notifications": {
-    "title_placeholder": "Enter notification title",
-    "message_placeholder": "Enter notification message"
-  },
-  "settings": {
-    "save_success": "All settings saved successfully",
-    "save_failed": "Save failed",
-    "reset_success": "Settings reset",
-    "admin_prefix_change_success": "Admin Prefix changed successfully",
-    "admin_prefix_change_failed": "Admin Prefix change failed",
-    "admin_prefix_changed": "Admin panel prefix changed to",
-    "notification_sent": "Notification sent",
-    "basic_config_load_failed": "Failed to load basic configuration",
-    "notification_config_load_failed": "Failed to load notification configuration",
-    "basic_config_save_failed": "Basic settings save failed",
-    "notification_config_save_failed": "Notification settings save failed",
-    "select_min_notification_level": "Select minimum notification level",
-    "webhook_placeholder": "https://hooks.slack.com/services/xxx or https://qyapi.weixin.qq.com/xxx"
-  }
+  "frontend.select_ssh_key": "Sélectionner une clé SSH"
 }

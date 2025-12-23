@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"bufio"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -11,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -171,6 +173,7 @@ func (dr *DockerRegistry) BuildAndPushImage(app *GitApp, deployLogger *DeployLog
 }
 
 // buildImage 构建Docker镜像
+// 修复：使用流式输出处理，避免大型镜像构建时内存暴涨
 func (dr *DockerRegistry) buildImage(app *GitApp, imageName string, deployLogger *DeployLogger) error {
 	// 检查Dockerfile是否存在
 	dockerfilePath := filepath.Join(app.GitPath, "Dockerfile")
@@ -190,18 +193,67 @@ func (dr *DockerRegistry) buildImage(app *GitApp, imageName string, deployLogger
 
 	deployLogger.WriteCommand("docker", []string{"build", "-t", imageName, app.GitPath})
 
-	// 捕获输出
-	output, err := cmd.CombinedOutput()
+	// 修复：使用流式输出处理，避免内存占用过高
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		deployLogger.WriteCommandOutput(string(output))
+		return fmt.Errorf("failed to create stdout pipe: %w", err)
+	}
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return fmt.Errorf("failed to create stderr pipe: %w", err)
+	}
+
+	// 启动命令
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start docker build: %w", err)
+	}
+
+	// 流式读取输出
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		dr.streamOutput(stdout, deployLogger)
+	}()
+
+	go func() {
+		defer wg.Done()
+		dr.streamOutput(stderr, deployLogger)
+	}()
+
+	// 等待输出读取完成
+	wg.Wait()
+
+	// 等待命令完成
+	if err := cmd.Wait(); err != nil {
 		deployLogger.WriteError(fmt.Errorf("docker build failed: %w", err))
 		return fmt.Errorf("docker build failed: %w", err)
 	}
 
-	deployLogger.WriteCommandOutput(string(output))
 	deployLogger.WriteLog("info", "docker", "Docker镜像构建成功")
 
 	return nil
+}
+
+// streamOutput 流式读取命令输出并写入日志
+// 修复：避免将所有输出加载到内存
+func (dr *DockerRegistry) streamOutput(reader io.Reader, deployLogger *DeployLogger) {
+	scanner := bufio.NewScanner(reader)
+	// 设置最大行长度为 1MB，防止单行过长
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.TrimSpace(line) != "" {
+			deployLogger.WriteLog("info", "build", line)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		dr.log.Errorf("Error reading command output: %v", err)
+	}
 }
 
 // pushImage 推送Docker镜像

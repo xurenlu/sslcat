@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"math/big"
@@ -429,9 +430,9 @@ func (m *Manager) GetCertificate(domain string) (*tls.Certificate, error) {
 	certPath := filepath.Join(m.config.SSL.CertDir, domain+".crt")
 	keyPath := filepath.Join(m.config.SSL.KeyDir, domain+".key")
 
-			cert, err := tls.LoadX509KeyPair(certPath, keyPath)
-			if err != nil {
-				m.log.Errorf("Failed to load certificate %s: %v", domain, err)
+	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+	if err != nil {
+		m.log.Errorf("Failed to load certificate %s: %v", domain, err)
 		// 加载失败，更新元数据缓存标记为不存在
 		m.metadataMutex.Lock()
 		m.certMetadataCache[domain] = &certMetadata{
@@ -443,15 +444,15 @@ func (m *Manager) GetCertificate(domain string) (*tls.Certificate, error) {
 	}
 
 	// 加载成功，更新证书缓存和元数据缓存
-				m.certMutex.Lock()
-				m.certCache[domain] = &cert
-				m.certMutex.Unlock()
+	m.certMutex.Lock()
+	m.certCache[domain] = &cert
+	m.certMutex.Unlock()
 	m.updateCertMetadata(domain, &cert)
 
-		// 清除失败缓存（如果存在）
-		m.failedCacheMutex.Lock()
-		delete(m.failedDomainCache, domain)
-		m.failedCacheMutex.Unlock()
+	// 清除失败缓存（如果存在）
+	m.failedCacheMutex.Lock()
+	delete(m.failedDomainCache, domain)
+	m.failedCacheMutex.Unlock()
 
 	return &cert, nil
 }
@@ -539,18 +540,32 @@ func (m *Manager) autoRenewCerts() {
 
 // renewExpiringCerts 续期即将过期的证书
 func (m *Manager) renewExpiringCerts() {
-	m.certMutex.RLock()
-	domains := make([]string, 0, len(m.certCache))
-	for domain := range m.certCache {
+	// 从磁盘扫描所有证书文件，而不仅仅是内存缓存
+	// 这样可以确保所有证书都会被检查续期，即使没有被访问过
+	certDir := m.config.SSL.CertDir
+	entries, err := os.ReadDir(certDir)
+	if err != nil {
+		m.log.Warnf("Failed to read certificate directory for renewal check: %v", err)
+		return
+	}
+
+	var domains []string
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if !strings.HasSuffix(strings.ToLower(name), ".crt") {
+			continue
+		}
+		domain := strings.TrimSuffix(name, ".crt")
 		domains = append(domains, domain)
 	}
-	m.certMutex.RUnlock()
+
+	m.log.Infof("Checking %d certificates for renewal", len(domains))
 
 	for _, domain := range domains {
 		certPath := filepath.Join(m.config.SSL.CertDir, domain+".crt")
-		if _, err := os.Stat(certPath); err != nil {
-			continue
-		}
 
 		// 检查证书是否即将过期（30天内）
 		if m.isCertExpiringSoon(certPath) {
@@ -559,8 +574,23 @@ func (m *Manager) renewExpiringCerts() {
 				if m.acmeMgr != nil && m.isAllowedDomain(domain) {
 					if _, err := m.acmeMgr.GetCertificate(&tls.ClientHelloInfo{ServerName: domain}); err != nil {
 						m.log.Errorf("ACME renewal failed %s: %v", domain, err)
+
+						// 发送证书续期失败通知
+						if m.notificationIntegrator != nil {
+							m.notificationIntegrator.SendCertFailedNotification(domain, fmt.Sprintf("自动续期失败: %v", err))
+						}
 					} else {
 						m.log.Infof("ACME renewal triggered: %s", domain)
+
+						// 同步ACME证书到磁盘
+						if _, syncErr := m.SyncACMECertsToDisk(); syncErr != nil {
+							m.log.Debugf("ACME post-renewal sync failed: %v", syncErr)
+						}
+
+						// 发送证书续期成功通知
+						if m.notificationIntegrator != nil {
+							m.notificationIntegrator.SendCertSuccessNotification(domain, 1, 0)
+						}
 					}
 				} else {
 					m.log.Warnf("Self-signed renewal disabled; ACME unavailable or domain not allowed: %s", domain)
@@ -840,7 +870,7 @@ func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error
 
 		attemptDuration := time.Since(attemptStart)
 		lastErr = err
-		
+
 		// 提供更详细的错误信息
 		errMsg := err.Error()
 		if strings.Contains(errMsg, "missing certificate") {
@@ -881,7 +911,7 @@ func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error
 
 	totalDuration := time.Since(startTime)
 	m.log.Errorf("All certificate request attempts failed for domain: %s, last error: %v (总耗时: %v)", domain, lastErr, totalDuration)
-	
+
 	// 提供诊断建议
 	errMsg := lastErr.Error()
 	var diagnosticTips string
@@ -941,7 +971,7 @@ func (m *Manager) checkDomainResolution(domain string) (bool, string, error) {
 			ips, err := net.LookupIP(domain)
 			ch <- result{ips, err}
 		}()
-		
+
 		select {
 		case res := <-ch:
 			return res.ips, res.err
@@ -949,7 +979,7 @@ func (m *Manager) checkDomainResolution(domain string) (bool, string, error) {
 			return nil, fmt.Errorf("DNS 解析超时")
 		}
 	}()
-	
+
 	if err != nil {
 		return false, "", fmt.Errorf("domain resolution failed: %w", err)
 	}
@@ -1197,35 +1227,153 @@ func (m *Manager) AllowDomainTemporary(domain string, ttl time.Duration) {
 // ListCertificatesFromDisk 扫描证书目录获取证书信息
 func (m *Manager) ListCertificatesFromDisk() []CertificateInfo {
 	certDir := m.config.SSL.CertDir
+
+	// #region agent log
+	logFile, _ := os.OpenFile("/Users/rocky/Sites/sslcat/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if logFile != nil {
+		logData, _ := json.Marshal(map[string]interface{}{
+			"sessionId":    "debug-session",
+			"runId":        "run1",
+			"hypothesisId": "D",
+			"location":     "manager.go:1227",
+			"message":      "ListCertificatesFromDisk starting",
+			"data":         map[string]interface{}{"certDir": certDir},
+			"timestamp":    time.Now().UnixMilli(),
+		})
+		logFile.WriteString(string(logData) + "\n")
+		logFile.Close()
+	}
+	// #endregion
+
 	entries, err := os.ReadDir(certDir)
 	if err != nil {
 		m.log.Warnf("Failed to read certificate directory %s: %v", certDir, err)
+		// #region agent log
+		if logFile, _ := os.OpenFile("/Users/rocky/Sites/sslcat/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); logFile != nil {
+			logData, _ := json.Marshal(map[string]interface{}{
+				"sessionId":    "debug-session",
+				"runId":        "run1",
+				"hypothesisId": "D",
+				"location":     "manager.go:1234",
+				"message":      "Failed to read cert directory",
+				"data":         map[string]interface{}{"error": err.Error()},
+				"timestamp":    time.Now().UnixMilli(),
+			})
+			logFile.WriteString(string(logData) + "\n")
+			logFile.Close()
+		}
+		// #endregion
 		return nil
 	}
 
 	var certs []CertificateInfo
+	var fileNames []string
 	for _, e := range entries {
 		if e.IsDir() {
 			continue
 		}
 		name := e.Name()
+		fileNames = append(fileNames, name)
 		if !strings.HasSuffix(strings.ToLower(name), ".crt") {
 			continue
 		}
 		domain := strings.TrimSuffix(name, ".crt")
 		certPath := filepath.Join(certDir, name)
+
+		// #region agent log
+		if logFile, _ := os.OpenFile("/Users/rocky/Sites/sslcat/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); logFile != nil {
+			logData, _ := json.Marshal(map[string]interface{}{
+				"sessionId":    "debug-session",
+				"runId":        "run1",
+				"hypothesisId": "B",
+				"location":     "manager.go:1250",
+				"message":      "Processing cert file",
+				"data":         map[string]interface{}{"fileName": name, "extractedDomain": domain, "certPath": certPath},
+				"timestamp":    time.Now().UnixMilli(),
+			})
+			logFile.WriteString(string(logData) + "\n")
+			logFile.Close()
+		}
+		// #endregion
+
 		pemBytes, err := os.ReadFile(certPath)
 		if err != nil {
+			// #region agent log
+			if logFile, _ := os.OpenFile("/Users/rocky/Sites/sslcat/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); logFile != nil {
+				logData, _ := json.Marshal(map[string]interface{}{
+					"sessionId":    "debug-session",
+					"runId":        "run1",
+					"hypothesisId": "C",
+					"location":     "manager.go:1256",
+					"message":      "Failed to read cert file",
+					"data":         map[string]interface{}{"certPath": certPath, "error": err.Error()},
+					"timestamp":    time.Now().UnixMilli(),
+				})
+				logFile.WriteString(string(logData) + "\n")
+				logFile.Close()
+			}
+			// #endregion
 			continue
 		}
 		block, _ := pem.Decode(pemBytes)
 		if block == nil || block.Type != "CERTIFICATE" {
+			// #region agent log
+			if logFile, _ := os.OpenFile("/Users/rocky/Sites/sslcat/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); logFile != nil {
+				logData, _ := json.Marshal(map[string]interface{}{
+					"sessionId":    "debug-session",
+					"runId":        "run1",
+					"hypothesisId": "C",
+					"location":     "manager.go:1263",
+					"message":      "Failed to decode PEM block",
+					"data": map[string]interface{}{"certPath": certPath, "blockNil": block == nil, "blockType": func() string {
+						if block != nil {
+							return block.Type
+						}
+						return ""
+					}()},
+					"timestamp": time.Now().UnixMilli(),
+				})
+				logFile.WriteString(string(logData) + "\n")
+				logFile.Close()
+			}
+			// #endregion
 			continue
 		}
 		x509Cert, err := x509.ParseCertificate(block.Bytes)
 		if err != nil {
+			// #region agent log
+			if logFile, _ := os.OpenFile("/Users/rocky/Sites/sslcat/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); logFile != nil {
+				logData, _ := json.Marshal(map[string]interface{}{
+					"sessionId":    "debug-session",
+					"runId":        "run1",
+					"hypothesisId": "C",
+					"location":     "manager.go:1270",
+					"message":      "Failed to parse certificate",
+					"data":         map[string]interface{}{"certPath": certPath, "error": err.Error()},
+					"timestamp":    time.Now().UnixMilli(),
+				})
+				logFile.WriteString(string(logData) + "\n")
+				logFile.Close()
+			}
+			// #endregion
 			continue
 		}
+
+		// #region agent log
+		if logFile, _ := os.OpenFile("/Users/rocky/Sites/sslcat/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); logFile != nil {
+			logData, _ := json.Marshal(map[string]interface{}{
+				"sessionId":    "debug-session",
+				"runId":        "run1",
+				"hypothesisId": "B",
+				"location":     "manager.go:1278",
+				"message":      "Successfully parsed certificate",
+				"data":         map[string]interface{}{"fileName": name, "extractedDomain": domain, "certDNSNames": x509Cert.DNSNames, "certCN": x509Cert.Subject.CommonName},
+				"timestamp":    time.Now().UnixMilli(),
+			})
+			logFile.WriteString(string(logData) + "\n")
+			logFile.Close()
+		}
+		// #endregion
 
 		status := "有效"
 		if time.Now().After(x509Cert.NotAfter) {
@@ -1261,6 +1409,29 @@ func (m *Manager) ListCertificatesFromDisk() []CertificateInfo {
 			Issuer:     issuer,
 		})
 	}
+
+	// #region agent log
+	if logFile, _ := os.OpenFile("/Users/rocky/Sites/sslcat/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); logFile != nil {
+		logData, _ := json.Marshal(map[string]interface{}{
+			"sessionId":    "debug-session",
+			"runId":        "run1",
+			"hypothesisId": "D",
+			"location":     "manager.go:1295",
+			"message":      "ListCertificatesFromDisk disk scan complete",
+			"data": map[string]interface{}{"certCount": len(certs), "allFiles": fileNames, "foundDomains": func() []string {
+				var d []string
+				for _, c := range certs {
+					d = append(d, c.Domain)
+				}
+				return d
+			}()},
+			"timestamp": time.Now().UnixMilli(),
+		})
+		logFile.WriteString(string(logData) + "\n")
+		logFile.Close()
+	}
+	// #endregion
+
 	// 合并内存缓存中的证书（如 ACME 刚获取）
 	m.certMutex.RLock()
 	for domain, cert := range m.certCache {
@@ -1316,14 +1487,67 @@ func (m *Manager) ListCertificatesFromDisk() []CertificateInfo {
 		})
 	}
 	m.certMutex.RUnlock()
+
+	// #region agent log
+	if logFile, _ := os.OpenFile("/Users/rocky/Sites/sslcat/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); logFile != nil {
+		var allDomains []string
+		for _, c := range certs {
+			allDomains = append(allDomains, c.Domain)
+		}
+		logData, _ := json.Marshal(map[string]interface{}{
+			"sessionId":    "debug-session",
+			"runId":        "run1",
+			"hypothesisId": "E",
+			"location":     "manager.go:1352",
+			"message":      "ListCertificatesFromDisk final result",
+			"data":         map[string]interface{}{"totalCertCount": len(certs), "allDomains": allDomains},
+			"timestamp":    time.Now().UnixMilli(),
+		})
+		logFile.WriteString(string(logData) + "\n")
+		logFile.Close()
+	}
+	// #endregion
+
 	return certs
 }
 
 // SyncACMECertsToDisk 扫描 acme-cache，将有效证书与私钥写入 certs/keys 目录
 func (m *Manager) SyncACMECertsToDisk() (int, error) {
 	acmeCacheDir := filepath.Join(filepath.Dir(m.config.SSL.CertDir), "acme-cache")
+
+	// #region agent log
+	if logFile, _ := os.OpenFile("/Users/rocky/Sites/sslcat/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); logFile != nil {
+		logData, _ := json.Marshal(map[string]interface{}{
+			"sessionId":    "debug-session",
+			"runId":        "run1",
+			"hypothesisId": "A",
+			"location":     "manager.go:1355",
+			"message":      "SyncACMECertsToDisk starting",
+			"data":         map[string]interface{}{"acmeCacheDir": acmeCacheDir, "certDir": m.config.SSL.CertDir, "keyDir": m.config.SSL.KeyDir},
+			"timestamp":    time.Now().UnixMilli(),
+		})
+		logFile.WriteString(string(logData) + "\n")
+		logFile.Close()
+	}
+	// #endregion
+
 	entries, err := os.ReadDir(acmeCacheDir)
 	if err != nil {
+		// #region agent log
+		if logFile, _ := os.OpenFile("/Users/rocky/Sites/sslcat/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); logFile != nil {
+			logData, _ := json.Marshal(map[string]interface{}{
+				"sessionId":    "debug-session",
+				"runId":        "run1",
+				"hypothesisId": "A",
+				"location":     "manager.go:1368",
+				"message":      "Failed to read ACME cache directory",
+				"data":         map[string]interface{}{"acmeCacheDir": acmeCacheDir, "error": err.Error()},
+				"timestamp":    time.Now().UnixMilli(),
+			})
+			logFile.WriteString(string(logData) + "\n")
+			logFile.Close()
+		}
+		// #endregion
 		return 0, fmt.Errorf("failed to read ACME cache directory: %w", err)
 	}
 	if err := os.MkdirAll(m.config.SSL.CertDir, 0755); err != nil {
@@ -1334,10 +1558,12 @@ func (m *Manager) SyncACMECertsToDisk() (int, error) {
 	}
 
 	var synced int
+	var acmeFileNames []string
 	for _, e := range entries {
 		if e.IsDir() {
 			continue
 		}
+		acmeFileNames = append(acmeFileNames, e.Name())
 		path := filepath.Join(acmeCacheDir, e.Name())
 		data, err := os.ReadFile(path)
 		if err != nil || len(data) == 0 {
@@ -1377,6 +1603,23 @@ func (m *Manager) SyncACMECertsToDisk() (int, error) {
 			domain = x509Cert.Subject.CommonName
 		}
 		domain = strings.ToLower(strings.TrimSpace(domain))
+
+		// #region agent log
+		if logFile, _ := os.OpenFile("/Users/rocky/Sites/sslcat/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); logFile != nil {
+			logData, _ := json.Marshal(map[string]interface{}{
+				"sessionId":    "debug-session",
+				"runId":        "run1",
+				"hypothesisId": "A",
+				"location":     "manager.go:1415",
+				"message":      "Extracted domain from ACME cert",
+				"data":         map[string]interface{}{"acmeFile": e.Name(), "dnsNames": x509Cert.DNSNames, "cn": x509Cert.Subject.CommonName, "extractedDomain": domain},
+				"timestamp":    time.Now().UnixMilli(),
+			})
+			logFile.WriteString(string(logData) + "\n")
+			logFile.Close()
+		}
+		// #endregion
+
 		if domain == "" {
 			continue
 		}
@@ -1389,8 +1632,40 @@ func (m *Manager) SyncACMECertsToDisk() (int, error) {
 
 		certPath := filepath.Join(m.config.SSL.CertDir, domain+".crt")
 		keyPath := filepath.Join(m.config.SSL.KeyDir, domain+".key")
+
+		// #region agent log
+		if logFile, _ := os.OpenFile("/Users/rocky/Sites/sslcat/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); logFile != nil {
+			logData, _ := json.Marshal(map[string]interface{}{
+				"sessionId":    "debug-session",
+				"runId":        "run1",
+				"hypothesisId": "B",
+				"location":     "manager.go:1433",
+				"message":      "Writing cert files",
+				"data":         map[string]interface{}{"domain": domain, "certPath": certPath, "keyPath": keyPath},
+				"timestamp":    time.Now().UnixMilli(),
+			})
+			logFile.WriteString(string(logData) + "\n")
+			logFile.Close()
+		}
+		// #endregion
+
 		if err := os.WriteFile(certPath, certPEM, 0644); err != nil {
 			m.log.Warnf("Failed to write certificate %s: %v", certPath, err)
+			// #region agent log
+			if logFile, _ := os.OpenFile("/Users/rocky/Sites/sslcat/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); logFile != nil {
+				logData, _ := json.Marshal(map[string]interface{}{
+					"sessionId":    "debug-session",
+					"runId":        "run1",
+					"hypothesisId": "B",
+					"location":     "manager.go:1445",
+					"message":      "Failed to write cert file",
+					"data":         map[string]interface{}{"certPath": certPath, "error": err.Error()},
+					"timestamp":    time.Now().UnixMilli(),
+				})
+				logFile.WriteString(string(logData) + "\n")
+				logFile.Close()
+			}
+			// #endregion
 			continue
 		}
 		if err := os.WriteFile(keyPath, keyPEM, 0600); err != nil {
@@ -1402,6 +1677,23 @@ func (m *Manager) SyncACMECertsToDisk() (int, error) {
 		}
 		synced++
 	}
+
+	// #region agent log
+	if logFile, _ := os.OpenFile("/Users/rocky/Sites/sslcat/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); logFile != nil {
+		logData, _ := json.Marshal(map[string]interface{}{
+			"sessionId":    "debug-session",
+			"runId":        "run1",
+			"hypothesisId": "A",
+			"location":     "manager.go:1462",
+			"message":      "SyncACMECertsToDisk complete",
+			"data":         map[string]interface{}{"syncedCount": synced, "acmeFiles": acmeFileNames},
+			"timestamp":    time.Now().UnixMilli(),
+		})
+		logFile.WriteString(string(logData) + "\n")
+		logFile.Close()
+	}
+	// #endregion
+
 	return synced, nil
 }
 

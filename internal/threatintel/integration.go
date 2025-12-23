@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -280,31 +281,57 @@ func (api *ThreatIntelAPI) CheckIPWithEmergingThreats(ip string) (*IOC, error) {
 }
 
 // BulkCheckIP 批量检查IP地址
+// 修复：添加并发限制和同步机制，避免创建大量 goroutine 导致内存快速增长
 func (api *ThreatIntelAPI) BulkCheckIP(ips []string) map[string]*IOC {
 	results := make(map[string]*IOC)
+	resultsMu := sync.Mutex{} // 保护 results map 的并发访问
+
+	// 限制并发数量，避免一次性创建过多 goroutine 导致内存快速增长
+	// 这符合"突然出问题时短时间内增长很多"的特征
+	maxConcurrent := 50 // 最多同时检查50个IP
+	if len(ips) < maxConcurrent {
+		maxConcurrent = len(ips)
+	}
+
+	semaphore := make(chan struct{}, maxConcurrent)
+	var wg sync.WaitGroup
 
 	for _, ip := range ips {
-		// 并行检查多个源
+		wg.Add(1)
+		semaphore <- struct{}{} // 获取信号量
+
 		go func(ipAddr string) {
+			defer wg.Done()
+			defer func() { <-semaphore }() // 释放信号量
+
 			// 检查AbuseIPDB
 			if ioc, err := api.CheckIPWithAbuseIPDB(ipAddr); err == nil && ioc != nil {
+				resultsMu.Lock()
 				results[ipAddr] = ioc
+				resultsMu.Unlock()
 				api.manager.AddIOC(ioc)
 			}
 
 			// 检查VirusTotal
 			if ioc, err := api.CheckIPWithVirusTotal(ipAddr); err == nil && ioc != nil {
+				resultsMu.Lock()
 				results[ipAddr] = ioc
+				resultsMu.Unlock()
 				api.manager.AddIOC(ioc)
 			}
 
 			// 检查Emerging Threats
 			if ioc, err := api.CheckIPWithEmergingThreats(ipAddr); err == nil && ioc != nil {
+				resultsMu.Lock()
 				results[ipAddr] = ioc
+				resultsMu.Unlock()
 				api.manager.AddIOC(ioc)
 			}
 		}(ip)
 	}
+
+	// 等待所有检查完成
+	wg.Wait()
 
 	return results
 }

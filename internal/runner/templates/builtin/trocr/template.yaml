@@ -2,8 +2,14 @@ id: trocr
 name: TrOCR (图片文字识别翻译)
 category: ai
 subcategory: image-translation
-tags: [python, ai, ocr, translation, trocr, gpu]
-description: [不可用] 镜像不存在 - Transformer OCR 服务，支持图片文字识别和多语言翻译。
+tags:
+  - python
+  - ai
+  - ocr
+  - translation
+  - trocr
+  - gpu
+description: "[不可用] 镜像不存在 - Transformer OCR 服务，支持图片文字识别和多语言翻译。"
 icon: trocr
 version: 1.0.0
 author: SSLcat Team

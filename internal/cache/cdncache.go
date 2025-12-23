@@ -23,6 +23,12 @@ import (
 	"github.com/xurenlu/sslcat/internal/config"
 )
 
+// processingEntry 处理中的请求条目（用于超时检测）
+type processingEntry struct {
+	ch        chan struct{}
+	createdAt time.Time
+}
+
 // CDNCache 本地静态文件缓存管理器
 type CDNCache struct {
 	cfg          *config.Config
@@ -34,7 +40,12 @@ type CDNCache struct {
 	hits   int64
 	misses int64
 	// 正在处理的请求，避免相同URL并发穿透
-	processing sync.Map // key: request_key, value: chan struct{}
+	processing sync.Map // key: request_key, value: *processingEntry
+	
+	// 清理器控制
+	stopProcessingCleaner chan struct{}
+	cleanerStarted        bool
+	cleanerMutex          sync.Mutex
 }
 
 type objectMeta struct {
@@ -58,12 +69,18 @@ func NewCDNCache(cfg *config.Config) *CDNCache {
 	// 创建MIME检测器
 	mimeDetector := NewMIMEDetector()
 
-	return &CDNCache{
-		cfg:          cfg,
-		log:          logrus.WithFields(logrus.Fields{"component": "cdn_cache"}),
-		compressor:   compressor,
-		mimeDetector: mimeDetector,
+	cache := &CDNCache{
+		cfg:                   cfg,
+		log:                   logrus.WithFields(logrus.Fields{"component": "cdn_cache"}),
+		compressor:            compressor,
+		mimeDetector:          mimeDetector,
+		stopProcessingCleaner: make(chan struct{}),
 	}
+	
+	// 启动 processing map 清理器，防止内存泄漏
+	cache.startProcessingCleaner()
+	
+	return cache
 }
 
 // ServeIfFresh 若命中缓存且未过期，直接回源本地文件
@@ -106,10 +123,34 @@ func (c *CDNCache) ServeIfFreshWithConfig(w http.ResponseWriter, r *http.Request
 
 		// 检查是否有相同请求正在处理，避免并发穿透
 		requestKey := c.getRequestKey(r)
-		if ch, loaded := c.processing.LoadOrStore(requestKey, make(chan struct{})); loaded {
+		
+		// 创建新的 processing entry
+		newEntry := &processingEntry{
+			ch:        make(chan struct{}),
+			createdAt: time.Now(),
+		}
+		
+		if existingValue, loaded := c.processing.LoadOrStore(requestKey, newEntry); loaded {
 			// 有相同请求正在处理，等待其完成
 			c.log.Infof("CDN缓存等待相同请求完成: url=%s", r.URL.Path)
-			<-ch.(chan struct{})
+			
+			// 获取已存在的 entry
+			existingEntry, ok := existingValue.(*processingEntry)
+			if !ok {
+				// 旧格式或无效，直接返回
+				c.log.Warnf("CDN缓存 processing entry 格式无效: url=%s", r.URL.Path)
+				return false
+			}
+			
+			// 使用 select 添加超时保护，防止永久阻塞
+			select {
+			case <-existingEntry.ch:
+				// 等待完成
+			case <-time.After(30 * time.Second):
+				// 超时，直接返回
+				c.log.Warnf("CDN缓存等待超时: url=%s", r.URL.Path)
+				return false
+			}
 			// 重新尝试读取缓存
 			if meta, err := c.readMeta(metaPath); err == nil && meta != nil {
 				c.log.Infof("CDN缓存等待后命中: url=%s", r.URL.Path)
@@ -189,9 +230,9 @@ func (c *CDNCache) ServeIfFreshWithConfig(w http.ResponseWriter, r *http.Request
 	}
 	defer f.Close()
 
-	// 智能压缩处理
+	// 修复：使用预压缩文件或流式处理，避免读取整个文件到内存
 	if c.compressor != nil && c.compressor.ShouldCompress(meta.Path, meta.SizeBytes, meta.ContentType) {
-		c.serveWithAdvancedCompression(w, r, f, meta)
+		c.serveWithPrecompression(w, r, filePath, meta)
 	} else {
 		// 简单写回
 		w.WriteHeader(http.StatusOK)
@@ -293,32 +334,68 @@ func (c *CDNCache) MaybeStoreWithConfig(resp *http.Response, forceEnabled bool) 
 		maxObj = 20 * 1024 * 1024
 	}
 
-	// 读取响应体
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		c.log.Debugf("read response body failed: %v", err)
-		resp.Body = io.NopCloser(bytes.NewReader(nil))
-		c.cleanupProcessing(req)
-		return
-	}
-	// 重置响应体给下游继续写
-	resp.Body = io.NopCloser(bytes.NewReader(data))
-
-	if int64(len(data)) > maxObj {
-		c.cleanupProcessing(req)
-		return
-	}
-
+	// 修复：使用流式处理 + 大小限制，避免大文件占用过多内存
 	filePath, metaPath := c.cachePaths(req)
 	_ = os.MkdirAll(filepath.Dir(filePath), 0755)
 
-	if err := os.WriteFile(filePath, data, 0644); err != nil {
-		c.log.Debugf("write cache failed: %v", err)
+	// 创建临时文件
+	tempFile, err := os.CreateTemp(filepath.Dir(filePath), ".cdn-tmp-*")
+	if err != nil {
+		c.log.Debugf("create temp file failed: %v", err)
+		c.cleanupProcessing(req)
+		return
+	}
+	tempPath := tempFile.Name()
+	defer func() {
+		tempFile.Close()
+		// 如果失败，清理临时文件
+		if _, err := os.Stat(tempPath); err == nil {
+			os.Remove(tempPath)
+		}
+	}()
+
+	// 使用 LimitedReader 限制读取大小，防止超大文件
+	limitedReader := &io.LimitedReader{R: resp.Body, N: maxObj + 1}
+
+	// 流式写入临时文件，同时保存到缓冲区用于重置响应体
+	var buf bytes.Buffer
+	teeReader := io.TeeReader(limitedReader, &buf)
+
+	written, err := io.Copy(tempFile, teeReader)
+	if err != nil {
+		c.log.Debugf("write temp file failed: %v", err)
+		c.cleanupProcessing(req)
+		return
+	}
+
+	// 检查是否超过限制
+	if written > maxObj {
+		c.log.Debugf("object too large: %d > %d", written, maxObj)
+		c.cleanupProcessing(req)
+		return
+	}
+
+	// 重置响应体给下游继续写
+	data := buf.Bytes()
+	resp.Body = io.NopCloser(bytes.NewReader(data))
+
+	// 关闭临时文件，准备重命名
+	tempFile.Close()
+
+	// 重命名为正式缓存文件
+	if err := os.Rename(tempPath, filePath); err != nil {
+		c.log.Debugf("rename cache file failed: %v", err)
 		c.cleanupProcessing(req)
 		return
 	}
 
 	c.log.Infof("CDN缓存写入成功: url=%s, filePath=%s, size=%d bytes", req.URL.Path, filePath, len(data))
+
+	// 修复：生成预压缩文件，避免每次请求都压缩
+	// 只对可压缩的文件类型生成预压缩版本
+	if c.compressor != nil && c.compressor.ShouldCompress(req.URL.Path, int64(len(data)), contentType) {
+		c.generatePrecompressedFiles(filePath, data)
+	}
 
 	encoding := resp.Header.Get("Content-Encoding")
 
@@ -647,8 +724,28 @@ func (c *CDNCache) getRequestKey(r *http.Request) string {
 func (c *CDNCache) cleanupProcessing(req *http.Request) {
 	if req != nil {
 		requestKey := c.getRequestKey(req)
-		if ch, loaded := c.processing.LoadAndDelete(requestKey); loaded {
-			close(ch.(chan struct{}))
+		if value, loaded := c.processing.LoadAndDelete(requestKey); loaded {
+			// 支持两种格式：新的 *processingEntry 和旧的 chan struct{}
+			switch v := value.(type) {
+			case *processingEntry:
+				if v != nil && v.ch != nil {
+					// 安全关闭 channel
+					select {
+					case <-v.ch:
+						// 已经关闭
+					default:
+						close(v.ch)
+					}
+				}
+			case chan struct{}:
+				// 旧格式，直接关闭
+				select {
+				case <-v:
+					// 已经关闭
+				default:
+					close(v)
+				}
+			}
 		}
 	}
 }
@@ -780,8 +877,84 @@ func (c *CDNCache) shouldCompressFile(filePath string, fileSize int64) bool {
 	return compressibleTypes[ext] && fileSize >= 1024
 }
 
-// serveWithAdvancedCompression 使用高级压缩方式服务文件
+// serveWithPrecompression 使用预压缩文件服务（避免内存泄漏）
+// 修复：不再每次请求都读取整个文件到内存并压缩，而是使用预压缩文件
+func (c *CDNCache) serveWithPrecompression(w http.ResponseWriter, r *http.Request, filePath string, meta *objectMeta) {
+	acceptEncoding := r.Header.Get("Accept-Encoding")
+	
+	// 检查客户端支持的压缩算法（按优先级）
+	supportsBr := strings.Contains(acceptEncoding, "br")
+	supportsGzip := strings.Contains(acceptEncoding, "gzip")
+
+	// 尝试使用预压缩文件
+	if supportsBr {
+		brPath := filePath + ".br"
+		if stat, err := os.Stat(brPath); err == nil && stat.Size() > 0 {
+			c.servePrecompressedFile(w, brPath, "br", meta)
+			return
+		}
+	}
+
+	if supportsGzip {
+		gzPath := filePath + ".gz"
+		if stat, err := os.Stat(gzPath); err == nil && stat.Size() > 0 {
+			c.servePrecompressedFile(w, gzPath, "gzip", meta)
+			return
+		}
+	}
+
+	// 没有预压缩文件，返回原文件
+	// 注意：不在请求时压缩，避免内存占用
+	file, err := os.Open(filePath)
+	if err != nil {
+		c.log.Errorf("Failed to open cached file: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	defer file.Close()
+
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.Copy(w, file)
+}
+
+// servePrecompressedFile 服务预压缩文件
+func (c *CDNCache) servePrecompressedFile(w http.ResponseWriter, compressedPath string, algorithm string, meta *objectMeta) {
+	file, err := os.Open(compressedPath)
+	if err != nil {
+		c.log.Errorf("Failed to open precompressed file: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	defer file.Close()
+
+	// 设置压缩相关头部
+	w.Header().Set("Content-Encoding", algorithm)
+	w.Header().Set("Vary", "Accept-Encoding")
+
+	// 添加压缩统计信息（调试用）
+	if c.log.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		stat, _ := file.Stat()
+		w.Header().Set("X-CDN-Compression-Algorithm", algorithm)
+		w.Header().Set("X-CDN-Original-Size", fmt.Sprintf("%d", meta.SizeBytes))
+		w.Header().Set("X-CDN-Compressed-Size", fmt.Sprintf("%d", stat.Size()))
+		if meta.SizeBytes > 0 {
+			ratio := float64(stat.Size()) / float64(meta.SizeBytes)
+			w.Header().Set("X-CDN-Compression-Ratio", fmt.Sprintf("%.2f", ratio))
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.Copy(w, file)
+
+	c.log.Debugf("CDN served precompressed %s: %s", algorithm, compressedPath)
+}
+
+// serveWithAdvancedCompression 使用高级压缩方式服务文件（已废弃，保留用于向后兼容）
+// 警告：此方法会读取整个文件到内存，不推荐使用
+// 请使用 serveWithPrecompression 代替
 func (c *CDNCache) serveWithAdvancedCompression(w http.ResponseWriter, r *http.Request, file io.Reader, meta *objectMeta) {
+	c.log.Warn("serveWithAdvancedCompression is deprecated and causes memory issues, please use serveWithPrecompression")
+	
 	// 读取文件内容
 	content, err := io.ReadAll(file)
 	if err != nil {
@@ -820,6 +993,31 @@ func (c *CDNCache) serveWithAdvancedCompression(w http.ResponseWriter, r *http.R
 	// 写入压缩后的内容
 	w.WriteHeader(http.StatusOK)
 	w.Write(result.Data)
+}
+
+// generatePrecompressedFiles 生成预压缩文件（gzip 和 brotli）
+// 修复：在存储时生成，避免每次请求都压缩
+func (c *CDNCache) generatePrecompressedFiles(filePath string, data []byte) {
+	// 异步生成，不阻塞主流程
+	go func() {
+		// 生成 gzip 版本
+		gzPath := filePath + ".gz"
+		if result, err := c.compressor.Compress(data, "gzip"); err == nil && result.Algorithm == compression.Gzip {
+			if err := os.WriteFile(gzPath, result.Data, 0644); err == nil {
+				c.log.Debugf("Generated precompressed gzip: %s (%d -> %d bytes, %.1f%% reduction)",
+					gzPath, result.OriginalSize, result.CompressedSize, result.Ratio*100)
+			}
+		}
+
+		// 生成 brotli 版本
+		brPath := filePath + ".br"
+		if result, err := c.compressor.Compress(data, "br"); err == nil && result.Algorithm == compression.Brotli {
+			if err := os.WriteFile(brPath, result.Data, 0644); err == nil {
+				c.log.Debugf("Generated precompressed brotli: %s (%d -> %d bytes, %.1f%% reduction)",
+					brPath, result.OriginalSize, result.CompressedSize, result.Ratio*100)
+			}
+		}
+	}()
 }
 
 // serveWithCompression 使用压缩方式服务文件（保留用于向后兼容）
@@ -867,4 +1065,115 @@ func (c *CDNCache) getSmartContentType(meta *objectMeta, path string) string {
 	// 5. 默认返回二进制类型
 	c.log.Debugf("使用默认Content-Type: application/octet-stream")
 	return "application/octet-stream"
+}
+
+// startProcessingCleaner 启动 processing map 清理器，防止内存泄漏
+func (c *CDNCache) startProcessingCleaner() {
+	c.cleanerMutex.Lock()
+	defer c.cleanerMutex.Unlock()
+	
+	if c.cleanerStarted {
+		return
+	}
+	c.cleanerStarted = true
+	
+	go func() {
+		// 使用质数间隔避免与其他定时器同时触发（67秒）
+		ticker := time.NewTicker(67 * time.Second)
+		defer ticker.Stop()
+		
+		c.log.Info("CDN Cache processing map 清理器已启动")
+		
+		for {
+			select {
+			case <-ticker.C:
+				c.cleanupStaleProcessingEntries()
+			case <-c.stopProcessingCleaner:
+				c.log.Info("CDN Cache processing map 清理器已停止")
+				return
+			}
+		}
+	}()
+}
+
+// cleanupStaleProcessingEntries 清理超时的 processing 条目
+func (c *CDNCache) cleanupStaleProcessingEntries() {
+	now := time.Now()
+	timeout := 5 * time.Minute // 5分钟超时
+	
+	count := 0
+	cleaned := 0
+	
+	c.processing.Range(func(key, value interface{}) bool {
+		count++
+		
+		entry, ok := value.(*processingEntry)
+		if !ok {
+			// 旧格式或无效条目，直接删除
+			c.processing.Delete(key)
+			cleaned++
+			c.log.Warnf("清理无效的 processing 条目: %v", key)
+			return true
+		}
+		
+		// 检查是否超时
+		if now.Sub(entry.createdAt) > timeout {
+			c.log.Warnf("清理超时的 processing 条目: %v (创建于 %v, 已存在 %v)", 
+				key, entry.createdAt, now.Sub(entry.createdAt))
+			
+			// 安全关闭 channel
+			select {
+			case <-entry.ch:
+				// 已经关闭
+			default:
+				close(entry.ch)
+			}
+			
+			c.processing.Delete(key)
+			cleaned++
+		}
+		
+		return true
+	})
+	
+	// 如果 map 大小异常，记录警告
+	if count > 1000 {
+		c.log.Errorf("⚠️ CDN Cache processing map 大小异常: %d 个条目（已清理 %d 个）", count, cleaned)
+	} else if count > 100 {
+		c.log.Warnf("CDN Cache processing map 较大: %d 个条目（已清理 %d 个）", count, cleaned)
+	} else if cleaned > 0 {
+		c.log.Infof("CDN Cache processing map 清理完成: 总数 %d, 清理 %d", count, cleaned)
+	}
+}
+
+// StopCleaner 停止清理器（在关闭时调用）
+func (c *CDNCache) StopCleaner() {
+	c.cleanerMutex.Lock()
+	defer c.cleanerMutex.Unlock()
+	
+	if !c.cleanerStarted {
+		return
+	}
+	
+	if c.stopProcessingCleaner != nil {
+		select {
+		case <-c.stopProcessingCleaner:
+			// 已经关闭
+		default:
+			close(c.stopProcessingCleaner)
+		}
+	}
+	
+	c.cleanerStarted = false
+	c.log.Info("CDN Cache 清理器已停止")
+}
+
+// GetProcessingMapSize 获取 processing map 的大小（用于监控）
+func (c *CDNCache) GetProcessingMapSize() int {
+	count := 0
+	c.processing.Range(func(key, value interface{}) bool {
+		count++
+		return true
+	})
+	return count
 }

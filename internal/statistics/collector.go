@@ -89,6 +89,10 @@ type Collector struct {
 
 	// 域名统计缓存
 	domainStats map[string]map[TimeDimension]map[string]*RequestStats
+	// 域名唯一IP集合：domain -> dimension -> timeKey -> IP set
+	domainUniqueIPs map[string]map[TimeDimension]map[string]map[string]struct{}
+	// 域名唯一UA集合：domain -> dimension -> timeKey -> UA set
+	domainUniqueUAs map[string]map[TimeDimension]map[string]map[string]struct{}
 
 	// 配置参数
 	topN            int
@@ -97,13 +101,15 @@ type Collector struct {
 	geoIPEnabled    bool
 
 	// 内存泄漏防护
-	stopChan        chan struct{}
-	maxIPEntries    int
-	maxUAEntries    int
-	maxCityEntries  int
-	maxDomainStats  int
-	samplingEnabled bool
-	samplingCounter uint64
+	stopChan            chan struct{}
+	maxIPEntries        int
+	maxUAEntries        int
+	maxCityEntries      int
+	maxDomainStats      int
+	maxUniqueIPsPerSlot int // 每个时间槽的最大唯一IP数
+	maxUniqueUAsPerSlot int // 每个时间槽的最大唯一UA数
+	samplingEnabled     bool
+	samplingCounter     uint64
 }
 
 // NewCollector 创建统计收集器
@@ -125,10 +131,12 @@ func NewCollector(dataDir string, enabled bool) *Collector {
 		cityFunnel: NewFunnelModel(10, 30*time.Minute, 20), // 城市: 至少10次访问，30分钟时间跨度，最多20条
 
 		// 初始化数据存储
-		ipEntries:   make(map[string]*FunnelEntry),
-		uaEntries:   make(map[string]*FunnelEntry),
-		cityEntries: make(map[string]*FunnelEntry),
-		domainStats: make(map[string]map[TimeDimension]map[string]*RequestStats),
+		ipEntries:       make(map[string]*FunnelEntry),
+		uaEntries:       make(map[string]*FunnelEntry),
+		cityEntries:     make(map[string]*FunnelEntry),
+		domainStats:     make(map[string]map[TimeDimension]map[string]*RequestStats),
+		domainUniqueIPs: make(map[string]map[TimeDimension]map[string]map[string]struct{}),
+		domainUniqueUAs: make(map[string]map[TimeDimension]map[string]map[string]struct{}),
 
 		// 默认配置
 		topN:            20,
@@ -137,12 +145,14 @@ func NewCollector(dataDir string, enabled bool) *Collector {
 		geoIPEnabled:    false,
 
 		// 内存泄漏防护配置
-		stopChan:        make(chan struct{}),
-		maxIPEntries:    5000, // 从1000提升到5000
-		maxUAEntries:    2000, // 从500提升到2000
-		maxCityEntries:  500,  // 从200提升到500
-		maxDomainStats:  100,  // 最多100个域名统计
-		samplingEnabled: true, // 启用采样
+		stopChan:            make(chan struct{}),
+		maxIPEntries:        5000,  // 从1000提升到5000
+		maxUAEntries:        2000,  // 从500提升到2000
+		maxCityEntries:      500,   // 从200提升到500
+		maxDomainStats:      100,   // 最多100个域名统计
+		maxUniqueIPsPerSlot: 10000, // 每个时间槽最多跟踪10000个唯一IP
+		maxUniqueUAsPerSlot: 5000,  // 每个时间槽最多跟踪5000个唯一UA
+		samplingEnabled:     true,  // 启用采样
 	}
 
 	if enabled {
@@ -219,6 +229,12 @@ func (c *Collector) updateDomainStats(record *AccessRecord, timestamp time.Time)
 	if c.domainStats[domain] == nil {
 		c.domainStats[domain] = make(map[TimeDimension]map[string]*RequestStats)
 	}
+	if c.domainUniqueIPs[domain] == nil {
+		c.domainUniqueIPs[domain] = make(map[TimeDimension]map[string]map[string]struct{})
+	}
+	if c.domainUniqueUAs[domain] == nil {
+		c.domainUniqueUAs[domain] = make(map[TimeDimension]map[string]map[string]struct{})
+	}
 
 	dimensions := []TimeDimension{DimensionHour, DimensionDay, DimensionMonth}
 
@@ -228,11 +244,26 @@ func (c *Collector) updateDomainStats(record *AccessRecord, timestamp time.Time)
 		if c.domainStats[domain][dim] == nil {
 			c.domainStats[domain][dim] = make(map[string]*RequestStats)
 		}
+		if c.domainUniqueIPs[domain][dim] == nil {
+			c.domainUniqueIPs[domain][dim] = make(map[string]map[string]struct{})
+		}
+		if c.domainUniqueUAs[domain][dim] == nil {
+			c.domainUniqueUAs[domain][dim] = make(map[string]map[string]struct{})
+		}
 
 		stats := c.domainStats[domain][dim][timeKey]
 		if stats == nil {
 			stats = &RequestStats{}
 			c.domainStats[domain][dim][timeKey] = stats
+		}
+
+		// 初始化唯一IP集合
+		if c.domainUniqueIPs[domain][dim][timeKey] == nil {
+			c.domainUniqueIPs[domain][dim][timeKey] = make(map[string]struct{})
+		}
+		// 初始化唯一UA集合
+		if c.domainUniqueUAs[domain][dim][timeKey] == nil {
+			c.domainUniqueUAs[domain][dim][timeKey] = make(map[string]struct{})
 		}
 
 		// 更新统计
@@ -241,8 +272,25 @@ func (c *Collector) updateDomainStats(record *AccessRecord, timestamp time.Time)
 			stats.NonSuccessCount++
 		}
 
-		// 这里简化处理，实际应该基于时间窗口计算unique值
-		// 在真实实现中需要维护独立的集合来跟踪唯一值
+		// 更新唯一IP统计（带内存保护）
+		ipSet := c.domainUniqueIPs[domain][dim][timeKey]
+		if _, exists := ipSet[record.IP]; !exists {
+			if len(ipSet) < c.maxUniqueIPsPerSlot {
+				ipSet[record.IP] = struct{}{}
+				stats.UniqueIPs = int64(len(ipSet))
+			}
+		}
+
+		// 更新唯一UA统计（带内存保护）
+		if record.UserAgent != "" {
+			uaSet := c.domainUniqueUAs[domain][dim][timeKey]
+			if _, exists := uaSet[record.UserAgent]; !exists {
+				if len(uaSet) < c.maxUniqueUAsPerSlot {
+					uaSet[record.UserAgent] = struct{}{}
+					stats.UniqueUserAgents = int64(len(uaSet))
+				}
+			}
+		}
 	}
 }
 
@@ -377,16 +425,31 @@ func (c *Collector) cleanupDomainStats(now time.Time) {
 				// 解析时间键判断是否过期
 				if c.isTimeKeyExpired(timeKey, dim, now) {
 					delete(timeStats, timeKey)
+					// 同时清理对应的唯一IP/UA集合
+					if c.domainUniqueIPs[domain] != nil && c.domainUniqueIPs[domain][dim] != nil {
+						delete(c.domainUniqueIPs[domain][dim], timeKey)
+					}
+					if c.domainUniqueUAs[domain] != nil && c.domainUniqueUAs[domain][dim] != nil {
+						delete(c.domainUniqueUAs[domain][dim], timeKey)
+					}
 				}
 			}
 			// 如果维度统计为空，删除它
 			if len(timeStats) == 0 {
 				delete(dimStats, dim)
+				if c.domainUniqueIPs[domain] != nil {
+					delete(c.domainUniqueIPs[domain], dim)
+				}
+				if c.domainUniqueUAs[domain] != nil {
+					delete(c.domainUniqueUAs[domain], dim)
+				}
 			}
 		}
 		// 如果域名统计为空，删除它
 		if len(dimStats) == 0 {
 			delete(c.domainStats, domain)
+			delete(c.domainUniqueIPs, domain)
+			delete(c.domainUniqueUAs, domain)
 		}
 	}
 }

@@ -199,6 +199,18 @@ func (m *Manager) Stop() {
 		lb.StopHealthCheck()
 	}
 	m.lbMutex.RUnlock()
+	
+	// 停止缓存清理器
+	if m.upstreamCache != nil {
+		m.upstreamCache.StopCleaner()
+		m.log.Info("Stopped upstream cache cleaner")
+	}
+	if m.cdnCache != nil {
+		m.cdnCache.StopCleaner()
+		m.log.Info("Stopped CDN cache cleaner")
+	}
+	
+	m.log.Info("Proxy manager stopped")
 }
 
 // initializeLoadBalancers 初始化负载均衡器
@@ -1060,7 +1072,16 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 
 // getOrCreateProxy 获取或创建反向代理
 func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProxy {
-	key := fmt.Sprintf("%s:%d", rule.Target, rule.Port)
+	// 生成缓存key，对于完整URL使用URL本身，对于IP+端口使用传统格式
+	var key string
+	targetURL := rule.Target
+	if strings.HasPrefix(strings.ToLower(targetURL), "http://") || strings.HasPrefix(strings.ToLower(targetURL), "https://") {
+		// 完整URL，使用URL本身作为key
+		key = targetURL
+	} else {
+		// IP或域名，使用传统格式
+		key = fmt.Sprintf("%s:%d", rule.Target, rule.Port)
+	}
 
 	m.cacheMutex.RLock()
 	if proxy, exists := m.proxyCache[key]; exists {
@@ -1071,7 +1092,6 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 
 	// 创建新的反向代理
 	// 允许在配置中直接写入完整URL（包含协议与端口）或仅写主机名/IP
-	targetURL := rule.Target
 	if !strings.HasPrefix(strings.ToLower(targetURL), "http://") && !strings.HasPrefix(strings.ToLower(targetURL), "https://") {
 		// 只有当target不包含协议时才添加协议和端口
 		if rule.Port > 0 {
@@ -1080,28 +1100,28 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 			targetURL = "http://" + rule.Target
 		}
 	} else {
-		// target已经包含完整URL，检查是否需要添加端口
-		// 只有当URL中没有端口且rule.Port > 0时才添加端口
-		if rule.Port > 0 {
-			// 检查URL是否已经包含端口
-			parsedURL, err := url.Parse(targetURL)
-			if err == nil && parsedURL.Port() == "" {
-				// URL中没有端口，添加端口
-				if strings.Contains(targetURL, ":") {
-					// 处理IPv6地址格式 [::1]:8080
-					if strings.Contains(targetURL, "[") && strings.Contains(targetURL, "]:") {
-						// 已经是IPv6格式，不需要修改
-					} else {
-						// 普通格式，添加端口
-						targetURL = targetURL + ":" + strconv.Itoa(rule.Port)
-					}
-				} else {
-					// 没有冒号，直接添加端口
-					targetURL = targetURL + ":" + strconv.Itoa(rule.Port)
-				}
-			}
+		// target已经包含完整URL，完全忽略port字段
+		// 解析URL以提取协议、主机和端口
+		parsedURL, err := url.Parse(targetURL)
+		if err != nil {
+			m.log.Errorf("Failed to parse target URL: %v", err)
+			return nil
 		}
+		
+		// 如果URL中没有端口，根据协议使用默认端口
+		if parsedURL.Port() == "" {
+			if parsedURL.Scheme == "https" {
+				// HTTPS默认端口443
+				parsedURL.Host = net.JoinHostPort(parsedURL.Hostname(), "443")
+			} else if parsedURL.Scheme == "http" {
+				// HTTP默认端口80
+				parsedURL.Host = net.JoinHostPort(parsedURL.Hostname(), "80")
+			}
+			targetURL = parsedURL.String()
+		}
+		// 如果URL中已有端口，直接使用，完全忽略rule.Port字段
 	}
+	
 	target, err := url.Parse(targetURL)
 	if err != nil {
 		m.log.Errorf("Failed to parse target URL: %v", err)
@@ -1425,6 +1445,29 @@ func (m *Manager) isIPAddress(target string) bool {
 	return net.ParseIP(target) != nil
 }
 
+// isHTTPSURL 检查目标是否为HTTPS URL（非IP地址）
+func (m *Manager) isHTTPSURL(target string) bool {
+	// 检查是否以 https:// 开头
+	if !strings.HasPrefix(strings.ToLower(target), "https://") {
+		return false
+	}
+	
+	// 解析URL
+	parsedURL, err := url.Parse(target)
+	if err != nil {
+		return false
+	}
+	
+	// 提取主机名（去除端口）
+	hostname := parsedURL.Hostname()
+	if hostname == "" {
+		return false
+	}
+	
+	// 检查主机名是否为IP地址
+	return !m.isIPAddress(hostname)
+}
+
 // getPort 获取请求端口
 func (m *Manager) getPort(r *http.Request) string {
 	if r.TLS != nil {
@@ -1591,16 +1634,37 @@ func (m *Manager) startOptimizedWebSocketProxy(clientConn, upstreamConn net.Conn
 	// 连接状态
 	var clientClosed, upstreamClosed int32
 
+	// 使用 WaitGroup 等待所有 goroutine 退出
+	var wg sync.WaitGroup
+
 	// 启动数据读取goroutine
-	go m.readWebSocketData(ctx, clientConn, clientToUpstream, errChan, &clientClosed, "client", rule)
-	go m.readWebSocketData(ctx, upstreamConn, upstreamToClient, errChan, &upstreamClosed, "upstream", rule)
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		m.readWebSocketData(ctx, clientConn, clientToUpstream, errChan, &clientClosed, "client", rule)
+	}()
+	go func() {
+		defer wg.Done()
+		m.readWebSocketData(ctx, upstreamConn, upstreamToClient, errChan, &upstreamClosed, "upstream", rule)
+	}()
 
 	// 启动数据写入goroutine
-	go m.writeWebSocketData(ctx, upstreamConn, clientToUpstream, errChan, &upstreamClosed, "upstream", rule)
-	go m.writeWebSocketData(ctx, clientConn, upstreamToClient, errChan, &clientClosed, "client", rule)
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		m.writeWebSocketData(ctx, upstreamConn, clientToUpstream, errChan, &upstreamClosed, "upstream", rule)
+	}()
+	go func() {
+		defer wg.Done()
+		m.writeWebSocketData(ctx, clientConn, upstreamToClient, errChan, &clientClosed, "client", rule)
+	}()
 
 	// 监控连接状态和错误
-	go m.monitorWebSocketConnections(ctx, clientConn, upstreamConn, errChan, &clientClosed, &upstreamClosed, rule)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		m.monitorWebSocketConnections(ctx, clientConn, upstreamConn, errChan, &clientClosed, &upstreamClosed, rule)
+	}()
 
 	// 等待连接关闭或超时
 	select {
@@ -1611,18 +1675,38 @@ func (m *Manager) startOptimizedWebSocketProxy(clientConn, upstreamConn net.Conn
 		m.log.Warnf("WebSocket connection timeout for %s", rule.Target)
 	}
 
-	// 清理资源
+	// 清理资源：先取消 context，让所有 goroutine 知道应该退出
+	cancel() // 取消 context，通知所有 goroutine 退出
+
+	// 设置关闭标志
 	atomic.StoreInt32(&clientClosed, 1)
 	atomic.StoreInt32(&upstreamClosed, 1)
 
-	// 给缓冲的数据一些时间完成传输
-	time.Sleep(100 * time.Millisecond)
-
-	close(clientToUpstream)
-	close(upstreamToClient)
-
+	// 关闭连接，这会触发 Read/Write 错误，让 goroutine 快速退出
 	clientConn.Close()
 	upstreamConn.Close()
+
+	// 使用 WaitGroup 等待所有 goroutine 退出，带超时保护
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// 所有 goroutine 已安全退出
+		m.log.Debugf("All WebSocket goroutines exited cleanly for %s", rule.Target)
+	case <-time.After(1 * time.Second):
+		// 超时，但至少我们尝试等待了
+		m.log.Warnf("Timeout waiting for WebSocket goroutines to exit for %s (this may indicate a goroutine leak)", rule.Target)
+	}
+
+	// 现在可以安全关闭通道，因为所有 goroutine 都已退出
+	close(clientToUpstream)
+	close(upstreamToClient)
+	// errChan 也应该关闭
+	close(errChan)
 
 	m.log.Infof("WebSocket proxy connection closed for %s", rule.Target)
 }
@@ -1646,7 +1730,7 @@ func (m *Manager) readWebSocketData(ctx context.Context, conn net.Conn, dataChan
 	defer m.bufferPool.Put(buffer) // 使用完后归还到池中
 
 	for atomic.LoadInt32(closed) == 0 {
-		// 检查上下文是否已取消
+		// 检查上下文是否已取消（在循环开始时检查，避免不必要的操作）
 		select {
 		case <-ctx.Done():
 			m.log.Debugf("WebSocket read context cancelled (%s)", connType)
@@ -1661,7 +1745,16 @@ func (m *Manager) readWebSocketData(ctx context.Context, conn net.Conn, dataChan
 		if err != nil {
 			if atomic.LoadInt32(closed) == 0 {
 				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-					// 超时不是错误，继续读取
+					// 超时不是错误，但在继续之前再次检查上下文
+					// 这样可以避免在上下文已取消时继续忙等待
+					select {
+					case <-ctx.Done():
+						return
+					default:
+						// 添加短暂延迟，避免超时后立即重试导致 CPU 占用过高
+						// 这可以防止在连接有问题时形成忙等待循环
+						time.Sleep(10 * time.Millisecond)
+					}
 					continue
 				}
 				m.log.Debugf("WebSocket read error (%s): %v", connType, err)
@@ -1711,17 +1804,23 @@ func (m *Manager) writeWebSocketData(ctx context.Context, conn net.Conn, dataCha
 		writeTimeout = 10 // 默认10秒
 	}
 
-	// 修复：使用 context.WithTimeout 而不是 time.After，避免定时器泄露
-	// time.After 在 select 循环中会不断创建新的定时器，导致内存泄露和 CPU 占用高
-	idleTimeoutCtx, idleTimeoutCancel := context.WithTimeout(ctx, 60*time.Second)
-	defer idleTimeoutCancel()
+	// 修复：使用 ticker 而不是不断创建新的 context，避免内存泄漏
+	// 不断创建 context.WithTimeout 会在高并发时产生大量 context 对象，导致内存占用过高
+	idleTimeout := 60 * time.Second
+	idleTicker := time.NewTicker(idleTimeout)
+	defer idleTicker.Stop()
+	
+	// 记录最后一次写入时间
+	lastWriteTime := time.Now()
 
 	for atomic.LoadInt32(closed) == 0 {
 		select {
 		case data, ok := <-dataChan:
-			// 重置空闲超时
-			idleTimeoutCancel()
-			idleTimeoutCtx, idleTimeoutCancel = context.WithTimeout(ctx, 60*time.Second)
+			// 重置空闲超时：更新最后写入时间并重置 ticker
+			lastWriteTime = time.Now()
+			// 停止旧 ticker 并创建新的
+			idleTicker.Stop()
+			idleTicker = time.NewTicker(idleTimeout)
 
 			if !ok {
 				// 通道已关闭
@@ -1739,20 +1838,22 @@ func (m *Manager) writeWebSocketData(ctx context.Context, conn net.Conn, dataCha
 				}
 				return
 			}
-		case <-idleTimeoutCtx.Done():
+		case <-idleTicker.C:
 			// 写入超时检查（60秒无数据）
-			idleTimeoutCancel()
-			if atomic.LoadInt32(closed) != 0 {
+			if time.Since(lastWriteTime) >= idleTimeout {
+				if atomic.LoadInt32(closed) != 0 {
+					return
+				}
+				// 超时，关闭连接
+				m.log.Debugf("WebSocket write idle timeout (%s)", connType)
+				errChan <- fmt.Errorf("write idle timeout")
 				return
 			}
-			// 重置超时，继续等待
-			idleTimeoutCtx, idleTimeoutCancel = context.WithTimeout(ctx, 60*time.Second)
+			// 如果时间未到（可能是 ticker 重置导致的误触发），继续等待
 		case <-ctx.Done():
-			idleTimeoutCancel()
 			return
 		}
 	}
-	idleTimeoutCancel()
 }
 
 // monitorWebSocketConnections 监控WebSocket连接状态

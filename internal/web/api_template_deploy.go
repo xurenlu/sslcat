@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -76,9 +77,24 @@ func (api *TemplateDeployAPI) DeployFromTemplate(w http.ResponseWriter, r *http.
 	logsDir := filepath.Join(appPath, "logs")
 	logFile := filepath.Join(logsDir, fmt.Sprintf("deploy-%s.log", time.Now().Format("20060102-150405")))
 
+	// 显式创建应用目录结构（确保目录存在）
+	if err := os.MkdirAll(appPath, 0755); err != nil {
+		api.logger.WithError(err).Errorf("创建应用目录失败: %s", appPath)
+		writeErrorJSON(w, fmt.Sprintf("创建应用目录失败: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// 显式创建日志目录
+	if err := os.MkdirAll(logsDir, 0755); err != nil {
+		api.logger.WithError(err).Errorf("创建日志目录失败: %s", logsDir)
+		writeErrorJSON(w, fmt.Sprintf("创建日志目录失败: %v", err), http.StatusInternalServerError)
+		return
+	}
+
 	// 创建部署日志记录器
 	logger, err := runner.NewDeployLogger(req.AppName, deployID, logFile)
 	if err != nil {
+		api.logger.WithError(err).Error("创建部署日志失败")
 		writeErrorJSON(w, fmt.Sprintf("创建部署日志失败: %v", err), http.StatusInternalServerError)
 		return
 	}

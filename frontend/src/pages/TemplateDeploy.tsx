@@ -117,6 +117,29 @@ const TemplateDeploy: React.FC = () => {
       return
     }
 
+    // 验证应用名称格式：只能包含小写字母、数字和连字符
+    const appNamePattern = /^[a-z0-9-]+$/
+    if (!appNamePattern.test(formData.app_name)) {
+      toast({
+        title: '验证失败',
+        description: '应用名称只能包含小写字母、数字和连字符',
+        status: 'error',
+        duration: 3000,
+      })
+      return
+    }
+
+    // 验证应用名称不能以连字符开头或结尾
+    if (formData.app_name.startsWith('-') || formData.app_name.endsWith('-')) {
+      toast({
+        title: '验证失败',
+        description: '应用名称不能以连字符开头或结尾',
+        status: 'error',
+        duration: 3000,
+      })
+      return
+    }
+
     try {
       setDeploying(true)
       const variables: any = {}
@@ -147,7 +170,30 @@ const TemplateDeploy: React.FC = () => {
         github_token: formData.github_token || '',
       })
 
-      if (response && response.success) {
+      // 检查响应中的 success 字段
+      if (!response) {
+        toast({
+          title: '部署失败',
+          description: '服务器未返回有效响应',
+          status: 'error',
+          duration: 5000,
+        })
+        return
+      }
+
+      if (response.success === false) {
+        // 如果 success 为 false，显示错误消息
+        const errorMessage = response.error || response.message || '部署失败，请查看日志了解详情'
+        toast({
+          title: '部署失败',
+          description: errorMessage,
+          status: 'error',
+          duration: 5000,
+        })
+        return
+      }
+
+      if (response.success) {
         toast({
           title: '部署已启动',
           description: response.message || `应用 ${formData.app_name} 正在后台部署中，请稍候查看状态`,
@@ -156,11 +202,21 @@ const TemplateDeploy: React.FC = () => {
         })
         // 跳转到应用列表页面，用户可以查看部署状态
         navigate(buildPath(adminPrefix, '/git-server'))
+      } else {
+        // 如果 success 字段不存在或为其他值，也显示错误
+        toast({
+          title: '部署失败',
+          description: response.message || response.error || '部署过程中出现未知错误',
+          status: 'error',
+          duration: 5000,
+        })
       }
     } catch (error: any) {
+      // 处理网络错误或其他异常
+      const errorMessage = error.message || error.data?.error || error.data?.message || '部署过程中出现错误'
       toast({
         title: '部署失败',
-        description: error.message || '部署过程中出现错误',
+        description: errorMessage,
         status: 'error',
         duration: 5000,
       })

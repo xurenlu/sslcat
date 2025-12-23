@@ -4,12 +4,14 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/xurenlu/sslcat/internal/notification"
 )
 
 // Manager 监控管理器（统一管理所有监控器）
 type ManagerOptions struct {
-	Enabled bool
-	Memory  MemoryMonitorOptions
+	Enabled  bool
+	Memory   MemoryMonitorOptions
+	Watchdog WatchdogMonitorOptions
 }
 
 // Manager 监控管理器（统一管理所有监控器）
@@ -18,6 +20,7 @@ type Manager struct {
 	goroutineMonitor   *GoroutineMonitor
 	memoryMonitor      *MemoryMonitor
 	performanceMonitor *PerformanceMonitor
+	watchdogMonitor    *WatchdogMonitor
 	options            ManagerOptions
 }
 
@@ -34,7 +37,7 @@ func NewManager(opts ManagerOptions) *Manager {
 }
 
 // Start 启动所有监控器
-func (m *Manager) Start() {
+func (m *Manager) Start(notificationMgr interface{}) {
 	if !m.options.Enabled {
 		m.log.Info("监控功能已禁用")
 		return
@@ -54,7 +57,25 @@ func (m *Manager) Start() {
 	m.performanceMonitor = NewPerformanceMonitor(30 * time.Second)
 	m.performanceMonitor.Start()
 
-	m.log.Info("监控管理器已启动（Goroutine监控、内存监控、性能监控）")
+	// 启动看门狗监控器（如果启用）
+	if m.options.Watchdog.Enabled {
+		var nmgr *notification.NotificationManager
+		if notificationMgr != nil {
+			// 尝试从NotificationIntegrator获取Manager
+			if integrator, ok := notificationMgr.(interface {
+				GetManager() *notification.NotificationManager
+			}); ok {
+				nmgr = integrator.GetManager()
+			} else if mgr, ok := notificationMgr.(*notification.NotificationManager); ok {
+				nmgr = mgr
+			}
+		}
+		m.watchdogMonitor = NewWatchdogMonitor(m.options.Watchdog, nmgr)
+		m.watchdogMonitor.Start()
+		m.log.Info("看门狗监控器已启动")
+	}
+
+	m.log.Info("监控管理器已启动（Goroutine监控、内存监控、性能监控、看门狗监控）")
 }
 
 // Stop 停止所有监控器
@@ -75,6 +96,10 @@ func (m *Manager) Stop() {
 
 	if m.performanceMonitor != nil {
 		m.performanceMonitor.Stop()
+	}
+
+	if m.watchdogMonitor != nil {
+		m.watchdogMonitor.Stop()
 	}
 
 	m.log.Info("监控管理器已停止")
@@ -111,6 +136,10 @@ func (m *Manager) GetAllStats() map[string]interface{} {
 		stats["performance"] = m.performanceMonitor.GetStats()
 	}
 
+	if m.watchdogMonitor != nil {
+		stats["watchdog"] = m.watchdogMonitor.GetStats()
+	}
+
 	return stats
 }
 
@@ -139,4 +168,17 @@ func (m *Manager) ResetAllBaselines() {
 	}
 
 	m.log.Info("所有监控基线已重置")
+}
+
+// GetWatchdogMonitor 获取看门狗监控器
+func (m *Manager) GetWatchdogMonitor() *WatchdogMonitor {
+	return m.watchdogMonitor
+}
+
+// UpdateWatchdogOptions 更新看门狗监控配置
+func (m *Manager) UpdateWatchdogOptions(opts WatchdogMonitorOptions) {
+	m.options.Watchdog = opts.normalize()
+	if m.watchdogMonitor != nil {
+		m.watchdogMonitor.UpdateOptions(m.options.Watchdog)
+	}
 }

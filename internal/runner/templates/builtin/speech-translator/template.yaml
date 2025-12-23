@@ -2,8 +2,14 @@ id: speech-translator
 name: Speech Translator (语音翻译)
 category: ai
 subcategory: speech-translation
-tags: [python, ai, speech, translation, real-time, gpu]
-description: [不可用] 镜像不存在 - 实时语音翻译服务，支持语音识别、翻译和语音合成。
+tags:
+  - python
+  - ai
+  - speech
+  - translation
+  - real-time
+  - gpu
+description: "[不可用] 镜像不存在 - 实时语音翻译服务，支持语音识别、翻译和语音合成。"
 icon: speech-translator
 version: 1.0.0
 author: SSLcat Team

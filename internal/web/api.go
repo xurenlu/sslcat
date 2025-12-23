@@ -83,7 +83,45 @@ func (s *Server) handleAPISSLCerts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// #region agent log
+	logFile, _ := os.OpenFile("/Users/rocky/Sites/sslcat/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if logFile != nil {
+		logData, _ := json.Marshal(map[string]interface{}{
+			"sessionId":    "debug-session",
+			"runId":        "run1",
+			"hypothesisId": "E",
+			"location":     "api.go:86",
+			"message":      "API handleAPISSLCerts called",
+			"data":         map[string]interface{}{"certDir": s.config.SSL.CertDir},
+			"timestamp":    time.Now().UnixMilli(),
+		})
+		logFile.WriteString(string(logData) + "\n")
+		logFile.Close()
+	}
+	// #endregion
+
 	certs := s.sslManager.GetCertificateList()
+
+	// #region agent log
+	if logFile, _ := os.OpenFile("/Users/rocky/Sites/sslcat/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); logFile != nil {
+		var domains []string
+		for _, c := range certs {
+			domains = append(domains, c.Domain)
+		}
+		logData, _ := json.Marshal(map[string]interface{}{
+			"sessionId":    "debug-session",
+			"runId":        "run1",
+			"hypothesisId": "E",
+			"location":     "api.go:99",
+			"message":      "API returning certificate list",
+			"data":         map[string]interface{}{"certCount": len(certs), "domains": domains},
+			"timestamp":    time.Now().UnixMilli(),
+		})
+		logFile.WriteString(string(logData) + "\n")
+		logFile.Close()
+	}
+	// #endregion
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(certs)
 }

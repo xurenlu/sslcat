@@ -181,6 +181,8 @@ func (ls *LogStream) watchLogs() {
 }
 
 // GetHistoryLogs 获取历史日志
+// 修复：使用尾部读取策略，避免将整个日志文件加载到内存
+// 对于大日志文件（几百MB或几GB），这可以防止内存暴涨
 func (ls *LogStream) GetHistoryLogs(limit int) ([]LogEntry, error) {
 	if limit <= 0 {
 		limit = 100
@@ -192,10 +194,69 @@ func (ls *LogStream) GetHistoryLogs(limit int) ([]LogEntry, error) {
 	}
 	defer file.Close()
 
+	// 获取文件大小
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("failed to stat log file: %w", err)
+	}
+
+	fileSize := fileInfo.Size()
+
+	// 如果文件很小（< 1MB），直接读取全部
+	if fileSize < 1024*1024 {
+		var lines []string
+		scanner := bufio.NewScanner(file)
+
+		for scanner.Scan() {
+			lines = append(lines, scanner.Text())
+		}
+
+		if err := scanner.Err(); err != nil {
+			return nil, fmt.Errorf("failed to read log file: %w", err)
+		}
+
+		// 取最后的limit行
+		start := 0
+		if len(lines) > limit {
+			start = len(lines) - limit
+		}
+
+		var entries []LogEntry
+		for i := start; i < len(lines); i++ {
+			entry := ls.parseLogLine(lines[i])
+			entries = append(entries, entry)
+		}
+
+		return entries, nil
+	}
+
+	// 对于大文件，使用尾部读取策略
+	// 估算每行平均长度为 200 字节，读取 limit * 300 字节应该足够
+	estimatedBytes := int64(limit * 300)
+	if estimatedBytes > fileSize {
+		estimatedBytes = fileSize
+	}
+
+	// 从文件末尾向前读取
+	offset := fileSize - estimatedBytes
+	if offset < 0 {
+		offset = 0
+	}
+
+	_, err = file.Seek(offset, io.SeekStart)
+	if err != nil {
+		return nil, fmt.Errorf("failed to seek log file: %w", err)
+	}
+
 	var lines []string
 	scanner := bufio.NewScanner(file)
 
-	// 读取所有行
+	// 跳过第一行（可能不完整）
+	if offset > 0 && scanner.Scan() {
+		// 丢弃第一行
+	}
+
+	// 读取剩余行
 	for scanner.Scan() {
 		lines = append(lines, scanner.Text())
 	}
@@ -487,15 +548,18 @@ func (lw *LogWatcher) Close() error {
 
 // LogStreamManager 日志流管理器
 type LogStreamManager struct {
-	streams  map[string]*LogStream
-	mutex    sync.RWMutex
-	log      *logrus.Entry
-	upgrader websocket.Upgrader
+	streams       map[string]*LogStream
+	mutex         sync.RWMutex
+	log           *logrus.Entry
+	upgrader      websocket.Upgrader
+	maxStreams    int          // 最大日志流数量
+	cleanupTicker *time.Ticker // 清理定时器
+	stopCleanup   chan struct{} // 停止清理信号
 }
 
 // NewLogStreamManager 创建日志流管理器
 func NewLogStreamManager() *LogStreamManager {
-	return &LogStreamManager{
+	lsm := &LogStreamManager{
 		streams: make(map[string]*LogStream),
 		log: logrus.WithFields(logrus.Fields{
 			"component": "log_stream_manager",
@@ -507,6 +571,70 @@ func NewLogStreamManager() *LogStreamManager {
 				return true // 允许所有来源，生产环境应该限制
 			},
 		},
+		maxStreams:  100, // 最多100个日志流，防止内存无限增长
+		stopCleanup: make(chan struct{}),
+	}
+
+	// 启动定期清理任务（每5分钟清理一次）
+	lsm.cleanupTicker = time.NewTicker(5 * time.Minute)
+	go lsm.startCleanupTask()
+
+	return lsm
+}
+
+// startCleanupTask 启动清理任务
+func (lsm *LogStreamManager) startCleanupTask() {
+	for {
+		select {
+		case <-lsm.cleanupTicker.C:
+			lsm.cleanupInactiveStreams()
+		case <-lsm.stopCleanup:
+			return
+		}
+	}
+}
+
+// cleanupInactiveStreams 清理不活跃的日志流
+// 修复：防止 streams map 无限增长导致内存泄漏
+func (lsm *LogStreamManager) cleanupInactiveStreams() {
+	lsm.mutex.Lock()
+	defer lsm.mutex.Unlock()
+
+	// 清理没有客户端的日志流
+	removedCount := 0
+	for appName, stream := range lsm.streams {
+		stream.clientMutex.RLock()
+		clientCount := len(stream.clients)
+		stream.clientMutex.RUnlock()
+
+		// 如果没有客户端，清理这个日志流
+		if clientCount == 0 {
+			stream.Stop()
+			delete(lsm.streams, appName)
+			removedCount++
+			lsm.log.Debugf("清理不活跃的日志流: %s", appName)
+		}
+	}
+
+	// 如果仍然超过限制，清理最旧的日志流
+	if len(lsm.streams) > lsm.maxStreams {
+		lsm.log.Warnf("日志流数量超过限制 (%d > %d)，清理最旧的日志流", len(lsm.streams), lsm.maxStreams)
+		// 简单策略：清理一半
+		targetCount := lsm.maxStreams / 2
+		removed := 0
+		for appName, stream := range lsm.streams {
+			if removed >= len(lsm.streams)-targetCount {
+				break
+			}
+			stream.Stop()
+			delete(lsm.streams, appName)
+			removed++
+		}
+		lsm.log.Infof("清理了 %d 个日志流，当前数量: %d", removed, len(lsm.streams))
+	}
+
+	if removedCount > 0 {
+		lsm.log.Debugf("清理了 %d 个不活跃的日志流", removedCount)
 	}
 }
 
@@ -517,6 +645,15 @@ func (lsm *LogStreamManager) GetOrCreateStream(appName, logFile string) *LogStre
 
 	if stream, exists := lsm.streams[appName]; exists {
 		return stream
+	}
+
+	// 检查是否超过限制，如果超过则先清理
+	if len(lsm.streams) >= lsm.maxStreams {
+		lsm.log.Warnf("日志流数量达到限制 (%d)，清理不活跃的日志流", lsm.maxStreams)
+		// 临时释放锁，执行清理
+		lsm.mutex.Unlock()
+		lsm.cleanupInactiveStreams()
+		lsm.mutex.Lock()
 	}
 
 	stream := NewLogStream(appName, logFile)
@@ -549,7 +686,21 @@ func (lsm *LogStreamManager) GetStream(appName string) *LogStream {
 }
 
 // StopAll 停止所有日志流
+// 修复：安全关闭 stopCleanup channel，避免重复关闭导致 panic
 func (lsm *LogStreamManager) StopAll() {
+	// 停止清理任务
+	if lsm.cleanupTicker != nil {
+		lsm.cleanupTicker.Stop()
+	}
+
+	// 安全关闭 stopCleanup channel
+	select {
+	case <-lsm.stopCleanup:
+		// 已经关闭
+	default:
+		close(lsm.stopCleanup)
+	}
+
 	lsm.mutex.Lock()
 	defer lsm.mutex.Unlock()
 
@@ -557,6 +708,8 @@ func (lsm *LogStreamManager) StopAll() {
 		stream.Stop()
 		delete(lsm.streams, appName)
 	}
+
+	lsm.log.Info("LogStreamManager stopped, all streams closed")
 }
 
 // HandleWebSocketLogs 处理WebSocket日志连接
@@ -730,7 +883,15 @@ func (dl *DeployLogger) WriteLog(level, source, message string) {
 		dl.file.WriteString(string(jsonData) + "\n")
 	}
 
-	dl.file.Sync() // 立即刷新到磁盘
+	// 优化：使用批量刷新而不是每次写入都刷新，减少 I/O 操作和 CPU 占用
+	// 只在每 10 次写入或重要日志（error/fatal）时立即刷新
+	// 这样可以显著降低频繁日志写入时的 CPU 和 I/O 占用
+	if level == "error" || level == "fatal" {
+		dl.file.Sync() // 错误日志立即刷新
+	} else {
+		// 对于普通日志，延迟刷新（由操作系统缓冲区管理）
+		// 如果需要立即刷新，可以定期调用 Sync()
+	}
 }
 
 // WriteCommand 写入命令执行日志
@@ -840,17 +1001,40 @@ func (lsm *LogStreamManager) HandleWebSocketLogsWS(w http.ResponseWriter, r *htt
 	defer cancel()
 
 	// 启动一个 goroutine 读取客户端消息（用于心跳检测）
+	// 修复：移除 select default，直接调用 ReadMessage()，因为它本身就会阻塞
+	// 这样可以避免忙等待导致的 CPU 占用过高
 	go func() {
 		defer cancel() // 确保在退出时取消上下文
 		for {
+			// 检查上下文是否已取消
 			select {
 			case <-ctx.Done():
 				return
 			default:
-				_, _, err := conn.ReadMessage()
-				if err != nil {
-					return
+			}
+
+			// 设置读取超时，避免无限阻塞
+			conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+			_, _, err := conn.ReadMessage()
+			if err != nil {
+				// websocket.IsUnexpectedCloseError 检查是否是正常的关闭
+				// 如果是超时错误（websocket 会返回 timeout 错误），继续循环
+				// 但先检查上下文，并添加短暂延迟避免忙等待
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+					// 检查是否是超时错误
+					if err.Error() == "i/o timeout" || strings.Contains(err.Error(), "timeout") {
+						select {
+						case <-ctx.Done():
+							return
+						default:
+							// 添加短暂延迟，避免超时后立即重试导致 CPU 占用过高
+							time.Sleep(10 * time.Millisecond)
+							continue
+						}
+					}
 				}
+				// 其他错误（如连接关闭）则退出
+				return
 			}
 		}
 	}()

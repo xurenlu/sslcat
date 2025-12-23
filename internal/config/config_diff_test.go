@@ -278,3 +278,107 @@ func TestDeepEqual(t *testing.T) {
 	}
 }
 
+func TestSaveConfigWithZeroValues(t *testing.T) {
+	// 创建临时目录
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "sslcat.conf")
+
+	// 创建测试配置，包含一个 ProxyRule，其中有很多零值字段
+	testConfig := getDefaultConfig()
+	testConfig.Proxy.Rules = []ProxyRule{
+		{
+			Domain:  "example.com",
+			Target:  "localhost",
+			Port:    3000,
+			Enabled: true,
+			SSLOnly: true,
+			// 以下字段都是零值（默认值），不应该被保存
+			// auth_enabled: false (零值)
+			// cdn_enabled: false (零值)
+			// health_check_enabled: false (零值)
+			// failover_enabled: false (零值)
+			// session_affinity_enabled: false (零值)
+			// 等等...
+		},
+	}
+
+	// 保存配置
+	if err := testConfig.Save(configFile); err != nil {
+		t.Fatalf("保存配置失败: %v", err)
+	}
+
+	// 读取保存的配置
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		t.Fatalf("读取配置文件失败: %v", err)
+	}
+
+	var savedConfig map[string]interface{}
+	if err := json.Unmarshal(data, &savedConfig); err != nil {
+		t.Fatalf("解析配置文件失败: %v", err)
+	}
+
+	// 验证 proxy.rules 存在
+	proxyMap, ok := savedConfig["proxy"].(map[string]interface{})
+	if !ok {
+		t.Fatal("保存的配置中应该包含 proxy 字段")
+	}
+
+	rules, ok := proxyMap["rules"].([]interface{})
+	if !ok || len(rules) != 1 {
+		t.Fatal("保存的配置中应该包含一个 proxy rule")
+	}
+
+	ruleMap, ok := rules[0].(map[string]interface{})
+	if !ok {
+		t.Fatal("proxy rule 应该是 map")
+	}
+
+	// 验证必要的字段存在
+	if ruleMap["domain"] != "example.com" {
+		t.Error("domain 字段应该存在")
+	}
+	if ruleMap["enabled"] != true {
+		t.Error("enabled 字段应该存在且为 true")
+	}
+	if ruleMap["ssl_only"] != true {
+		t.Error("ssl_only 字段应该存在且为 true")
+	}
+
+	// 验证零值字段不应该存在（如果默认值也是零值）
+	zeroValueFields := []string{
+		"auth_enabled",
+		"cdn_enabled",
+		"health_check_enabled",
+		"failover_enabled",
+		"session_affinity_enabled",
+		"auth_cookie_domain",
+		"auth_session_timeout",
+		"cdn_preset",
+		"cdn_ttl_seconds",
+		"connect_timeout_sec",
+		"expect_continue_timeout_sec",
+		"expected_status_code",
+		"failure_threshold",
+		"max_retries",
+		"retry_interval",
+		"recovery_threshold",
+		"health_check_interval",
+		"health_check_timeout",
+		"health_check_method",
+		"health_check_path",
+		"session_affinity_method",
+		"session_affinity_cookie",
+		"session_affinity_header",
+		"session_affinity_ttl",
+	}
+
+	for _, field := range zeroValueFields {
+		if _, exists := ruleMap[field]; exists {
+			t.Errorf("零值字段 %s 不应该被保存（默认值也是零值）", field)
+		}
+	}
+
+	t.Logf("保存的配置文件内容:\n%s", string(data))
+}
+

@@ -6,8 +6,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 )
@@ -807,21 +810,21 @@ func Load(configFile string) (*Config, error) {
 			LogLevel:    "info", // 默认日志级别
 			EnablePprof: false,  // 默认禁用 pprof
 			// 新的端口配置默认值
-			PortMode:          "standard", // 默认标准模式
-			CustomPort:        8080,       // 默认自定义端口
-			EnableHTTPS:       true,       // 默认启用 HTTPS
-			AccessLogEnabled:  true,
-			AccessLogFormat:   "nginx",
-			AccessLogPath:     "./data/access.log",
-			AccessLogMaxSize:  100 * 1024 * 1024,
-			AccessLogMaxFiles: 10,
+			PortMode:             "standard", // 默认标准模式
+			CustomPort:           8080,       // 默认自定义端口
+			EnableHTTPS:          true,       // 默认启用 HTTPS
+			AccessLogEnabled:     true,
+			AccessLogFormat:      "nginx",
+			AccessLogPath:        "./data/access.log",
+			AccessLogMaxSize:     100 * 1024 * 1024,
+			AccessLogMaxFiles:    10,
 			SharedCacheMaxSizeMB: 64,
-			ReadTimeoutSec:    1800,     // 30分钟
-			WriteTimeoutSec:   1800,     // 30分钟
-			IdleTimeoutSec:    120,      // 2分钟（可调）
-			MaxUploadBytes:    1 << 30,  // 1 GiB
-			SessionStorage:    "file",   // 默认使用文件存储
-			DataDir:           "./data", // 数据目录
+			ReadTimeoutSec:       1800,     // 30分钟
+			WriteTimeoutSec:      1800,     // 30分钟
+			IdleTimeoutSec:       120,      // 2分钟（可调）
+			MaxUploadBytes:       1 << 30,  // 1 GiB
+			SessionStorage:       "file",   // 默认使用文件存储
+			DataDir:              "./data", // 数据目录
 		},
 		SSL: SSLConfig{
 			Staging:            false,
@@ -938,9 +941,16 @@ func Load(configFile string) (*Config, error) {
 			},
 		},
 		Monitoring: MonitoringConfig{
-			Enabled:                  true,  // 默认启用监控
-			MemoryMaxUsagePercent:    20.0,  // 默认20%
-			MemoryReleaseCooldownSec: 300,   // 默认5分钟
+			Enabled:                  true, // 默认启用监控
+			MemoryMaxUsagePercent:    20.0, // 默认20%
+			MemoryReleaseCooldownSec: 300,  // 默认5分钟
+			// 看门狗默认配置
+			WatchdogEnabled:                     false, // 默认禁用，需要用户手动启用
+			WatchdogCheckIntervalSec:            30,    // 默认30秒
+			WatchdogCPUThresholdPercent:         30.0,  // 默认30%
+			WatchdogCPUIncreaseThresholdPercent: 15.0,  // 默认15%
+			WatchdogCPUIncreaseWindowSec:        180,   // 默认3分钟
+			WatchdogAlertCooldownSec:            3600,  // 默认1小时
 		},
 		CacheWarmup: CacheWarmupConfig{
 			Enabled:  false, // 默认禁用缓存预热
@@ -1281,6 +1291,13 @@ func getDefaultConfig() *Config {
 		},
 		Monitoring: MonitoringConfig{
 			Enabled: true,
+			// 看门狗默认配置
+			WatchdogEnabled:                     false,
+			WatchdogCheckIntervalSec:            30,
+			WatchdogCPUThresholdPercent:         30.0,
+			WatchdogCPUIncreaseThresholdPercent: 15.0,
+			WatchdogCPUIncreaseWindowSec:        180,
+			WatchdogAlertCooldownSec:            3600,
 		},
 		CacheWarmup: CacheWarmupConfig{
 			Enabled:  false,
@@ -1347,8 +1364,14 @@ func diffMap(current, defaultVal map[string]interface{}, result map[string]inter
 
 		defaultValForKey, exists := defaultVal[key]
 		if !exists {
-			// 默认配置中没有这个键，保留
-			result[key] = currentVal
+			// 默认配置中没有这个键，检查当前值是否是零值
+			// 如果是零值，则不保留（因为默认值就是零值）
+			if !isZeroValue(currentVal) {
+				// 如果是嵌套结构（map 或 slice），需要递归清理零值字段
+				if cleaned := cleanZeroValues(currentVal); cleaned != nil {
+					result[key] = cleaned
+				}
+			}
 			continue
 		}
 
@@ -1365,7 +1388,105 @@ func diffMap(current, defaultVal map[string]interface{}, result map[string]inter
 			}
 		} else if !deepEqual(currentVal, defaultValForKey) {
 			// 不是嵌套 map，直接比较
-			result[key] = currentVal
+			// 但需要清理零值字段（特别是对于 slice 中的 map 元素）
+			if cleaned := cleanZeroValues(currentVal); cleaned != nil {
+				result[key] = cleaned
+			}
+		}
+	}
+}
+
+// cleanZeroValues 清理嵌套结构中的零值字段
+func cleanZeroValues(v interface{}) interface{} {
+	if v == nil {
+		return nil
+	}
+
+	// 处理 map
+	if m, ok := v.(map[string]interface{}); ok {
+		cleaned := make(map[string]interface{})
+		for key, val := range m {
+			// 跳过零值字段
+			if isZeroValue(val) {
+				continue
+			}
+			// 递归清理嵌套结构
+			if cleanedVal := cleanZeroValues(val); cleanedVal != nil {
+				cleaned[key] = cleanedVal
+			}
+		}
+		if len(cleaned) == 0 {
+			return nil
+		}
+		return cleaned
+	}
+
+	// 处理 slice
+	if s, ok := v.([]interface{}); ok {
+		cleaned := make([]interface{}, 0, len(s))
+		for _, item := range s {
+			if cleanedItem := cleanZeroValues(item); cleanedItem != nil {
+				cleaned = append(cleaned, cleanedItem)
+			}
+		}
+		if len(cleaned) == 0 {
+			return nil
+		}
+		return cleaned
+	}
+
+	// 其他类型直接返回
+	return v
+}
+
+// isZeroValue 检查值是否是零值（应该被忽略的默认值）
+func isZeroValue(v interface{}) bool {
+	if v == nil {
+		return true
+	}
+
+	// 使用反射来处理所有类型，因为 JSON 反序列化后的类型可能不同
+	rv := reflect.ValueOf(v)
+	if !rv.IsValid() {
+		return true
+	}
+
+	switch rv.Kind() {
+	case reflect.Bool:
+		return !rv.Bool()
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return rv.Int() == 0
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return rv.Uint() == 0
+	case reflect.Float32, reflect.Float64:
+		return rv.Float() == 0
+	case reflect.String:
+		return rv.String() == ""
+	case reflect.Slice, reflect.Array:
+		return rv.Len() == 0
+	case reflect.Map:
+		return rv.Len() == 0
+	case reflect.Ptr, reflect.Interface:
+		return rv.IsNil()
+	default:
+		// 对于其他类型，尝试类型断言
+		switch val := v.(type) {
+		case bool:
+			return !val
+		case int, int8, int16, int32, int64:
+			return val == 0
+		case uint, uint8, uint16, uint32, uint64:
+			return val == 0
+		case float32, float64:
+			return val == 0
+		case string:
+			return val == ""
+		case []interface{}:
+			return len(val) == 0
+		case map[string]interface{}:
+			return len(val) == 0
+		default:
+			return false
 		}
 	}
 }
@@ -2123,10 +2244,45 @@ func (rule *ProxyRule) GetEffectiveBackends() []ProxyBackend {
 }
 
 // IsLoadBalanced 判断是否启用负载均衡
-// 基于后端数量自动判断
+// 基于后端数量自动判断，但如果存在HTTPS URL后端则不启用负载均衡
 func (rule *ProxyRule) IsLoadBalanced() bool {
 	backends := rule.GetEffectiveBackends()
-	return len(backends) > 1
+	if len(backends) <= 1 {
+		return false
+	}
+
+	// 检查是否存在HTTPS URL后端（非IP地址）
+	// 如果存在HTTPS URL后端，即使有多个后端也不启用负载均衡
+	for _, backend := range backends {
+		if isHTTPSURL(backend.Host) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// isHTTPSURL 检查后端主机是否为HTTPS URL（非IP地址）
+func isHTTPSURL(host string) bool {
+	// 检查是否以 https:// 开头
+	if !strings.HasPrefix(strings.ToLower(host), "https://") {
+		return false
+	}
+
+	// 解析URL
+	parsedURL, err := url.Parse(host)
+	if err != nil {
+		return false
+	}
+
+	// 提取主机名（去除端口）
+	hostname := parsedURL.Hostname()
+	if hostname == "" {
+		return false
+	}
+
+	// 检查主机名是否为IP地址
+	return net.ParseIP(hostname) == nil
 }
 
 // MatchesPath 检查请求路径是否匹配规则
@@ -2288,9 +2444,17 @@ func (rule *PathPrefixRule) GetMatchedPrefix(requestPath string) string {
 
 // MonitoringConfig 监控配置
 type MonitoringConfig struct {
-	Enabled                    bool    `json:"enabled"`
-	MemoryMaxUsagePercent      float64 `json:"memory_max_usage_percent"`       // 触发内存释放的系统占用百分比
-	MemoryReleaseCooldownSec   int     `json:"memory_release_cooldown_sec"`    // 内存释放冷却时间（秒）
+	Enabled                  bool    `json:"enabled"`
+	MemoryMaxUsagePercent    float64 `json:"memory_max_usage_percent"`    // 触发内存释放的系统占用百分比
+	MemoryReleaseCooldownSec int     `json:"memory_release_cooldown_sec"` // 内存释放冷却时间（秒）
+
+	// 看门狗监控配置
+	WatchdogEnabled                     bool    `json:"watchdog_enabled"`                        // 是否启用看门狗
+	WatchdogCheckIntervalSec            int     `json:"watchdog_check_interval_sec"`             // 检查间隔（秒，默认30）
+	WatchdogCPUThresholdPercent         float64 `json:"watchdog_cpu_threshold_percent"`          // CPU绝对阈值（默认30%）
+	WatchdogCPUIncreaseThresholdPercent float64 `json:"watchdog_cpu_increase_threshold_percent"` // CPU增长阈值（默认15%）
+	WatchdogCPUIncreaseWindowSec        int     `json:"watchdog_cpu_increase_window_sec"`        // 增长检测时间窗口（默认180秒，即3分钟）
+	WatchdogAlertCooldownSec            int     `json:"watchdog_alert_cooldown_sec"`             // 报警冷却时间（默认3600秒，即1小时）
 }
 
 // CacheWarmupConfig 缓存预热配置
