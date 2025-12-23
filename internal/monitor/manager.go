@@ -4,14 +4,12 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/xurenlu/sslcat/internal/notification"
 )
 
 // Manager 监控管理器（统一管理所有监控器）
 type ManagerOptions struct {
-	Enabled  bool
-	Memory   MemoryMonitorOptions
-	Watchdog WatchdogMonitorOptions
+	Enabled bool
+	Memory  MemoryMonitorOptions
 }
 
 // Manager 监控管理器（统一管理所有监控器）
@@ -37,7 +35,7 @@ func NewManager(opts ManagerOptions) *Manager {
 }
 
 // Start 启动所有监控器
-func (m *Manager) Start(notificationMgr interface{}) {
+func (m *Manager) Start() {
 	if !m.options.Enabled {
 		m.log.Info("监控功能已禁用")
 		return
@@ -57,25 +55,7 @@ func (m *Manager) Start(notificationMgr interface{}) {
 	m.performanceMonitor = NewPerformanceMonitor(30 * time.Second)
 	m.performanceMonitor.Start()
 
-	// 启动看门狗监控器（如果启用）
-	if m.options.Watchdog.Enabled {
-		var nmgr *notification.NotificationManager
-		if notificationMgr != nil {
-			// 尝试从NotificationIntegrator获取Manager
-			if integrator, ok := notificationMgr.(interface {
-				GetManager() *notification.NotificationManager
-			}); ok {
-				nmgr = integrator.GetManager()
-			} else if mgr, ok := notificationMgr.(*notification.NotificationManager); ok {
-				nmgr = mgr
-			}
-		}
-		m.watchdogMonitor = NewWatchdogMonitor(m.options.Watchdog, nmgr)
-		m.watchdogMonitor.Start()
-		m.log.Info("看门狗监控器已启动")
-	}
-
-	m.log.Info("监控管理器已启动（Goroutine监控、内存监控、性能监控、看门狗监控）")
+	m.log.Info("监控管理器已启动（Goroutine监控、内存监控、性能监控）")
 }
 
 // Stop 停止所有监控器
@@ -171,14 +151,3 @@ func (m *Manager) ResetAllBaselines() {
 }
 
 // GetWatchdogMonitor 获取看门狗监控器
-func (m *Manager) GetWatchdogMonitor() *WatchdogMonitor {
-	return m.watchdogMonitor
-}
-
-// UpdateWatchdogOptions 更新看门狗监控配置
-func (m *Manager) UpdateWatchdogOptions(opts WatchdogMonitorOptions) {
-	m.options.Watchdog = opts.normalize()
-	if m.watchdogMonitor != nil {
-		m.watchdogMonitor.UpdateOptions(m.options.Watchdog)
-	}
-}
