@@ -156,14 +156,26 @@ func (sm *SessionManager) SetSessionCookie(w http.ResponseWriter, sessionID stri
 
 // GetSessionFromRequest 从请求中获取会话
 func (sm *SessionManager) GetSessionFromRequest(r *http.Request) (*Session, bool) {
+	var sessionID string
+	
+	// 1. 优先从 Cookie 获取
 	cookie, err := r.Cookie("sslcat_session")
-	if err != nil {
-		sm.log.Debugf("❌ 未找到 Session Cookie: %v, 所有 Cookies: %v", err, r.Cookies())
-		return nil, false
+	if err == nil {
+		sessionID = cookie.Value
+		sm.log.Debugf("✅ 从 Cookie 找到 Session: %s", sessionID)
+	} else {
+		// 2. 如果 Cookie 不存在，尝试从 URL 参数获取（调试用）
+		sessionID = r.URL.Query().Get("session")
+		if sessionID != "" {
+			sm.log.Warnf("⚠️  从 URL 参数获取 Session（不安全，仅用于调试）: %s", sessionID)
+		} else {
+			sm.log.Debugf("❌ 未找到 Session - Cookie错误: %v, 所有Cookies: %v, URL: %s", 
+				err, r.Cookies(), r.URL.String())
+			return nil, false
+		}
 	}
 
-	sm.log.Debugf("✅ 找到 Session Cookie: %s", cookie.Value)
-	return sm.GetSession(cookie.Value)
+	return sm.GetSession(sessionID)
 }
 
 // GetAllSessions 获取所有会话
