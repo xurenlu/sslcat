@@ -1,6 +1,7 @@
 package ssl
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
@@ -720,20 +721,39 @@ func (m *Manager) GetTLSConfig() *tls.Config {
 			}
 			if m.isAllowedDomain(host) {
 				if cert, err := m.acmeMgr.GetCertificate(hello); err == nil {
-					// 将 autocert 获取的证书也加载到内存缓存中，以便在证书列表中显示
-					m.certMutex.Lock()
-					m.certCache[strings.ToLower(host)] = cert
-					m.certMutex.Unlock()
-					m.updateCertMetadata(strings.ToLower(host), cert)
+					domain := strings.ToLower(host)
 					
-					// 立即将证书持久化到磁盘，避免重启后丢失
-					go func(domain string, certificate *tls.Certificate) {
-						if err := m.saveCertificateToDisk(domain, certificate); err != nil {
-							m.log.Warnf("Failed to save certificate to disk for %s: %v", domain, err)
-						} else {
-							m.log.Infof("Certificate saved to disk for %s", domain)
+					// 检查是否需要持久化（只在首次获取或证书更新时）
+					needsPersist := false
+					m.certMutex.RLock()
+					existingCert, exists := m.certCache[domain]
+					if !exists {
+						// 首次获取，需要持久化
+						needsPersist = true
+					} else if existingCert != nil && len(existingCert.Certificate) > 0 && len(cert.Certificate) > 0 {
+						// 检查证书是否更新（比较证书内容）
+						if !bytes.Equal(existingCert.Certificate[0], cert.Certificate[0]) {
+							needsPersist = true
 						}
-					}(strings.ToLower(host), cert)
+					}
+					m.certMutex.RUnlock()
+					
+					// 将 autocert 获取的证书加载到内存缓存中
+					m.certMutex.Lock()
+					m.certCache[domain] = cert
+					m.certMutex.Unlock()
+					m.updateCertMetadata(domain, cert)
+					
+					// 只在需要时持久化到磁盘
+					if needsPersist {
+						go func(d string, certificate *tls.Certificate) {
+							if err := m.saveCertificateToDisk(d, certificate); err != nil {
+								m.log.Warnf("Failed to save certificate to disk for %s: %v", d, err)
+							} else {
+								m.log.Infof("Certificate saved to disk for %s", d)
+							}
+						}(domain, cert)
+					}
 					
 					return cert, nil
 				}
