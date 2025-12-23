@@ -127,6 +127,12 @@ func (sm *SessionManager) DeleteSession(sessionID string) {
 
 // SetSessionCookie 设置会话Cookie
 func (sm *SessionManager) SetSessionCookie(w http.ResponseWriter, sessionID string, secure bool) {
+	// 如果是 HTTPS，使用 SameSite=None 以支持跨站点；否则使用 Lax
+	sameSite := http.SameSiteLaxMode
+	if secure {
+		sameSite = http.SameSiteNoneMode
+	}
+	
 	cookie := &http.Cookie{
 		Name:     "sslcat_session",
 		Value:    sessionID,
@@ -134,9 +140,11 @@ func (sm *SessionManager) SetSessionCookie(w http.ResponseWriter, sessionID stri
 		MaxAge:   8 * 3600, // 8小时
 		HttpOnly: true,
 		Secure:   secure,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: sameSite,
 	}
 	http.SetCookie(w, cookie)
+	
+	sm.log.Debugf("设置 Session Cookie: sessionID=%s, secure=%v, sameSite=%v", sessionID, secure, sameSite)
 }
 
 // GetSessionFromRequest 从请求中获取会话
