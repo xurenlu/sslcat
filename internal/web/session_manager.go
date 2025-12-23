@@ -127,31 +127,27 @@ func (sm *SessionManager) DeleteSession(sessionID string) {
 
 // SetSessionCookie 设置会话Cookie
 func (sm *SessionManager) SetSessionCookie(w http.ResponseWriter, sessionID string, secure bool) {
-	// 对于 HTTP 站点，完全不设置 SameSite 属性（让浏览器使用默认值）
-	// 这样可以最大程度兼容各种浏览器
+	// 临时调试模式：完全开放的 Cookie 设置
+	// 移除所有安全限制以排查问题
 	cookie := &http.Cookie{
 		Name:     "sslcat_session",
 		Value:    sessionID,
 		Path:     "/",
-		Domain:   "", // 不设置 Domain，让浏览器自动使用当前域名
+		Domain:   "", // 不设置 Domain
 		MaxAge:   8 * 3600, // 8小时
-		HttpOnly: true,
-		Secure:   false, // HTTP 站点必须设置为 false
-		// 不设置 SameSite，让浏览器使用默认行为
-	}
-	
-	// 如果是 HTTPS，才设置 Secure 和 SameSite
-	if secure {
-		cookie.Secure = true
-		cookie.SameSite = http.SameSiteNoneMode
+		HttpOnly: false, // 临时禁用 HttpOnly 以便 JavaScript 可以访问
+		Secure:   false, // 禁用 Secure
+		// 完全不设置 SameSite
 	}
 	
 	http.SetCookie(w, cookie)
 	
-	// 获取实际的 Set-Cookie 响应头
-	setCookieHeader := w.Header().Get("Set-Cookie")
-	sm.log.Infof("✅ 设置 Session Cookie - sessionID=%s, secure=%v, SameSite=%v, Set-Cookie头: %s", 
-		sessionID, secure, cookie.SameSite, setCookieHeader)
+	// 同时手动设置一个更简单的 Cookie 头（绕过 Go 的限制）
+	simpleCookie := fmt.Sprintf("sslcat_session=%s; Path=/; Max-Age=28800", sessionID)
+	w.Header().Add("Set-Cookie", simpleCookie)
+	
+	sm.log.Infof("✅ 设置 Session Cookie (调试模式) - sessionID=%s, 简化Cookie: %s", 
+		sessionID, simpleCookie)
 }
 
 // GetSessionFromRequest 从请求中获取会话
