@@ -151,9 +151,11 @@ func (sm *SessionManager) SetSessionCookie(w http.ResponseWriter, sessionID stri
 func (sm *SessionManager) GetSessionFromRequest(r *http.Request) (*Session, bool) {
 	cookie, err := r.Cookie("sslcat_session")
 	if err != nil {
+		sm.log.Debugf("❌ 未找到 Session Cookie: %v, 所有 Cookies: %v", err, r.Cookies())
 		return nil, false
 	}
 
+	sm.log.Debugf("✅ 找到 Session Cookie: %s", cookie.Value)
 	return sm.GetSession(cookie.Value)
 }
 
