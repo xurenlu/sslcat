@@ -1163,8 +1163,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if s.config.Server.Debug {
 		s.log.Debugf("=== ServeHTTP: %s %s from %s ===", r.Method, r.URL.Path, s.getClientIP(r))
 	}
+	// 临时禁用 IP 重定向功能，允许通过 IP 地址访问管理面板
 	// 若通过IP访问且存在可用的LE域名，强制跳转到 https://域名 + AdminPrefix（仅限管理面板路径或根）
 	// 但排除 localhost/127.0.0.1，这些用于内部 API 调用
+	/*
 	host := r.Host
 	hostOnly := host
 	if idx := strings.Index(host, ":"); idx != -1 {
@@ -1181,6 +1183,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	*/
 
 	// 语言切换：如果存在 ?lang= 参数，则设置 cookie 并重定向到去掉 lang 的同一路径
 	if langParam := r.URL.Query().Get("lang"); langParam != "" {
