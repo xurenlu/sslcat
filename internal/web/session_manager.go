@@ -137,6 +137,7 @@ func (sm *SessionManager) SetSessionCookie(w http.ResponseWriter, sessionID stri
 		Name:     "sslcat_session",
 		Value:    sessionID,
 		Path:     "/",
+		Domain:   "", // 不设置 Domain，让浏览器自动使用当前域名
 		MaxAge:   8 * 3600, // 8小时
 		HttpOnly: true,
 		Secure:   secure,
@@ -144,7 +145,10 @@ func (sm *SessionManager) SetSessionCookie(w http.ResponseWriter, sessionID stri
 	}
 	http.SetCookie(w, cookie)
 	
-	sm.log.Debugf("设置 Session Cookie: sessionID=%s, secure=%v, sameSite=%v", sessionID, secure, sameSite)
+	// 获取实际的 Set-Cookie 响应头
+	setCookieHeader := w.Header().Get("Set-Cookie")
+	sm.log.Infof("✅ 设置 Session Cookie - sessionID=%s, secure=%v, sameSite=%v, Set-Cookie头: %s", 
+		sessionID, secure, sameSite, setCookieHeader)
 }
 
 // GetSessionFromRequest 从请求中获取会话
