@@ -572,7 +572,7 @@ func extractDomainFromTLSError(msg string) string {
 func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *ssl.Manager, proxyManager *proxy.Manager, readTimeout, writeTimeout, idleTimeout time.Duration) {
 	// 创建过滤的 ErrorLog
 	filteredLog := newFilteredErrorLog()
-	
+
 	// 启动 HTTPS 服务器 (443)
 	if cfg.Server.EnableHTTPS {
 		httpsServer := &http.Server{
@@ -684,7 +684,7 @@ func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *s
 func startCustomMode(cfg *config.Config, webServer http.Handler, readTimeout, writeTimeout, idleTimeout time.Duration) {
 	// 创建过滤的 ErrorLog
 	filteredLog := newFilteredErrorLog()
-	
+
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.CustomPort),
 		Handler:      webServer,
@@ -827,60 +827,60 @@ func startMemoryMonitor(cdnCache *cache.CDNCache, proxyManager *proxy.Manager) {
 		// 使用质数间隔避免与其他定时器同时触发（5分钟 = 301秒）
 		ticker := time.NewTicker(301 * time.Second)
 		defer ticker.Stop()
-		
+
 		logrus.Info("内存监控已启动，每5分钟输出一次统计信息")
-		
+
 		for range ticker.C {
 			var m runtime.MemStats
 			runtime.ReadMemStats(&m)
-			
+
 			goroutines := runtime.NumGoroutine()
-			
+
 			// 基本内存统计
 			allocMB := m.Alloc / 1024 / 1024
 			sysMB := m.Sys / 1024 / 1024
 			numGC := m.NumGC
-			
+
 			// 获取 CDN Cache processing map 大小
 			processingMapSize := 0
 			if cdnCache != nil {
 				processingMapSize = cdnCache.GetProcessingMapSize()
 			}
-			
+
 			// 正常日志
 			logrus.Infof("📊 内存统计: Alloc=%dMB, Sys=%dMB, NumGC=%d, Goroutines=%d, CDN_Processing=%d",
 				allocMB, sysMB, numGC, goroutines, processingMapSize)
-			
+
 			// 异常检测和告警
 			warnings := []string{}
-			
+
 			// Goroutine 数量检查
 			if goroutines > 10000 {
 				warnings = append(warnings, fmt.Sprintf("Goroutine 数量异常高: %d (严重)", goroutines))
 			} else if goroutines > 5000 {
 				warnings = append(warnings, fmt.Sprintf("Goroutine 数量较高: %d (警告)", goroutines))
 			}
-			
+
 			// 内存使用检查
 			if allocMB > 2000 {
 				warnings = append(warnings, fmt.Sprintf("内存使用异常高: %dMB (严重)", allocMB))
 			} else if allocMB > 1000 {
 				warnings = append(warnings, fmt.Sprintf("内存使用较高: %dMB (警告)", allocMB))
 			}
-			
+
 			// CDN processing map 检查
 			if processingMapSize > 1000 {
 				warnings = append(warnings, fmt.Sprintf("CDN processing map 异常大: %d 个条目 (严重)", processingMapSize))
 			} else if processingMapSize > 100 {
 				warnings = append(warnings, fmt.Sprintf("CDN processing map 较大: %d 个条目 (警告)", processingMapSize))
 			}
-			
+
 			// 输出告警
 			if len(warnings) > 0 {
 				for _, warning := range warnings {
 					logrus.Errorf("⚠️ 内存告警: %s", warning)
 				}
-				
+
 				// 输出详细的 Goroutine 信息（仅在异常时）
 				if goroutines > 5000 {
 					logrus.Warnf("建议检查 Goroutine 泄漏，可以使用: curl http://localhost:6060/debug/pprof/goroutine?debug=2")

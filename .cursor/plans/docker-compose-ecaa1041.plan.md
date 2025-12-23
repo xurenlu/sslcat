@@ -1,4 +1,9 @@
-<!-- ecaa1041-3fe5-4a59-8daf-9836830e5f41 a22fc848-7f04-4f97-b02e-a623825b0faf -->
+---
+name: Docker Compose 模板化部署详细规划（加强版）
+overview: ""
+todos: []
+---
+
 # Docker Compose 模板化部署详细规划（加强版）
 
 ## 一、总体架构

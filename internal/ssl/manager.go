@@ -713,19 +713,24 @@ func (m *Manager) GetTLSConfig() *tls.Config {
 				if m.onClientHello != nil {
 					m.onClientHello(hello)
 				}
-				host := hello.ServerName
-				if host == "" {
-					host = "localhost"
-				}
-				if m.isAllowedDomain(host) {
-					if cert, err := m.acmeMgr.GetCertificate(hello); err == nil {
-						return cert, nil
-					}
-				}
-				// 回退到本地（文件/缓存）或默认自签
-				if cert, err := m.GetCertificate(host); err == nil {
+			host := hello.ServerName
+			if host == "" {
+				host = "localhost"
+			}
+			if m.isAllowedDomain(host) {
+				if cert, err := m.acmeMgr.GetCertificate(hello); err == nil {
+					// 将 autocert 获取的证书也加载到内存缓存中，以便在证书列表中显示
+					m.certMutex.Lock()
+					m.certCache[strings.ToLower(host)] = cert
+					m.certMutex.Unlock()
+					m.updateCertMetadata(strings.ToLower(host), cert)
 					return cert, nil
 				}
+			}
+			// 回退到本地（文件/缓存）或默认自签
+			if cert, err := m.GetCertificate(host); err == nil {
+				return cert, nil
+			}
 				if m.defaultCert != nil {
 					return m.defaultCert, nil
 				}
