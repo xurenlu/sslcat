@@ -5,6 +5,101 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.27-rc1] - 2025-12-23
+
+### 🐛 重大 Bug 修复
+
+#### 内存泄漏和资源管理问题修复（P0/P1）
+
+**隧道管理器**
+- **添加 Stop 方法（P0）**: 为隧道管理器添加完整的 Stop 方法，确保所有隧道进程在服务停止时正确关闭
+  - 防止僵尸进程和端口冲突
+  - 并发停止所有隧道，最多等待 15 秒
+  - 修复服务重启后旧进程仍在运行的问题
+
+**配置监听器**
+- **修复 Goroutine 泄漏（P1）**: 修复配置文件监听器中 `time.After` 导致的 goroutine 泄漏
+  - 使用 `time.AfterFunc` 替代 `time.After`，复用 Timer
+  - 避免频繁修改配置文件时创建大量 goroutine
+  - 减少内存和 CPU 占用
+
+**负载均衡器**
+- **修复 Channel 重复关闭（P1）**: 修复健康检查停止时可能导致的 panic
+  - 使用 `select` 语句安全关闭 channel
+  - 防止重复调用 `StopHealthCheck` 时崩溃
+
+**隧道进程**
+- **修复日志文件泄漏（P1）**: 确保隧道进程日志文件正确关闭
+  - 使用 `defer` 确保文件关闭
+  - 即使发生 panic 也能正确释放文件描述符
+  - 防止文件描述符泄漏
+
+**通知系统**
+- **修复 RateLimiter 内存泄漏（P1）**: 为速率限制器添加定期清理机制
+  - 每 30 分钟自动清理过期条目（超过 2 小时）
+  - 防止 `limits` map 无限增长
+  - 添加 Stop 方法确保清理器正确停止
+- **优化 History 管理（P1）**: 改进通知历史记录管理效率
+  - 批量删除过期记录，而非每次只删除一个
+  - 添加并发保护（`sync.RWMutex`）
+  - 减少内存分配和 GC 压力
+
+**Web 服务器**
+- **添加 Stop 方法**: 为 Web 服务器添加 Stop 方法，确保隧道管理器被正确停止
+- **完善生命周期管理**: 在 `main.go` 中添加所有模块的 Stop 调用
+  - 停止 Web 服务器（包括隧道管理器）
+  - 停止通知管理器
+  - 确保所有资源正确清理
+
+### 🚀 性能优化
+
+**资源管理**
+- 消除多个 Goroutine 泄漏点
+- 优化内存使用，防止无限增长
+- 改进并发安全性
+- 提高配置重载效率
+
+**稳定性提升**
+- 防止多种 panic 场景
+- 确保资源正确释放
+- 改善长时间运行稳定性
+- 优化服务停止和重启流程
+
+### 📝 代码质量
+
+**架构改进**
+- 统一的生命周期管理模式
+- 清晰的资源清理机制
+- 完善的并发控制
+- 防御性编程实践
+
+**可维护性**
+- 添加详细的注释说明
+- 统一的错误处理
+- 改进的日志记录
+- 完整的修复文档
+
+### 🔍 影响范围
+
+**修复的文件**
+- `internal/tunnel/manager.go` - 隧道管理器
+- `internal/config/watcher.go` - 配置监听器
+- `internal/loadbalancer/healthcheck.go` - 负载均衡器
+- `internal/tunnel/process.go` - 隧道进程
+- `internal/notification/rate_limiter.go` - 速率限制器
+- `internal/notification/notification.go` - 通知管理器
+- `internal/web/server.go` - Web 服务器
+- `main.go` - 主程序
+
+**测试建议**
+- 测试服务的正常启动和停止
+- 测试配置热重载时的资源清理
+- 长时间运行测试（24小时+）
+- 使用 pprof 监控 goroutine 和内存
+- 压力测试验证稳定性
+
+---
+
 ## [1.3.24-rc4] - 2025-11-12
 
 ### 🐛 Bug 修复

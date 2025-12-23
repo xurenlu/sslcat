@@ -39,6 +39,8 @@ type ConfigWatcher struct {
 	// 防抖配置
 	debounceInterval time.Duration
 	lastChangeTime   time.Time
+	debounceTimer    *time.Timer
+	debounceMutex    sync.Mutex
 }
 
 // NewConfigWatcher 创建配置监听器
@@ -145,24 +147,21 @@ func (cw *ConfigWatcher) handleFileEvent(event fsnotify.Event) {
 		cw.log.Debugf("Config file changed: %s (op: %v)", event.Name, event.Op)
 
 		// 防抖处理：避免短时间内多次重载
-		now := time.Now()
-		cw.lastChangeTime = now
-
-		// 延迟处理，等待文件写入完成
-		go func() {
+		// 使用 Timer 复用，避免每次都创建新 goroutine
+		cw.debounceMutex.Lock()
+		if cw.debounceTimer != nil {
+			cw.debounceTimer.Stop()
+		}
+		cw.debounceTimer = time.AfterFunc(cw.debounceInterval, func() {
 			select {
-			case <-time.After(cw.debounceInterval):
-				// 检查是否有新的变化
-				if cw.lastChangeTime.After(now) {
-					return // 有更新的变化，取消这次处理
-				}
-
-				cw.reloadConfig()
 			case <-cw.ctx.Done():
 				// 监听器已停止，取消处理
 				return
+			default:
+				cw.reloadConfig()
 			}
-		}()
+		})
+		cw.debounceMutex.Unlock()
 	}
 }
 

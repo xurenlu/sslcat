@@ -103,14 +103,18 @@ func (h *processHandle) wait() {
 	h.logFile = nil
 	h.mu.Unlock()
 
+	// 使用 defer 确保日志文件一定会被关闭，即使发生 panic
 	if logFile != nil {
+		defer func() {
+			_ = logFile.Sync()
+			_ = logFile.Close()
+		}()
+		
 		if err != nil {
 			fmt.Fprintf(logFile, "==== [%s] 进程退出，错误: %v\n", time.Now().Format(time.RFC3339), err)
 		} else {
 			fmt.Fprintf(logFile, "==== [%s] 进程正常退出\n", time.Now().Format(time.RFC3339))
 		}
-		_ = logFile.Sync()
-		_ = logFile.Close()
 	}
 
 	if h.isStopRequested() {

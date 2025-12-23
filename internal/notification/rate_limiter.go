@@ -7,15 +7,23 @@ import (
 
 // RateLimiter 速率限制器
 type RateLimiter struct {
-	limits map[string]map[NotificationType]time.Time
-	mutex  sync.RWMutex
+	limits     map[string]map[NotificationType]time.Time
+	mutex      sync.RWMutex
+	stopChan   chan struct{}
+	cleanerOnce sync.Once
 }
 
 // NewRateLimiter 创建速率限制器
 func NewRateLimiter() *RateLimiter {
-	return &RateLimiter{
-		limits: make(map[string]map[NotificationType]time.Time),
+	rl := &RateLimiter{
+		limits:   make(map[string]map[NotificationType]time.Time),
+		stopChan: make(chan struct{}),
 	}
+	
+	// 启动清理器
+	rl.startCleaner()
+	
+	return rl
 }
 
 // IsRateLimited 检查是否被速率限制
@@ -130,4 +138,62 @@ func (rl *RateLimiter) GetStats() map[string]any {
 	}
 
 	return stats
+}
+
+// startCleaner 启动定期清理器，清理过期的限制条目
+func (rl *RateLimiter) startCleaner() {
+	rl.cleanerOnce.Do(func() {
+		go func() {
+			ticker := time.NewTicker(30 * time.Minute) // 每30分钟清理一次
+			defer ticker.Stop()
+			
+			for {
+				select {
+				case <-ticker.C:
+					rl.cleanExpiredLimits()
+				case <-rl.stopChan:
+					return
+				}
+			}
+		}()
+	})
+}
+
+// cleanExpiredLimits 清理过期的限制条目
+func (rl *RateLimiter) cleanExpiredLimits() {
+	rl.mutex.Lock()
+	defer rl.mutex.Unlock()
+	
+	now := time.Now()
+	cleaned := 0
+	
+	for key, limits := range rl.limits {
+		for notificationType, lastTime := range limits {
+			// 如果距离上次通知超过2小时，认为已过期
+			if now.Sub(lastTime) > 2*time.Hour {
+				delete(limits, notificationType)
+				cleaned++
+			}
+		}
+		
+		// 如果该 key 下没有任何限制了，删除整个 key
+		if len(limits) == 0 {
+			delete(rl.limits, key)
+		}
+	}
+	
+	if cleaned > 0 {
+		// 使用 logrus 记录清理信息（需要在调用处传入 logger）
+		// 这里简化处理，实际使用时可以添加 logger 字段
+	}
+}
+
+// Stop 停止清理器
+func (rl *RateLimiter) Stop() {
+	select {
+	case <-rl.stopChan:
+		// Already closed
+	default:
+		close(rl.stopChan)
+	}
 }

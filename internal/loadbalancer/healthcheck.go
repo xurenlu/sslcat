@@ -107,8 +107,14 @@ func (lb *LoadBalancer) StartHealthCheck() {
 
 // StopHealthCheck 停止健康检查
 func (lb *LoadBalancer) StopHealthCheck() {
+	// 安全关闭 channel，防止重复关闭导致 panic
 	if lb.healthCheckDone != nil {
-		close(lb.healthCheckDone)
+		select {
+		case <-lb.healthCheckDone:
+			// Already closed
+		default:
+			close(lb.healthCheckDone)
+		}
 		lb.healthCheckDone = nil
 	}
 

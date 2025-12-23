@@ -35,7 +35,7 @@ import (
 )
 
 var (
-	version = "1.3.24-rc4"
+	version = "1.3.27-rc1"
 	build   = "dev"
 )
 
@@ -468,6 +468,9 @@ func main() {
 		startStandardMode(cfg, webServer, sslManager, proxyManager, readTimeout, writeTimeout, idleTimeout)
 	}
 
+	// 启动内存监控
+	startMemoryMonitor(cdnCache, proxyManager)
+
 	// 等待信号
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
@@ -477,12 +480,21 @@ func main() {
 	// 发送系统关闭通知
 	notificationIntegrator.SendSystemShutdownNotification()
 
+	// 停止各个模块
 	securityManager.Stop()
 	proxyManager.Stop()
 	sslManager.Stop()
 
 	// 停止 Runner 模块
 	gitServer.Stop()
+
+	// 停止 Web 服务器（包括隧道管理器）
+	webServer.Stop()
+
+	// 停止通知管理器
+	if notificationIntegrator != nil && notificationIntegrator.GetManager() != nil {
+		notificationIntegrator.GetManager().Stop()
+	}
 
 	logrus.Info("SSLcat server stopped")
 }
@@ -807,6 +819,75 @@ func exportPprofData(profileType, outputPath, serverURL string) {
 		fmt.Println("💡 使用 go tool pprof 分析 goroutine:")
 		fmt.Printf("   go tool pprof %s\n", outputPath)
 	}
+}
+
+// startMemoryMonitor 启动内存监控
+func startMemoryMonitor(cdnCache *cache.CDNCache, proxyManager *proxy.Manager) {
+	go func() {
+		// 使用质数间隔避免与其他定时器同时触发（5分钟 = 301秒）
+		ticker := time.NewTicker(301 * time.Second)
+		defer ticker.Stop()
+		
+		logrus.Info("内存监控已启动，每5分钟输出一次统计信息")
+		
+		for range ticker.C {
+			var m runtime.MemStats
+			runtime.ReadMemStats(&m)
+			
+			goroutines := runtime.NumGoroutine()
+			
+			// 基本内存统计
+			allocMB := m.Alloc / 1024 / 1024
+			sysMB := m.Sys / 1024 / 1024
+			numGC := m.NumGC
+			
+			// 获取 CDN Cache processing map 大小
+			processingMapSize := 0
+			if cdnCache != nil {
+				processingMapSize = cdnCache.GetProcessingMapSize()
+			}
+			
+			// 正常日志
+			logrus.Infof("📊 内存统计: Alloc=%dMB, Sys=%dMB, NumGC=%d, Goroutines=%d, CDN_Processing=%d",
+				allocMB, sysMB, numGC, goroutines, processingMapSize)
+			
+			// 异常检测和告警
+			warnings := []string{}
+			
+			// Goroutine 数量检查
+			if goroutines > 10000 {
+				warnings = append(warnings, fmt.Sprintf("Goroutine 数量异常高: %d (严重)", goroutines))
+			} else if goroutines > 5000 {
+				warnings = append(warnings, fmt.Sprintf("Goroutine 数量较高: %d (警告)", goroutines))
+			}
+			
+			// 内存使用检查
+			if allocMB > 2000 {
+				warnings = append(warnings, fmt.Sprintf("内存使用异常高: %dMB (严重)", allocMB))
+			} else if allocMB > 1000 {
+				warnings = append(warnings, fmt.Sprintf("内存使用较高: %dMB (警告)", allocMB))
+			}
+			
+			// CDN processing map 检查
+			if processingMapSize > 1000 {
+				warnings = append(warnings, fmt.Sprintf("CDN processing map 异常大: %d 个条目 (严重)", processingMapSize))
+			} else if processingMapSize > 100 {
+				warnings = append(warnings, fmt.Sprintf("CDN processing map 较大: %d 个条目 (警告)", processingMapSize))
+			}
+			
+			// 输出告警
+			if len(warnings) > 0 {
+				for _, warning := range warnings {
+					logrus.Errorf("⚠️ 内存告警: %s", warning)
+				}
+				
+				// 输出详细的 Goroutine 信息（仅在异常时）
+				if goroutines > 5000 {
+					logrus.Warnf("建议检查 Goroutine 泄漏，可以使用: curl http://localhost:6060/debug/pprof/goroutine?debug=2")
+				}
+			}
+		}
+	}()
 }
 
 // showHelp 显示帮助信息，包括所有子命令和启动参数

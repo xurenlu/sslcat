@@ -72,6 +72,47 @@ func NewManager(cfg config.TunnelManagerConfig, dataDir string, logger *logrus.E
 	return mgr
 }
 
+// Stop 停止隧道管理器，关闭所有隧道
+func (m *Manager) Stop() {
+	m.log.Info("正在停止隧道管理器...")
+	
+	// 停止所有隧道
+	m.mu.RLock()
+	var targets []processTarget
+	for providerID, tunnels := range m.processes {
+		for tunnelID := range tunnels {
+			targets = append(targets, processTarget{providerID: providerID, tunnelID: tunnelID})
+		}
+	}
+	m.mu.RUnlock()
+	
+	// 并发停止所有隧道
+	var wg sync.WaitGroup
+	for _, target := range targets {
+		wg.Add(1)
+		go func(providerID, tunnelID string) {
+			defer wg.Done()
+			if _, err := m.StopTunnel(providerID, tunnelID); err != nil && err != ErrNotRunning {
+				m.log.WithError(err).Warnf("停止隧道失败: %s/%s", providerID, tunnelID)
+			}
+		}(target.providerID, target.tunnelID)
+	}
+	
+	// 等待所有隧道停止，最多等待 15 秒
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	
+	select {
+	case <-done:
+		m.log.Info("所有隧道已停止")
+	case <-time.After(15 * time.Second):
+		m.log.Warn("停止隧道超时，强制退出")
+	}
+}
+
 // SyncFromConfig 根据配置同步管理器状态
 func (m *Manager) SyncFromConfig(cfg config.TunnelManagerConfig) {
 	m.mu.Lock()

@@ -3,6 +3,7 @@ package notification
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -106,6 +107,7 @@ type NotificationManager struct {
 	log                *logrus.Entry
 	rateLimiter        *RateLimiter
 	history            []Notification
+	historyMutex       sync.RWMutex      // 保护 history 的并发访问
 	maxHistory         int
 	minLevel           NotificationLevel // 最小通知级别
 	sendSemaphore      chan struct{}     // 并发控制
@@ -590,9 +592,17 @@ func (nm *NotificationManager) SendConfigReloadFailed(configFile string, reason 
 
 // addToHistory 添加到历史记录
 func (nm *NotificationManager) addToHistory(notification *Notification) {
+	nm.historyMutex.Lock()
+	defer nm.historyMutex.Unlock()
+	
 	nm.history = append(nm.history, *notification)
+	
+	// 优化：当超过限制时，一次性删除多余的旧记录，而不是每次只删除一个
 	if len(nm.history) > nm.maxHistory {
-		nm.history = nm.history[1:]
+		// 保留最新的 maxHistory 条记录
+		// 例如：如果 maxHistory=1000，history 有 1100 条，则删除前 100 条
+		excess := len(nm.history) - nm.maxHistory
+		nm.history = nm.history[excess:]
 	}
 }
 
@@ -603,6 +613,9 @@ func (nm *NotificationManager) generateID() string {
 
 // GetHistory 获取通知历史
 func (nm *NotificationManager) GetHistory(limit int) []Notification {
+	nm.historyMutex.RLock()
+	defer nm.historyMutex.RUnlock()
+	
 	if limit <= 0 || limit > len(nm.history) {
 		limit = len(nm.history)
 	}
@@ -657,4 +670,16 @@ func (nm *NotificationManager) getEnabledChannels() []string {
 		}
 	}
 	return enabled
+}
+
+// Stop 停止通知管理器
+func (nm *NotificationManager) Stop() {
+	nm.log.Info("Stopping notification manager")
+	
+	// 停止速率限制器的清理器
+	if nm.rateLimiter != nil {
+		nm.rateLimiter.Stop()
+	}
+	
+	nm.log.Info("Notification manager stopped")
 }
