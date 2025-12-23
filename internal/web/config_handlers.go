@@ -31,7 +31,7 @@ func (s *Server) handleConfigImport(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method == "GET" {
 		fmt.Fprintf(w, `<!DOCTYPE html><html><head><meta charset="utf-8"><title>导入配置</title>
-		<link href="https://cdnproxy.shifen.de/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"></head><body>
+		<link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"></head><body>
 		<div class="container mt-4"><h3>导入配置(JSON)</h3>
 		<div class="mb-3">
 			<a class="btn btn-outline-info btn-sm" href="%s/config/export" target="_blank">
@@ -199,7 +199,7 @@ func (s *Server) renderDiffHTML(d config.ConfigDiff) string {
 		return b.String()
 	}
 
-	head := `<link href="https://cdnproxy.shifen.de/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">`
+	head := `<link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">`
 	b := &strings.Builder{}
 	b.WriteString(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>配置变更预览</title>` + head + `</head><body>`)
 	b.WriteString(`<div class="container mt-4">

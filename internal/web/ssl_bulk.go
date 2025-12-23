@@ -62,7 +62,7 @@ func (s *Server) handleSSLBulkUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method == "GET" {
 		fmt.Fprintf(w, `<!DOCTYPE html><html><head><meta charset="utf-8"><title>导入全部证书</title>
-		<link href="https://cdnproxy.shifen.de/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"></head><body>
+		<link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"></head><body>
 		<div class="container mt-4"><h3>导入全部证书(zip)</h3>
 		<form method="POST" enctype="multipart/form-data" class="mt-3">
 			<div class="mb-3"><input class="form-control" type="file" name="zip" accept=".zip" required></div>

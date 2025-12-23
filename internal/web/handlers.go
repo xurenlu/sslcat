@@ -526,7 +526,7 @@ func (s *Server) handleRecoverHelp(w http.ResponseWriter, r *http.Request) {
 	cmds := s.translator.T("recover.commands")
 	back := s.translator.T("recover.back_to_login")
 	fmt.Fprintf(w, `<!DOCTYPE html><html><head><meta charset="utf-8"><title>%s</title>
-    <link href="https://cdnproxy.shifen.de/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"></head><body>
+    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"></head><body>
     <div class="container mt-4">
       <h3>%s</h3>
       <p class="text-muted">%s</p>
@@ -833,7 +833,7 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method == "GET" {
 		fmt.Fprintf(w, `<!DOCTYPE html><html><head><meta charset="utf-8"><title>修改密码</title>
-		<link href="https://cdnproxy.shifen.de/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"></head><body>
+		<link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"></head><body>
 		<div class="container mt-4"><h3>修改密码</h3>
 		<form method="POST">
 			<div class="mb-3"><label class="form-label">新密码</label><input class="form-control" type="password" name="new" required></div>
