@@ -2,6 +2,7 @@ package ssl
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -724,6 +725,16 @@ func (m *Manager) GetTLSConfig() *tls.Config {
 					m.certCache[strings.ToLower(host)] = cert
 					m.certMutex.Unlock()
 					m.updateCertMetadata(strings.ToLower(host), cert)
+					
+					// 立即将证书持久化到磁盘，避免重启后丢失
+					go func(domain string, certificate *tls.Certificate) {
+						if err := m.saveCertificateToDisk(domain, certificate); err != nil {
+							m.log.Warnf("Failed to save certificate to disk for %s: %v", domain, err)
+						} else {
+							m.log.Infof("Certificate saved to disk for %s", domain)
+						}
+					}(strings.ToLower(host), cert)
+					
 					return cert, nil
 				}
 			}
@@ -2065,6 +2076,70 @@ func (m *Manager) saveCertificate(domain string, certDER [][]byte, privateKey *r
 
 	m.updateCertMetadata(domain, &cert) // 更新元数据缓存
 
+	return nil
+}
+
+// saveCertificateToDisk 将 tls.Certificate 持久化到磁盘
+func (m *Manager) saveCertificateToDisk(domain string, cert *tls.Certificate) error {
+	if cert == nil || len(cert.Certificate) == 0 {
+		return fmt.Errorf("invalid certificate")
+	}
+
+	// 编码证书链
+	var certPEM []byte
+	for _, derBytes := range cert.Certificate {
+		certPEM = append(certPEM, pem.EncodeToMemory(&pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: derBytes,
+		})...)
+	}
+
+	// 编码私钥
+	var keyPEM []byte
+	if cert.PrivateKey != nil {
+		switch key := cert.PrivateKey.(type) {
+		case *rsa.PrivateKey:
+			keyPEM = pem.EncodeToMemory(&pem.Block{
+				Type:  "RSA PRIVATE KEY",
+				Bytes: x509.MarshalPKCS1PrivateKey(key),
+			})
+		case *ecdsa.PrivateKey:
+			keyBytes, err := x509.MarshalECPrivateKey(key)
+			if err != nil {
+				return fmt.Errorf("failed to marshal EC private key: %w", err)
+			}
+			keyPEM = pem.EncodeToMemory(&pem.Block{
+				Type:  "EC PRIVATE KEY",
+				Bytes: keyBytes,
+			})
+		default:
+			return fmt.Errorf("unsupported private key type: %T", key)
+		}
+	} else {
+		return fmt.Errorf("certificate has no private key")
+	}
+
+	// 确保目录存在
+	if err := os.MkdirAll(m.config.SSL.CertDir, 0755); err != nil {
+		return fmt.Errorf("failed to create cert directory: %w", err)
+	}
+	if err := os.MkdirAll(m.config.SSL.KeyDir, 0755); err != nil {
+		return fmt.Errorf("failed to create key directory: %w", err)
+	}
+
+	// 保存文件
+	certPath := filepath.Join(m.config.SSL.CertDir, domain+".crt")
+	keyPath := filepath.Join(m.config.SSL.KeyDir, domain+".key")
+
+	if err := os.WriteFile(certPath, certPEM, 0644); err != nil {
+		return fmt.Errorf("failed to write certificate file: %w", err)
+	}
+
+	if err := os.WriteFile(keyPath, keyPEM, 0600); err != nil {
+		return fmt.Errorf("failed to write key file: %w", err)
+	}
+
+	m.log.Infof("Certificate persisted to disk: %s (cert: %s, key: %s)", domain, certPath, keyPath)
 	return nil
 }
 
