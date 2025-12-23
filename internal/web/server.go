@@ -366,6 +366,15 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		if releaseCooldownSec < 60 {
 			releaseCooldownSec = 300
 		}
+		// 配置看门狗监控选项
+		watchdogOpts := monitor.WatchdogMonitorOptions{
+			Enabled:                     cfg.Monitoring.WatchdogEnabled,
+			CheckInterval:               time.Duration(cfg.Monitoring.WatchdogCheckIntervalSec) * time.Second,
+			CPUThresholdPercent:         cfg.Monitoring.WatchdogCPUThresholdPercent,
+			CPUIncreaseThresholdPercent: cfg.Monitoring.WatchdogCPUIncreaseThresholdPercent,
+			CPUIncreaseWindow:           time.Duration(cfg.Monitoring.WatchdogCPUIncreaseWindowSec) * time.Second,
+			AlertCooldown:               time.Duration(cfg.Monitoring.WatchdogAlertCooldownSec) * time.Second,
+		}
 
 		server.monitorManager = monitor.NewManager(monitor.ManagerOptions{
 			Enabled: cfg.Monitoring.Enabled,
@@ -1977,11 +1986,11 @@ func (s *Server) updateMemoryMonitor(maxUsagePercent float64, cooldownSec int) {
 // Stop 停止 Web 服务器及其管理的资源
 func (s *Server) Stop() {
 	s.log.Info("Stopping web server")
-	
+
 	// 停止隧道管理器
 	if s.tunnelManager != nil {
 		s.tunnelManager.Stop()
 	}
-	
+
 	s.log.Info("Web server stopped")
 }

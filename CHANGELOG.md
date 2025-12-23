@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.27-rc2] - 2025-12-23
+
+### 🐛 Bug 修复
+
+**监控系统**
+- **恢复 Watchdog 监控功能**: 恢复看门狗监控器的完整功能
+  - 恢复 `ManagerOptions` 中的 `Watchdog` 字段
+  - 恢复 `Start()` 方法的 `notificationMgr` 参数支持
+  - 恢复 `GetWatchdogMonitor()` 和 `UpdateWatchdogOptions()` 方法
+  - 支持 CPU 使用率监控和异常告警
+  - 集成通知系统，自动发送告警
+
+---
+
 ## [1.3.27-rc1] - 2025-12-23
 
 ### 🐛 重大 Bug 修复
