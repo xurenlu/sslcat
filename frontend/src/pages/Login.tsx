@@ -117,21 +117,15 @@ const Login: React.FC = () => {
     setIsLoading(true)
     setError('')
 
-    // 验证必填项
+    // 验证必填项（默认登录模式：用户名和密码）
     if (systemConfig.require_captcha && !captchaText) {
       setError(t.login.enter_captcha)
       setIsLoading(false)
       return
     }
 
-    if (systemConfig.require_totp && totpCode.length !== 6) {
-      setError(t.login.enter_totp)
-      setIsLoading(false)
-      return
-    }
-
     try {
-      // 构建登录请求数据
+      // 构建登录请求数据（默认登录：用户名 + 密码，不包含 TOTP）
       const loginData: any = {
         username,
         password
@@ -143,10 +137,7 @@ const Login: React.FC = () => {
         loginData.captcha_session_id = captchaSessionId
       }
 
-      // 添加 TOTP（如果需要）
-      if (systemConfig.require_totp) {
-        loginData.totp_code = totpCode
-      }
+      // 注意：默认登录模式不使用 TOTP，即使启用了 TOTP
 
       // 直接调用 API（绕过 AuthContext 的简单登录方法）
       const response = await fetch(buildApiPath(adminPrefix, '/api/auth/login'), {
@@ -353,36 +344,6 @@ const Login: React.FC = () => {
                           isDisabled={isLoading}
                         />
                         <Text fontSize="xs" color="gray.500" mt={1}>不区分大小写</Text>
-                      </FormControl>
-                    )}
-
-                    {/* TOTP 验证码 */}
-                    {systemConfig.require_totp && (
-                      <FormControl isRequired>
-                        <FormLabel>
-                          <HStack>
-                            <FiSmartphone />
-                            <Text>TOTP 验证码</Text>
-                          </HStack>
-                        </FormLabel>
-                        <HStack justify="center">
-                          <PinInput
-                            size="lg"
-                            value={totpCode}
-                            onChange={setTotpCode}
-                            isDisabled={isLoading}
-                          >
-                            <PinInputField />
-                            <PinInputField />
-                            <PinInputField />
-                            <PinInputField />
-                            <PinInputField />
-                            <PinInputField />
-                          </PinInput>
-                        </HStack>
-                        <Text fontSize="xs" color="gray.500" textAlign="center" mt={1}>
-                          请输入您的身份验证应用中的 6 位数字
-                        </Text>
                       </FormControl>
                     )}
 

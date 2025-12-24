@@ -208,8 +208,9 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		s.log.Infof("Login verification: username_match=%v, password_match=%v", usernameMatch, passwordMatch)
 
 		if usernameMatch && passwordMatch {
-			// TOTP 二次验证（如果启用）
-			if s.config.Admin.EnableTOTP && !s.verifyTOTP(totpCode) {
+			// TOTP 二次验证（仅在提供了 TOTP 码时才验证）
+			// 如果启用了 TOTP 但用户没有提供 TOTP 码，允许登录（默认登录模式）
+			if s.config.Admin.EnableTOTP && totpCode != "" && !s.verifyTOTP(totpCode) {
 				hp := "hp_seed000"
 				startTs := time.Now().UnixMilli()
 				data := map[string]interface{}{
