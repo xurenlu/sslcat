@@ -319,30 +319,37 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 
 	// 初始化 WebAuthn 管理器
 	// 确定 RPID 和 RPOrigin
+	// WebAuthn 要求 RPID 必须是有效的域名，不能是 IP 地址
 	rpID := cfg.Server.Host
-	if rpID == "" {
+	if rpID == "" || rpID == "0.0.0.0" {
 		rpID = "localhost"
 	}
 	// 移除端口号（如果有）
 	if idx := strings.Index(rpID, ":"); idx != -1 {
 		rpID = rpID[:idx]
 	}
+	// 检查是否是 IP 地址，如果是则使用 localhost
+	if net.ParseIP(rpID) != nil {
+		rpID = "localhost"
+	}
 	
 	// 确定 RPOrigin
-	rpOrigin := "https://" + rpID
+	port := 8080
 	if cfg.Server.PortMode == "custom" && cfg.Server.CustomPort != 0 {
-		if !cfg.Server.EnableHTTPS {
-			rpOrigin = fmt.Sprintf("http://%s:%d", rpID, cfg.Server.CustomPort)
-		} else {
-			rpOrigin = fmt.Sprintf("https://%s:%d", rpID, cfg.Server.CustomPort)
-		}
-	} else if rpID == "localhost" {
-		// 开发环境使用 HTTP
-		if cfg.Server.PortMode == "custom" && cfg.Server.CustomPort != 0 {
-			rpOrigin = fmt.Sprintf("http://localhost:%d", cfg.Server.CustomPort)
-		} else {
-			rpOrigin = "http://localhost:8080"
-		}
+		port = cfg.Server.CustomPort
+	}
+	
+	protocol := "http"
+	if cfg.Server.EnableHTTPS || port == 443 {
+		protocol = "https"
+	}
+	
+	// 构建 RPOrigin（标准端口不需要显示端口号）
+	var rpOrigin string
+	if (protocol == "http" && port == 80) || (protocol == "https" && port == 443) {
+		rpOrigin = fmt.Sprintf("%s://%s", protocol, rpID)
+	} else {
+		rpOrigin = fmt.Sprintf("%s://%s:%d", protocol, rpID, port)
 	}
 	
 	webauthnManager, err := NewWebAuthnManager(
@@ -933,6 +940,7 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/refresh", s.handleAPIDNSRefresh)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl/upload", s.handleAPISSLUpload)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl/delete", s.handleAPISSLDelete)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/settings/public", s.handleAPISettingsPublic) // 公开端点，登录页面使用
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/settings", s.handleAPISettings)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/settings/update", s.handleAPISettingsUpdate)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/settings/basic", s.handleAPISettingsBasic)

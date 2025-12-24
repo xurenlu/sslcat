@@ -372,15 +372,22 @@ const Settings: React.FC = () => {
     }
   }
 
-  // 辅助函数：将 ArrayBuffer 转换为 Base64
-  const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+  // 辅助函数：将 ArrayBuffer 转换为 Base64 URL 编码（WebAuthn 规范要求）
+  const arrayBufferToBase64URL = (buffer: ArrayBuffer): string => {
     const bytes = new Uint8Array(buffer)
     let binary = ''
     for (let i = 0; i < bytes.byteLength; i++) {
       binary += String.fromCharCode(bytes[i])
     }
+    // 转换为 Base64，然后转换为 Base64 URL 编码（替换 + 为 -，/ 为 _，移除 =）
     return btoa(binary)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '')
   }
+  
+  // 保留旧函数名以兼容
+  const arrayBufferToBase64 = arrayBufferToBase64URL
 
   // 加载 TOTP 状态
   const loadTotpStatus = async () => {

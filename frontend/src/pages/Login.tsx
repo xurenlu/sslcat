@@ -84,7 +84,8 @@ const Login: React.FC = () => {
 
   const loadSystemConfig = async () => {
     try {
-      const response = await fetch(buildApiPath(adminPrefix, '/api/settings'), {
+      // 使用公开的 API 端点，无需认证
+      const response = await fetch(buildApiPath(adminPrefix, '/api/settings/public'), {
         credentials: 'include'
       })
       if (response.ok) {
@@ -92,12 +93,18 @@ const Login: React.FC = () => {
         // API 返回格式: { success: true, data: { ... } }
         const data = result.data || result
         console.log('System config loaded:', data) // 调试日志
+        console.log('totp_enabled:', data.totp_enabled) // 调试日志
+        console.log('webauthn_enabled:', data.webauthn_enabled) // 调试日志
         setSystemConfig({
           require_captcha: data.security?.enable_captcha || false,
           require_totp: data.totp_enabled || false,
-          totp_enabled: data.totp_enabled || false,  // TOTP 是否已配置（从顶层读取）
-          webauthn_enabled: data.webauthn_enabled || false  // WebAuthn 是否可用（从顶层读取）
+          totp_enabled: data.totp_enabled === true,  // TOTP 是否已配置（从顶层读取，严格检查）
+          webauthn_enabled: data.webauthn_enabled === true  // WebAuthn 是否可用（从顶层读取，严格检查）
         })
+        console.log('Final systemConfig:', {
+          totp_enabled: data.totp_enabled === true,
+          webauthn_enabled: data.webauthn_enabled === true
+        }) // 调试日志
       }
     } catch (error) {
       console.error('Failed to load system config:', error)
@@ -339,11 +346,23 @@ const Login: React.FC = () => {
       try {
         // options 现在直接就是 PublicKeyCredentialRequestOptions 对象
         // 但是需要将字符串字段转换为 ArrayBuffer
+        console.log('beginData:', beginData) // 调试日志
+        console.log('beginData.options:', beginData.options) // 调试日志
+        console.log('beginData.options.challenge:', beginData.options?.challenge) // 调试日志
+        
         const publicKeyOptions = { ...beginData.options }
         
         // 转换 challenge (Base64 URL 编码的字符串 -> ArrayBuffer)
-        if (typeof publicKeyOptions.challenge === 'string') {
-          publicKeyOptions.challenge = base64URLToArrayBuffer(publicKeyOptions.challenge)
+        if (publicKeyOptions.challenge) {
+          if (typeof publicKeyOptions.challenge === 'string') {
+            console.log('转换 challenge 从字符串:', publicKeyOptions.challenge) // 调试日志
+            publicKeyOptions.challenge = base64URLToArrayBuffer(publicKeyOptions.challenge)
+            console.log('转换后的 challenge 类型:', publicKeyOptions.challenge instanceof ArrayBuffer) // 调试日志
+          } else {
+            console.warn('challenge 不是字符串类型:', typeof publicKeyOptions.challenge, publicKeyOptions.challenge) // 调试日志
+          }
+        } else {
+          console.error('challenge 字段不存在或为空') // 调试日志
         }
         
         // 转换 allowCredentials[].id (如果存在)
@@ -353,6 +372,8 @@ const Login: React.FC = () => {
             id: typeof cred.id === 'string' ? base64URLToArrayBuffer(cred.id) : cred.id
           }))
         }
+        
+        console.log('传递给 navigator.credentials.get 的 publicKey:', publicKeyOptions) // 调试日志
         
         credential = await navigator.credentials.get({
           publicKey: publicKeyOptions,
@@ -413,15 +434,22 @@ const Login: React.FC = () => {
     }
   }
 
-  // 辅助函数：将 ArrayBuffer 转换为 Base64
-  const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+  // 辅助函数：将 ArrayBuffer 转换为 Base64 URL 编码（WebAuthn 规范要求）
+  const arrayBufferToBase64URL = (buffer: ArrayBuffer): string => {
     const bytes = new Uint8Array(buffer)
     let binary = ''
     for (let i = 0; i < bytes.byteLength; i++) {
       binary += String.fromCharCode(bytes[i])
     }
+    // 转换为 Base64，然后转换为 Base64 URL 编码（替换 + 为 -，/ 为 _，移除 =）
     return btoa(binary)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '')
   }
+  
+  // 保留旧函数名以兼容
+  const arrayBufferToBase64 = arrayBufferToBase64URL
 
   if (authLoading) {
     return (

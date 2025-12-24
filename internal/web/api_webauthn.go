@@ -187,18 +187,19 @@ func (s *Server) handleAPIWebAuthnFinishRegistration(w http.ResponseWriter, r *h
 		return
 	}
 
-	// 读取请求体（需要保存以便后续传递给 webauthn 库）
+	// 读取请求体
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": "读取请求体失败"})
 		return
 	}
-	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
+	// 解析请求，提取 session_key、device_name 和 response
 	var req struct {
-		SessionKey string `json:"session_key"`
-		DeviceName string `json:"device_name"`
+		SessionKey string                 `json:"session_key"`
+		DeviceName string                 `json:"device_name"`
+		Response   map[string]interface{} `json:"response"`
 	}
 
 	if err := json.Unmarshal(bodyBytes, &req); err != nil {
@@ -231,13 +232,32 @@ func (s *Server) handleAPIWebAuthnFinishRegistration(w http.ResponseWriter, r *h
 		return
 	}
 
-	// 恢复请求体供 webauthn 库使用
-	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	// 将 response 转换为 JSON，作为新的请求体传递给 webauthn 库
+	// go-webauthn 库期望请求体直接是 CredentialCreationResponse
+	responseBytes, err := json.Marshal(req.Response)
+	if err != nil {
+		s.log.Errorf("序列化 WebAuthn 响应失败: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "处理响应失败"})
+		return
+	}
+
+	// 调试：打印响应内容（前500字符）
+	responseStr := string(responseBytes)
+	if len(responseStr) > 500 {
+		s.log.Infof("WebAuthn 注册响应 (前500字符): %s...", responseStr[:500])
+	} else {
+		s.log.Infof("WebAuthn 注册响应: %s", responseStr)
+	}
+
+	// 创建新的请求体供 webauthn 库使用
+	r.Body = io.NopCloser(bytes.NewBuffer(responseBytes))
 
 	// 验证并完成注册（直接使用 http.Request）
 	credential, err := s.webauthnManager.webauthn.FinishRegistration(user, *sessionData, r)
 	if err != nil {
 		s.log.Errorf("完成 WebAuthn 注册失败: %v", err)
+		s.log.Errorf("请求体内容: %s", string(responseBytes))
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": "注册失败: " + err.Error()})
 		return
@@ -309,6 +329,14 @@ func (s *Server) handleAPIWebAuthnBeginLogin(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// 调试：打印序列化后的 JSON（前500字符）
+	jsonStr := string(optionsJSON)
+	if len(jsonStr) > 500 {
+		s.log.Infof("WebAuthn 登录选项 JSON (前500字符): %s...", jsonStr[:500])
+	} else {
+		s.log.Infof("WebAuthn 登录选项 JSON: %s", jsonStr)
+	}
+
 	var optionsMap map[string]interface{}
 	if err := json.Unmarshal(optionsJSON, &optionsMap); err != nil {
 		s.log.Errorf("反序列化 WebAuthn 选项失败: %v", err)
@@ -317,23 +345,52 @@ func (s *Server) handleAPIWebAuthnBeginLogin(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// 调试：打印 optionsMap 的键
+	keys := make([]string, 0, len(optionsMap))
+	for k := range optionsMap {
+		keys = append(keys, k)
+	}
+	s.log.Infof("WebAuthn 登录选项的键: %v", keys)
+
 	// CredentialAssertion 结构包含 Response 字段，Response 字段又包含 PublicKey 字段
 	// 需要提取 PublicKeyCredentialRequestOptions
 	var publicKeyOptions map[string]interface{}
 	if response, ok := optionsMap["Response"].(map[string]interface{}); ok {
+		s.log.Infof("找到 Response 字段")
 		// 如果存在 Response 字段，检查是否有 PublicKey 字段
 		if publicKey, ok := response["PublicKey"].(map[string]interface{}); ok {
+			s.log.Infof("找到 Response.PublicKey 字段")
+			publicKeyOptions = publicKey
+		} else if publicKey, ok := response["publicKey"].(map[string]interface{}); ok {
+			s.log.Infof("找到 Response.publicKey 字段（小写）")
 			publicKeyOptions = publicKey
 		} else {
 			// 如果没有 PublicKey 字段，直接使用 Response
+			s.log.Infof("Response 中没有 PublicKey，直接使用 Response")
 			publicKeyOptions = response
 		}
 	} else if publicKey, ok := optionsMap["PublicKey"].(map[string]interface{}); ok {
-		// 如果直接存在 PublicKey 字段，使用它
+		s.log.Infof("找到 PublicKey 字段（顶层）")
+		publicKeyOptions = publicKey
+	} else if publicKey, ok := optionsMap["publicKey"].(map[string]interface{}); ok {
+		s.log.Infof("找到 publicKey 字段（顶层，小写）")
 		publicKeyOptions = publicKey
 	} else {
 		// 如果没有找到，直接使用整个 optionsMap
+		s.log.Infof("未找到嵌套结构，直接使用整个 optionsMap")
 		publicKeyOptions = optionsMap
+	}
+
+	// 调试：打印选项的键和 challenge 字段
+	publicKeyKeys := make([]string, 0, len(publicKeyOptions))
+	for k := range publicKeyOptions {
+		publicKeyKeys = append(publicKeyKeys, k)
+	}
+	s.log.Infof("WebAuthn 登录选项的键: %v", publicKeyKeys)
+	if challenge, ok := publicKeyOptions["challenge"]; ok {
+		s.log.Infof("WebAuthn 登录选项的 challenge 类型: %T, 值: %v", challenge, challenge)
+	} else {
+		s.log.Warnf("WebAuthn 登录选项中没有找到 challenge 字段")
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -351,18 +408,19 @@ func (s *Server) handleAPIWebAuthnFinishLogin(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// 读取请求体（需要保存以便后续传递给 webauthn 库）
+	// 读取请求体
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": "读取请求体失败"})
 		return
 	}
-	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
+	// 解析请求，提取 username、session_key 和 response
 	var req struct {
-		Username   string `json:"username"`
-		SessionKey string `json:"session_key"`
+		Username   string                 `json:"username"`
+		SessionKey string                 `json:"session_key"`
+		Response   map[string]interface{} `json:"response"`
 	}
 
 	if err := json.Unmarshal(bodyBytes, &req); err != nil {
@@ -387,8 +445,18 @@ func (s *Server) handleAPIWebAuthnFinishLogin(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// 恢复请求体供 webauthn 库使用
-	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	// 将 response 转换为 JSON，作为新的请求体传递给 webauthn 库
+	// go-webauthn 库期望请求体直接是 CredentialAssertionResponse
+	responseBytes, err := json.Marshal(req.Response)
+	if err != nil {
+		s.log.Errorf("序列化 WebAuthn 响应失败: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "处理响应失败"})
+		return
+	}
+
+	// 创建新的请求体供 webauthn 库使用
+	r.Body = io.NopCloser(bytes.NewBuffer(responseBytes))
 
 	// 验证并完成登录（直接使用 http.Request）
 	credential, err := s.webauthnManager.webauthn.FinishLogin(user, *sessionData, r)

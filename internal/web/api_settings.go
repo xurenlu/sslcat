@@ -60,7 +60,26 @@ func (s *Server) sendAdminPrefixChangeNotification(oldPrefix, newPrefix string) 
 	}
 }
 
-// handleAPISettings 获取系统设置
+// handleAPISettingsPublic 获取公开的系统设置（登录页面使用，无需认证）
+func (s *Server) handleAPISettingsPublic(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		s.writeErrorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	// 只返回登录页面需要的公开配置信息
+	settings := map[string]interface{}{
+		"security": map[string]interface{}{
+			"enable_captcha": s.config.Security.EnableCaptcha,
+		},
+		"totp_enabled":    s.config.Admin.EnableTOTP,
+		"webauthn_enabled": s.webauthnManager != nil, // WebAuthn 是否可用
+	}
+
+	s.writeSuccessResponse(w, settings, "Public settings retrieved successfully")
+}
+
+// handleAPISettings 获取系统设置（需要认证）
 func (s *Server) handleAPISettings(w http.ResponseWriter, r *http.Request) {
 	if !s.authorizeAPI(w, r, true) {
 		return
