@@ -504,25 +504,25 @@ const Statistics: React.FC = () => {
                 <Table size="sm">
                   <Thead>
                     <Tr>
-                      <Th>{t.statistics.ranking}</Th>
-                      <Th>{t.statistics.userAgent}</Th>
-                      <Th isNumeric>{t.statistics.visitCount}</Th>
+                      <Th w="60px">{t.statistics.ranking}</Th>
+                      <Th maxW="200px">{t.statistics.userAgent}</Th>
+                      <Th isNumeric w="100px">{t.statistics.visitCount}</Th>
                     </Tr>
                   </Thead>
                   <Tbody>
                     {(data?.top_user_agents || []).slice(0, 10).map((item, index) => (
                       <Tr key={item.key}>
-                        <Td>
+                        <Td w="60px">
                           <Badge colorScheme={index < 3 ? 'blue' : 'gray'}>
                             #{index + 1}
                           </Badge>
                         </Td>
-                        <Td>
-                          <Text fontSize="sm" maxW="200px" isTruncated>
+                        <Td maxW="200px">
+                          <Text fontSize="sm" isTruncated>
                             {item.key || t.statistics.unknown}
                           </Text>
                         </Td>
-                        <Td isNumeric>{formatNumber(item.count)}</Td>
+                        <Td isNumeric w="100px">{formatNumber(item.count)}</Td>
                       </Tr>
                     ))}
                   </Tbody>

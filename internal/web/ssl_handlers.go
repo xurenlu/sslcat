@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -161,20 +162,39 @@ func (s *Server) handleSSLUpload(w http.ResponseWriter, r *http.Request) {
 		}
 		defer keyFile.Close()
 
-		certPath := s.config.SSL.CertDir + "/" + domain + ".crt"
-		keyPath := s.config.SSL.KeyDir + "/" + domain + ".key"
+		// 确保证书和密钥目录存在
+		if err := os.MkdirAll(s.config.SSL.CertDir, 0755); err != nil {
+			s.log.Errorf("Failed to create cert directory: %v", err)
+			http.Error(w, "failed to create cert directory", http.StatusInternalServerError)
+			return
+		}
+		if err := os.MkdirAll(s.config.SSL.KeyDir, 0755); err != nil {
+			s.log.Errorf("Failed to create key directory: %v", err)
+			http.Error(w, "failed to create key directory", http.StatusInternalServerError)
+			return
+		}
+
+		// 使用 filepath.Join 构建路径，确保跨平台兼容性
+		certPath := filepath.Join(s.config.SSL.CertDir, domain+".crt")
+		keyPath := filepath.Join(s.config.SSL.KeyDir, domain+".key")
 
 		if err := streamToFile(certFile, certPath, 0644); err != nil {
+			s.log.Errorf("Failed to save certificate to %s: %v", certPath, err)
 			http.Error(w, "failed to save certificate", http.StatusInternalServerError)
 			return
 		}
 		if err := streamToFile(keyFile, keyPath, 0600); err != nil {
+			s.log.Errorf("Failed to save private key to %s: %v", keyPath, err)
 			http.Error(w, "failed to save private key", http.StatusInternalServerError)
 			return
 		}
 
+		s.log.Infof("Certificate uploaded successfully: domain=%s, cert=%s, key=%s", domain, certPath, keyPath)
+
 		if err := s.sslManager.LoadCertificateFromDisk(domain); err != nil {
 			s.log.Warnf("Failed to load certificate after upload: %v", err)
+		} else {
+			s.log.Infof("Certificate loaded to memory successfully: domain=%s", domain)
 		}
 		http.Redirect(w, r, s.config.AdminPrefix+"/ssl", http.StatusFound)
 		return

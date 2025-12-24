@@ -6,9 +6,11 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sys/unix"
 )
 
 // ProcessStats 进程统计信息
@@ -191,9 +193,9 @@ func (r *LinuxProcessStatsReader) getProcessMemory() (uint64, error) {
 
 // DarwinProcessStatsReader macOS系统进程统计读取器
 type DarwinProcessStatsReader struct {
-	lastCPUTime uint64
-	lastSysTime time.Time
-	numCPU      int
+	lastCPUTimeUs uint64    // 上次CPU时间（微秒）
+	lastSysTime   time.Time // 上次采样时间
+	numCPU        int       // CPU核心数
 }
 
 func (r *DarwinProcessStatsReader) GetProcessStats() (*ProcessStats, error) {
@@ -206,14 +208,15 @@ func (r *DarwinProcessStatsReader) GetProcessStats() (*ProcessStats, error) {
 		Timestamp: time.Now(),
 	}
 
-	// macOS使用runtime包获取内存信息
+	// 获取系统总内存
+	totalMem, err := r.getTotalMemory()
+	if err != nil {
+		return nil, fmt.Errorf("获取系统内存失败: %w", err)
+	}
+
+	// 获取进程内存
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
-
-	// 获取系统总内存（需要系统调用，这里使用近似值）
-	// 注意：macOS上获取系统总内存比较复杂，这里使用一个合理的默认值
-	// 实际应用中可以通过 sysctl 命令获取
-	totalMem := uint64(8 * 1024 * 1024 * 1024) // 默认8GB，实际应该从系统获取
 	processMem := m.Sys
 
 	// 计算内存占用百分比
@@ -221,13 +224,58 @@ func (r *DarwinProcessStatsReader) GetProcessStats() (*ProcessStats, error) {
 		stats.MemoryPercent = (float64(processMem) / float64(totalMem)) * 100
 	}
 
-	// macOS上CPU占用计算比较复杂，这里使用runtime包提供的近似值
-	// 实际应该使用系统调用获取更准确的值
-	stats.CPUPercent = 0.0 // 暂时设为0，需要实现系统调用获取
+	// 获取CPU时间并计算CPU占用百分比
+	cpuTimeUs, err := r.getCPUTime()
+	if err != nil {
+		return nil, fmt.Errorf("获取CPU时间失败: %w", err)
+	}
 
-	log.Warn("macOS系统CPU占用统计功能需要进一步实现")
+	// 计算CPU占用百分比
+	now := time.Now()
+	if r.lastSysTime.IsZero() {
+		r.lastSysTime = now
+		r.lastCPUTimeUs = cpuTimeUs
+		stats.CPUPercent = 0.0
+	} else {
+		timeDiff := now.Sub(r.lastSysTime).Seconds()
+		if timeDiff > 0 {
+			cpuDiffUs := cpuTimeUs - r.lastCPUTimeUs
+			// CPU占用 = (进程CPU时间差 / 实际时间差 / CPU核心数) * 100
+			// cpuDiffUs 是微秒，timeDiff 是秒，需要统一单位
+			cpuDiffSeconds := float64(cpuDiffUs) / 1e6
+			totalCPUTime := timeDiff * float64(r.numCPU)
+			if totalCPUTime > 0 {
+				stats.CPUPercent = (cpuDiffSeconds / totalCPUTime) * 100
+			}
+		}
+		r.lastSysTime = now
+		r.lastCPUTimeUs = cpuTimeUs
+	}
 
 	return stats, nil
+}
+
+// getTotalMemory 通过 sysctl 获取系统总内存（字节）
+func (r *DarwinProcessStatsReader) getTotalMemory() (uint64, error) {
+	memSize, err := unix.SysctlUint64("hw.memsize")
+	if err != nil {
+		return 0, fmt.Errorf("sysctl获取hw.memsize失败: %w", err)
+	}
+	return memSize, nil
+}
+
+// getCPUTime 通过 getrusage 获取进程CPU时间（单位：微秒）
+func (r *DarwinProcessStatsReader) getCPUTime() (uint64, error) {
+	var rusage syscall.Rusage
+	err := syscall.Getrusage(syscall.RUSAGE_SELF, &rusage)
+	if err != nil {
+		return 0, fmt.Errorf("getrusage失败: %w", err)
+	}
+
+	// 用户态时间 + 内核态时间（转换为微秒）
+	userTimeUs := uint64(rusage.Utime.Sec)*1e6 + uint64(rusage.Utime.Usec)
+	sysTimeUs := uint64(rusage.Stime.Sec)*1e6 + uint64(rusage.Stime.Usec)
+	return userTimeUs + sysTimeUs, nil
 }
 
 // FallbackProcessStatsReader 回退方案：使用runtime包获取基本信息
@@ -267,6 +315,7 @@ func (r *FallbackProcessStatsReader) GetProcessStats() (*ProcessStats, error) {
 
 	return stats, nil
 }
+
 
 
 
