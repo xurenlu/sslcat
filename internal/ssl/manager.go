@@ -2197,6 +2197,11 @@ func (m *Manager) requestCertificateWithDNSRetry(domain, providerName string, ma
 
 // performDNSChallenge 执行DNS挑战验证
 func (m *Manager) performDNSChallenge(domain, providerName string) error {
+	m.sendProgressEvent(domain, CertProgressEvent{
+		Status:  "dns_init",
+		Message: fmt.Sprintf("正在初始化 DNS-01 验证，使用 %s", providerName),
+	})
+
 	// 生成账户密钥（如果还没有）
 	accountKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -2223,6 +2228,11 @@ func (m *Manager) performDNSChallenge(domain, providerName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to register ACME account: %w", err)
 	}
+
+	m.sendProgressEvent(domain, CertProgressEvent{
+		Status:  "dns_order",
+		Message: "正在创建证书订单...",
+	})
 
 	// 创建订单
 	order, err := client.AuthorizeOrder(ctx, acme.DomainIDs(domain))
@@ -2259,6 +2269,11 @@ func (m *Manager) performDNSChallenge(domain, providerName string) error {
 		// 确定记录名称
 		recordName := GetACMEChallengeRecordNameForWildcard(domain)
 
+		m.sendProgressEvent(domain, CertProgressEvent{
+			Status:  "dns_create_record",
+			Message: fmt.Sprintf("正在创建 DNS TXT 记录: %s", recordName),
+		})
+
 		// 创建DNS挑战，使用故障转移机制
 		challengeInfo, err := m.dnsManager.CreateDNSChallengeWithFailover(ctx, domain, recordName, keyAuth)
 		if err != nil {
@@ -2272,6 +2287,20 @@ func (m *Manager) performDNSChallenge(domain, providerName string) error {
 			}
 		}()
 
+		m.sendProgressEvent(domain, CertProgressEvent{
+			Status:  "dns_propagation",
+			Message: "等待 DNS 记录传播 (约10秒)...",
+		})
+
+		// 等待 DNS 记录传播（简化版：固定等待 10 秒）
+		m.log.Infof("Waiting 10 seconds for DNS propagation...")
+		time.Sleep(10 * time.Second)
+
+		m.sendProgressEvent(domain, CertProgressEvent{
+			Status:  "dns_verify",
+			Message: "正在等待 Let's Encrypt 验证 DNS 记录...",
+		})
+
 		// 接受挑战
 		_, err = client.Accept(ctx, challenge)
 		if err != nil {
@@ -2283,6 +2312,11 @@ func (m *Manager) performDNSChallenge(domain, providerName string) error {
 		if err != nil {
 			return fmt.Errorf("authorization failed: %w", err)
 		}
+
+		m.sendProgressEvent(domain, CertProgressEvent{
+			Status:  "dns_verified",
+			Message: "DNS 验证成功!",
+		})
 	}
 
 	// 生成私钥

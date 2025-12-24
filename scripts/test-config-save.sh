@@ -8,7 +8,7 @@ set -e
 echo "🧪 开始测试配置文件保存功能..."
 
 # 设置代理（如果需要）
-export https_proxy=http://127.0.0.1:7890 http_proxy=http://127.0.0.1:7890 all_proxy=socks5://127.0.0.1:7890
+export https_proxy=http://127.0.0.1:7895 http_proxy=http://127.0.0.1:7895 all_proxy=socks5://127.0.0.1:7895
 
 # 检查是否在正确的目录
 if [ ! -f "main.go" ]; then

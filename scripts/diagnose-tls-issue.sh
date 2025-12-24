@@ -4,7 +4,7 @@
 # 用于诊断 sg2.shifen.de 的 TLS 连接问题
 
 DOMAIN="sg2.shifen.de"
-PROXY="socks5://127.0.0.1:7890"
+PROXY="socks5://127.0.0.1:7895"
 
 echo "=== TLS 连接诊断 ==="
 echo "域名: $DOMAIN"
