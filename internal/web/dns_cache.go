@@ -92,12 +92,30 @@ func (c *DNSCache) updateProviderCacheAsync(providerName string) {
 			Updating:    false,
 		}
 	} else {
+		// 只统计 type 为 "domain" 的项（排除 DNS 记录）
+		domainCount := 0
+		totalCount := len(domains)
+		for _, domain := range domains {
+			if domain.Type == "domain" {
+				domainCount++
+			}
+		}
+		
 		c.cache[providerName] = &DNSProviderCache{
 			Domains:     domains,
-			DomainCount: len(domains),
+			DomainCount: domainCount,
 			LastUpdate:  time.Now(),
 			Error:       "",
 			Updating:    false,
+		}
+		
+		// 调试信息：如果域名数为0但总记录数不为0，说明可能有问题
+		if domainCount == 0 && totalCount > 0 {
+			// 记录所有记录类型以便调试
+			typeCount := make(map[string]int)
+			for _, d := range domains {
+				typeCount[d.Type] = typeCount[d.Type] + 1
+			}
 		}
 	}
 }
