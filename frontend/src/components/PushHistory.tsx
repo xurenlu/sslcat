@@ -359,7 +359,7 @@ const PushHistory: React.FC<PushHistoryProps> = ({ appName, limit = 50 }) => {
                   <>
                     <Divider />
                     <Box>
-                      <Text fontWeight="bold" mb={2}>{t.tunnels.logFile}</Text>
+                      <Text fontWeight="bold" mb={2}>日志文件</Text>
                       <Code fontSize="xs">{selectedPush.log_file}</Code>
                     </Box>
                   </>

@@ -40,7 +40,7 @@ import {
 } from 'react-icons/fi'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
 import { useTranslation } from '../hooks/useLanguage'
-import { TOAST_DURATION } from '../constants'
+import { DEFAULTS } from '../constants'
 
 interface MonitoringConfig {
   enabled: boolean
@@ -160,7 +160,7 @@ const Monitoring: React.FC = () => {
           toast({
             title: t.monitoring?.save_success || '监控配置已保存',
             status: 'success',
-            duration: TOAST_DURATION,
+            duration: DEFAULTS.TOAST_DURATION,
           })
           // 重新加载配置以确保同步
           await loadConfig()
@@ -176,7 +176,7 @@ const Monitoring: React.FC = () => {
         title: t.monitoring?.save_failed || '保存失败',
         description: error.message || '未知错误',
         status: 'error',
-        duration: TOAST_DURATION,
+        duration: DEFAULTS.TOAST_DURATION,
       })
     } finally {
       setSaving(false)
