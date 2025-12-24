@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.29-rc1] - 2025-12-25
+
+### ✨ 新增功能
+
+#### 证书申请实时进度显示
+- **SSE 流式响应**: 后端新增 `/api/ssl/generate-stream` API，使用 Server-Sent Events 实时推送证书申请进度
+- **实时进度条**: 前端在申请证书对话框中显示实时进度条和步骤详情
+- **状态追踪**: 显示 DNS 检查、验证方式选择、验证过程、成功/失败状态等完整流程
+
+#### 证书申请预检信息
+- **预检 API**: 新增 `/api/ssl/preflight` API，在申请前检查域名相关信息
+- **DNS 服务商检测**: 显示域名是否在已配置的 DNS 服务商中
+- **解析状态检测**: 显示域名是否解析到当前服务器
+- **挑战方式预测**: 显示将使用的挑战方式（HTTP-01 或 DNS-01）
+
+#### 挑战方法配置
+- **系统设置集成**: 在系统设置页面新增挑战方法配置选项
+- **双重挑战支持**: 支持 HTTP-01 和 DNS-01 两种挑战方式的启用/禁用
+- **多语言支持**: 挑战方法配置支持中文、英文、德语、法语、西班牙语、日语、俄语
+
+#### Makefile 改进
+- **dev-full 命令**: 新增 `make dev-full` 命令，一键构建前端并启动开发服务器
+
+### 🐛 Bug 修复
+
+#### 阿里云 DNS API 修复
+- **域名格式问题**: 修复阿里云 API 需要根域名而非完整子域名的问题
+  - 新增 `extractDomainAndRR` 方法自动分离根域名和子域名
+  - 支持特殊域名后缀（如 co.uk、com.cn 等）
+- **TTL 范围问题**: 修复阿里云要求 TTL 在 600-86400 之间的限制
+  - 默认 TTL 从 120 秒改为 600 秒
+  - 阿里云 Provider 自动校正 TTL 范围
+
+#### SSE 流式响应修复
+- **Flusher 接口**: 为 responseWriter 添加 `Flush()` 方法，支持 SSE 流式响应
+- **通道关闭问题**: 修复证书申请完成时通道关闭导致的 panic 问题
+  - 使用 `sync.Once` 确保通道只关闭一次
+  - 添加 recover 机制防止 panic
+
+#### ACME 客户端修复
+- **密钥缺失问题**: 修复 DNS-01 验证时 ACME 客户端未设置账户密钥的问题
+  - 为 `performDNSChallenge` 函数生成 ECDSA P-256 账户密钥
+
+### 🔧 其他改进
+
+- **取消自动重试**: 证书申请失败后不再自动重试，改为一次失败即结束
+- **进度事件管理**: 优化进度事件的状态管理和通道生命周期
+- **前端编译资源**: 更新前端编译后的静态资源
+
 ## [1.3.28-rc1] - 2025-12-24
 
 ### 🎉 重大架构变更
