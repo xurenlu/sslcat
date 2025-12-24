@@ -107,10 +107,70 @@ func (s *Server) handleAPIWebAuthnBeginRegistration(w http.ResponseWriter, r *ht
 	sessionKey := "webauthn_reg_" + session.Username + "_" + time.Now().Format("20060102150405")
 	saveWebAuthnSession(sessionKey, sessionData)
 
+	// 将 options 序列化为 JSON，然后反序列化以确保格式正确
+	optionsJSON, err := json.Marshal(options)
+	if err != nil {
+		s.log.Errorf("序列化 WebAuthn 选项失败: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "序列化选项失败"})
+		return
+	}
+
+	// 调试：打印序列化后的 JSON（前500字符）
+	jsonStr := string(optionsJSON)
+	if len(jsonStr) > 500 {
+		s.log.Infof("WebAuthn 注册选项 JSON (前500字符): %s...", jsonStr[:500])
+	} else {
+		s.log.Infof("WebAuthn 注册选项 JSON: %s", jsonStr)
+	}
+
+	var optionsMap map[string]interface{}
+	if err := json.Unmarshal(optionsJSON, &optionsMap); err != nil {
+		s.log.Errorf("反序列化 WebAuthn 选项失败: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "处理选项失败"})
+		return
+	}
+
+	// 调试：打印 optionsMap 的键
+	keys := make([]string, 0, len(optionsMap))
+	for k := range optionsMap {
+		keys = append(keys, k)
+	}
+	s.log.Infof("WebAuthn 注册选项的键: %v", keys)
+
+	// CredentialCreation 结构：{ Response: { PublicKey: {...} } }
+	// 序列化后可能是 { Response: { PublicKey: {...} } } 或 { publicKey: {...} }
+	var publicKeyOptions map[string]interface{}
+	
+	// 先检查 Response.PublicKey
+	if response, ok := optionsMap["Response"].(map[string]interface{}); ok {
+		s.log.Infof("找到 Response 字段")
+		if publicKey, ok := response["PublicKey"].(map[string]interface{}); ok {
+			s.log.Infof("找到 Response.PublicKey 字段")
+			publicKeyOptions = publicKey
+		} else if publicKey, ok := response["publicKey"].(map[string]interface{}); ok {
+			s.log.Infof("找到 Response.publicKey 字段（小写）")
+			publicKeyOptions = publicKey
+		} else {
+			s.log.Infof("Response 中没有 PublicKey，直接使用 Response")
+			publicKeyOptions = response
+		}
+	} else if publicKey, ok := optionsMap["PublicKey"].(map[string]interface{}); ok {
+		s.log.Infof("找到 PublicKey 字段（顶层）")
+		publicKeyOptions = publicKey
+	} else if publicKey, ok := optionsMap["publicKey"].(map[string]interface{}); ok {
+		s.log.Infof("找到 publicKey 字段（顶层，小写）")
+		publicKeyOptions = publicKey
+	} else {
+		s.log.Infof("未找到嵌套结构，直接使用整个 optionsMap")
+		publicKeyOptions = optionsMap
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":      true,
-		"options":      options,
+		"options":      publicKeyOptions, // 直接返回 publicKeyOptions，不再包装
 		"session_key":  sessionKey,
 		"device_name":  req.DeviceName,
 	})
@@ -240,10 +300,46 @@ func (s *Server) handleAPIWebAuthnBeginLogin(w http.ResponseWriter, r *http.Requ
 	sessionKey := "webauthn_login_" + req.Username + "_" + time.Now().Format("20060102150405")
 	saveWebAuthnSession(sessionKey, sessionData)
 
+	// 将 options 序列化为 JSON，然后反序列化以确保格式正确
+	optionsJSON, err := json.Marshal(options)
+	if err != nil {
+		s.log.Errorf("序列化 WebAuthn 选项失败: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "序列化选项失败"})
+		return
+	}
+
+	var optionsMap map[string]interface{}
+	if err := json.Unmarshal(optionsJSON, &optionsMap); err != nil {
+		s.log.Errorf("反序列化 WebAuthn 选项失败: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "处理选项失败"})
+		return
+	}
+
+	// CredentialAssertion 结构包含 Response 字段，Response 字段又包含 PublicKey 字段
+	// 需要提取 PublicKeyCredentialRequestOptions
+	var publicKeyOptions map[string]interface{}
+	if response, ok := optionsMap["Response"].(map[string]interface{}); ok {
+		// 如果存在 Response 字段，检查是否有 PublicKey 字段
+		if publicKey, ok := response["PublicKey"].(map[string]interface{}); ok {
+			publicKeyOptions = publicKey
+		} else {
+			// 如果没有 PublicKey 字段，直接使用 Response
+			publicKeyOptions = response
+		}
+	} else if publicKey, ok := optionsMap["PublicKey"].(map[string]interface{}); ok {
+		// 如果直接存在 PublicKey 字段，使用它
+		publicKeyOptions = publicKey
+	} else {
+		// 如果没有找到，直接使用整个 optionsMap
+		publicKeyOptions = optionsMap
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":     true,
-		"options":     options,
+		"options":     publicKeyOptions, // 直接返回 publicKeyOptions，不再包装
 		"session_key": sessionKey,
 	})
 }

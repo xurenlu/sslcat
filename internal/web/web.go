@@ -17,18 +17,8 @@ func (s *Server) handleStaticSites(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := map[string]interface{}{
-		"AdminPrefix": s.config.AdminPrefix,
-		"Sites":       s.config.StaticSites,
-	}
-
-	// 检查模板是否存在，如果不存在则回退到前端 SPA
-	if !s.templateRenderer.TemplateExists("static_sites.html") {
-		s.handleSPA(w, r)
-		return
-	}
-
-	s.templateRenderer.DetectLanguageAndRender(w, r, "static_sites.html", data)
+	// 已迁移到 React SPA
+	s.handleSPA(w, r)
 }
 
 // handleStaticSitesAdd 添加/保存静态站点

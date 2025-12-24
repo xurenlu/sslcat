@@ -146,6 +146,7 @@ const Settings: React.FC = () => {
   const { isOpen: isTotpModalOpen, onOpen: onTotpModalOpen, onClose: onTotpModalClose } = useDisclosure()
   
   // WebAuthn 相关状态
+  const [webauthnEnabled, setWebauthnEnabled] = useState(false)
   const [webauthnCredentials, setWebauthnCredentials] = useState<any[]>([])
   const [webauthnLoading, setWebauthnLoading] = useState(false)
   const [webauthnDeviceName, setWebauthnDeviceName] = useState('')
@@ -222,11 +223,55 @@ const Settings: React.FC = () => {
         throw new Error(beginData.error || '开始注册失败')
       }
 
+      // 调试：打印接收到的数据
+      console.log('WebAuthn beginData:', JSON.stringify(beginData, null, 2))
+      console.log('beginData.options:', beginData.options)
+      console.log('beginData.options.challenge:', beginData.options?.challenge)
+
+      // 辅助函数：将 Base64 URL 编码的字符串转换为 ArrayBuffer
+      const base64URLToArrayBuffer = (base64URL: string): ArrayBuffer => {
+        // Base64 URL 编码使用 - 和 _ 而不是 + 和 /
+        const base64 = base64URL.replace(/-/g, '+').replace(/_/g, '/')
+        // 添加填充
+        const padded = base64 + '='.repeat((4 - base64.length % 4) % 4)
+        // 转换为二进制字符串
+        const binary = atob(padded)
+        // 转换为 ArrayBuffer
+        const bytes = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i)
+        }
+        return bytes.buffer
+      }
+
       // 调用浏览器 WebAuthn API
       let credential: PublicKeyCredential
       try {
+        // options 现在直接就是 PublicKeyCredentialCreationOptions 对象
+        // 但是需要将字符串字段转换为 ArrayBuffer
+        const publicKeyOptions = { ...beginData.options }
+        
+        // 转换 challenge (Base64 URL 编码的字符串 -> ArrayBuffer)
+        if (typeof publicKeyOptions.challenge === 'string') {
+          publicKeyOptions.challenge = base64URLToArrayBuffer(publicKeyOptions.challenge)
+        }
+        
+        // 转换 user.id (Base64 URL 编码的字符串 -> ArrayBuffer)
+        if (publicKeyOptions.user && typeof publicKeyOptions.user.id === 'string') {
+          publicKeyOptions.user.id = base64URLToArrayBuffer(publicKeyOptions.user.id)
+        }
+        
+        console.log('转换后的 publicKeyOptions:', {
+          ...publicKeyOptions,
+          challenge: '[ArrayBuffer]',
+          user: {
+            ...publicKeyOptions.user,
+            id: '[ArrayBuffer]'
+          }
+        })
+        
         credential = await navigator.credentials.create({
-          publicKey: beginData.options,
+          publicKey: publicKeyOptions,
         }) as PublicKeyCredential
       } catch (err: any) {
         if (err.name === 'NotAllowedError') {
@@ -505,9 +550,15 @@ const Settings: React.FC = () => {
         })
         
         if (response.ok) {
-          const data = await response.json()
-          if (data.success && data.data) {
-            const config = data.data
+          const result = await response.json()
+          // API 返回格式: { success: true, data: { ... } }
+          const data = result.data || result
+          // 检查 WebAuthn 是否可用（从 data 对象中读取）
+          if (data.webauthn_enabled !== undefined) {
+            setWebauthnEnabled(data.webauthn_enabled)
+          }
+          if (result.success && result.data) {
+            const config = result.data
             setSettings(prev => ({
               ...prev,
               // 基础设置
@@ -1095,7 +1146,8 @@ const Settings: React.FC = () => {
 
               <Divider my={2} />
 
-              {/* WebAuthn 指纹登录 */}
+              {/* WebAuthn 指纹登录（仅在 WebAuthn 可用时显示） */}
+              {webauthnEnabled && (
               <FormControl>
                 <FormLabel>
                   <HStack>
@@ -1153,6 +1205,7 @@ const Settings: React.FC = () => {
                   注册新设备
                 </Button>
               </FormControl>
+              )}
             </VStack>
           </CardBody>
         </Card>

@@ -248,7 +248,6 @@ func (s *Server) handleAPISettingsUpdate(w http.ResponseWriter, r *http.Request)
 	if oldPrefix != s.config.AdminPrefix {
 		s.mux = http.NewServeMux()
 		s.setupRoutes()
-		s.templateRenderer.ClearCache()
 
 		// 发送前缀变更通知
 		s.sendAdminPrefixChangeNotification(oldPrefix, s.config.AdminPrefix)
@@ -396,7 +395,6 @@ func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) 
 	if oldPrefix != s.config.AdminPrefix {
 		s.mux = http.NewServeMux()
 		s.setupRoutes()
-		s.templateRenderer.ClearCache()
 		s.log.Infof("管理前缀已从 %s 更改为 %s，路由已重建", oldPrefix, s.config.AdminPrefix)
 
 		// 发送前缀变更通知

@@ -4,16 +4,17 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/mail"
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 	"unicode"
 
+	"github.com/xurenlu/sslcat/internal/assets"
 	"github.com/xurenlu/sslcat/internal/config"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -78,181 +79,46 @@ func isValidFirstSetupDomain(domain string) bool {
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
-	// 使用Info级别确保能看到日志
-	s.log.Infof("=== handleLogin called: method=%s, path=%s ===", r.Method, r.URL.Path)
-
-	if r.Method == "GET" {
-		debugForced := strings.EqualFold(r.URL.Query().Get("debug"), "true") || r.URL.Query().Get("debug") == "1"
-
-		// 下发人机验证要素（TOTP启用时禁用PoW）
-		startTs := time.Now().UnixMilli()
-		honeypotName := "hp_seed000"
-
-		data := map[string]interface{}{
-			"AdminPrefix":    s.config.AdminPrefix,
-			"Error":          "",
-			"RequireCaptcha": s.config.Security.EnableCaptcha,
-			"RequireTOTP":    s.config.Admin.EnableTOTP,
-			"Debug":          debugForced,
-			"HoneypotName":   honeypotName,
-			"FormStartTs":    startTs,
-		}
-
-		s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
+	// 直接返回 React SPA 登录页面（不检查认证）
+	// React SPA 使用 /api/auth/login API 端点进行登录
+	fsys, err := assets.GetFrontendFS()
+	if err != nil {
+		s.log.Errorf("Failed to get frontend filesystem: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	if r.Method == "POST" {
-		s.log.Infof("=== POST login received ===")
-		_ = r.ParseForm()
-		s.log.Infof("Form parsed, values: username='%s', password_len=%d",
-			r.FormValue("username"), len(r.FormValue("password")))
+	// 读取 index.html
+	indexFile, err := fsys.Open("index.html")
+	if err != nil {
+		s.log.Errorf("Failed to open index.html: %v", err)
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+	defer indexFile.Close()
 
-		// 蜜罐：检测非空值填写（空值不算填写）
-		for k, v := range r.Form {
-			if strings.HasPrefix(k, "hp_") && len(v) > 0 {
-				trimmed := strings.TrimSpace(v[0])
-				if trimmed != "" {
-					hp := "hp_seed000"
-					startTs := time.Now().UnixMilli()
-					data := map[string]interface{}{
-						"AdminPrefix":    s.config.AdminPrefix,
-						"Error":          "疑似自动化提交（蜜罐触发）",
-						"RequireCaptcha": s.config.Security.EnableCaptcha && !s.config.Admin.EnableTOTP,
-						"RequireTOTP":    s.config.Admin.EnableTOTP,
-						"Debug":          false,
-						"HoneypotName":   hp,
-						"FormStartTs":    startTs,
-					}
-					s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
-					return
-				}
-			}
-		}
-
-		// 最小填写时长：<MinFormMs 拒绝
-		s.log.Infof("Checking minimum form duration...")
-		if ts := strings.TrimSpace(r.FormValue("form_start_ts")); ts != "" {
-			s.log.Infof("form_start_ts found: %s", ts)
-			if ms, err := strconv.ParseInt(ts, 10, 64); err == nil {
-				s.log.Infof("Parsed timestamp: %d", ms)
-				minMs := int64(800)
-				if s.config.Security.MinFormMs > 0 {
-					minMs = int64(s.config.Security.MinFormMs)
-				}
-				duration := time.Now().UnixMilli() - ms
-				s.log.Infof("Form duration: %dms, required: %dms", duration, minMs)
-				if duration < minMs {
-					s.log.Infof("FORM TOO FAST: %dms < %dms", duration, minMs)
-					hp := "hp_seed000"
-					startTs := time.Now().UnixMilli()
-					data := map[string]interface{}{
-						"AdminPrefix":    s.config.AdminPrefix,
-						"Error":          "提交过快，请重试",
-						"RequireCaptcha": s.config.Security.EnableCaptcha,
-						"Debug":          false,
-						"HoneypotName":   hp,
-						"FormStartTs":    startTs,
-					}
-					s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
-					return
-				}
-			} else {
-				s.log.Infof("Failed to parse form_start_ts: %s", ts)
-			}
-		} else {
-			s.log.Infof("No form_start_ts found")
-		}
-
-		// 图形验证码校验（按开关，TOTP启用时跳过）
-		enableCaptcha := s.config.Security.EnableCaptcha && !s.config.Admin.EnableTOTP
-		s.log.Infof("Captcha check: enabled=%v (EnableCaptcha=%v, EnableTOTP=%v)", enableCaptcha, s.config.Security.EnableCaptcha, s.config.Admin.EnableTOTP)
-		if enableCaptcha {
-			sid := strings.TrimSpace(r.FormValue("captcha_session_id"))
-			code := strings.TrimSpace(r.FormValue("captcha_text"))
-			s.log.Infof("Captcha values: sid='%s', code='%s'", sid, code)
-			captchaResult := s.captchaManager.VerifyCaptchaString(sid, code)
-			s.log.Infof("Captcha verification result: %v", captchaResult)
-			if sid == "" || code == "" || !captchaResult {
-				s.log.Infof("CAPTCHA FAILED: sid_empty=%v, code_empty=%v, verify_result=%v", sid == "", code == "", captchaResult)
-				hp := "hp_seed000"
-				startTs := time.Now().UnixMilli()
-				data := map[string]interface{}{
-					"AdminPrefix":    s.config.AdminPrefix,
-					"Error":          "验证码错误，请重试",
-					"RequireCaptcha": s.config.Security.EnableCaptcha,
-					"RequireTOTP":    s.config.Admin.EnableTOTP,
-					"Debug":          false,
-					"HoneypotName":   hp,
-					"FormStartTs":    startTs,
-				}
-				s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
-				return
-			}
-		} else {
-			s.log.Infof("Captcha disabled, skipping check")
-		}
-
-		// 用户名密码校验（支持 bcrypt/明文，明文将自动迁移为 bcrypt）
-		s.log.Infof("Starting password verification...")
-		username := r.FormValue("username")
-		password := r.FormValue("password")
-		totpCode := strings.TrimSpace(r.FormValue("totp_code"))
-
-		s.log.Infof("Login attempt: username='%s', password_len=%d, expected_username='%s'",
-			username, len(password), s.config.Admin.Username)
-
-		usernameMatch := username == s.config.Admin.Username
-		passwordMatch := s.verifyAdminPassword(password)
-
-		s.log.Infof("Login verification: username_match=%v, password_match=%v", usernameMatch, passwordMatch)
-
-		if usernameMatch && passwordMatch {
-			// TOTP 二次验证（仅在提供了 TOTP 码时才验证）
-			// 如果启用了 TOTP 但用户没有提供 TOTP 码，允许登录（默认登录模式）
-			if s.config.Admin.EnableTOTP && totpCode != "" && !s.verifyTOTP(totpCode) {
-				hp := "hp_seed000"
-				startTs := time.Now().UnixMilli()
-				data := map[string]interface{}{
-					"AdminPrefix":    s.config.AdminPrefix,
-					"Error":          "TOTP验证码错误",
-					"RequireCaptcha": s.config.Security.EnableCaptcha,
-					"RequireTOTP":    s.config.Admin.EnableTOTP,
-					"Debug":          false,
-					"HoneypotName":   hp,
-					"FormStartTs":    startTs,
-				}
-				s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
-				return
-			}
-
-			s.processLogin(w, r)
-			return
-		}
-
-		// 登录失败，记录安全日志
-		clientIP := s.getClientIP(r)
-		s.securityManager.LogAccess(clientIP, r.Header.Get("User-Agent"), r.URL.Path, false)
-		s.audit("login_failed", clientIP)
-
-		// 显示错误页面（重新生成完整表单数据）
-		startTs := time.Now().UnixMilli()
-		honeypotName := "hp_seed000"
-
-		data := map[string]interface{}{
-			"AdminPrefix":    s.config.AdminPrefix,
-			"Error":          s.translator.T("login.invalid"),
-			"RequireCaptcha": s.config.Security.EnableCaptcha,
-			"RequireTOTP":    s.config.Admin.EnableTOTP,
-			"Debug":          false,
-			"HoneypotName":   honeypotName,
-			"FormStartTs":    startTs,
-		}
-		s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
+	// 读取HTML内容
+	htmlContent, err := io.ReadAll(indexFile)
+	if err != nil {
+		s.log.Errorf("Failed to read index.html: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	// 动态重写资源路径，将相对路径替换为当前管理面板路径
+	htmlStr := string(htmlContent)
+	// 替换 /assets/ 为当前管理面板路径 + /assets/
+	htmlStr = strings.ReplaceAll(htmlStr, `src="/assets/`, `src="`+s.config.AdminPrefix+`/assets/`)
+	htmlStr = strings.ReplaceAll(htmlStr, `href="/assets/`, `href="`+s.config.AdminPrefix+`/assets/`)
+	// 替换 favicon 路径
+	htmlStr = strings.ReplaceAll(htmlStr, `href="/favicon.ico"`, `href="`+s.config.AdminPrefix+`/favicon.ico"`)
+
+	// 设置内容类型
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+
+	// 写入修改后的HTML内容
+	w.Write([]byte(htmlStr))
 }
 
 // verifyAdminPassword 校验管理员密码；支持 bcrypt；若存储为明文且匹配，会自动迁移为 bcrypt
@@ -321,41 +187,7 @@ func min(a, b int) int {
 	return b
 }
 
-func (s *Server) handleMobile(w http.ResponseWriter, r *http.Request) {
-	if !s.checkAuth(w, r) {
-		return
-	}
-
-	stats := s.getSystemStats()
-
-	data := map[string]interface{}{
-		"AdminPrefix": s.config.AdminPrefix,
-		"Stats":       stats,
-	}
-	s.templateRenderer.DetectLanguageAndRender(w, r, "mobile.html", data)
-}
-
-func (s *Server) handleCharts(w http.ResponseWriter, r *http.Request) {
-	if !s.checkAuth(w, r) {
-		return
-	}
-
-	stats := s.getSystemStats()
-
-	data := map[string]interface{}{
-		"AdminPrefix": s.config.AdminPrefix,
-		"Stats":       stats,
-	}
-	s.templateRenderer.DetectLanguageAndRender(w, r, "charts.html", data)
-}
-
-func (s *Server) handleDefault(w http.ResponseWriter, r *http.Request, domain string) {
-	data := map[string]interface{}{
-		"AdminPrefix": s.config.AdminPrefix,
-		"Domain":      domain,
-	}
-	s.templateRenderer.DetectLanguageAndRender(w, r, "default.html", data)
-}
+// handleMobile, handleCharts, handleDefault 已移除，使用 React SPA
 
 func (s *Server) processLogin(w http.ResponseWriter, r *http.Request) {
 	s.log.Infof("=== processLogin called ===")
@@ -410,7 +242,7 @@ func (s *Server) processLogin(w http.ResponseWriter, r *http.Request) {
 		)
 		if err != nil {
 			s.log.Errorf("创建会话失败: %v", err)
-			s.renderLoginError(w, r, "登录失败，请重试")
+			http.Redirect(w, r, s.config.AdminPrefix+"/login?error=登录失败，请重试", http.StatusFound)
 			return
 		}
 
@@ -446,25 +278,8 @@ func (s *Server) processLogin(w http.ResponseWriter, r *http.Request) {
 	s.securityManager.LogAccess(clientIP, r.Header.Get("User-Agent"), r.URL.Path, false)
 	s.audit("login_failed", clientIP)
 
-	// 显示错误页面（重新生成完整表单数据）
-	s.renderLoginError(w, r, s.translator.T("login.invalid"))
-}
-
-// renderLoginError 渲染登录错误页面
-func (s *Server) renderLoginError(w http.ResponseWriter, r *http.Request, errorMsg string) {
-	startTs := time.Now().UnixMilli()
-	honeypotName := "hp_seed000"
-
-	data := map[string]interface{}{
-		"AdminPrefix":    s.config.AdminPrefix,
-		"Error":          errorMsg,
-		"RequireCaptcha": s.config.Security.EnableCaptcha,
-		"RequireTOTP":    s.config.Admin.EnableTOTP,
-		"Debug":          false,
-		"HoneypotName":   honeypotName,
-		"FormStartTs":    startTs,
-	}
-	s.templateRenderer.DetectLanguageAndRender(w, r, "login.html", data)
+	// 重定向到登录页面（React SPA 会处理错误显示）
+	http.Redirect(w, r, s.config.AdminPrefix+"/login?error="+url.QueryEscape(s.translator.T("login.invalid")), http.StatusFound)
 }
 
 func (s *Server) getEffectiveAdminPassword() string {
@@ -624,8 +439,6 @@ func (s *Server) handleSettingsSave(w http.ResponseWriter, r *http.Request) {
 		if oldPrefix != s.config.AdminPrefix {
 			s.mux = http.NewServeMux()
 			s.setupRoutes()
-			// 清理模板缓存，确保使用新的配置
-			s.templateRenderer.ClearCache()
 
 			// 发送前缀变更通知
 			s.sendAdminPrefixChangeNotification(oldPrefix, s.config.AdminPrefix)
@@ -975,14 +788,4 @@ func (s *Server) handleAPICloudStorageDetect(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
-	if !s.checkAuth(w, r) {
-		return
-	}
-	stats := s.getSystemStats()
-	data := map[string]interface{}{
-		"AdminPrefix": s.config.AdminPrefix,
-		"Stats":       stats,
-	}
-	s.templateRenderer.DetectLanguageAndRender(w, r, "dashboard.html", data)
-}
+// handleDashboard 已移除，使用 React SPA

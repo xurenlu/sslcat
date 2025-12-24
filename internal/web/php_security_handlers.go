@@ -15,22 +15,8 @@ func (s *Server) handlePHPSecurity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 获取选中的域名
-	selectedDomain := r.URL.Query().Get("domain")
-
-	data := map[string]interface{}{
-		"AdminPrefix":    s.config.AdminPrefix,
-		"Sites":          s.config.PHPSites,
-		"SelectedDomain": selectedDomain,
-	}
-
-	// 检查模板是否存在，如果不存在则回退到前端 SPA
-	if !s.templateRenderer.TemplateExists("php_security.html") {
-		s.handleSPA(w, r)
-		return
-	}
-
-	s.templateRenderer.DetectLanguageAndRender(w, r, "php_security.html", data)
+	// 已迁移到 React SPA
+	s.handleSPA(w, r)
 }
 
 // handlePHPOptimization 处理 PHP 性能优化页面

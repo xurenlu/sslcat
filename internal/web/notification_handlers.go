@@ -24,49 +24,8 @@ func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 获取通知历史
-	limit := 50
-	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 200 {
-			limit = l
-		}
-	}
-
-	history := s.notificationIntegrator.GetNotificationHistory(limit)
-	stats := s.notificationIntegrator.GetNotificationStats()
-
-	data := map[string]interface{}{
-		"AdminPrefix": s.config.AdminPrefix,
-		"History":     history,
-		"Stats":       stats,
-		"CurrentUser": currentUser,
-		"Limit":       limit,
-		"Levels": map[string]string{
-			"info":     "信息",
-			"warning":  "警告",
-			"error":    "错误",
-			"critical": "严重",
-		},
-		"Types": map[string]string{
-			"ddos_attack":     "DDoS攻击",
-			"cert_expiring":   "证书过期",
-			"cert_failed":     "证书失败",
-			"system_error":    "系统错误",
-			"security_alert":  "安全警报",
-			"user_login":      "用户登录",
-			"user_action":     "用户操作",
-			"system_startup":  "系统启动",
-			"system_shutdown": "系统关闭",
-		},
-	}
-
-	// 检查模板是否存在，如果不存在则回退到前端 SPA
-	if !s.templateRenderer.TemplateExists("notifications.html") {
-		s.handleSPA(w, r)
-		return
-	}
-
-	s.templateRenderer.DetectLanguageAndRender(w, r, "notifications.html", data)
+	// 已迁移到 React SPA
+	s.handleSPA(w, r)
 }
 
 // handleNotificationTest 测试通知

@@ -32,19 +32,8 @@ func (s *Server) handlePHPSites(w http.ResponseWriter, r *http.Request) {
 		siteStatuses[site.Domain] = status
 	}
 
-	data := map[string]interface{}{
-		"AdminPrefix":  s.config.AdminPrefix,
-		"Sites":        s.config.PHPSites,
-		"SiteStatuses": siteStatuses,
-	}
-
-	// 检查模板是否存在，如果不存在则回退到前端 SPA
-	if !s.templateRenderer.TemplateExists("php_sites.html") {
-		s.handleSPA(w, r)
-		return
-	}
-
-	s.templateRenderer.DetectLanguageAndRender(w, r, "php_sites.html", data)
+	// 已迁移到 React SPA
+	s.handleSPA(w, r)
 }
 
 func (s *Server) handlePHPSitesAdd(w http.ResponseWriter, r *http.Request) {

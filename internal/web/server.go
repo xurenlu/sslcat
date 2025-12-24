@@ -52,7 +52,6 @@ type Server struct {
 	securityManager  *security.Manager
 	sslManager       *ssl.Manager
 	notifier         *notify.Notifier
-	templateRenderer *TemplateRenderer
 	translator       *i18n.Translator
 	mux              *http.ServeMux
 	log              *logrus.Entry
@@ -247,16 +246,12 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		logrus.Warnf("Failed to read embedded i18n files: %v", err)
 	}
 
-	// 初始化模板渲染器
-	templateRenderer := NewTemplateRenderer(translator)
-
 	server := &Server{
 		config:             cfg,
 		proxyManager:       proxyMgr,
 		securityManager:    secMgr,
 		sslManager:         sslMgr,
 		notifier:           notify.NewFromEnv(),
-		templateRenderer:   templateRenderer,
 		translator:         translator,
 		mux:                http.NewServeMux(),
 		startTime:          time.Now(),

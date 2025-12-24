@@ -22,28 +22,8 @@ func (s *Server) handleAISecurityPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 检查模板是否存在，如果不存在则回退到前端 SPA
-	if !s.templateRenderer.TemplateExists("ai_security.html") {
-		// 回退到前端 SPA，返回 index.html
-		s.handleSPA(w, r)
-		return
-	}
-
-	// 获取配置和最新分析结果
-	var lastAnalysis *ai.AnalysisResult
-	if s.aiSecurityAnalyzer != nil {
-		lastAnalysis = s.aiSecurityAnalyzer.GetLastAnalysis()
-	}
-
-	data := map[string]interface{}{
-		"AdminPrefix":  s.config.AdminPrefix,
-		"CurrentUser":  currentUser,
-		"CurrentPage":  "ai_security",
-		"Config":       s.config.AISecurity,
-		"LastAnalysis": lastAnalysis,
-	}
-
-	s.templateRenderer.DetectLanguageAndRender(w, r, "ai_security.html", data)
+	// 已迁移到 React SPA
+	s.handleSPA(w, r)
 }
 
 // handleAISecurityConfigAPI AI 安全配置 API

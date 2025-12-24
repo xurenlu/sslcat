@@ -34,6 +34,11 @@ import TemplateMarket from './pages/TemplateMarket'
 import TemplateDeploy from './pages/TemplateDeploy'
 import Tunnels from './pages/Tunnels'
 
+// 辅助组件：为需要 Layout 的页面添加 Layout
+const LayoutRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <Layout>{children}</Layout>
+)
+
 const AppRoutes: React.FC = () => {
   const { adminPrefix, isLoading, error } = useConfig()
 
@@ -66,145 +71,201 @@ const AppRoutes: React.FC = () => {
         </AuthGuard>
       } />
       
-      {/* 所有其他页面都需要认证 */}
+      {/* 所有其他页面都需要认证和 Layout */}
       <Route path={`${adminPrefix}/`} element={
         <AuthGuard>
-          <Dashboard />
+          <LayoutRoute>
+            <Dashboard />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/dashboard`} element={
         <AuthGuard>
-          <Dashboard />
+          <LayoutRoute>
+            <Dashboard />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/proxy`} element={
         <AuthGuard>
-          <ProxyList />
+          <LayoutRoute>
+            <ProxyList />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/proxy/add`} element={
         <AuthGuard>
-          <ProxyAdd />
+          <LayoutRoute>
+            <ProxyAdd />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/proxy/edit`} element={
         <AuthGuard>
-          <ProxyEdit />
+          <LayoutRoute>
+            <ProxyEdit />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/sites`} element={
         <AuthGuard>
-          <SitesManagement />
+          <LayoutRoute>
+            <SitesManagement />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/static-site-edit`} element={
         <AuthGuard>
-          <StaticSiteEdit />
+          <LayoutRoute>
+            <StaticSiteEdit />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/static-site-add`} element={
         <AuthGuard>
-          <StaticSiteEdit />
+          <LayoutRoute>
+            <StaticSiteEdit />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/php-site-edit`} element={
         <AuthGuard>
-          <PHPSiteEdit />
+          <LayoutRoute>
+            <PHPSiteEdit />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/php-site-add`} element={
         <AuthGuard>
-          <PHPSiteEdit />
+          <LayoutRoute>
+            <PHPSiteEdit />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/ssl`} element={
         <AuthGuard>
-          <SSLManagement />
+          <LayoutRoute>
+            <SSLManagement />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/settings`} element={
         <AuthGuard>
-          <Settings />
+          <LayoutRoute>
+            <Settings />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/dns`} element={
         <AuthGuard>
-          <DNSManagement />
+          <LayoutRoute>
+            <DNSManagement />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/tunnels`} element={
         <AuthGuard>
-          <Tunnels />
+          <LayoutRoute>
+            <Tunnels />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/security`} element={
         <AuthGuard>
-          <Security />
+          <LayoutRoute>
+            <Security />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/git-server`} element={
         <AuthGuard>
-          <GitServerManagement />
+          <LayoutRoute>
+            <GitServerManagement />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/templates`} element={
         <AuthGuard>
-          <TemplateMarket />
+          <LayoutRoute>
+            <TemplateMarket />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/templates/deploy/:templateId`} element={
         <AuthGuard>
-          <TemplateDeploy />
+          <LayoutRoute>
+            <TemplateDeploy />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/notifications`} element={
         <AuthGuard>
-          <Notifications />
+          <LayoutRoute>
+            <Notifications />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/users`} element={
         <AuthGuard>
-          <UserManagement />
+          <LayoutRoute>
+            <UserManagement />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/change-password`} element={
         <AuthGuard>
-          <ChangePassword />
+          <LayoutRoute>
+            <ChangePassword />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/cdn`} element={
         <AuthGuard>
-          <CDNManagement />
+          <LayoutRoute>
+            <CDNManagement />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/statistics`} element={
         <AuthGuard>
-          <Statistics />
+          <LayoutRoute>
+            <Statistics />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/slow-requests`} element={
         <AuthGuard>
-          <SlowRequests />
+          <LayoutRoute>
+            <SlowRequests />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/cluster`} element={
         <AuthGuard>
-          <ClusterSettings />
+          <LayoutRoute>
+            <ClusterSettings />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/cluster/status`} element={
         <AuthGuard>
-          <ClusterStatus />
+          <LayoutRoute>
+            <ClusterStatus />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/ai-security`} element={
         <AuthGuard>
-          <AISecurityAnalysis />
+          <LayoutRoute>
+            <AISecurityAnalysis />
+          </LayoutRoute>
         </AuthGuard>
       } />
       <Route path={`${adminPrefix}/image-optimization`} element={
         <AuthGuard>
-          <ImageOptimization />
+          <LayoutRoute>
+            <ImageOptimization />
+          </LayoutRoute>
         </AuthGuard>
       } />
     </Routes>
@@ -269,11 +330,7 @@ function App() {
       <LanguageProvider>
         <ConfigProvider>
           <AuthProvider>
-            <Box minH="100vh">
-              <Layout>
-                <AppRoutes />
-              </Layout>
-            </Box>
+            <AppRoutes />
           </AuthProvider>
         </ConfigProvider>
       </LanguageProvider>
