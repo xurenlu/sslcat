@@ -35,6 +35,7 @@ interface SystemConfig {
   require_captcha?: boolean
   require_totp?: boolean
   totp_enabled?: boolean  // TOTP 是否已配置（用于显示仅TOTP登录选项）
+  webauthn_enabled?: boolean  // WebAuthn 是否可用
 }
 
 const Login: React.FC = () => {
@@ -53,6 +54,8 @@ const Login: React.FC = () => {
   const [totpOnlyCaptchaText, setTotpOnlyCaptchaText] = useState('')  // TOTP-only 模式的验证码文本
   const [totpOnlyCaptchaSessionId, setTotpOnlyCaptchaSessionId] = useState('')  // TOTP-only 模式的验证码会话ID
   const [totpOnlyCaptchaImageUrl, setTotpOnlyCaptchaImageUrl] = useState('')  // TOTP-only 模式的验证码图片
+  const [webauthnMode, setWebauthnMode] = useState(false)  // WebAuthn 登录模式
+  const [webauthnUsername, setWebauthnUsername] = useState('')  // WebAuthn 登录用户名
   
   const { login, isAuthenticated, isLoading: authLoading } = useAuth()
   const { adminPrefix } = useConfig()
@@ -89,7 +92,8 @@ const Login: React.FC = () => {
         setSystemConfig({
           require_captcha: data.security?.enable_captcha || false,
           require_totp: data.server?.enable_totp || false,
-          totp_enabled: data.server?.enable_totp || false  // TOTP 是否已配置
+          totp_enabled: data.server?.enable_totp || false,  // TOTP 是否已配置
+          webauthn_enabled: data.webauthn_enabled || false  // WebAuthn 是否可用
         })
       }
     } catch (error) {
@@ -278,6 +282,111 @@ const Login: React.FC = () => {
     }
   }
 
+  // WebAuthn 登录
+  const handleWebAuthnLogin = async () => {
+    if (!webauthnUsername.trim()) {
+      setError('请输入用户名')
+      return
+    }
+
+    setIsLoading(true)
+    setError('')
+
+    try {
+      // 1. 开始登录流程
+      const beginResponse = await fetch(buildApiPath(adminPrefix, '/api/webauthn/login/begin'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ username: webauthnUsername }),
+      })
+
+      if (!beginResponse.ok) {
+        const errorData = await beginResponse.json()
+        setError(errorData.error || 'WebAuthn 登录失败')
+        setIsLoading(false)
+        return
+      }
+
+      const beginData = await beginResponse.json()
+      if (!beginData.success) {
+        setError(beginData.error || 'WebAuthn 登录失败')
+        setIsLoading(false)
+        return
+      }
+
+      // 2. 调用浏览器 WebAuthn API
+      let credential: PublicKeyCredential
+      try {
+        credential = await navigator.credentials.get({
+          publicKey: beginData.options,
+        }) as PublicKeyCredential
+      } catch (err: any) {
+        if (err.name === 'NotAllowedError') {
+          setError('用户取消了验证')
+        } else {
+          setError('生物识别验证失败: ' + (err.message || '未知错误'))
+        }
+        setIsLoading(false)
+        return
+      }
+
+      // 3. 准备响应数据
+      const response = credential.response as AuthenticatorAssertionResponse
+      const credentialResponse = {
+        id: credential.id,
+        rawId: arrayBufferToBase64(credential.rawId),
+        response: {
+          authenticatorData: arrayBufferToBase64(response.authenticatorData),
+          clientDataJSON: arrayBufferToBase64(response.clientDataJSON),
+          signature: arrayBufferToBase64(response.signature),
+          userHandle: response.userHandle ? arrayBufferToBase64(response.userHandle) : null,
+        },
+        type: credential.type,
+      }
+
+      // 4. 完成登录
+      const finishResponse = await fetch(buildApiPath(adminPrefix, '/api/webauthn/login/finish'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          username: webauthnUsername,
+          session_key: beginData.session_key,
+          response: credentialResponse,
+        }),
+      })
+
+      if (finishResponse.ok) {
+        toast({
+          title: 'WebAuthn 登录成功',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        })
+        window.location.href = `${adminPrefix}/dashboard`
+      } else {
+        const errorData = await finishResponse.json()
+        setError(errorData.error || 'WebAuthn 登录失败')
+      }
+    } catch (err) {
+      setError('登录失败，请重试')
+      console.error('WebAuthn login error:', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // 辅助函数：将 ArrayBuffer 转换为 Base64
+  const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+    const bytes = new Uint8Array(buffer)
+    let binary = ''
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i])
+    }
+    return btoa(binary)
+  }
+
   if (authLoading) {
     return (
       <Center h="100vh">
@@ -329,7 +438,56 @@ const Login: React.FC = () => {
 
             {/* 登录表单 */}
             <Box w="full">
-              {!totpOnlyMode ? (
+              {webauthnMode ? (
+                // WebAuthn 登录模式
+                <VStack spacing={4}>
+                  <Alert status="info" borderRadius="md">
+                    <AlertIcon />
+                    <Box>
+                      <Text fontWeight="bold">指纹/生物识别登录</Text>
+                      <Text fontSize="sm">使用设备的生物识别功能快速登录</Text>
+                    </Box>
+                  </Alert>
+
+                  <FormControl isRequired>
+                    <FormLabel>用户名</FormLabel>
+                    <Input
+                      value={webauthnUsername}
+                      onChange={(e) => setWebauthnUsername(e.target.value)}
+                      placeholder="请输入用户名"
+                      size="lg"
+                      isDisabled={isLoading}
+                      autoFocus
+                    />
+                  </FormControl>
+
+                  <Button
+                    colorScheme="blue"
+                    size="lg"
+                    w="full"
+                    onClick={handleWebAuthnLogin}
+                    isLoading={isLoading}
+                    loadingText="验证中..."
+                    isDisabled={!webauthnUsername.trim()}
+                    leftIcon={<FiSmartphone />}
+                  >
+                    使用指纹登录
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    w="full"
+                    onClick={() => {
+                      setWebauthnMode(false)
+                      setError('')
+                      setWebauthnUsername('')
+                    }}
+                  >
+                    ← 返回正常登录
+                  </Button>
+                </VStack>
+              ) : !totpOnlyMode ? (
                 // 正常登录模式
                 <form onSubmit={handleSubmit}>
                   <VStack spacing={4}>
@@ -496,45 +654,69 @@ const Login: React.FC = () => {
                 </form>
               )}
 
-              {/* 仅 TOTP 登录切换（只有启用了 TOTP 才显示） */}
-              {systemConfig.totp_enabled && (
+              {/* 登录方式切换 */}
+              {!webauthnMode && (
                 <>
                   <Divider my={4} />
-                  <Text textAlign="center" fontSize="sm">
-                    {totpOnlyMode ? (
-                      <Link
-                        color="blue.500"
+                  <VStack spacing={2}>
+                    {/* WebAuthn 登录选项 */}
+                    {systemConfig.webauthn_enabled && !totpOnlyMode && (
+                      <Button
+                        variant="outline"
+                        colorScheme="blue"
+                        size="sm"
+                        w="full"
                         onClick={() => {
-                          setTotpOnlyMode(false)
-                          setError('')
-                          setTotpOnlyCode('')
-                        }}
-                        cursor="pointer"
-                      >
-                        ← 返回正常登录
-                      </Link>
-                    ) : (
-                      <Link
-                        color="orange.500"
-                        onClick={() => {
-                          setTotpOnlyMode(true)
+                          setWebauthnMode(true)
                           setError('')
                         }}
-                        cursor="pointer"
-                      >
-                        忘记密码？使用 TOTP 紧急登录 →
-                      </Link>
+                    leftIcon={<FiSmartphone />}
+                  >
+                    使用指纹/生物识别登录
+                  </Button>
                     )}
-                  </Text>
+
+                    {/* TOTP 紧急登录选项 */}
+                    {systemConfig.totp_enabled && (
+                      <Text textAlign="center" fontSize="sm">
+                        {totpOnlyMode ? (
+                          <Link
+                            color="blue.500"
+                            onClick={() => {
+                              setTotpOnlyMode(false)
+                              setError('')
+                              setTotpOnlyCode('')
+                            }}
+                            cursor="pointer"
+                          >
+                            ← 返回正常登录
+                          </Link>
+                        ) : (
+                          <Link
+                            color="orange.500"
+                            onClick={() => {
+                              setTotpOnlyMode(true)
+                              setError('')
+                            }}
+                            cursor="pointer"
+                          >
+                            忘记密码？使用 TOTP 紧急登录 →
+                          </Link>
+                        )}
+                      </Text>
+                    )}
+                  </VStack>
                 </>
               )}
             </Box>
 
             {/* 提示信息 */}
             <Text fontSize="sm" color="gray.500" textAlign="center">
-              {totpOnlyMode 
-                ? '紧急登录仅限超级管理员使用'
-                : '首次使用请使用超级管理员账户登录'
+              {webauthnMode
+                ? '请确保已在该设备上注册过 WebAuthn 凭证'
+                : totpOnlyMode 
+                  ? '紧急登录仅限超级管理员使用'
+                  : '首次使用请使用超级管理员账户登录'
               }
             </Text>
           </VStack>

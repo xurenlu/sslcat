@@ -125,6 +125,9 @@ type Server struct {
 	// 隧道管理器
 	tunnelManager *tunnel.Manager
 
+	// WebAuthn 管理器
+	webauthnManager *WebAuthnManager
+
 	// Cluster runtime status
 	clusterLastConfigSyncAt      time.Time
 	clusterLastCertSyncAt        time.Time
@@ -318,6 +321,48 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	}
 	server.sessionManager = sessionManager
 	server.log.Infof("会话管理器已初始化，存储类型: %s，数据目录: %s", sessionStorage, dataDir)
+
+	// 初始化 WebAuthn 管理器
+	// 确定 RPID 和 RPOrigin
+	rpID := cfg.Server.Host
+	if rpID == "" {
+		rpID = "localhost"
+	}
+	// 移除端口号（如果有）
+	if idx := strings.Index(rpID, ":"); idx != -1 {
+		rpID = rpID[:idx]
+	}
+	
+	// 确定 RPOrigin
+	rpOrigin := "https://" + rpID
+	if cfg.Server.PortMode == "custom" && cfg.Server.CustomPort != 0 {
+		if !cfg.Server.EnableHTTPS {
+			rpOrigin = fmt.Sprintf("http://%s:%d", rpID, cfg.Server.CustomPort)
+		} else {
+			rpOrigin = fmt.Sprintf("https://%s:%d", rpID, cfg.Server.CustomPort)
+		}
+	} else if rpID == "localhost" {
+		// 开发环境使用 HTTP
+		if cfg.Server.PortMode == "custom" && cfg.Server.CustomPort != 0 {
+			rpOrigin = fmt.Sprintf("http://localhost:%d", cfg.Server.CustomPort)
+		} else {
+			rpOrigin = "http://localhost:8080"
+		}
+	}
+	
+	webauthnManager, err := NewWebAuthnManager(
+		server.log.WithField("component", "webauthn"),
+		dataDir,
+		rpID,
+		rpOrigin,
+	)
+	if err != nil {
+		server.log.Warnf("WebAuthn 初始化失败（功能将不可用）: %v", err)
+		// 不阻止服务器启动，WebAuthn 功能将不可用
+	} else {
+		server.webauthnManager = webauthnManager
+		server.log.Infof("WebAuthn 管理器已初始化，RPID: %s, RPOrigin: %s", rpID, rpOrigin)
+	}
 
 	// 设置通知集成器
 	server.notificationIntegrator = notificationIntegrator
@@ -855,6 +900,16 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/totp/generate", s.handleAPITOTPGenerate)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/totp/enable", s.handleAPITOTPEnable)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/totp/disable", s.handleAPITOTPDisable)
+
+	// WebAuthn API（如果已初始化）
+	if s.webauthnManager != nil {
+		s.mux.HandleFunc(s.config.AdminPrefix+"/api/webauthn/register/begin", s.handleAPIWebAuthnBeginRegistration)
+		s.mux.HandleFunc(s.config.AdminPrefix+"/api/webauthn/register/finish", s.handleAPIWebAuthnFinishRegistration)
+		s.mux.HandleFunc(s.config.AdminPrefix+"/api/webauthn/login/begin", s.handleAPIWebAuthnBeginLogin)
+		s.mux.HandleFunc(s.config.AdminPrefix+"/api/webauthn/login/finish", s.handleAPIWebAuthnFinishLogin)
+		s.mux.HandleFunc(s.config.AdminPrefix+"/api/webauthn/credentials", s.handleAPIWebAuthnListCredentials)
+		s.mux.HandleFunc(s.config.AdminPrefix+"/api/webauthn/credentials/delete", s.handleAPIWebAuthnDeleteCredential)
+	}
 
 	// 用户管理 API
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/users", s.handleAPIUsers)

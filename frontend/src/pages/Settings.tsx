@@ -13,6 +13,7 @@ import {
   Switch,
   Button,
   Icon,
+  IconButton,
   useToast,
   SimpleGrid,
   Text,
@@ -45,6 +46,8 @@ import {
   FiKey,
   FiCheck,
   FiX,
+  FiSmartphone,
+  FiTrash2,
 } from 'react-icons/fi'
 import { useConfig } from '../contexts/ConfigContext'
 import { useTranslation } from '../hooks/useLanguage'
@@ -141,6 +144,12 @@ const Settings: React.FC = () => {
   const [totpSecret, setTotpSecret] = useState('')
   const [totpVerifyCode, setTotpVerifyCode] = useState('')
   const { isOpen: isTotpModalOpen, onOpen: onTotpModalOpen, onClose: onTotpModalClose } = useDisclosure()
+  
+  // WebAuthn 相关状态
+  const [webauthnCredentials, setWebauthnCredentials] = useState<any[]>([])
+  const [webauthnLoading, setWebauthnLoading] = useState(false)
+  const [webauthnDeviceName, setWebauthnDeviceName] = useState('')
+  const { isOpen: isWebauthnModalOpen, onOpen: onWebauthnModalOpen, onClose: onWebauthnModalClose } = useDisclosure()
 
   // 当adminPrefix变化时更新设置
   useEffect(() => {
@@ -149,6 +158,184 @@ const Settings: React.FC = () => {
       adminPrefix: adminPrefix,
     }))
   }, [adminPrefix])
+
+  // 加载 WebAuthn 凭证列表
+  const loadWebauthnCredentials = async () => {
+    try {
+      const response = await fetch(`${adminPrefix}/api/webauthn/credentials`, {
+        method: 'GET',
+        credentials: 'include',
+      })
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setWebauthnCredentials(data.credentials || [])
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load WebAuthn credentials:', error)
+    }
+  }
+
+  // 开始 WebAuthn 注册
+  const beginWebauthnRegistration = async () => {
+    if (!webauthnDeviceName.trim()) {
+      toast({
+        title: '请输入设备名称',
+        status: 'warning',
+        duration: TOAST_DURATION.SHORT,
+        isClosable: true,
+      })
+      return
+    }
+
+    setWebauthnLoading(true)
+    try {
+      // 获取当前用户信息
+      const meResponse = await fetch(`${adminPrefix}/api/auth/me`, {
+        credentials: 'include',
+      })
+      if (!meResponse.ok) {
+        throw new Error('获取用户信息失败')
+      }
+      const meData = await meResponse.json()
+      const username = meData.username
+
+      // 开始注册
+      const beginResponse = await fetch(`${adminPrefix}/api/webauthn/register/begin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          username,
+          device_name: webauthnDeviceName,
+        }),
+      })
+
+      if (!beginResponse.ok) {
+        const errorData = await beginResponse.json()
+        throw new Error(errorData.error || '开始注册失败')
+      }
+
+      const beginData = await beginResponse.json()
+      if (!beginData.success) {
+        throw new Error(beginData.error || '开始注册失败')
+      }
+
+      // 调用浏览器 WebAuthn API
+      let credential: PublicKeyCredential
+      try {
+        credential = await navigator.credentials.create({
+          publicKey: beginData.options,
+        }) as PublicKeyCredential
+      } catch (err: any) {
+        if (err.name === 'NotAllowedError') {
+          throw new Error('用户取消了验证')
+        }
+        throw new Error('生物识别验证失败: ' + (err.message || '未知错误'))
+      }
+
+      // 准备响应数据
+      const response = credential.response as AuthenticatorAttestationResponse
+      const credentialResponse = {
+        id: credential.id,
+        rawId: arrayBufferToBase64(credential.rawId),
+        response: {
+          attestationObject: arrayBufferToBase64(response.attestationObject),
+          clientDataJSON: arrayBufferToBase64(response.clientDataJSON),
+        },
+        type: credential.type,
+      }
+
+      // 完成注册
+      const finishResponse = await fetch(`${adminPrefix}/api/webauthn/register/finish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          session_key: beginData.session_key,
+          device_name: webauthnDeviceName,
+          response: credentialResponse,
+        }),
+      })
+
+      const finishData = await finishResponse.json()
+      if (finishData.success) {
+        toast({
+          title: 'WebAuthn 注册成功',
+          description: `设备 "${webauthnDeviceName}" 已成功注册`,
+          status: 'success',
+          duration: TOAST_DURATION.SHORT,
+          isClosable: true,
+        })
+        onWebauthnModalClose()
+        setWebauthnDeviceName('')
+        loadWebauthnCredentials()
+      } else {
+        throw new Error(finishData.error || '注册失败')
+      }
+    } catch (error) {
+      toast({
+        title: '注册失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: TOAST_DURATION.SHORT,
+        isClosable: true,
+      })
+    } finally {
+      setWebauthnLoading(false)
+    }
+  }
+
+  // 删除 WebAuthn 凭证
+  const deleteWebauthnCredential = async (credentialId: string) => {
+    if (!confirm('确定要删除此设备的 WebAuthn 凭证吗？删除后将无法使用该设备登录。')) {
+      return
+    }
+
+    setWebauthnLoading(true)
+    try {
+      const response = await fetch(`${adminPrefix}/api/webauthn/credentials/delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ credential_id: credentialId }),
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        toast({
+          title: '凭证已删除',
+          status: 'success',
+          duration: TOAST_DURATION.SHORT,
+          isClosable: true,
+        })
+        loadWebauthnCredentials()
+      } else {
+        throw new Error(data.error || '删除失败')
+      }
+    } catch (error) {
+      toast({
+        title: '删除失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: TOAST_DURATION.SHORT,
+        isClosable: true,
+      })
+    } finally {
+      setWebauthnLoading(false)
+    }
+  }
+
+  // 辅助函数：将 ArrayBuffer 转换为 Base64
+  const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+    const bytes = new Uint8Array(buffer)
+    let binary = ''
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i])
+    }
+    return btoa(binary)
+  }
 
   // 加载 TOTP 状态
   const loadTotpStatus = async () => {
@@ -411,7 +598,8 @@ const Settings: React.FC = () => {
       Promise.all([
         loadBasicConfig(),
         loadNotificationConfig(),
-        loadTotpStatus()
+        loadTotpStatus(),
+        loadWebauthnCredentials()
       ])
     }
   }, [adminPrefix])
@@ -903,6 +1091,67 @@ const Settings: React.FC = () => {
                     </Button>
                   )}
                 </HStack>
+              </FormControl>
+
+              <Divider my={2} />
+
+              {/* WebAuthn 指纹登录 */}
+              <FormControl>
+                <FormLabel>
+                  <HStack>
+                    <Icon as={FiSmartphone} />
+                    <Text>WebAuthn 指纹/生物识别登录</Text>
+                  </HStack>
+                </FormLabel>
+                <Text fontSize="sm" color="gray.600" mb={3}>
+                  使用设备的生物识别功能（指纹、Face ID、Touch ID）或 Windows Hello 快速登录，无需输入密码。
+                </Text>
+                
+                {/* 已注册的设备列表 */}
+                {webauthnCredentials.length > 0 && (
+                  <VStack spacing={2} align="stretch" mb={3}>
+                    <Text fontSize="sm" fontWeight="bold">已注册的设备：</Text>
+                    {webauthnCredentials.map((cred) => (
+                      <HStack
+                        key={cred.id}
+                        p={2}
+                        border="1px solid"
+                        borderColor="gray.200"
+                        borderRadius="md"
+                        justify="space-between"
+                      >
+                        <VStack align="start" spacing={0}>
+                          <Text fontSize="sm" fontWeight="medium">
+                            {cred.device_name || '未命名设备'}
+                          </Text>
+                          <Text fontSize="xs" color="gray.500">
+                            注册于 {new Date(cred.created_at).toLocaleString('zh-CN')}
+                            {cred.last_used_at && ` • 最后使用 ${new Date(cred.last_used_at).toLocaleString('zh-CN')}`}
+                          </Text>
+                        </VStack>
+                        <IconButton
+                          aria-label="删除设备"
+                          icon={<FiTrash2 />}
+                          size="sm"
+                          colorScheme="red"
+                          variant="ghost"
+                          onClick={() => deleteWebauthnCredential(cred.credential_id)}
+                          isLoading={webauthnLoading}
+                        />
+                      </HStack>
+                    ))}
+                  </VStack>
+                )}
+
+                <Button
+                  colorScheme="blue"
+                  size="sm"
+                  onClick={onWebauthnModalOpen}
+                  isLoading={webauthnLoading}
+                  leftIcon={<Icon as={FiSmartphone} />}
+                >
+                  注册新设备
+                </Button>
               </FormControl>
             </VStack>
           </CardBody>
@@ -1582,6 +1831,64 @@ const Settings: React.FC = () => {
               leftIcon={<Icon as={FiCheck} />}
             >
               启用 TOTP
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* WebAuthn 注册模态框 */}
+      <Modal isOpen={isWebauthnModalOpen} onClose={onWebauthnModalClose} size="md" isCentered>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>
+            <HStack>
+              <Icon as={FiSmartphone} color="blue.500" />
+              <Text>注册 WebAuthn 设备</Text>
+            </HStack>
+          </ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={4} align="stretch">
+              <Alert status="info" borderRadius="md">
+                <AlertIcon />
+                <Box>
+                  <Text fontWeight="bold">步骤 1：输入设备名称</Text>
+                  <Text fontSize="sm">为这个设备起一个容易识别的名称，如 "Chrome on MacBook"</Text>
+                </Box>
+              </Alert>
+
+              <FormControl isRequired>
+                <FormLabel>设备名称</FormLabel>
+                <Input
+                  value={webauthnDeviceName}
+                  onChange={(e) => setWebauthnDeviceName(e.target.value)}
+                  placeholder="例如：Chrome on MacBook"
+                  isDisabled={webauthnLoading}
+                  autoFocus
+                />
+              </FormControl>
+
+              <Alert status="warning" borderRadius="md">
+                <AlertIcon />
+                <Box>
+                  <Text fontWeight="bold">步骤 2：完成生物识别验证</Text>
+                  <Text fontSize="sm">点击"开始注册"后，浏览器会要求您进行指纹、Face ID 或其他生物识别验证</Text>
+                </Box>
+              </Alert>
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onWebauthnModalClose}>
+              取消
+            </Button>
+            <Button
+              colorScheme="blue"
+              onClick={beginWebauthnRegistration}
+              isLoading={webauthnLoading}
+              isDisabled={!webauthnDeviceName.trim()}
+              leftIcon={<Icon as={FiSmartphone} />}
+            >
+              开始注册
             </Button>
           </ModalFooter>
         </ModalContent>
