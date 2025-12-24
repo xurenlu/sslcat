@@ -164,6 +164,41 @@ func (m *Manager) UpdateWatchdogOptions(opts WatchdogMonitorOptions) {
 	}
 }
 
+// RestartWatchdog 重启看门狗监控器
+func (m *Manager) RestartWatchdog(opts WatchdogMonitorOptions, notificationMgr interface{}) error {
+	m.log.Info("重启看门狗监控器...")
+
+	// 停止现有的看门狗
+	if m.watchdogMonitor != nil {
+		m.watchdogMonitor.Stop()
+		m.watchdogMonitor = nil
+	}
+
+	// 如果启用，启动新的看门狗
+	if opts.Enabled {
+		var nmgr *notification.NotificationManager
+		if notificationMgr != nil {
+			// 尝试从NotificationIntegrator获取Manager
+			if integrator, ok := notificationMgr.(interface {
+				GetManager() *notification.NotificationManager
+			}); ok {
+				nmgr = integrator.GetManager()
+			} else if mgr, ok := notificationMgr.(*notification.NotificationManager); ok {
+				nmgr = mgr
+			}
+		}
+		m.watchdogMonitor = NewWatchdogMonitor(opts, nmgr)
+		m.watchdogMonitor.Start()
+		m.options.Watchdog = opts
+		m.log.Info("看门狗监控器已重启")
+	} else {
+		m.options.Watchdog = opts
+		m.log.Info("看门狗监控器已停止（已禁用）")
+	}
+
+	return nil
+}
+
 // ResetAllBaselines 重置所有基线
 func (m *Manager) ResetAllBaselines() {
 	m.log.Info("重置所有监控基线...")
@@ -182,5 +217,3 @@ func (m *Manager) ResetAllBaselines() {
 
 	m.log.Info("所有监控基线已重置")
 }
-
-// GetWatchdogMonitor 获取看门狗监控器

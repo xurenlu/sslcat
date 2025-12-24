@@ -69,6 +69,7 @@ const Settings: React.FC = () => {
     letsEncryptEmail: 'admin@example.com',
     sslProvider: 'letsencrypt',
     sslStaging: false, // 是否使用 staging 环境
+    challengeMethods: ['http-01'], // 挑战方法：['http-01', 'dns-01']
     
     // 安全设置
     enableDDoSProtection: true,
@@ -649,6 +650,34 @@ const Settings: React.FC = () => {
     }
   }
 
+  // 加载挑战方法配置
+  const loadChallengeMethods = async () => {
+    try {
+      const response = await fetch(`${adminPrefix}/api/dns/providers`, {
+        method: 'GET',
+        credentials: 'include',
+      })
+      
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && result.methods) {
+          // methods 字段包含当前配置的挑战方法
+          setSettings(prev => ({
+            ...prev,
+            challengeMethods: result.methods || ['http-01'],
+          }))
+        }
+      }
+    } catch (error) {
+      console.error('加载挑战方法配置失败:', error)
+      // 失败时使用默认值
+      setSettings(prev => ({
+        ...prev,
+        challengeMethods: ['http-01'],
+      }))
+    }
+  }
+
   // 页面加载时或 adminPrefix 变化时重新加载配置
   useEffect(() => {
     if (adminPrefix) {
@@ -657,12 +686,13 @@ const Settings: React.FC = () => {
         loadBasicConfig(),
         loadNotificationConfig(),
         loadTotpStatus(),
-        loadWebauthnCredentials()
+        loadWebauthnCredentials(),
+        loadChallengeMethods()
       ])
     }
   }, [adminPrefix])
 
-  const handleInputChange = (field: string, value: string | boolean | number) => {
+  const handleInputChange = (field: string, value: string | boolean | number | string[]) => {
     setSettings(prev => ({
       ...prev,
       [field]: value,
@@ -672,8 +702,21 @@ const Settings: React.FC = () => {
   const saveAllSettings = async () => {
     setLoading(true)
     try {
-      // 并行保存基础设置和通知设置
-      const [basicResponse, notificationResponse] = await Promise.all([
+      // 验证挑战方法
+      if (!settings.challengeMethods || settings.challengeMethods.length === 0) {
+        toast({
+          title: '保存失败',
+          description: '至少需要选择一种挑战方法',
+          status: 'error',
+          duration: TOAST_DURATION.SHORT,
+          isClosable: true,
+        })
+        setLoading(false)
+        return
+      }
+
+      // 并行保存基础设置、通知设置和挑战方法配置
+      const [basicResponse, notificationResponse, challengeResponse] = await Promise.all([
         // 保存基础设置
         fetch(`${adminPrefix}/api/settings/basic`, {
           method: 'POST',
@@ -756,6 +799,16 @@ const Settings: React.FC = () => {
               },
             },
           }),
+        }),
+        // 保存挑战方法配置
+        fetch(`${adminPrefix}/api/dns/config`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            default_provider: '', // 保持默认提供商不变
+            challenge_methods: settings.challengeMethods || ['http-01'],
+          }),
         })
       ])
 
@@ -771,6 +824,12 @@ const Settings: React.FC = () => {
         throw new Error(errorData.message || t.settings.notification_config_save_failed)
       }
 
+      // 检查挑战方法配置保存结果
+      if (!challengeResponse.ok) {
+        const errorData = await challengeResponse.json()
+        throw new Error(errorData.error || '保存挑战方法配置失败')
+      }
+
       toast({
         title: t.settings.save_success,
         status: 'success',
@@ -781,7 +840,8 @@ const Settings: React.FC = () => {
       // 重新加载配置以显示最新保存的值
       await Promise.all([
         loadBasicConfig(),
-        loadNotificationConfig()
+        loadNotificationConfig(),
+        loadChallengeMethods()
       ])
       
       // 如果adminPrefix发生变化，使用新的changeAdminPrefix函数
@@ -836,6 +896,7 @@ const Settings: React.FC = () => {
       letsEncryptEmail: 'admin@example.com',
       sslProvider: 'letsencrypt',
       sslStaging: false,
+      challengeMethods: ['http-01'],
       enableDDoSProtection: true,
       maxRequestsPerMinute: '1000',
       enableRateLimit: true,
@@ -1068,6 +1129,66 @@ const Settings: React.FC = () => {
               <Text fontSize="sm" color="orange.600">
                 ⚠️ Staging 环境签发的证书不被浏览器信任，仅用于测试。正式使用请关闭此选项。
               </Text>
+
+              <Divider my={2} />
+
+              {/* 挑战方法配置 */}
+              <FormControl>
+                <FormLabel>{t.settings.challengeMethods}</FormLabel>
+                <VStack spacing={2} align="stretch">
+                  <FormControl display="flex" alignItems="flex-start">
+                    <input
+                      type="checkbox"
+                      checked={settings.challengeMethods?.includes('http-01') || false}
+                      onChange={(e) => {
+                        const methods = settings.challengeMethods || []
+                        if (e.target.checked) {
+                          if (!methods.includes('http-01')) {
+                            handleInputChange('challengeMethods', [...methods, 'http-01'])
+                          }
+                        } else {
+                          handleInputChange('challengeMethods', methods.filter(m => m !== 'http-01'))
+                        }
+                      }}
+                      style={{ marginTop: '4px', marginRight: '8px' }}
+                    />
+                    <Box>
+                      <Text fontWeight="medium">{t.settings.challengeMethodHttp01}</Text>
+                      <Text fontSize="sm" color="gray.600">
+                        {t.settings.challengeMethodHttp01Desc}
+                      </Text>
+                    </Box>
+                  </FormControl>
+                  <FormControl display="flex" alignItems="flex-start">
+                    <input
+                      type="checkbox"
+                      checked={settings.challengeMethods?.includes('dns-01') || false}
+                      onChange={(e) => {
+                        const methods = settings.challengeMethods || []
+                        if (e.target.checked) {
+                          if (!methods.includes('dns-01')) {
+                            handleInputChange('challengeMethods', [...methods, 'dns-01'])
+                          }
+                        } else {
+                          handleInputChange('challengeMethods', methods.filter(m => m !== 'dns-01'))
+                        }
+                      }}
+                      style={{ marginTop: '4px', marginRight: '8px' }}
+                    />
+                    <Box>
+                      <Text fontWeight="medium">{t.settings.challengeMethodDns01}</Text>
+                      <Text fontSize="sm" color="gray.600">
+                        {t.settings.challengeMethodDns01Desc}
+                      </Text>
+                    </Box>
+                  </FormControl>
+                </VStack>
+                {(!settings.challengeMethods || settings.challengeMethods.length === 0) && (
+                  <Text fontSize="sm" color="red.500" mt={2}>
+                    ⚠️ {t.settings.challengeMethodRequired}
+                  </Text>
+                )}
+              </FormControl>
               
             </VStack>
           </CardBody>

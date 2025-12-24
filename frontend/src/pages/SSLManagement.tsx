@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   Box,
   Heading,
@@ -31,6 +31,15 @@ import {
   FormLabel,
   Input,
   useDisclosure,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
+  Spinner,
+  Divider,
+  Alert,
+  AlertIcon,
+  AlertDescription,
 } from '@chakra-ui/react'
 import {
   FiShield,
@@ -39,6 +48,8 @@ import {
   FiTrash2,
   FiCheck,
   FiX,
+  FiUpload,
+  FiKey,
 } from 'react-icons/fi'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
 import { useTranslation } from '../hooks/useLanguage'
@@ -58,8 +69,29 @@ const SSLManagement: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [applying, setApplying] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [newDomain, setNewDomain] = useState('')
+  const [uploadDomain, setUploadDomain] = useState('')
+  const [certFile, setCertFile] = useState<File | null>(null)
+  const [keyFile, setKeyFile] = useState<File | null>(null)
+  const [preflightLoading, setPreflightLoading] = useState(false)
+  const [preflightData, setPreflightData] = useState<{
+    dns_provider: { name: string; found: boolean; available: boolean }
+    resolution: { resolved: boolean; points_to_server: boolean; info: string; error: string }
+    challenge: { type: string; reason: string }
+  } | null>(null)
+  const [progressEvents, setProgressEvents] = useState<Array<{
+    status: string
+    message: string
+    attempt: number
+    maxAttempts: number
+    progress: number
+    error?: string
+    timestamp: string
+  }>>([])
+  const [eventSource, setEventSource] = useState<EventSource | null>(null)
   const { isOpen, onOpen, onClose } = useDisclosure()
+  const { isOpen: isUploadOpen, onOpen: onUploadOpen, onClose: onUploadClose } = useDisclosure()
   const toast = useToast()
   const { adminPrefix } = useConfig()
   const t = useTranslation()
@@ -118,6 +150,60 @@ const SSLManagement: React.FC = () => {
     }
   }
 
+  // 预检域名信息
+  const preflightDomain = useCallback(async (domain: string) => {
+    if (!domain.trim()) {
+      setPreflightData(null)
+      return
+    }
+
+    setPreflightLoading(true)
+    try {
+      const response = await fetch(
+        buildApiPath(adminPrefix, `/ssl/preflight?domain=${encodeURIComponent(domain.trim())}`),
+        {
+          method: 'GET',
+          credentials: 'include',
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      if (data.success) {
+        setPreflightData(data)
+      } else {
+        setPreflightData(null)
+      }
+    } catch (error) {
+      console.error('预检域名失败:', error)
+      setPreflightData(null)
+    } finally {
+      setPreflightLoading(false)
+    }
+  }, [adminPrefix])
+
+  // 监听域名输入变化，debounce 调用预检 API
+  useEffect(() => {
+    if (!isOpen) {
+      // 对话框关闭时清空预检数据
+      setPreflightData(null)
+      return
+    }
+
+    const timer = setTimeout(() => {
+      if (newDomain.trim()) {
+        preflightDomain(newDomain)
+      } else {
+        setPreflightData(null)
+      }
+    }, 500) // 500ms debounce
+
+    return () => clearTimeout(timer)
+  }, [newDomain, isOpen, preflightDomain])
+
   const applyCertificate = async () => {
     if (!newDomain.trim()) {
       toast({
@@ -129,16 +215,20 @@ const SSLManagement: React.FC = () => {
       return
     }
 
+    // 清空之前的进度
+    setProgressEvents([])
     setApplying(true)
+
     try {
-      const response = await fetch(buildApiPath(adminPrefix, '/ssl/generate'), {
+      // 使用流式 API
+      const response = await fetch(buildApiPath(adminPrefix, '/ssl/generate-stream'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
         body: JSON.stringify({
-          domains: [newDomain.trim()], // 后端期望的是数组
+          domain: newDomain.trim(),
         }),
       })
 
@@ -146,22 +236,72 @@ const SSLManagement: React.FC = () => {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
 
-      const data = await response.json()
-      toast({
-        title: '证书申请成功',
-        description: `域名 ${newDomain} 的证书已开始申请，请稍后刷新查看`,
-        status: 'success',
-        duration: 5000,
-        isClosable: true,
-      })
-      
-      setNewDomain('')
-      onClose()
-      
-      // 3秒后自动刷新证书列表
-      setTimeout(() => {
-        refreshCertificates()
-      }, 3000)
+      // 使用 EventSource 接收 SSE 事件
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+
+      if (!reader) {
+        throw new Error('无法读取响应流')
+      }
+
+      let buffer = ''
+      let isComplete = false
+
+      while (!isComplete) {
+        const { done, value } = await reader.read()
+        
+        if (done) {
+          isComplete = true
+          break
+        }
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || '' // 保留最后不完整的行
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const eventData = JSON.parse(line.slice(6))
+              setProgressEvents(prev => [...prev, eventData])
+
+              // 如果完成或失败，结束
+              if (eventData.status === 'success' || eventData.status === 'failed' || eventData.status === 'completed') {
+                isComplete = true
+                
+                if (eventData.status === 'success') {
+                  toast({
+                    title: '证书申请成功',
+                    description: eventData.message || `域名 ${newDomain} 的证书申请成功`,
+                    status: 'success',
+                    duration: 5000,
+                    isClosable: true,
+                  })
+                  
+                  // 3秒后自动刷新证书列表并关闭对话框
+                  setTimeout(() => {
+                    refreshCertificates()
+                    setNewDomain('')
+                    setPreflightData(null)
+                    setProgressEvents([])
+                    onClose()
+                  }, 3000)
+                } else if (eventData.status === 'failed') {
+                  toast({
+                    title: '证书申请失败',
+                    description: eventData.error || eventData.message || '未知错误',
+                    status: 'error',
+                    duration: 5000,
+                    isClosable: true,
+                  })
+                }
+              }
+            } catch (e) {
+              console.error('解析进度事件失败:', e)
+            }
+          }
+        }
+      }
     } catch (error) {
       console.error('申请SSL证书失败:', error)
       toast({
@@ -171,41 +311,136 @@ const SSLManagement: React.FC = () => {
         duration: 4000,
         isClosable: true,
       })
+      setProgressEvents(prev => [...prev, {
+        status: 'failed',
+        message: error instanceof Error ? error.message : '未知错误',
+        attempt: 0,
+        maxAttempts: 0,
+        progress: 100,
+        error: error instanceof Error ? error.message : '未知错误',
+        timestamp: new Date().toISOString(),
+      }])
     } finally {
       setApplying(false)
     }
   }
 
-  const downloadCertificate = async (domain: string) => {
+  const downloadCertificate = async (domain: string, type: 'cert' | 'key' | 'bundle' = 'cert') => {
     try {
       const effectivePrefix = adminPrefix || '/sslcat-panel'
       
       // 创建下载链接并触发下载
-      const downloadUrl = `${effectivePrefix}/ssl/download?domain=${encodeURIComponent(domain)}&type=cert`
+      const downloadUrl = `${effectivePrefix}/ssl/download?domain=${encodeURIComponent(domain)}&type=${type}`
       
       // 创建一个临时的 a 标签来触发下载
       const link = document.createElement('a')
       link.href = downloadUrl
-      link.download = `${domain}.crt`
+      
+      let filename = ''
+      switch (type) {
+        case 'cert':
+          filename = `${domain}.crt`
+          break
+        case 'key':
+          filename = `${domain}.key`
+          break
+        case 'bundle':
+          filename = `${domain}-bundle.pem`
+          break
+      }
+      link.download = filename
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
       
       toast({
-        title: '证书下载已启动',
-        description: `正在下载域名 ${domain} 的证书`,
+        title: '下载已启动',
+        description: `正在下载域名 ${domain} 的${type === 'cert' ? '证书' : type === 'key' ? '私钥' : '证书包'}`,
         status: 'success',
         duration: 3000,
         isClosable: true,
       })
     } catch (error) {
       toast({
-        title: '证书下载失败',
+        title: '下载失败',
         description: error instanceof Error ? error.message : '未知错误',
         status: 'error',
         duration: 4000,
         isClosable: true,
       })
+    }
+  }
+
+  const uploadCertificate = async () => {
+    if (!uploadDomain.trim()) {
+      toast({
+        title: '请输入域名',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      })
+      return
+    }
+
+    if (!certFile || !keyFile) {
+      toast({
+        title: '请选择文件',
+        description: '请同时选择证书文件和私钥文件',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      })
+      return
+    }
+
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('domain', uploadDomain.trim())
+      formData.append('cert', certFile)
+      formData.append('key', keyFile)
+
+      const effectivePrefix = adminPrefix || '/sslcat-panel'
+      const response = await fetch(`${effectivePrefix}/ssl/upload`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || `HTTP error! status: ${response.status}`)
+      }
+
+      toast({
+        title: '证书上传成功',
+        description: `域名 ${uploadDomain} 的证书已成功上传`,
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      })
+
+      // 清空表单
+      setUploadDomain('')
+      setCertFile(null)
+      setKeyFile(null)
+      onUploadClose()
+
+      // 刷新证书列表
+      setTimeout(() => {
+        refreshCertificates()
+      }, 1000)
+    } catch (error) {
+      console.error('上传SSL证书失败:', error)
+      toast({
+        title: '证书上传失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: 4000,
+        isClosable: true,
+      })
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -358,7 +593,15 @@ const SSLManagement: React.FC = () => {
             mr={2}
             onClick={onOpen}
           >
-{t.ssl.applyCertificate}
+            {t.ssl.applyCertificate}
+          </Button>
+          <Button
+            leftIcon={<Icon as={FiUpload} />}
+            colorScheme="purple"
+            mr={2}
+            onClick={onUploadOpen}
+          >
+            上传证书
           </Button>
           <Button
             leftIcon={<Icon as={FiRefreshCw} />}
@@ -454,14 +697,36 @@ const SSLManagement: React.FC = () => {
                             colorScheme="blue"
                             onClick={() => renewCertificate(cert.domain)}
                           />
-                          <IconButton
-                            aria-label={t.ssl.downloadCertificate}
-                            icon={<FiDownload />}
-                            size="sm"
-                            variant="ghost"
-                            colorScheme="green"
-                            onClick={() => downloadCertificate(cert.domain)}
-                          />
+                          <Menu>
+                            <MenuButton
+                              as={IconButton}
+                              aria-label={t.ssl.downloadCertificate}
+                              icon={<FiDownload />}
+                              size="sm"
+                              variant="ghost"
+                              colorScheme="green"
+                            />
+                            <MenuList>
+                              <MenuItem
+                                icon={<FiShield />}
+                                onClick={() => downloadCertificate(cert.domain, 'cert')}
+                              >
+                                下载证书
+                              </MenuItem>
+                              <MenuItem
+                                icon={<FiKey />}
+                                onClick={() => downloadCertificate(cert.domain, 'key')}
+                              >
+                                下载私钥
+                              </MenuItem>
+                              <MenuItem
+                                icon={<FiDownload />}
+                                onClick={() => downloadCertificate(cert.domain, 'bundle')}
+                              >
+                                下载证书包
+                              </MenuItem>
+                            </MenuList>
+                          </Menu>
                           <IconButton
                             aria-label={t.ssl.deleteCertificate}
                             icon={<FiTrash2 />}
@@ -490,28 +755,196 @@ const SSLManagement: React.FC = () => {
       </Card>
 
       {/* 申请证书对话框 */}
-      <Modal isOpen={isOpen} onClose={onClose}>
+      <Modal
+        isOpen={isOpen}
+        onClose={() => {
+          if (!applying) {
+            setProgressEvents([])
+            setPreflightData(null)
+            onClose()
+          }
+        }}
+        size="lg"
+        closeOnOverlayClick={!applying}
+      >
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>{t.ssl.applyCertificate}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
-            <FormControl>
-              <FormLabel>{t.ssl.domain}</FormLabel>
-              <Input
-                placeholder={t.ssl.domainPlaceholder}
-                value={newDomain}
-                onChange={(e) => setNewDomain(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    applyCertificate()
-                  }
-                }}
-              />
-              <Text fontSize="sm" color="gray.500" mt={2}>
-                {t.ssl.wildcardSupport}
-              </Text>
-            </FormControl>
+            <VStack spacing={4} align="stretch">
+              <FormControl>
+                <FormLabel>{t.ssl.domain}</FormLabel>
+                <Input
+                  placeholder={t.ssl.domainPlaceholder}
+                  value={newDomain}
+                  onChange={(e) => setNewDomain(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      applyCertificate()
+                    }
+                  }}
+                />
+                <Text fontSize="sm" color="gray.500" mt={2}>
+                  {t.ssl.wildcardSupport}
+                </Text>
+              </FormControl>
+
+              {/* 预检信息显示区域 */}
+              {newDomain.trim() && (
+                <>
+                  <Divider />
+                  <Box>
+                    <Text fontSize="sm" fontWeight="semibold" mb={2}>
+                      域名预检信息
+                    </Text>
+                    {preflightLoading ? (
+                      <HStack spacing={2}>
+                        <Spinner size="sm" />
+                        <Text fontSize="sm" color="gray.500">
+                          正在检查域名信息...
+                        </Text>
+                      </HStack>
+                    ) : preflightData ? (
+                      <VStack spacing={2} align="stretch" fontSize="sm">
+                        {/* DNS 服务商信息 */}
+                        <HStack spacing={2}>
+                          <Text fontWeight="medium" minW="100px">
+                            DNS 服务商:
+                          </Text>
+                          {preflightData.dns_provider.found ? (
+                            <Badge colorScheme="green">
+                              {preflightData.dns_provider.name}
+                            </Badge>
+                          ) : (
+                            <Badge colorScheme="yellow">未在已配置的提供商中</Badge>
+                          )}
+                        </HStack>
+
+                        {/* 域名解析信息 */}
+                        <HStack spacing={2}>
+                          <Text fontWeight="medium" minW="100px">
+                            解析状态:
+                          </Text>
+                          {preflightData.resolution.error ? (
+                            <Text color="red.500">{preflightData.resolution.error}</Text>
+                          ) : (
+                            <>
+                              {preflightData.resolution.points_to_server ? (
+                                <Badge colorScheme="green">指向本服务器</Badge>
+                              ) : (
+                                <Badge colorScheme="orange">未指向本服务器</Badge>
+                              )}
+                              <Text color="gray.600" fontSize="xs">
+                                {preflightData.resolution.info}
+                              </Text>
+                            </>
+                          )}
+                        </HStack>
+
+                        {/* 挑战方式信息 */}
+                        <HStack spacing={2}>
+                          <Text fontWeight="medium" minW="100px">
+                            挑战方式:
+                          </Text>
+                          <Badge
+                            colorScheme={
+                              preflightData.challenge.type === 'DNS-01' ? 'blue' : 'purple'
+                            }
+                          >
+                            {preflightData.challenge.type}
+                          </Badge>
+                          <Text color="gray.600" fontSize="xs">
+                            {preflightData.challenge.reason}
+                          </Text>
+                        </HStack>
+                      </VStack>
+                    ) : (
+                      <Text fontSize="sm" color="gray.500">
+                        输入域名后将自动检查相关信息
+                      </Text>
+                    )}
+                  </Box>
+                </>
+              )}
+
+              {/* 申请进度显示区域 */}
+              {applying && progressEvents.length > 0 && (
+                <>
+                  <Divider />
+                  <Box>
+                    <Text fontSize="sm" fontWeight="semibold" mb={3}>
+                      申请进度
+                    </Text>
+                    <VStack spacing={3} align="stretch">
+                      {/* 进度条 */}
+                      {progressEvents.length > 0 && (
+                        <Box>
+                          <Progress
+                            value={progressEvents[progressEvents.length - 1]?.progress || 0}
+                            colorScheme={
+                              progressEvents[progressEvents.length - 1]?.status === 'success'
+                                ? 'green'
+                                : progressEvents[progressEvents.length - 1]?.status === 'failed'
+                                ? 'red'
+                                : 'blue'
+                            }
+                            size="sm"
+                            borderRadius="md"
+                          />
+                          <Text fontSize="xs" color="gray.500" mt={1} textAlign="right">
+                            {progressEvents[progressEvents.length - 1]?.progress || 0}%
+                          </Text>
+                        </Box>
+                      )}
+
+                      {/* 进度事件列表 */}
+                      <Box
+                        maxH="200px"
+                        overflowY="auto"
+                        border="1px"
+                        borderColor="gray.200"
+                        borderRadius="md"
+                        p={3}
+                        bg="gray.50"
+                      >
+                        <VStack spacing={2} align="stretch">
+                          {progressEvents.map((event, index) => (
+                            <Box key={index} fontSize="sm">
+                              <HStack spacing={2} align="start">
+                                {event.status === 'success' && (
+                                  <Icon as={FiCheck} color="green.500" mt={0.5} />
+                                )}
+                                {event.status === 'failed' && (
+                                  <Icon as={FiX} color="red.500" mt={0.5} />
+                                )}
+                                {event.status !== 'success' && event.status !== 'failed' && (
+                                  <Spinner size="xs" color="blue.500" />
+                                )}
+                                <Box flex={1}>
+                                  <Text fontWeight="medium">{event.message}</Text>
+                                  {event.error && (
+                                    <Alert status="error" size="sm" mt={2} borderRadius="md">
+                                      <AlertIcon />
+                                      <AlertDescription fontSize="xs">{event.error}</AlertDescription>
+                                    </Alert>
+                                  )}
+                                  {event.attempt > 0 && (
+                                    <Text fontSize="xs" color="gray.500" mt={1}>
+                                      尝试 {event.attempt}/{event.maxAttempts}
+                                    </Text>
+                                  )}
+                                </Box>
+                              </HStack>
+                            </Box>
+                          ))}
+                        </VStack>
+                      </Box>
+                    </VStack>
+                  </Box>
+                </>
+              )}
+            </VStack>
           </ModalBody>
           <ModalFooter>
             <Button variant="ghost" mr={3} onClick={onClose}>
@@ -524,6 +957,79 @@ const SSLManagement: React.FC = () => {
               loadingText={t.ssl.applying}
             >
               {t.ssl.applyCertificate}
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* 上传证书对话框 */}
+      <Modal isOpen={isUploadOpen} onClose={onUploadClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>上传 SSL 证书</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={4}>
+              <FormControl isRequired>
+                <FormLabel>域名</FormLabel>
+                <Input
+                  placeholder="example.com"
+                  value={uploadDomain}
+                  onChange={(e) => setUploadDomain(e.target.value)}
+                />
+              </FormControl>
+              <FormControl isRequired>
+                <FormLabel>证书文件 (.crt/.pem)</FormLabel>
+                <Input
+                  type="file"
+                  accept=".crt,.pem"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      setCertFile(file)
+                    }
+                  }}
+                />
+                {certFile && (
+                  <Text fontSize="sm" color="green.500" mt={1}>
+                    已选择: {certFile.name}
+                  </Text>
+                )}
+              </FormControl>
+              <FormControl isRequired>
+                <FormLabel>私钥文件 (.key/.pem)</FormLabel>
+                <Input
+                  type="file"
+                  accept=".key,.pem"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      setKeyFile(file)
+                    }
+                  }}
+                />
+                {keyFile && (
+                  <Text fontSize="sm" color="green.500" mt={1}>
+                    已选择: {keyFile.name}
+                  </Text>
+                )}
+              </FormControl>
+              <Text fontSize="sm" color="gray.500">
+                支持 PEM 格式的证书和私钥文件
+              </Text>
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onUploadClose}>
+              取消
+            </Button>
+            <Button
+              colorScheme="purple"
+              onClick={uploadCertificate}
+              isLoading={uploading}
+              loadingText="上传中..."
+            >
+              上传证书
             </Button>
           </ModalFooter>
         </ModalContent>

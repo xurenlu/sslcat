@@ -36,7 +36,6 @@ import (
 	"github.com/xurenlu/sslcat/internal/ssl"
 	"github.com/xurenlu/sslcat/internal/statistics"
 	"github.com/xurenlu/sslcat/internal/tracing"
-	"github.com/xurenlu/sslcat/internal/tunnel"
 	"github.com/xurenlu/sslcat/internal/waf"
 
 	"io"
@@ -121,9 +120,6 @@ type Server struct {
 	// 慢请求管理器
 	slowRequestManager *slowrequest.Manager
 
-	// 隧道管理器
-	tunnelManager *tunnel.Manager
-
 	// WebAuthn 管理器
 	webauthnManager *WebAuthnManager
 
@@ -179,9 +175,6 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	if dataDir == "" {
 		dataDir = "./data"
 	}
-
-	// 初始化隧道管理器
-	tunnelManager := tunnel.NewManager(cfg.Tunnels, dataDir, logrus.WithField("component", "tunnel_manager"))
 
 	// 初始化图片优化器
 	imageOptConfig := &imageopt.Config{
@@ -265,7 +258,6 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		imageOptimizer:     imageOptimizer,
 		wafEngine:          wafEngine,
 		slowRequestManager: slowRequestManager,
-		tunnelManager:      tunnelManager,
 		sharedCache:        sharedCache,
 		log: logrus.WithFields(logrus.Fields{
 			"component": "web_server",
@@ -506,9 +498,6 @@ func (s *Server) UpdateConfig(newConfig *config.Config) {
 	s.cleanupOldConfigResources(oldConfig, newConfig)
 
 	s.config = newConfig
-	if s.tunnelManager != nil {
-		s.tunnelManager.SyncFromConfig(newConfig.Tunnels)
-	}
 
 	// 更新压缩器配置
 	if s.compressor != nil {
@@ -927,18 +916,23 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/proxy-rules/rename", s.handleAPIProxyRulesRename)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl-certs", s.handleAPISSLCerts)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl/generate", s.handleAPISSLGenerate)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl/generate-stream", s.handleAPISSLGenerateStream)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl/preflight", s.handleAPISSLPreflight)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl/retry", s.handleAPISSLRetry)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl/retry-config", s.handleAPISSLRetryConfig)
 
 	// DNS API路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/providers", s.handleAPIDNSProviders)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/provider", s.handleAPIDNSProvidersPost)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/provider", s.handleAPIDNSProvider) // 统一处理 POST 和 DELETE
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/providers/manage", s.handleAPIDNSProvidersPost)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/providers/delete", s.handleAPIDNSProvidersDelete)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/validate", s.handleAPIDNSValidate)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/test", s.handleAPIDNSTest)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/test-config", s.handleAPIDNSTestConfig)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/request-cert", s.handleAPIDNSRequestCert)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/config", s.handleAPIDNSConfig)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/refresh", s.handleAPIDNSRefresh)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/dns/provider/domains", s.handleAPIDNSProviderDomains)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl/upload", s.handleAPISSLUpload)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl/delete", s.handleAPISSLDelete)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/settings/public", s.handleAPISettingsPublic) // 公开端点，登录页面使用
@@ -946,14 +940,11 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/settings/update", s.handleAPISettingsUpdate)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/settings/basic", s.handleAPISettingsBasic)
 
-	// 隧道管理 API
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/tunnels/providers", s.handleAPITunnelProviders)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/tunnels/providers/save", s.handleAPITunnelProvidersSave)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/tunnels/providers/delete", s.handleAPITunnelProvidersDelete)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/tunnels/delete", s.handleAPITunnelDelete)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/tunnels/start", s.handleAPITunnelStart)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/tunnels/stop", s.handleAPITunnelStop)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/tunnels/status", s.handleAPITunnelStatus)
+	// 监控 API
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/monitoring/config", s.handleAPIMonitoringConfig)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/monitoring/stats", s.handleAPIMonitoringStats)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/monitoring/watchdog/restart", s.handleAPIMonitoringWatchdogRestart)
+
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/unblock", s.handleAPISecurityUnblock)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/static-sites", s.handleAPIStaticSites)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/static-sites/delete", s.handleAPIStaticSitesDelete)
@@ -2055,11 +2046,6 @@ func (s *Server) updateMemoryMonitor(maxUsagePercent float64, cooldownSec int) {
 // Stop 停止 Web 服务器及其管理的资源
 func (s *Server) Stop() {
 	s.log.Info("Stopping web server")
-
-	// 停止隧道管理器
-	if s.tunnelManager != nil {
-		s.tunnelManager.Stop()
-	}
 
 	s.log.Info("Web server stopped")
 }

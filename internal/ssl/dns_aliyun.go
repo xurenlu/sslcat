@@ -46,39 +46,100 @@ func (p *AliyunProvider) Validate() error {
 }
 
 func (p *AliyunProvider) SetTXTRecord(ctx context.Context, domain, name, value string, ttl int) error {
+	// 阿里云 API 需要根域名和子域名分离
+	// domain 参数可能是 ca.17push.com，需要提取根域名 17push.com
+	rootDomain, rr := p.extractDomainAndRR(domain, name)
+	p.log.Debugf("Aliyun SetTXTRecord: original domain=%s, name=%s -> rootDomain=%s, RR=%s", domain, name, rootDomain, rr)
+	
+	// 阿里云 TTL 要求在 600-86400 之间
+	if ttl < 600 {
+		ttl = 600
+	} else if ttl > 86400 {
+		ttl = 86400
+	}
+
 	// 检查记录是否已存在
-	existingRecord, err := p.getTXTRecord(ctx, domain, name)
+	existingRecord, err := p.getTXTRecord(ctx, rootDomain, rr)
 	if err != nil && err.Error() != "record not found" {
 		return err
 	}
 
 	if existingRecord != "" {
 		// 更新现有记录
-		return p.updateTXTRecord(ctx, domain, name, value, ttl)
+		return p.updateTXTRecord(ctx, rootDomain, rr, value, ttl)
 	}
 
 	// 创建新记录
-	return p.createTXTRecord(ctx, domain, name, value, ttl)
+	return p.createTXTRecord(ctx, rootDomain, rr, value, ttl)
+}
+
+// extractDomainAndRR 从完整域名中提取根域名和 RR 记录
+// 例如：domain=ca.17push.com, name=_acme-challenge -> rootDomain=17push.com, rr=_acme-challenge.ca
+func (p *AliyunProvider) extractDomainAndRR(domain, name string) (rootDomain, rr string) {
+	// 尝试从已知的域名列表中查找根域名
+	// 如果没有，则按照常见规则处理（最后两段为根域名）
+	parts := strings.Split(domain, ".")
+	
+	// 处理特殊情况：如 co.uk, com.cn 等二级域名后缀
+	specialSuffixes := map[string]bool{
+		"co.uk": true, "com.cn": true, "net.cn": true, "org.cn": true,
+		"com.au": true, "co.jp": true, "co.nz": true, "co.kr": true,
+	}
+	
+	if len(parts) >= 2 {
+		lastTwo := strings.Join(parts[len(parts)-2:], ".")
+		if specialSuffixes[lastTwo] && len(parts) >= 3 {
+			// 三级域名后缀，根域名取最后三段
+			rootDomain = strings.Join(parts[len(parts)-3:], ".")
+			if len(parts) > 3 {
+				subdomain := strings.Join(parts[:len(parts)-3], ".")
+				rr = name + "." + subdomain
+			} else {
+				rr = name
+			}
+		} else {
+			// 普通二级域名后缀，根域名取最后两段
+			rootDomain = strings.Join(parts[len(parts)-2:], ".")
+			if len(parts) > 2 {
+				subdomain := strings.Join(parts[:len(parts)-2], ".")
+				rr = name + "." + subdomain
+			} else {
+				rr = name
+			}
+		}
+	} else {
+		// 域名格式不对，直接返回原值
+		rootDomain = domain
+		rr = name
+	}
+	
+	return rootDomain, rr
 }
 
 func (p *AliyunProvider) DeleteTXTRecord(ctx context.Context, domain, name string) error {
+	// 阿里云 API 需要根域名和子域名分离
+	rootDomain, rr := p.extractDomainAndRR(domain, name)
+	p.log.Debugf("Aliyun DeleteTXTRecord: original domain=%s, name=%s -> rootDomain=%s, RR=%s", domain, name, rootDomain, rr)
+
 	// 获取记录ID
-	recordID, err := p.getRecordID(ctx, domain, name)
+	recordID, err := p.getRecordID(ctx, rootDomain, rr)
 	if err != nil {
 		return err
 	}
 
 	if recordID == "" {
-		p.log.Debugf("TXT record not found: %s", name)
+		p.log.Debugf("TXT record not found: %s", rr)
 		return nil
 	}
 
 	// 删除记录
-	return p.deleteRecord(ctx, domain, recordID)
+	return p.deleteRecord(ctx, rootDomain, recordID)
 }
 
 func (p *AliyunProvider) GetTXTRecord(ctx context.Context, domain, name string) (string, error) {
-	return p.getTXTRecord(ctx, domain, name)
+	// 阿里云 API 需要根域名和子域名分离
+	rootDomain, rr := p.extractDomainAndRR(domain, name)
+	return p.getTXTRecord(ctx, rootDomain, rr)
 }
 
 func (p *AliyunProvider) WaitForPropagation(ctx context.Context, domain, name, value string) error {
@@ -174,43 +235,123 @@ type AliyunDNSRecord struct {
 // getDomains 获取阿里云域名列表
 func (p *AliyunProvider) getDomains(ctx context.Context) ([]AliyunDomain, error) {
 	params := map[string]string{
-		"Action":  "DescribeDomains",
-		"Version": "2015-01-09",
+		"Action":    "DescribeDomains",
+		"Version":   "2015-01-09",
+		"PageSize":  "100", // 设置每页大小，最多100
+		"PageNumber": "1",  // 从第一页开始
 	}
 
-	result, err := p.makeRequest(ctx, "DescribeDomains", params)
-	if err != nil {
-		return nil, err
-	}
+	var allDomains []AliyunDomain
 
-	domainsData, ok := result["Domains"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("invalid response format")
-	}
+	// 处理分页，最多获取10页（1000个域名）
+	for pageNum := 1; pageNum <= 10; pageNum++ {
+		params["PageNumber"] = fmt.Sprintf("%d", pageNum)
 
-	domainList, ok := domainsData["Domain"].([]interface{})
-	if !ok {
-		return nil, fmt.Errorf("invalid domain list format")
-	}
+		result, err := p.makeRequest(ctx, "DescribeDomains", params)
+		if err != nil {
+			if pageNum == 1 {
+				return nil, fmt.Errorf("failed to get domains from Aliyun API: %w", err)
+			}
+			// 如果不是第一页出错，可能是已经获取完所有数据
+			p.log.Debugf("Error fetching page %d, assuming all domains retrieved: %v", pageNum, err)
+			break
+		}
 
-	var domains []AliyunDomain
-	for _, domainData := range domainList {
-		domainMap, ok := domainData.(map[string]interface{})
+		// 记录原始响应以便调试
+		p.log.Debugf("Aliyun API response keys: %v", getMapKeys(result))
+
+		domainsData, ok := result["Domains"].(map[string]interface{})
 		if !ok {
-			continue
+			if pageNum == 1 {
+				// 记录原始响应以便调试
+				p.log.Warnf("Invalid response format from Aliyun API, result keys: %v", getMapKeys(result))
+				return nil, fmt.Errorf("invalid response format: missing 'Domains' field, response keys: %v", getMapKeys(result))
+			}
+			break
 		}
 
-		domain := AliyunDomain{
-			ID:        getString(domainMap, "DomainId"),
-			Name:      getString(domainMap, "DomainName"),
-			Status:    getString(domainMap, "Status"),
-			CreatedAt: parseTime(getString(domainMap, "CreateTime")),
-			UpdatedAt: parseTime(getString(domainMap, "UpdateTime")),
+		// 处理 Domain 字段：可能是数组或单个对象
+		var domainList []interface{}
+		domainValue := domainsData["Domain"]
+
+		if domainValue == nil {
+			// 没有域名数据
+			if pageNum == 1 {
+				p.log.Infof("No domains found in Aliyun account")
+				return []AliyunDomain{}, nil
+			}
+			break
 		}
-		domains = append(domains, domain)
+
+		switch v := domainValue.(type) {
+		case []interface{}:
+			// 多个域名，是数组
+			domainList = v
+		case map[string]interface{}:
+			// 单个域名，是对象
+			domainList = []interface{}{v}
+		default:
+			if pageNum == 1 {
+				p.log.Warnf("Unexpected Domain type: %T, value: %v", domainValue, domainValue)
+				return nil, fmt.Errorf("invalid domain list format: unexpected type %T", domainValue)
+			}
+			break
+		}
+
+		// 解析域名列表
+		pageDomains := 0
+		for _, domainData := range domainList {
+			domainMap, ok := domainData.(map[string]interface{})
+			if !ok {
+				p.log.Warnf("Skipping invalid domain data: %v", domainData)
+				continue
+			}
+
+			domain := AliyunDomain{
+				ID:        getString(domainMap, "DomainId"),
+				Name:      getString(domainMap, "DomainName"),
+				Status:    getString(domainMap, "Status"),
+				CreatedAt: parseTime(getString(domainMap, "CreateTime")),
+				UpdatedAt: parseTime(getString(domainMap, "UpdateTime")),
+			}
+
+			if domain.Name == "" {
+				p.log.Warnf("Skipping domain with empty name: %v", domainMap)
+				continue
+			}
+
+			allDomains = append(allDomains, domain)
+			pageDomains++
+		}
+
+		// 如果这一页没有域名，说明已经获取完所有数据
+		if pageDomains == 0 {
+			break
+		}
+
+		// 检查是否还有更多页
+		totalCount := getInt(domainsData, "TotalCount")
+		if totalCount > 0 && len(allDomains) >= totalCount {
+			break
+		}
+
+		// 如果这一页的域名数量少于 PageSize，说明已经是最后一页
+		if pageDomains < 100 {
+			break
+		}
 	}
 
-	return domains, nil
+	p.log.Infof("Retrieved %d domains from Aliyun", len(allDomains))
+	return allDomains, nil
+}
+
+// getMapKeys 获取 map 的所有键（用于调试）
+func getMapKeys(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 // getDomainRecords 获取指定域名的 DNS 记录
@@ -219,43 +360,94 @@ func (p *AliyunProvider) getDomainRecords(ctx context.Context, domainName string
 		"Action":     "DescribeDomainRecords",
 		"Version":    "2015-01-09",
 		"DomainName": domainName,
+		"PageSize":   "100",
+		"PageNumber": "1",
 	}
 
-	result, err := p.makeRequest(ctx, "DescribeDomainRecords", params)
-	if err != nil {
-		return nil, err
-	}
+	var allRecords []AliyunDNSRecord
 
-	recordsData, ok := result["DomainRecords"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("invalid response format")
-	}
+	// 处理分页
+	for pageNum := 1; pageNum <= 10; pageNum++ {
+		params["PageNumber"] = fmt.Sprintf("%d", pageNum)
 
-	recordList, ok := recordsData["Record"].([]interface{})
-	if !ok {
-		return nil, fmt.Errorf("invalid record list format")
-	}
+		result, err := p.makeRequest(ctx, "DescribeDomainRecords", params)
+		if err != nil {
+			if pageNum == 1 {
+				return nil, err
+			}
+			break
+		}
 
-	var records []AliyunDNSRecord
-	for _, recordData := range recordList {
-		recordMap, ok := recordData.(map[string]interface{})
+		recordsData, ok := result["DomainRecords"].(map[string]interface{})
 		if !ok {
-			continue
+			if pageNum == 1 {
+				p.log.Warnf("Invalid response format for domain records, result keys: %v", getMapKeys(result))
+				return nil, fmt.Errorf("invalid response format: missing 'DomainRecords' field")
+			}
+			break
 		}
 
-		record := AliyunDNSRecord{
-			ID:        getString(recordMap, "RecordId"),
-			Name:      getString(recordMap, "RR"),
-			Type:      getString(recordMap, "Type"),
-			Value:     getString(recordMap, "Value"),
-			TTL:       getInt(recordMap, "TTL"),
-			CreatedAt: parseTime(getString(recordMap, "CreateTime")),
-			UpdatedAt: parseTime(getString(recordMap, "UpdateTime")),
+		// 处理 Record 字段：可能是数组或单个对象
+		var recordList []interface{}
+		recordValue := recordsData["Record"]
+
+		if recordValue == nil {
+			if pageNum == 1 {
+				p.log.Debugf("No records found for domain %s", domainName)
+				return []AliyunDNSRecord{}, nil
+			}
+			break
 		}
-		records = append(records, record)
+
+		switch v := recordValue.(type) {
+		case []interface{}:
+			// 多个记录，是数组
+			recordList = v
+		case map[string]interface{}:
+			// 单个记录，是对象
+			recordList = []interface{}{v}
+		default:
+			if pageNum == 1 {
+				p.log.Warnf("Unexpected Record type: %T, value: %v", recordValue, recordValue)
+				return nil, fmt.Errorf("invalid record list format: unexpected type %T", recordValue)
+			}
+			break
+		}
+
+		// 解析记录列表
+		pageRecords := 0
+		for _, recordData := range recordList {
+			recordMap, ok := recordData.(map[string]interface{})
+			if !ok {
+				p.log.Warnf("Skipping invalid record data: %v", recordData)
+				continue
+			}
+
+			record := AliyunDNSRecord{
+				ID:        getString(recordMap, "RecordId"),
+				Name:      getString(recordMap, "RR"),
+				Type:      getString(recordMap, "Type"),
+				Value:     getString(recordMap, "Value"),
+				TTL:       getInt(recordMap, "TTL"),
+				CreatedAt: parseTime(getString(recordMap, "CreateTime")),
+				UpdatedAt: parseTime(getString(recordMap, "UpdateTime")),
+			}
+			allRecords = append(allRecords, record)
+			pageRecords++
+		}
+
+		// 如果这一页没有记录，说明已经获取完所有数据
+		if pageRecords == 0 {
+			break
+		}
+
+		// 如果这一页的记录数量少于 PageSize，说明已经是最后一页
+		if pageRecords < 100 {
+			break
+		}
 	}
 
-	return records, nil
+	return allRecords, nil
 }
 
 // 阿里云API签名和请求辅助函数
@@ -328,17 +520,25 @@ func (p *AliyunProvider) makeRequest(ctx context.Context, action string, params 
 
 	var result map[string]interface{}
 	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, err
+		p.log.Errorf("Failed to parse Aliyun API response: %v, body: %s", err, string(body))
+		return nil, fmt.Errorf("failed to parse API response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		p.log.Errorf("Aliyun API returned non-200 status: %d, body: %s", resp.StatusCode, string(body))
 		return nil, fmt.Errorf("Aliyun API error: %d, body: %s", resp.StatusCode, string(body))
 	}
 
 	// 检查API错误
 	if errorCode, exists := result["Code"]; exists {
 		errorMsg, _ := result["Message"].(string)
-		return nil, fmt.Errorf("Aliyun API error: %s - %s", errorCode, errorMsg)
+		requestID, _ := result["RequestId"].(string)
+		errMsg := fmt.Sprintf("Aliyun API error: %s - %s", errorCode, errorMsg)
+		if requestID != "" {
+			errMsg += fmt.Sprintf(" (RequestId: %s)", requestID)
+		}
+		p.log.Errorf("Aliyun API error: %s, response: %s", errMsg, string(body))
+		return nil, fmt.Errorf(errMsg)
 	}
 
 	return result, nil

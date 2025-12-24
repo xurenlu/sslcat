@@ -97,11 +97,11 @@ export interface Translation {
     userManagement: string
     changePassword: string
     statistics: string
+    monitoring?: string
     slowRequests: string
     imageOptimization: string
     cluster?: string
     clusterStatus?: string
-    tunnels?: string
   }
   
   // 仪表板
@@ -169,68 +169,6 @@ export interface Translation {
     lastError: string
   }
 
-  // 隧道管理
-  tunnels?: {
-    title: string
-    description: string
-    addProvider: string
-    editProvider: string
-    deleteProvider: string
-    confirmDeleteProvider: string
-    addTunnel: string
-    editTunnel: string
-    deleteTunnel: string
-    confirmDeleteTunnel: string
-    providerType: string
-    providerName: string
-    descriptionLabel: string
-    enabled: string
-    autoStart: string
-    credentials: string
-    options: string
-    metadata: string
-    parameters: string
-    notes: string
-    key: string
-    value: string
-    addRow: string
-    removeRow: string
-    credentialPlaceholder: string
-    optionPlaceholder: string
-    secretStored: string
-    protocol: string
-    localAddress: string
-    localPort: string
-    publicHostname: string
-    publicPort: string
-    edgeRegion: string
-    status: string
-    lastError: string
-    lastUpdated: string
-    actions: string
-        logFile: string
-        pid: string
-        restartCount: string
-        lastStarted: string
-        lastStopped: string
-        copyLogPath: string
-        copyLogPathSuccess: string
-        copyLogPathFailed: string
-    startTunnel: string
-    stopTunnel: string
-    refresh: string
-    save: string
-    cancel: string
-    noProviders: string
-    createFirstProvider: string
-    statusConnected: string
-    statusDisconnected: string
-    statusError: string
-    statusUnknown: string
-    statusConnecting: string
-    providerBadgeAutoStart: string
-    providerBadgeDisabled: string
-  }
   
   // 代理管理
   proxy: {
@@ -475,6 +413,31 @@ export interface Translation {
     exportError: string
   }
   
+  // 监控页面
+  monitoring?: {
+    title: string
+    realtime_stats: string
+    watchdog_config: string
+    basic_config: string
+    cpu_usage: string
+    memory_usage: string
+    watchdog_enabled: string
+    cpu_threshold: string
+    cpu_increase_threshold: string
+    cpu_increase_window: string
+    memory_threshold_mb: string
+    memory_threshold_percent: string
+    memory_increase_threshold: string
+    memory_increase_window: string
+    check_interval: string
+    alert_cooldown: string
+    exit_on_memory: string
+    exit_on_cpu: string
+    exit_warning: string
+    save_success: string
+    save_failed: string
+  }
+  
   // 设置页面
   settings: {
     title: string
@@ -488,6 +451,12 @@ export interface Translation {
     httpsPort: string
     autoSSL: string
     letsEncryptEmail: string
+    challengeMethods: string
+    challengeMethodHttp01: string
+    challengeMethodDns01: string
+    challengeMethodHttp01Desc: string
+    challengeMethodDns01Desc: string
+    challengeMethodRequired: string
     enableDDoSProtection: string
     enableRateLimit: string
     maxRequestsPerMinute: string

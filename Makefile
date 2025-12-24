@@ -105,6 +105,12 @@ dev:
 	@echo "启动开发服务器..."
 	@go run main.go --config sslcat.conf --log-level debug
 
+# 构建前端并启动开发服务器（推荐用于开发）
+.PHONY: dev-full
+dev-full: build-frontend
+	@echo "前端构建完成，启动开发服务器..."
+	@go run main.go --config sslcat.conf --log-level debug
+
 # 修复 Node.js 环境
 .PHONY: fix-node
 fix-node:
@@ -268,7 +274,8 @@ help:
 	@echo "  build-linux  - 构建 Linux 服务器版本 (推荐用于部署)"
 	@echo "  build-all    - 构建所有平台二进制文件"
 	@echo "  run          - 构建并运行开发服务器"
-	@echo "  dev          - 直接运行开发服务器"
+	@echo "  dev          - 直接运行开发服务器（不构建前端）"
+	@echo "  dev-full     - 构建前端并启动开发服务器（推荐用于开发）"
 	@echo "  install      - 安装到系统"
 	@echo "  release      - 创建发布包"
 	@echo "  docs         - 生成文档"

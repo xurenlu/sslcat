@@ -34,6 +34,15 @@ func (m *DNSProviderManager) RegisterProviderWithPriority(name string, provider 
 	m.log.Infof("Registered DNS provider: %s with priority %d", name, priority)
 }
 
+// UnregisterProvider 注销DNS服务商
+func (m *DNSProviderManager) UnregisterProvider(name string) {
+	if _, exists := m.providers[name]; exists {
+		delete(m.providers, name)
+		delete(m.priorities, name)
+		m.log.Infof("Unregistered DNS provider: %s", name)
+	}
+}
+
 // GetProvider 获取指定的DNS服务商
 func (m *DNSProviderManager) GetProvider(name string) (DNSProviderInterface, error) {
 	provider, exists := m.providers[name]
@@ -213,7 +222,7 @@ func (m *DNSProviderManager) ListProviders() []string {
 
 // CreateDNSChallengeWithFailover 使用故障转移机制创建DNS挑战
 func (m *DNSProviderManager) CreateDNSChallengeWithFailover(ctx context.Context, domain, name, value string) (interface{}, error) {
-	err := m.SetTXTRecordWithFailover(ctx, domain, name, value, 120)
+	err := m.SetTXTRecordWithFailover(ctx, domain, name, value, 600)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +243,7 @@ func (m *DNSProviderManager) CreateDNSChallenge(ctx context.Context, domain, nam
 		return nil, err
 	}
 
-	err = provider.SetTXTRecord(ctx, domain, name, value, 120)
+	err = provider.SetTXTRecord(ctx, domain, name, value, 600)
 	if err != nil {
 		return nil, err
 	}

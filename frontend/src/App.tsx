@@ -29,10 +29,10 @@ import AISecurityAnalysis from './pages/AISecurityAnalysis'
 import ImageOptimization from './pages/ImageOptimization'
 import FirstTimeSetup from './pages/FirstTimeSetup'
 import ClusterSettings from './pages/ClusterSettings'
+import Monitoring from './pages/Monitoring'
 import ClusterStatus from './pages/ClusterStatus'
 import TemplateMarket from './pages/TemplateMarket'
 import TemplateDeploy from './pages/TemplateDeploy'
-import Tunnels from './pages/Tunnels'
 
 // 辅助组件：为需要 Layout 的页面添加 Layout
 const LayoutRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -160,13 +160,6 @@ const AppRoutes: React.FC = () => {
           </LayoutRoute>
         </AuthGuard>
       } />
-      <Route path={`${adminPrefix}/tunnels`} element={
-        <AuthGuard>
-          <LayoutRoute>
-            <Tunnels />
-          </LayoutRoute>
-        </AuthGuard>
-      } />
       <Route path={`${adminPrefix}/security`} element={
         <AuthGuard>
           <LayoutRoute>
@@ -227,6 +220,13 @@ const AppRoutes: React.FC = () => {
         <AuthGuard>
           <LayoutRoute>
             <Statistics />
+          </LayoutRoute>
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/monitoring`} element={
+        <AuthGuard>
+          <LayoutRoute>
+            <Monitoring />
           </LayoutRoute>
         </AuthGuard>
       } />

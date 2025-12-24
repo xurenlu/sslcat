@@ -1,9 +1,9 @@
 package ssl
 
 import (
-	"bytes"
 	"context"
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -61,6 +61,21 @@ type Manager struct {
 	// 证书元数据缓存：缓存证书文件存在性和有效期，避免频繁磁盘查找
 	certMetadataCache map[string]*certMetadata
 	metadataMutex     sync.RWMutex
+	// 证书申请进度事件通道：用于实时推送申请进度
+	progressChannels map[string]chan CertProgressEvent
+	progressMutex   sync.RWMutex
+}
+
+// CertProgressEvent 证书申请进度事件
+type CertProgressEvent struct {
+	Domain      string    `json:"domain"`
+	Status      string    `json:"status"`      // "started", "checking_dns", "using_dns01", "using_http01", "success", "failed", "retrying"
+	Message     string    `json:"message"`     // 进度消息
+	Attempt     int       `json:"attempt"`     // 当前尝试次数
+	MaxAttempts int       `json:"max_attempts"` // 最大尝试次数
+	Progress    int       `json:"progress"`     // 进度百分比 0-100
+	Error       string    `json:"error,omitempty"` // 错误信息（如果有）
+	Timestamp   time.Time `json:"timestamp"`
 }
 
 // NewManager 创建SSL管理器
@@ -80,6 +95,7 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 		dnsManager:         NewDNSProviderManager(log),
 		failedDomainCache:  make(map[string]time.Time),
 		certMetadataCache:  make(map[string]*certMetadata),
+		progressChannels:   make(map[string]chan CertProgressEvent),
 	}
 
 	// 初始化一个默认自签证书（用于未允许域名回退，避免写盘）
@@ -708,64 +724,30 @@ func (m *Manager) SetOnClientHello(fn func(*tls.ClientHelloInfo)) {
 
 // GetTLSConfig 获取用于HTTPS服务器的TLS配置
 func (m *Manager) GetTLSConfig() *tls.Config {
-	// 若启用 ACME，优先使用 ACME 的证书获取逻辑（仅允许域名）
+	// 若启用 ACME，使用 ACME 的 HTTP-01 验证处理器，但不自动申请证书
+	// 证书必须通过后台手动申请，访问时只使用已存在的证书
 	if m.acmeMgr != nil {
 		return &tls.Config{
 			GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 				if m.onClientHello != nil {
 					m.onClientHello(hello)
 				}
-			host := hello.ServerName
-			if host == "" {
-				host = "localhost"
-			}
-			if m.isAllowedDomain(host) {
-				if cert, err := m.acmeMgr.GetCertificate(hello); err == nil {
-					domain := strings.ToLower(host)
-					
-					// 检查是否需要持久化（只在首次获取或证书更新时）
-					needsPersist := false
-					m.certMutex.RLock()
-					existingCert, exists := m.certCache[domain]
-					if !exists {
-						// 首次获取，需要持久化
-						needsPersist = true
-					} else if existingCert != nil && len(existingCert.Certificate) > 0 && len(cert.Certificate) > 0 {
-						// 检查证书是否更新（比较证书内容）
-						if !bytes.Equal(existingCert.Certificate[0], cert.Certificate[0]) {
-							needsPersist = true
-						}
-					}
-					m.certMutex.RUnlock()
-					
-					// 将 autocert 获取的证书加载到内存缓存中
-					m.certMutex.Lock()
-					m.certCache[domain] = cert
-					m.certMutex.Unlock()
-					m.updateCertMetadata(domain, cert)
-					
-					// 只在需要时持久化到磁盘
-					if needsPersist {
-						go func(d string, certificate *tls.Certificate) {
-							if err := m.saveCertificateToDisk(d, certificate); err != nil {
-								m.log.Warnf("Failed to save certificate to disk for %s: %v", d, err)
-							} else {
-								m.log.Infof("Certificate saved to disk for %s", d)
-							}
-						}(domain, cert)
-					}
-					
+				host := hello.ServerName
+				if host == "" {
+					host = "localhost"
+				}
+				
+				// 只使用已存在的证书，不自动申请
+				// 证书必须通过后台手动申请，访问时只使用已存在的证书
+				if cert, err := m.GetCertificate(host); err == nil {
 					return cert, nil
 				}
-			}
-			// 回退到本地（文件/缓存）或默认自签
-			if cert, err := m.GetCertificate(host); err == nil {
-				return cert, nil
-			}
+				
+				// 如果没有证书，回退到默认自签证书
 				if m.defaultCert != nil {
 					return m.defaultCert, nil
 				}
-				return nil, fmt.Errorf("no certificate available for %s", host)
+				return nil, fmt.Errorf("no certificate available for %s (certificate must be requested manually from admin panel)", host)
 			},
 			NextProtos: []string{"h2", "http/1.1", "acme-tls/1"},
 			MinVersion: tls.VersionTLS12,
@@ -849,8 +831,8 @@ func (m *Manager) EnsureDomainCert(domain string) error {
 		return fmt.Errorf("empty domain")
 	}
 
-	// 使用智能重试机制申请证书
-	return m.ensureDomainCertWithRetry(domain, 3) // 最多重试3次
+	// 不重试，一次失败就结束
+	return m.ensureDomainCertWithRetry(domain, 1)
 }
 
 // ensureDomainCertWithRetry 带重试机制的证书申请
@@ -858,34 +840,206 @@ func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error
 	var lastErr error
 	startTime := time.Now()
 
+	// 发送开始事件
+	m.sendProgressEvent(domain, CertProgressEvent{
+		Domain:      domain,
+		Status:      "started",
+		Message:     fmt.Sprintf("开始申请证书: %s", domain),
+		Attempt:     0,
+		MaxAttempts: maxRetries,
+		Progress:    0,
+		Timestamp:   time.Now(),
+	})
+
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		attemptStart := time.Now()
 		m.log.Infof("Certificate request attempt %d/%d for domain: %s", attempt, maxRetries, domain)
 
+		// 发送重试事件
+		if attempt > 1 {
+			m.sendProgressEvent(domain, CertProgressEvent{
+				Domain:      domain,
+				Status:      "retrying",
+				Message:     fmt.Sprintf("第 %d/%d 次尝试申请证书", attempt, maxRetries),
+				Attempt:     attempt,
+				MaxAttempts: maxRetries,
+				Progress:    (attempt - 1) * 30, // 每次尝试约30%进度
+				Timestamp:   time.Now(),
+			})
+		}
+
 		// 第一次尝试时检查域名解析
 		if attempt == 1 {
+			m.sendProgressEvent(domain, CertProgressEvent{
+				Domain:      domain,
+				Status:      "checking_dns",
+				Message:     "正在检查域名解析...",
+				Attempt:     attempt,
+				MaxAttempts: maxRetries,
+				Progress:    10,
+				Timestamp:   time.Now(),
+			})
+
 			dnsCheckStart := time.Now()
 			if resolved, info, err := m.checkDomainResolution(domain); err != nil {
 				m.log.Warnf("Domain resolution check failed for %s: %v", domain, err)
+				m.sendProgressEvent(domain, CertProgressEvent{
+					Domain:      domain,
+					Status:      "checking_dns",
+					Message:     fmt.Sprintf("DNS解析检查失败: %v", err),
+					Attempt:     attempt,
+					MaxAttempts: maxRetries,
+					Progress:    15,
+					Error:       err.Error(),
+					Timestamp:   time.Now(),
+				})
 			} else {
 				dnsCheckDuration := time.Since(dnsCheckStart)
 				m.log.Infof("Domain resolution check for %s: %s (耗时: %v)", domain, info, dnsCheckDuration)
+				resolvedMsg := "DNS解析检查完成"
 				if !resolved {
+					resolvedMsg = "DNS解析检查完成，但域名可能未指向本服务器"
 					m.log.Warnf("Domain %s may not resolve to this server, HTTP-01 validation might fail", domain)
 				}
+				m.sendProgressEvent(domain, CertProgressEvent{
+					Domain:      domain,
+					Status:      "checking_dns",
+					Message:     resolvedMsg + ": " + info,
+					Attempt:     attempt,
+					MaxAttempts: maxRetries,
+					Progress:    15,
+					Timestamp:   time.Now(),
+				})
 			}
 		}
 
 		// 临时放行该域名以触发申请（避免必须写入配置）
 		m.AllowDomainTemporary(domain, 24*time.Hour)
 
-		// 尝试HTTP-01验证
+		// 优先使用DNS-01验证（如果配置了DNS提供商且域名属于某个提供商）
+		supportsDNS := m.supportsDNSChallenge()
+		hasProvider := m.hasAvailableDNSProvider()
+		m.log.Infof("Certificate request for %s: supportsDNSChallenge=%v, hasAvailableDNSProvider=%v", domain, supportsDNS, hasProvider)
+		
+		if supportsDNS && hasProvider {
+			providerName := m.findDNSProviderForDomain(domain)
+			m.log.Infof("findDNSProviderForDomain(%s) returned: %s", domain, providerName)
+			
+			if providerName != "" {
+				m.sendProgressEvent(domain, CertProgressEvent{
+					Domain:      domain,
+					Status:      "using_dns01",
+					Message:     fmt.Sprintf("使用 DNS-01 验证，DNS服务商: %s", providerName),
+					Attempt:     attempt,
+					MaxAttempts: maxRetries,
+					Progress:    30,
+					Timestamp:   time.Now(),
+				})
+
+				dnsStart := time.Now()
+				m.log.Infof("Domain %s found in DNS provider %s, using DNS-01 validation", domain, providerName)
+				if dnsErr := m.RequestCertificateWithDNS(domain, providerName); dnsErr == nil {
+					dnsDuration := time.Since(dnsStart)
+					totalDuration := time.Since(startTime)
+					m.log.Infof("DNS-01 validation successful for domain: %s (DNS耗时: %v, 总耗时: %v)", domain, dnsDuration, totalDuration)
+
+					m.sendProgressEvent(domain, CertProgressEvent{
+						Domain:      domain,
+						Status:      "success",
+						Message:     fmt.Sprintf("证书申请成功！耗时: %v", totalDuration),
+						Attempt:     attempt,
+						MaxAttempts: maxRetries,
+						Progress:    100,
+						Timestamp:   time.Now(),
+					})
+
+					// 发送证书申请成功通知
+					if m.notificationIntegrator != nil {
+						m.notificationIntegrator.SendCertSuccessNotification(domain, attempt, totalDuration)
+					}
+
+					return nil
+				} else {
+					dnsDuration := time.Since(dnsStart)
+					m.log.Warnf("DNS-01 validation failed for %s (耗时: %v): %v, will try HTTP-01 as fallback", domain, dnsDuration, dnsErr)
+					
+					m.sendProgressEvent(domain, CertProgressEvent{
+						Domain:      domain,
+						Status:      "using_dns01",
+						Message:     fmt.Sprintf("DNS-01 验证失败，将尝试 HTTP-01: %v", dnsErr),
+						Attempt:     attempt,
+						MaxAttempts: maxRetries,
+						Progress:    50,
+						Error:       dnsErr.Error(),
+						Timestamp:   time.Now(),
+					})
+					// DNS-01失败，继续尝试HTTP-01作为备选
+				}
+			} else {
+				m.log.Warnf("Domain %s not found in any DNS provider, will use HTTP-01", domain)
+			}
+		} else {
+			// 详细说明为什么没有使用 DNS-01
+			var reasons []string
+			if !supportsDNS {
+				if len(m.config.SSL.ChallengeMethods) > 0 {
+					reasons = append(reasons, fmt.Sprintf("DNS-01 未在配置的挑战方法中 (当前配置: %v)", m.config.SSL.ChallengeMethods))
+				} else {
+					reasons = append(reasons, "未配置挑战方法且没有可用的 DNS 提供商")
+				}
+			}
+			if !hasProvider {
+				reasons = append(reasons, "没有可用的 DNS 提供商")
+			}
+			if supportsDNS && hasProvider {
+				// 这种情况说明 findDNSProviderForDomain 返回了空字符串
+				reasons = append(reasons, fmt.Sprintf("域名 %s 不在任何已配置的 DNS 提供商管理的域名列表中", domain))
+			}
+			
+			if len(reasons) > 0 {
+				reasonMsg := strings.Join(reasons, "; ")
+				m.log.Warnf("将使用 HTTP-01 验证申请证书 %s，原因: %s", domain, reasonMsg)
+				
+				m.sendProgressEvent(domain, CertProgressEvent{
+					Domain:      domain,
+					Status:      "using_http01",
+					Message:     fmt.Sprintf("将使用 HTTP-01 验证，原因: %s", reasonMsg),
+					Attempt:     attempt,
+					MaxAttempts: maxRetries,
+					Progress:    30,
+					Timestamp:   time.Now(),
+				})
+			}
+		}
+
+		// 尝试HTTP-01验证（作为备选或主要方式）
+		m.log.Infof("开始使用 HTTP-01 验证申请证书: %s", domain)
+		
+		m.sendProgressEvent(domain, CertProgressEvent{
+			Domain:      domain,
+			Status:      "using_http01",
+			Message:     "正在使用 HTTP-01 验证申请证书...",
+			Attempt:     attempt,
+			MaxAttempts: maxRetries,
+			Progress:    50,
+			Timestamp:   time.Now(),
+		})
 		acmeStart := time.Now()
 		_, err := m.acmeMgr.GetCertificate(&tls.ClientHelloInfo{ServerName: domain})
 		acmeDuration := time.Since(acmeStart)
 
 		if err == nil {
 			// 申请成功，同步证书
+			m.sendProgressEvent(domain, CertProgressEvent{
+				Domain:      domain,
+				Status:      "using_http01",
+				Message:     "证书申请成功，正在同步到磁盘...",
+				Attempt:     attempt,
+				MaxAttempts: maxRetries,
+				Progress:    90,
+				Timestamp:   time.Now(),
+			})
+
 			syncStart := time.Now()
 			if _, syncErr := m.SyncACMECertsToDisk(); syncErr != nil {
 				m.log.Debugf("ACME post-issue sync failed: %v", syncErr)
@@ -895,6 +1049,16 @@ func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error
 			totalDuration := time.Since(startTime)
 			m.log.Infof("Certificate request successful for domain: %s (attempt %d, ACME耗时: %v, 同步耗时: %v, 总耗时: %v)",
 				domain, attempt, acmeDuration, syncDuration, totalDuration)
+
+			m.sendProgressEvent(domain, CertProgressEvent{
+				Domain:      domain,
+				Status:      "success",
+				Message:     fmt.Sprintf("证书申请成功！总耗时: %v", totalDuration),
+				Attempt:     attempt,
+				MaxAttempts: maxRetries,
+				Progress:    100,
+				Timestamp:   time.Now(),
+			})
 
 			// 发送证书申请成功通知
 			if m.notificationIntegrator != nil {
@@ -909,40 +1073,29 @@ func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error
 
 		// 提供更详细的错误信息
 		errMsg := err.Error()
+		var errorDetails string
 		if strings.Contains(errMsg, "missing certificate") {
+			errorDetails = "可能原因: 1) 域名DNS未解析到此服务器 2) 防火墙阻止80端口 3) 服务器未在standard模式监听80端口 4) Let's Encrypt无法访问验证端点"
 			m.log.Warnf("HTTP-01 validation failed for %s (attempt %d, 耗时: %v): %v", domain, attempt, attemptDuration, err)
-			m.log.Warnf("可能原因: 1) 域名DNS未解析到此服务器 2) 防火墙阻止80端口 3) 服务器未在standard模式监听80端口 4) Let's Encrypt无法访问验证端点")
+			m.log.Warnf(errorDetails)
 		} else {
 			m.log.Warnf("HTTP-01 validation failed for %s (attempt %d, 耗时: %v): %v", domain, attempt, attemptDuration, err)
+			errorDetails = errMsg
 		}
 
-		// 如果HTTP-01失败且配置了DNS服务商，尝试DNS-01验证
-		if m.supportsDNSChallenge() && m.hasAvailableDNSProvider() {
-			dnsStart := time.Now()
-			m.log.Infof("Attempting DNS-01 validation for domain: %s", domain)
-			if dnsErr := m.tryDNSValidation(domain); dnsErr == nil {
-				dnsDuration := time.Since(dnsStart)
-				totalDuration := time.Since(startTime)
-				m.log.Infof("DNS-01 validation successful for domain: %s (DNS耗时: %v, 总耗时: %v)", domain, dnsDuration, totalDuration)
+		m.sendProgressEvent(domain, CertProgressEvent{
+			Domain:      domain,
+			Status:      "failed",
+			Message:     fmt.Sprintf("HTTP-01 验证失败 (第 %d/%d 次尝试)", attempt, maxRetries),
+			Attempt:     attempt,
+			MaxAttempts: maxRetries,
+			Progress:    50 + (attempt-1)*15, // 每次失败增加15%进度
+			Error:       errorDetails,
+			Timestamp:   time.Now(),
+		})
 
-				// 发送证书申请成功通知
-				if m.notificationIntegrator != nil {
-					m.notificationIntegrator.SendCertSuccessNotification(domain, attempt, totalDuration)
-				}
-
-				return nil
-			} else {
-				dnsDuration := time.Since(dnsStart)
-				m.log.Warnf("DNS-01 validation also failed for %s (耗时: %v): %v", domain, dnsDuration, dnsErr)
-			}
-		}
-
-		// 如果不是最后一次尝试，等待一段时间后重试
-		if attempt < maxRetries {
-			waitTime := time.Duration(attempt*10) * time.Second // 递增等待时间
-			m.log.Infof("Waiting %v before retry for domain: %s", waitTime, domain)
-			time.Sleep(waitTime)
-		}
+		// 不重试，一次失败就结束
+		// 注释掉重试逻辑，因为 maxRetries 已设置为 1
 	}
 
 	totalDuration := time.Since(startTime)
@@ -986,6 +1139,121 @@ func (m *Manager) tryDNSValidation(domain string) error {
 	m.log.Infof("Using DNS provider: %s for domain: %s", providerName, domain)
 
 	return m.RequestCertificateWithDNS(domain, providerName)
+}
+
+// findDNSProviderForDomain 查找域名属于哪个DNS提供商
+func (m *Manager) findDNSProviderForDomain(domain string) string {
+	// 提取主域名（例如：www.example.com -> example.com）
+	domainParts := strings.Split(domain, ".")
+	if len(domainParts) < 2 {
+		m.log.Debugf("Invalid domain format: %s", domain)
+		return ""
+	}
+
+	// 尝试匹配主域名和子域名
+	// 例如：example.com, www.example.com, api.example.com 都应该匹配到 example.com
+	var mainDomain string
+	if len(domainParts) >= 2 {
+		mainDomain = strings.Join(domainParts[len(domainParts)-2:], ".")
+	}
+	m.log.Infof("Looking for DNS provider for domain: %s (main domain: %s)", domain, mainDomain)
+
+	// 按优先级顺序检查所有DNS提供商
+	providers := m.dnsManager.GetProvidersSortedByPriority()
+	m.log.Infof("Available DNS providers: %v", providers)
+	
+	for _, providerName := range providers {
+		provider, err := m.dnsManager.GetProvider(providerName)
+		if err != nil {
+			m.log.Debugf("Failed to get provider %s: %v", providerName, err)
+			continue
+		}
+
+		// 获取该提供商管理的域名列表
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		domains, err := provider.ListDomains(ctx)
+		cancel()
+
+		if err != nil {
+			m.log.Warnf("Failed to list domains from provider %s: %v", providerName, err)
+			continue
+		}
+
+		m.log.Infof("Provider %s has %d total records", providerName, len(domains))
+
+		// 检查域名是否在该提供商的域名列表中
+		for _, d := range domains {
+			if d.Type == "domain" {
+				// 精确匹配或主域名匹配
+				if strings.EqualFold(d.Name, domain) || strings.EqualFold(d.Name, mainDomain) {
+					m.log.Infof("Domain %s matched provider %s (matched domain: %s)", domain, providerName, d.Name)
+					return providerName
+				}
+			}
+		}
+		
+		// 记录该提供商的所有域名以便调试
+		domainNames := make([]string, 0)
+		for _, d := range domains {
+			if d.Type == "domain" {
+				domainNames = append(domainNames, d.Name)
+			}
+		}
+		m.log.Infof("Provider %s manages domains: %v", providerName, domainNames)
+	}
+
+	// 如果没有找到匹配的提供商，使用默认提供商（如果配置了）
+	if m.config.SSL.DefaultDNSProvider != "" {
+		_, err := m.dnsManager.GetProvider(m.config.SSL.DefaultDNSProvider)
+		if err == nil {
+			m.log.Infof("Using default DNS provider %s for domain %s (no exact match found)", m.config.SSL.DefaultDNSProvider, domain)
+			return m.config.SSL.DefaultDNSProvider
+		}
+	}
+
+	// 收集所有已检查的域名列表，用于错误提示
+	allCheckedDomains := make([]string, 0)
+	for _, providerName := range providers {
+		provider, err := m.dnsManager.GetProvider(providerName)
+		if err != nil {
+			continue
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		domains, err := provider.ListDomains(ctx)
+		cancel()
+		if err == nil {
+			for _, d := range domains {
+				if d.Type == "domain" && !contains(allCheckedDomains, d.Name) {
+					allCheckedDomains = append(allCheckedDomains, d.Name)
+				}
+			}
+		}
+	}
+	
+	m.log.Warnf("未找到域名 %s 对应的 DNS 提供商。主域名: %s，已检查的提供商: %v，这些提供商管理的域名: %v", 
+		domain, mainDomain, providers, allCheckedDomains)
+	return ""
+}
+
+// contains 检查字符串切片中是否包含指定字符串
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
+// supportsHTTPChallenge 检查是否支持HTTP验证
+func (m *Manager) supportsHTTPChallenge() bool {
+	for _, method := range m.config.SSL.ChallengeMethods {
+		if method == "http-01" {
+			return true
+		}
+	}
+	// 如果没有配置挑战方法，默认支持HTTP-01
+	return len(m.config.SSL.ChallengeMethods) == 0
 }
 
 // checkDomainResolution 检查域名解析状态
@@ -1887,7 +2155,7 @@ func (m *Manager) initializeDNSProviders() {
 
 // RequestCertificateWithDNS 使用DNS验证申请证书
 func (m *Manager) RequestCertificateWithDNS(domain, providerName string) error {
-	return m.requestCertificateWithDNSRetry(domain, providerName, 2) // DNS验证最多重试2次
+	return m.requestCertificateWithDNSRetry(domain, providerName, 1) // 不重试，一次失败就结束
 }
 
 // requestCertificateWithDNSRetry 带重试机制的DNS验证证书申请
@@ -1920,12 +2188,8 @@ func (m *Manager) requestCertificateWithDNSRetry(domain, providerName string, ma
 		lastErr = err
 		m.log.Warnf("DNS certificate request failed for %s (attempt %d): %v", domain, attempt, err)
 
-		// 如果不是最后一次尝试，等待一段时间后重试
-		if attempt < maxRetries {
-			waitTime := time.Duration(attempt*15) * time.Second // DNS验证等待时间稍长
-			m.log.Infof("Waiting %v before DNS retry for domain: %s", waitTime, domain)
-			time.Sleep(waitTime)
-		}
+		// 不重试，一次失败就结束
+		// 注释掉重试逻辑，因为 maxRetries 已设置为 1
 	}
 
 	return fmt.Errorf("DNS certificate request failed after %d attempts: %w", maxRetries, lastErr)
@@ -1933,8 +2197,16 @@ func (m *Manager) requestCertificateWithDNSRetry(domain, providerName string, ma
 
 // performDNSChallenge 执行DNS挑战验证
 func (m *Manager) performDNSChallenge(domain, providerName string) error {
+	// 生成账户密钥（如果还没有）
+	accountKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return fmt.Errorf("failed to generate account key: %w", err)
+	}
+
 	// 创建ACME客户端
-	client := &acme.Client{}
+	client := &acme.Client{
+		Key: accountKey,
+	}
 	if m.config.SSL.Staging {
 		client.DirectoryURL = "https://acme-staging-v02.api.letsencrypt.org/directory"
 	} else {
@@ -1947,7 +2219,6 @@ func (m *Manager) performDNSChallenge(domain, providerName string) error {
 	}
 
 	ctx := context.Background()
-	var err error
 	account, err = client.Register(ctx, account, acme.AcceptTOS)
 	if err != nil {
 		return fmt.Errorf("failed to register ACME account: %w", err)
@@ -2047,12 +2318,43 @@ func (m *Manager) performDNSChallenge(domain, providerName string) error {
 
 // supportsDNSChallenge 检查是否支持DNS验证
 func (m *Manager) supportsDNSChallenge() bool {
-	for _, method := range m.config.SSL.ChallengeMethods {
-		if method == "dns-01" {
-			return true
+	// 如果明确配置了 challenge_methods，检查是否包含 dns-01
+	if len(m.config.SSL.ChallengeMethods) > 0 {
+		for _, method := range m.config.SSL.ChallengeMethods {
+			if method == "dns-01" {
+				return true
+			}
 		}
+		return false
 	}
+	
+	// 如果没有配置 challenge_methods，但有可用的 DNS 提供商，默认支持 DNS-01
+	// 这样可以自动使用 DNS-01，无需手动配置
+	if m.hasAvailableDNSProvider() {
+		return true
+	}
+	
 	return false
+}
+
+// SupportsDNSChallenge 公开方法：检查是否支持DNS验证
+func (m *Manager) SupportsDNSChallenge() bool {
+	return m.supportsDNSChallenge()
+}
+
+// HasAvailableDNSProvider 公开方法：检查是否有可用的DNS服务商
+func (m *Manager) HasAvailableDNSProvider() bool {
+	return m.hasAvailableDNSProvider()
+}
+
+// FindDNSProviderForDomain 公开方法：查找域名属于哪个DNS提供商
+func (m *Manager) FindDNSProviderForDomain(domain string) string {
+	return m.findDNSProviderForDomain(domain)
+}
+
+// CheckDomainResolution 公开方法：检查域名解析状态
+func (m *Manager) CheckDomainResolution(domain string) (bool, string, error) {
+	return m.checkDomainResolution(domain)
 }
 
 // saveCertificate 保存证书到文件
@@ -2215,4 +2517,61 @@ func (m *Manager) GetDNSProviderDomains(providerName string) ([]DomainInfo, erro
 	}
 
 	return domains, nil
+}
+
+// RegisterDNSProvider 注册DNS provider（公开方法，用于动态注册）
+func (m *Manager) RegisterDNSProvider(name string, provider DNSProviderInterface, priority int) {
+	m.dnsManager.RegisterProviderWithPriority(name, provider, priority)
+	m.log.Infof("Registered DNS provider: %s with priority %d", name, priority)
+}
+
+// UnregisterDNSProvider 注销DNS provider（公开方法，用于动态注销）
+func (m *Manager) UnregisterDNSProvider(name string) {
+	m.dnsManager.UnregisterProvider(name)
+	m.log.Infof("Unregistered DNS provider: %s", name)
+}
+
+// CreateProgressChannel 为域名创建进度通道
+func (m *Manager) CreateProgressChannel(domain string) chan CertProgressEvent {
+	m.progressMutex.Lock()
+	defer m.progressMutex.Unlock()
+	
+	ch := make(chan CertProgressEvent, 10) // 缓冲10个事件
+	m.progressChannels[domain] = ch
+	return ch
+}
+
+// GetProgressChannel 获取域名的进度通道
+func (m *Manager) GetProgressChannel(domain string) (chan CertProgressEvent, bool) {
+	m.progressMutex.RLock()
+	defer m.progressMutex.RUnlock()
+	
+	ch, ok := m.progressChannels[domain]
+	return ch, ok
+}
+
+// CloseProgressChannel 关闭并删除进度通道
+func (m *Manager) CloseProgressChannel(domain string) {
+	m.progressMutex.Lock()
+	defer m.progressMutex.Unlock()
+	
+	if ch, ok := m.progressChannels[domain]; ok {
+		close(ch)
+		delete(m.progressChannels, domain)
+	}
+}
+
+// sendProgressEvent 发送进度事件（非阻塞）
+func (m *Manager) sendProgressEvent(domain string, event CertProgressEvent) {
+	m.progressMutex.RLock()
+	ch, ok := m.progressChannels[domain]
+	m.progressMutex.RUnlock()
+	
+	if ok {
+		select {
+		case ch <- event:
+		default:
+			// 通道已满，跳过（避免阻塞）
+		}
+	}
 }
