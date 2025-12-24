@@ -2,6 +2,8 @@ package monitor
 
 import (
 	"fmt"
+	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -18,13 +20,13 @@ type WatchdogMonitorOptions struct {
 	CPUIncreaseWindow           time.Duration
 	AlertCooldown               time.Duration
 	// 内存监控选项
-	MemoryThresholdMB           int64   // 内存绝对阈值（MB）
-	MemoryThresholdPercent      float64 // 内存占用百分比阈值
-	MemoryIncreaseThresholdMB   int64   // 内存增长阈值（MB）
-	MemoryIncreaseWindow        time.Duration
+	MemoryThresholdMB         int64   // 内存绝对阈值（MB）
+	MemoryThresholdPercent    float64 // 内存占用百分比阈值
+	MemoryIncreaseThresholdMB int64   // 内存增长阈值（MB）
+	MemoryIncreaseWindow      time.Duration
 	// 自动退出选项
-	ExitOnMemoryThreshold       bool  // 达到内存阈值时自动退出
-	ExitOnCPUThreshold          bool  // 达到CPU阈值时自动退出
+	ExitOnMemoryThreshold bool // 达到内存阈值时自动退出
+	ExitOnCPUThreshold    bool // 达到CPU阈值时自动退出
 }
 
 func (o WatchdogMonitorOptions) normalize() WatchdogMonitorOptions {
@@ -66,11 +68,16 @@ type WatchdogMonitor struct {
 	lastAbsoluteAlertTime time.Time
 	lastIncreaseAlertTime time.Time
 	alertMutex            sync.RWMutex
+
+	// 运行实例标识
+	hostName string
+	hostIP   string
 }
 
 // NewWatchdogMonitor 创建看门狗监控器
 func NewWatchdogMonitor(opts WatchdogMonitorOptions, notificationMgr *notification.NotificationManager) *WatchdogMonitor {
 	normalized := opts.normalize()
+	hostName, hostIP := resolveHostInfo()
 	return &WatchdogMonitor{
 		log: logrus.WithFields(logrus.Fields{
 			"component": "watchdog_monitor",
@@ -80,6 +87,8 @@ func NewWatchdogMonitor(opts WatchdogMonitorOptions, notificationMgr *notificati
 		notificationMgr: notificationMgr,
 		history:         make([]ProcessStatsRecord, 0),
 		maxHistorySize:  1000, // 保存足够多的历史数据
+		hostName:        hostName,
+		hostIP:          hostIP,
 	}
 }
 
@@ -271,20 +280,22 @@ func (wm *WatchdogMonitor) sendAlert(alertType string, current *ProcessStats, ba
 		"current_cpu":    current.CPUPercent,
 		"current_memory": current.MemoryPercent,
 		"timestamp":      current.Timestamp.Format(time.RFC3339),
+		"hostname":       wm.hostName,
+		"host_ip":        wm.hostIP,
 	}
 
 	if alertType == "absolute_threshold" {
 		title = "CPU占用超过阈值"
-		message = fmt.Sprintf("当前进程CPU占用 %.1f%%，超过配置的阈值 %.1f%%",
-			current.CPUPercent, wm.options.CPUThresholdPercent)
+		message = fmt.Sprintf("当前进程CPU占用 %.1f%%，超过配置的阈值 %.1f%% (主机: %s, IP: %s)",
+			current.CPUPercent, wm.options.CPUThresholdPercent, wm.hostName, wm.hostIP)
 		details["threshold"] = wm.options.CPUThresholdPercent
 	} else if alertType == "increase_trend" {
 		title = "CPU占用快速增长"
 		if baseline != nil {
 			increase := current.CPUPercent - baseline.CPUPercent
-			message = fmt.Sprintf("CPU占用在 %v 内从 %.1f%% 增长到 %.1f%% (增长: %.1f%%)，超过配置的增长阈值 %.1f%%",
+			message = fmt.Sprintf("CPU占用在 %v 内从 %.1f%% 增长到 %.1f%% (增长: %.1f%%)，超过配置的增长阈值 %.1f%% (主机: %s, IP: %s)",
 				wm.options.CPUIncreaseWindow,
-				baseline.CPUPercent, current.CPUPercent, increase, wm.options.CPUIncreaseThresholdPercent)
+				baseline.CPUPercent, current.CPUPercent, increase, wm.options.CPUIncreaseThresholdPercent, wm.hostName, wm.hostIP)
 			details["baseline_cpu"] = baseline.CPUPercent
 			details["baseline_memory"] = baseline.MemoryPercent
 			details["increase"] = increase
@@ -346,7 +357,55 @@ func (wm *WatchdogMonitor) UpdateOptions(opts WatchdogMonitorOptions) {
 		normalized.CheckInterval, normalized.CPUThresholdPercent, normalized.CPUIncreaseThresholdPercent)
 }
 
+func resolveHostInfo() (string, string) {
+	hostName, err := os.Hostname()
+	if err != nil || hostName == "" {
+		hostName = "unknown"
+	}
 
+	hostIP := firstNonLoopbackIPv4()
+	if hostIP == "" {
+		hostIP = "unknown"
+	}
 
+	return hostName, hostIP
+}
 
+func firstNonLoopbackIPv4() string {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return ""
+	}
 
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+
+			if ip == nil || ip.IsLoopback() {
+				continue
+			}
+			ip = ip.To4()
+			if ip == nil {
+				continue
+			}
+			return ip.String()
+		}
+	}
+
+	return ""
+}
