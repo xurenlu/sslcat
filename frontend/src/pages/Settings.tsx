@@ -23,11 +23,28 @@ import {
   Alert,
   AlertIcon,
   AlertDescription,
+  Image,
+  PinInput,
+  PinInputField,
+  Divider,
+  Spinner,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  ModalCloseButton,
+  useDisclosure,
 } from '@chakra-ui/react'
 import {
   FiSettings,
   FiSave,
   FiRefreshCw,
+  FiShield,
+  FiKey,
+  FiCheck,
+  FiX,
 } from 'react-icons/fi'
 import { useConfig } from '../contexts/ConfigContext'
 import { useTranslation } from '../hooks/useLanguage'
@@ -116,6 +133,14 @@ const Settings: React.FC = () => {
   
   const [loading, setLoading] = useState(false)
   const toast = useToast()
+  
+  // TOTP 相关状态
+  const [totpEnabled, setTotpEnabled] = useState(false)
+  const [totpLoading, setTotpLoading] = useState(false)
+  const [totpQrCode, setTotpQrCode] = useState('')
+  const [totpSecret, setTotpSecret] = useState('')
+  const [totpVerifyCode, setTotpVerifyCode] = useState('')
+  const { isOpen: isTotpModalOpen, onOpen: onTotpModalOpen, onClose: onTotpModalClose } = useDisclosure()
 
   // 当adminPrefix变化时更新设置
   useEffect(() => {
@@ -124,6 +149,165 @@ const Settings: React.FC = () => {
       adminPrefix: adminPrefix,
     }))
   }, [adminPrefix])
+
+  // 加载 TOTP 状态
+  const loadTotpStatus = async () => {
+    try {
+      const response = await fetch(`${adminPrefix}/api/totp/status`, {
+        method: 'GET',
+        credentials: 'include',
+      })
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setTotpEnabled(data.enabled)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load TOTP status:', error)
+    }
+  }
+
+  // 生成 TOTP 二维码
+  const generateTotpQrCode = async () => {
+    setTotpLoading(true)
+    try {
+      const response = await fetch(`${adminPrefix}/api/totp/generate`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setTotpQrCode(data.qr_code)
+          setTotpSecret(data.secret)
+          onTotpModalOpen()
+        } else {
+          toast({
+            title: '生成二维码失败',
+            description: data.error,
+            status: 'error',
+            duration: TOAST_DURATION.SHORT,
+            isClosable: true,
+          })
+        }
+      }
+    } catch (error) {
+      toast({
+        title: '生成二维码失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: TOAST_DURATION.SHORT,
+        isClosable: true,
+      })
+    } finally {
+      setTotpLoading(false)
+    }
+  }
+
+  // 启用 TOTP
+  const enableTotp = async () => {
+    if (totpVerifyCode.length !== 6) {
+      toast({
+        title: '请输入 6 位验证码',
+        status: 'warning',
+        duration: TOAST_DURATION.SHORT,
+        isClosable: true,
+      })
+      return
+    }
+
+    setTotpLoading(true)
+    try {
+      const response = await fetch(`${adminPrefix}/api/totp/enable`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          secret: totpSecret,
+          code: totpVerifyCode,
+        }),
+      })
+      const data = await response.json()
+      if (data.success) {
+        setTotpEnabled(true)
+        onTotpModalClose()
+        setTotpVerifyCode('')
+        setTotpQrCode('')
+        setTotpSecret('')
+        toast({
+          title: 'TOTP 已启用',
+          description: '双因素认证已成功开启，登录时需要输入验证码',
+          status: 'success',
+          duration: TOAST_DURATION.SHORT,
+          isClosable: true,
+        })
+      } else {
+        toast({
+          title: '启用失败',
+          description: data.error || '验证码错误',
+          status: 'error',
+          duration: TOAST_DURATION.SHORT,
+          isClosable: true,
+        })
+        setTotpVerifyCode('')
+      }
+    } catch (error) {
+      toast({
+        title: '启用失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: TOAST_DURATION.SHORT,
+        isClosable: true,
+      })
+    } finally {
+      setTotpLoading(false)
+    }
+  }
+
+  // 禁用 TOTP
+  const disableTotp = async () => {
+    if (!confirm('确定要禁用 TOTP 双因素认证吗？这会降低账户安全性。')) {
+      return
+    }
+
+    setTotpLoading(true)
+    try {
+      const response = await fetch(`${adminPrefix}/api/totp/disable`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const data = await response.json()
+      if (data.success) {
+        setTotpEnabled(false)
+        toast({
+          title: 'TOTP 已禁用',
+          description: '双因素认证已关闭',
+          status: 'info',
+          duration: TOAST_DURATION.SHORT,
+          isClosable: true,
+        })
+      } else {
+        toast({
+          title: '禁用失败',
+          description: data.error,
+          status: 'error',
+          duration: TOAST_DURATION.SHORT,
+          isClosable: true,
+        })
+      }
+    } catch (error) {
+      toast({
+        title: '禁用失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: TOAST_DURATION.SHORT,
+        isClosable: true,
+      })
+    } finally {
+      setTotpLoading(false)
+    }
+  }
 
   // 加载基础配置（提取为独立方法）
   const loadBasicConfig = async () => {
@@ -226,7 +410,8 @@ const Settings: React.FC = () => {
       // 并行加载配置
       Promise.all([
         loadBasicConfig(),
-        loadNotificationConfig()
+        loadNotificationConfig(),
+        loadTotpStatus()
       ])
     }
   }, [adminPrefix])
@@ -673,6 +858,51 @@ const Settings: React.FC = () => {
                   placeholder="1000"
                   type="number"
                 />
+              </FormControl>
+
+              <Divider my={2} />
+
+              {/* TOTP 双因素认证 */}
+              <FormControl>
+                <FormLabel>
+                  <HStack>
+                    <Icon as={FiKey} />
+                    <Text>TOTP 双因素认证</Text>
+                    {totpEnabled ? (
+                      <Badge colorScheme="green">已启用</Badge>
+                    ) : (
+                      <Badge colorScheme="gray">未启用</Badge>
+                    )}
+                  </HStack>
+                </FormLabel>
+                <Text fontSize="sm" color="gray.600" mb={3}>
+                  使用 Google Authenticator、Authy 等应用生成一次性密码，增强登录安全性。
+                  {totpEnabled && ' 启用后，忘记密码时也可使用 TOTP 紧急登录。'}
+                </Text>
+                <HStack>
+                  {totpEnabled ? (
+                    <Button
+                      colorScheme="orange"
+                      variant="outline"
+                      size="sm"
+                      onClick={disableTotp}
+                      isLoading={totpLoading}
+                      leftIcon={<Icon as={FiX} />}
+                    >
+                      禁用 TOTP
+                    </Button>
+                  ) : (
+                    <Button
+                      colorScheme="green"
+                      size="sm"
+                      onClick={generateTotpQrCode}
+                      isLoading={totpLoading}
+                      leftIcon={<Icon as={FiShield} />}
+                    >
+                      启用 TOTP
+                    </Button>
+                  )}
+                </HStack>
               </FormControl>
             </VStack>
           </CardBody>
@@ -1277,6 +1507,85 @@ const Settings: React.FC = () => {
           </VStack>
         </CardBody>
       </Card>
+
+      {/* TOTP 设置模态框 */}
+      <Modal isOpen={isTotpModalOpen} onClose={onTotpModalClose} size="lg" isCentered>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>
+            <HStack>
+              <Icon as={FiShield} color="green.500" />
+              <Text>设置 TOTP 双因素认证</Text>
+            </HStack>
+          </ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={6} align="stretch">
+              <Alert status="info" borderRadius="md">
+                <AlertIcon />
+                <Box>
+                  <Text fontWeight="bold">步骤 1：扫描二维码</Text>
+                  <Text fontSize="sm">使用 Google Authenticator、Authy、Microsoft Authenticator 等应用扫描下方二维码</Text>
+                </Box>
+              </Alert>
+
+              {totpQrCode && (
+                <Box textAlign="center">
+                  <Image
+                    src={totpQrCode}
+                    alt="TOTP QR Code"
+                    mx="auto"
+                    borderRadius="md"
+                    border="1px solid"
+                    borderColor="gray.200"
+                  />
+                  <Text fontSize="xs" color="gray.500" mt={2}>
+                    密钥: {totpSecret}
+                  </Text>
+                </Box>
+              )}
+
+              <Divider />
+
+              <Box>
+                <Text fontWeight="bold" mb={3}>步骤 2：输入验证码</Text>
+                <Text fontSize="sm" color="gray.600" mb={3}>
+                  输入应用中显示的 6 位数字验证码以完成设置
+                </Text>
+                <HStack justify="center">
+                  <PinInput
+                    size="lg"
+                    value={totpVerifyCode}
+                    onChange={setTotpVerifyCode}
+                    isDisabled={totpLoading}
+                  >
+                    <PinInputField />
+                    <PinInputField />
+                    <PinInputField />
+                    <PinInputField />
+                    <PinInputField />
+                    <PinInputField />
+                  </PinInput>
+                </HStack>
+              </Box>
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onTotpModalClose}>
+              取消
+            </Button>
+            <Button
+              colorScheme="green"
+              onClick={enableTotp}
+              isLoading={totpLoading}
+              isDisabled={totpVerifyCode.length !== 6}
+              leftIcon={<Icon as={FiCheck} />}
+            >
+              启用 TOTP
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </Box>
   )
 }

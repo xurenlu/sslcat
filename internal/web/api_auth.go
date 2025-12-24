@@ -156,6 +156,93 @@ func (s *Server) handleAPIAuthLogout(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleAPIAuthTOTPLogin 处理仅 TOTP 登录（忘记密码时使用）
+func (s *Server) handleAPIAuthTOTPLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		TOTPCode string `json:"totp_code"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
+		return
+	}
+
+	// 检查 TOTP 是否已启用
+	if !s.config.Admin.EnableTOTP {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "TOTP is not enabled"})
+		return
+	}
+
+	// 验证 TOTP 码
+	if req.TOTPCode == "" || len(req.TOTPCode) != 6 {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid TOTP code format"})
+		return
+	}
+
+	if !s.verifyTOTP(req.TOTPCode) {
+		// 记录失败尝试
+		clientIP := s.getClientIP(r)
+		s.securityManager.LogAccess(clientIP, r.Header.Get("User-Agent"), r.URL.Path, false)
+		s.audit("totp_login_failed", clientIP)
+
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid TOTP code"})
+		return
+	}
+
+	// TOTP 验证成功，创建超级管理员会话
+	clientIP := s.getClientIP(r)
+	userAgent := r.Header.Get("User-Agent")
+	session, err := s.sessionManager.CreateSession(
+		s.config.Admin.Username,
+		RoleSuperAdmin,
+		clientIP,
+		userAgent,
+	)
+	if err != nil {
+		s.log.Errorf("创建会话失败: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "failed to create session"})
+		return
+	}
+
+	// 设置会话Cookie
+	s.sessionManager.SetSessionCookie(w, session.SessionID, r.TLS != nil)
+
+	// 记录用户操作日志
+	s.userManager.LogUserAction(
+		s.config.Admin.Username,
+		"totp_login_success",
+		"system",
+		"TOTP紧急登录成功（忘记密码）",
+		clientIP,
+		userAgent,
+	)
+
+	// 审计
+	s.audit("totp_login_success", s.config.Admin.Username)
+
+	s.log.Infof("TOTP紧急登录成功: %s (IP: %s)", s.config.Admin.Username, clientIP)
+
+	// 返回用户信息
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"user": map[string]interface{}{
+			"username": s.config.Admin.Username,
+			"role":     RoleSuperAdmin,
+		},
+	})
+}
+
 // handleAPIAuthMe 获取当前用户信息
 func (s *Server) handleAPIAuthMe(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {

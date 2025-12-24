@@ -3,6 +3,7 @@ package web
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"image/png"
 	"net/http"
@@ -168,4 +169,184 @@ func (s *Server) getEffectiveTOTPSecret() string {
 		}
 	}
 	return s.config.Admin.TOTPSecret
+}
+
+// handleAPITOTPStatus 获取 TOTP 状态
+func (s *Server) handleAPITOTPStatus(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]interface{}{
+		"success": true,
+		"enabled": s.config.Admin.EnableTOTP,
+	}
+	_ = json.NewEncoder(w).Encode(response)
+}
+
+// handleAPITOTPGenerate 生成新的 TOTP 密钥和二维码
+func (s *Server) handleAPITOTPGenerate(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 生成新的 TOTP 密钥
+	key, err := totp.Generate(totp.GenerateOpts{
+		Issuer:      "SSLcat",
+		AccountName: s.config.Admin.Username,
+	})
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Failed to generate TOTP key",
+		})
+		return
+	}
+
+	// 生成二维码
+	img, err := key.Image(200, 200)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Failed to generate QR code",
+		})
+		return
+	}
+
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Failed to encode QR code",
+		})
+		return
+	}
+
+	qrDataURL := "data:image/png;base64," + base64.StdEncoding.EncodeToString(buf.Bytes())
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":  true,
+		"secret":   key.Secret(),
+		"qr_code":  qrDataURL,
+		"issuer":   "SSLcat",
+		"account":  s.config.Admin.Username,
+	})
+}
+
+// handleAPITOTPEnable 启用 TOTP
+func (s *Server) handleAPITOTPEnable(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Secret string `json:"secret"`
+		Code   string `json:"code"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Invalid JSON",
+		})
+		return
+	}
+
+	if req.Secret == "" || req.Code == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Missing secret or code",
+		})
+		return
+	}
+
+	// 验证代码
+	if !totp.Validate(req.Code, req.Secret) {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Invalid TOTP code",
+		})
+		return
+	}
+
+	// 保存TOTP密钥到文件
+	if s.config.Admin.TOTPSecretFile != "" {
+		if err := os.WriteFile(s.config.Admin.TOTPSecretFile, []byte(req.Secret+"\n"), 0600); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": false,
+				"error":   "Failed to save TOTP secret: " + err.Error(),
+			})
+			return
+		}
+	}
+
+	// 保存配置
+	s.config.Admin.EnableTOTP = true
+	s.config.Admin.TOTPSecret = req.Secret
+	_ = s.config.Save(s.config.ConfigFile)
+
+	// 审计日志
+	clientIP := s.getClientIP(r)
+	s.audit("totp_enabled", clientIP)
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "TOTP enabled successfully",
+	})
+}
+
+// handleAPITOTPDisable 禁用 TOTP
+func (s *Server) handleAPITOTPDisable(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 禁用 TOTP
+	s.config.Admin.EnableTOTP = false
+	s.config.Admin.TOTPSecret = ""
+	// 删除TOTP密钥文件
+	if s.config.Admin.TOTPSecretFile != "" {
+		_ = os.Remove(s.config.Admin.TOTPSecretFile)
+	}
+	_ = s.config.Save(s.config.ConfigFile)
+
+	// 审计日志
+	clientIP := s.getClientIP(r)
+	s.audit("totp_disabled", clientIP)
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "TOTP disabled successfully",
+	})
 }

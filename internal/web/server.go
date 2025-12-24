@@ -845,9 +845,16 @@ func (s *Server) setupRoutes() {
 	// API路由
 	// 认证相关 API
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/auth/login", s.handleAPIAuthLogin)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/auth/totp-login", s.handleAPIAuthTOTPLogin) // 仅TOTP登录（忘记密码时使用）
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/auth/logout", s.handleAPIAuthLogout)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/auth/me", s.handleAPIAuthMe)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/auth/change-password", s.handleAPIChangePassword)
+
+	// TOTP 设置 API
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/totp/status", s.handleAPITOTPStatus)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/totp/generate", s.handleAPITOTPGenerate)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/totp/enable", s.handleAPITOTPEnable)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/totp/disable", s.handleAPITOTPDisable)
 
 	// 用户管理 API
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/users", s.handleAPIUsers)
