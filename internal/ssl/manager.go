@@ -11,6 +11,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"math/big"
 	"net"
@@ -2310,7 +2311,14 @@ func (m *Manager) performDNSChallenge(domain, providerName string) error {
 		// 等待挑战完成
 		_, err = client.WaitAuthorization(ctx, authz.URI)
 		if err != nil {
-			return fmt.Errorf("authorization failed: %w", err)
+			// 尝试提取 ACME 错误详情
+			errMsg := extractACMEErrorDetails(err)
+			m.sendProgressEvent(domain, CertProgressEvent{
+				Status:  "dns_verify_failed",
+				Message: fmt.Sprintf("Let's Encrypt 验证失败: %s", errMsg),
+				Error:   errMsg,
+			})
+			return fmt.Errorf("authorization failed: %s", errMsg)
 		}
 
 		m.sendProgressEvent(domain, CertProgressEvent{
@@ -2608,4 +2616,45 @@ func (m *Manager) sendProgressEvent(domain string, event CertProgressEvent) {
 			// 通道已满，跳过（避免阻塞）
 		}
 	}
+}
+
+// extractACMEErrorDetails 从 ACME 错误中提取详细信息
+func extractACMEErrorDetails(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	// 尝试提取 acme.Error 类型的详情
+	var acmeErr *acme.Error
+	if errors.As(err, &acmeErr) {
+		// ACME 错误包含类型、状态码和详细描述
+		details := fmt.Sprintf("[%s] %s", acmeErr.ProblemType, acmeErr.Detail)
+		if len(acmeErr.Subproblems) > 0 {
+			for _, sub := range acmeErr.Subproblems {
+				details += fmt.Sprintf(" | 子问题[%s]: %s", sub.Identifier.Value, sub.Detail)
+			}
+		}
+		return details
+	}
+
+	// 尝试提取 acme.AuthorizationError 类型的详情
+	var authzErr *acme.AuthorizationError
+	if errors.As(err, &authzErr) {
+		details := fmt.Sprintf("域名 %s 授权失败", authzErr.Identifier)
+		if authzErr.Errors != nil {
+			for _, e := range authzErr.Errors {
+				// Errors 中的元素可能是 *acme.Error
+				var subErr *acme.Error
+				if errors.As(e, &subErr) {
+					details += fmt.Sprintf(" | [%s] %s", subErr.ProblemType, subErr.Detail)
+				} else {
+					details += fmt.Sprintf(" | %s", e.Error())
+				}
+			}
+		}
+		return details
+	}
+
+	// 返回原始错误信息
+	return err.Error()
 }
