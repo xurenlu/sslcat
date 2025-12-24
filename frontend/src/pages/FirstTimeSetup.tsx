@@ -16,9 +16,19 @@ import {
   HStack,
   Heading,
   IconButton,
+  Image,
   Input,
   InputGroup,
   InputRightElement,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  ModalOverlay,
+  PinInput,
+  PinInputField,
   Progress,
   Step,
   StepDescription,
@@ -31,10 +41,11 @@ import {
   Stepper,
   Text,
   VStack,
+  useDisclosure,
   useSteps,
   useToast,
 } from '@chakra-ui/react'
-import { FiAlertCircle, FiCheck, FiEye, FiEyeOff, FiLock, FiMail } from 'react-icons/fi'
+import { FiAlertCircle, FiCheck, FiEye, FiEyeOff, FiKey, FiLock, FiMail, FiShield, FiSmartphone } from 'react-icons/fi'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
 import { useTranslation } from '../hooks/useLanguage'
 import { Translation } from '../i18n'
@@ -124,13 +135,29 @@ const FirstTimeSetup: React.FC = () => {
 
   const { activeStep, setActiveStep } = useSteps({
     index: 0,
-    count: 3,
+    count: 5,
   })
+
+  // TOTP 相关状态
+  const [totpEnabled, setTotpEnabled] = useState(false)
+  const [totpLoading, setTotpLoading] = useState(false)
+  const [totpQrCode, setTotpQrCode] = useState('')
+  const [totpSecret, setTotpSecret] = useState('')
+  const [totpVerifyCode, setTotpVerifyCode] = useState('')
+  const { isOpen: isTotpModalOpen, onOpen: onTotpModalOpen, onClose: onTotpModalClose } = useDisclosure()
+
+  // WebAuthn 相关状态
+  const [webauthnEnabled, setWebauthnEnabled] = useState(false)
+  const [webauthnLoading, setWebauthnLoading] = useState(false)
+  const [webauthnDeviceName, setWebauthnDeviceName] = useState('')
+  const { isOpen: isWebauthnModalOpen, onOpen: onWebauthnModalOpen, onClose: onWebauthnModalClose } = useDisclosure()
 
   const steps = [
     { title: t.setup.step1_title, description: t.setup.step1_desc },
     { title: t.setup.step2_title, description: t.setup.step2_desc },
     { title: t.setup.step3_title, description: t.setup.step3_desc },
+    { title: 'TOTP 双因素认证', description: '设置 TOTP 验证码' },
+    { title: '指纹/生物识别登录', description: '注册设备指纹识别' },
   ]
 
   const passwordMetrics = useMemo(() => computePasswordMetrics(newPassword, t), [newPassword, t])
@@ -221,6 +248,238 @@ const FirstTimeSetup: React.FC = () => {
     })
   }
 
+  // 生成 TOTP 二维码
+  const generateTotpQrCode = async () => {
+    setTotpLoading(true)
+    try {
+      const response = await fetch(buildApiPath(adminPrefix, '/api/totp/generate'), {
+        method: 'POST',
+        credentials: 'include',
+      })
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setTotpQrCode(data.qr_code)
+          setTotpSecret(data.secret)
+          onTotpModalOpen()
+        } else {
+          toast({
+            title: '生成二维码失败',
+            description: data.error,
+            status: 'error',
+            duration: 3000,
+            isClosable: true,
+          })
+        }
+      }
+    } catch (error) {
+      toast({
+        title: '生成二维码失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+    } finally {
+      setTotpLoading(false)
+    }
+  }
+
+  // 启用 TOTP
+  const enableTotp = async () => {
+    if (totpVerifyCode.length !== 6) {
+      toast({
+        title: '请输入 6 位验证码',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      })
+      return
+    }
+
+    setTotpLoading(true)
+    try {
+      const response = await fetch(buildApiPath(adminPrefix, '/api/totp/enable'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          secret: totpSecret,
+          code: totpVerifyCode,
+        }),
+      })
+      const data = await response.json()
+      if (data.success) {
+        setTotpEnabled(true)
+        onTotpModalClose()
+        setTotpVerifyCode('')
+        setTotpQrCode('')
+        setTotpSecret('')
+        toast({
+          title: 'TOTP 已启用',
+          description: '双因素认证已成功开启',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        })
+      } else {
+        toast({
+          title: '启用失败',
+          description: data.error || '验证码错误',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        })
+        setTotpVerifyCode('')
+      }
+    } catch (error) {
+      toast({
+        title: '启用失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+    } finally {
+      setTotpLoading(false)
+    }
+  }
+
+  // 开始 WebAuthn 注册
+  const beginWebauthnRegistration = async () => {
+    if (!webauthnDeviceName.trim()) {
+      toast({
+        title: '请输入设备名称',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      })
+      return
+    }
+
+    setWebauthnLoading(true)
+    try {
+      // 获取当前用户名
+      const meResponse = await fetch(buildApiPath(adminPrefix, '/api/auth/me'), {
+        credentials: 'include',
+      })
+      if (!meResponse.ok) {
+        throw new Error('获取用户信息失败')
+      }
+      const meData = await meResponse.json()
+      const username = meData.username
+
+      // 开始注册
+      const beginResponse = await fetch(buildApiPath(adminPrefix, '/api/webauthn/register/begin'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          username,
+          device_name: webauthnDeviceName,
+        }),
+      })
+
+      if (!beginResponse.ok) {
+        const errorData = await beginResponse.json()
+        throw new Error(errorData.error || '开始注册失败')
+      }
+
+      const beginData = await beginResponse.json()
+      if (!beginData.success) {
+        throw new Error(beginData.error || '开始注册失败')
+      }
+
+      // 辅助函数：将 Base64 URL 编码的字符串转换为 ArrayBuffer
+      const base64URLToArrayBuffer = (base64URL: string): ArrayBuffer => {
+        const base64 = base64URL.replace(/-/g, '+').replace(/_/g, '/')
+        const padded = base64 + '='.repeat((4 - base64.length % 4) % 4)
+        const binary = atob(padded)
+        const bytes = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i)
+        }
+        return bytes.buffer
+      }
+
+      // 调用浏览器 WebAuthn API
+      const publicKeyOptions = { ...beginData.options }
+      if (typeof publicKeyOptions.challenge === 'string') {
+        publicKeyOptions.challenge = base64URLToArrayBuffer(publicKeyOptions.challenge)
+      }
+      if (publicKeyOptions.user && typeof publicKeyOptions.user.id === 'string') {
+        publicKeyOptions.user.id = base64URLToArrayBuffer(publicKeyOptions.user.id)
+      }
+
+      const credential = await navigator.credentials.create({
+        publicKey: publicKeyOptions,
+      }) as PublicKeyCredential
+
+      // 准备响应数据
+      const response = credential.response as AuthenticatorAttestationResponse
+      const arrayBufferToBase64URL = (buffer: ArrayBuffer): string => {
+        const bytes = new Uint8Array(buffer)
+        let binary = ''
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i])
+        }
+        return btoa(binary)
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=/g, '')
+      }
+
+      const credentialResponse = {
+        id: credential.id,
+        rawId: arrayBufferToBase64URL(credential.rawId),
+        response: {
+          attestationObject: arrayBufferToBase64URL(response.attestationObject),
+          clientDataJSON: arrayBufferToBase64URL(response.clientDataJSON),
+        },
+        type: credential.type,
+      }
+
+      // 完成注册
+      const finishResponse = await fetch(buildApiPath(adminPrefix, '/api/webauthn/register/finish'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          session_key: beginData.session_key,
+          device_name: webauthnDeviceName,
+          response: credentialResponse,
+        }),
+      })
+
+      const finishData = await finishResponse.json()
+      if (finishData.success) {
+        const deviceName = webauthnDeviceName // 保存设备名称，因为后面会清空
+        setWebauthnEnabled(true)
+        onWebauthnModalClose()
+        setWebauthnDeviceName('')
+        toast({
+          title: 'WebAuthn 注册成功',
+          description: `设备 "${deviceName}" 已成功注册`,
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        })
+      } else {
+        throw new Error(finishData.error || '注册失败')
+      }
+    } catch (error) {
+      toast({
+        title: '注册失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+    } finally {
+      setWebauthnLoading(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     markAllTouched()
@@ -266,11 +525,14 @@ const FirstTimeSetup: React.FC = () => {
           duration: 3000,
         })
 
-        setActiveStep(2)
-
-        setTimeout(() => {
-          window.location.href = `${adminPrefix}/dashboard`
-        }, 1500)
+        // 如果用户还没有设置 TOTP 或 WebAuthn，提示他们设置
+        if (!totpEnabled || !webauthnEnabled) {
+          setActiveStep(3) // 跳转到安全设置步骤
+        } else {
+          setTimeout(() => {
+            window.location.href = `${adminPrefix}/dashboard`
+          }, 1500)
+        }
       } else {
         const error = (await response.text()) || t.setup.submit_error_unknown
         captureMessage(`first_time_setup_failed: ${error}`, 'error')
@@ -295,6 +557,14 @@ const FirstTimeSetup: React.FC = () => {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // 完成首次设置（包括安全设置）
+  const handleCompleteSetup = async () => {
+    // 如果用户已经设置了 TOTP 和 WebAuthn，或者选择跳过，则完成设置
+    setTimeout(() => {
+      window.location.href = `${adminPrefix}/dashboard`
+    }, 500)
   }
 
   return (
@@ -547,22 +817,265 @@ const FirstTimeSetup: React.FC = () => {
                 </CardBody>
               </Card>
 
+              {/* 步骤 4：TOTP 双因素认证（可选但强烈推荐） */}
+              <Card w="full">
+                <CardHeader bg="orange.50">
+                  <HStack>
+                    <FiKey />
+                    <Heading size="md">TOTP 双因素认证</Heading>
+                    {totpEnabled && (
+                      <Badge colorScheme="green" ml={2}>
+                        已设置
+                      </Badge>
+                    )}
+                  </HStack>
+                </CardHeader>
+                <CardBody>
+                  <VStack spacing={4}>
+                    <Alert status="warning">
+                      <AlertIcon />
+                      <Box>
+                        <Text fontWeight="bold">强烈推荐设置 TOTP 双因素认证</Text>
+                        <Text fontSize="sm">
+                          TOTP 双因素认证可以大幅提升账户安全性。即使密码泄露，攻击者也无法登录您的账户。
+                          忘记密码时，您也可以使用 TOTP 验证码进行紧急登录。
+                        </Text>
+                      </Box>
+                    </Alert>
+
+                    {totpEnabled ? (
+                      <Alert status="success">
+                        <AlertIcon />
+                        <Text>TOTP 双因素认证已成功设置</Text>
+                      </Alert>
+                    ) : (
+                      <Button
+                        colorScheme="orange"
+                        size="lg"
+                        w="full"
+                        onClick={generateTotpQrCode}
+                        isLoading={totpLoading}
+                        leftIcon={<FiKey />}
+                      >
+                        设置 TOTP 双因素认证
+                      </Button>
+                    )}
+                  </VStack>
+                </CardBody>
+              </Card>
+
+              {/* 步骤 5：WebAuthn 指纹识别（可选但强烈推荐） */}
+              <Card w="full">
+                <CardHeader bg="purple.50">
+                  <HStack>
+                    <FiSmartphone />
+                    <Heading size="md">指纹/生物识别登录</Heading>
+                    {webauthnEnabled && (
+                      <Badge colorScheme="green" ml={2}>
+                        已设置
+                      </Badge>
+                    )}
+                  </HStack>
+                </CardHeader>
+                <CardBody>
+                  <VStack spacing={4}>
+                    <Alert status="warning">
+                      <AlertIcon />
+                      <Box>
+                        <Text fontWeight="bold">强烈推荐设置指纹/生物识别登录</Text>
+                        <Text fontSize="sm">
+                          指纹/生物识别登录是最便捷且安全的登录方式。设置后，您可以使用设备的生物识别功能（指纹、面容等）快速登录，无需输入密码。
+                        </Text>
+                      </Box>
+                    </Alert>
+
+                    {webauthnEnabled ? (
+                      <Alert status="success">
+                        <AlertIcon />
+                        <Text>指纹识别登录已成功设置</Text>
+                      </Alert>
+                    ) : (
+                      <Button
+                        colorScheme="purple"
+                        size="lg"
+                        w="full"
+                        onClick={onWebauthnModalOpen}
+                        isLoading={webauthnLoading}
+                        leftIcon={<FiSmartphone />}
+                      >
+                        设置指纹识别登录
+                      </Button>
+                    )}
+                  </VStack>
+                </CardBody>
+              </Card>
+
               {/* 提交按钮 */}
-              <HStack w="full" justify="flex-end">
-                <Button
-                  type="submit"
-                  colorScheme="blue"
-                  size="lg"
-                  isLoading={isLoading}
-                  isDisabled={!canSubmit || isLoading}
-                  loadingText={t.setup.loading}
-                  leftIcon={<FiCheck />}
-                >
-                  {t.setup.submit_button}
-                </Button>
+              <HStack w="full" justify="space-between">
+                {activeStep >= 3 && (
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={() => {
+                      // 如果用户已经设置了基本配置，允许跳过安全设置
+                      if (newPasswordValid && adminEmailValid) {
+                        handleCompleteSetup()
+                      }
+                    }}
+                    isDisabled={isLoading}
+                  >
+                    跳过安全设置（不推荐）
+                  </Button>
+                )}
+                <HStack>
+                  {activeStep < 3 ? (
+                    <Button
+                      type="submit"
+                      colorScheme="blue"
+                      size="lg"
+                      isLoading={isLoading}
+                      isDisabled={!canSubmit || isLoading}
+                      loadingText={t.setup.loading}
+                      leftIcon={<FiCheck />}
+                    >
+                      {t.setup.submit_button}
+                    </Button>
+                  ) : (
+                    <Button
+                      colorScheme="green"
+                      size="lg"
+                      onClick={handleCompleteSetup}
+                      isDisabled={isLoading}
+                      leftIcon={<FiCheck />}
+                    >
+                      完成设置
+                    </Button>
+                  )}
+                </HStack>
               </HStack>
             </VStack>
           </form>
+
+          {/* TOTP 设置模态框 */}
+          <Modal isOpen={isTotpModalOpen} onClose={onTotpModalClose} size="md">
+            <ModalOverlay />
+            <ModalContent>
+              <ModalHeader>设置 TOTP 双因素认证</ModalHeader>
+              <ModalCloseButton />
+              <ModalBody>
+                <VStack spacing={4}>
+                  <Alert status="info">
+                    <AlertIcon />
+                    <Box>
+                      <Text fontSize="sm" fontWeight="bold">
+                        请使用手机应用扫描二维码
+                      </Text>
+                      <Text fontSize="xs">
+                        推荐使用 Google Authenticator、Microsoft Authenticator 或 Authy 等应用
+                      </Text>
+                    </Box>
+                  </Alert>
+
+                  {totpQrCode && (
+                    <Box textAlign="center">
+                      <Image
+                        src={totpQrCode}
+                        alt="TOTP QR Code"
+                        mx="auto"
+                        borderRadius="md"
+                        border="1px solid"
+                        borderColor="gray.200"
+                      />
+                      <Text fontSize="xs" color="gray.500" mt={2}>
+                        密钥: {totpSecret}
+                      </Text>
+                    </Box>
+                  )}
+
+                  <Box w="full">
+                    <Text fontSize="sm" mb={2} textAlign="center">
+                      输入应用中显示的 6 位数字验证码以完成设置
+                    </Text>
+                    <HStack justify="center">
+                      <PinInput
+                        size="lg"
+                        value={totpVerifyCode}
+                        onChange={setTotpVerifyCode}
+                        isDisabled={totpLoading}
+                      >
+                        <PinInputField />
+                        <PinInputField />
+                        <PinInputField />
+                        <PinInputField />
+                        <PinInputField />
+                        <PinInputField />
+                      </PinInput>
+                    </HStack>
+                  </Box>
+                </VStack>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="ghost" mr={3} onClick={onTotpModalClose}>
+                  取消
+                </Button>
+                <Button
+                  colorScheme="blue"
+                  onClick={enableTotp}
+                  isLoading={totpLoading}
+                  isDisabled={totpVerifyCode.length !== 6}
+                >
+                  确认启用
+                </Button>
+              </ModalFooter>
+            </ModalContent>
+          </Modal>
+
+          {/* WebAuthn 设置模态框 */}
+          <Modal isOpen={isWebauthnModalOpen} onClose={onWebauthnModalClose} size="md">
+            <ModalOverlay />
+            <ModalContent>
+              <ModalHeader>设置指纹识别登录</ModalHeader>
+              <ModalCloseButton />
+              <ModalBody>
+                <VStack spacing={4}>
+                  <Alert status="info">
+                    <AlertIcon />
+                    <Box>
+                      <Text fontSize="sm" fontWeight="bold">
+                        请为您的设备命名
+                      </Text>
+                      <Text fontSize="xs">
+                        例如：MacBook Pro、iPhone 13、Windows PC 等
+                      </Text>
+                    </Box>
+                  </Alert>
+
+                  <FormControl>
+                    <FormLabel>设备名称</FormLabel>
+                    <Input
+                      value={webauthnDeviceName}
+                      onChange={(e) => setWebauthnDeviceName(e.target.value)}
+                      placeholder="例如：MacBook Pro"
+                      size="lg"
+                    />
+                  </FormControl>
+                </VStack>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="ghost" mr={3} onClick={onWebauthnModalClose}>
+                  取消
+                </Button>
+                <Button
+                  colorScheme="purple"
+                  onClick={beginWebauthnRegistration}
+                  isLoading={webauthnLoading}
+                  isDisabled={!webauthnDeviceName.trim()}
+                >
+                  开始注册
+                </Button>
+              </ModalFooter>
+            </ModalContent>
+          </Modal>
         </VStack>
       </Box>
     </Box>

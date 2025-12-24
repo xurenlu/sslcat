@@ -17,6 +17,14 @@ type WatchdogMonitorOptions struct {
 	CPUIncreaseThresholdPercent float64
 	CPUIncreaseWindow           time.Duration
 	AlertCooldown               time.Duration
+	// 内存监控选项
+	MemoryThresholdMB           int64   // 内存绝对阈值（MB）
+	MemoryThresholdPercent      float64 // 内存占用百分比阈值
+	MemoryIncreaseThresholdMB   int64   // 内存增长阈值（MB）
+	MemoryIncreaseWindow        time.Duration
+	// 自动退出选项
+	ExitOnMemoryThreshold       bool  // 达到内存阈值时自动退出
+	ExitOnCPUThreshold          bool  // 达到CPU阈值时自动退出
 }
 
 func (o WatchdogMonitorOptions) normalize() WatchdogMonitorOptions {

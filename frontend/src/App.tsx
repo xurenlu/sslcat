@@ -65,11 +65,8 @@ const AppRoutes: React.FC = () => {
       
       {/* 登录和首次设置页面不需要认证 */}
       <Route path={`${adminPrefix}/login`} element={<Login />} />
-      <Route path={`${adminPrefix}/settings/first-setup`} element={
-        <AuthGuard>
-          <FirstTimeSetup />
-        </AuthGuard>
-      } />
+      {/* 首次设置页面：后端已检查认证，前端直接渲染 */}
+      <Route path={`${adminPrefix}/settings/first-setup`} element={<FirstTimeSetup />} />
       
       {/* 所有其他页面都需要认证和 Layout */}
       <Route path={`${adminPrefix}/`} element={

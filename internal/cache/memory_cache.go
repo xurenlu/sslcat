@@ -41,15 +41,15 @@ type MemoryCacheConfig struct {
 	CleanupInterval time.Duration // 清理间隔
 }
 
-// DefaultMemoryCacheConfig 默认配置
+// DefaultMemoryCacheConfig 默认配置（资源受限模式）
 func DefaultMemoryCacheConfig(name string) *MemoryCacheConfig {
 	return &MemoryCacheConfig{
 		Name:            name,
-		MaxEntries:      1000,             // 增加到1000，BigCache性能更好
-		MaxSizeBytes:    25 * 1024 * 1024, // 25MB (从50MB减半)
-		MaxItemSize:     5 * 1024 * 1024,  // 5MB (从10MB减半)
-		DefaultTTL:      24 * time.Hour,   // 24小时
-		CleanupInterval: 5 * time.Minute,  // 5分钟清理一次
+		MaxEntries:      200,             // 从1000减少到200，降低内存占用
+		MaxSizeBytes:    5 * 1024 * 1024, // 5MB（从25MB大幅减少）
+		MaxItemSize:     1 * 1024 * 1024, // 1MB（从5MB减少）
+		DefaultTTL:      24 * time.Hour,  // 24小时
+		CleanupInterval: 5 * time.Minute, // 5分钟清理一次
 	}
 }
 

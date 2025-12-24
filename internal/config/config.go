@@ -813,12 +813,12 @@ func Load(configFile string) (*Config, error) {
 			PortMode:             "standard", // 默认标准模式
 			CustomPort:           8080,       // 默认自定义端口
 			EnableHTTPS:          true,       // 默认启用 HTTPS
-			AccessLogEnabled:     true,
-			AccessLogFormat:      "nginx",
-			AccessLogPath:        "./data/access.log",
-			AccessLogMaxSize:     100 * 1024 * 1024,
-			AccessLogMaxFiles:    10,
-			SharedCacheMaxSizeMB: 64,
+		AccessLogEnabled:     true,
+		AccessLogFormat:      "nginx",
+		AccessLogPath:        "./data/access.log",
+		AccessLogMaxSize:     100 * 1024 * 1024,
+		AccessLogMaxFiles:    10,
+		SharedCacheMaxSizeMB: 10, // 从64MB降低到10MB（资源受限模式）
 			ReadTimeoutSec:       1800,     // 30分钟
 			WriteTimeoutSec:      1800,     // 30分钟
 			IdleTimeoutSec:       120,      // 2分钟（可调）
@@ -925,21 +925,21 @@ func Load(configFile string) (*Config, error) {
 				CleanupInterval: 7200, // 2小时
 			},
 		},
-		UpstreamCache: UpstreamCacheConfig{
-			Enabled:         true,
-			CacheDir:        "./data/upstream-cache",
-			MaxSizeBytes:    1024 * 1024 * 1024, // 1GB
-			DefaultTTL:      1 * time.Hour,      // 1小时
-			RespectUpstream: true,
-			MinFileSize:     1024,              // 1KB
-			MaxFileSize:     100 * 1024 * 1024, // 100MB
-			CacheableTypes: []string{
-				"image/jpeg", "image/png", "image/gif", "image/webp",
-				"text/css", "text/javascript", "application/javascript",
-				"font/woff", "font/woff2", "application/font-woff",
-				"video/mp4", "audio/mpeg",
-			},
+	UpstreamCache: UpstreamCacheConfig{
+		Enabled:         false,              // 默认禁用，减少内存占用
+		CacheDir:        "./data/upstream-cache",
+		MaxSizeBytes:    50 * 1024 * 1024,  // 从1GB降低到50MB（资源受限模式）
+		DefaultTTL:      1 * time.Hour,     // 1小时
+		RespectUpstream: true,
+		MinFileSize:     1024,              // 1KB
+		MaxFileSize:     10 * 1024 * 1024,  // 从100MB降低到10MB
+		CacheableTypes: []string{
+			"image/jpeg", "image/png", "image/gif", "image/webp",
+			"text/css", "text/javascript", "application/javascript",
+			"font/woff", "font/woff2", "application/font-woff",
+			"video/mp4", "audio/mpeg",
 		},
+	},
 		Monitoring: MonitoringConfig{
 			Enabled:                  true, // 默认启用监控
 			MemoryMaxUsagePercent:    20.0, // 默认20%
@@ -2455,6 +2455,14 @@ type MonitoringConfig struct {
 	WatchdogCPUIncreaseThresholdPercent float64 `json:"watchdog_cpu_increase_threshold_percent"` // CPU增长阈值（默认15%）
 	WatchdogCPUIncreaseWindowSec        int     `json:"watchdog_cpu_increase_window_sec"`        // 增长检测时间窗口（默认180秒，即3分钟）
 	WatchdogAlertCooldownSec            int     `json:"watchdog_alert_cooldown_sec"`             // 报警冷却时间（默认3600秒，即1小时）
+	// 内存监控配置
+	WatchdogMemoryThresholdMB         int64   `json:"watchdog_memory_threshold_mb"`          // 内存绝对阈值（MB，0表示禁用）
+	WatchdogMemoryThresholdPercent    float64 `json:"watchdog_memory_threshold_percent"`     // 内存占用百分比阈值（0表示禁用）
+	WatchdogMemoryIncreaseThresholdMB int64   `json:"watchdog_memory_increase_threshold_mb"` // 内存增长阈值（MB，0表示禁用）
+	WatchdogMemoryIncreaseWindowSec   int     `json:"watchdog_memory_increase_window_sec"`   // 内存增长检测窗口（秒）
+	// 自动退出配置
+	WatchdogExitOnMemoryThreshold bool `json:"watchdog_exit_on_memory_threshold"` // 达到内存阈值时自动退出（由systemd重启）
+	WatchdogExitOnCPUThreshold    bool `json:"watchdog_exit_on_cpu_threshold"`    // 达到CPU阈值时自动退出（由systemd重启）
 }
 
 // CacheWarmupConfig 缓存预热配置

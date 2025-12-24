@@ -140,20 +140,21 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	compressor := compression.NewCompressor(compression.FromConfig(cfg))
 
 	// 创建共享的内存缓存实例（合并压缩缓存和图片优化缓存）
+	// 默认值从64MB降低到10MB，减少资源受限环境的内存占用
 	sharedCacheSizeMB := cfg.Server.SharedCacheMaxSizeMB
 	if sharedCacheSizeMB <= 0 {
-		sharedCacheSizeMB = 64
+		sharedCacheSizeMB = 10 // 从64MB降低到10MB
 	}
-	if sharedCacheSizeMB < 8 {
-		sharedCacheSizeMB = 8
+	if sharedCacheSizeMB < 5 {
+		sharedCacheSizeMB = 5 // 最小5MB
 	}
 	maxSharedCacheBytes := int64(sharedCacheSizeMB) * 1024 * 1024
 
 	sharedCache := cache.NewMemoryCache(&cache.MemoryCacheConfig{
 		Name:            "shared_cache",
-		MaxEntries:      400, // 压缩200 + 图片200
+		MaxEntries:      100, // 从400降低到100
 		MaxSizeBytes:    maxSharedCacheBytes,
-		MaxItemSize:     2 * 1024 * 1024, // 2MB
+		MaxItemSize:     1 * 1024 * 1024, // 从2MB降低到1MB
 		DefaultTTL:      24 * time.Hour,  // 24小时
 		CleanupInterval: 5 * time.Minute, // 统一使用5分钟清理间隔
 	})
@@ -220,7 +221,7 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		imageOptConfig.CacheTTL = 86400
 	}
 	if imageOptConfig.MaxCacheSize == 0 {
-		imageOptConfig.MaxCacheSize = 200 * 1024 * 1024 // 从1GB减少到200MB
+		imageOptConfig.MaxCacheSize = 20 * 1024 * 1024 // 从200MB降低到20MB（资源受限模式）
 	}
 	// 使用共享缓存实例创建图片优化器
 	imageOptimizer := imageopt.NewOptimizerWithCache(imageOptConfig, sharedCache)
@@ -332,18 +333,18 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	if net.ParseIP(rpID) != nil {
 		rpID = "localhost"
 	}
-	
+
 	// 确定 RPOrigin
 	port := 8080
 	if cfg.Server.PortMode == "custom" && cfg.Server.CustomPort != 0 {
 		port = cfg.Server.CustomPort
 	}
-	
+
 	protocol := "http"
 	if cfg.Server.EnableHTTPS || port == 443 {
 		protocol = "https"
 	}
-	
+
 	// 构建 RPOrigin（标准端口不需要显示端口号）
 	var rpOrigin string
 	if (protocol == "http" && port == 80) || (protocol == "https" && port == 443) {
@@ -351,7 +352,7 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	} else {
 		rpOrigin = fmt.Sprintf("%s://%s:%d", protocol, rpID, port)
 	}
-	
+
 	webauthnManager, err := NewWebAuthnManager(
 		server.log.WithField("component", "webauthn"),
 		dataDir,
@@ -1232,22 +1233,22 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// 若通过IP访问且存在可用的LE域名，强制跳转到 https://域名 + AdminPrefix（仅限管理面板路径或根）
 	// 但排除 localhost/127.0.0.1，这些用于内部 API 调用
 	/*
-	host := r.Host
-	hostOnly := host
-	if idx := strings.Index(host, ":"); idx != -1 {
-		hostOnly = host[:idx]
-	}
-	if net.ParseIP(hostOnly) != nil {
-		// 检查是否为 localhost/127.0.0.1，这些不应该重定向
-		isLocalhost := hostOnly == "127.0.0.1" || hostOnly == "::1" || hostOnly == "localhost"
-
-		// 仅当访问管理面板路径时才重定向（但排除 localhost）
-		if !isLocalhost && s.leRedirectHost != "" && strings.HasPrefix(r.URL.Path, s.config.AdminPrefix) {
-			target := "https://" + s.leRedirectHost + r.RequestURI
-			http.Redirect(wrappedWriter, r, target, http.StatusMovedPermanently)
-			return
+		host := r.Host
+		hostOnly := host
+		if idx := strings.Index(host, ":"); idx != -1 {
+			hostOnly = host[:idx]
 		}
-	}
+		if net.ParseIP(hostOnly) != nil {
+			// 检查是否为 localhost/127.0.0.1，这些不应该重定向
+			isLocalhost := hostOnly == "127.0.0.1" || hostOnly == "::1" || hostOnly == "localhost"
+
+			// 仅当访问管理面板路径时才重定向（但排除 localhost）
+			if !isLocalhost && s.leRedirectHost != "" && strings.HasPrefix(r.URL.Path, s.config.AdminPrefix) {
+				target := "https://" + s.leRedirectHost + r.RequestURI
+				http.Redirect(wrappedWriter, r, target, http.StatusMovedPermanently)
+				return
+			}
+		}
 	*/
 
 	// 语言切换：如果存在 ?lang= 参数，则设置 cookie 并重定向到去掉 lang 的同一路径

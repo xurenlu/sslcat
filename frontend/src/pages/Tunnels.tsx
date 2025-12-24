@@ -780,104 +780,106 @@ const Tunnels: React.FC = () => {
 									{provider.tunnels.length} tunnels
 								</Text>
 								<Divider />
-								<Table variant="simple" size="sm">
-									<Thead>
-										<Tr>
-											<Th>{texts.providerName}</Th>
-											<Th>{texts.protocol}</Th>
-											<Th>{texts.localAddress}</Th>
-											<Th>{texts.publicHostname}</Th>
-											<Th>{texts.status}</Th>
-											<Th>{texts.lastUpdated}</Th>
-											<Th textAlign="right">{texts.actions}</Th>
-										</Tr>
-									</Thead>
-								<Tbody>
-									{provider.tunnels.map((tunnel) => (
-										<Tr key={tunnel.id}>
-											<Td>{tunnel.name}</Td>
-											<Td textTransform="uppercase">{tunnel.protocol}</Td>
-											<Td>{`${tunnel.local_address}:${tunnel.local_port}`}</Td>
-											<Td>
-												{tunnel.public_hostname ? `${tunnel.public_hostname}${tunnel.public_port ? `:${tunnel.public_port}` : ''}` : '--'}
-											</Td>
-											<Td>
-												<VStack align="start" spacing={1}>
-													{renderStatusBadge(tunnel.status)}
-													{tunnel.last_error && (
-														<Tooltip label={tunnel.last_error} placement="top-start">
-															<Text fontSize="xs" color="red.500" maxW="240px" isTruncated>
-																{texts.lastError}: {tunnel.last_error}
-															</Text>
-														</Tooltip>
-													)}
-													{typeof tunnel.pid === 'number' && tunnel.pid > 0 && (
-														<Text fontSize="xs" color="gray.500">
-															{texts.pid}: {tunnel.pid}
-														</Text>
-													)}
-													<Text fontSize="xs" color="gray.500">
-														{texts.restartCount}: {tunnel.restart_count ?? 0}
-													</Text>
-													{tunnel.last_started_at && (
-														<Text fontSize="xs" color="gray.500">
-															{texts.lastStarted}: {formatDateTime(tunnel.last_started_at)}
-														</Text>
-													)}
-													{tunnel.last_stopped_at && (
-														<Text fontSize="xs" color="gray.500">
-															{texts.lastStopped}: {formatDateTime(tunnel.last_stopped_at)}
-														</Text>
-													)}
-													{tunnel.log_path && (
-														<HStack spacing={1} maxW="240px">
-															<Tooltip label={tunnel.log_path} placement="top-start">
-																<Text fontSize="xs" color="gray.500" flex="1" isTruncated>
-																	{texts.logFile}: {extractFileName(tunnel.log_path)}
+								<Box overflowX="auto" w="100%">
+									<Table variant="simple" size="sm" minW="1000px">
+										<Thead>
+											<Tr>
+												<Th minW="120px">{texts.providerName}</Th>
+												<Th minW="80px">{texts.protocol}</Th>
+												<Th minW="140px">{texts.localAddress}</Th>
+												<Th minW="180px">{texts.publicHostname}</Th>
+												<Th minW="280px">{texts.status}</Th>
+												<Th minW="160px">{texts.lastUpdated}</Th>
+												<Th textAlign="right" minW="140px">{texts.actions}</Th>
+											</Tr>
+										</Thead>
+									<Tbody>
+										{provider.tunnels.map((tunnel) => (
+											<Tr key={tunnel.id}>
+												<Td>{tunnel.name}</Td>
+												<Td textTransform="uppercase">{tunnel.protocol}</Td>
+												<Td>{`${tunnel.local_address}:${tunnel.local_port}`}</Td>
+												<Td>
+													{tunnel.public_hostname ? `${tunnel.public_hostname}${tunnel.public_port ? `:${tunnel.public_port}` : ''}` : '--'}
+												</Td>
+												<Td>
+													<VStack align="start" spacing={1}>
+														{renderStatusBadge(tunnel.status)}
+														{tunnel.last_error && (
+															<Tooltip label={tunnel.last_error} placement="top-start">
+																<Text fontSize="xs" color="red.500" maxW="240px" isTruncated>
+																	{texts.lastError}: {tunnel.last_error}
 																</Text>
 															</Tooltip>
-															<IconButton
-																aria-label={texts.copyLogPath}
-																icon={<FiCopy />}
-																size="xs"
-																variant="ghost"
-																onClick={() => handleCopyLogPath(tunnel.log_path!)}
-															/>
-														</HStack>
-													)}
-												</VStack>
-											</Td>
-											<Td>{formatDateTime(tunnel.updated_at)}</Td>
-											<Td textAlign="right">
-												<HStack justify="flex-end" spacing={2}>
-													<IconButton
-														aria-label={tunnel.status === 'connected' ? texts.stopTunnel : texts.startTunnel}
-														icon={tunnel.status === 'connected' ? <FiStopCircle /> : <FiPlay />}
-														colorScheme={tunnel.status === 'connected' ? 'red' : 'green'}
-														size="sm"
-														isLoading={actioningTunnel === tunnel.id}
-														onClick={() => handleTunnelAction(tunnel.status === 'connected' ? 'stop' : 'start', provider, tunnel)}
-													/>
-													<IconButton
-														aria-label="edit-tunnel"
-														icon={<FiEdit />}
-														size="sm"
-														onClick={() => handleEditTunnel(provider, tunnel)}
-													/>
-													<IconButton
-														aria-label="delete-tunnel"
-														icon={<FiTrash2 />}
-														size="sm"
-														colorScheme="red"
-														isLoading={deletingTarget === tunnel.id}
-														onClick={() => handleDeleteTunnel(provider, tunnel)}
-													/>
-												</HStack>
-											</Td>
-										</Tr>
-									))}
-								</Tbody>
-								</Table>
+														)}
+														{typeof tunnel.pid === 'number' && tunnel.pid > 0 && (
+															<Text fontSize="xs" color="gray.500">
+																{texts.pid}: {tunnel.pid}
+															</Text>
+														)}
+														<Text fontSize="xs" color="gray.500">
+															{texts.restartCount}: {tunnel.restart_count ?? 0}
+														</Text>
+														{tunnel.last_started_at && (
+															<Text fontSize="xs" color="gray.500">
+																{texts.lastStarted}: {formatDateTime(tunnel.last_started_at)}
+															</Text>
+														)}
+														{tunnel.last_stopped_at && (
+															<Text fontSize="xs" color="gray.500">
+																{texts.lastStopped}: {formatDateTime(tunnel.last_stopped_at)}
+															</Text>
+														)}
+														{tunnel.log_path && (
+															<HStack spacing={1} maxW="240px">
+																<Tooltip label={tunnel.log_path} placement="top-start">
+																	<Text fontSize="xs" color="gray.500" flex="1" isTruncated>
+																		{texts.logFile}: {extractFileName(tunnel.log_path)}
+																	</Text>
+																</Tooltip>
+																<IconButton
+																	aria-label={texts.copyLogPath}
+																	icon={<FiCopy />}
+																	size="xs"
+																	variant="ghost"
+																	onClick={() => handleCopyLogPath(tunnel.log_path!)}
+																/>
+															</HStack>
+														)}
+													</VStack>
+												</Td>
+												<Td>{formatDateTime(tunnel.updated_at)}</Td>
+												<Td textAlign="right">
+													<HStack justify="flex-end" spacing={2}>
+														<IconButton
+															aria-label={tunnel.status === 'connected' ? texts.stopTunnel : texts.startTunnel}
+															icon={tunnel.status === 'connected' ? <FiStopCircle /> : <FiPlay />}
+															colorScheme={tunnel.status === 'connected' ? 'red' : 'green'}
+															size="sm"
+															isLoading={actioningTunnel === tunnel.id}
+															onClick={() => handleTunnelAction(tunnel.status === 'connected' ? 'stop' : 'start', provider, tunnel)}
+														/>
+														<IconButton
+															aria-label="edit-tunnel"
+															icon={<FiEdit />}
+															size="sm"
+															onClick={() => handleEditTunnel(provider, tunnel)}
+														/>
+														<IconButton
+															aria-label="delete-tunnel"
+															icon={<FiTrash2 />}
+															size="sm"
+															colorScheme="red"
+															isLoading={deletingTarget === tunnel.id}
+															onClick={() => handleDeleteTunnel(provider, tunnel)}
+														/>
+													</HStack>
+												</Td>
+											</Tr>
+										))}
+									</Tbody>
+									</Table>
+								</Box>
 							</VStack>
 						</CardBody>
 					</Card>

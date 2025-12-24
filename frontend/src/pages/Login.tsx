@@ -20,12 +20,13 @@ import {
   IconButton,
   InputGroup,
   InputLeftElement,
+  InputRightElement,
   PinInput,
   PinInputField,
   Divider,
   Link,
 } from '@chakra-ui/react'
-import { FiShield, FiUser, FiLock, FiRefreshCw, FiSmartphone, FiKey } from 'react-icons/fi'
+import { FiShield, FiUser, FiLock, FiRefreshCw, FiSmartphone, FiKey, FiEye, FiEyeOff } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
@@ -41,6 +42,7 @@ interface SystemConfig {
 const Login: React.FC = () => {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false) // 控制密码显示/隐藏
   const [totpCode, setTotpCode] = useState('')
   const [captchaText, setCaptchaText] = useState('')
   const [captchaSessionId, setCaptchaSessionId] = useState('')
@@ -573,13 +575,24 @@ const Login: React.FC = () => {
                           <FiLock color="gray" />
                         </InputLeftElement>
                         <Input
-                          type="password"
+                          type={showPassword ? 'text' : 'password'}
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           placeholder={t.login.password_placeholder}
                           size="lg"
                           isDisabled={isLoading}
+                          pr="4.5rem"
                         />
+                        <InputRightElement width="4.5rem" h="full">
+                          <IconButton
+                            aria-label={showPassword ? '隐藏密码' : '显示密码'}
+                            icon={showPassword ? <FiEyeOff /> : <FiEye />}
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowPassword(!showPassword)}
+                            isDisabled={isLoading}
+                          />
+                        </InputRightElement>
                       </InputGroup>
                     </FormControl>
 
