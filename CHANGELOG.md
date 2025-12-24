@@ -5,6 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.28-rc1] - 2025-12-24
+
+### 🎉 重大架构变更
+
+#### 完全迁移到 React SPA
+- **移除 Go HTML 模板**: 删除所有 Go HTML 模板文件和相关代码，统一使用 React SPA 架构
+  - 删除 `internal/assets/templates/login.html` 等模板文件
+  - 移除 `TemplateRenderer` 组件和相关渲染逻辑
+  - 简化后端代码，移除模板相关的路由和处理函数
+  - 统一前后端架构，提升代码可维护性
+
+### ✨ 登录页面改进
+
+#### 用户体验优化
+- **密码显示/隐藏功能**: 在密码输入框右侧添加眼睛图标，点击可切换显示/隐藏密码
+  - 使用 `FiEye` 和 `FiEyeOff` 图标提供直观的视觉反馈
+  - 支持键盘操作，提升可访问性
+- **修复配置访问问题**: 解决登录页面无法访问系统配置导致 TOTP 和 WebAuthn 登录入口不显示的问题
+  - 创建 `/api/settings/public` 公开 API 端点，无需认证即可访问登录页面需要的配置
+  - 修复登录页面无法显示 TOTP 和 WebAuthn 登录入口的问题
+  - 确保登录页面能正确读取 `totp_enabled` 和 `webauthn_enabled` 配置
+
+#### WebAuthn 登录修复
+- **修复 challenge 字段转换问题**: 修复 WebAuthn 登录时 challenge 字段无法正确转换为 ArrayBuffer 的问题
+  - 添加详细的调试日志用于排查问题
+  - 前端使用 Base64 URL 编码符合 WebAuthn 规范
+  - 确保 WebAuthn 登录流程正常工作
+
+### 🛠️ 技术改进
+
+#### 代码清理
+- **移除冗余代码**: 删除不再使用的模板渲染相关代码
+  - 移除 `internal/web/templates.go` 文件
+  - 移除 `internal/assets/embed.go` 中的模板相关嵌入代码
+  - 简化后端路由注册逻辑
+
+#### API 优化
+- **公开 API 端点**: 新增 `/api/settings/public` 端点，专门为登录页面提供配置信息
+  - 无需认证即可访问，解决登录页面的配置读取问题
+  - 只返回必要的公开配置信息，保证安全性
+
+### 📝 代码质量
+
+#### 架构统一
+- **前后端分离**: 完全采用前后端分离架构，提升代码组织性
+- **类型安全**: 完善 TypeScript 类型定义，确保类型安全
+- **代码简化**: 移除重复的模板代码，减少维护成本
+
+---
+
 ## [1.3.27-rc2] - 2025-12-23
 
 ### 🐛 Bug 修复
