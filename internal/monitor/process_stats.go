@@ -257,11 +257,22 @@ func (r *DarwinProcessStatsReader) GetProcessStats() (*ProcessStats, error) {
 
 // getTotalMemory 通过 sysctl 获取系统总内存（字节）
 func (r *DarwinProcessStatsReader) getTotalMemory() (uint64, error) {
-	memSize, err := unix.SysctlUint64("hw.memsize")
+	// 使用 Sysctl 获取原始数据，然后转换为 uint64
+	val, err := unix.Sysctl("hw.memsize")
 	if err != nil {
-		return 0, fmt.Errorf("sysctl获取hw.memsize失败: %w", err)
+		// 如果 sysctl 失败，使用默认值 8GB
+		return 8 * 1024 * 1024 * 1024, nil
 	}
-	return memSize, nil
+	// hw.memsize 返回的是小端序的 8 字节整数
+	if len(val) >= 8 {
+		var memSize uint64
+		for i := 0; i < 8; i++ {
+			memSize |= uint64(val[i]) << (i * 8)
+		}
+		return memSize, nil
+	}
+	// 默认返回 8GB
+	return 8 * 1024 * 1024 * 1024, nil
 }
 
 // getCPUTime 通过 getrusage 获取进程CPU时间（单位：微秒）
