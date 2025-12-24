@@ -49,6 +49,10 @@ const Login: React.FC = () => {
   const [systemConfig, setSystemConfig] = useState<SystemConfig>({})
   const [totpOnlyMode, setTotpOnlyMode] = useState(false)  // 仅 TOTP 登录模式（忘记密码时使用）
   const [totpOnlyCode, setTotpOnlyCode] = useState('')     // 仅 TOTP 登录的验证码
+  const [totpOnlyNeedCaptcha, setTotpOnlyNeedCaptcha] = useState(false)  // TOTP-only 模式是否需要验证码
+  const [totpOnlyCaptchaText, setTotpOnlyCaptchaText] = useState('')  // TOTP-only 模式的验证码文本
+  const [totpOnlyCaptchaSessionId, setTotpOnlyCaptchaSessionId] = useState('')  // TOTP-only 模式的验证码会话ID
+  const [totpOnlyCaptchaImageUrl, setTotpOnlyCaptchaImageUrl] = useState('')  // TOTP-only 模式的验证码图片
   
   const { login, isAuthenticated, isLoading: authLoading } = useAuth()
   const { adminPrefix } = useConfig()
@@ -187,6 +191,26 @@ const Login: React.FC = () => {
     }
   }
 
+  // 加载 TOTP-only 模式的验证码
+  const loadTotpOnlyCaptcha = async () => {
+    try {
+      const response = await fetch(buildApiPath(adminPrefix, '/api/captcha/image') + '?_=' + Date.now(), {
+        credentials: 'include'
+      })
+      if (response.ok) {
+        const sessionId = response.headers.get('X-Captcha-Session')
+        if (sessionId) {
+          setTotpOnlyCaptchaSessionId(sessionId)
+        }
+        const blob = await response.blob()
+        const objectUrl = URL.createObjectURL(blob)
+        setTotpOnlyCaptchaImageUrl(objectUrl)
+      }
+    } catch (error) {
+      console.error('Failed to load captcha:', error)
+    }
+  }
+
   // 仅 TOTP 登录（忘记密码时使用）
   const handleTotpOnlyLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -199,14 +223,27 @@ const Login: React.FC = () => {
       return
     }
 
+    // 如果需要验证码，检查验证码
+    if (totpOnlyNeedCaptcha && !totpOnlyCaptchaText) {
+      setError('请输入验证码')
+      setIsLoading(false)
+      return
+    }
+
     try {
+      const requestBody: any = { totp_code: totpOnlyCode }
+      if (totpOnlyNeedCaptcha) {
+        requestBody.captcha_text = totpOnlyCaptchaText
+        requestBody.captcha_session_id = totpOnlyCaptchaSessionId
+      }
+
       const response = await fetch(buildApiPath(adminPrefix, '/api/auth/totp-login'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ totp_code: totpOnlyCode }),
+        body: JSON.stringify(requestBody),
       })
 
       if (response.ok) {
@@ -221,7 +258,17 @@ const Login: React.FC = () => {
       } else {
         const errorData = await response.json()
         setError(errorData.error || 'TOTP 验证码错误')
+        
+        // 如果服务器要求验证码，显示验证码输入框
+        if (errorData.need_captcha) {
+          setTotpOnlyNeedCaptcha(true)
+          loadTotpOnlyCaptcha()
+        }
+        
         setTotpOnlyCode('')
+        if (totpOnlyNeedCaptcha) {
+          setTotpOnlyCaptchaText('')
+        }
       }
     } catch (err) {
       setError('登录失败，请重试')
@@ -371,6 +418,39 @@ const Login: React.FC = () => {
                         <Text fontSize="sm">忘记密码时，可使用 TOTP 验证码直接登录超级管理员账户</Text>
                       </Box>
                     </Alert>
+
+                    {/* 验证码（如果需要） */}
+                    {totpOnlyNeedCaptcha && (
+                      <FormControl isRequired>
+                        <FormLabel>图形验证码</FormLabel>
+                        <HStack>
+                          <Image
+                            src={totpOnlyCaptchaImageUrl}
+                            alt="验证码"
+                            h="48px"
+                            borderRadius="md"
+                            border="1px solid"
+                            borderColor="gray.200"
+                          />
+                          <IconButton
+                            aria-label="刷新验证码"
+                            icon={<FiRefreshCw />}
+                            onClick={loadTotpOnlyCaptcha}
+                            variant="outline"
+                            size="sm"
+                          />
+                        </HStack>
+                        <Input
+                          value={totpOnlyCaptchaText}
+                          onChange={(e) => setTotpOnlyCaptchaText(e.target.value)}
+                          placeholder="请输入验证码"
+                          size="md"
+                          mt={2}
+                          isDisabled={isLoading}
+                        />
+                        <Text fontSize="xs" color="gray.500" mt={1}>不区分大小写</Text>
+                      </FormControl>
+                    )}
 
                     <FormControl isRequired>
                       <FormLabel>

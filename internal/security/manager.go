@@ -54,9 +54,12 @@ type Manager struct {
 	uaInvalid5Min map[string][]time.Time
 	// TLS 指纹计数
 	tlsFPCounts map[string][]time.Time
-	mutex       sync.RWMutex
-	log         *logrus.Entry
-	stopChan    chan struct{}
+	// TOTP-only 登录失败计数（独立于普通登录）
+	totpOnlyAttemptCounts map[string]int
+	totpOnlyLastAttempts  map[string][]time.Time
+	mutex                 sync.RWMutex
+	log                   *logrus.Entry
+	stopChan              chan struct{}
 	// TLS 指纹持久化
 	tlsFPRotator *logger.Rotator
 	geoIPService *GeoIPService
@@ -100,17 +103,19 @@ func NewManager(cfg *config.Config) *Manager {
 	}
 
 	return &Manager{
-		config:         cfg,
-		accessLogs:     make(map[string][]AccessLog),
-		blockedIPs:     make(map[string]BlockedIP),
-		attemptCounts:  make(map[string]int),
-		lastAttempts:   make(map[string][]time.Time),
-		uaInvalid1Min:  make(map[string][]time.Time),
-		uaInvalid5Min:  make(map[string][]time.Time),
-		tlsFPCounts:    make(map[string][]time.Time),
-		stopChan:       make(chan struct{}),
-		geoIPService:   geoIPService,
-		corsMiddleware: corsMiddleware,
+		config:                cfg,
+		accessLogs:            make(map[string][]AccessLog),
+		blockedIPs:            make(map[string]BlockedIP),
+		attemptCounts:         make(map[string]int),
+		lastAttempts:          make(map[string][]time.Time),
+		uaInvalid1Min:         make(map[string][]time.Time),
+		uaInvalid5Min:         make(map[string][]time.Time),
+		tlsFPCounts:           make(map[string][]time.Time),
+		totpOnlyAttemptCounts: make(map[string]int),
+		totpOnlyLastAttempts:  make(map[string][]time.Time),
+		stopChan:              make(chan struct{}),
+		geoIPService:          geoIPService,
+		corsMiddleware:        corsMiddleware,
 		log: logrus.WithFields(logrus.Fields{
 			"component": "security_manager",
 		}),
@@ -999,4 +1004,82 @@ func (m *Manager) UpdateGeoConfig(config config.GeoBlockingConfig) error {
 	m.log.Info("GeoIP configuration updated")
 
 	return nil
+}
+
+// CheckTOTPOnlyLoginSecurity 检查 TOTP-only 登录的安全性
+// 返回 (是否允许, 错误信息, 是否需要验证码)
+func (m *Manager) CheckTOTPOnlyLoginSecurity(ip string) (bool, string, bool) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	// 1. 检查 IP 是否被封禁
+	if blocked, reason := m.CheckIPAccess(ip); !blocked {
+		return false, reason, false
+	}
+	if m.IsBlocked(ip) {
+		return false, "IP已被封禁", false
+	}
+
+	// 2. 检查 TOTP-only 登录失败次数（更严格的限制）
+	now := time.Now()
+	
+	// 清理过期的失败记录（15分钟前）
+	var validAttempts []time.Time
+	if attempts, exists := m.totpOnlyLastAttempts[ip]; exists {
+		for _, attempt := range attempts {
+			if now.Sub(attempt) <= 15*time.Minute {
+				validAttempts = append(validAttempts, attempt)
+			}
+		}
+		m.totpOnlyLastAttempts[ip] = validAttempts
+	}
+
+	// 检查最近15分钟内的失败次数
+	recentAttempts := len(validAttempts)
+	
+	// 检查最近1分钟内的失败次数
+	oneMinAttempts := 0
+	for _, attempt := range validAttempts {
+		if now.Sub(attempt) <= time.Minute {
+			oneMinAttempts++
+		}
+	}
+
+	// 3. 安全策略：
+	// - 1分钟内超过3次失败：需要验证码
+	// - 15分钟内超过5次失败：封禁IP 15分钟
+	if oneMinAttempts >= 3 {
+		return true, "", true // 需要验证码
+	}
+	if recentAttempts >= 5 {
+		// 封禁IP 15分钟
+		m.blockIP(ip, fmt.Sprintf("TOTP-only登录失败次数过多: %d次/15分钟", recentAttempts))
+		return false, fmt.Sprintf("TOTP-only登录失败次数过多，IP已被临时封禁15分钟"), false
+	}
+
+	return true, "", false
+}
+
+// RecordTOTPOnlyLoginFailure 记录 TOTP-only 登录失败
+func (m *Manager) RecordTOTPOnlyLoginFailure(ip string) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	now := time.Now()
+	m.totpOnlyAttemptCounts[ip]++
+	if m.totpOnlyLastAttempts[ip] == nil {
+		m.totpOnlyLastAttempts[ip] = make([]time.Time, 0)
+	}
+	m.totpOnlyLastAttempts[ip] = append(m.totpOnlyLastAttempts[ip], now)
+	
+	m.log.Warnf("TOTP-only登录失败: IP=%s, 失败次数=%d", ip, m.totpOnlyAttemptCounts[ip])
+}
+
+// ClearTOTPOnlyLoginAttempts 清除 TOTP-only 登录失败记录（登录成功时调用）
+func (m *Manager) ClearTOTPOnlyLoginAttempts(ip string) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	delete(m.totpOnlyAttemptCounts, ip)
+	delete(m.totpOnlyLastAttempts, ip)
 }

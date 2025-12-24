@@ -164,7 +164,9 @@ func (s *Server) handleAPIAuthTOTPLogin(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var req struct {
-		TOTPCode string `json:"totp_code"`
+		TOTPCode        string `json:"totp_code"`
+		CaptchaText     string `json:"captcha_text"`
+		CaptchaSessionID string `json:"captcha_session_id"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -173,33 +175,72 @@ func (s *Server) handleAPIAuthTOTPLogin(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// 检查 TOTP 是否已启用
+	clientIP := s.getClientIP(r)
+
+	// 1. 检查 TOTP 是否已启用
 	if !s.config.Admin.EnableTOTP {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": "TOTP is not enabled"})
 		return
 	}
 
-	// 验证 TOTP 码
+	// 2. 安全检查：检查 IP 是否被封禁、失败次数等
+	allowed, reason, needCaptcha := s.securityManager.CheckTOTPOnlyLoginSecurity(clientIP)
+	if !allowed {
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(map[string]string{"error": reason})
+		return
+	}
+
+	// 3. 如果需要验证码，验证验证码
+	if needCaptcha {
+		if req.CaptchaText == "" || req.CaptchaSessionID == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"error":        "需要验证码",
+				"need_captcha": true,
+			})
+			return
+		}
+		if !s.captchaManager.VerifyCaptchaString(req.CaptchaSessionID, req.CaptchaText) {
+			s.securityManager.RecordTOTPOnlyLoginFailure(clientIP)
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "验证码错误"})
+			return
+		}
+	}
+
+	// 4. 验证 TOTP 码格式
 	if req.TOTPCode == "" || len(req.TOTPCode) != 6 {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": "invalid TOTP code format"})
 		return
 	}
 
+	// 5. 验证 TOTP 码
 	if !s.verifyTOTP(req.TOTPCode) {
 		// 记录失败尝试
-		clientIP := s.getClientIP(r)
+		s.securityManager.RecordTOTPOnlyLoginFailure(clientIP)
 		s.securityManager.LogAccess(clientIP, r.Header.Get("User-Agent"), r.URL.Path, false)
 		s.audit("totp_login_failed", clientIP)
 
+		// 再次检查是否需要验证码
+		_, _, needCaptchaAfterFail := s.securityManager.CheckTOTPOnlyLoginSecurity(clientIP)
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid TOTP code"})
+		response := map[string]interface{}{
+			"error": "invalid TOTP code",
+		}
+		if needCaptchaAfterFail {
+			response["need_captcha"] = true
+		}
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	// TOTP 验证成功，创建超级管理员会话
-	clientIP := s.getClientIP(r)
+	// 6. TOTP 验证成功，清除失败记录
+	s.securityManager.ClearTOTPOnlyLoginAttempts(clientIP)
+
+	// 7. 创建超级管理员会话
 	userAgent := r.Header.Get("User-Agent")
 	session, err := s.sessionManager.CreateSession(
 		s.config.Admin.Username,
