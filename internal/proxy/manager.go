@@ -1274,11 +1274,16 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 			Timeout:   time.Duration(connectTimeout) * time.Second,
 			KeepAlive: time.Duration(keepAliveTimeout) * time.Second,
 		}).DialContext,
-		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          100,
-		IdleConnTimeout:       time.Duration(idleTimeout) * time.Second,
-		TLSHandshakeTimeout:   time.Duration(tlsHandshakeTimeout) * time.Second,
-		ExpectContinueTimeout: time.Duration(expectContinueTimeout) * time.Second,
+		ForceAttemptHTTP2:      true,
+		MaxIdleConns:           100,
+		MaxIdleConnsPerHost:    10,                                      // 每个主机保持 10 个空闲连接，提高连接复用
+		IdleConnTimeout:        time.Duration(idleTimeout) * time.Second,
+		TLSHandshakeTimeout:    time.Duration(tlsHandshakeTimeout) * time.Second,
+		ExpectContinueTimeout:  time.Duration(expectContinueTimeout) * time.Second,
+		ResponseHeaderTimeout:  30 * time.Second, // 响应头超时，防止连接泄漏
+		MaxResponseHeaderBytes: 1 << 20,          // 限制响应头最大 1MB，防止内存攻击
+		ReadBufferSize:         32 * 1024,        // 32KB 读缓冲，减少小缓冲区频繁分配
+		WriteBufferSize:        32 * 1024,        // 32KB 写缓冲，减少小缓冲区频繁分配
 		// 不验证后端证书，允许自签名证书
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}

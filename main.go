@@ -193,13 +193,13 @@ func main() {
 
 	log.Infof("Starting SSLcat v%s (build: %s)", version, build)
 
-	// 配置 Go 运行时内存管理：更积极地归还内存给操作系统
-	// 1. 设置更积极的 GC 触发阈值（降低 GOGC 值）
+	// 配置 Go 运行时内存管理：优化 GC 以减少 CPU 占用
+	// 1. 设置 GC 触发阈值
 	//    GOGC 可以是任意正数值：
 	//    - 默认 100：每增长 100% 内存触发 GC
-	//    - 50：每增长 50% 内存就触发 GC（更频繁，内存峰值更低）
-	//    - 75：每增长 75% 内存触发 GC（平衡值，推荐）
-	//    - 更高的值（如 100, 150）：GC 频率更低，内存峰值更高
+	//    - 50：每增长 50% 内存就触发 GC（更频繁，内存峰值更低，CPU 占用高）
+	//    - 75：每增长 75% 内存触发 GC（平衡值）
+	//    - 100：每增长 100% 内存触发 GC（减少 GC 频率，降低 CPU 占用）
 	//    可以通过环境变量 GOGC 设置，也可以在代码中设置默认值
 	//    注意：Go 运行时会自动读取 GOGC 环境变量，如果设置了环境变量，会优先使用
 	goGCEnv := os.Getenv("GOGC")
@@ -211,13 +211,14 @@ func main() {
 			log.Infof("GOGC set to %d via environment variable", goGCPercent)
 		} else {
 			log.Warnf("Invalid GOGC value '%s', using default", goGCEnv)
-			debug.SetGCPercent(75) // 无效值时使用默认值
-			log.Info("Set GC percent to 75 (default)")
+			debug.SetGCPercent(100) // 无效值时使用默认值 100
+			log.Info("Set GC percent to 100 (default)")
 		}
 	} else {
-		// 如果未设置 GOGC 环境变量，使用代码设置的默认值 75
-		debug.SetGCPercent(75)
-		log.Info("Set GC percent to 75 for balanced memory release (can be adjusted via GOGC env var)")
+		// 如果未设置 GOGC 环境变量，使用代码设置的默认值 100
+		// 从 75 调整为 100，减少 GC 频率，降低 CPU 占用
+		debug.SetGCPercent(100)
+		log.Info("Set GC percent to 100 for reduced GC pressure (can be adjusted via GOGC env var)")
 	}
 
 	// 2. 设置内存限制（如果未通过环境变量设置）
@@ -576,13 +577,15 @@ func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *s
 	// 启动 HTTPS 服务器 (443)
 	if cfg.Server.EnableHTTPS {
 		httpsServer := &http.Server{
-			Addr:         fmt.Sprintf("%s:443", cfg.Server.Host),
-			Handler:      webServer,
-			ReadTimeout:  readTimeout,
-			WriteTimeout: writeTimeout,
-			IdleTimeout:  idleTimeout,
-			TLSConfig:    sslManager.GetTLSConfig(),
-			ErrorLog:     log.New(filteredLog, "", 0), // 使用过滤的 ErrorLog
+			Addr:              fmt.Sprintf("%s:443", cfg.Server.Host),
+			Handler:           webServer,
+			ReadTimeout:       readTimeout,
+			WriteTimeout:      writeTimeout,
+			ReadHeaderTimeout: 10 * time.Second, // 读取 header 超时，防止慢速攻击
+			MaxHeaderBytes:    1 << 20,          // 限制请求头最大 1MB，防止内存攻击
+			IdleTimeout:       idleTimeout,
+			TLSConfig:         sslManager.GetTLSConfig(),
+			ErrorLog:          log.New(filteredLog, "", 0), // 使用过滤的 ErrorLog
 		}
 
 		// 配置 HTTP/2 支持
@@ -668,8 +671,11 @@ func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *s
 			// 没有配置的域名：默认用 HTTP 处理，不强制重定向
 			webServer.ServeHTTP(w, r)
 		})),
-		ReadTimeout:  readTimeout,
-		WriteTimeout: writeTimeout,
+		ReadTimeout:       readTimeout,
+		WriteTimeout:      writeTimeout,
+		ReadHeaderTimeout: 10 * time.Second, // 读取 header 超时，防止慢速攻击
+		MaxHeaderBytes:    1 << 20,          // 限制请求头最大 1MB，防止内存攻击
+		IdleTimeout:       90 * time.Second, // 空闲连接超时
 	}
 
 	go func() {
@@ -686,12 +692,14 @@ func startCustomMode(cfg *config.Config, webServer http.Handler, readTimeout, wr
 	filteredLog := newFilteredErrorLog()
 
 	server := &http.Server{
-		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.CustomPort),
-		Handler:      webServer,
-		ReadTimeout:  readTimeout,
-		WriteTimeout: writeTimeout,
-		IdleTimeout:  idleTimeout,
-		ErrorLog:     log.New(filteredLog, "", 0), // 使用过滤的 ErrorLog
+		Addr:              fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.CustomPort),
+		Handler:           webServer,
+		ReadTimeout:       readTimeout,
+		WriteTimeout:      writeTimeout,
+		ReadHeaderTimeout: 10 * time.Second, // 读取 header 超时，防止慢速攻击
+		MaxHeaderBytes:    1 << 20,          // 限制请求头最大 1MB，防止内存攻击
+		IdleTimeout:       idleTimeout,
+		ErrorLog:          log.New(filteredLog, "", 0), // 使用过滤的 ErrorLog
 	}
 
 	go func() {
