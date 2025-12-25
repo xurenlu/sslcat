@@ -1026,15 +1026,15 @@ func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error
 			Timestamp:   time.Now(),
 		})
 		acmeStart := time.Now()
-		_, err := m.acmeMgr.GetCertificate(&tls.ClientHelloInfo{ServerName: domain})
+		cert, err := m.acmeMgr.GetCertificate(&tls.ClientHelloInfo{ServerName: domain})
 		acmeDuration := time.Since(acmeStart)
 
-		if err == nil {
-			// 申请成功，同步证书
+		if err == nil && cert != nil {
+			// 申请成功，立即将证书保存到缓存和磁盘
 			m.sendProgressEvent(domain, CertProgressEvent{
 				Domain:      domain,
 				Status:      "using_http01",
-				Message:     "证书申请成功，正在同步到磁盘...",
+				Message:     "证书申请成功，正在保存证书...",
 				Attempt:     attempt,
 				MaxAttempts: maxRetries,
 				Progress:    90,
@@ -1042,6 +1042,35 @@ func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error
 			})
 
 			syncStart := time.Now()
+			// 先保存证书到磁盘
+			if saveErr := m.saveCertificateToDisk(domain, cert); saveErr != nil {
+				m.log.Warnf("Failed to save certificate to disk for %s: %v", domain, saveErr)
+				// 即使保存失败，也尝试直接缓存内存中的证书
+				m.certMutex.Lock()
+				m.certCache[domain] = cert
+				m.certMutex.Unlock()
+				m.updateCertMetadata(domain, cert)
+				// 清除失败缓存
+				m.failedCacheMutex.Lock()
+				delete(m.failedDomainCache, domain)
+				m.failedCacheMutex.Unlock()
+			} else {
+				// 保存成功后，加载到缓存
+				if loadErr := m.LoadCertificateFromDisk(domain); loadErr != nil {
+					m.log.Warnf("Failed to load certificate from disk for %s: %v", domain, loadErr)
+					// 如果从磁盘加载失败，直接缓存内存中的证书
+					m.certMutex.Lock()
+					m.certCache[domain] = cert
+					m.certMutex.Unlock()
+					m.updateCertMetadata(domain, cert)
+				}
+				// 清除失败缓存（LoadCertificateFromDisk 内部应该已经处理了，但为了安全还是清除一下）
+				m.failedCacheMutex.Lock()
+				delete(m.failedDomainCache, domain)
+				m.failedCacheMutex.Unlock()
+			}
+			
+			// 同时尝试同步 ACME 缓存中的其他证书
 			if _, syncErr := m.SyncACMECertsToDisk(); syncErr != nil {
 				m.log.Debugf("ACME post-issue sync failed: %v", syncErr)
 			}

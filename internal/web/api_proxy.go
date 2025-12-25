@@ -220,11 +220,13 @@ func (s *Server) handleAPIProxyRulesPost(w http.ResponseWriter, r *http.Request)
 	// 记录配置保存成功
 	s.log.Infof("Proxy rule saved successfully: %s -> %s:%d", req.Domain, req.Target, req.Port)
 
-	// 尝试预取证书
+	// 异步尝试预取证书，避免阻塞 API 响应
 	if s.sslManager != nil {
-		if err := s.sslManager.EnsureDomainCert(req.Domain); err != nil {
-			s.log.Warnf("Failed to prefetch certificate %s: %v", req.Domain, err)
-		}
+		go func(domain string) {
+			if err := s.sslManager.EnsureDomainCert(domain); err != nil {
+				s.log.Warnf("Failed to prefetch certificate %s: %v", domain, err)
+			}
+		}(req.Domain)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

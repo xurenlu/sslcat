@@ -63,9 +63,11 @@ func (s *Server) handleStaticSitesAdd(w http.ResponseWriter, r *http.Request) {
 		s.config.StaticSites = append(s.config.StaticSites, config.StaticSite{Domain: domain, Root: root, Index: index, Enabled: true})
 	}
 
-	// 允许域名触发证书申请（若启用 ACME）
+	// 异步允许域名触发证书申请（若启用 ACME），避免阻塞 HTTP 响应
 	if s.sslManager != nil {
-		_ = s.sslManager.EnsureDomainCert(domain)
+		go func(d string) {
+			_ = s.sslManager.EnsureDomainCert(d)
+		}(domain)
 	}
 
 	_ = s.config.Save(s.config.ConfigFile)

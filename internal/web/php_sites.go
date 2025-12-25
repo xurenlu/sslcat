@@ -75,8 +75,11 @@ func (s *Server) handlePHPSitesAdd(w http.ResponseWriter, r *http.Request) {
 		s.config.PHPSites = append(s.config.PHPSites, config.PHPSite{Domain: domain, Root: root, Index: index, Enabled: true, FCGIAddr: fcgi})
 	}
 
+	// 异步允许域名触发证书申请（若启用 ACME），避免阻塞 HTTP 响应
 	if s.sslManager != nil {
-		_ = s.sslManager.EnsureDomainCert(domain)
+		go func(d string) {
+			_ = s.sslManager.EnsureDomainCert(d)
+		}(domain)
 	}
 	_ = s.config.Save(s.config.ConfigFile)
 	http.Redirect(w, r, s.config.AdminPrefix+"/php-sites", http.StatusFound)

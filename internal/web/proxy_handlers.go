@@ -139,11 +139,13 @@ func (s *Server) handleProxyAdd(w http.ResponseWriter, r *http.Request) {
 			// 保存配置
 			s.config.Save(s.config.ConfigFile)
 
-			// 尝试为该域名预取/申请证书（若启用 ACME）
+			// 异步尝试为该域名预取/申请证书（若启用 ACME），避免阻塞 HTTP 响应
 			if s.sslManager != nil {
-				if err := s.sslManager.EnsureDomainCert(domain); err != nil {
-					s.log.Warnf("Failed to prefetch certificate %s: %v", domain, err)
-				}
+				go func(d string) {
+					if err := s.sslManager.EnsureDomainCert(d); err != nil {
+						s.log.Warnf("Failed to prefetch certificate %s: %v", d, err)
+					}
+				}(domain)
 			}
 
 			// 重定向回代理管理页面
@@ -266,11 +268,13 @@ func (s *Server) handleProxyEdit(w http.ResponseWriter, r *http.Request) {
 			// 保存配置
 			s.config.Save(s.config.ConfigFile)
 
-			// 尝试为该域名预取/申请证书（若启用 ACME）
+			// 异步尝试为该域名预取/申请证书（若启用 ACME），避免阻塞 HTTP 响应
 			if s.sslManager != nil {
-				if err := s.sslManager.EnsureDomainCert(domain); err != nil {
-					s.log.Warnf("Failed to prefetch certificate %s: %v", domain, err)
-				}
+				go func(d string) {
+					if err := s.sslManager.EnsureDomainCert(d); err != nil {
+						s.log.Warnf("Failed to prefetch certificate %s: %v", d, err)
+					}
+				}(domain)
 			}
 
 			// 重定向回代理管理页面

@@ -83,11 +83,13 @@ func (s *Server) handleAPIStaticSites(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// 尝试为该域名预取/申请证书（若启用 ACME）
+		// 异步尝试为该域名预取/申请证书（若启用 ACME），避免阻塞 API 响应
 		if s.sslManager != nil {
-			if err := s.sslManager.EnsureDomainCert(req.Domain); err != nil {
-				s.log.Warnf("Failed to prefetch certificate for static site %s: %v", req.Domain, err)
-			}
+			go func(domain string) {
+				if err := s.sslManager.EnsureDomainCert(domain); err != nil {
+					s.log.Warnf("Failed to prefetch certificate for static site %s: %v", domain, err)
+				}
+			}(req.Domain)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -257,11 +259,13 @@ func (s *Server) handleAPIPHPSites(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// 尝试为该域名预取/申请证书（若启用 ACME）
+		// 异步尝试为该域名预取/申请证书（若启用 ACME），避免阻塞 API 响应
 		if s.sslManager != nil {
-			if err := s.sslManager.EnsureDomainCert(req.Domain); err != nil {
-				s.log.Warnf("Failed to prefetch certificate for PHP site %s: %v", req.Domain, err)
-			}
+			go func(domain string) {
+				if err := s.sslManager.EnsureDomainCert(domain); err != nil {
+					s.log.Warnf("Failed to prefetch certificate for PHP site %s: %v", domain, err)
+				}
+			}(req.Domain)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
