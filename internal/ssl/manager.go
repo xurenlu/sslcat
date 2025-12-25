@@ -591,17 +591,37 @@ func (m *Manager) renewExpiringCerts() {
 			m.log.Infof("Certificate expiring soon, starting renewal: %s", domain)
 			if m.config.SSL.DisableSelfSigned {
 				if m.acmeMgr != nil && m.isAllowedDomain(domain) {
-					if _, err := m.acmeMgr.GetCertificate(&tls.ClientHelloInfo{ServerName: domain}); err != nil {
+					cert, err := m.acmeMgr.GetCertificate(&tls.ClientHelloInfo{ServerName: domain})
+					if err != nil {
 						m.log.Errorf("ACME renewal failed %s: %v", domain, err)
 
 						// 发送证书续期失败通知
 						if m.notificationIntegrator != nil {
 							m.notificationIntegrator.SendCertFailedNotification(domain, fmt.Sprintf("自动续期失败: %v", err))
 						}
-					} else {
+					} else if cert != nil {
 						m.log.Infof("ACME renewal triggered: %s", domain)
 
-						// 同步ACME证书到磁盘
+						// 立即保存证书到磁盘并加载到缓存
+						if saveErr := m.saveCertificateToDisk(domain, cert); saveErr != nil {
+							m.log.Warnf("Failed to save renewed certificate to disk for %s: %v", domain, saveErr)
+						} else {
+							// 保存成功后，加载到缓存
+							if loadErr := m.LoadCertificateFromDisk(domain); loadErr != nil {
+								m.log.Warnf("Failed to load renewed certificate from disk for %s: %v", domain, loadErr)
+								// 如果从磁盘加载失败，直接缓存内存中的证书
+								m.certMutex.Lock()
+								m.certCache[domain] = cert
+								m.certMutex.Unlock()
+								m.updateCertMetadata(domain, cert)
+							}
+							// 清除失败缓存
+							m.failedCacheMutex.Lock()
+							delete(m.failedDomainCache, domain)
+							m.failedCacheMutex.Unlock()
+						}
+
+						// 同时尝试同步 ACME 缓存中的其他证书
 						if _, syncErr := m.SyncACMECertsToDisk(); syncErr != nil {
 							m.log.Debugf("ACME post-renewal sync failed: %v", syncErr)
 						}
@@ -610,6 +630,8 @@ func (m *Manager) renewExpiringCerts() {
 						if m.notificationIntegrator != nil {
 							m.notificationIntegrator.SendCertSuccessNotification(domain, 1, 0)
 						}
+					} else {
+						m.log.Warnf("ACME renewal returned nil certificate for %s", domain)
 					}
 				} else {
 					m.log.Warnf("Self-signed renewal disabled; ACME unavailable or domain not allowed: %s", domain)
