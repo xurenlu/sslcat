@@ -195,19 +195,6 @@ func (m *Manager) setHeadersBatch(headers http.Header, headerMap map[string]stri
 	}
 }
 
-// setHeadersBatchFromPool 批量设置 header（使用对象池）
-// 这个函数内部使用对象池获取 map，使用完后自动归还
-func (m *Manager) setHeadersBatchFromPool(headers http.Header, fn func(map[string]string)) {
-	headerMap := m.getHeaderMap()
-	defer m.putHeaderMap(headerMap)
-	
-	// 调用回调函数填充 map
-	fn(headerMap)
-	
-	// 批量设置 header
-	m.setHeadersBatch(headers, headerMap)
-}
-
 // SetResponseProcessor 设置响应处理器
 func (m *Manager) SetResponseProcessor(processor ResponseProcessor) {
 	m.responseProcessor = processor
