@@ -196,13 +196,13 @@ func main() {
 	// 配置 Go 运行时内存管理：优化 GC 以减少 CPU 占用
 	// 1. 设置 GC 触发阈值
 	//    GOGC 可以是任意正数值：
-	//    - 默认 300：每增长 300% 内存触发 GC（适合低流量场景，减少 GC 频率）
-	//    - 100：每增长 100% 内存触发 GC（平衡值，适合中等流量）
-	//    - 200：每增长 200% 内存触发 GC（减少 GC 频率，适合高流量）
+	//    - 默认 200：每增长 200% 内存触发 GC（平衡值，适合大多数场景）
+	//    - 100：每增长 100% 内存触发 GC（Go 默认值，适合内存受限环境）
+	//    - 300：每增长 300% 内存触发 GC（适合低流量场景，减少 GC 频率）
 	//    - 50：每增长 50% 内存就触发 GC（更频繁，内存峰值更低，CPU 占用高）
 	//    可以通过环境变量 GOGC 设置，也可以在代码中设置默认值
 	//    注意：Go 运行时会自动读取 GOGC 环境变量，如果设置了环境变量，会优先使用
-	//    对于低流量场景，推荐使用 300 或更高值以减少 GC 频率和 CPU 占用
+	//    推荐值：200（平衡）、300（低流量）、100（内存受限）
 	goGCEnv := os.Getenv("GOGC")
 	if goGCEnv != "" {
 		// 解析环境变量值
@@ -216,12 +216,11 @@ func main() {
 			log.Info("Set GC percent to 100 (default)")
 		}
 	} else {
-		// 如果未设置 GOGC 环境变量，使用代码设置的默认值 300
-		// 从 100 调整为 300，进一步减少 GC 频率，降低 CPU 占用
-		// 对于低流量场景，更高的 GOGC 值可以显著减少 GC 频率和 CPU 占用
-		// 注意：这会导致内存占用略高，但对于低流量场景可以接受
-		debug.SetGCPercent(300)
-		log.Info("Set GC percent to 300 for reduced GC pressure (can be adjusted via GOGC env var)")
+		// 如果未设置 GOGC 环境变量，使用代码设置的默认值 200
+		// GOGC=200 是一个平衡值：既能减少 GC 频率降低 CPU 占用，又不会导致内存占用过高
+		// 适合大多数场景，包括中低流量的生产环境
+		debug.SetGCPercent(200)
+		log.Info("Set GC percent to 200 for balanced GC pressure (can be adjusted via GOGC env var)")
 	}
 
 	// 2. 设置内存限制（如果未通过环境变量设置）

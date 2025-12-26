@@ -509,7 +509,7 @@ SyslogIdentifier=sslcat
 
 # Go 运行时内存管理优化
 Environment="GOMEMLIMIT=1280MiB"
-Environment="GOGC=100"
+Environment="GOGC=200"
 Environment="GODEBUG=madvdontneed=1"
 
 # 安全设置
