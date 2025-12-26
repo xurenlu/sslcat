@@ -1195,10 +1195,17 @@ func (m *Manager) tryDNSValidation(domain string) error {
 
 // findDNSProviderForDomain 查找域名属于哪个DNS提供商
 func (m *Manager) findDNSProviderForDomain(domain string) string {
+	// 处理通配符域名：*.example.com -> example.com
+	searchDomain := domain
+	if strings.HasPrefix(domain, "*.") {
+		searchDomain = domain[2:]
+		m.log.Debugf("Wildcard domain detected: %s, using root domain: %s", domain, searchDomain)
+	}
+
 	// 提取主域名（例如：www.example.com -> example.com）
-	domainParts := strings.Split(domain, ".")
+	domainParts := strings.Split(searchDomain, ".")
 	if len(domainParts) < 2 {
-		m.log.Debugf("Invalid domain format: %s", domain)
+		m.log.Debugf("Invalid domain format: %s", searchDomain)
 		return ""
 	}
 
@@ -2318,16 +2325,23 @@ func (m *Manager) performDNSChallenge(domain, providerName string) error {
 			return fmt.Errorf("failed to generate DNS challenge record: %w", err)
 		}
 
-		// 确定记录名称
+		// 确定记录名称和DNS记录的域名
+		// 对于通配符域名（*.example.com），DNS记录需要在根域名（example.com）下创建
 		recordName := GetACMEChallengeRecordNameForWildcard(domain)
+		dnsDomain := domain
+		if strings.HasPrefix(domain, "*.") {
+			// 提取根域名：*.example.com -> example.com
+			dnsDomain = domain[2:]
+			m.log.Infof("Wildcard domain detected: %s, using root domain for DNS challenge: %s", domain, dnsDomain)
+		}
 
 		m.sendProgressEvent(domain, CertProgressEvent{
 			Status:  "dns_create_record",
-			Message: fmt.Sprintf("正在创建 DNS TXT 记录: %s", recordName),
+			Message: fmt.Sprintf("正在创建 DNS TXT 记录: %s (在 %s 下)", recordName, dnsDomain),
 		})
 
-		// 创建DNS挑战，使用故障转移机制
-		challengeInfo, err := m.dnsManager.CreateDNSChallengeWithFailover(ctx, domain, recordName, keyAuth)
+		// 创建DNS挑战，使用故障转移机制（使用根域名创建DNS记录）
+		challengeInfo, err := m.dnsManager.CreateDNSChallengeWithFailover(ctx, dnsDomain, recordName, keyAuth)
 		if err != nil {
 			return fmt.Errorf("failed to create DNS challenge: %w", err)
 		}
