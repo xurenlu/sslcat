@@ -507,6 +507,11 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=sslcat
 
+# Go 运行时内存管理优化
+Environment="GOMEMLIMIT=1280MiB"
+Environment="GOGC=100"
+Environment="GODEBUG=madvdontneed=1"
+
 # 安全设置
 NoNewPrivileges=true
 PrivateTmp=true

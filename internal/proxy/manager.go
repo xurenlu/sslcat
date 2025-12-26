@@ -77,6 +77,9 @@ type Manager struct {
 	// 性能优化：header key 规范化缓存，避免重复转换
 	headerKeyCache map[string]string
 	headerKeyMutex sync.RWMutex
+
+	// 性能优化：header map 对象池，复用 map[string]string 对象
+	headerMapPool *sync.Pool
 }
 
 // NewManager 创建代理管理器
@@ -104,6 +107,13 @@ func NewManager(cfg *config.Config, sslMgr *ssl.Manager, secMgr *security.Manage
 		},
 		// 性能优化：初始化 header key 缓存
 		headerKeyCache: make(map[string]string),
+		// 性能优化：初始化 header map 对象池，复用 map[string]string 对象
+		// 预分配容量为 8，适合大多数 header 数量场景
+		headerMapPool: &sync.Pool{
+			New: func() interface{} {
+				return make(map[string]string, 8)
+			},
+		},
 	}
 
 	// 初始化负载均衡器
@@ -160,6 +170,20 @@ func (m *Manager) deleteHeadersBatch(headers http.Header, keys []string) {
 	}
 }
 
+// getHeaderMap 从对象池获取 header map
+func (m *Manager) getHeaderMap() map[string]string {
+	return m.headerMapPool.Get().(map[string]string)
+}
+
+// putHeaderMap 归还 header map 到对象池
+func (m *Manager) putHeaderMap(headerMap map[string]string) {
+	// 清空 map 但保留容量
+	for k := range headerMap {
+		delete(headerMap, k)
+	}
+	m.headerMapPool.Put(headerMap)
+}
+
 // setHeadersBatch 批量设置 header
 func (m *Manager) setHeadersBatch(headers http.Header, headerMap map[string]string) {
 	for key, value := range headerMap {
@@ -169,6 +193,19 @@ func (m *Manager) setHeadersBatch(headers http.Header, headerMap map[string]stri
 			headers.Set(key, value)
 		}
 	}
+}
+
+// setHeadersBatchFromPool 批量设置 header（使用对象池）
+// 这个函数内部使用对象池获取 map，使用完后自动归还
+func (m *Manager) setHeadersBatchFromPool(headers http.Header, fn func(map[string]string)) {
+	headerMap := m.getHeaderMap()
+	defer m.putHeaderMap(headerMap)
+	
+	// 调用回调函数填充 map
+	fn(headerMap)
+	
+	// 批量设置 header
+	m.setHeadersBatch(headers, headerMap)
 }
 
 // SetResponseProcessor 设置响应处理器
@@ -538,12 +575,14 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 
 		// 处理自定义上游请求头部
 		if len(rule.UpstreamRequestHeaders) > 0 {
-			upstreamHeaders := make(map[string]string, len(rule.UpstreamRequestHeaders))
-		for key, value := range rule.UpstreamRequestHeaders {
-			trimmedKey := strings.TrimSpace(key)
+			// 使用对象池优化：从对象池获取 map，使用后归还
+			upstreamHeaders := m.getHeaderMap()
+			defer m.putHeaderMap(upstreamHeaders)
+			for key, value := range rule.UpstreamRequestHeaders {
+				trimmedKey := strings.TrimSpace(key)
 				if trimmedKey != "" {
 					upstreamHeaders[trimmedKey] = value
-			}
+				}
 			}
 			m.setHeadersBatch(r.Header, upstreamHeaders)
 		}
@@ -649,12 +688,14 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 
 			// 处理自定义响应头部
 			if ruleFromCtx != nil && len(ruleFromCtx.ResponseHeaders) > 0 {
-				responseHeaders := make(map[string]string, len(ruleFromCtx.ResponseHeaders))
-			for key, value := range ruleFromCtx.ResponseHeaders {
-				trimmedKey := strings.TrimSpace(key)
+				// 使用对象池优化：从对象池获取 map，使用后归还
+				responseHeaders := m.getHeaderMap()
+				defer m.putHeaderMap(responseHeaders)
+				for key, value := range ruleFromCtx.ResponseHeaders {
+					trimmedKey := strings.TrimSpace(key)
 					if trimmedKey != "" {
 						responseHeaders[trimmedKey] = value
-				}
+					}
 				}
 				m.setHeadersBatch(resp.Header, responseHeaders)
 			}
@@ -914,12 +955,14 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 
 		// 处理自定义上游请求头部
 		if len(rule.UpstreamRequestHeaders) > 0 {
-			upstreamHeaders := make(map[string]string, len(rule.UpstreamRequestHeaders))
-		for key, value := range rule.UpstreamRequestHeaders {
-			trimmedKey := strings.TrimSpace(key)
+			// 使用对象池优化：从对象池获取 map，使用后归还
+			upstreamHeaders := m.getHeaderMap()
+			defer m.putHeaderMap(upstreamHeaders)
+			for key, value := range rule.UpstreamRequestHeaders {
+				trimmedKey := strings.TrimSpace(key)
 				if trimmedKey != "" {
 					upstreamHeaders[trimmedKey] = value
-			}
+				}
 			}
 			m.setHeadersBatch(r.Header, upstreamHeaders)
 		}
@@ -987,12 +1030,14 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 
 		// 处理自定义响应头部
 		if ruleFromCtx != nil && len(ruleFromCtx.ResponseHeaders) > 0 {
-			responseHeaders := make(map[string]string, len(ruleFromCtx.ResponseHeaders))
-		for key, value := range ruleFromCtx.ResponseHeaders {
-			trimmedKey := strings.TrimSpace(key)
+			// 使用对象池优化：从对象池获取 map，使用后归还
+			responseHeaders := m.getHeaderMap()
+			defer m.putHeaderMap(responseHeaders)
+			for key, value := range ruleFromCtx.ResponseHeaders {
+				trimmedKey := strings.TrimSpace(key)
 				if trimmedKey != "" {
 					responseHeaders[trimmedKey] = value
-			}
+				}
 			}
 			m.setHeadersBatch(resp.Header, responseHeaders)
 		}
