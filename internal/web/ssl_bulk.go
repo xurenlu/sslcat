@@ -19,41 +19,54 @@ func (s *Server) handleSSLDownloadAll(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", "attachment; filename=sslcerts-"+time.Now().Format("20060102-150405")+".zip")
 	zw := zip.NewWriter(w)
 	defer zw.Close()
-	// 打包 cert_dir 与 key_dir
-	addDir := func(root string) {
-		entries, _ := os.ReadDir(root)
-		for _, e := range entries {
-			if e.IsDir() {
-				continue
-			}
-			name := e.Name()
-			if !strings.HasSuffix(strings.ToLower(name), ".crt") && !strings.HasSuffix(strings.ToLower(name), ".key") && !strings.HasSuffix(strings.ToLower(name), ".pem") {
-				continue
-			}
-			path := root + "/" + name
-			f, err := os.Open(path)
-			if err != nil {
-				continue
-			}
-			defer f.Close()
-			wri, err := zw.Create(strings.TrimPrefix(path, "./"))
-			if err != nil {
-				continue
-			}
-			buf := make([]byte, 32*1024)
-			for {
-				n, er := f.Read(buf)
-				if n > 0 {
-					_, _ = wri.Write(buf[:n])
-				}
-				if er != nil {
-					break
+
+	// 获取所有证书列表
+	certs := s.sslManager.GetCertificateList()
+
+	// 按域名组织文件结构
+	for _, certInfo := range certs {
+		domain := certInfo.Domain
+		// 为每个域名创建文件夹
+		domainDir := domain + "/"
+
+		// 添加证书文件
+		certPath := filepath.Join(s.config.SSL.CertDir, domain+".crt")
+		if certFile, err := os.Open(certPath); err == nil {
+			zipPath := domainDir + domain + ".crt"
+			if wri, err := zw.Create(zipPath); err == nil {
+				buf := make([]byte, 32*1024)
+				for {
+					n, er := certFile.Read(buf)
+					if n > 0 {
+						_, _ = wri.Write(buf[:n])
+					}
+					if er != nil {
+						break
+					}
 				}
 			}
+			certFile.Close()
+		}
+
+		// 添加私钥文件
+		keyPath := filepath.Join(s.config.SSL.KeyDir, domain+".key")
+		if keyFile, err := os.Open(keyPath); err == nil {
+			zipPath := domainDir + domain + ".key"
+			if wri, err := zw.Create(zipPath); err == nil {
+				buf := make([]byte, 32*1024)
+				for {
+					n, er := keyFile.Read(buf)
+					if n > 0 {
+						_, _ = wri.Write(buf[:n])
+					}
+					if er != nil {
+						break
+					}
+				}
+			}
+			keyFile.Close()
 		}
 	}
-	addDir(s.config.SSL.CertDir)
-	addDir(s.config.SSL.KeyDir)
 }
 
 func (s *Server) handleSSLBulkUpload(w http.ResponseWriter, r *http.Request) {

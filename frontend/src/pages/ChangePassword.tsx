@@ -226,8 +226,14 @@ const ChangePassword: React.FC = () => {
               </HStack>
               <HStack justify="space-between">
                 <Text>{t.users.status}:</Text>
-                <Badge colorScheme={user?.is_active ? 'green' : 'red'} fontSize="sm">
-                  {user?.is_active ? t.users.active : t.users.disabled}
+                <Badge 
+                  colorScheme={
+                    // 超级管理员始终为活跃状态
+                    (user?.role === 'super_admin' || user?.is_active) ? 'green' : 'red'
+                  } 
+                  fontSize="sm"
+                >
+                  {(user?.role === 'super_admin' || user?.is_active) ? t.users.active : t.users.disabled}
                 </Badge>
               </HStack>
             </VStack>

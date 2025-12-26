@@ -299,9 +299,22 @@ func (s *Server) handleAPIAuthMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 获取完整的用户信息
+	user := s.getCurrentUser(r)
+	isActive := true
+	if user != nil {
+		isActive = user.IsActive
+	} else {
+		// 如果是配置文件中的管理员，始终为活跃状态
+		if session.Username == s.config.Admin.Username {
+			isActive = true
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"username": session.Username,
 		"role":     session.Role,
+		"is_active": isActive,
 	})
 }

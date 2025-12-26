@@ -313,3 +313,95 @@ func (s *Server) handleAPIMonitoringWatchdogRestart(w http.ResponseWriter, r *ht
 	s.writeSuccessResponse(w, nil, "Watchdog restarted successfully")
 }
 
+// handleAPIMonitoringMetrics 获取历史指标数据
+func (s *Server) handleAPIMonitoringMetrics(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizeAPI(w, r, true) {
+		return
+	}
+
+	if r.Method != "GET" {
+		s.writeErrorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	if s.monitorManager == nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, "Monitor manager not initialized")
+		return
+	}
+
+	metricsStorage := s.monitorManager.GetMetricsStorage()
+	if metricsStorage == nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, "Metrics storage not enabled")
+		return
+	}
+
+	// 解析查询参数
+	startTimeStr := r.URL.Query().Get("start_time")
+	endTimeStr := r.URL.Query().Get("end_time")
+	granularity := r.URL.Query().Get("granularity")
+
+	// 默认时间范围：最近7天
+	var startTime, endTime time.Time
+	now := time.Now()
+	endTime = now
+
+	if startTimeStr == "" {
+		startTime = now.AddDate(0, 0, -7)
+	} else {
+		var err error
+		startTime, err = time.Parse(time.RFC3339, startTimeStr)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, "Invalid start_time format, use RFC3339 (e.g., 2025-12-01T00:00:00Z)")
+			return
+		}
+	}
+
+	if endTimeStr != "" {
+		var err error
+		endTime, err = time.Parse(time.RFC3339, endTimeStr)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, "Invalid end_time format, use RFC3339 (e.g., 2025-12-26T23:59:59Z)")
+			return
+		}
+	}
+
+	// 验证时间范围
+	if startTime.After(endTime) {
+		s.writeErrorResponse(w, http.StatusBadRequest, "start_time must be before end_time")
+		return
+	}
+
+	// 限制查询范围（最多90天）
+	if endTime.Sub(startTime) > 90*24*time.Hour {
+		s.writeErrorResponse(w, http.StatusBadRequest, "Time range cannot exceed 90 days")
+		return
+	}
+
+	// 默认 granularity
+	if granularity == "" {
+		granularity = "auto"
+	}
+
+	// 验证 granularity
+	validGranularities := map[string]bool{
+		"auto":  true,
+		"15min": true,
+		"daily": true,
+		"all":   true,
+	}
+	if !validGranularities[granularity] {
+		s.writeErrorResponse(w, http.StatusBadRequest, "Invalid granularity, must be one of: auto, 15min, daily, all")
+		return
+	}
+
+	// 查询数据
+	result, err := metricsStorage.GetMetrics(startTime, endTime, granularity)
+	if err != nil {
+		s.log.Errorf("查询指标数据失败: %v", err)
+		s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to query metrics: "+err.Error())
+		return
+	}
+
+	s.writeSuccessResponse(w, result, "Metrics retrieved successfully")
+}
+

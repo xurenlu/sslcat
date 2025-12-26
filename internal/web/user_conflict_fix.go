@@ -27,7 +27,7 @@ func (ucm *UserConflictManager) ValidateUsername(username string) error {
 
 	// 检查其他保留用户名
 	reservedNames := []string{
-		"root", "administrator", "superuser", "superadmin",
+		"admin", "root", "administrator", "superuser", "superadmin",
 		"system", "sslcat", "sslcat-admin", "sslcat-admin",
 	}
 

@@ -436,6 +436,7 @@ export interface Translation {
     exit_warning: string
     save_success: string
     save_failed: string
+    history_charts: string
   }
   
   // 设置页面

@@ -2,13 +2,11 @@ package cache
 
 import (
 	"bytes"
-	"context"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"time"
 
-	"github.com/allegro/bigcache/v3"
 	"github.com/sirupsen/logrus"
 )
 
@@ -33,12 +31,13 @@ func (item *MemoryCacheItem) IsExpired() bool {
 
 // MemoryCacheConfig 统一的内存缓存配置
 type MemoryCacheConfig struct {
-	Name            string        // 缓存名称（用于日志）
-	MaxEntries      int           // 最大条目数
-	MaxSizeBytes    int64         // 最大总大小（字节）
-	MaxItemSize     int64         // 单个项最大大小（字节）
-	DefaultTTL      time.Duration // 默认 TTL（0 表示永不过期）
-	CleanupInterval time.Duration // 清理间隔
+	Name            string           // 缓存名称（用于日志）
+	MaxEntries      int              // 最大条目数
+	MaxSizeBytes    int64            // 最大总大小（字节）
+	MaxItemSize     int64            // 单个项最大大小（字节）
+	DefaultTTL      time.Duration    // 默认 TTL（0 表示永不过期）
+	CleanupInterval time.Duration    // 清理间隔
+	BackendType     CacheBackendType // 缓存后端类型（bigcache/simple/auto）
 }
 
 // DefaultMemoryCacheConfig 默认配置（资源受限模式）
@@ -53,14 +52,15 @@ func DefaultMemoryCacheConfig(name string) *MemoryCacheConfig {
 	}
 }
 
-// MemoryCache 统一的内存缓存管理器（使用 BigCache 作为底层实现）
+// MemoryCache 统一的内存缓存管理器（支持多种后端实现）
 type MemoryCache struct {
-	cache  *bigcache.BigCache
-	config *bigcache.Config
-	log    *logrus.Entry
-	name   string
+	backend    CacheBackend // 缓存后端（可插拔）
+	log        *logrus.Entry
+	name       string
+	maxItemSize int64        // 单个项最大大小（用于验证）
+	defaultTTL  time.Duration // 默认 TTL
 
-	// 统计信息（手动维护，因为 BigCache 不提供详细统计）
+	// 统计信息（手动维护）
 	hits      uint64
 	misses    uint64
 	evictions uint64
@@ -73,42 +73,37 @@ func NewMemoryCache(config *MemoryCacheConfig) *MemoryCache {
 		config = DefaultMemoryCacheConfig("default")
 	}
 
-	// 转换配置为 BigCache 配置
-	bigCacheConfig := bigcache.DefaultConfig(time.Duration(config.DefaultTTL))
-	bigCacheConfig.Shards = 16 // 从32减少到16，减少内存开销（分片预分配）
-	bigCacheConfig.LifeWindow = time.Duration(config.DefaultTTL)
-	bigCacheConfig.CleanWindow = time.Duration(config.CleanupInterval)
-	bigCacheConfig.MaxEntriesInWindow = config.MaxEntries * 2 // 从5倍减少到2倍
-	bigCacheConfig.MaxEntrySize = int(config.MaxItemSize)
-	bigCacheConfig.HardMaxCacheSize = int(config.MaxSizeBytes / (1024 * 1024)) // 转换为 MB
-	bigCacheConfig.Verbose = false
-	bigCacheConfig.Logger = logrus.New()
+	// 如果未指定后端类型，默认使用 simple（轻量级，适合低流量场景）
+	if config.BackendType == "" {
+		config.BackendType = CacheBackendSimple
+	}
 
-	// 创建 BigCache 实例
-	cache, err := bigcache.New(context.Background(), bigCacheConfig)
+	// 创建缓存后端
+	backend, err := NewCacheBackend(config.BackendType, config)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to create BigCache: %v", err))
+		panic(fmt.Sprintf("Failed to create cache backend: %v", err))
 	}
 
 	mc := &MemoryCache{
-		cache:  cache,
-		config: &bigCacheConfig,
-		name:   config.Name,
+		backend:     backend,
+		name:        config.Name,
+		maxItemSize: config.MaxItemSize,
+		defaultTTL:  config.DefaultTTL,
 		log: logrus.WithFields(logrus.Fields{
 			"component": "memory_cache",
 			"name":      config.Name,
 		}),
 	}
 
-	mc.log.Infof("Memory cache initialized with BigCache: max_entries=%d, max_size=%d bytes, ttl=%v",
-		config.MaxEntries, config.MaxSizeBytes, config.DefaultTTL)
+	mc.log.Infof("Memory cache initialized with backend=%s: max_entries=%d, max_size=%d bytes, ttl=%v",
+		config.BackendType, config.MaxEntries, config.MaxSizeBytes, config.DefaultTTL)
 
 	return mc
 }
 
 // Get 获取缓存项
 func (mc *MemoryCache) Get(key string) (*MemoryCacheItem, bool) {
-	data, err := mc.cache.Get(key)
+	data, err := mc.backend.Get(key)
 	if err != nil {
 		mc.misses++
 		return nil, false
@@ -124,7 +119,7 @@ func (mc *MemoryCache) Get(key string) (*MemoryCacheItem, bool) {
 
 	// 检查是否过期
 	if item.IsExpired() {
-		mc.cache.Delete(key)
+		mc.backend.Delete(key)
 		mc.misses++
 		mc.expired++
 		return nil, false
@@ -136,7 +131,7 @@ func (mc *MemoryCache) Get(key string) (*MemoryCacheItem, bool) {
 
 	// 重新序列化并存储（更新访问时间）
 	if updatedData, err := marshalCacheItem(item); err == nil {
-		_ = mc.cache.Set(key, updatedData)
+		_ = mc.backend.Set(key, updatedData)
 	} else {
 		mc.log.Errorf("Failed to re-marshal cache item: %v", err)
 	}
@@ -155,16 +150,16 @@ func (mc *MemoryCache) SetWithMetadata(key string, data []byte, metadata map[str
 	size := int64(len(data))
 
 	// 检查单个项大小
-	if size > int64(mc.config.MaxEntrySize) {
-		return fmt.Errorf("item too large: %d bytes (max: %d)", size, mc.config.MaxEntrySize)
+	if size > mc.maxItemSize {
+		return fmt.Errorf("item too large: %d bytes (max: %d)", size, mc.maxItemSize)
 	}
 
 	// 确定过期时间
 	var expiresAt time.Time
 	if ttl > 0 {
 		expiresAt = time.Now().Add(ttl)
-	} else if mc.config.LifeWindow > 0 {
-		expiresAt = time.Now().Add(mc.config.LifeWindow)
+	} else if mc.defaultTTL > 0 {
+		expiresAt = time.Now().Add(mc.defaultTTL)
 	}
 
 	// 创建缓存项
@@ -184,25 +179,25 @@ func (mc *MemoryCache) SetWithMetadata(key string, data []byte, metadata map[str
 		return fmt.Errorf("failed to marshal cache item: %w", err)
 	}
 
-	// 存储到 BigCache
-	return mc.cache.Set(key, itemData)
+	// 存储到缓存后端
+	return mc.backend.Set(key, itemData)
 }
 
 // Delete 删除缓存项
 func (mc *MemoryCache) Delete(key string) bool {
-	err := mc.cache.Delete(key)
+	err := mc.backend.Delete(key)
 	return err == nil
 }
 
 // Clear 清空所有缓存
 func (mc *MemoryCache) Clear() {
-	mc.cache.Reset()
+	mc.backend.Reset()
 	mc.log.Info("Cache cleared")
 }
 
 // Stats 获取统计信息
 func (mc *MemoryCache) Stats() map[string]interface{} {
-	stats := mc.cache.Len()
+	stats := mc.backend.Len()
 	totalRequests := mc.hits + mc.misses
 	hitRate := 0.0
 	if totalRequests > 0 {
@@ -222,8 +217,8 @@ func (mc *MemoryCache) Stats() map[string]interface{} {
 
 // GetSize 获取当前缓存大小（字节）
 func (mc *MemoryCache) GetSize() int64 {
-	// BigCache 不直接提供大小信息，我们通过条目数估算
-	entries := mc.cache.Len()
+	// 通过条目数估算（所有后端都支持）
+	entries := mc.backend.Len()
 	// 估算每个条目平均大小（包括序列化开销）
 	avgSize := int64(1024) // 1KB 作为平均大小
 	return int64(entries) * avgSize
@@ -231,7 +226,7 @@ func (mc *MemoryCache) GetSize() int64 {
 
 // Close 关闭缓存
 func (mc *MemoryCache) Close() {
-	mc.cache.Close()
+	mc.backend.Close()
 	mc.log.Info("Memory cache closed")
 }
 

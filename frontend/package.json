@@ -25,7 +25,8 @@
     "react-dom": "^18.2.0",
     "react-i18next": "^16.0.0",
     "react-icons": "^4.12.0",
-    "react-router-dom": "^6.20.1"
+    "react-router-dom": "^6.20.1",
+    "recharts": "^2.10.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.1",

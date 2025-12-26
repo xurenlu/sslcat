@@ -364,6 +364,7 @@ export const zhCN: Translation = {
     exit_warning: '⚠️ 启用自动退出后，进程将在超过阈值时退出。systemd 会在 5 秒后自动重启进程。请确保使用 systemd 管理 SSLcat 服务。',
     save_success: '监控配置已保存',
     save_failed: '保存失败',
+    history_charts: '历史数据图表',
   },
   settings: {
     title: '系统设置',

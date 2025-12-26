@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.30] - 2025-12-26
+
+### 🚀 重大优化
+
+#### 可插拔缓存后端系统
+- **多种缓存实现**: 新增可插拔的缓存后端系统，支持 `bigcache`、`simple` 和 `auto` 三种模式
+- **轻量级缓存**: 新增 `simple` 缓存实现，基于 map + mutex，按需分配内存，无预分配
+- **内存优化**: 默认使用 `simple` 后端，大幅降低内存占用（从 3.89GB 降低到 50-100MB）
+- **配置选项**: 新增 `cache_backend_type` 配置项，可在配置文件中选择缓存后端类型
+- **自动选择**: 支持 `auto` 模式，根据缓存大小自动选择最优后端
+
+#### 内存占用优化
+- **bigcache 优化**: 优化 bigcache 配置，减少分片数和预分配内存
+  - 极小缓存（<10MB）: 2 个分片
+  - 小缓存（<50MB）: 4 个分片
+  - 大缓存（>=50MB）: 8 个分片
+- **默认缓存大小**: 共享缓存默认大小从 10MB 降低到 5MB
+- **缓存条目数**: MaxEntries 从 100 降低到 50
+- **单项大小**: MaxItemSize 从 1MB 降低到 512KB
+
+#### CPU 占用优化
+- **CPU 百分比计算**: 修复 CPU 百分比计算异常（如 30493.9%）的问题
+  - 添加时间差验证（0-3600秒）
+  - 添加 CPU 时间回绕检测
+  - 添加异常值过滤（限制在合理范围内）
+  - 添加详细日志记录
+
+#### VACUUM 操作优化
+- **智能 VACUUM**: 优化 SQLite VACUUM 操作，只在删除大量数据（>100条）时执行
+- **轻量优化**: 优先使用 `PRAGMA optimize` 进行轻量优化
+- **减少 CPU 消耗**: 避免频繁 VACUUM 导致的 CPU 暴涨
+
+### 🐛 Bug 修复
+
+#### 证书管理
+- **证书自动续期**: 修复证书自动续期成功后未立即保存的问题
+- **证书申请阻塞**: 修复添加站点/代理时证书申请阻塞 API 响应的问题
+
+### 📝 文档
+
+- **缓存后端选择指南**: 新增缓存后端选择和使用文档
+- **内存优化报告**: 新增内存深度分析报告
+- **CPU 诊断报告**: 新增 CPU 暴涨排查和修复报告
+
+### ⚙️ 配置变更
+
+- **新增配置项**: `server.cache_backend_type` - 缓存后端类型（bigcache/simple/auto，默认 simple）
+- **默认值变更**: 缓存后端默认从 `auto` 改为 `simple`，更适合低流量场景
+
 ## [1.3.29-rc1] - 2025-12-25
 
 ### ✨ 新增功能

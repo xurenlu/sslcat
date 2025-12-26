@@ -86,23 +86,67 @@ func (r *LinuxProcessStatsReader) GetProcessStats() (*ProcessStats, error) {
 
 	// 计算CPU占用百分比
 	now := time.Now()
+	maxReasonableCPU := float64(r.numCPU) * 100 * 2 // 允许2倍的核心数*100%作为上限
+	
 	if r.lastSysTime.IsZero() {
+		// 首次调用，初始化基准值
 		r.lastSysTime = now
 		r.lastCPUTime = cpuTime
 		stats.CPUPercent = 0.0
 	} else {
 		timeDiff := now.Sub(r.lastSysTime).Seconds()
-		if timeDiff > 0 {
-			cpuDiff := cpuTime - r.lastCPUTime
-			// CPU占用 = (进程CPU时间差 / 总CPU时间差) * 100
-			// 总CPU时间差 = 时间差 * CPU核心数
-			totalCPUTime := timeDiff * float64(r.numCPU) * 100 // 转换为百分之一秒
-			if totalCPUTime > 0 {
-				stats.CPUPercent = (float64(cpuDiff) / totalCPUTime) * 100
+		
+		// 检查时间差是否合理（避免系统时间回退或异常大的时间差）
+		if timeDiff <= 0 || timeDiff >= 3600 {
+			// 时间差异常，重置基准值
+			if timeDiff >= 3600 {
+				log.Warnf("检测到异常大的时间差 %.1f 秒，重置基准值", timeDiff)
+			} else if timeDiff <= 0 {
+				log.Warnf("检测到异常的时间差 %.3f 秒（可能是系统时间回退），重置基准值", timeDiff)
+			}
+			r.lastSysTime = now
+			r.lastCPUTime = cpuTime
+			stats.CPUPercent = 0.0
+		} else {
+			// 检查 CPU 时间是否回绕（如果新值小于旧值，可能是进程重启或计数器回绕）
+			if cpuTime < r.lastCPUTime {
+				// CPU 时间回绕或进程重启，重置基准值
+				log.Debugf("检测到 CPU 时间回绕或进程重启，重置基准值 (旧值: %d, 新值: %d)", r.lastCPUTime, cpuTime)
+				r.lastSysTime = now
+				r.lastCPUTime = cpuTime
+				stats.CPUPercent = 0.0
+			} else {
+				// 正常计算 CPU 占用百分比
+				cpuDiff := cpuTime - r.lastCPUTime
+				// CPU占用 = (进程CPU时间差 / 总CPU时间差) * 100
+				// 总CPU时间差 = 时间差 * CPU核心数
+				// cpuTime 是百分之一秒，timeDiff 是秒，需要统一单位
+				totalCPUTime := timeDiff * float64(r.numCPU) * 100 // 转换为百分之一秒
+				
+				if totalCPUTime > 0 {
+					cpuPercent := (float64(cpuDiff) / totalCPUTime) * 100
+					
+					// 限制 CPU 百分比在合理范围内
+					// 正常情况下，单核100%是上限，多核可以超过100%但不会超过核心数*100%
+					if cpuPercent > maxReasonableCPU {
+						log.Warnf("检测到异常的 CPU 百分比 %.1f%%，可能是计算错误，重置基准值 (cpuDiff: %d, timeDiff: %.3fs, numCPU: %d, totalCPUTime: %.1f)",
+							cpuPercent, cpuDiff, timeDiff, r.numCPU, totalCPUTime)
+						r.lastSysTime = now
+						r.lastCPUTime = cpuTime
+						stats.CPUPercent = 0.0
+					} else {
+						stats.CPUPercent = cpuPercent
+						// 正常情况，更新基准值
+						r.lastSysTime = now
+						r.lastCPUTime = cpuTime
+					}
+				} else {
+					stats.CPUPercent = 0.0
+					r.lastSysTime = now
+					r.lastCPUTime = cpuTime
+				}
 			}
 		}
-		r.lastSysTime = now
-		r.lastCPUTime = cpuTime
 	}
 
 	// 计算内存占用百分比

@@ -1,6 +1,7 @@
 package monitor
 
 import (
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -12,6 +13,7 @@ type ManagerOptions struct {
 	Enabled  bool
 	Memory   MemoryMonitorOptions
 	Watchdog WatchdogMonitorOptions
+	MetricsStorage MetricsStorageOptions
 }
 
 // Manager 监控管理器（统一管理所有监控器）
@@ -21,6 +23,7 @@ type Manager struct {
 	memoryMonitor      *MemoryMonitor
 	performanceMonitor *PerformanceMonitor
 	watchdogMonitor    *WatchdogMonitor
+	metricsStorage     *MetricsStorage
 	options            ManagerOptions
 }
 
@@ -28,12 +31,25 @@ type Manager struct {
 func NewManager(opts ManagerOptions) *Manager {
 	normalized := opts
 	normalized.Memory = normalized.Memory.normalize()
-	return &Manager{
+	
+	manager := &Manager{
 		log: logrus.WithFields(logrus.Fields{
 			"component": "monitor_manager",
 		}),
 		options: normalized,
 	}
+	
+	// 初始化指标存储（如果启用）
+	if normalized.MetricsStorage.Enabled {
+		metricsStorage, err := NewMetricsStorage(normalized.MetricsStorage)
+		if err != nil {
+			manager.log.Errorf("初始化指标存储失败: %v", err)
+		} else {
+			manager.metricsStorage = metricsStorage
+		}
+	}
+	
+	return manager
 }
 
 // Start 启动所有监控器
@@ -75,7 +91,20 @@ func (m *Manager) Start(notificationMgr interface{}) {
 		m.log.Info("看门狗监控器已启动")
 	}
 
-	m.log.Info("监控管理器已启动（Goroutine监控、内存监控、性能监控、看门狗监控）")
+	// 启动指标存储（如果启用）
+	if m.metricsStorage != nil {
+		m.metricsStorage.Start()
+		m.log.Info("指标存储已启动")
+	}
+
+	components := []string{"Goroutine监控", "内存监控", "性能监控"}
+	if m.options.Watchdog.Enabled {
+		components = append(components, "看门狗监控")
+	}
+	if m.metricsStorage != nil {
+		components = append(components, "指标存储")
+	}
+	m.log.Infof("监控管理器已启动（%s）", strings.Join(components, "、"))
 }
 
 // Stop 停止所有监控器
@@ -100,6 +129,10 @@ func (m *Manager) Stop() {
 
 	if m.watchdogMonitor != nil {
 		m.watchdogMonitor.Stop()
+	}
+
+	if m.metricsStorage != nil {
+		m.metricsStorage.Stop()
 	}
 
 	m.log.Info("监控管理器已停止")
@@ -154,6 +187,11 @@ func (m *Manager) UpdateMemoryMonitorOptions(opts MemoryMonitorOptions) {
 // GetWatchdogMonitor 获取看门狗监控器（用于外部查询）
 func (m *Manager) GetWatchdogMonitor() *WatchdogMonitor {
 	return m.watchdogMonitor
+}
+
+// GetMetricsStorage 获取指标存储（用于外部查询）
+func (m *Manager) GetMetricsStorage() *MetricsStorage {
+	return m.metricsStorage
 }
 
 // UpdateWatchdogOptions 更新看门狗监控配置

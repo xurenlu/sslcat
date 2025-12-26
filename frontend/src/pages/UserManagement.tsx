@@ -194,6 +194,18 @@ const UserManagement: React.FC = () => {
       return
     }
 
+    // 禁止使用 "admin" 作为用户名
+    if (addForm.username.toLowerCase() === 'admin') {
+      toast({
+        title: '用户名不能为 "admin"',
+        description: 'admin 是保留用户名，不能使用',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+      return
+    }
+
     if (!addForm.password || addForm.password.length < 6) {
       toast({
         title: '密码长度至少6个字符',

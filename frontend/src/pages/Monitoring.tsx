@@ -29,6 +29,12 @@ import {
   AlertDescription,
   Spinner,
   Divider,
+  Select,
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel,
 } from '@chakra-ui/react'
 import {
   FiActivity,
@@ -37,10 +43,21 @@ import {
   FiCpu,
   FiHardDrive,
   FiAlertTriangle,
+  FiTrendingUp,
 } from 'react-icons/fi'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
 import { useTranslation } from '../hooks/useLanguage'
 import { DEFAULTS } from '../constants'
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts'
 
 interface MonitoringConfig {
   enabled: boolean
@@ -65,6 +82,27 @@ interface MonitoringStats {
   memory_percent: number
   memory_rss_mb: number
   timestamp: string
+}
+
+interface ProcessMetric {
+  id: number
+  timestamp: string
+  granularity: string
+  cpu_percent: number
+  memory_mb: number
+  memory_percent: number
+  sample_count: number
+}
+
+interface MetricsQueryResult {
+  data: ProcessMetric[]
+  summary: {
+    total_samples: number
+    avg_cpu: number
+    avg_memory_mb: number
+    max_cpu: number
+    max_memory_mb: number
+  }
 }
 
 const Monitoring: React.FC = () => {
@@ -100,6 +138,9 @@ const Monitoring: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [statsLoading, setStatsLoading] = useState(false)
+  const [metricsLoading, setMetricsLoading] = useState(false)
+  const [metricsData, setMetricsData] = useState<MetricsQueryResult | null>(null)
+  const [timeRange, setTimeRange] = useState<'today' | '7days' | '30days' | '90days'>('today')
 
   // 加载配置
   const loadConfig = async () => {
@@ -183,10 +224,67 @@ const Monitoring: React.FC = () => {
     }
   }
 
+  // 加载历史指标数据
+  const loadMetrics = async (range: 'today' | '7days' | '30days' | '90days') => {
+    setMetricsLoading(true)
+    try {
+      const now = new Date()
+      let startTime: Date
+      let granularity: string
+
+      switch (range) {
+        case 'today':
+          startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+          granularity = '15min'
+          break
+        case '7days':
+          startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          granularity = 'auto'
+          break
+        case '30days':
+          startTime = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+          granularity = 'auto'
+          break
+        case '90days':
+          startTime = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+          granularity = 'auto'
+          break
+        default:
+          startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          granularity = 'auto'
+      }
+
+      const params = new URLSearchParams({
+        start_time: startTime.toISOString(),
+        end_time: now.toISOString(),
+        granularity: granularity,
+      })
+
+      const response = await fetch(
+        buildApiPath(adminPrefix, `/api/monitoring/metrics?${params.toString()}`),
+        {
+          credentials: 'include',
+        }
+      )
+
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && result.data) {
+          setMetricsData(result.data)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load metrics:', error)
+    } finally {
+      setMetricsLoading(false)
+    }
+  }
+
   // 定时刷新统计数据
   useEffect(() => {
     loadConfig()
     loadStats()
+    loadMetrics(timeRange)
 
     const interval = setInterval(() => {
       loadStats()
@@ -194,6 +292,12 @@ const Monitoring: React.FC = () => {
 
     return () => clearInterval(interval)
   }, [adminPrefix])
+
+  // 当时间范围改变时重新加载数据
+  useEffect(() => {
+    loadMetrics(timeRange)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeRange])
 
   return (
     <Box>
@@ -212,14 +316,6 @@ const Monitoring: React.FC = () => {
             isLoading={loading || statsLoading}
           >
             {t.common?.refresh || '刷新'}
-          </Button>
-          <Button
-            leftIcon={<FiSave />}
-            colorScheme="blue"
-            onClick={saveConfig}
-            isLoading={saving}
-          >
-            {t.common?.save || '保存'}
           </Button>
         </HStack>
       </HStack>
@@ -273,6 +369,197 @@ const Monitoring: React.FC = () => {
               <StatHelpText>最后刷新时间</StatHelpText>
             </Stat>
           </SimpleGrid>
+        </CardBody>
+      </Card>
+
+      {/* 历史数据图表 */}
+      <Card mb={6}>
+        <CardHeader>
+          <HStack justify="space-between">
+            <Heading size="md">
+              <Icon as={FiTrendingUp} mr={2} />
+              {t.monitoring?.history_charts || '历史数据图表'}
+            </Heading>
+            <HStack>
+              <Select
+                value={timeRange}
+                onChange={(e) => setTimeRange(e.target.value as any)}
+                width="150px"
+              >
+                <option value="today">今天</option>
+                <option value="7days">最近7天</option>
+                <option value="30days">最近30天</option>
+                <option value="90days">最近90天</option>
+              </Select>
+              <Button
+                size="sm"
+                leftIcon={<FiRefreshCw />}
+                onClick={() => loadMetrics(timeRange)}
+                isLoading={metricsLoading}
+              >
+                刷新
+              </Button>
+            </HStack>
+          </HStack>
+        </CardHeader>
+        <CardBody>
+          {metricsLoading ? (
+            <Box textAlign="center" py={10}>
+              <Spinner size="lg" />
+              <Text mt={4}>加载历史数据中...</Text>
+            </Box>
+          ) : metricsData && metricsData.data.length > 0 ? (
+            <Tabs>
+              <TabList>
+                <Tab>CPU 使用率</Tab>
+                <Tab>内存使用</Tab>
+              </TabList>
+              <TabPanels>
+                <TabPanel>
+                  <Box height="400px">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={metricsData.data.map((item) => ({
+                        time: new Date(item.timestamp).toLocaleString('zh-CN', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: timeRange === 'today' ? '2-digit' : undefined,
+                          minute: timeRange === 'today' ? '2-digit' : undefined,
+                        }),
+                        timestamp: item.timestamp,
+                        value: item.cpu_percent,
+                      }))}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis
+                          dataKey="time"
+                          angle={-45}
+                          textAnchor="end"
+                          height={80}
+                          interval="preserveStartEnd"
+                        />
+                        <YAxis label={{ value: 'CPU (%)', angle: -90, position: 'insideLeft' }} />
+                        <Tooltip
+                          formatter={(value: any) => [`${Number(value).toFixed(2)}%`, 'CPU 使用率']}
+                          labelFormatter={(label) => `时间: ${label}`}
+                        />
+                        <Legend />
+                        <Line
+                          type="monotone"
+                          dataKey="value"
+                          stroke="#3182CE"
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                          name="CPU 使用率"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </Box>
+                  {metricsData.summary && (
+                    <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4} mt={4}>
+                      <Stat>
+                        <StatLabel>平均 CPU</StatLabel>
+                        <StatNumber fontSize="lg">{metricsData.summary.avg_cpu.toFixed(2)}%</StatNumber>
+                      </Stat>
+                      <Stat>
+                        <StatLabel>最大 CPU</StatLabel>
+                        <StatNumber fontSize="lg">{metricsData.summary.max_cpu.toFixed(2)}%</StatNumber>
+                      </Stat>
+                      <Stat>
+                        <StatLabel>数据点数</StatLabel>
+                        <StatNumber fontSize="lg">{metricsData.summary.total_samples}</StatNumber>
+                      </Stat>
+                    </SimpleGrid>
+                  )}
+                </TabPanel>
+                <TabPanel>
+                  <Box height="400px">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={metricsData.data.map((item) => ({
+                        time: new Date(item.timestamp).toLocaleString('zh-CN', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: timeRange === 'today' ? '2-digit' : undefined,
+                          minute: timeRange === 'today' ? '2-digit' : undefined,
+                        }),
+                        timestamp: item.timestamp,
+                        value: item.memory_mb,
+                        percent: item.memory_percent,
+                      }))}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis
+                          dataKey="time"
+                          angle={-45}
+                          textAnchor="end"
+                          height={80}
+                          interval="preserveStartEnd"
+                        />
+                        <YAxis
+                          yAxisId="left"
+                          label={{ value: '内存 (MB)', angle: -90, position: 'insideLeft' }}
+                        />
+                        <YAxis
+                          yAxisId="right"
+                          orientation="right"
+                          label={{ value: '内存 (%)', angle: 90, position: 'insideRight' }}
+                        />
+                        <Tooltip
+                          formatter={(value: any, name: string) => {
+                            if (name === '内存MB') {
+                              return [`${Number(value).toFixed(2)} MB`, '内存使用']
+                            } else {
+                              return [`${Number(value).toFixed(2)}%`, '内存百分比']
+                            }
+                          }}
+                          labelFormatter={(label) => `时间: ${label}`}
+                        />
+                        <Legend />
+                        <Line
+                          yAxisId="left"
+                          type="monotone"
+                          dataKey="value"
+                          stroke="#38A169"
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                          name="内存MB"
+                        />
+                        <Line
+                          yAxisId="right"
+                          type="monotone"
+                          dataKey="percent"
+                          stroke="#805AD5"
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                          name="内存百分比"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </Box>
+                  {metricsData.summary && (
+                    <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4} mt={4}>
+                      <Stat>
+                        <StatLabel>平均内存</StatLabel>
+                        <StatNumber fontSize="lg">{metricsData.summary.avg_memory_mb.toFixed(2)} MB</StatNumber>
+                      </Stat>
+                      <Stat>
+                        <StatLabel>最大内存</StatLabel>
+                        <StatNumber fontSize="lg">{metricsData.summary.max_memory_mb.toFixed(2)} MB</StatNumber>
+                      </Stat>
+                      <Stat>
+                        <StatLabel>数据点数</StatLabel>
+                        <StatNumber fontSize="lg">{metricsData.summary.total_samples}</StatNumber>
+                      </Stat>
+                    </SimpleGrid>
+                  )}
+                </TabPanel>
+              </TabPanels>
+            </Tabs>
+          ) : (
+            <Box textAlign="center" py={10}>
+              <Text color="gray.500">暂无历史数据</Text>
+              <Text fontSize="sm" color="gray.400" mt={2}>
+                历史数据将在启用指标存储后开始收集
+              </Text>
+            </Box>
+          )}
         </CardBody>
       </Card>
 
@@ -601,6 +888,19 @@ const Monitoring: React.FC = () => {
           </VStack>
         </CardBody>
       </Card>
+
+      {/* 保存按钮 - 放在页面底部 */}
+      <HStack justify="flex-end" mt={6}>
+        <Button
+          leftIcon={<FiSave />}
+          colorScheme="blue"
+          onClick={saveConfig}
+          isLoading={saving}
+          size="lg"
+        >
+          {t.common?.save || '保存'}
+        </Button>
+      </HStack>
     </Box>
   )
 }

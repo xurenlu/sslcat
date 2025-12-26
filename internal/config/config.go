@@ -73,7 +73,8 @@ type ServerConfig struct {
 	AccessLogMaxFiles int    `json:"access_log_max_files"`
 
 	// 共享内存缓存
-	SharedCacheMaxSizeMB int `json:"shared_cache_max_size_mb"` // 共享缓存最大容量（MB）
+	SharedCacheMaxSizeMB int    `json:"shared_cache_max_size_mb"` // 共享缓存最大容量（MB）
+	CacheBackendType     string `json:"cache_backend_type"`       // 缓存后端类型：bigcache/simple/auto（默认simple）
 
 	// 客户端连接超时（秒）
 	ReadTimeoutSec  int `json:"read_timeout_sec"`
@@ -949,6 +950,14 @@ func Load(configFile string) (*Config, error) {
 			WatchdogCPUIncreaseThresholdPercent: 15.0,  // 默认15%
 			WatchdogCPUIncreaseWindowSec:        180,   // 默认3分钟
 			WatchdogAlertCooldownSec:            3600,  // 默认1小时
+			// 指标存储默认配置
+			MetricsStorage: MetricsStorageConfig{
+				Enabled:            true,  // 默认启用
+				SamplingInterval:    15,    // 默认15分钟
+				RetentionDays:       90,    // 默认保留90天
+				DetailRetentionDays: 7,     // 默认详细数据保留7天
+				MaxRows:             10000, // 默认最大10000行
+			},
 		},
 		CacheWarmup: CacheWarmupConfig{
 			Enabled:  false, // 默认禁用缓存预热
@@ -1296,6 +1305,14 @@ func getDefaultConfig() *Config {
 			WatchdogCPUIncreaseThresholdPercent: 15.0,
 			WatchdogCPUIncreaseWindowSec:        180,
 			WatchdogAlertCooldownSec:            3600,
+			// 指标存储默认配置
+			MetricsStorage: MetricsStorageConfig{
+				Enabled:            true,
+				SamplingInterval:    15,
+				RetentionDays:       90,
+				DetailRetentionDays: 7,
+				MaxRows:             10000,
+			},
 		},
 		CacheWarmup: CacheWarmupConfig{
 			Enabled:  false,
@@ -2410,6 +2427,18 @@ type MonitoringConfig struct {
 	// 自动退出配置
 	WatchdogExitOnMemoryThreshold bool `json:"watchdog_exit_on_memory_threshold"` // 达到内存阈值时自动退出（由systemd重启）
 	WatchdogExitOnCPUThreshold    bool `json:"watchdog_exit_on_cpu_threshold"`    // 达到CPU阈值时自动退出（由systemd重启）
+
+	// 指标存储配置
+	MetricsStorage MetricsStorageConfig `json:"metrics_storage"`
+}
+
+// MetricsStorageConfig 指标存储配置
+type MetricsStorageConfig struct {
+	Enabled            bool `json:"enabled"`              // 是否启用指标存储
+	SamplingInterval   int  `json:"sampling_interval"`    // 采样间隔（分钟，默认15）
+	RetentionDays      int  `json:"retention_days"`      // 数据保留天数（默认90）
+	DetailRetentionDays int  `json:"detail_retention_days"` // 详细数据保留天数（默认7，超过此天数后聚合为天数据）
+	MaxRows            int  `json:"max_rows"`            // 最大行数限制（默认10000）
 }
 
 // CacheWarmupConfig 缓存预热配置

@@ -136,23 +136,31 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	compressor := compression.NewCompressor(compression.FromConfig(cfg))
 
 	// 创建共享的内存缓存实例（合并压缩缓存和图片优化缓存）
-	// 默认值从64MB降低到10MB，减少资源受限环境的内存占用
+	// 激进优化：大幅降低默认缓存大小，减少 bigcache mmap 预分配内存
+	// bigcache 使用 mmap 预分配，即使配置 10MB 也可能预分配几 GB
 	sharedCacheSizeMB := cfg.Server.SharedCacheMaxSizeMB
 	if sharedCacheSizeMB <= 0 {
-		sharedCacheSizeMB = 10 // 从64MB降低到10MB
+		sharedCacheSizeMB = 5 // 从 10MB 进一步降低到 5MB
 	}
-	if sharedCacheSizeMB < 5 {
-		sharedCacheSizeMB = 5 // 最小5MB
+	if sharedCacheSizeMB < 1 {
+		sharedCacheSizeMB = 1 // 最小 1MB（如果设置为 0 或更小，使用 1MB）
 	}
 	maxSharedCacheBytes := int64(sharedCacheSizeMB) * 1024 * 1024
 
+	// 确定缓存后端类型（默认使用 simple，轻量级）
+	cacheBackendType := cache.CacheBackendSimple
+	if cfg.Server.CacheBackendType != "" {
+		cacheBackendType = cache.CacheBackendType(cfg.Server.CacheBackendType)
+	}
+
 	sharedCache := cache.NewMemoryCache(&cache.MemoryCacheConfig{
 		Name:            "shared_cache",
-		MaxEntries:      100, // 从400降低到100
+		MaxEntries:      50, // 从 100 进一步降低到 50，减少预分配
 		MaxSizeBytes:    maxSharedCacheBytes,
-		MaxItemSize:     1 * 1024 * 1024, // 从2MB降低到1MB
+		MaxItemSize:     512 * 1024, // 从 1MB 降低到 512KB
 		DefaultTTL:      24 * time.Hour,  // 24小时
 		CleanupInterval: 5 * time.Minute, // 统一使用5分钟清理间隔
+		BackendType:     cacheBackendType, // 使用配置的后端类型
 	})
 
 	// 使用共享缓存实例创建压缩缓存
@@ -416,6 +424,30 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 			AlertCooldown:               time.Duration(cfg.Monitoring.WatchdogAlertCooldownSec) * time.Second,
 		}
 
+		// 准备指标存储配置
+		metricsStorageOpts := monitor.MetricsStorageOptions{
+			Enabled:            cfg.Monitoring.MetricsStorage.Enabled,
+			DataDir:            dataDir,
+			SamplingInterval:   time.Duration(cfg.Monitoring.MetricsStorage.SamplingInterval) * time.Minute,
+			RetentionDays:      cfg.Monitoring.MetricsStorage.RetentionDays,
+			DetailRetentionDays: cfg.Monitoring.MetricsStorage.DetailRetentionDays,
+			MaxRows:            cfg.Monitoring.MetricsStorage.MaxRows,
+		}
+		
+		// 如果未配置，使用默认值
+		if metricsStorageOpts.SamplingInterval == 0 {
+			metricsStorageOpts.SamplingInterval = 15 * time.Minute
+		}
+		if metricsStorageOpts.RetentionDays == 0 {
+			metricsStorageOpts.RetentionDays = 90
+		}
+		if metricsStorageOpts.DetailRetentionDays == 0 {
+			metricsStorageOpts.DetailRetentionDays = 7
+		}
+		if metricsStorageOpts.MaxRows == 0 {
+			metricsStorageOpts.MaxRows = 10000
+		}
+
 		server.monitorManager = monitor.NewManager(monitor.ManagerOptions{
 			Enabled: cfg.Monitoring.Enabled,
 			Memory: monitor.MemoryMonitorOptions{
@@ -424,6 +456,7 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 				ReleaseCooldown:     time.Duration(releaseCooldownSec) * time.Second,
 			},
 			Watchdog: watchdogOpts,
+			MetricsStorage: metricsStorageOpts,
 		})
 		server.monitorManager.Start(server.notificationIntegrator)
 		server.log.Info("监控管理器已启动")
@@ -943,6 +976,7 @@ func (s *Server) setupRoutes() {
 	// 监控 API
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/monitoring/config", s.handleAPIMonitoringConfig)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/monitoring/stats", s.handleAPIMonitoringStats)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/monitoring/metrics", s.handleAPIMonitoringMetrics)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/monitoring/watchdog/restart", s.handleAPIMonitoringWatchdogRestart)
 
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/unblock", s.handleAPISecurityUnblock)

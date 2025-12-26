@@ -371,6 +371,39 @@ const SSLManagement: React.FC = () => {
     }
   }
 
+  const downloadAllCertificates = async () => {
+    try {
+      const effectivePrefix = adminPrefix || '/sslcat-panel'
+      
+      // 创建下载链接并触发下载
+      const downloadUrl = `${effectivePrefix}/ssl/download-all`
+      
+      // 创建一个临时的 a 标签来触发下载
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = `sslcerts-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.zip`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
+      toast({
+        title: '下载已启动',
+        description: `正在下载所有域名的 SSL 证书包`,
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      })
+    } catch (error) {
+      toast({
+        title: '下载失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: 4000,
+        isClosable: true,
+      })
+    }
+  }
+
   const uploadCertificate = async () => {
     if (!uploadDomain.trim()) {
       toast({
@@ -602,6 +635,15 @@ const SSLManagement: React.FC = () => {
             onClick={onUploadOpen}
           >
             上传证书
+          </Button>
+          <Button
+            leftIcon={<Icon as={FiDownload} />}
+            colorScheme="teal"
+            mr={2}
+            onClick={downloadAllCertificates}
+            isDisabled={certificates.length === 0}
+          >
+            下载全部证书
           </Button>
           <Button
             leftIcon={<Icon as={FiRefreshCw} />}
