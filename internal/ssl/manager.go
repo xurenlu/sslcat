@@ -854,6 +854,19 @@ func (m *Manager) EnsureDomainCert(domain string) error {
 		return fmt.Errorf("empty domain")
 	}
 
+	// 记录证书续期/申请请求的详细信息
+	m.log.Infof("Certificate request initiated for domain: %s", domain)
+	
+	// 检查是否已有证书，记录旧证书的有效期
+	if existingCert := m.getCertificateFromCache(domain); existingCert != nil {
+		if x509Cert, err := x509.ParseCertificate(existingCert.Certificate[0]); err == nil {
+			m.log.Infof("Existing certificate found for %s: NotBefore=%v, NotAfter=%v, DaysRemaining=%.1f",
+				domain, x509Cert.NotBefore, x509Cert.NotAfter, time.Until(x509Cert.NotAfter).Hours()/24)
+		}
+	} else {
+		m.log.Infof("No existing certificate found for %s, will request new certificate", domain)
+	}
+
 	// 不重试，一次失败就结束
 	return m.ensureDomainCertWithRetry(domain, 1)
 }
@@ -1064,27 +1077,56 @@ func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error
 			})
 
 			syncStart := time.Now()
+			
+			// 记录新证书的有效期信息
+			if x509Cert, err := x509.ParseCertificate(cert.Certificate[0]); err == nil {
+				m.log.Infof("New certificate obtained for %s: NotBefore=%v, NotAfter=%v, ValidDays=%.1f",
+					domain, x509Cert.NotBefore, x509Cert.NotAfter, x509Cert.NotAfter.Sub(x509Cert.NotBefore).Hours()/24)
+			}
+			
 			// 先保存证书到磁盘
 			if saveErr := m.saveCertificateToDisk(domain, cert); saveErr != nil {
-				m.log.Warnf("Failed to save certificate to disk for %s: %v", domain, saveErr)
+				m.log.Errorf("Failed to save certificate to disk for %s: %v", domain, saveErr)
 				// 即使保存失败，也尝试直接缓存内存中的证书
 				m.certMutex.Lock()
 				m.certCache[domain] = cert
 				m.certMutex.Unlock()
 				m.updateCertMetadata(domain, cert)
+				m.log.Infof("Certificate cached in memory for %s (disk save failed)", domain)
 				// 清除失败缓存
 				m.failedCacheMutex.Lock()
 				delete(m.failedDomainCache, domain)
 				m.failedCacheMutex.Unlock()
 			} else {
-				// 保存成功后，加载到缓存
+				certPath := filepath.Join(m.config.SSL.CertDir, domain+".crt")
+				keyPath := filepath.Join(m.config.SSL.KeyDir, domain+".key")
+				m.log.Infof("Certificate saved to disk: cert=%s, key=%s", certPath, keyPath)
+				
+				// 保存成功后，强制从磁盘重新加载证书以确保缓存是最新的
+				m.log.Infof("Reloading certificate from disk to ensure cache is up-to-date: %s", domain)
+				
+				// 先清除旧的缓存
+				m.certMutex.Lock()
+				delete(m.certCache, domain)
+				m.certMutex.Unlock()
+				
 				if loadErr := m.LoadCertificateFromDisk(domain); loadErr != nil {
-					m.log.Warnf("Failed to load certificate from disk for %s: %v", domain, loadErr)
+					m.log.Errorf("Failed to load certificate from disk for %s: %v", domain, loadErr)
 					// 如果从磁盘加载失败，直接缓存内存中的证书
 					m.certMutex.Lock()
 					m.certCache[domain] = cert
 					m.certMutex.Unlock()
 					m.updateCertMetadata(domain, cert)
+					m.log.Infof("Certificate cached in memory for %s (disk load failed)", domain)
+				} else {
+					m.log.Infof("Certificate successfully loaded from disk to cache: %s", domain)
+					// 验证加载的证书有效期
+					if loadedCert := m.getCertificateFromCache(domain); loadedCert != nil {
+						if x509Cert, err := x509.ParseCertificate(loadedCert.Certificate[0]); err == nil {
+							m.log.Infof("Loaded certificate verification for %s: NotAfter=%v, DaysRemaining=%.1f",
+								domain, x509Cert.NotAfter, time.Until(x509Cert.NotAfter).Hours()/24)
+						}
+					}
 				}
 				// 清除失败缓存（LoadCertificateFromDisk 内部应该已经处理了，但为了安全还是清除一下）
 				m.failedCacheMutex.Lock()
@@ -2681,6 +2723,13 @@ func (m *Manager) sendProgressEvent(domain string, event CertProgressEvent) {
 			// 通道已满，跳过（避免阻塞）
 		}
 	}
+}
+
+// getCertificateFromCache 从缓存中获取证书（线程安全）
+func (m *Manager) getCertificateFromCache(domain string) *tls.Certificate {
+	m.certMutex.RLock()
+	defer m.certMutex.RUnlock()
+	return m.certCache[domain]
 }
 
 // extractACMEErrorDetails 从 ACME 错误中提取详细信息

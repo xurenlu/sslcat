@@ -287,7 +287,7 @@ func (s *Server) handleAPISSLRetryConfig(w http.ResponseWriter, r *http.Request)
 	})
 }
 
-// handleAPISSLRetry 手动重试证书申请
+// handleAPISSLRetry 手动重试证书申请（不支持SSE，保留用于兼容）
 func (s *Server) handleAPISSLRetry(w http.ResponseWriter, r *http.Request) {
 	if !s.authorizeAPI(w, r, false) {
 		return
@@ -336,6 +336,162 @@ func (s *Server) handleAPISSLRetry(w http.ResponseWriter, r *http.Request) {
 		"message": "Certificate request successful",
 		"domain":  domain,
 	})
+}
+
+// handleAPISSLRetryStream 手动重试证书申请（支持SSE流式进度）
+func (s *Server) handleAPISSLRetryStream(w http.ResponseWriter, r *http.Request) {
+	// 处理 OPTIONS 预检请求
+	if r.Method == "OPTIONS" {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if !s.authorizeAPI(w, r, false) { // 需要写权限
+		return
+	}
+
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Domain string `json:"domain"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
+		return
+	}
+
+	domain := strings.TrimSpace(req.Domain)
+	if domain == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "domain is required"})
+		return
+	}
+
+	s.log.Infof("Manual retry (SSE) requested for domain: %s", domain)
+
+	// 设置 SSE 响应头
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	// 创建进度通道
+	progressCh := s.sslManager.CreateProgressChannel(domain)
+	
+	// 使用 done 通道来协调 goroutine 和主循环
+	done := make(chan struct{})
+	var closeOnce sync.Once
+	
+	// 在 goroutine 中执行证书续期
+	go func() {
+		defer func() {
+			// 捕获 panic，避免向已关闭的通道发送
+			if r := recover(); r != nil {
+				s.log.Errorf("Certificate renewal goroutine panic: %v", r)
+			}
+			// 通知主循环 goroutine 已完成
+			close(done)
+			// 延迟关闭进度通道，确保所有事件都已发送
+			time.Sleep(200 * time.Millisecond)
+			closeOnce.Do(func() {
+				s.sslManager.CloseProgressChannel(domain)
+			})
+		}()
+
+		if err := s.sslManager.EnsureDomainCert(domain); err != nil {
+			// 发送失败事件（使用非阻塞方式，带 recover）
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						// 通道已关闭，忽略
+					}
+				}()
+				select {
+				case progressCh <- ssl.CertProgressEvent{
+					Domain:      domain,
+					Status:      "failed",
+					Message:     fmt.Sprintf("证书续期失败: %v", err),
+					Progress:    100,
+					Error:       err.Error(),
+					Timestamp:   time.Now(),
+				}:
+				case <-time.After(100 * time.Millisecond):
+					// 超时，通道可能已关闭，忽略
+				}
+			}()
+		}
+	}()
+
+	// 监听进度事件并发送到客户端
+	ctx := r.Context()
+	defer func() {
+		// 确保通道被关闭
+		closeOnce.Do(func() {
+			s.sslManager.CloseProgressChannel(domain)
+		})
+	}()
+
+	for {
+		select {
+		case event, ok := <-progressCh:
+			if !ok {
+				// 通道已关闭
+				return
+			}
+
+			// 发送 SSE 事件
+			eventJSON, _ := json.Marshal(event)
+			fmt.Fprintf(w, "data: %s\n\n", eventJSON)
+			flusher.Flush()
+
+			// 如果已完成或失败，等待 goroutine 完成后再返回
+			if event.Status == "success" || event.Status == "failed" || event.Status == "completed" {
+				// 等待 goroutine 完成
+				select {
+				case <-done:
+				case <-time.After(2 * time.Second):
+					// 超时，强制关闭
+				}
+				return
+			}
+
+		case <-ctx.Done():
+			// 客户端断开连接，等待 goroutine 完成
+			select {
+			case <-done:
+			case <-time.After(1 * time.Second):
+			}
+			return
+			
+		case <-done:
+			// goroutine 已完成，等待最后的事件
+			select {
+			case event, ok := <-progressCh:
+				if ok {
+					eventJSON, _ := json.Marshal(event)
+					fmt.Fprintf(w, "data: %s\n\n", eventJSON)
+					flusher.Flush()
+				}
+			case <-time.After(500 * time.Millisecond):
+				// 超时，没有更多事件
+			}
+			return
+		}
+	}
 }
 
 // handleAPISSLDelete 删除SSL证书

@@ -952,6 +952,7 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl/generate-stream", s.handleAPISSLGenerateStream)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl/preflight", s.handleAPISSLPreflight)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl/retry", s.handleAPISSLRetry)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl/retry-stream", s.handleAPISSLRetryStream)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/ssl/retry-config", s.handleAPISSLRetryConfig)
 
 	// DNS API路由

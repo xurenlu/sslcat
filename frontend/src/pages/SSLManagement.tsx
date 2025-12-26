@@ -70,7 +70,9 @@ const SSLManagement: React.FC = () => {
   const [syncing, setSyncing] = useState(false)
   const [applying, setApplying] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [renewing, setRenewing] = useState(false)
   const [newDomain, setNewDomain] = useState('')
+  const [renewDomain, setRenewDomain] = useState('')
   const [uploadDomain, setUploadDomain] = useState('')
   const [certFile, setCertFile] = useState<File | null>(null)
   const [keyFile, setKeyFile] = useState<File | null>(null)
@@ -89,9 +91,19 @@ const SSLManagement: React.FC = () => {
     error?: string
     timestamp: string
   }>>([])
+  const [renewProgressEvents, setRenewProgressEvents] = useState<Array<{
+    status: string
+    message: string
+    attempt: number
+    maxAttempts: number
+    progress: number
+    error?: string
+    timestamp: string
+  }>>([])
   const [eventSource, setEventSource] = useState<EventSource | null>(null)
   const { isOpen, onOpen, onClose } = useDisclosure()
   const { isOpen: isUploadOpen, onOpen: onUploadOpen, onClose: onUploadClose } = useDisclosure()
+  const { isOpen: isRenewOpen, onOpen: onRenewOpen, onClose: onRenewClose } = useDisclosure()
   const toast = useToast()
   const { adminPrefix } = useConfig()
   const t = useTranslation()
@@ -478,53 +490,114 @@ const SSLManagement: React.FC = () => {
   }
 
   const renewCertificate = async (domain: string) => {
-    try {
-      toast({
-        title: '证书更新已启动',
-        description: `正在为域名 ${domain} 申请新证书，请稍候...`,
-        status: 'info',
-        duration: 3000,
-        isClosable: true,
-      })
+    // 设置续期域名并打开进度对话框
+    setRenewDomain(domain)
+    setRenewProgressEvents([])
+    setRenewing(true)
+    onRenewOpen()
 
-      // 调用后端 API 重新申请证书
-      const response = await fetch(buildApiPath(adminPrefix, '/ssl/retry'), {
+    try {
+      // 使用流式 API
+      const response = await fetch(buildApiPath(adminPrefix, '/ssl/retry-stream'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ domain }),
+        body: JSON.stringify({
+          domain: domain.trim(),
+        }),
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
 
-      const result = await response.json()
-      
-      toast({
-        title: '证书更新成功',
-        description: `域名 ${domain} 的证书已成功更新`,
-        status: 'success',
-        duration: 4000,
-        isClosable: true,
-      })
+      // 使用 EventSource 接收 SSE 事件
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
 
-      // 3秒后刷新证书列表以显示新证书信息
-      setTimeout(() => {
-        refreshCertificates()
-      }, 3000)
+      if (!reader) {
+        throw new Error('无法读取响应流')
+      }
+
+      let buffer = ''
+      let isComplete = false
+
+      while (!isComplete) {
+        const { done, value } = await reader.read()
+        
+        if (done) {
+          isComplete = true
+          break
+        }
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || '' // 保留最后不完整的行
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const eventData = JSON.parse(line.slice(6))
+              setRenewProgressEvents(prev => [...prev, eventData])
+
+              // 如果完成或失败，结束
+              if (eventData.status === 'success' || eventData.status === 'failed' || eventData.status === 'completed') {
+                isComplete = true
+                
+                if (eventData.status === 'success') {
+                  toast({
+                    title: '证书续期成功',
+                    description: eventData.message || `域名 ${domain} 的证书已成功续期`,
+                    status: 'success',
+                    duration: 5000,
+                    isClosable: true,
+                  })
+                  
+                  // 3秒后自动刷新证书列表并关闭对话框
+                  setTimeout(() => {
+                    refreshCertificates()
+                    setRenewDomain('')
+                    setRenewProgressEvents([])
+                    onRenewClose()
+                  }, 3000)
+                } else if (eventData.status === 'failed') {
+                  toast({
+                    title: '证书续期失败',
+                    description: eventData.error || eventData.message || '未知错误',
+                    status: 'error',
+                    duration: 5000,
+                    isClosable: true,
+                  })
+                }
+              }
+            } catch (e) {
+              console.error('解析进度事件失败:', e)
+            }
+          }
+        }
+      }
     } catch (error) {
-      console.error('证书更新失败:', error)
+      console.error('证书续期失败:', error)
       toast({
-        title: '证书更新失败',
+        title: '证书续期失败',
         description: error instanceof Error ? error.message : '未知错误',
         status: 'error',
         duration: 4000,
         isClosable: true,
       })
+      setRenewProgressEvents(prev => [...prev, {
+        status: 'failed',
+        message: error instanceof Error ? error.message : '未知错误',
+        attempt: 0,
+        maxAttempts: 0,
+        progress: 100,
+        error: error instanceof Error ? error.message : '未知错误',
+        timestamp: new Date().toISOString(),
+      }])
+    } finally {
+      setRenewing(false)
     }
   }
 
@@ -1072,6 +1145,140 @@ const SSLManagement: React.FC = () => {
               loadingText="上传中..."
             >
               上传证书
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* 续期证书对话框 */}
+      <Modal
+        isOpen={isRenewOpen}
+        onClose={() => {
+          if (!renewing) {
+            setRenewProgressEvents([])
+            setRenewDomain('')
+            onRenewClose()
+          }
+        }}
+        size="lg"
+        closeOnOverlayClick={!renewing}
+      >
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>续期证书</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={4} align="stretch">
+              <Box>
+                <Text fontSize="sm" fontWeight="semibold" mb={2}>
+                  域名
+                </Text>
+                <Text fontSize="md" fontFamily="mono" color="blue.600">
+                  {renewDomain}
+                </Text>
+              </Box>
+
+              {/* 续期进度显示区域 */}
+              {renewing && renewProgressEvents.length > 0 && (
+                <>
+                  <Divider />
+                  <Box>
+                    <Text fontSize="sm" fontWeight="semibold" mb={3}>
+                      续期进度
+                    </Text>
+                    <VStack spacing={3} align="stretch">
+                      {/* 进度条 */}
+                      {renewProgressEvents.length > 0 && (
+                        <Box>
+                          <Progress
+                            value={renewProgressEvents[renewProgressEvents.length - 1]?.progress || 0}
+                            colorScheme={
+                              renewProgressEvents[renewProgressEvents.length - 1]?.status === 'success'
+                                ? 'green'
+                                : renewProgressEvents[renewProgressEvents.length - 1]?.status === 'failed'
+                                ? 'red'
+                                : 'blue'
+                            }
+                            size="sm"
+                            borderRadius="md"
+                          />
+                          <Text fontSize="xs" color="gray.500" mt={1} textAlign="right">
+                            {renewProgressEvents[renewProgressEvents.length - 1]?.progress || 0}%
+                          </Text>
+                        </Box>
+                      )}
+
+                      {/* 进度事件列表 */}
+                      <Box
+                        maxH="200px"
+                        overflowY="auto"
+                        border="1px"
+                        borderColor="gray.200"
+                        borderRadius="md"
+                        p={3}
+                        bg="gray.50"
+                      >
+                        <VStack spacing={2} align="stretch">
+                          {renewProgressEvents.map((event, index) => (
+                            <Box key={index} fontSize="sm">
+                              <HStack spacing={2} align="start">
+                                {event.status === 'success' && (
+                                  <Icon as={FiCheck} color="green.500" mt={0.5} />
+                                )}
+                                {event.status === 'failed' && (
+                                  <Icon as={FiX} color="red.500" mt={0.5} />
+                                )}
+                                {event.status !== 'success' && event.status !== 'failed' && (
+                                  <Spinner size="xs" color="blue.500" />
+                                )}
+                                <Box flex={1}>
+                                  <Text fontWeight="medium">{event.message}</Text>
+                                  {event.error && (
+                                    <Alert status="error" size="sm" mt={2} borderRadius="md">
+                                      <AlertIcon />
+                                      <AlertDescription fontSize="xs">{event.error}</AlertDescription>
+                                    </Alert>
+                                  )}
+                                  {event.attempt > 0 && (
+                                    <Text fontSize="xs" color="gray.500" mt={1}>
+                                      尝试 {event.attempt}/{event.maxAttempts}
+                                    </Text>
+                                  )}
+                                </Box>
+                              </HStack>
+                            </Box>
+                          ))}
+                        </VStack>
+                      </Box>
+                    </VStack>
+                  </Box>
+                </>
+              )}
+
+              {/* 如果还没有开始或者没有进度事件，显示提示信息 */}
+              {!renewing && renewProgressEvents.length === 0 && (
+                <Alert status="info" borderRadius="md">
+                  <AlertIcon />
+                  <AlertDescription fontSize="sm">
+                    即将为域名 <strong>{renewDomain}</strong> 续期证书，请稍候...
+                  </AlertDescription>
+                </Alert>
+              )}
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                if (!renewing) {
+                  setRenewProgressEvents([])
+                  setRenewDomain('')
+                  onRenewClose()
+                }
+              }}
+              isDisabled={renewing}
+            >
+              关闭
             </Button>
           </ModalFooter>
         </ModalContent>
