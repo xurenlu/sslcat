@@ -862,6 +862,16 @@ func (m *Manager) EnsureDomainCert(domain string) error {
 		if x509Cert, err := x509.ParseCertificate(existingCert.Certificate[0]); err == nil {
 			m.log.Infof("Existing certificate found for %s: NotBefore=%v, NotAfter=%v, DaysRemaining=%.1f",
 				domain, x509Cert.NotBefore, x509Cert.NotAfter, time.Until(x509Cert.NotAfter).Hours()/24)
+			
+			// 强制删除ACME缓存中的旧证书，以触发重新申请
+			if m.acmeMgr.Cache != nil {
+				m.log.Infof("Deleting ACME cache for %s to force renewal", domain)
+				if err := m.acmeMgr.Cache.Delete(context.Background(), domain); err != nil {
+					m.log.Warnf("Failed to delete ACME cache for %s: %v (will continue anyway)", domain, err)
+				} else {
+					m.log.Infof("ACME cache deleted successfully for %s", domain)
+				}
+			}
 		}
 	} else {
 		m.log.Infof("No existing certificate found for %s, will request new certificate", domain)
