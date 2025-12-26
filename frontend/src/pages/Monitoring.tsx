@@ -270,7 +270,19 @@ const Monitoring: React.FC = () => {
       if (response.ok) {
         const result = await response.json()
         if (result.success && result.data) {
-          setMetricsData(result.data)
+          // 确保 data 字段始终是数组，如果为 null 则设为空数组
+          const metricsResult = {
+            ...result.data,
+            data: result.data.data || [],
+            summary: result.data.summary || {
+              total_samples: 0,
+              avg_cpu: 0,
+              avg_memory_mb: 0,
+              max_cpu: 0,
+              max_memory_mb: 0,
+            },
+          }
+          setMetricsData(metricsResult)
         }
       }
     } catch (error) {
@@ -408,7 +420,7 @@ const Monitoring: React.FC = () => {
               <Spinner size="lg" />
               <Text mt={4}>加载历史数据中...</Text>
             </Box>
-          ) : metricsData && metricsData.data.length > 0 ? (
+          ) : metricsData && metricsData.data && Array.isArray(metricsData.data) && metricsData.data.length > 0 ? (
             <Tabs>
               <TabList>
                 <Tab>CPU 使用率</Tab>
