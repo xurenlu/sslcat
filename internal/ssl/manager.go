@@ -2048,6 +2048,22 @@ func (m *Manager) SyncACMECertsToDisk() (int, error) {
 		certPath := filepath.Join(m.config.SSL.CertDir, domain+".crt")
 		keyPath := filepath.Join(m.config.SSL.KeyDir, domain+".key")
 
+		// 检查磁盘上是否已有证书，如果已有，比较过期时间，避免用旧证书覆盖新证书
+		if existingCertData, err := os.ReadFile(certPath); err == nil {
+			if existingBlock, _ := pem.Decode(existingCertData); existingBlock != nil {
+				if existingX509Cert, err := x509.ParseCertificate(existingBlock.Bytes); err == nil {
+					// 比较过期时间：只有当 acme-cache 中的证书比磁盘上的证书更新（过期时间更晚）时才覆盖
+					if x509Cert.NotAfter.Before(existingX509Cert.NotAfter) || x509Cert.NotAfter.Equal(existingX509Cert.NotAfter) {
+						m.log.Debugf("Skipping sync for %s: ACME cache cert (expires %v) is not newer than disk cert (expires %v)",
+							domain, x509Cert.NotAfter, existingX509Cert.NotAfter)
+						continue
+					}
+					m.log.Infof("ACME cache cert for %s (expires %v) is newer than disk cert (expires %v), will sync",
+						domain, x509Cert.NotAfter, existingX509Cert.NotAfter)
+				}
+			}
+		}
+
 		// #region agent log
 		if logFile, _ := os.OpenFile("/Users/rocky/Sites/sslcat/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); logFile != nil {
 			logData, _ := json.Marshal(map[string]interface{}{
