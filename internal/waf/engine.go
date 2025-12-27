@@ -132,9 +132,9 @@ func (e *Engine) cleanupOldEvents() {
 
 	now := time.Now()
 	maxAge := 24 * time.Hour
-	keepIndex := 0
+	keepIndex := -1 // 使用 -1 表示未找到有效事件
 
-	// 保留最近24小时内的事件
+	// 找到第一个在24小时内的事件
 	for i, event := range e.events {
 		if now.Sub(event.Timestamp) <= maxAge {
 			keepIndex = i
@@ -142,13 +142,20 @@ func (e *Engine) cleanupOldEvents() {
 		}
 	}
 
+	// 如果找到了有效事件，删除该索引之前的所有过期事件
 	if keepIndex > 0 {
 		removed := keepIndex
 		e.events = e.events[keepIndex:]
+		e.log.Debugf("WAF清理了 %d 个过期事件（超过24小时）", removed)
+	} else if keepIndex == -1 {
+		// 所有事件都过期了，清空所有事件
+		removed := len(e.events)
+		e.events = make([]AttackEvent, 0)
 		if removed > 0 {
-			e.log.Debugf("WAF清理了 %d 个过期事件（超过24小时）", removed)
+			e.log.Debugf("WAF清理了 %d 个过期事件（超过24小时，全部清空）", removed)
 		}
 	}
+	// 如果 keepIndex == 0，说明第一个事件就是有效的，不需要删除任何事件
 
 	// 如果事件数量仍超过限制，进一步清理
 	if len(e.events) > e.maxEvents {
