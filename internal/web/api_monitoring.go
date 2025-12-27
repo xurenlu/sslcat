@@ -385,12 +385,14 @@ func (s *Server) handleAPIMonitoringMetrics(w http.ResponseWriter, r *http.Reque
 	// 验证 granularity
 	validGranularities := map[string]bool{
 		"auto":  true,
+		"1min":  true,
+		"5min":  true,
 		"15min": true,
 		"daily": true,
 		"all":   true,
 	}
 	if !validGranularities[granularity] {
-		s.writeErrorResponse(w, http.StatusBadRequest, "Invalid granularity, must be one of: auto, 15min, daily, all")
+		s.writeErrorResponse(w, http.StatusBadRequest, "Invalid granularity, must be one of: auto, 1min, 5min, 15min, daily, all")
 		return
 	}
 

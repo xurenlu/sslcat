@@ -141,6 +141,7 @@ const Monitoring: React.FC = () => {
   const [metricsLoading, setMetricsLoading] = useState(false)
   const [metricsData, setMetricsData] = useState<MetricsQueryResult | null>(null)
   const [timeRange, setTimeRange] = useState<'today' | '7days' | '30days' | '90days'>('today')
+  const [granularity, setGranularity] = useState<'1min' | '5min' | '15min'>('1min')
 
   // 加载配置
   const loadConfig = async () => {
@@ -225,39 +226,34 @@ const Monitoring: React.FC = () => {
   }
 
   // 加载历史指标数据
-  const loadMetrics = async (range: 'today' | '7days' | '30days' | '90days') => {
+  const loadMetrics = async (range: 'today' | '7days' | '30days' | '90days', selectedGranularity?: '1min' | '5min' | '15min') => {
     setMetricsLoading(true)
     try {
       const now = new Date()
       let startTime: Date
-      let granularity: string
+      const useGranularity = selectedGranularity || granularity
 
       switch (range) {
         case 'today':
           startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-          granularity = '15min'
           break
         case '7days':
           startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-          granularity = 'auto'
           break
         case '30days':
           startTime = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-          granularity = 'auto'
           break
         case '90days':
           startTime = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
-          granularity = 'auto'
           break
         default:
           startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-          granularity = 'auto'
       }
 
       const params = new URLSearchParams({
         start_time: startTime.toISOString(),
         end_time: now.toISOString(),
-        granularity: granularity,
+        granularity: useGranularity,
       })
 
       const response = await fetch(
@@ -296,7 +292,7 @@ const Monitoring: React.FC = () => {
   useEffect(() => {
     loadConfig()
     loadStats()
-    loadMetrics(timeRange)
+    loadMetrics(timeRange, granularity)
 
     const interval = setInterval(() => {
       loadStats()
@@ -305,11 +301,11 @@ const Monitoring: React.FC = () => {
     return () => clearInterval(interval)
   }, [adminPrefix])
 
-  // 当时间范围改变时重新加载数据
+  // 当时间范围或粒度改变时重新加载数据
   useEffect(() => {
-    loadMetrics(timeRange)
+    loadMetrics(timeRange, granularity)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeRange])
+  }, [timeRange, granularity])
 
   return (
     <Box>
@@ -403,10 +399,19 @@ const Monitoring: React.FC = () => {
                 <option value="30days">最近30天</option>
                 <option value="90days">最近90天</option>
               </Select>
+              <Select
+                value={granularity}
+                onChange={(e) => setGranularity(e.target.value as '1min' | '5min' | '15min')}
+                width="120px"
+              >
+                <option value="1min">1分钟</option>
+                <option value="5min">5分钟</option>
+                <option value="15min">15分钟</option>
+              </Select>
               <Button
                 size="sm"
                 leftIcon={<FiRefreshCw />}
-                onClick={() => loadMetrics(timeRange)}
+                onClick={() => loadMetrics(timeRange, granularity)}
                 isLoading={metricsLoading}
               >
                 刷新

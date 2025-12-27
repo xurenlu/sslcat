@@ -124,6 +124,7 @@ create_directories() {
         mkdir -p /etc/sslcat
         mkdir -p /opt/sslcat/{bin,data,logs}
         mkdir -p /var/log/sslcat
+        mkdir -p /var/lib/sslcat
         mkdir -p /var/www
         mkdir -p /home/git
     elif [[ "$OSTYPE" == "darwin"* ]]; then
@@ -517,7 +518,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=false
-ReadWritePaths=/opt/sslcat /etc/sslcat /home/git
+ReadWritePaths=/opt/sslcat /etc/sslcat /home/git /var/lib/sslcat
 
 [Install]
 WantedBy=multi-user.target

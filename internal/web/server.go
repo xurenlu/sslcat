@@ -434,9 +434,9 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 			MaxRows:            cfg.Monitoring.MetricsStorage.MaxRows,
 		}
 		
-		// 如果未配置，使用默认值
+		// 如果未配置，使用默认值（1分钟）
 		if metricsStorageOpts.SamplingInterval == 0 {
-			metricsStorageOpts.SamplingInterval = 15 * time.Minute
+			metricsStorageOpts.SamplingInterval = 1 * time.Minute
 		}
 		if metricsStorageOpts.RetentionDays == 0 {
 			metricsStorageOpts.RetentionDays = 90

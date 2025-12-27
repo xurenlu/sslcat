@@ -953,7 +953,7 @@ func Load(configFile string) (*Config, error) {
 			// 指标存储默认配置
 			MetricsStorage: MetricsStorageConfig{
 				Enabled:            true,  // 默认启用
-				SamplingInterval:    15,    // 默认15分钟
+				SamplingInterval:    1,     // 默认1分钟（支持更细粒度的监控）
 				RetentionDays:       90,    // 默认保留90天
 				DetailRetentionDays: 7,     // 默认详细数据保留7天
 				MaxRows:             10000, // 默认最大10000行
@@ -1308,7 +1308,7 @@ func getDefaultConfig() *Config {
 			// 指标存储默认配置
 			MetricsStorage: MetricsStorageConfig{
 				Enabled:            true,
-				SamplingInterval:    15,
+				SamplingInterval:    1, // 默认1分钟
 				RetentionDays:       90,
 				DetailRetentionDays: 7,
 				MaxRows:             10000,

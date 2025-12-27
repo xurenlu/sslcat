@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -31,7 +32,7 @@ type MetricsStorage struct {
 type ProcessMetric struct {
 	ID            int64     `json:"id"`
 	Timestamp     time.Time `json:"timestamp"`
-	Granularity   string    `json:"granularity"` // "15min" 或 "daily"
+	Granularity   string    `json:"granularity"` // "1min", "5min", "15min" 或 "daily"
 	CPUPercent    float64   `json:"cpu_percent"`
 	MemoryMB      float64   `json:"memory_mb"`
 	MemoryPercent float64   `json:"memory_percent"`
@@ -262,15 +263,15 @@ func (ms *MetricsStorage) RecordMetrics(cpuPercent, memoryMB, memoryPercent floa
 	}
 
 	now := time.Now()
-	// 将时间戳对齐到15分钟边界
-	timestamp := now.Truncate(15 * time.Minute)
+	// 将时间戳对齐到1分钟边界（存储1分钟粒度的原始数据）
+	timestamp := now.Truncate(1 * time.Minute)
 
 	insertSQL := `
 	INSERT OR REPLACE INTO process_metrics 
 	(timestamp, granularity, cpu_percent, memory_mb, memory_percent, sample_count, created_at)
 	VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)`
 
-	_, err := ms.db.Exec(insertSQL, timestamp, "15min", cpuPercent, memoryMB, memoryPercent)
+	_, err := ms.db.Exec(insertSQL, timestamp, "1min", cpuPercent, memoryMB, memoryPercent)
 	if err != nil {
 		return fmt.Errorf("插入指标数据失败: %v", err)
 	}
@@ -278,7 +279,7 @@ func (ms *MetricsStorage) RecordMetrics(cpuPercent, memoryMB, memoryPercent floa
 	return nil
 }
 
-// AggregateDaily 将15分钟数据聚合为天数据
+// AggregateDaily 将1分钟数据聚合为天数据
 func (ms *MetricsStorage) AggregateDaily() error {
 	if !ms.enabled {
 		return nil
@@ -289,7 +290,7 @@ func (ms *MetricsStorage) AggregateDaily() error {
 
 	ms.log.Infof("开始聚合 %s 之前的数据", cutoffTime.Format("2006-01-02"))
 
-	// 查询需要聚合的数据（7天前的15分钟数据）
+	// 查询需要聚合的数据（从1分钟数据聚合为天数据）
 	querySQL := `
 	SELECT 
 		DATE(timestamp) as day,
@@ -300,7 +301,7 @@ func (ms *MetricsStorage) AggregateDaily() error {
 		MAX(memory_mb) as max_memory_mb,
 		COUNT(*) as sample_count
 	FROM process_metrics
-	WHERE granularity = '15min' 
+	WHERE granularity = '1min' 
 		AND timestamp < ?
 	GROUP BY DATE(timestamp)`
 
@@ -350,8 +351,8 @@ func (ms *MetricsStorage) AggregateDaily() error {
 		aggregatedCount++
 	}
 
-	// 删除已聚合的15分钟数据
-	deleteSQL := `DELETE FROM process_metrics WHERE granularity = '15min' AND timestamp < ?`
+	// 删除已聚合的1分钟数据（保留最近detailRetentionDays天的详细数据）
+	deleteSQL := `DELETE FROM process_metrics WHERE granularity = '1min' AND timestamp < ?`
 	result, err := tx.Exec(deleteSQL, cutoffTime)
 	if err != nil {
 		return fmt.Errorf("删除已聚合数据失败: %v", err)
@@ -363,7 +364,7 @@ func (ms *MetricsStorage) AggregateDaily() error {
 		return fmt.Errorf("提交事务失败: %v", err)
 	}
 
-	ms.log.Infof("聚合完成: 聚合了 %d 天的数据，删除了 %d 条15分钟数据", aggregatedCount, deletedCount)
+	ms.log.Infof("聚合完成: 聚合了 %d 天的数据，删除了 %d 条1分钟数据", aggregatedCount, deletedCount)
 
 	return nil
 }
@@ -511,52 +512,63 @@ func (ms *MetricsStorage) GetMetrics(startTime, endTime time.Time, granularity s
 	// 如果 granularity 为 "auto"，根据时间范围自动选择
 	if granularity == "auto" {
 		duration := endTime.Sub(startTime)
-		if duration <= 7*24*time.Hour {
-			// 7天内，优先使用15分钟粒度
-			granularity = "15min"
+		if duration <= 24*time.Hour {
+			// 1天内，使用1分钟粒度
+			granularity = "1min"
+		} else if duration <= 7*24*time.Hour {
+			// 7天内，使用5分钟粒度
+			granularity = "5min"
 		} else {
-			// 超过7天，使用天粒度
-			granularity = "daily"
+			// 超过7天，使用15分钟粒度
+			granularity = "15min"
 		}
 	}
 
 	var querySQL string
+	var rows *sql.Rows
+	var err error
+
+	// 对于需要聚合的粒度，先查询1分钟数据，然后在代码中聚合
+	needAggregation := granularity == "5min" || granularity == "15min" || granularity == "daily"
+	queryGranularity := "1min"
 	if granularity == "all" {
+		queryGranularity = ""
+	} else if !needAggregation {
+		queryGranularity = granularity
+	}
+
+	// 构建查询SQL
+	if queryGranularity == "" {
 		querySQL = `
 		SELECT id, timestamp, granularity, cpu_percent, memory_mb, memory_percent, sample_count, created_at
 		FROM process_metrics
 		WHERE timestamp >= ? AND timestamp <= ?
 		ORDER BY timestamp ASC`
+		rows, err = ms.db.Query(querySQL, startTime, endTime)
 	} else {
 		querySQL = `
 		SELECT id, timestamp, granularity, cpu_percent, memory_mb, memory_percent, sample_count, created_at
 		FROM process_metrics
 		WHERE timestamp >= ? AND timestamp <= ? AND granularity = ?
 		ORDER BY timestamp ASC`
+		rows, err = ms.db.Query(querySQL, startTime, endTime, queryGranularity)
 	}
 
-	var rows *sql.Rows
-	var err error
-	if granularity == "all" {
-		rows, err = ms.db.Query(querySQL, startTime, endTime)
-	} else {
-		rows, err = ms.db.Query(querySQL, startTime, endTime, granularity)
-	}
 	if err != nil {
 		return nil, fmt.Errorf("查询指标数据失败: %v", err)
 	}
 	defer rows.Close()
 
-	var metrics []ProcessMetric
-	var totalCPU, totalMemoryMB float64
-	var maxCPU, maxMemoryMB float64
-	var totalSamples int
-
+	// 先读取所有原始数据
+	var rawMetrics []ProcessMetric
 	for rows.Next() {
 		var metric ProcessMetric
+		var timestampStr string
+		var timestampTime time.Time
+
 		if err := rows.Scan(
 			&metric.ID,
-			&metric.Timestamp,
+			&timestampStr,
 			&metric.Granularity,
 			&metric.CPUPercent,
 			&metric.MemoryMB,
@@ -567,7 +579,34 @@ func (ms *MetricsStorage) GetMetrics(startTime, endTime time.Time, granularity s
 			return nil, fmt.Errorf("扫描指标数据失败: %v", err)
 		}
 
-		metrics = append(metrics, metric)
+		// 解析时间戳（SQLite返回的格式）
+		timestampTime, err = time.Parse("2006-01-02 15:04:05", timestampStr)
+		if err != nil {
+			// 尝试RFC3339格式
+			timestampTime, err = time.Parse(time.RFC3339, timestampStr)
+			if err != nil {
+				ms.log.Warnf("解析时间戳失败: %v, 原始值: %s", err, timestampStr)
+				continue
+			}
+		}
+		metric.Timestamp = timestampTime
+		rawMetrics = append(rawMetrics, metric)
+	}
+
+	// 如果需要聚合，执行聚合逻辑
+	var metrics []ProcessMetric
+	if needAggregation && len(rawMetrics) > 0 {
+		metrics = ms.aggregateMetrics(rawMetrics, granularity)
+	} else {
+		metrics = rawMetrics
+	}
+
+	// 计算汇总信息
+	var totalCPU, totalMemoryMB float64
+	var maxCPU, maxMemoryMB float64
+	totalSamples := len(metrics)
+
+	for _, metric := range metrics {
 		totalCPU += metric.CPUPercent
 		totalMemoryMB += metric.MemoryMB
 		if metric.CPUPercent > maxCPU {
@@ -576,7 +615,6 @@ func (ms *MetricsStorage) GetMetrics(startTime, endTime time.Time, granularity s
 		if metric.MemoryMB > maxMemoryMB {
 			maxMemoryMB = metric.MemoryMB
 		}
-		totalSamples++
 	}
 
 	summary := MetricsQuerySummary{
@@ -594,5 +632,75 @@ func (ms *MetricsStorage) GetMetrics(startTime, endTime time.Time, granularity s
 		Data:    metrics,
 		Summary: summary,
 	}, nil
+}
+
+// aggregateMetrics 聚合指标数据到指定粒度
+func (ms *MetricsStorage) aggregateMetrics(rawMetrics []ProcessMetric, targetGranularity string) []ProcessMetric {
+	if len(rawMetrics) == 0 {
+		return nil
+	}
+
+	var intervalMinutes int
+	switch targetGranularity {
+	case "5min":
+		intervalMinutes = 5
+	case "15min":
+		intervalMinutes = 15
+	case "daily":
+		intervalMinutes = 24 * 60 // 一天
+	default:
+		return rawMetrics
+	}
+
+	// 使用map来存储聚合后的数据，key是时间对齐后的时间戳
+	aggregatedMap := make(map[time.Time]*ProcessMetric)
+
+	for _, raw := range rawMetrics {
+		var alignedTime time.Time
+		if targetGranularity == "daily" {
+			// 对齐到当天00:00:00
+			alignedTime = time.Date(raw.Timestamp.Year(), raw.Timestamp.Month(), raw.Timestamp.Day(), 0, 0, 0, 0, raw.Timestamp.Location())
+		} else {
+			// 对齐到指定分钟间隔的边界
+			minutes := raw.Timestamp.Minute()
+			alignedMinutes := (minutes / intervalMinutes) * intervalMinutes
+			alignedTime = time.Date(raw.Timestamp.Year(), raw.Timestamp.Month(), raw.Timestamp.Day(),
+				raw.Timestamp.Hour(), alignedMinutes, 0, 0, raw.Timestamp.Location())
+		}
+
+		if agg, exists := aggregatedMap[alignedTime]; exists {
+			// 聚合：使用平均值
+			count := float64(agg.SampleCount + 1)
+			agg.CPUPercent = (agg.CPUPercent*float64(agg.SampleCount) + raw.CPUPercent) / count
+			agg.MemoryMB = (agg.MemoryMB*float64(agg.SampleCount) + raw.MemoryMB) / count
+			agg.MemoryPercent = (agg.MemoryPercent*float64(agg.SampleCount) + raw.MemoryPercent) / count
+			agg.SampleCount++
+		} else {
+			// 创建新的聚合点
+			aggregatedMap[alignedTime] = &ProcessMetric{
+				ID:            0,
+				Timestamp:     alignedTime,
+				Granularity:   targetGranularity,
+				CPUPercent:    raw.CPUPercent,
+				MemoryMB:      raw.MemoryMB,
+				MemoryPercent: raw.MemoryPercent,
+				SampleCount:   1,
+				CreatedAt:     raw.CreatedAt,
+			}
+		}
+	}
+
+	// 转换为切片并排序
+	result := make([]ProcessMetric, 0, len(aggregatedMap))
+	for _, agg := range aggregatedMap {
+		result = append(result, *agg)
+	}
+
+	// 按时间排序
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Timestamp.Before(result[j].Timestamp)
+	})
+
+	return result
 }
 
