@@ -34,6 +34,9 @@ const (
 	proxyBackendKey   contextKey = "proxyBackend"
 	proxyStartTimeKey contextKey = "proxyStartTime"
 	cdnEnabledKey     contextKey = "cdnEnabled"
+
+	// 图片优化的最大可处理体积（4MB），避免大图/未知长度占用大量内存
+	maxImageOptimizeBytes = 4 * 1024 * 1024
 )
 
 // loggingTransport 包装Transport以记录实际发送的请求
@@ -80,6 +83,9 @@ type Manager struct {
 
 	// 性能优化：header map 对象池，复用 map[string]string 对象
 	headerMapPool *sync.Pool
+
+	// 错误日志限流器：防止大量重复错误日志导致 CPU 高占用
+	errorLogLimiter *errorLogRateLimiter
 }
 
 // NewManager 创建代理管理器
@@ -114,6 +120,8 @@ func NewManager(cfg *config.Config, sslMgr *ssl.Manager, secMgr *security.Manage
 				return make(map[string]string, 8)
 			},
 		},
+		// 初始化错误日志限流器：相同错误每分钟最多记录一次
+		errorLogLimiter: newErrorLogRateLimiter(time.Minute),
 	}
 
 	// 初始化负载均衡器
@@ -215,6 +223,10 @@ func (m *Manager) Start() error {
 
 // Stop 停止代理管理器
 func (m *Manager) Stop() {
+	// 停止错误日志限流器
+	if m.errorLogLimiter != nil {
+		m.errorLogLimiter.Stop()
+	}
 	m.log.Info("Stopping proxy manager")
 
 	// 停止所有负载均衡器的健康检查
@@ -223,7 +235,7 @@ func (m *Manager) Stop() {
 		lb.StopHealthCheck()
 	}
 	m.lbMutex.RUnlock()
-	
+
 	// 停止缓存清理器
 	if m.upstreamCache != nil {
 		m.upstreamCache.StopCleaner()
@@ -233,7 +245,7 @@ func (m *Manager) Stop() {
 		m.cdnCache.StopCleaner()
 		m.log.Info("Stopped CDN cache cleaner")
 	}
-	
+
 	m.log.Info("Proxy manager stopped")
 }
 
@@ -584,8 +596,8 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 		// 设置原始请求信息
 		originalHeaders := map[string]string{
 			"X-Forwarded-Server": "sslcat",
-			"X-Original-URI":      r.RequestURI,
-			"X-Original-Method":   r.Method,
+			"X-Original-URI":     r.RequestURI,
+			"X-Original-Method":  r.Method,
 		}
 		m.setHeadersBatch(r.Header, originalHeaders)
 
@@ -692,7 +704,7 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 				backendHeaders := map[string]string{
 					"X-Backend-ID":      backendFromCtx.ID,
 					"X-Backend-Address": backendFromCtx.GetAddress(),
-					"X-Response-Time":    responseTime.String(),
+					"X-Response-Time":   responseTime.String(),
 				}
 				m.setHeadersBatch(resp.Header, backendHeaders)
 			}
@@ -749,7 +761,30 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 			if backendFromCtx != nil {
 				backendFromCtx.IncrementFailures()
 				backendFromCtx.DecrementConnections() // 确保连接计数正确
-				m.log.Errorf("Proxy error to backend %s (%s): %v", backendFromCtx.ID, backendFromCtx.GetAddress(), err)
+				
+				// 使用错误日志限流器：相同错误每分钟最多记录一次
+				errorKey := fmt.Sprintf("backend:%s:%s:%v", backendFromCtx.ID, backendFromCtx.GetAddress(), err)
+				shouldLog, count := m.errorLogLimiter.shouldLog(errorKey)
+
+				if shouldLog {
+					// 首次记录或超过时间窗口，正常记录错误（包含客户端信息）
+					clientIP := m.getClientIP(r)
+					userAgent := r.Header.Get("User-Agent")
+					if userAgent == "" {
+						userAgent = "-"
+					}
+					m.log.WithFields(logrus.Fields{
+						"client_ip":  clientIP,
+						"user_agent": userAgent,
+						"method":     r.Method,
+						"path":       r.URL.Path,
+					}).Errorf("Proxy error to backend %s (%s): %v", backendFromCtx.ID, backendFromCtx.GetAddress(), err)
+				} else {
+					// 相同错误在时间窗口内，使用 Debug 级别记录，并包含跳过计数
+					if count%100 == 0 { // 每100次跳过记录一次统计信息
+						m.log.Debugf("Proxy error to backend (rate limited, %d skipped): %s (%s): %v", count, backendFromCtx.ID, backendFromCtx.GetAddress(), err)
+					}
+				}
 
 				// 默认错误处理
 				w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -768,7 +803,17 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 				`, backendFromCtx.ID, backendFromCtx.GetAddress(), err, m.version)
 			} else {
 				// 如果没有后端信息，使用通用错误处理
-				m.log.Errorf("Proxy error: %v", err)
+				// 使用错误日志限流器
+				errorKey := fmt.Sprintf("generic:%v", err)
+				shouldLog, count := m.errorLogLimiter.shouldLog(errorKey)
+
+				if shouldLog {
+					m.log.Errorf("Proxy error: %v", err)
+				} else {
+					if count%100 == 0 {
+						m.log.Debugf("Proxy error (rate limited, %d skipped): %v", count, err)
+					}
+				}
 				w.Header().Set("Content-Type", "text/html; charset=utf-8")
 				w.WriteHeader(http.StatusBadGateway)
 				fmt.Fprintf(w, `
@@ -964,8 +1009,8 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 		// 设置原始请求信息
 		originalHeaders := map[string]string{
 			"X-Forwarded-Server": "sslcat",
-			"X-Original-URI":      r.RequestURI,
-			"X-Original-Method":   r.Method,
+			"X-Original-URI":     r.RequestURI,
+			"X-Original-Method":  r.Method,
 		}
 		m.setHeadersBatch(r.Header, originalHeaders)
 
@@ -1003,94 +1048,100 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 
 			// 记录响应详情
 			m.logResponseDetails(resp, ruleFromCtx)
-		// 移除可能的安全头，让目标服务器自己设置
-		// 性能优化：批量删除
-		securityHeaders := []string{
-			"Strict-Transport-Security",
-			"X-Frame-Options",
-			"X-Content-Type-Options",
-		}
-		m.deleteHeadersBatch(resp.Header, securityHeaders)
-
-		// 添加代理标识
-		resp.Header.Set("X-Proxy-By", "SSLcat/"+m.version)
-
-		// 处理自定义响应头部
-		if ruleFromCtx != nil && len(ruleFromCtx.ResponseHeaders) > 0 {
-			// 使用对象池优化：从对象池获取 map，使用后归还
-			responseHeaders := m.getHeaderMap()
-			defer m.putHeaderMap(responseHeaders)
-			for key, value := range ruleFromCtx.ResponseHeaders {
-				trimmedKey := strings.TrimSpace(key)
-				if trimmedKey != "" {
-					responseHeaders[trimmedKey] = value
-				}
+			// 移除可能的安全头，让目标服务器自己设置
+			// 性能优化：批量删除
+			securityHeaders := []string{
+				"Strict-Transport-Security",
+				"X-Frame-Options",
+				"X-Content-Type-Options",
 			}
-			m.setHeadersBatch(resp.Header, responseHeaders)
-		}
+			m.deleteHeadersBatch(resp.Header, securityHeaders)
 
-		// 图片优化处理
-		if m.responseProcessor != nil && (resp.Request.Method == "GET" || resp.Request.Method == "HEAD") {
-			// 检查是否为图片响应
-			contentType := resp.Header.Get("Content-Type")
-			if strings.HasPrefix(contentType, "image/") {
-				// 读取响应体
-				body, err := io.ReadAll(resp.Body)
-				if err != nil {
-					m.log.Warnf("Failed to read response body for image optimization: %v", err)
-				} else {
-					// 关闭原始响应体
-					resp.Body.Close()
+			// 添加代理标识
+			resp.Header.Set("X-Proxy-By", "SSLcat/"+m.version)
 
-					// 应用图片优化
-					optimizedData, newContentType, err := m.responseProcessor.ProcessResponse(body, contentType, resp.Request)
-					if err != nil {
-						m.log.Warnf("Image optimization failed: %v, using original", err)
-						// 如果优化失败，使用原始数据
-						optimizedData = body
-						newContentType = contentType
-					} else {
-						// 更新响应头
-						if newContentType != contentType {
-							resp.Header.Set("Content-Type", newContentType)
-						}
-						resp.Header.Set("Content-Length", strconv.Itoa(len(optimizedData)))
-
-						// 添加优化标识
-						if len(optimizedData) < len(body) {
-							resp.Header.Set("X-Image-Optimized", "true")
-							compressionRatio := float64(len(body)-len(optimizedData)) / float64(len(body)) * 100
-							resp.Header.Set("X-Image-Compression-Ratio", fmt.Sprintf("%.1f%%", compressionRatio))
-						}
+			// 处理自定义响应头部
+			if ruleFromCtx != nil && len(ruleFromCtx.ResponseHeaders) > 0 {
+				// 使用对象池优化：从对象池获取 map，使用后归还
+				responseHeaders := m.getHeaderMap()
+				defer m.putHeaderMap(responseHeaders)
+				for key, value := range ruleFromCtx.ResponseHeaders {
+					trimmedKey := strings.TrimSpace(key)
+					if trimmedKey != "" {
+						responseHeaders[trimmedKey] = value
 					}
+				}
+				m.setHeadersBatch(resp.Header, responseHeaders)
+			}
 
-					// 设置新的响应体
-					resp.Body = io.NopCloser(bytes.NewReader(optimizedData))
+			// 图片优化处理
+			if m.responseProcessor != nil && (resp.Request.Method == "GET" || resp.Request.Method == "HEAD") {
+				// 检查是否为图片响应
+				contentType := resp.Header.Get("Content-Type")
+				if strings.HasPrefix(contentType, "image/") {
+					// 仅对已知且较小的图片做优化，避免大体积响应导致巨额内存占用
+					if resp.ContentLength <= 0 || resp.ContentLength > maxImageOptimizeBytes {
+						m.log.Debugf("Skip image optimization due to size (Content-Length=%d) for %s %s",
+							resp.ContentLength, resp.Request.Method, resp.Request.URL.Path)
+						return nil
+					}
+					// 读取响应体
+					body, err := io.ReadAll(resp.Body)
+					if err != nil {
+						m.log.Warnf("Failed to read response body for image optimization: %v", err)
+					} else {
+						// 关闭原始响应体
+						resp.Body.Close()
+
+						// 应用图片优化
+						optimizedData, newContentType, err := m.responseProcessor.ProcessResponse(body, contentType, resp.Request)
+						if err != nil {
+							m.log.Warnf("Image optimization failed: %v, using original", err)
+							// 如果优化失败，使用原始数据
+							optimizedData = body
+							newContentType = contentType
+						} else {
+							// 更新响应头
+							if newContentType != contentType {
+								resp.Header.Set("Content-Type", newContentType)
+							}
+							resp.Header.Set("Content-Length", strconv.Itoa(len(optimizedData)))
+
+							// 添加优化标识
+							if len(optimizedData) < len(body) {
+								resp.Header.Set("X-Image-Optimized", "true")
+								compressionRatio := float64(len(body)-len(optimizedData)) / float64(len(body)) * 100
+								resp.Header.Set("X-Image-Compression-Ratio", fmt.Sprintf("%.1f%%", compressionRatio))
+							}
+						}
+
+						// 设置新的响应体
+						resp.Body = io.NopCloser(bytes.NewReader(optimizedData))
+					}
 				}
 			}
-		}
 
-		// CDN 缓存落盘（全局或域名启用）
-		// 使用之前定义的cdnEnabled变量
-		if m.cdnCache != nil && cdnEnabledFromCtx {
-			if ruleFromCtx != nil && ruleFromCtx.CDNDefaultTTLSeconds > 0 {
-				resp.Header.Set("X-SSLcat-CDN-Default-TTL", strconv.Itoa(ruleFromCtx.CDNDefaultTTLSeconds))
+			// CDN 缓存落盘（全局或域名启用）
+			// 使用之前定义的cdnEnabled变量
+			if m.cdnCache != nil && cdnEnabledFromCtx {
+				if ruleFromCtx != nil && ruleFromCtx.CDNDefaultTTLSeconds > 0 {
+					resp.Header.Set("X-SSLcat-CDN-Default-TTL", strconv.Itoa(ruleFromCtx.CDNDefaultTTLSeconds))
+				}
+				// 临时修改请求Host为后端域名，确保缓存路径一致性
+				originalHost := resp.Request.Host
+				if ruleFromCtx != nil {
+					backendHost := m.extractHostFromTarget(ruleFromCtx.Target, ruleFromCtx.Port)
+					resp.Request.Host = backendHost
+				}
+				m.cdnCache.MaybeStoreWithConfig(resp, cdnEnabledFromCtx)
+				// 恢复原始Host
+				resp.Request.Host = originalHost
+				if ruleFromCtx != nil {
+					resp.Header.Del("X-SSLcat-CDN-Default-TTL")
+				}
 			}
-			// 临时修改请求Host为后端域名，确保缓存路径一致性
-			originalHost := resp.Request.Host
-			if ruleFromCtx != nil {
-				backendHost := m.extractHostFromTarget(ruleFromCtx.Target, ruleFromCtx.Port)
-				resp.Request.Host = backendHost
-			}
-			m.cdnCache.MaybeStoreWithConfig(resp, cdnEnabledFromCtx)
-			// 恢复原始Host
-			resp.Request.Host = originalHost
-			if ruleFromCtx != nil {
-				resp.Header.Del("X-SSLcat-CDN-Default-TTL")
-			}
+			return nil
 		}
-		return nil
-	}
 	}
 
 	// 将请求特定信息放入 context
@@ -1139,7 +1190,7 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 			m.log.Errorf("Failed to parse target URL: %v", err)
 			return nil
 		}
-		
+
 		// 如果URL中没有端口，根据协议使用默认端口
 		if parsedURL.Port() == "" {
 			if parsedURL.Scheme == "https" {
@@ -1153,7 +1204,7 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 		}
 		// 如果URL中已有端口，直接使用，完全忽略rule.Port字段
 	}
-	
+
 	target, err := url.Parse(targetURL)
 	if err != nil {
 		m.log.Errorf("Failed to parse target URL: %v", err)
@@ -1308,7 +1359,7 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 		}).DialContext,
 		ForceAttemptHTTP2:      true,
 		MaxIdleConns:           100,
-		MaxIdleConnsPerHost:    10,                                      // 每个主机保持 10 个空闲连接，提高连接复用
+		MaxIdleConnsPerHost:    10, // 每个主机保持 10 个空闲连接，提高连接复用
 		IdleConnTimeout:        time.Duration(idleTimeout) * time.Second,
 		TLSHandshakeTimeout:    time.Duration(tlsHandshakeTimeout) * time.Second,
 		ExpectContinueTimeout:  time.Duration(expectContinueTimeout) * time.Second,
@@ -1332,7 +1383,35 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 	// 但为了代码健壮性，还是添加检查
 	if proxy.ErrorHandler == nil {
 		proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-			m.log.Errorf("Proxy error %s -> %s: %v", r.Host, targetURL, err)
+			// 使用错误日志限流器：相同错误每分钟最多记录一次
+			errorKey := fmt.Sprintf("%s->%s:%v", r.Host, targetURL, err)
+			shouldLog, count := m.errorLogLimiter.shouldLog(errorKey)
+
+			if shouldLog {
+				// 首次记录或超过时间窗口，正常记录错误（包含客户端信息）
+				clientIP := m.getClientIP(r)
+				userAgent := r.Header.Get("User-Agent")
+				if userAgent == "" {
+					userAgent = "-"
+				}
+				m.log.WithFields(logrus.Fields{
+					"client_ip":  clientIP,
+					"user_agent": userAgent,
+					"method":     r.Method,
+					"path":       r.URL.Path,
+					"referer":    r.Header.Get("Referer"),
+				}).Errorf("Proxy error %s -> %s: %v", r.Host, targetURL, err)
+			} else {
+				// 相同错误在时间窗口内，使用 Debug 级别记录，并包含跳过计数
+				// 这样可以在需要调试时看到，但不会产生大量 Error 日志
+				if count%100 == 0 { // 每100次跳过记录一次统计信息
+					clientIP := m.getClientIP(r)
+					m.log.WithFields(logrus.Fields{
+						"client_ip": clientIP,
+						"skipped":   count,
+					}).Debugf("Proxy error (rate limited, %d skipped): %s -> %s: %v", count, r.Host, targetURL, err)
+				}
+			}
 
 			// 返回错误页面
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -1488,19 +1567,19 @@ func (m *Manager) isHTTPSURL(target string) bool {
 	if !strings.HasPrefix(strings.ToLower(target), "https://") {
 		return false
 	}
-	
+
 	// 解析URL
 	parsedURL, err := url.Parse(target)
 	if err != nil {
 		return false
 	}
-	
+
 	// 提取主机名（去除端口）
 	hostname := parsedURL.Hostname()
 	if hostname == "" {
 		return false
 	}
-	
+
 	// 检查主机名是否为IP地址
 	return !m.isIPAddress(hostname)
 }
@@ -1846,7 +1925,7 @@ func (m *Manager) writeWebSocketData(ctx context.Context, conn net.Conn, dataCha
 	idleTimeout := 60 * time.Second
 	idleTicker := time.NewTicker(idleTimeout)
 	defer idleTicker.Stop()
-	
+
 	// 记录最后一次写入时间
 	lastWriteTime := time.Now()
 
@@ -2643,5 +2722,108 @@ func (m *Manager) InjectTraceHeaders(r *http.Request, traceHeaders map[string]st
 
 	if len(traceHeaders) > 0 && m.log != nil {
 		m.log.Debugf("Injected trace headers for %s: %v", r.Host, traceHeaders)
+	}
+}
+
+// errorLogRateLimiter 错误日志限流器：防止大量重复错误日志导致 CPU 高占用
+type errorLogRateLimiter struct {
+	mu             sync.RWMutex
+	errors         map[string]time.Time // 错误键 -> 最后记录时间
+	window         time.Duration        // 时间窗口
+	cleanupTicker  *time.Ticker
+	stopChan       chan struct{}
+	totalErrors    int64 // 总错误数（原子操作）
+	skippedErrors  int64 // 跳过的错误数（原子操作）
+}
+
+// newErrorLogRateLimiter 创建错误日志限流器
+// window: 相同错误在窗口内最多记录一次
+func newErrorLogRateLimiter(window time.Duration) *errorLogRateLimiter {
+	limiter := &errorLogRateLimiter{
+		errors:        make(map[string]time.Time),
+		window:        window,
+		cleanupTicker: time.NewTicker(5 * time.Minute), // 每5分钟清理一次过期记录
+		stopChan:      make(chan struct{}),
+	}
+
+	// 启动清理协程
+	go limiter.cleanupLoop()
+
+	return limiter
+}
+
+// shouldLog 检查是否应该记录错误
+// 返回: (shouldLog, errorCount)
+func (rl *errorLogRateLimiter) shouldLog(errorKey string) (bool, int64) {
+	atomic.AddInt64(&rl.totalErrors, 1)
+
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	now := time.Now()
+	lastLogTime, exists := rl.errors[errorKey]
+
+	// 如果错误不存在或已超过时间窗口，允许记录
+	if !exists || now.Sub(lastLogTime) >= rl.window {
+		rl.errors[errorKey] = now
+		return true, atomic.LoadInt64(&rl.totalErrors)
+	}
+
+	// 否则跳过记录
+	atomic.AddInt64(&rl.skippedErrors, 1)
+	return false, atomic.LoadInt64(&rl.skippedErrors)
+}
+
+// cleanupLoop 定期清理过期的错误记录
+func (rl *errorLogRateLimiter) cleanupLoop() {
+	for {
+		select {
+		case <-rl.cleanupTicker.C:
+			rl.cleanup()
+		case <-rl.stopChan:
+			rl.cleanupTicker.Stop()
+			return
+		}
+	}
+}
+
+// cleanup 清理过期的错误记录
+func (rl *errorLogRateLimiter) cleanup() {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	now := time.Now()
+	expiredKeys := make([]string, 0)
+
+	for key, lastLogTime := range rl.errors {
+		if now.Sub(lastLogTime) >= rl.window*2 { // 保留窗口的两倍时间，避免频繁创建删除
+			expiredKeys = append(expiredKeys, key)
+		}
+	}
+
+	for _, key := range expiredKeys {
+		delete(rl.errors, key)
+	}
+
+	if len(expiredKeys) > 0 {
+		// 使用 debug 级别记录清理信息，避免影响性能
+		// logrus.Debugf("Cleaned up %d expired error log entries", len(expiredKeys))
+	}
+}
+
+// Stop 停止错误日志限流器
+func (rl *errorLogRateLimiter) Stop() {
+	close(rl.stopChan)
+}
+
+// getStats 获取统计信息
+func (rl *errorLogRateLimiter) getStats() map[string]interface{} {
+	rl.mu.RLock()
+	defer rl.mu.RUnlock()
+
+	return map[string]interface{}{
+		"total_errors":   atomic.LoadInt64(&rl.totalErrors),
+		"skipped_errors": atomic.LoadInt64(&rl.skippedErrors),
+		"tracked_keys":   len(rl.errors),
 	}
 }
