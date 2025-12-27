@@ -281,13 +281,26 @@ func (e *AdvancedEngine) CheckRequestAdvanced(r *http.Request) ([]*AttackEvent, 
 		e.updateStats(time.Since(startTime))
 	}()
 
+	var events []*AttackEvent
+	blocked := false
+
+	// 首先使用基础引擎检查（包含敏感文件和扫描工具检测）
+	if baseEvent, baseBlocked := e.Engine.CheckRequest(r); baseEvent != nil {
+		events = append(events, baseEvent)
+		blocked = baseBlocked
+		// 如果基础引擎已经阻止，直接返回
+		if blocked {
+			e.stats.mutex.Lock()
+			e.stats.AttacksBlocked++
+			e.stats.mutex.Unlock()
+			return events, blocked
+		}
+	}
+
 	e.mutex.RLock()
 	rules := make([]*AdvancedRule, len(e.rulesByPriority))
 	copy(rules, e.rulesByPriority)
 	e.mutex.RUnlock()
-
-	var events []*AttackEvent
-	blocked := false
 
 	// 提取请求变量
 	variables := e.extractVariables(r)

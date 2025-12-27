@@ -110,17 +110,47 @@ const Security: React.FC = () => {
         
         // 转换日志为事件格式 - 只显示有风险、可疑的事件
         const events = logsData.logs ? logsData.logs
-          .filter((log: any) => !log.success) // 只显示失败的访问（被阻止的）
-          .slice(0, 10)
-          .map((log: any, index: number) => ({
-            id: index.toString(),
-            type: 'suspicious_ip',
-            severity: 'high',
-            source: log.ip,
-            description: '访问被阻止 - 可疑行为',
-            timestamp: new Date(log.timestamp).toLocaleString('zh-CN'),
-            blocked: true,
-          })) : []
+          .filter((log: any) => {
+            // 显示 WAF 事件或被阻止的访问
+            return log.type === 'waf' || !log.success
+          })
+          .slice(0, 100) // 增加显示数量
+          .map((log: any, index: number) => {
+            // 根据日志类型生成描述
+            let description = '访问被阻止 - 可疑行为'
+            let severity: 'low' | 'medium' | 'high' | 'critical' = 'high'
+            let eventType: 'ddos_attack' | 'bruteforce' | 'suspicious_ip' | 'malware' = 'suspicious_ip'
+
+            if (log.type === 'waf') {
+              if (log.rule_type === 'sensitive_file') {
+                description = `敏感文件访问尝试: ${log.rule_name || log.path}`
+                severity = 'critical'
+                eventType = 'malware'
+              } else if (log.rule_type === 'scanner_detection') {
+                description = `安全扫描工具检测: ${log.rule_name || '未知扫描器'}`
+                severity = 'high'
+                eventType = 'ddos_attack'
+              } else {
+                description = `WAF检测: ${log.rule_name || '未知规则'} - ${log.path || ''}`
+                severity = log.blocked ? 'high' : 'medium'
+                eventType = 'suspicious_ip'
+              }
+            }
+
+            return {
+              id: log.id || index.toString(),
+              type: eventType,
+              severity,
+              source: log.ip || log.client_ip || 'unknown',
+              description,
+              timestamp: new Date(log.timestamp).toLocaleString('zh-CN'),
+              blocked: log.blocked !== undefined ? log.blocked : !log.success,
+              // 添加额外信息用于显示
+              method: log.method || '',
+              path: log.path || log.url || '',
+              ruleName: log.rule_name || '',
+            }
+          }) : []
         
         setEvents(events)
       } else {

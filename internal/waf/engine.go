@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -23,6 +24,8 @@ const (
 	RuleTypePathTraversal    RuleType = "path_traversal"
 	RuleTypeCommandInjection RuleType = "command_injection"
 	RuleTypeFileUpload       RuleType = "file_upload"
+	RuleTypeSensitiveFile    RuleType = "sensitive_file"    // 敏感文件访问
+	RuleTypeScannerDetection RuleType = "scanner_detection" // 扫描工具检测
 	RuleTypeCustom           RuleType = "custom"
 )
 
@@ -77,15 +80,24 @@ type Engine struct {
 	maxEvents    int
 	mutex        sync.RWMutex
 	log          *logrus.Entry
+	
+	// 日志限流器：防止大量重复日志导致 CPU 高占用
+	logLimiter   *wafLogRateLimiter
+	// 事件清理定时器
+	cleanupTicker *time.Ticker
+	stopChan      chan struct{}
 }
 
 // NewEngine 创建WAF引擎
 func NewEngine() *Engine {
 	engine := &Engine{
-		rules:     make(map[string]*Rule),
-		enabled:   true,
-		events:    make([]AttackEvent, 0),
-		maxEvents: 10000, // 最多保存10000个事件
+		rules:        make(map[string]*Rule),
+		enabled:      true,
+		events:       make([]AttackEvent, 0),
+		maxEvents:    10000, // 最多保存10000个事件
+		logLimiter:   newWAFLogRateLimiter(time.Minute), // 相同攻击每分钟最多记录一次日志
+		cleanupTicker: time.NewTicker(10 * time.Minute), // 每10分钟清理一次过期事件
+		stopChan:     make(chan struct{}),
 		log: logrus.WithFields(logrus.Fields{
 			"component": "waf_engine",
 		}),
@@ -94,7 +106,66 @@ func NewEngine() *Engine {
 	// 初始化默认规则
 	engine.initDefaultRules()
 
+	// 启动事件清理协程
+	go engine.eventCleanupLoop()
+
 	return engine
+}
+
+// eventCleanupLoop 事件清理循环
+func (e *Engine) eventCleanupLoop() {
+	for {
+		select {
+		case <-e.cleanupTicker.C:
+			e.cleanupOldEvents()
+		case <-e.stopChan:
+			e.cleanupTicker.Stop()
+			return
+		}
+	}
+}
+
+// cleanupOldEvents 清理超过24小时的旧事件
+func (e *Engine) cleanupOldEvents() {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+
+	now := time.Now()
+	maxAge := 24 * time.Hour
+	keepIndex := 0
+
+	// 保留最近24小时内的事件
+	for i, event := range e.events {
+		if now.Sub(event.Timestamp) <= maxAge {
+			keepIndex = i
+			break
+		}
+	}
+
+	if keepIndex > 0 {
+		removed := keepIndex
+		e.events = e.events[keepIndex:]
+		if removed > 0 {
+			e.log.Debugf("WAF清理了 %d 个过期事件（超过24小时）", removed)
+		}
+	}
+
+	// 如果事件数量仍超过限制，进一步清理
+	if len(e.events) > e.maxEvents {
+		overflow := len(e.events) - e.maxEvents
+		e.events = e.events[overflow:]
+		e.log.Debugf("WAF清理了 %d 个超出数量限制的事件", overflow)
+	}
+}
+
+// Stop 停止WAF引擎（用于优雅关闭）
+func (e *Engine) Stop() {
+	if e.stopChan != nil {
+		close(e.stopChan)
+	}
+	if e.logLimiter != nil {
+		e.logLimiter.Stop()
+	}
 }
 
 // initDefaultRules 初始化默认规则
@@ -200,6 +271,72 @@ func (e *Engine) initDefaultRules() {
 		})
 	}
 
+	// 敏感文件访问规则
+	sensitiveFileRules := []struct {
+		name    string
+		pattern string
+	}{
+		{"Git Config", `(?i)/\.git/`},
+		{"Git Files", `(?i)\.git/config|\.git/HEAD|\.git/index`},
+		{"AWS Credentials", `(?i)/\.aws/|\.aws/credentials`},
+		{"Environment Files", `(?i)/\.env$|/\.env\b|\.env\.local`},
+		{"Config Files", `(?i)/config\.php|/config\.json|/config\.yml|/config\.yaml`},
+		{"Backup Files", `(?i)\.bak$|\.backup$|\.old$|\.orig$|\.swp$|\.tmp$`},
+		{"Database Files", `(?i)\.db$|\.sqlite$|\.sql$|/phpmyadmin`},
+		{"Private Keys", `(?i)/id_rsa$|/id_dsa$|/\.ssh/|/\.pem$`},
+		{"Server Files", `(?i)/server\.js|/package\.json|/composer\.json|/requirements\.txt`},
+		{"Admin Panels", `(?i)/admin|/wp-admin|/administrator|/phpmyadmin`},
+		{"Test Files", `(?i)/test\.php|/info\.php|/phpinfo\.php`},
+	}
+
+	for i, rule := range sensitiveFileRules {
+		e.AddRule(&Rule{
+			ID:          fmt.Sprintf("sensitive_%d", i+1),
+			Name:        rule.name,
+			Type:        RuleTypeSensitiveFile,
+			Pattern:     rule.pattern,
+			Action:      ActionBlock,
+			Enabled:     true,
+			Description: "敏感文件/路径访问检测",
+			CreatedAt:   time.Now(),
+		})
+	}
+
+	// 安全扫描工具检测规则
+	scannerRules := []struct {
+		name    string
+		pattern string
+	}{
+		{"Assetnote Scanner", `(?i)Assetnote`},
+		{"Nmap Scanner", `(?i)nmap|Nmap`},
+		{"Nikto Scanner", `(?i)nikto|Nikto`},
+		{"SQLMap Scanner", `(?i)sqlmap`},
+		{"Acunetix Scanner", `(?i)Acunetix|WVS`},
+		{"AppScan Scanner", `(?i)AppScan|Rational`},
+		{"Nessus Scanner", `(?i)Nessus`},
+		{"OpenVAS Scanner", `(?i)OpenVAS`},
+		{"Qualys Scanner", `(?i)Qualys`},
+		{"Burp Scanner", `(?i)Burp`},
+		{"OWASP Scanner", `(?i)OWASP|ZAP`},
+		{"Masscan Scanner", `(?i)masscan`},
+		{"Zmap Scanner", `(?i)zmap`},
+		{"Shodan Scanner", `(?i)Shodan`},
+		{"Censys Scanner", `(?i)Censys`},
+	}
+
+	for i, rule := range scannerRules {
+		e.AddRule(&Rule{
+			ID:          fmt.Sprintf("scanner_%d", i+1),
+			Name:        rule.name,
+			Type:        RuleTypeScannerDetection,
+			Pattern:     rule.pattern,
+			Action:      ActionBlock, // 直接阻止扫描工具
+			Enabled:     true,
+			Description: "安全扫描工具检测",
+			CreatedAt:   time.Now(),
+		})
+	}
+
 	e.log.Infof("已初始化 %d 个默认WAF规则", len(e.rules))
 }
 
@@ -227,6 +364,9 @@ func (e *Engine) AddRule(rule *Rule) error {
 		e.pathPatterns = append(e.pathPatterns, rule)
 	case RuleTypeCommandInjection:
 		e.cmdPatterns = append(e.cmdPatterns, rule)
+	case RuleTypeSensitiveFile, RuleTypeScannerDetection:
+		// 敏感文件和扫描工具检测规则使用自定义规则存储
+		e.customRules = append(e.customRules, rule)
 	case RuleTypeCustom:
 		e.customRules = append(e.customRules, rule)
 	}
@@ -274,22 +414,137 @@ func (e *Engine) CheckRequest(r *http.Request) (*AttackEvent, bool) {
 	clientIP := e.getClientIP(r)
 	userAgent := r.Header.Get("User-Agent")
 
-	// 检查URL参数
+	// 1. 检查URL路径（敏感文件检测）
+	if event := e.checkURLPath(r, clientIP, userAgent, url, method); event != nil {
+		return event, event.Blocked
+	}
+
+	// 2. 检查User-Agent（扫描工具检测）
+	if event := e.checkUserAgent(r, clientIP, userAgent, url, method); event != nil {
+		return event, event.Blocked
+	}
+
+	// 3. 检查URL参数
 	if event := e.checkURLParams(r, clientIP, userAgent, url, method); event != nil {
 		return event, event.Blocked
 	}
 
-	// 检查请求头
+	// 4. 检查请求头
 	if event := e.checkHeaders(r, clientIP, userAgent, url, method); event != nil {
 		return event, event.Blocked
 	}
 
-	// 检查请求体
+	// 5. 检查请求体
 	if event := e.checkBody(r, clientIP, userAgent, url, method); event != nil {
 		return event, event.Blocked
 	}
 
 	return nil, false
+}
+
+// checkURLPath 检查URL路径
+func (e *Engine) checkURLPath(r *http.Request, clientIP, userAgent, url, method string) *AttackEvent {
+	path := r.URL.Path
+	if path == "" {
+		path = "/"
+	}
+
+	// 检查敏感文件路径规则
+	for _, rule := range e.rules {
+		if !rule.Enabled {
+			continue
+		}
+
+		// 只检查敏感文件和扫描工具类型的规则
+		if rule.Type != RuleTypeSensitiveFile && rule.Type != RuleTypeScannerDetection {
+			continue
+		}
+
+		if rule.Regex.MatchString(path) {
+			event := &AttackEvent{
+				ID:        e.generateEventID(),
+				ClientIP:  clientIP,
+				UserAgent: userAgent,
+				URL:       url,
+				Method:    method,
+				RuleID:    rule.ID,
+				RuleName:  rule.Name,
+				RuleType:  rule.Type,
+				Action:    rule.Action,
+				Payload:   path,
+				Timestamp: time.Now(),
+				Blocked:   rule.Action == ActionBlock,
+			}
+
+			e.addEvent(event)
+
+			e.log.Warnf("WAF检测到%s: %s from %s, 路径: %s, 动作: %s",
+				map[RuleType]string{
+					RuleTypeSensitiveFile:    "敏感文件访问",
+					RuleTypeScannerDetection: "扫描工具访问",
+				}[rule.Type], clientIP, path, rule.Action)
+
+			return event
+		}
+	}
+
+	return nil
+}
+
+// checkUserAgent 检查User-Agent
+func (e *Engine) checkUserAgent(r *http.Request, clientIP, userAgent, url, method string) *AttackEvent {
+	if userAgent == "" {
+		return nil
+	}
+
+	// 检查扫描工具User-Agent规则
+	for _, rule := range e.rules {
+		if !rule.Enabled {
+			continue
+		}
+
+		if rule.Type != RuleTypeScannerDetection {
+			continue
+		}
+
+		if rule.Regex.MatchString(userAgent) {
+			event := &AttackEvent{
+				ID:        e.generateEventID(),
+				ClientIP:  clientIP,
+				UserAgent: userAgent,
+				URL:       url,
+				Method:    method,
+				RuleID:    rule.ID,
+				RuleName:  rule.Name,
+				RuleType:  rule.Type,
+				Action:    rule.Action,
+				Payload:   "User-Agent: " + userAgent,
+				Timestamp: time.Now(),
+				Blocked:   rule.Action == ActionBlock,
+			}
+
+			e.addEvent(event)
+
+			// 使用日志限流器：相同扫描工具每分钟最多记录一次日志
+			logKey := fmt.Sprintf("scanner:%s:%s:%s", clientIP, rule.Name, userAgent)
+			shouldLog, count := e.logLimiter.shouldLog(logKey)
+
+			if shouldLog {
+				e.log.Warnf("WAF检测到扫描工具: %s from %s, User-Agent: %s, 动作: %s",
+					rule.Name, clientIP, userAgent, rule.Action)
+			} else {
+				// 每100次跳过记录一次统计信息
+				if count%100 == 0 {
+					e.log.Debugf("WAF检测到扫描工具 (rate limited, %d skipped): %s from %s, 规则: %s",
+						count, clientIP, rule.Name)
+				}
+			}
+
+			return event
+		}
+	}
+
+	return nil
 }
 
 // checkURLParams 检查URL参数
@@ -388,8 +643,20 @@ func (e *Engine) matchRules(payload, clientIP, userAgent, url, method string) *A
 
 			e.addEvent(event)
 
-			e.log.Warnf("WAF检测到攻击: %s from %s, 规则: %s, 动作: %s",
-				rule.Type, clientIP, rule.Name, rule.Action)
+			// 使用日志限流器：相同攻击每分钟最多记录一次日志
+			logKey := fmt.Sprintf("%s:%s:%s:%s", rule.Type, clientIP, rule.Name, payload[:min(len(payload), 100)])
+			shouldLog, count := e.logLimiter.shouldLog(logKey)
+
+			if shouldLog {
+				e.log.Warnf("WAF检测到攻击: %s from %s, 规则: %s, 动作: %s",
+					rule.Type, clientIP, rule.Name, rule.Action)
+			} else {
+				// 每100次跳过记录一次统计信息
+				if count%100 == 0 {
+					e.log.Debugf("WAF检测到攻击 (rate limited, %d skipped): %s from %s, 规则: %s",
+						count, rule.Type, clientIP, rule.Name)
+				}
+			}
 
 			return event
 		}
@@ -540,4 +807,99 @@ func (e *Engine) ClearEvents() {
 
 	e.events = make([]AttackEvent, 0)
 	e.log.Info("WAF攻击事件已清空")
+}
+
+// min 辅助函数
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// wafLogRateLimiter WAF日志限流器
+type wafLogRateLimiter struct {
+	mu            sync.RWMutex
+	logs          map[string]time.Time // 日志键 -> 最后记录时间
+	window        time.Duration        // 时间窗口
+	cleanupTicker *time.Ticker
+	stopChan      chan struct{}
+	totalLogs     int64 // 总日志数（原子操作）
+	skippedLogs   int64 // 跳过的日志数（原子操作）
+}
+
+// newWAFLogRateLimiter 创建WAF日志限流器
+func newWAFLogRateLimiter(window time.Duration) *wafLogRateLimiter {
+	limiter := &wafLogRateLimiter{
+		logs:          make(map[string]time.Time),
+		window:        window,
+		cleanupTicker: time.NewTicker(5 * time.Minute), // 每5分钟清理一次过期记录
+		stopChan:      make(chan struct{}),
+	}
+
+	// 启动清理协程
+	go limiter.cleanupLoop()
+
+	return limiter
+}
+
+// shouldLog 检查是否应该记录日志
+// 返回: (shouldLog, skippedCount)
+func (rl *wafLogRateLimiter) shouldLog(logKey string) (bool, int64) {
+	atomic.AddInt64(&rl.totalLogs, 1)
+
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	now := time.Now()
+	lastLogTime, exists := rl.logs[logKey]
+
+	// 如果日志键不存在或已超过时间窗口，允许记录
+	if !exists || now.Sub(lastLogTime) >= rl.window {
+		rl.logs[logKey] = now
+		return true, atomic.LoadInt64(&rl.skippedLogs)
+	}
+
+	// 否则跳过记录
+	atomic.AddInt64(&rl.skippedLogs, 1)
+	return false, atomic.LoadInt64(&rl.skippedLogs)
+}
+
+// cleanupLoop 定期清理过期的日志记录
+func (rl *wafLogRateLimiter) cleanupLoop() {
+	for {
+		select {
+		case <-rl.cleanupTicker.C:
+			rl.cleanup()
+		case <-rl.stopChan:
+			rl.cleanupTicker.Stop()
+			return
+		}
+	}
+}
+
+// cleanup 清理过期的日志记录
+func (rl *wafLogRateLimiter) cleanup() {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	now := time.Now()
+	expiredKeys := make([]string, 0)
+
+	for key, lastLogTime := range rl.logs {
+		if now.Sub(lastLogTime) >= rl.window*2 { // 保留窗口的两倍时间
+			expiredKeys = append(expiredKeys, key)
+		}
+	}
+
+	for _, key := range expiredKeys {
+		delete(rl.logs, key)
+	}
+}
+
+// Stop 停止日志限流器
+func (rl *wafLogRateLimiter) Stop() {
+	if rl.stopChan != nil {
+		close(rl.stopChan)
+	}
 }

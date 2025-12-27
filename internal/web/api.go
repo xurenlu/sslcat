@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -139,26 +140,56 @@ func (s *Server) handleAPISecurityLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	onlyFailed := r.URL.Query().Get("only_failed") == "1"
 
-	type logItem struct {
-		IP        string    `json:"ip"`
-		UserAgent string    `json:"user_agent"`
-		Path      string    `json:"path"`
-		Timestamp time.Time `json:"timestamp"`
-		Success   bool      `json:"success"`
-	}
-	var all []logItem
+	var all []map[string]any
 
-	// 通过只读访问器遍历
+	// 添加 WAF 事件
+	if s.wafEngine != nil && s.wafEngine.Engine != nil {
+		wafEvents := s.wafEngine.Engine.GetEvents(limit * 2) // 获取更多事件以便筛选
+		for _, event := range wafEvents {
+			all = append(all, map[string]any{
+				"ip":         event.ClientIP,
+				"user_agent": event.UserAgent,
+				"path":       event.URL,
+				"timestamp":  event.Timestamp,
+				"success":    false, // WAF 事件都是失败的访问
+				"type":       "waf",
+				"rule_name":  event.RuleName,
+				"rule_type":  string(event.RuleType),
+				"blocked":    event.Blocked,
+				"method":     event.Method,
+			})
+		}
+	}
+
+	// 通过只读访问器遍历安全管理器日志
 	for ip, logs := range s.securityManager.AccessLogsSnapshot() {
 		for _, l := range logs {
 			if onlyFailed && l.Success {
 				continue
 			}
-			all = append(all, logItem{IP: ip, UserAgent: l.UserAgent, Path: l.Path, Timestamp: l.Timestamp, Success: l.Success})
+			all = append(all, map[string]any{
+				"ip":         ip,
+				"user_agent": l.UserAgent,
+				"path":       l.Path,
+				"timestamp":  l.Timestamp,
+				"success":    l.Success,
+				"type":       "access",
+			})
 		}
 	}
+
+	// 按时间戳排序（最新的在前）
+	sort.Slice(all, func(i, j int) bool {
+		ti, ok1 := all[i]["timestamp"].(time.Time)
+		tj, ok2 := all[j]["timestamp"].(time.Time)
+		if !ok1 || !ok2 {
+			return false
+		}
+		return ti.After(tj)
+	})
+
 	if len(all) > limit {
-		all = all[len(all)-limit:]
+		all = all[:limit]
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"logs": all})
@@ -465,3 +496,4 @@ func (s *Server) handleAPIImageCaptcha(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "image/png")
 	_ = png.Encode(w, img)
 }
+

@@ -11,9 +11,11 @@ import (
 
 const (
 	minMemoryUsageRatio     = 0.05
-	defaultMemoryUsageRatio = 0.20
+	defaultMemoryUsageRatio = 0.70 // 默认 70% 系统内存才触发释放，避免频繁 GC
 	maxMemoryUsageRatio     = 0.90
-	minReleaseCooldown      = time.Minute
+	minReleaseCooldown      = 5 * time.Minute        // 至少 5 分钟冷却，避免密集 GC
+	warningThresholdMin     = 1 * 1024 * 1024 * 1024 // 1GB 警告下限
+	criticalThresholdMin    = 2 * 1024 * 1024 * 1024 // 2GB 严重警告下限
 )
 
 // MemoryMonitorOptions 内存监控选项
@@ -40,7 +42,7 @@ func (o MemoryMonitorOptions) normalize() MemoryMonitorOptions {
 		o.MaxSystemUsageRatio = maxMemoryUsageRatio
 	}
 	if o.ReleaseCooldown <= 0 {
-		o.ReleaseCooldown = 5 * time.Minute
+		o.ReleaseCooldown = 15 * time.Minute
 	}
 	if o.ReleaseCooldown < minReleaseCooldown {
 		o.ReleaseCooldown = minReleaseCooldown
@@ -98,6 +100,16 @@ func NewMemoryMonitor(options MemoryMonitorOptions) *MemoryMonitor {
 		baselineAlloc = 100 * 1024 * 1024 // 100MB 作为最小基线
 	}
 
+	// 动态阈值：基于基线放大倍数，同时设置下限，避免过于敏感
+	warningThreshold := baselineAlloc * 5 // 至少 5 倍基线
+	if warningThreshold < warningThresholdMin {
+		warningThreshold = warningThresholdMin
+	}
+	criticalThreshold := baselineAlloc * 10 // 至少 10 倍基线
+	if criticalThreshold < criticalThresholdMin {
+		criticalThreshold = criticalThresholdMin
+	}
+
 	return &MemoryMonitor{
 		log: logrus.WithFields(logrus.Fields{
 			"component": "memory_monitor",
@@ -105,8 +117,8 @@ func NewMemoryMonitor(options MemoryMonitorOptions) *MemoryMonitor {
 		stopChan:          make(chan struct{}),
 		checkInterval:     checkInterval,
 		baselineAlloc:     baselineAlloc,
-		warningThreshold:  500 * 1024 * 1024,  // 500MB增长警告
-		criticalThreshold: 1024 * 1024 * 1024, // 1GB增长严重警告
+		warningThreshold:  warningThreshold,
+		criticalThreshold: criticalThreshold,
 		maxHistorySize:    100,
 		allocHistory:      make([]uint64, 0, 100),
 		sysHistory:        make([]uint64, 0, 100),
