@@ -845,7 +845,7 @@ func Load(configFile string) (*Config, error) {
 		},
 		Proxy: ProxyConfig{
 			Rules:                []ProxyRule{},
-			UnmatchedBehavior:    "502",
+			UnmatchedBehavior:    "503", // 默认使用低成本 503，减少未匹配域名的资源消耗
 			UnmatchedRedirectURL: "",
 		},
 		CDNCache: CDNCacheConfig{
@@ -1203,7 +1203,7 @@ func getDefaultConfig() *Config {
 		},
 		Proxy: ProxyConfig{
 			Rules:                []ProxyRule{},
-			UnmatchedBehavior:    "502",
+			UnmatchedBehavior:    "503", // 默认使用低成本 503，减少未匹配域名的资源消耗
 			UnmatchedRedirectURL: "",
 		},
 		CDNCache: CDNCacheConfig{

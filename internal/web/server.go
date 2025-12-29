@@ -1531,6 +1531,13 @@ func (s *Server) proxyMiddleware(w http.ResponseWriter, r *http.Request) bool {
 		}
 		s.log.Warnf("Unmatched proxy for host=%s path=%s, redirecting to %s", host, r.URL.Path, target)
 		http.Redirect(w, r, target, http.StatusFound)
+	case "503":
+		// 低成本快速失败：减少日志与返回体大小
+		s.log.Debugf("Unmatched proxy for host=%s path=%s, returning 503", host, r.URL.Path)
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte("503 Service Unavailable\n"))
+		return true
 	case "blank":
 		s.log.Warnf("Unmatched proxy for host=%s path=%s, returning blank", host, r.URL.Path)
 		w.WriteHeader(http.StatusOK)

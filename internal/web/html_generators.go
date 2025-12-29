@@ -1046,6 +1046,7 @@ func (s *Server) generateSettingsHTML(data map[string]interface{}) string {
                             <div class="mb-3">
                                 <label for="proxy_unmatched_behavior" class="form-label">未命中代理时的行为</label>
                                 <select class="form-select" id="proxy_unmatched_behavior" name="proxy_unmatched_behavior">
+                                    <option value="503" %s>503 Service Unavailable</option>
                                     <option value="502" %s>502 Bad Gateway</option>
                                     <option value="404" %s>404 Not Found</option>
                                     <option value="302" %s>302 Redirect</option>
@@ -1085,6 +1086,7 @@ func (s *Server) generateSettingsHTML(data map[string]interface{}) string {
 		map[bool]string{true: "管理TOTP", false: "设置TOTP"}[s.config.Admin.EnableTOTP],
 		s.getConfigSSLEmail(data),
 		s.getConfigSSLDisableSelfSigned(data),
+		map[bool]string{true: "selected"}[s.config.Proxy.UnmatchedBehavior == "503"],
 		map[bool]string{true: "selected"}[s.config.Proxy.UnmatchedBehavior == "502"],
 		map[bool]string{true: "selected"}[s.config.Proxy.UnmatchedBehavior == "404"],
 		map[bool]string{true: "selected"}[s.config.Proxy.UnmatchedBehavior == "302"],

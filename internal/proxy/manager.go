@@ -120,8 +120,8 @@ func NewManager(cfg *config.Config, sslMgr *ssl.Manager, secMgr *security.Manage
 				return make(map[string]string, 8)
 			},
 		},
-		// 初始化错误日志限流器：相同错误每分钟最多记录一次
-		errorLogLimiter: newErrorLogRateLimiter(time.Minute),
+		// 初始化错误日志限流器：默认每秒最多记录有限条，避免日志风暴
+		errorLogLimiter: newErrorLogRateLimiter(time.Second, 5),
 	}
 
 	// 初始化负载均衡器
@@ -247,6 +247,18 @@ func (m *Manager) Stop() {
 	}
 
 	m.log.Info("Proxy manager stopped")
+}
+
+// ErrorLogStats 返回错误日志限流统计，便于对跳过量做告警/观测
+func (m *Manager) ErrorLogStats() map[string]interface{} {
+	if m.errorLogLimiter == nil {
+		return map[string]interface{}{
+			"total_errors":   int64(0),
+			"skipped_errors": int64(0),
+			"tracked_keys":   0,
+		}
+	}
+	return m.errorLogLimiter.getStats()
 }
 
 // initializeLoadBalancers 初始化负载均衡器
@@ -2727,21 +2739,32 @@ func (m *Manager) InjectTraceHeaders(r *http.Request, traceHeaders map[string]st
 
 // errorLogRateLimiter 错误日志限流器：防止大量重复错误日志导致 CPU 高占用
 type errorLogRateLimiter struct {
-	mu             sync.RWMutex
-	errors         map[string]time.Time // 错误键 -> 最后记录时间
-	window         time.Duration        // 时间窗口
-	cleanupTicker  *time.Ticker
-	stopChan       chan struct{}
-	totalErrors    int64 // 总错误数（原子操作）
-	skippedErrors  int64 // 跳过的错误数（原子操作）
+	mu            sync.RWMutex
+	errors        map[string]*errorLogEntry // 错误键 -> 窗口信息
+	window        time.Duration             // 时间窗口（如 1s）
+	maxPerWindow  int                       // 窗口内最多允许的日志条数
+	cleanupTicker *time.Ticker
+	stopChan      chan struct{}
+	totalErrors   int64 // 总错误数（原子操作）
+	skippedErrors int64 // 跳过的错误数（原子操作）
+}
+
+type errorLogEntry struct {
+	last  time.Time
+	count int
 }
 
 // newErrorLogRateLimiter 创建错误日志限流器
-// window: 相同错误在窗口内最多记录一次
-func newErrorLogRateLimiter(window time.Duration) *errorLogRateLimiter {
+// window: 时间窗口（例如 1 秒）
+// maxPerWindow: 单个错误键在窗口内允许记录的最大次数
+func newErrorLogRateLimiter(window time.Duration, maxPerWindow int) *errorLogRateLimiter {
+	if maxPerWindow <= 0 {
+		maxPerWindow = 1
+	}
 	limiter := &errorLogRateLimiter{
-		errors:        make(map[string]time.Time),
+		errors:        make(map[string]*errorLogEntry),
 		window:        window,
+		maxPerWindow:  maxPerWindow,
 		cleanupTicker: time.NewTicker(5 * time.Minute), // 每5分钟清理一次过期记录
 		stopChan:      make(chan struct{}),
 	}
@@ -2753,7 +2776,7 @@ func newErrorLogRateLimiter(window time.Duration) *errorLogRateLimiter {
 }
 
 // shouldLog 检查是否应该记录错误
-// 返回: (shouldLog, errorCount)
+// 返回: (shouldLog, errorCount) 允许记录时返回 totalErrors，拒绝时返回 skippedErrors
 func (rl *errorLogRateLimiter) shouldLog(errorKey string) (bool, int64) {
 	atomic.AddInt64(&rl.totalErrors, 1)
 
@@ -2761,11 +2784,21 @@ func (rl *errorLogRateLimiter) shouldLog(errorKey string) (bool, int64) {
 	defer rl.mu.Unlock()
 
 	now := time.Now()
-	lastLogTime, exists := rl.errors[errorKey]
+	entry, exists := rl.errors[errorKey]
 
-	// 如果错误不存在或已超过时间窗口，允许记录
-	if !exists || now.Sub(lastLogTime) >= rl.window {
-		rl.errors[errorKey] = now
+	// 如果错误不存在或窗口已过期，重置计数并允许记录
+	if !exists || now.Sub(entry.last) >= rl.window {
+		rl.errors[errorKey] = &errorLogEntry{
+			last:  now,
+			count: 1,
+		}
+		return true, atomic.LoadInt64(&rl.totalErrors)
+	}
+
+	// 窗口内计数未超过上限，允许记录并累加
+	if entry.count < rl.maxPerWindow {
+		entry.count++
+		entry.last = now
 		return true, atomic.LoadInt64(&rl.totalErrors)
 	}
 
@@ -2795,8 +2828,8 @@ func (rl *errorLogRateLimiter) cleanup() {
 	now := time.Now()
 	expiredKeys := make([]string, 0)
 
-	for key, lastLogTime := range rl.errors {
-		if now.Sub(lastLogTime) >= rl.window*2 { // 保留窗口的两倍时间，避免频繁创建删除
+	for key, entry := range rl.errors {
+		if now.Sub(entry.last) >= rl.window*2 { // 保留窗口的两倍时间，避免频繁创建删除
 			expiredKeys = append(expiredKeys, key)
 		}
 	}
