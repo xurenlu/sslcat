@@ -277,31 +277,30 @@ func (wm *WatchdogMonitor) sendAlert(alertType string, current *ProcessStats, ba
 	var level notification.NotificationLevel = notification.LevelWarning
 	details := map[string]any{
 		"alert_type":     alertType,
-		"current_cpu":    current.CPUPercent,
-		"current_memory": current.MemoryPercent,
+		"current_cpu":    fmt.Sprintf("%.2f", current.CPUPercent),
+		"current_memory": fmt.Sprintf("%.2f", current.MemoryPercent),
 		"timestamp":      current.Timestamp.Format(time.RFC3339),
 		"hostname":       wm.hostName,
 		"host_ip":        wm.hostIP,
 	}
 
 	if alertType == "absolute_threshold" {
-		title = "CPU占用超过阈值"
-		message = fmt.Sprintf("当前进程CPU占用 %.1f%%，超过配置的阈值 %.1f%% (主机: %s, IP: %s)",
+		title = "CPU utilization exceeded threshold"
+		message = fmt.Sprintf("Current process CPU utilization is %.2f%%, exceeding the configured threshold of %.2f%% (Host: %s, IP: %s)",
 			current.CPUPercent, wm.options.CPUThresholdPercent, wm.hostName, wm.hostIP)
-		details["threshold"] = wm.options.CPUThresholdPercent
+		details["threshold"] = fmt.Sprintf("%.2f", wm.options.CPUThresholdPercent)
 	} else if alertType == "increase_trend" {
-		title = "CPU占用快速增长"
+		title = "CPU utilization rapid increase"
 		if baseline != nil {
 			increase := current.CPUPercent - baseline.CPUPercent
-			message = fmt.Sprintf("CPU占用在 %v 内从 %.1f%% 增长到 %.1f%% (增长: %.1f%%)，超过配置的增长阈值 %.1f%% (主机: %s, IP: %s)",
-				wm.options.CPUIncreaseWindow,
-				baseline.CPUPercent, current.CPUPercent, increase, wm.options.CPUIncreaseThresholdPercent, wm.hostName, wm.hostIP)
-			details["baseline_cpu"] = baseline.CPUPercent
-			details["baseline_memory"] = baseline.MemoryPercent
-			details["increase"] = increase
+			message = fmt.Sprintf("CPU utilization increased from %.2f%% to %.2f%% (increase: %.2f%%) within %v, exceeding the configured increase threshold of %.2f%% (Host: %s, IP: %s)",
+				baseline.CPUPercent, current.CPUPercent, increase, wm.options.CPUIncreaseWindow, wm.options.CPUIncreaseThresholdPercent, wm.hostName, wm.hostIP)
+			details["baseline_cpu"] = fmt.Sprintf("%.2f", baseline.CPUPercent)
+			details["baseline_memory"] = fmt.Sprintf("%.2f", baseline.MemoryPercent)
+			details["increase"] = fmt.Sprintf("%.2f", increase)
 			details["increase_window"] = wm.options.CPUIncreaseWindow.String()
 		}
-		details["increase_threshold"] = wm.options.CPUIncreaseThresholdPercent
+		details["increase_threshold"] = fmt.Sprintf("%.2f", wm.options.CPUIncreaseThresholdPercent)
 	}
 
 	// 如果CPU占用非常高，提升为错误级别
