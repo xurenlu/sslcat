@@ -227,8 +227,14 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	// 使用共享缓存实例创建图片优化器
 	imageOptimizer := imageopt.NewOptimizerWithCache(imageOptConfig, sharedCache)
 
-	// 初始化WAF引擎
-	wafEngine := waf.NewAdvancedEngine()
+	// 初始化WAF引擎（带频率限制配置）
+	rateLimitConfig := &waf.WAFRateLimitConfig{
+		Enabled:          cfg.Security.WAFRateLimitEnabled,
+		WindowSec:        cfg.Security.WAFRateLimitWindow,
+		MaxHits:          cfg.Security.WAFRateLimitMaxHits,
+		BlockDurationSec: cfg.Security.WAFRateLimitBlockSec,
+	}
+	wafEngine := waf.NewAdvancedEngine(rateLimitConfig)
 
 	// 初始化翻译器（从嵌入读取）
 	translator := i18n.NewTranslator(i18n.LangZhCN, "")

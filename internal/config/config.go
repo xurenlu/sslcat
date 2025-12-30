@@ -355,6 +355,12 @@ type SecurityConfig struct {
 	EnableWAF      bool `json:"enable_waf"`
 	EnableDDOS     bool `json:"enable_ddos"`
 
+	// WAF 频率限制配置
+	WAFRateLimitEnabled  bool `json:"waf_rate_limit_enabled"`   // 是否启用 WAF 频率限制
+	WAFRateLimitWindow   int  `json:"waf_rate_limit_window"`    // 时间窗口（秒），默认 60
+	WAFRateLimitMaxHits  int  `json:"waf_rate_limit_max_hits"`  // 时间窗口内最大触发次数，默认 10
+	WAFRateLimitBlockSec int  `json:"waf_rate_limit_block_sec"` // 封禁时长（秒），默认 3600
+
 	// 人机验证配置
 	EnableCaptcha bool `json:"enable_captcha"`
 	MinFormMs     int  `json:"min_form_ms"`

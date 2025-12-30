@@ -86,10 +86,40 @@ type Engine struct {
 	// 事件清理定时器
 	cleanupTicker *time.Ticker
 	stopChan      chan struct{}
+	
+	// WAF 频率限制
+	rateLimiter *wafRateLimiter
+}
+
+// WAFRateLimitConfig WAF 频率限制配置
+type WAFRateLimitConfig struct {
+	Enabled       bool
+	WindowSec     int
+	MaxHits       int
+	BlockDurationSec int
 }
 
 // NewEngine 创建WAF引擎
-func NewEngine() *Engine {
+func NewEngine(rateLimitConfig *WAFRateLimitConfig) *Engine {
+	log := logrus.WithFields(logrus.Fields{
+		"component": "waf_engine",
+	})
+
+	// 初始化频率限制器
+	var rateLimiter *wafRateLimiter
+	if rateLimitConfig != nil {
+		rateLimiter = newWAFRateLimiter(
+			rateLimitConfig.Enabled,
+			rateLimitConfig.WindowSec,
+			rateLimitConfig.MaxHits,
+			rateLimitConfig.BlockDurationSec,
+			log,
+		)
+	} else {
+		// 默认配置：禁用
+		rateLimiter = newWAFRateLimiter(false, 60, 10, 3600, log)
+	}
+
 	engine := &Engine{
 		rules:        make(map[string]*Rule),
 		enabled:      true,
@@ -98,9 +128,8 @@ func NewEngine() *Engine {
 		logLimiter:   newWAFLogRateLimiter(time.Minute), // 相同攻击每分钟最多记录一次日志
 		cleanupTicker: time.NewTicker(10 * time.Minute), // 每10分钟清理一次过期事件
 		stopChan:     make(chan struct{}),
-		log: logrus.WithFields(logrus.Fields{
-			"component": "waf_engine",
-		}),
+		log:          log,
+		rateLimiter:  rateLimiter,
 	}
 
 	// 初始化默认规则
@@ -418,6 +447,25 @@ func (e *Engine) CheckRequest(r *http.Request) (*AttackEvent, bool) {
 	clientIP := e.getClientIP(r)
 	userAgent := r.Header.Get("User-Agent")
 
+	// 检查 IP 是否被频率限制封禁
+	if e.rateLimiter != nil && e.rateLimiter.IsBlocked(clientIP) {
+		event := &AttackEvent{
+			ID:        e.generateEventID(),
+			ClientIP:  clientIP,
+			UserAgent: userAgent,
+			URL:       url,
+			Method:    method,
+			RuleID:    "rate_limit",
+			RuleName:  "WAF 频率限制",
+			RuleType:  RuleTypeCustom,
+			Action:    ActionBlock,
+			Payload:   "IP 因频繁触发 WAF 规则而被封禁",
+			Timestamp: time.Now(),
+			Blocked:   true,
+		}
+		return event, true
+	}
+
 	// 使用读锁进行检测
 	e.mutex.RLock()
 	var event *AttackEvent
@@ -441,6 +489,13 @@ func (e *Engine) CheckRequest(r *http.Request) (*AttackEvent, bool) {
 	// 如果检测到攻击，在释放读锁后添加事件
 	if event != nil {
 		e.addEvent(event)
+		
+		// 记录频率限制
+		if e.rateLimiter != nil && e.rateLimiter.RecordHit(clientIP) {
+			// IP 已被频率限制封禁
+			e.log.Warnf("WAF 频率限制：IP %s 已被自动封禁", clientIP)
+		}
+		
 		return event, event.Blocked
 	}
 
@@ -799,6 +854,35 @@ func (e *Engine) ClearEvents() {
 	e.log.Info("WAF攻击事件已清空")
 }
 
+// GetRateLimitBlockedIPs 获取被频率限制封禁的 IP 列表
+func (e *Engine) GetRateLimitBlockedIPs() map[string]time.Time {
+	if e.rateLimiter == nil {
+		return make(map[string]time.Time)
+	}
+	return e.rateLimiter.GetBlockedIPs()
+}
+
+// UnblockRateLimitIP 解除频率限制封禁
+func (e *Engine) UnblockRateLimitIP(ip string) {
+	if e.rateLimiter != nil {
+		e.rateLimiter.UnblockIP(ip)
+	}
+}
+
+// UpdateRateLimitConfig 更新频率限制配置
+func (e *Engine) UpdateRateLimitConfig(config *WAFRateLimitConfig) {
+	if e.rateLimiter != nil && config != nil {
+		e.rateLimiter.UpdateConfig(
+			config.Enabled,
+			config.WindowSec,
+			config.MaxHits,
+			config.BlockDurationSec,
+		)
+		e.log.Infof("WAF 频率限制配置已更新: enabled=%v, window=%ds, max_hits=%d, block=%ds",
+			config.Enabled, config.WindowSec, config.MaxHits, config.BlockDurationSec)
+	}
+}
+
 // min 辅助函数
 func min(a, b int) int {
 	if a < b {
@@ -891,5 +975,216 @@ func (rl *wafLogRateLimiter) cleanup() {
 func (rl *wafLogRateLimiter) Stop() {
 	if rl.stopChan != nil {
 		close(rl.stopChan)
+	}
+}
+
+// wafRateLimiter WAF 频率限制器
+type wafRateLimiter struct {
+	mu            sync.RWMutex
+	ipHits        map[string][]time.Time // IP -> 触发时间列表
+	blockedIPs    map[string]time.Time   // IP -> 封禁到期时间
+	enabled       bool
+	window        time.Duration // 时间窗口
+	maxHits       int           // 最大触发次数
+	blockDuration time.Duration // 封禁时长
+	cleanupTicker *time.Ticker
+	stopChan      chan struct{}
+	log           *logrus.Entry
+}
+
+// newWAFRateLimiter 创建 WAF 频率限制器
+func newWAFRateLimiter(enabled bool, windowSec, maxHits, blockSec int, log *logrus.Entry) *wafRateLimiter {
+	if windowSec <= 0 {
+		windowSec = 60 // 默认 60 秒
+	}
+	if maxHits <= 0 {
+		maxHits = 10 // 默认 10 次
+	}
+	if blockSec <= 0 {
+		blockSec = 3600 // 默认 1 小时
+	}
+
+	rl := &wafRateLimiter{
+		ipHits:        make(map[string][]time.Time),
+		blockedIPs:    make(map[string]time.Time),
+		enabled:       enabled,
+		window:        time.Duration(windowSec) * time.Second,
+		maxHits:       maxHits,
+		blockDuration: time.Duration(blockSec) * time.Second,
+		cleanupTicker: time.NewTicker(5 * time.Minute), // 每 5 分钟清理一次
+		stopChan:      make(chan struct{}),
+		log:           log,
+	}
+
+	// 启动清理协程
+	go rl.cleanup()
+
+	return rl
+}
+
+// RecordHit 记录一次 WAF 触发
+func (rl *wafRateLimiter) RecordHit(ip string) bool {
+	if !rl.enabled {
+		return false
+	}
+
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	now := time.Now()
+
+	// 检查是否已被封禁
+	if expireTime, blocked := rl.blockedIPs[ip]; blocked {
+		if now.Before(expireTime) {
+			// 仍在封禁期内
+			return true
+		}
+		// 封禁已过期，移除
+		delete(rl.blockedIPs, ip)
+	}
+
+	// 获取该 IP 的触发历史
+	hits := rl.ipHits[ip]
+
+	// 移除过期的触发记录
+	validHits := make([]time.Time, 0)
+	for _, hitTime := range hits {
+		if now.Sub(hitTime) < rl.window {
+			validHits = append(validHits, hitTime)
+		}
+	}
+
+	// 添加当前触发
+	validHits = append(validHits, now)
+	rl.ipHits[ip] = validHits
+
+	// 检查是否超过阈值
+	if len(validHits) >= rl.maxHits {
+		// 封禁该 IP
+		expireTime := now.Add(rl.blockDuration)
+		rl.blockedIPs[ip] = expireTime
+		rl.log.Warnf("WAF 频率限制：IP %s 在 %v 内触发 %d 次规则，已封禁 %v",
+			ip, rl.window, len(validHits), rl.blockDuration)
+		return true
+	}
+
+	return false
+}
+
+// IsBlocked 检查 IP 是否被封禁
+func (rl *wafRateLimiter) IsBlocked(ip string) bool {
+	if !rl.enabled {
+		return false
+	}
+
+	rl.mu.RLock()
+	defer rl.mu.RUnlock()
+
+	expireTime, blocked := rl.blockedIPs[ip]
+	if !blocked {
+		return false
+	}
+
+	// 检查是否已过期
+	if time.Now().After(expireTime) {
+		return false
+	}
+
+	return true
+}
+
+// GetBlockedIPs 获取所有被封禁的 IP
+func (rl *wafRateLimiter) GetBlockedIPs() map[string]time.Time {
+	rl.mu.RLock()
+	defer rl.mu.RUnlock()
+
+	result := make(map[string]time.Time)
+	now := time.Now()
+
+	for ip, expireTime := range rl.blockedIPs {
+		if now.Before(expireTime) {
+			result[ip] = expireTime
+		}
+	}
+
+	return result
+}
+
+// UnblockIP 解除 IP 封禁
+func (rl *wafRateLimiter) UnblockIP(ip string) {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	delete(rl.blockedIPs, ip)
+	delete(rl.ipHits, ip)
+	rl.log.Infof("WAF 频率限制：已解除 IP %s 的封禁", ip)
+}
+
+// UpdateConfig 更新配置
+func (rl *wafRateLimiter) UpdateConfig(enabled bool, windowSec, maxHits, blockSec int) {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	rl.enabled = enabled
+	if windowSec > 0 {
+		rl.window = time.Duration(windowSec) * time.Second
+	}
+	if maxHits > 0 {
+		rl.maxHits = maxHits
+	}
+	if blockSec > 0 {
+		rl.blockDuration = time.Duration(blockSec) * time.Second
+	}
+}
+
+// cleanup 清理过期数据
+func (rl *wafRateLimiter) cleanup() {
+	for {
+		select {
+		case <-rl.cleanupTicker.C:
+			rl.doCleanup()
+		case <-rl.stopChan:
+			return
+		}
+	}
+}
+
+// doCleanup 执行清理
+func (rl *wafRateLimiter) doCleanup() {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	now := time.Now()
+
+	// 清理过期的封禁记录
+	for ip, expireTime := range rl.blockedIPs {
+		if now.After(expireTime) {
+			delete(rl.blockedIPs, ip)
+		}
+	}
+
+	// 清理过期的触发记录
+	for ip, hits := range rl.ipHits {
+		validHits := make([]time.Time, 0)
+		for _, hitTime := range hits {
+			if now.Sub(hitTime) < rl.window*2 { // 保留窗口的两倍时间
+				validHits = append(validHits, hitTime)
+			}
+		}
+		if len(validHits) > 0 {
+			rl.ipHits[ip] = validHits
+		} else {
+			delete(rl.ipHits, ip)
+		}
+	}
+}
+
+// Stop 停止频率限制器
+func (rl *wafRateLimiter) Stop() {
+	if rl.stopChan != nil {
+		close(rl.stopChan)
+	}
+	if rl.cleanupTicker != nil {
+		rl.cleanupTicker.Stop()
 	}
 }
