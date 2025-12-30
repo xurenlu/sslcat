@@ -87,6 +87,7 @@ func (r *LinuxProcessStatsReader) GetProcessStats() (*ProcessStats, error) {
 	// 计算CPU占用百分比
 	now := time.Now()
 	maxReasonableCPU := float64(r.numCPU) * 100 * 2 // 允许2倍的核心数*100%作为上限
+	const minTimeDiff = 0.01 // 最小时间差 10 毫秒，避免除以接近零的数
 	
 	if r.lastSysTime.IsZero() {
 		// 首次调用，初始化基准值
@@ -96,13 +97,16 @@ func (r *LinuxProcessStatsReader) GetProcessStats() (*ProcessStats, error) {
 	} else {
 		timeDiff := now.Sub(r.lastSysTime).Seconds()
 		
-		// 检查时间差是否合理（避免系统时间回退或异常大的时间差）
-		if timeDiff <= 0 || timeDiff >= 3600 {
+		// 检查时间差是否合理（避免系统时间回退、异常大的时间差或时间差太小）
+		if timeDiff < minTimeDiff || timeDiff >= 3600 {
 			// 时间差异常，重置基准值
 			if timeDiff >= 3600 {
 				log.Warnf("检测到异常大的时间差 %.1f 秒，重置基准值", timeDiff)
 			} else if timeDiff <= 0 {
 				log.Warnf("检测到异常的时间差 %.3f 秒（可能是系统时间回退），重置基准值", timeDiff)
+			} else {
+				// timeDiff 太小（< 10ms），静默跳过本次采样，避免除以接近零的数
+				log.Debugf("时间差太小 %.3f 秒，跳过本次 CPU 采样", timeDiff)
 			}
 			r.lastSysTime = now
 			r.lastCPUTime = cpuTime

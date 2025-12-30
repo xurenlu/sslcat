@@ -389,3 +389,131 @@ journalctl -u sslcat -f | grep -E "timeout|context canceled" | awk '{print $NF}'
 
 **下一步行动**: 请确认是否执行上述紧急措施。
 
+---
+
+## 🔍 2025-12-30 15:47 UTC - 后续诊断更新
+
+### 当前状态（重启后 3 小时）
+
+```bash
+服务器: shifen.de
+进程: sslcat (PID: 1245266)
+运行时长: 3小时2分钟
+负载: 0.00, 0.01, 0.00
+内存: 36.3M (RSS)
+CPU: 8.229s (总计)
+```
+
+### ✅ 问题已解决
+
+重启后服务运行正常：
+- CPU 使用率正常（8秒/3小时 ≈ 0.07%）
+- 内存使用正常（36.3MB）
+- 负载正常（接近0）
+- 无 Goroutine 泄漏
+
+### ⚠️ 发现新问题：CPU 监控计算错误
+
+#### 问题现象
+
+日志中频繁出现 CPU 百分比计算错误：
+
+```
+Dec 30 09:50:27: 检测到异常的 CPU 百分比 20391.6%，可能是计算错误，重置基准值 
+                 (cpuDiff: 15, timeDiff: 0.000s, numCPU: 4, totalCPUTime: 0.1)
+
+Dec 30 11:33:32: 检测到异常的 CPU 百分比 4178.9%，可能是计算错误，重置基准值 
+                 (cpuDiff: 11, timeDiff: 0.001s, numCPU: 4, totalCPUTime: 0.3)
+
+Dec 30 13:48:07: 检测到异常的 CPU 百分比 2239.9%，可能是计算错误，重置基准值 
+                 (cpuDiff: 1, timeDiff: 0.000s, numCPU: 4, totalCPUTime: 0.0)
+
+Dec 30 15:13:07: 检测到异常的 CPU 百分比 1292.8%，可能是计算错误，重置基准值 
+                 (cpuDiff: 1, timeDiff: 0.000s, numCPU: 4, totalCPUTime: 0.1)
+```
+
+**统计**: 24小时内出现 **10 次** CPU 计算错误
+
+#### 根本原因
+
+位置：`internal/monitor/process_stats.go:97-149`
+
+问题代码：
+```go
+timeDiff := now.Sub(r.lastSysTime).Seconds()
+
+// 检查时间差是否合理
+if timeDiff <= 0 || timeDiff >= 3600 {
+    // 重置基准值
+} else {
+    // 计算 CPU 百分比
+    totalCPUTime := timeDiff * float64(r.numCPU) * 100
+    cpuPercent := (float64(cpuDiff) / totalCPUTime) * 100
+}
+```
+
+**Bug 分析**：
+1. 代码检查了 `timeDiff <= 0`，但没有检查 `timeDiff` 非常小的情况
+2. 当 `timeDiff` 为 0.000 或 0.001 秒时，`totalCPUTime` 非常小
+3. 导致 `cpuPercent = cpuDiff / 极小值 * 100` 计算出异常高的百分比
+4. 虽然有上限检查（`maxReasonableCPU`），但仍会产生大量警告日志
+
+#### 触发场景
+
+1. **进程启动时**：首次调用 `GetProcessStats()` 后立即第二次调用
+2. **高频监控**：监控间隔太短（< 0.01 秒）
+3. **系统时间抖动**：系统时间微小波动
+
+#### 修复方案
+
+```go
+timeDiff := now.Sub(r.lastSysTime).Seconds()
+
+// 检查时间差是否合理（添加最小时间差检查）
+const minTimeDiff = 0.01 // 最小 10 毫秒
+if timeDiff <= minTimeDiff || timeDiff >= 3600 {
+    // 时间差异常，重置基准值
+    if timeDiff >= 3600 {
+        log.Warnf("检测到异常大的时间差 %.1f 秒，重置基准值", timeDiff)
+    } else if timeDiff <= 0 {
+        log.Warnf("检测到异常的时间差 %.3f 秒（可能是系统时间回退），重置基准值", timeDiff)
+    } else {
+        // timeDiff 太小，静默重置（不记录日志）
+        log.Debugf("时间差太小 %.3f 秒，跳过本次采样", timeDiff)
+    }
+    r.lastSysTime = now
+    r.lastCPUTime = cpuTime
+    stats.CPUPercent = 0.0
+} else {
+    // 正常计算...
+}
+```
+
+#### 影响评估
+
+- ✅ **不影响功能**：只是监控数据计算错误，不影响核心功能
+- ⚠️ **日志污染**：每次启动和高频监控时产生警告日志
+- ⚠️ **误报警告**：可能触发监控告警（如果配置了 CPU 告警）
+
+### 🎯 建议措施
+
+1. **立即修复**：更新 `process_stats.go`，添加最小时间差检查（0.01秒）
+2. **监控优化**：确保监控间隔 >= 1 秒
+3. **日志优化**：时间差太小时使用 Debug 级别，不使用 Warning
+
+### 📊 对比分析
+
+| 指标 | 重启前（10:30） | 重启后（15:47） | 状态 |
+|------|----------------|----------------|------|
+| CPU 使用率 | 41-43% | ~0.07% | ✅ 正常 |
+| 内存使用 | 2.8-5.0 GB | 36.3 MB | ✅ 正常 |
+| Goroutine | 23,000-26,000 | ~10 | ✅ 正常 |
+| 负载 | 高 | 0.00 | ✅ 正常 |
+| CPU 计算错误 | 频繁 | 频繁 | ⚠️ 需修复 |
+
+### 结论
+
+1. **原问题已解决**：恶意扫描导致的 CPU/内存飙升问题通过重启已解决
+2. **发现新问题**：CPU 监控计算存在 bug，需要修复
+3. **优先级**：新问题优先级较低，不影响核心功能，可以在下个版本修复
+
