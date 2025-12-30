@@ -217,6 +217,9 @@ type ProxyRule struct {
 
 	// WebSocket代理优化配置
 	WebSocketOptimized    bool `json:"websocket_optimized"`     // 是否启用WebSocket优化，默认true
+	
+	// WAF 配置（按域名）
+	WAFEnabled *bool `json:"waf_enabled,omitempty"` // 是否启用WAF，nil表示使用全局配置
 	WebSocketBufferSize   int  `json:"websocket_buffer_size"`   // WebSocket缓冲区大小，默认100
 	WebSocketReadTimeout  int  `json:"websocket_read_timeout"`  // WebSocket读取超时（秒），默认30
 	WebSocketWriteTimeout int  `json:"websocket_write_timeout"` // WebSocket写入超时（秒），默认10

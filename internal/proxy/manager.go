@@ -827,19 +827,36 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 					}
 				}
 				w.Header().Set("Content-Type", "text/html; charset=utf-8")
-				w.WriteHeader(http.StatusBadGateway)
+				w.WriteHeader(http.StatusServiceUnavailable)
 				fmt.Fprintf(w, `
+				<!DOCTYPE html>
 				<html>
-				<head><title>Proxy Error</title></head>
+				<head>
+					<meta charset="UTF-8">
+					<title>503 Service Unavailable</title>
+					<style>
+						body { font-family: Arial, sans-serif; margin: 50px; background: #f5f5f5; }
+						.container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+						h1 { color: #ff9800; }
+						.info { background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0; }
+						.footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; color: #6c757d; font-size: 14px; }
+					</style>
+				</head>
 				<body>
-					<h1>502 Bad Gateway</h1>
-					<p>Unable to connect to upstream server</p>
-					<p>Error: %v</p>
-					<hr>
-					<p><small>Powered by sslcat-%s</small></p>
+					<div class="container">
+						<h1>⚠️ 503 Service Unavailable</h1>
+						<div class="info">
+							<strong>服务暂时不可用</strong>
+						</div>
+						<p>抱歉，服务器暂时无法处理您的请求。请稍后重试。</p>
+						<div class="footer">
+							<p>如果问题持续存在，请联系网站管理员。</p>
+							<p><small>Powered by sslcat-%s</small></p>
+						</div>
+					</div>
 				</body>
 				</html>
-				`, err, m.version)
+				`, m.version)
 			}
 		}
 	}
@@ -1425,21 +1442,38 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 				}
 			}
 
-			// 返回错误页面
+			// 返回错误页面（隐藏上游信息）
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			w.WriteHeader(http.StatusBadGateway)
+			w.WriteHeader(http.StatusServiceUnavailable)
 			fmt.Fprintf(w, `
+			<!DOCTYPE html>
 			<html>
-			<head><title>Proxy Error</title></head>
+			<head>
+				<meta charset="UTF-8">
+				<title>503 Service Unavailable</title>
+				<style>
+					body { font-family: Arial, sans-serif; margin: 50px; background: #f5f5f5; }
+					.container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+					h1 { color: #ff9800; }
+					.info { background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0; }
+					.footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; color: #6c757d; font-size: 14px; }
+				</style>
+			</head>
 			<body>
-				<h1>502 Bad Gateway</h1>
-				<p>Unable to connect to upstream: %s</p>
-				<p>Error: %v</p>
-				<hr>
-				<p><small>Powered by sslcat-%s</small></p>
+				<div class="container">
+					<h1>⚠️ 503 Service Unavailable</h1>
+					<div class="info">
+						<strong>服务暂时不可用</strong>
+					</div>
+					<p>抱歉，服务器暂时无法处理您的请求。请稍后重试。</p>
+					<div class="footer">
+						<p>如果问题持续存在，请联系网站管理员。</p>
+						<p><small>Powered by sslcat-%s</small></p>
+					</div>
+				</div>
 			</body>
 			</html>
-			`, targetURL, err, m.version)
+			`, m.version)
 		}
 	}
 
@@ -2842,6 +2876,23 @@ func (rl *errorLogRateLimiter) cleanup() {
 		// 使用 debug 级别记录清理信息，避免影响性能
 		// logrus.Debugf("Cleaned up %d expired error log entries", len(expiredKeys))
 	}
+}
+
+// FindRuleByDomain 根据域名查找代理规则
+func (m *Manager) FindRuleByDomain(domain string) *config.ProxyRule {
+	// 移除端口号
+	host := domain
+	if idx := strings.Index(domain, ":"); idx != -1 {
+		host = domain[:idx]
+	}
+	
+	for i := range m.config.Proxy.Rules {
+		rule := &m.config.Proxy.Rules[i]
+		if rule.Domain == host && rule.Enabled {
+			return rule
+		}
+	}
+	return nil
 }
 
 // Stop 停止错误日志限流器

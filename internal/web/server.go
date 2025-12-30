@@ -1311,14 +1311,75 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// WAF 检测（开启时才生效）
-	if s.config.Security.EnableWAF && s.wafEngine != nil {
+	// WAF 检测（开启时才生效，支持按域名配置）
+	wafEnabled := s.config.Security.EnableWAF
+	// 检查是否有域名级别的 WAF 配置
+	if rule := s.proxyManager.FindRuleByDomain(r.Host); rule != nil && rule.WAFEnabled != nil {
+		wafEnabled = *rule.WAFEnabled
+	}
+	
+	if wafEnabled && s.wafEngine != nil {
 		if events, blocked := s.wafEngine.CheckRequestAdvanced(r); blocked {
-			s.log.Warnf("WAF blocked request from %s: %d events detected", s.getClientIP(r), len(events))
-			http.Error(wrappedWriter, "Request blocked by WAF", http.StatusForbidden)
+			s.log.Warnf("WAF blocked request from %s to %s: %d events detected", s.getClientIP(r), r.Host, len(events))
+			
+			// 构建详细的拦截页面
+			var reasons []string
+			for _, event := range events {
+				reasons = append(reasons, fmt.Sprintf("%s (%s)", event.RuleName, event.RuleType))
+			}
+			
+			blockPage := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>403 Forbidden - WAF Protection</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 50px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #d32f2f; }
+        .info { background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0; }
+        .reasons { background: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0; }
+        .reason-item { padding: 5px 0; color: #495057; }
+        .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; color: #6c757d; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛡️ 403 Forbidden</h1>
+        <div class="info">
+            <strong>您的请求已被 Web 应用防火墙 (WAF) 拦截</strong>
+        </div>
+        <p>检测到以下安全威胁：</p>
+        <div class="reasons">
+            %s
+        </div>
+        <p>如果您认为这是误判，请联系网站管理员。</p>
+        <div class="footer">
+            <p>请求ID: %s</p>
+            <p>时间: %s</p>
+            <p>客户端IP: %s</p>
+        </div>
+    </div>
+</body>
+</html>`, 
+				func() string {
+					var html string
+					for _, reason := range reasons {
+						html += fmt.Sprintf(`<div class="reason-item">• %s</div>`, reason)
+					}
+					return html
+				}(),
+				events[0].ID,
+				time.Now().Format("2006-01-02 15:04:05"),
+				s.getClientIP(r),
+			)
+			
+			wrappedWriter.Header().Set("Content-Type", "text/html; charset=utf-8")
+			wrappedWriter.WriteHeader(http.StatusForbidden)
+			wrappedWriter.Write([]byte(blockPage))
 			return
 		} else if len(events) > 0 {
-			s.log.Infof("WAF detected %d security events from %s", len(events), s.getClientIP(r))
+			s.log.Infof("WAF detected %d security events from %s to %s", len(events), s.getClientIP(r), r.Host)
 		}
 	}
 
