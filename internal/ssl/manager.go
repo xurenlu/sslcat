@@ -182,7 +182,7 @@ func (m *Manager) DeleteCertificate(domain string) error {
 	// 从缓存中删除
 	delete(m.certCache, domain)
 
-	// 删除文件
+	// 删除 certs/ 和 keys/ 目录中的证书文件
 	certFile := filepath.Join(m.config.SSL.CertDir, domain+".crt")
 	keyFile := filepath.Join(m.config.SSL.KeyDir, domain+".key")
 
@@ -194,7 +194,52 @@ func (m *Manager) DeleteCertificate(domain string) error {
 		m.log.Warnf("Failed to remove private key file %s: %v", keyFile, err)
 	}
 
-	m.log.Infof("Deleted certificate for domain %s", domain)
+	// 删除 acme-cache 目录中的证书缓存（防止重启后自动恢复）
+	acmeCacheDir := filepath.Join(filepath.Dir(m.config.SSL.CertDir), "acme-cache")
+	if m.acmeMgr != nil {
+		// 尝试从 autocert 缓存中删除
+		ctx := context.Background()
+		if err := m.acmeMgr.Cache.Delete(ctx, domain); err != nil {
+			m.log.Warnf("Failed to delete certificate from ACME cache for %s: %v", domain, err)
+		} else {
+			m.log.Infof("Deleted certificate from ACME cache for domain %s", domain)
+		}
+		
+		// 同时删除可能存在的通配符域名缓存（*.domain）
+		wildcardDomain := "*." + domain
+		if err := m.acmeMgr.Cache.Delete(ctx, wildcardDomain); err == nil {
+			m.log.Infof("Deleted wildcard certificate from ACME cache for domain %s", wildcardDomain)
+		}
+		
+		// 删除子域名的情况（如果是子域名，也尝试删除主域名）
+		parts := strings.Split(domain, ".")
+		if len(parts) > 2 {
+			// 可能是子域名，尝试删除对应的通配符证书
+			parentDomain := strings.Join(parts[1:], ".")
+			wildcardParent := "*." + parentDomain
+			if err := m.acmeMgr.Cache.Delete(ctx, wildcardParent); err == nil {
+				m.log.Infof("Deleted parent wildcard certificate from ACME cache for domain %s", wildcardParent)
+			}
+		}
+	} else {
+		// 如果没有 acmeMgr，尝试直接删除文件
+		acmeCacheFile := filepath.Join(acmeCacheDir, domain)
+		if err := os.Remove(acmeCacheFile); err != nil && !os.IsNotExist(err) {
+			m.log.Warnf("Failed to remove ACME cache file %s: %v", acmeCacheFile, err)
+		}
+	}
+
+	// 清除元数据缓存
+	m.metadataMutex.Lock()
+	delete(m.certMetadataCache, domain)
+	m.metadataMutex.Unlock()
+
+	// 清除失败缓存
+	m.failedCacheMutex.Lock()
+	delete(m.failedDomainCache, domain)
+	m.failedCacheMutex.Unlock()
+
+	m.log.Infof("Deleted certificate for domain %s (including ACME cache)", domain)
 	return nil
 }
 
