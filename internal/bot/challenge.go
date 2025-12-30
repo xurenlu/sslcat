@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"math"
+	mathrand "math/rand"
 	"sync"
 	"time"
 
@@ -76,7 +77,7 @@ func (cm *ChallengeManager) GenerateChallenge(clientIP, domain string) *Challeng
 	challengeID := cm.generateID()
 
 	// 生成滑块验证挑战
-	target := 50 + (rand.Intn(40) - 20) // 30-70 之间的随机位置
+	target := 50 + (mathrand.Intn(40) - 20) // 30-70 之间的随机位置
 	challenge := &Challenge{
 		ID:           challengeID,
 		ClientIP:     clientIP,

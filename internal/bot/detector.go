@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/xurenlu/sslcat/internal/config"
 )
 
 // Detector 机器人检测器
@@ -32,30 +33,6 @@ type DetectionResult struct {
 	Action        string // "allow", "challenge", "block"
 }
 
-// BotDetectionConfig 机器人检测配置
-type BotDetectionConfig struct {
-	// 检测模式: "monitor"(仅记录) | "challenge"(验证)
-	Mode string `json:"mode"`
-
-	// 风险阈值
-	LowRiskThreshold    int `json:"low_risk_threshold"`
-	MediumRiskThreshold int `json:"medium_risk_threshold"`
-	HighRiskThreshold   int `json:"high_risk_threshold"`
-
-	// 频率限制
-	MaxRequestsPerMinute int `json:"max_requests_per_minute"`
-	MaxRequestsPerHour   int `json:"max_requests_per_hour"`
-
-	// 白名单有效期(小时)
-	WhitelistDuration int `json:"whitelist_duration"`
-
-	// Token 有效期(小时)
-	TokenDuration int `json:"token_duration"`
-
-	// 跳过验证的路径
-	SkipPaths []string `json:"skip_paths"`
-}
-
 // NewDetector 创建机器人检测器
 func NewDetector(logger *logrus.Logger, whitelist *WhitelistManager, challenge *ChallengeManager) *Detector {
 	return &Detector{
@@ -68,8 +45,8 @@ func NewDetector(logger *logrus.Logger, whitelist *WhitelistManager, challenge *
 }
 
 // CheckRequest 检查请求是否为机器人
-func (d *Detector) CheckRequest(r *http.Request, config *BotDetectionConfig) (*DetectionResult, bool) {
-	if !d.enabled || config == nil {
+func (d *Detector) CheckRequest(r *http.Request, botConfig *config.BotDetectionConfig) (*DetectionResult, bool) {
+	if !d.enabled || botConfig == nil {
 		return nil, false
 	}
 
@@ -79,7 +56,7 @@ func (d *Detector) CheckRequest(r *http.Request, config *BotDetectionConfig) (*D
 	domain := r.Host
 
 	// 检查是否在跳过路径列表中
-	if d.shouldSkipPath(r.URL.Path, config.SkipPaths) {
+	if d.shouldSkipPath(r.URL.Path, botConfig.SkipPaths) {
 		return &DetectionResult{
 			IsBot:          false,
 			RiskScore:      0,
@@ -107,7 +84,7 @@ func (d *Detector) CheckRequest(r *http.Request, config *BotDetectionConfig) (*D
 			d.logger.Debugf("Valid verification token for IP %s", clientIP)
 			// Token 有效，添加到白名单
 			if d.whitelist != nil {
-				d.whitelist.Add(clientIP, domain, token, time.Duration(config.WhitelistDuration)*time.Hour)
+				d.whitelist.Add(clientIP, domain, token, time.Duration(botConfig.WhitelistDuration)*time.Hour)
 			}
 			return &DetectionResult{
 				IsBot:          false,
@@ -120,27 +97,27 @@ func (d *Detector) CheckRequest(r *http.Request, config *BotDetectionConfig) (*D
 	}
 
 	// 行为分析
-	riskScore := d.analyzer.AnalyzeRequest(r, config)
+	riskScore := d.analyzer.AnalyzeRequest(r, botConfig)
 
 	result := &DetectionResult{
 		RiskScore: riskScore,
-		IsBot:     riskScore >= config.MediumRiskThreshold,
+		IsBot:     riskScore >= botConfig.MediumRiskThreshold,
 	}
 
 	// 根据风险评分决定动作
-	if riskScore < config.LowRiskThreshold {
+	if riskScore < botConfig.LowRiskThreshold {
 		// 低风险，直接放行
 		result.NeedsChallenge = false
 		result.Action = "allow"
 		result.Reason = "low risk"
-	} else if riskScore < config.MediumRiskThreshold {
+	} else if riskScore < botConfig.MediumRiskThreshold {
 		// 中风险，检查是否有有效 Token
 		result.NeedsChallenge = false
 		result.Action = "allow"
 		result.Reason = "medium risk but no challenge"
-	} else if riskScore < config.HighRiskThreshold {
+	} else if riskScore < botConfig.HighRiskThreshold {
 		// 中高风险，需要验证
-		if config.Mode == "challenge" {
+		if botConfig.Mode == "challenge" {
 			result.NeedsChallenge = true
 			result.Action = "challenge"
 			result.Reason = fmt.Sprintf("risk score %d requires verification", riskScore)
@@ -157,7 +134,7 @@ func (d *Detector) CheckRequest(r *http.Request, config *BotDetectionConfig) (*D
 		}
 	} else {
 		// 高风险，强制验证或阻止
-		if config.Mode == "challenge" {
+		if botConfig.Mode == "challenge" {
 			result.NeedsChallenge = true
 			result.Action = "challenge"
 			result.Reason = fmt.Sprintf("high risk score %d", riskScore)
@@ -280,8 +257,8 @@ func hashString(s string) string {
 }
 
 // DefaultConfig 返回默认配置
-func DefaultConfig() *BotDetectionConfig {
-	return &BotDetectionConfig{
+func DefaultConfig() *config.BotDetectionConfig {
+	return &config.BotDetectionConfig{
 		Mode:                 "monitor",
 		LowRiskThreshold:     30,
 		MediumRiskThreshold:  50,

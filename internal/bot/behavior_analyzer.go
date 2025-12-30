@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/xurenlu/sslcat/internal/config"
 )
 
 // BehaviorAnalyzer 行为分析器
@@ -63,7 +64,7 @@ func NewBehaviorAnalyzer(logger *logrus.Logger) *BehaviorAnalyzer {
 }
 
 // AnalyzeRequest 分析请求并返回风险评分 (0-100)
-func (ba *BehaviorAnalyzer) AnalyzeRequest(r *http.Request, config *BotDetectionConfig) int {
+func (ba *BehaviorAnalyzer) AnalyzeRequest(r *http.Request, botConfig *config.BotDetectionConfig) int {
 	clientIP := ba.getClientIP(r)
 	userAgent := r.Header.Get("User-Agent")
 
@@ -73,7 +74,7 @@ func (ba *BehaviorAnalyzer) AnalyzeRequest(r *http.Request, config *BotDetection
 	score += ba.analyzeUserAgent(userAgent)
 
 	// 2. 请求频率分析 (0-30分)
-	score += ba.analyzeRequestFrequency(clientIP, config)
+	score += ba.analyzeRequestFrequency(clientIP, botConfig)
 
 	// 3. 路径模式分析 (0-25分)
 	score += ba.analyzePathPattern(clientIP, r.URL.Path)
@@ -131,7 +132,7 @@ func (ba *BehaviorAnalyzer) analyzeUserAgent(userAgent string) int {
 }
 
 // analyzeRequestFrequency 分析请求频率
-func (ba *BehaviorAnalyzer) analyzeRequestFrequency(clientIP string, config *BotDetectionConfig) int {
+func (ba *BehaviorAnalyzer) analyzeRequestFrequency(clientIP string, botConfig *config.BotDetectionConfig) int {
 	ba.requestTracker.mutex.Lock()
 	defer ba.requestTracker.mutex.Unlock()
 
@@ -162,16 +163,16 @@ func (ba *BehaviorAnalyzer) analyzeRequestFrequency(clientIP string, config *Bot
 
 	// 检查每分钟请求数
 	minuteCount := len(stats.MinuteWindow)
-	if config.MaxRequestsPerMinute > 0 && minuteCount > config.MaxRequestsPerMinute {
+	if botConfig.MaxRequestsPerMinute > 0 && minuteCount > botConfig.MaxRequestsPerMinute {
 		// 超过限制，评分增加
-		excess := float64(minuteCount-config.MaxRequestsPerMinute) / float64(config.MaxRequestsPerMinute)
+		excess := float64(minuteCount-botConfig.MaxRequestsPerMinute) / float64(botConfig.MaxRequestsPerMinute)
 		score += int(excess * 20)
 	}
 
 	// 检查每小时请求数
 	hourCount := len(stats.HourWindow)
-	if config.MaxRequestsPerHour > 0 && hourCount > config.MaxRequestsPerHour {
-		excess := float64(hourCount-config.MaxRequestsPerHour) / float64(config.MaxRequestsPerHour)
+	if botConfig.MaxRequestsPerHour > 0 && hourCount > botConfig.MaxRequestsPerHour {
+		excess := float64(hourCount-botConfig.MaxRequestsPerHour) / float64(botConfig.MaxRequestsPerHour)
 		score += int(excess * 10)
 	}
 

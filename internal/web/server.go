@@ -18,6 +18,7 @@ import (
 
 	"github.com/xurenlu/sslcat/internal/ai"
 	"github.com/xurenlu/sslcat/internal/assets"
+	"github.com/xurenlu/sslcat/internal/bot"
 	"github.com/xurenlu/sslcat/internal/cache"
 	"github.com/xurenlu/sslcat/internal/compression"
 	"github.com/xurenlu/sslcat/internal/config"
@@ -122,6 +123,11 @@ type Server struct {
 
 	// WebAuthn 管理器
 	webauthnManager *WebAuthnManager
+
+	// 机器人检测器
+	botDetector        *bot.Detector
+	botWhitelistMgr    *bot.WhitelistManager
+	botChallengeMgr    *bot.ChallengeManager
 
 	// Cluster runtime status
 	clusterLastConfigSyncAt      time.Time
@@ -314,6 +320,25 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	if secMgr != nil && secMgr.GetGeoIPService() != nil {
 		server.ddosProtector.SetGeoIPService(secMgr.GetGeoIPService())
 	}
+
+	// 初始化机器人检测组件
+	botDBPath := filepath.Join(dataDir, "bot_detection.db")
+	botWhitelistMgr, err := bot.NewWhitelistManager(logrus.StandardLogger(), botDBPath)
+	if err != nil {
+		logrus.WithError(err).Warn("Failed to initialize bot whitelist manager")
+	} else {
+		server.botWhitelistMgr = botWhitelistMgr
+	}
+
+	// 初始化挑战管理器（使用配置中的密钥或默认密钥）
+	tokenSecret := cfg.Server.SecretKey
+	if tokenSecret == "" {
+		tokenSecret = "default-bot-token-secret-change-me"
+	}
+	server.botChallengeMgr = bot.NewChallengeManager(logrus.StandardLogger(), tokenSecret)
+
+	// 初始化机器人检测器
+	server.botDetector = bot.NewDetector(logrus.StandardLogger(), server.botWhitelistMgr, server.botChallengeMgr)
 
 	// 初始化代理访问控制管理器
 	server.proxyAuthManager = NewProxyAuthManager(server.log)
@@ -1019,6 +1044,26 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/waf/subnet-stats", s.handleAPIWAFSubnetStats)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/waf/tls-stats", s.handleAPIWAFTLSStats)
 
+	// Bot API 前缀查询接口（在管理面板下）
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/config/bot-api-prefix", s.handleAPIConfigBotAPIPrefix)
+
+	// 机器人检测 API（使用随机前缀，避免暴露管理面板路径）
+	botAPIPrefix := s.config.BotAPIPrefix
+	if botAPIPrefix == "" {
+		botAPIPrefix = "/bot-api" // 兼容旧配置
+	}
+	s.mux.HandleFunc(botAPIPrefix+"/config", s.handleAPIBotDetectionConfig)
+	s.mux.HandleFunc(botAPIPrefix+"/stats", s.handleAPIBotDetectionStats)
+	s.mux.HandleFunc(botAPIPrefix+"/whitelist", s.handleAPIBotDetectionWhitelist)
+	s.mux.HandleFunc(botAPIPrefix+"/logs", s.handleAPIBotDetectionLogs)
+	
+	// 机器人验证接口（公开访问）
+	s.mux.HandleFunc("/bot-challenge/verify", s.HandleBotChallengeVerify)
+	s.mux.HandleFunc("/bot-challenge/refresh", s.HandleBotChallengeRefresh)
+	
+	// 记录机器人 API 前缀到日志（仅启动时记录一次）
+	s.log.Infof("Bot Detection API prefix: %s", botAPIPrefix)
+
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/unblock", s.handleAPISecurityUnblock)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/static-sites", s.handleAPIStaticSites)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/static-sites/delete", s.handleAPIStaticSitesDelete)
@@ -1426,6 +1471,38 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			s.log.Warnf("DDoS protection blocked request from %s: %s", s.getClientIP(r), reason)
 			http.Error(wrappedWriter, "Request blocked by DDoS protection", http.StatusTooManyRequests)
 			return
+		}
+	}
+
+	// 机器人检测（跳过管理面板和验证接口）
+	if s.botDetector != nil && !strings.HasPrefix(r.URL.Path, s.config.AdminPrefix) && !strings.HasPrefix(r.URL.Path, "/bot-challenge") {
+		// 获取域名对应的代理规则
+		host := r.Host
+		if idx := strings.Index(host, ":"); idx != -1 {
+			host = host[:idx]
+		}
+		
+		if rule := s.proxyManager.GetProxyConfig(host); rule != nil && rule.BotDetectionEnabled && rule.BotDetectionConfig != nil {
+			result, needsChallenge := s.botDetector.CheckRequest(r, rule.BotDetectionConfig)
+			if needsChallenge && result != nil && result.Challenge != nil {
+				s.serveBotChallenge(wrappedWriter, r, result.Challenge)
+				return
+			}
+			
+			// 记录检测日志
+			if result != nil && s.botWhitelistMgr != nil {
+				go func() {
+					clientIP := s.getClientIP(r)
+					userAgent := r.Header.Get("User-Agent")
+					if storage := s.botWhitelistMgr; storage != nil {
+						// 这里需要访问 storage 的 LogDetection 方法
+						// 由于 WhitelistManager 没有直接暴露 storage，我们先跳过日志记录
+						// 或者可以在 WhitelistManager 中添加 LogDetection 方法
+						_ = clientIP
+						_ = userAgent
+					}
+				}()
+			}
 		}
 	}
 

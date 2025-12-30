@@ -24,6 +24,7 @@ type Config struct {
 	Security    SecurityConfig `json:"security"`
 	CDNCache    CDNCacheConfig `json:"cdn_cache"`
 	AdminPrefix string         `json:"admin_prefix"`
+	BotAPIPrefix string        `json:"bot_api_prefix"` // 机器人检测 API 前缀（随机生成）
 	ConfigFile  string         `json:"-"` // 配置文件路径，不序列化
 
 	// 压缩配置
@@ -86,6 +87,9 @@ type ServerConfig struct {
 	// Session 存储配置
 	SessionStorage string `json:"session_storage"` // memory|file (默认 file)
 	DataDir        string `json:"data_dir"`        // 数据目录（用于文件存储）
+	
+	// 安全密钥（用于 Token 签名等）
+	SecretKey string `json:"secret_key"`
 }
 
 // SSLConfig SSL证书配置
@@ -938,6 +942,7 @@ func Load(configFile string) (*Config, error) {
 			CleanupIntervalMin:     5,
 		},
 		AdminPrefix: "/sslcat-panel",
+		BotAPIPrefix: generateBotAPIPrefix(),
 		Cluster: ClusterConfig{
 			Mode:     "standalone",
 			NodeID:   generateNodeID(),
@@ -1123,6 +1128,20 @@ func generateNodeID() string {
 	combined := fmt.Sprintf("%d-%x", timestamp, data)
 	hash := sha256.Sum256([]byte(combined))
 	return hex.EncodeToString(hash[:8])
+}
+
+// generateBotAPIPrefix 生成随机的机器人检测 API 前缀
+func generateBotAPIPrefix() string {
+	// 生成 16 字节随机数据
+	data := make([]byte, 16)
+	_, err := rand.Read(data)
+	if err != nil {
+		// 如果随机数生成失败，使用时间戳
+		data = []byte(fmt.Sprintf("%d", time.Now().UnixNano()))
+	}
+	hash := sha256.Sum256(data)
+	// 使用前 12 个字符作为前缀，添加 /bot- 前缀使其更易识别（但不暴露管理面板）
+	return "/bot-" + hex.EncodeToString(hash[:6])
 }
 
 // IsSlaveMode 检查是否为Slave模式
@@ -1450,6 +1469,7 @@ func getDefaultConfig() *Config {
 			CleanupIntervalMin:      5,
 		},
 		AdminPrefix: "/sslcat-panel",
+		BotAPIPrefix: generateBotAPIPrefix(),
 		Cluster: ClusterConfig{
 			Mode:     "standalone",
 			NodeID:   generateNodeID(),
