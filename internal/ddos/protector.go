@@ -221,6 +221,12 @@ func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
 	}
 
 	clientIP := p.getClientIP(r)
+	
+	// 排除内网IP，不对内网请求进行DDoS检测
+	if p.isPrivateIP(clientIP) {
+		return false, ""
+	}
+	
 	userAgent := r.Header.Get("User-Agent")
 	now := time.Now()
 
@@ -668,6 +674,38 @@ func (p *Protector) getClientIP(r *http.Request) string {
 	}
 
 	return r.RemoteAddr
+}
+
+// isPrivateIP 检查是否为内网IP
+func (p *Protector) isPrivateIP(ip string) bool {
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil {
+		return false
+	}
+
+	// 检查是否为内网IP段
+	privateBlocks := []string{
+		"10.0.0.0/8",       // A类私有地址
+		"172.16.0.0/12",    // B类私有地址
+		"192.168.0.0/16",   // C类私有地址
+		"127.0.0.0/8",      // 本地回环地址
+		"169.254.0.0/16",   // 链路本地地址
+		"::1/128",          // IPv6 本地回环
+		"fc00::/7",         // IPv6 私有地址
+		"fe80::/10",        // IPv6 链路本地地址
+	}
+
+	for _, block := range privateBlocks {
+		_, network, err := net.ParseCIDR(block)
+		if err != nil {
+			continue
+		}
+		if network.Contains(parsedIP) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // cleanupRoutine 清理协程
