@@ -30,9 +30,11 @@ import {
   FiServer,
   FiCheckCircle,
 } from 'react-icons/fi'
-import { Link as RouterLink } from 'react-router-dom'
+import { Link as RouterLink, useNavigate } from 'react-router-dom'
 import { useTranslation } from '../hooks/useLanguage'
 import { useConfig, buildPath, buildApiPath } from '../contexts/ConfigContext'
+import WAFStatsCard from '../components/WAFStatsCard'
+import { WAFStatsResponse } from '../types/waf'
 
 interface DashboardStats {
   activeRules: number
@@ -43,6 +45,13 @@ interface DashboardStats {
   sslCertificates: number
   uptime: number
   uptimeString: string
+}
+
+interface WAFDashboardStats {
+  enabled: boolean
+  totalBlocked: number
+  activeRules: number
+  detectionRate: number
 }
 
 const Dashboard: React.FC = () => {
@@ -56,11 +65,18 @@ const Dashboard: React.FC = () => {
     uptime: 0,
     uptimeString: '计算中...',
   })
+  const [wafStats, setWafStats] = useState<WAFDashboardStats>({
+    enabled: false,
+    totalBlocked: 0,
+    activeRules: 0,
+    detectionRate: 0,
+  })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const toast = useToast()
   const t = useTranslation()
   const { adminPrefix } = useConfig()
+  const navigate = useNavigate()
 
   const refreshStats = async () => {
     setLoading(true)
@@ -69,6 +85,8 @@ const Dashboard: React.FC = () => {
       // 确保 adminPrefix 不为空，否则使用备用前缀
       const effectivePrefix = adminPrefix || '/sslcat-panel'
       console.log('Dashboard refreshStats - adminPrefix:', adminPrefix, 'effectivePrefix:', effectivePrefix)
+      
+      // 获取系统统计
       const response = await fetch(buildApiPath(effectivePrefix, '/stats'), {
         method: 'GET',
         credentials: 'include', // 包含认证 cookies
@@ -95,6 +113,30 @@ const Dashboard: React.FC = () => {
       
       console.log('Dashboard processed stats:', processedStats)
       setStats(processedStats)
+
+      // 获取 WAF 统计
+      try {
+        const wafResponse = await fetch(buildApiPath(effectivePrefix, '/api/waf/stats'), {
+          method: 'GET',
+          credentials: 'include',
+        })
+
+        if (wafResponse.ok) {
+          const wafData: WAFStatsResponse = await wafResponse.json()
+          if (wafData.success && wafData.data) {
+            setWafStats({
+              enabled: wafData.data.enabled,
+              totalBlocked: wafData.data.blocked_events || 0,
+              activeRules: wafData.data.total_rules || 0,
+              detectionRate: wafData.data.detection_rate || 0,
+            })
+          }
+        }
+      } catch (wafError) {
+        console.error('获取 WAF 统计失败:', wafError)
+        // WAF 统计失败不影响整体页面加载
+      }
+      
       setLoading(false)
       toast({
         title: t.common.success,
@@ -181,6 +223,17 @@ const Dashboard: React.FC = () => {
           <Text ml={4} color="gray.600">{t.dialog.loadingSystemData}</Text>
         </Flex>
       )}
+
+      {/* WAF 概览卡片 */}
+      <Box mb={8}>
+        <WAFStatsCard
+          enabled={wafStats.enabled}
+          totalBlocked={wafStats.totalBlocked}
+          activeRules={wafStats.activeRules}
+          detectionRate={wafStats.detectionRate}
+          onClick={() => navigate(buildPath(adminPrefix, '/security'))}
+        />
+      </Box>
 
       {/* 统计卡片 */}
       <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={6} mb={8}>

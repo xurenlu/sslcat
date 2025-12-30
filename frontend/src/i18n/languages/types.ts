@@ -733,6 +733,44 @@ export interface Translation {
     bruteforce: string
     suspiciousIP: string
     malware: string
+    // WAF 相关
+    wafTab: string
+    wafStats: string
+    wafStatus: string
+    wafRules: string
+    wafEvents: string
+    wafConfig: string
+    totalRules: string
+    activeRules: string
+    totalBlocked: string
+    todayBlocked: string
+    detectionRate: string
+    ruleType: string
+    ruleAction: string
+    ruleName: string
+    rulePattern: string
+    ruleDescription: string
+    ruleEnabled: string
+    ruleDisabled: string
+    actionBlock: string
+    actionLog: string
+    actionWarn: string
+    sqlInjection: string
+    xss: string
+    pathTraversal: string
+    commandInjection: string
+    fileUpload: string
+    sensitiveFile: string
+    scannerDetection: string
+    customRule: string
+    noEvents: string
+    noRules: string
+    wafNotAvailable: string
+    enableWAF: string
+    disableWAF: string
+    wafConfigUpdated: string
+    wafConfigFailed: string
+    totalEvents: string
   }
 
   // 地理位置过滤
