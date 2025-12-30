@@ -145,6 +145,9 @@ interface ProxyRuleForm {
   
   // 性能监控配置
   enable_tracing: boolean
+  
+  // WAF 配置
+  waf_enabled?: boolean | null
   enable_metrics: boolean
   tls_handshake_timeout_sec: number
   expect_continue_timeout_sec: number
@@ -244,6 +247,8 @@ const ProxyAdd: React.FC = () => {
     enable_metrics: false,
     // 访问控制字段
     auth_enabled: false,
+    // WAF 配置 (null 表示使用全局配置)
+    waf_enabled: null,
     auth_users: [{ username: '', password: '' }],
     auth_session_timeout: 3600,
     auth_cookie_domain: '',
@@ -394,6 +399,8 @@ const ProxyAdd: React.FC = () => {
           backends: formData.backends,
           enabled: formData.enabled,
           ssl_only: formData.ssl_only,
+          // WAF 配置
+          waf_enabled: formData.waf_enabled,
           // 类CDN设置
           cdn_mode_enabled: formData.cdn_mode_enabled,
           cdn_enabled: formData.cdn_enabled,

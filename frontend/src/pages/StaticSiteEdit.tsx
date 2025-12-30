@@ -20,7 +20,7 @@ import {
   Flex,
   SimpleGrid,
 } from '@chakra-ui/react'
-import { FiArrowLeft, FiGlobe, FiSave, FiFolder } from 'react-icons/fi'
+import { FiArrowLeft, FiGlobe, FiSave, FiFolder, FiShield } from 'react-icons/fi'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useConfig, buildPath, buildApiPath } from '../contexts/ConfigContext'
 import { useTranslation } from '../hooks/useLanguage'
@@ -36,6 +36,7 @@ interface StaticSiteForm {
   enabled: boolean
   headers: Record<string, string>
   path_prefix_rules: PathPrefixRule[]
+  waf_enabled?: boolean | null
 }
 
 const StaticSiteEdit: React.FC = () => {
@@ -54,6 +55,7 @@ const StaticSiteEdit: React.FC = () => {
     enabled: true,
     headers: {},
     path_prefix_rules: [],
+    waf_enabled: null,
   })
   
   const [loading, setLoading] = useState(false)
@@ -85,6 +87,7 @@ const StaticSiteEdit: React.FC = () => {
             enabled: site.enabled ?? true,
             headers: site.response_headers || {},
             path_prefix_rules: site.path_prefix_rules || [],
+            waf_enabled: site.waf_enabled ?? null,
           })
         }
       } catch (error) {
@@ -150,6 +153,7 @@ const StaticSiteEdit: React.FC = () => {
           enabled: formData.enabled,
           headers: formData.headers,
           path_prefix_rules: formData.path_prefix_rules,
+          waf_enabled: formData.waf_enabled,
         }),
       })
 
@@ -250,6 +254,50 @@ const StaticSiteEdit: React.FC = () => {
                     />
                     <Text>{formData.enabled ? '已启用' : '已禁用'}</Text>
                   </HStack>
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel>
+                    <HStack>
+                      <Icon as={FiShield} />
+                      <Text>WAF 防护</Text>
+                    </HStack>
+                  </FormLabel>
+                  <VStack align="stretch" spacing={2}>
+                    <Text fontSize="sm" color="gray.500">
+                      {formData.waf_enabled === null 
+                        ? '使用全局 WAF 配置（默认）' 
+                        : formData.waf_enabled 
+                          ? '已为此站点启用 WAF' 
+                          : '已为此站点禁用 WAF'}
+                    </Text>
+                    <HStack>
+                      <Button
+                        size="sm"
+                        variant={formData.waf_enabled === null ? 'solid' : 'outline'}
+                        colorScheme={formData.waf_enabled === null ? 'blue' : 'gray'}
+                        onClick={() => handleInputChange('waf_enabled', null)}
+                      >
+                        全局
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={formData.waf_enabled === true ? 'solid' : 'outline'}
+                        colorScheme={formData.waf_enabled === true ? 'green' : 'gray'}
+                        onClick={() => handleInputChange('waf_enabled', true)}
+                      >
+                        启用
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={formData.waf_enabled === false ? 'solid' : 'outline'}
+                        colorScheme={formData.waf_enabled === false ? 'red' : 'gray'}
+                        onClick={() => handleInputChange('waf_enabled', false)}
+                      >
+                        禁用
+                      </Button>
+                    </HStack>
+                  </VStack>
                 </FormControl>
               </SimpleGrid>
             </VStack>

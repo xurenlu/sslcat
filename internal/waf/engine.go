@@ -412,37 +412,35 @@ func (e *Engine) CheckRequest(r *http.Request) (*AttackEvent, bool) {
 		return nil, false
 	}
 
-	e.mutex.RLock()
-	defer e.mutex.RUnlock()
-
 	// 获取请求数据
 	url := r.URL.String()
 	method := r.Method
 	clientIP := e.getClientIP(r)
 	userAgent := r.Header.Get("User-Agent")
 
+	// 使用读锁进行检测
+	e.mutex.RLock()
+	var event *AttackEvent
+	
 	// 1. 检查URL路径（敏感文件检测）
-	if event := e.checkURLPath(r, clientIP, userAgent, url, method); event != nil {
-		return event, event.Blocked
+	if event = e.checkURLPath(r, clientIP, userAgent, url, method); event == nil {
+		// 2. 检查User-Agent（扫描工具检测）
+		if event = e.checkUserAgent(r, clientIP, userAgent, url, method); event == nil {
+			// 3. 检查URL参数
+			if event = e.checkURLParams(r, clientIP, userAgent, url, method); event == nil {
+				// 4. 检查请求头
+				if event = e.checkHeaders(r, clientIP, userAgent, url, method); event == nil {
+					// 5. 检查请求体
+					event = e.checkBody(r, clientIP, userAgent, url, method)
+				}
+			}
+		}
 	}
+	e.mutex.RUnlock()
 
-	// 2. 检查User-Agent（扫描工具检测）
-	if event := e.checkUserAgent(r, clientIP, userAgent, url, method); event != nil {
-		return event, event.Blocked
-	}
-
-	// 3. 检查URL参数
-	if event := e.checkURLParams(r, clientIP, userAgent, url, method); event != nil {
-		return event, event.Blocked
-	}
-
-	// 4. 检查请求头
-	if event := e.checkHeaders(r, clientIP, userAgent, url, method); event != nil {
-		return event, event.Blocked
-	}
-
-	// 5. 检查请求体
-	if event := e.checkBody(r, clientIP, userAgent, url, method); event != nil {
+	// 如果检测到攻击，在释放读锁后添加事件
+	if event != nil {
+		e.addEvent(event)
 		return event, event.Blocked
 	}
 
@@ -483,13 +481,15 @@ func (e *Engine) checkURLPath(r *http.Request, clientIP, userAgent, url, method 
 				Blocked:   rule.Action == ActionBlock,
 			}
 
-			e.addEvent(event)
-
-			e.log.Warnf("WAF检测到%s: %s from %s, 路径: %s, 动作: %s",
-				map[RuleType]string{
-					RuleTypeSensitiveFile:    "敏感文件访问",
-					RuleTypeScannerDetection: "扫描工具访问",
-				}[rule.Type], clientIP, path, rule.Action)
+			// 日志记录（使用限流器避免日志风暴）
+			logKey := fmt.Sprintf("%s:%s:%s", rule.Type, clientIP, rule.ID)
+			if shouldLog, _ := e.logLimiter.shouldLog(logKey); shouldLog {
+				e.log.Warnf("WAF检测到%s: %s from %s, 路径: %s, 动作: %s",
+					map[RuleType]string{
+						RuleTypeSensitiveFile:    "敏感文件访问",
+						RuleTypeScannerDetection: "扫描工具访问",
+					}[rule.Type], rule.Name, clientIP, path, rule.Action)
+			}
 
 			return event
 		}
@@ -530,21 +530,11 @@ func (e *Engine) checkUserAgent(r *http.Request, clientIP, userAgent, url, metho
 				Blocked:   rule.Action == ActionBlock,
 			}
 
-			e.addEvent(event)
-
 			// 使用日志限流器：相同扫描工具每分钟最多记录一次日志
-			logKey := fmt.Sprintf("scanner:%s:%s:%s", clientIP, rule.Name, userAgent)
-			shouldLog, count := e.logLimiter.shouldLog(logKey)
-
-			if shouldLog {
+			logKey := fmt.Sprintf("scanner:%s:%s:%s", clientIP, rule.ID, userAgent)
+			if shouldLog, _ := e.logLimiter.shouldLog(logKey); shouldLog {
 				e.log.Warnf("WAF检测到扫描工具: %s from %s, User-Agent: %s, 动作: %s",
 					rule.Name, clientIP, userAgent, rule.Action)
-			} else {
-				// 每100次跳过记录一次统计信息
-				if count%100 == 0 {
-					e.log.Debugf("WAF检测到扫描工具 (rate limited, %d skipped): %s from %s, 规则: %s",
-						count, clientIP, rule.Name)
-				}
 			}
 
 			return event
@@ -648,21 +638,11 @@ func (e *Engine) matchRules(payload, clientIP, userAgent, url, method string) *A
 				Blocked:   rule.Action == ActionBlock,
 			}
 
-			e.addEvent(event)
-
 			// 使用日志限流器：相同攻击每分钟最多记录一次日志
-			logKey := fmt.Sprintf("%s:%s:%s:%s", rule.Type, clientIP, rule.Name, payload[:min(len(payload), 100)])
-			shouldLog, count := e.logLimiter.shouldLog(logKey)
-
-			if shouldLog {
+			logKey := fmt.Sprintf("%s:%s:%s:%s", rule.Type, clientIP, rule.ID, payload[:min(len(payload), 100)])
+			if shouldLog, _ := e.logLimiter.shouldLog(logKey); shouldLog {
 				e.log.Warnf("WAF检测到攻击: %s from %s, 规则: %s, 动作: %s",
 					rule.Type, clientIP, rule.Name, rule.Action)
-			} else {
-				// 每100次跳过记录一次统计信息
-				if count%100 == 0 {
-					e.log.Debugf("WAF检测到攻击 (rate limited, %d skipped): %s from %s, 规则: %s",
-						count, rule.Type, clientIP, rule.Name)
-				}
 			}
 
 			return event
@@ -672,8 +652,11 @@ func (e *Engine) matchRules(payload, clientIP, userAgent, url, method string) *A
 	return nil
 }
 
-// addEvent 添加事件
+// addEvent 添加事件（注意：调用此方法时必须已经释放读锁，因为需要获取写锁）
 func (e *Engine) addEvent(event *AttackEvent) {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+	
 	e.events = append(e.events, *event)
 
 	// 保持事件数量限制

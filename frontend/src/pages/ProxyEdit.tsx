@@ -143,6 +143,9 @@ interface ProxyRuleForm {
   keep_alive_timeout_sec: number
   idle_timeout_sec: number
   
+  // WAF 配置
+  waf_enabled?: boolean | null
+  
   // 性能监控配置
   enable_tracing: boolean
   enable_metrics: boolean
@@ -259,6 +262,8 @@ const ProxyEdit: React.FC = () => {
     websocket_optimized: true,
     websocket_buffer_size: 100,
     websocket_read_timeout: 30,
+    // WAF 配置 (null 表示使用全局配置)
+    waf_enabled: null,
     websocket_write_timeout: 10,
     websocket_ping_interval: 30,
     upstream_request_headers: {},
@@ -349,6 +354,9 @@ const ProxyEdit: React.FC = () => {
             
             // 统一后端配置
             backends: backends,
+            
+            // WAF 配置
+            waf_enabled: rule.waf_enabled ?? null,
             
             // 负载均衡配置（自动启用）
             load_balancer_algorithm: rule.load_balancer_algorithm || 'round_robin',
@@ -556,6 +564,8 @@ const ProxyEdit: React.FC = () => {
           backends: formData.backends,
           enabled: formData.enabled,
           ssl_only: formData.ssl_only,
+          // WAF 配置
+          waf_enabled: formData.waf_enabled,
           // 类CDN设置
           cdn_mode_enabled: formData.cdn_mode_enabled,
           cdn_enabled: formData.cdn_enabled,
@@ -761,6 +771,50 @@ const ProxyEdit: React.FC = () => {
                         isChecked={formData.ssl_only}
                         onChange={(e) => handleInputChange('ssl_only', e.target.checked)}
                       />
+                    </HStack>
+
+                    <HStack justify="space-between">
+                      <Box>
+                        <FormLabel mb={1}>
+                          <HStack>
+                            <Icon as={FiShield} />
+                            <Text>WAF 防护</Text>
+                          </HStack>
+                        </FormLabel>
+                        <Text fontSize="sm" color="gray.500">
+                          {formData.waf_enabled === null 
+                            ? '使用全局 WAF 配置（默认）' 
+                            : formData.waf_enabled 
+                              ? '已为此域名启用 WAF' 
+                              : '已为此域名禁用 WAF'}
+                        </Text>
+                      </Box>
+                      <HStack>
+                        <Button
+                          size="sm"
+                          variant={formData.waf_enabled === null ? 'solid' : 'outline'}
+                          colorScheme={formData.waf_enabled === null ? 'blue' : 'gray'}
+                          onClick={() => handleInputChange('waf_enabled', null)}
+                        >
+                          全局
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={formData.waf_enabled === true ? 'solid' : 'outline'}
+                          colorScheme={formData.waf_enabled === true ? 'green' : 'gray'}
+                          onClick={() => handleInputChange('waf_enabled', true)}
+                        >
+                          启用
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={formData.waf_enabled === false ? 'solid' : 'outline'}
+                          colorScheme={formData.waf_enabled === false ? 'red' : 'gray'}
+                          onClick={() => handleInputChange('waf_enabled', false)}
+                        >
+                          禁用
+                        </Button>
+                      </HStack>
                     </HStack>
 
                     <HStack justify="space-between">
