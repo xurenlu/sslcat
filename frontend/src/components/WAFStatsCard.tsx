@@ -71,7 +71,7 @@ const WAFStatsCard: React.FC<WAFStatsCardProps> = ({
 
             <Stat>
               <StatLabel fontSize="xs" color="gray.500">
-                {t.security.activeRules}
+                {t.security.wafRules}
               </StatLabel>
               <StatNumber fontSize="2xl" color="blue.500">
                 {activeRules}
