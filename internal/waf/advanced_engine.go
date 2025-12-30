@@ -100,8 +100,8 @@ type EngineStats struct {
 }
 
 // NewAdvancedEngine 创建高级WAF引擎
-func NewAdvancedEngine(rateLimitConfig *WAFRateLimitConfig) *AdvancedEngine {
-	baseEngine := NewEngine(rateLimitConfig)
+func NewAdvancedEngine(rateLimitConfig *WAFRateLimitConfig, multiDimConfig *MultiDimBlockConfig) *AdvancedEngine {
+	baseEngine := NewEngine(rateLimitConfig, multiDimConfig)
 
 	engine := &AdvancedEngine{
 		Engine:          baseEngine,
@@ -270,8 +270,13 @@ func (e *AdvancedEngine) AddAdvancedRule(rule *AdvancedRule) error {
 }
 
 // @Todo 待集成
-// CheckRequestAdvanced 高级请求检查
+// CheckRequestAdvanced 高级请求检查（向后兼容）
 func (e *AdvancedEngine) CheckRequestAdvanced(r *http.Request) ([]*AttackEvent, bool) {
+	return e.CheckRequestAdvancedWithTLS(r, "")
+}
+
+// CheckRequestAdvancedWithTLS 高级请求检查（带 TLS 指纹）
+func (e *AdvancedEngine) CheckRequestAdvancedWithTLS(r *http.Request, tlsFingerprint string) ([]*AttackEvent, bool) {
 	if !e.enabled {
 		return nil, false
 	}
@@ -284,8 +289,8 @@ func (e *AdvancedEngine) CheckRequestAdvanced(r *http.Request) ([]*AttackEvent, 
 	var events []*AttackEvent
 	blocked := false
 
-	// 首先使用基础引擎检查（包含敏感文件和扫描工具检测）
-	if baseEvent, baseBlocked := e.Engine.CheckRequest(r); baseEvent != nil {
+	// 首先使用基础引擎检查（包含敏感文件和扫描工具检测，带 TLS 指纹）
+	if baseEvent, baseBlocked := e.Engine.CheckRequestWithTLS(r, tlsFingerprint); baseEvent != nil {
 		events = append(events, baseEvent)
 		blocked = baseBlocked
 		// 如果基础引擎已经阻止，直接返回

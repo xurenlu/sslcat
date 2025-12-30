@@ -1,0 +1,42 @@
+{
+  "security": {
+    "enable_waf": true,
+    
+    "// WAF 频率限制配置": "自动封禁频繁触发 WAF 规则的 IP",
+    "waf_rate_limit_enabled": true,
+    "waf_rate_limit_window": 60,
+    "waf_rate_limit_max_hits": 10,
+    "waf_rate_limit_block_sec": 3600,
+    
+    "// 配置说明": {
+      "waf_rate_limit_enabled": "是否启用 WAF 频率限制",
+      "waf_rate_limit_window": "时间窗口（秒），在此时间内统计触发次数",
+      "waf_rate_limit_max_hits": "时间窗口内的最大触发次数",
+      "waf_rate_limit_block_sec": "封禁时长（秒）"
+    },
+    
+    "// 推荐配置": {
+      "生产环境（严格）": {
+        "waf_rate_limit_window": 60,
+        "waf_rate_limit_max_hits": 5,
+        "waf_rate_limit_block_sec": 7200
+      },
+      "生产环境（标准）": {
+        "waf_rate_limit_window": 60,
+        "waf_rate_limit_max_hits": 10,
+        "waf_rate_limit_block_sec": 3600
+      },
+      "测试环境（宽松）": {
+        "waf_rate_limit_window": 120,
+        "waf_rate_limit_max_hits": 20,
+        "waf_rate_limit_block_sec": 1800
+      },
+      "遭受攻击时（超严格）": {
+        "waf_rate_limit_window": 30,
+        "waf_rate_limit_max_hits": 3,
+        "waf_rate_limit_block_sec": 86400
+      }
+    }
+  }
+}
+

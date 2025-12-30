@@ -234,6 +234,10 @@ type ProxyRule struct {
 	ManagedByGitDeploy bool   `json:"managed_by_git_deploy"` // 是否由Git部署服务管理
 	GitDeployAppName   string `json:"git_deploy_app_name"`   // 关联的Git应用名称
 	GitDeployAppID     string `json:"git_deploy_app_id"`     // 关联的Git应用ID
+
+	// 机器人检测配置
+	BotDetectionEnabled bool                `json:"bot_detection_enabled"`           // 是否启用机器人检测
+	BotDetectionConfig  *BotDetectionConfig `json:"bot_detection_config,omitempty"` // 机器人检测配置
 }
 
 // PathPrefixRule 路径前缀规则
@@ -360,6 +364,18 @@ type SecurityConfig struct {
 	WAFRateLimitWindow   int  `json:"waf_rate_limit_window"`    // 时间窗口（秒），默认 60
 	WAFRateLimitMaxHits  int  `json:"waf_rate_limit_max_hits"`  // 时间窗口内最大触发次数，默认 10
 	WAFRateLimitBlockSec int  `json:"waf_rate_limit_block_sec"` // 封禁时长（秒），默认 3600
+
+	// TLS 指纹封禁配置
+	WAFTLSBlockEnabled     bool `json:"waf_tls_block_enabled"`      // 是否启用 TLS 指纹封禁
+	WAFTLSBlockWindow      int  `json:"waf_tls_block_window"`       // 时间窗口（秒），默认 60
+	WAFTLSBlockMaxHits     int  `json:"waf_tls_block_max_hits"`     // 时间窗口内最大触发次数，默认 10
+	WAFTLSBlockDurationSec int  `json:"waf_tls_block_duration_sec"` // 封禁时长（秒），默认 3600
+
+	// IP 段封禁配置
+	WAFSubnetBlockEnabled      bool `json:"waf_subnet_block_enabled"`       // 是否启用 IP 段封禁
+	WAFSubnetMask              int  `json:"waf_subnet_mask"`                // 网段掩码，默认 24 (/24)
+	WAFSubnetThreshold         int  `json:"waf_subnet_threshold"`           // 同段被封IP数量阈值，默认 3
+	WAFSubnetBlockDurationSec  int  `json:"waf_subnet_block_duration_sec"`  // 封禁时长（秒），默认 7200
 
 	// 人机验证配置
 	EnableCaptcha bool `json:"enable_captcha"`
@@ -604,6 +620,30 @@ type StaticSite struct {
 
 	// 自定义响应头
 	ResponseHeaders map[string]string `json:"response_headers,omitempty"`
+}
+
+// BotDetectionConfig 机器人检测配置
+type BotDetectionConfig struct {
+	// 检测模式: "monitor"(仅记录) | "challenge"(验证)
+	Mode string `json:"mode"`
+
+	// 风险阈值
+	LowRiskThreshold    int `json:"low_risk_threshold"`
+	MediumRiskThreshold int `json:"medium_risk_threshold"`
+	HighRiskThreshold   int `json:"high_risk_threshold"`
+
+	// 频率限制
+	MaxRequestsPerMinute int `json:"max_requests_per_minute"`
+	MaxRequestsPerHour   int `json:"max_requests_per_hour"`
+
+	// 白名单有效期(小时)
+	WhitelistDuration int `json:"whitelist_duration"`
+
+	// Token 有效期(小时)
+	TokenDuration int `json:"token_duration"`
+
+	// 跳过验证的路径
+	SkipPaths []string `json:"skip_paths"`
 }
 
 // PHPSite PHP 站点配置

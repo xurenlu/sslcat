@@ -227,14 +227,35 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	// 使用共享缓存实例创建图片优化器
 	imageOptimizer := imageopt.NewOptimizerWithCache(imageOptConfig, sharedCache)
 
-	// 初始化WAF引擎（带频率限制配置）
+	// 初始化WAF引擎（带频率限制和多维度封禁配置）
 	rateLimitConfig := &waf.WAFRateLimitConfig{
 		Enabled:          cfg.Security.WAFRateLimitEnabled,
 		WindowSec:        cfg.Security.WAFRateLimitWindow,
 		MaxHits:          cfg.Security.WAFRateLimitMaxHits,
 		BlockDurationSec: cfg.Security.WAFRateLimitBlockSec,
 	}
-	wafEngine := waf.NewAdvancedEngine(rateLimitConfig)
+	
+	multiDimConfig := &waf.MultiDimBlockConfig{
+		// IP 维度配置（使用频率限制配置）
+		IPEnabled:       cfg.Security.WAFRateLimitEnabled,
+		IPWindow:        time.Duration(cfg.Security.WAFRateLimitWindow) * time.Second,
+		IPMaxHits:       cfg.Security.WAFRateLimitMaxHits,
+		IPBlockDuration: time.Duration(cfg.Security.WAFRateLimitBlockSec) * time.Second,
+		
+		// TLS 指纹维度配置
+		TLSEnabled:       cfg.Security.WAFTLSBlockEnabled,
+		TLSWindow:        time.Duration(cfg.Security.WAFTLSBlockWindow) * time.Second,
+		TLSMaxHits:       cfg.Security.WAFTLSBlockMaxHits,
+		TLSBlockDuration: time.Duration(cfg.Security.WAFTLSBlockDurationSec) * time.Second,
+		
+		// IP 段维度配置
+		SubnetEnabled:       cfg.Security.WAFSubnetBlockEnabled,
+		SubnetMask:          cfg.Security.WAFSubnetMask,
+		SubnetThreshold:     cfg.Security.WAFSubnetThreshold,
+		SubnetBlockDuration: time.Duration(cfg.Security.WAFSubnetBlockDurationSec) * time.Second,
+	}
+	
+	wafEngine := waf.NewAdvancedEngine(rateLimitConfig, multiDimConfig)
 
 	// 初始化翻译器（从嵌入读取）
 	translator := i18n.NewTranslator(i18n.LangZhCN, "")
@@ -991,6 +1012,12 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/waf/rules", s.handleAPIWAFRules)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/waf/events", s.handleAPIWAFEvents)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/waf/config", s.handleAPIWAFConfig)
+	
+	// WAF 多维度封禁 API
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/waf/blocked-list", s.handleAPIWAFBlockedList)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/waf/unblock", s.handleAPIWAFUnblock)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/waf/subnet-stats", s.handleAPIWAFSubnetStats)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/waf/tls-stats", s.handleAPIWAFTLSStats)
 
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/unblock", s.handleAPISecurityUnblock)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/static-sites", s.handleAPIStaticSites)
@@ -1325,7 +1352,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	if wafEnabled && s.wafEngine != nil {
-		if events, blocked := s.wafEngine.CheckRequestAdvanced(r); blocked {
+		// 提取 TLS 指纹
+		tlsFingerprint := s.extractTLSFingerprint(r)
+		
+		// 使用带 TLS 指纹的检查方法
+		if events, blocked := s.wafEngine.CheckRequestAdvancedWithTLS(r, tlsFingerprint); blocked {
 			s.log.Warnf("WAF blocked request from %s to %s: %d events detected", s.getClientIP(r), r.Host, len(events))
 			
 			// 构建详细的拦截页面
@@ -1677,6 +1708,26 @@ func (s *Server) getClientIP(r *http.Request) string {
 
 	// 使用真实的 RemoteAddr
 	return remoteIP
+}
+
+// extractTLSFingerprint 从 TLS 连接提取指纹
+func (s *Server) extractTLSFingerprint(r *http.Request) string {
+	if r.TLS == nil {
+		return ""
+	}
+
+	// 生成简单的 TLS 指纹：版本 + 密码套件 + 扩展数量
+	// 这是一个简化的 JA3 风格指纹
+	version := r.TLS.Version
+	cipherSuite := r.TLS.CipherSuite
+	serverName := r.TLS.ServerName
+	
+	// 构建指纹字符串
+	raw := fmt.Sprintf("v=%d;cs=%d;sni=%s", version, cipherSuite, serverName)
+	
+	// 计算 SHA256 哈希
+	hash := sha256.Sum256([]byte(raw))
+	return hex.EncodeToString(hash[:])
 }
 
 func (s *Server) isPrivateIP(ip string) bool {

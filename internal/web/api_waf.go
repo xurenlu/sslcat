@@ -2,10 +2,12 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/sirupsen/logrus"
+	"github.com/xurenlu/sslcat/internal/waf"
 )
 
 // WAFStatsResponse WAF统计响应
@@ -227,6 +229,159 @@ func (s *Server) handleAPIWAFConfig(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		s.log.WithError(err).Error("Failed to encode WAF config response")
+	}
+}
+
+// handleAPIWAFBlockedList 获取多维度封禁列表
+func (s *Server) handleAPIWAFBlockedList(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizeAPI(w, r, true) {
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		s.writeErrorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	// 检查WAF引擎是否可用
+	if s.wafEngine == nil || s.wafEngine.Engine == nil {
+		s.writeErrorResponse(w, http.StatusServiceUnavailable, "WAF engine not available")
+		return
+	}
+
+	// 获取维度参数
+	dimension := r.URL.Query().Get("dimension")
+	
+	var records interface{}
+	switch dimension {
+	case "ip":
+		records = s.wafEngine.Engine.GetMultiDimBlockedList("ip")
+	case "tls":
+		records = s.wafEngine.Engine.GetMultiDimBlockedList("tls_fingerprint")
+	case "subnet":
+		records = s.wafEngine.Engine.GetMultiDimBlockedList("ip_subnet")
+	case "":
+		// 返回所有维度
+		records = s.wafEngine.Engine.GetMultiDimBlockedList("")
+	default:
+		s.writeErrorResponse(w, http.StatusBadRequest, "Invalid dimension parameter")
+		return
+	}
+
+	response := map[string]interface{}{
+		"success": true,
+		"data":    records,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		s.log.WithError(err).Error("Failed to encode WAF blocked list response")
+	}
+}
+
+// handleAPIWAFUnblock 解除多维度封禁
+func (s *Server) handleAPIWAFUnblock(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizeAPI(w, r, false) { // 需要写权限
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		s.writeErrorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	// 检查WAF引擎是否可用
+	if s.wafEngine == nil || s.wafEngine.Engine == nil {
+		s.writeErrorResponse(w, http.StatusServiceUnavailable, "WAF engine not available")
+		return
+	}
+
+	var req struct {
+		Dimension string `json:"dimension"`
+		Value     string `json:"value"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, "Invalid JSON format")
+		return
+	}
+
+	if req.Dimension == "" || req.Value == "" {
+		s.writeErrorResponse(w, http.StatusBadRequest, "Missing dimension or value")
+		return
+	}
+
+	// 解除封禁（转换维度类型）
+	s.wafEngine.Engine.UnblockMultiDim(waf.BlockDimension(req.Dimension), req.Value)
+
+	response := map[string]interface{}{
+		"success": true,
+		"message": fmt.Sprintf("Successfully unblocked %s: %s", req.Dimension, req.Value),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		s.log.WithError(err).Error("Failed to encode WAF unblock response")
+	}
+}
+
+// handleAPIWAFSubnetStats 获取 IP 段统计
+func (s *Server) handleAPIWAFSubnetStats(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizeAPI(w, r, true) {
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		s.writeErrorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	// 检查WAF引擎是否可用
+	if s.wafEngine == nil || s.wafEngine.Engine == nil {
+		s.writeErrorResponse(w, http.StatusServiceUnavailable, "WAF engine not available")
+		return
+	}
+
+	stats := s.wafEngine.Engine.GetSubnetStats()
+
+	response := map[string]interface{}{
+		"success": true,
+		"data":    stats,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		s.log.WithError(err).Error("Failed to encode WAF subnet stats response")
+	}
+}
+
+// handleAPIWAFTLSStats 获取 TLS 指纹统计
+func (s *Server) handleAPIWAFTLSStats(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizeAPI(w, r, true) {
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		s.writeErrorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	// 检查WAF引擎是否可用
+	if s.wafEngine == nil || s.wafEngine.Engine == nil {
+		s.writeErrorResponse(w, http.StatusServiceUnavailable, "WAF engine not available")
+		return
+	}
+
+	stats := s.wafEngine.Engine.GetTLSStats()
+
+	response := map[string]interface{}{
+		"success": true,
+		"data":    stats,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		s.log.WithError(err).Error("Failed to encode WAF TLS stats response")
 	}
 }
 

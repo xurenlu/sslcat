@@ -87,11 +87,11 @@ type Engine struct {
 	cleanupTicker *time.Ticker
 	stopChan      chan struct{}
 	
-	// WAF 频率限制
-	rateLimiter *wafRateLimiter
+	// 多维度封禁器（替代原有的 rateLimiter）
+	multiDimBlocker *wafMultiDimBlocker
 }
 
-// WAFRateLimitConfig WAF 频率限制配置
+// WAFRateLimitConfig WAF 频率限制配置（保留向后兼容）
 type WAFRateLimitConfig struct {
 	Enabled       bool
 	WindowSec     int
@@ -100,36 +100,44 @@ type WAFRateLimitConfig struct {
 }
 
 // NewEngine 创建WAF引擎
-func NewEngine(rateLimitConfig *WAFRateLimitConfig) *Engine {
+func NewEngine(rateLimitConfig *WAFRateLimitConfig, multiDimConfig *MultiDimBlockConfig) *Engine {
 	log := logrus.WithFields(logrus.Fields{
 		"component": "waf_engine",
 	})
 
-	// 初始化频率限制器
-	var rateLimiter *wafRateLimiter
-	if rateLimitConfig != nil {
-		rateLimiter = newWAFRateLimiter(
-			rateLimitConfig.Enabled,
-			rateLimitConfig.WindowSec,
-			rateLimitConfig.MaxHits,
-			rateLimitConfig.BlockDurationSec,
-			log,
-		)
+	// 初始化多维度封禁器
+	var multiDimBlocker *wafMultiDimBlocker
+	if multiDimConfig != nil {
+		multiDimBlocker = newWAFMultiDimBlocker(multiDimConfig, log)
+	} else if rateLimitConfig != nil {
+		// 向后兼容：将旧的 rateLimitConfig 转换为 multiDimConfig
+		multiDimBlocker = newWAFMultiDimBlocker(&MultiDimBlockConfig{
+			IPEnabled:       rateLimitConfig.Enabled,
+			IPWindow:        time.Duration(rateLimitConfig.WindowSec) * time.Second,
+			IPMaxHits:       rateLimitConfig.MaxHits,
+			IPBlockDuration: time.Duration(rateLimitConfig.BlockDurationSec) * time.Second,
+			TLSEnabled:      false,
+			SubnetEnabled:   false,
+		}, log)
 	} else {
-		// 默认配置：禁用
-		rateLimiter = newWAFRateLimiter(false, 60, 10, 3600, log)
+		// 默认配置：全部禁用
+		multiDimBlocker = newWAFMultiDimBlocker(&MultiDimBlockConfig{
+			IPEnabled:     false,
+			TLSEnabled:    false,
+			SubnetEnabled: false,
+		}, log)
 	}
 
 	engine := &Engine{
-		rules:        make(map[string]*Rule),
-		enabled:      true,
-		events:       make([]AttackEvent, 0),
-		maxEvents:    10000, // 最多保存10000个事件
-		logLimiter:   newWAFLogRateLimiter(time.Minute), // 相同攻击每分钟最多记录一次日志
-		cleanupTicker: time.NewTicker(10 * time.Minute), // 每10分钟清理一次过期事件
-		stopChan:     make(chan struct{}),
-		log:          log,
-		rateLimiter:  rateLimiter,
+		rules:           make(map[string]*Rule),
+		enabled:         true,
+		events:          make([]AttackEvent, 0),
+		maxEvents:       10000, // 最多保存10000个事件
+		logLimiter:      newWAFLogRateLimiter(time.Minute), // 相同攻击每分钟最多记录一次日志
+		cleanupTicker:   time.NewTicker(10 * time.Minute), // 每10分钟清理一次过期事件
+		stopChan:        make(chan struct{}),
+		log:             log,
+		multiDimBlocker: multiDimBlocker,
 	}
 
 	// 初始化默认规则
@@ -435,8 +443,13 @@ func (e *Engine) removeFromSlice(slice *[]*Rule, ruleID string) {
 	}
 }
 
-// CheckRequest 检查请求
+// CheckRequest 检查请求（不带 TLS 指纹，向后兼容）
 func (e *Engine) CheckRequest(r *http.Request) (*AttackEvent, bool) {
+	return e.CheckRequestWithTLS(r, "")
+}
+
+// CheckRequestWithTLS 检查请求（带 TLS 指纹）
+func (e *Engine) CheckRequestWithTLS(r *http.Request, tlsFingerprint string) (*AttackEvent, bool) {
 	if !e.enabled {
 		return nil, false
 	}
@@ -447,23 +460,25 @@ func (e *Engine) CheckRequest(r *http.Request) (*AttackEvent, bool) {
 	clientIP := e.getClientIP(r)
 	userAgent := r.Header.Get("User-Agent")
 
-	// 检查 IP 是否被频率限制封禁
-	if e.rateLimiter != nil && e.rateLimiter.IsBlocked(clientIP) {
-		event := &AttackEvent{
-			ID:        e.generateEventID(),
-			ClientIP:  clientIP,
-			UserAgent: userAgent,
-			URL:       url,
-			Method:    method,
-			RuleID:    "rate_limit",
-			RuleName:  "WAF 频率限制",
-			RuleType:  RuleTypeCustom,
-			Action:    ActionBlock,
-			Payload:   "IP 因频繁触发 WAF 规则而被封禁",
-			Timestamp: time.Now(),
-			Blocked:   true,
+	// 检查多维度封禁
+	if e.multiDimBlocker != nil {
+		if blocked, dimension, reason := e.multiDimBlocker.IsBlocked(clientIP, tlsFingerprint); blocked {
+			event := &AttackEvent{
+				ID:        e.generateEventID(),
+				ClientIP:  clientIP,
+				UserAgent: userAgent,
+				URL:       url,
+				Method:    method,
+				RuleID:    string(dimension),
+				RuleName:  fmt.Sprintf("多维度封禁: %s", dimension),
+				RuleType:  RuleTypeCustom,
+				Action:    ActionBlock,
+				Payload:   reason,
+				Timestamp: time.Now(),
+				Blocked:   true,
+			}
+			return event, true
 		}
-		return event, true
 	}
 
 	// 使用读锁进行检测
@@ -490,10 +505,9 @@ func (e *Engine) CheckRequest(r *http.Request) (*AttackEvent, bool) {
 	if event != nil {
 		e.addEvent(event)
 		
-		// 记录频率限制
-		if e.rateLimiter != nil && e.rateLimiter.RecordHit(clientIP) {
-			// IP 已被频率限制封禁
-			e.log.Warnf("WAF 频率限制：IP %s 已被自动封禁", clientIP)
+		// 记录到多维度封禁器
+		if e.multiDimBlocker != nil {
+			e.multiDimBlocker.RecordHit(clientIP, tlsFingerprint)
 		}
 		
 		return event, event.Blocked
@@ -854,33 +868,69 @@ func (e *Engine) ClearEvents() {
 	e.log.Info("WAF攻击事件已清空")
 }
 
-// GetRateLimitBlockedIPs 获取被频率限制封禁的 IP 列表
+// GetRateLimitBlockedIPs 获取被频率限制封禁的 IP 列表（向后兼容）
 func (e *Engine) GetRateLimitBlockedIPs() map[string]time.Time {
-	if e.rateLimiter == nil {
+	if e.multiDimBlocker == nil {
 		return make(map[string]time.Time)
 	}
-	return e.rateLimiter.GetBlockedIPs()
+	
+	result := make(map[string]time.Time)
+	for _, record := range e.multiDimBlocker.GetBlockedList(DimensionIP) {
+		result[record.Value] = record.ExpireTime
+	}
+	return result
 }
 
-// UnblockRateLimitIP 解除频率限制封禁
+// UnblockRateLimitIP 解除频率限制封禁（向后兼容）
 func (e *Engine) UnblockRateLimitIP(ip string) {
-	if e.rateLimiter != nil {
-		e.rateLimiter.UnblockIP(ip)
+	if e.multiDimBlocker != nil {
+		e.multiDimBlocker.UnblockByDimension(DimensionIP, ip)
 	}
 }
 
-// UpdateRateLimitConfig 更新频率限制配置
+// UpdateRateLimitConfig 更新频率限制配置（向后兼容）
 func (e *Engine) UpdateRateLimitConfig(config *WAFRateLimitConfig) {
-	if e.rateLimiter != nil && config != nil {
-		e.rateLimiter.UpdateConfig(
-			config.Enabled,
-			config.WindowSec,
-			config.MaxHits,
-			config.BlockDurationSec,
-		)
+	if e.multiDimBlocker != nil && config != nil {
+		// 更新 IP 维度配置
+		e.multiDimBlocker.config.IPEnabled = config.Enabled
+		e.multiDimBlocker.config.IPWindow = time.Duration(config.WindowSec) * time.Second
+		e.multiDimBlocker.config.IPMaxHits = config.MaxHits
+		e.multiDimBlocker.config.IPBlockDuration = time.Duration(config.BlockDurationSec) * time.Second
+		
 		e.log.Infof("WAF 频率限制配置已更新: enabled=%v, window=%ds, max_hits=%d, block=%ds",
 			config.Enabled, config.WindowSec, config.MaxHits, config.BlockDurationSec)
 	}
+}
+
+// GetMultiDimBlockedList 获取多维度封禁列表
+func (e *Engine) GetMultiDimBlockedList(dimension BlockDimension) []*BlockRecord {
+	if e.multiDimBlocker == nil {
+		return []*BlockRecord{}
+	}
+	return e.multiDimBlocker.GetBlockedList(dimension)
+}
+
+// UnblockMultiDim 解除多维度封禁
+func (e *Engine) UnblockMultiDim(dimension BlockDimension, value string) {
+	if e.multiDimBlocker != nil {
+		e.multiDimBlocker.UnblockByDimension(dimension, value)
+	}
+}
+
+// GetSubnetStats 获取 IP 段统计
+func (e *Engine) GetSubnetStats() map[string]int {
+	if e.multiDimBlocker == nil {
+		return make(map[string]int)
+	}
+	return e.multiDimBlocker.GetSubnetStats()
+}
+
+// GetTLSStats 获取 TLS 指纹统计
+func (e *Engine) GetTLSStats() map[string]int {
+	if e.multiDimBlocker == nil {
+		return make(map[string]int)
+	}
+	return e.multiDimBlocker.GetTLSStats()
 }
 
 // min 辅助函数
