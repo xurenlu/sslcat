@@ -660,11 +660,18 @@ const Settings: React.FC = () => {
       
       if (response.ok) {
         const result = await response.json()
-        if (result.success && result.methods) {
-          // methods 字段包含当前配置的挑战方法
+        // /api/dns/providers 返回的是 { available, configured, default, methods }
+        // 没有 success 字段，直接读取 methods
+        if (result.methods) {
           setSettings(prev => ({
             ...prev,
             challengeMethods: result.methods || ['http-01'],
+          }))
+        } else {
+          // 如果没有 methods 字段，使用默认值
+          setSettings(prev => ({
+            ...prev,
+            challengeMethods: ['http-01'],
           }))
         }
       }
