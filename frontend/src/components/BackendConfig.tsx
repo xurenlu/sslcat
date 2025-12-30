@@ -36,6 +36,7 @@ import {
   FiClock
 } from 'react-icons/fi'
 import { useTranslation } from '../hooks/useLanguage'
+import { detectProxyLoop, getProxyLoopHelpText } from '../utils/proxyLoopDetection'
 
 interface ProxyBackend {
   id: string
@@ -163,6 +164,15 @@ const BackendConfig: React.FC<BackendConfigProps> = ({
     backend.host.toLowerCase().startsWith('https://')
   )
 
+  // 检查所有后端是否有循环配置
+  const loopErrors = backends
+    .map((backend, index) => {
+      if (!backend.enabled) return null
+      const error = detectProxyLoop(backend.host, backend.port)
+      return error ? { index, error } : null
+    })
+    .filter(Boolean)
+
   return (
     <Box>
       {/* 后端服务器配置 */}
@@ -171,6 +181,29 @@ const BackendConfig: React.FC<BackendConfigProps> = ({
           <Icon as={FiServer} mr={2} />
           后端服务器配置
         </Heading>
+        
+        {/* 循环检测总体警告 */}
+        {loopErrors.length > 0 && (
+          <Alert status="error" mb={4}>
+            <AlertIcon />
+            <Box>
+              <Text fontWeight="medium">🚨 检测到 {loopErrors.length} 个代理循环配置</Text>
+              <Text fontSize="sm" mt={1}>
+                以下后端服务器配置会导致代理循环，请立即修改：
+              </Text>
+              <VStack align="stretch" mt={2} spacing={1}>
+                {loopErrors.map((item: any) => (
+                  <Text key={item.index} fontSize="sm" color="red.700">
+                    • 后端服务器 {item.index + 1}
+                  </Text>
+                ))}
+              </VStack>
+              <Text fontSize="sm" mt={2} fontWeight="medium">
+                💡 提示：{getProxyLoopHelpText()}
+              </Text>
+            </Box>
+          </Alert>
+        )}
         
         <Alert status="info" mb={4}>
           <AlertIcon />
@@ -262,6 +295,29 @@ const BackendConfig: React.FC<BackendConfigProps> = ({
                         </Text>
                       )}
                     </FormControl>
+                  </SimpleGrid>
+
+                  {/* 循环检测警告 */}
+                  {(() => {
+                    const loopError = detectProxyLoop(backend.host, backend.port)
+                    if (loopError) {
+                      return (
+                        <Alert status="error" variant="left-accent">
+                          <AlertIcon />
+                          <Box>
+                            <Text fontWeight="medium">代理循环检测</Text>
+                            <Text fontSize="sm">{loopError}</Text>
+                            <Text fontSize="sm" mt={2}>
+                              💡 建议：如果需要代理到本地服务，请使用其他端口（如 3000、8080 等）
+                            </Text>
+                          </Box>
+                        </Alert>
+                      )
+                    }
+                    return null
+                  })()}
+
+                  <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
 
                     <FormControl>
                       <FormLabel>权重</FormLabel>

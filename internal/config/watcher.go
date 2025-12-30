@@ -239,60 +239,9 @@ func (cw *ConfigWatcher) reloadConfig() {
 	}
 }
 
-// validateConfig 验证配置
+// validateConfig 验证配置（委托给公共函数）
 func (cw *ConfigWatcher) validateConfig(config *Config) error {
-	// 基本验证
-	if config == nil {
-		return fmt.Errorf("config is nil")
-	}
-
-	// 验证服务器配置
-	if config.Server.Port <= 0 || config.Server.Port > 65535 {
-		return fmt.Errorf("invalid server port: %d", config.Server.Port)
-	}
-
-	// 验证SSL配置
-	if config.SSL.Email == "" {
-		return fmt.Errorf("SSL email is required")
-	}
-
-	// 验证管理员配置
-	if config.Admin.Username == "" {
-		return fmt.Errorf("admin username is required")
-	}
-
-	// 验证代理规则
-	for i, rule := range config.Proxy.Rules {
-		if rule.Domain == "" {
-			return fmt.Errorf("proxy rule %d: domain is required", i)
-		}
-
-		if !rule.LoadBalancerEnabled {
-			// 单后端模式
-			if rule.Target == "" {
-				return fmt.Errorf("proxy rule %d: target is required", i)
-			}
-			if rule.Port <= 0 {
-				return fmt.Errorf("proxy rule %d: invalid port: %d", i, rule.Port)
-			}
-		} else {
-			// 负载均衡模式
-			if len(rule.LoadBalancerBackends) == 0 {
-				return fmt.Errorf("proxy rule %d: load balancer backends are required", i)
-			}
-
-			for j, backend := range rule.LoadBalancerBackends {
-				if backend.Host == "" {
-					return fmt.Errorf("proxy rule %d, backend %d: host is required", i, j)
-				}
-				if backend.Port <= 0 {
-					return fmt.Errorf("proxy rule %d, backend %d: invalid port: %d", i, j, backend.Port)
-				}
-			}
-		}
-	}
-
-	return nil
+	return ValidateConfigWithLoopDetection(config)
 }
 
 // GetConfig 获取当前配置（线程安全）

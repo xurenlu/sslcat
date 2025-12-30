@@ -1053,6 +1053,11 @@ func Load(configFile string) (*Config, error) {
 	// 执行代理规则迁移
 	config.migrateProxyRules()
 
+	// 验证配置（包括循环检测）
+	if err := ValidateConfigWithLoopDetection(config); err != nil {
+		return nil, fmt.Errorf("configuration validation failed: %w", err)
+	}
+
 	return config, nil
 }
 
@@ -1157,6 +1162,156 @@ func (c *Config) GetProxyRules() []interface{} {
 
 func (c *Config) GetSSLDomains() []string {
 	return c.SSL.Domains
+}
+
+// ValidateConfigWithLoopDetection 验证配置（包括循环检测）
+func ValidateConfigWithLoopDetection(config *Config) error {
+	// 基本验证
+	if config == nil {
+		return fmt.Errorf("config is nil")
+	}
+
+	// 验证服务器配置
+	if config.Server.Port <= 0 || config.Server.Port > 65535 {
+		return fmt.Errorf("invalid server port: %d", config.Server.Port)
+	}
+
+	// 验证SSL配置
+	if config.SSL.Email == "" {
+		return fmt.Errorf("SSL email is required")
+	}
+
+	// 验证管理员配置
+	if config.Admin.Username == "" {
+		return fmt.Errorf("admin username is required")
+	}
+
+	// 获取 sslcat 监听的端口列表
+	listeningPorts := getListeningPorts(config)
+
+	// 验证代理规则
+	for i, rule := range config.Proxy.Rules {
+		if rule.Domain == "" {
+			return fmt.Errorf("proxy rule %d: domain is required", i)
+		}
+
+		if !rule.LoadBalancerEnabled {
+			// 单后端模式
+			if rule.Target == "" {
+				return fmt.Errorf("proxy rule %d: target is required", i)
+			}
+			if rule.Port <= 0 {
+				return fmt.Errorf("proxy rule %d: invalid port: %d", i, rule.Port)
+			}
+
+			// 检测循环代理：后端指向自己
+			if err := detectProxyLoop(config, &rule, listeningPorts); err != nil {
+				return fmt.Errorf("proxy rule %d (%s): %w", i, rule.Domain, err)
+			}
+		} else {
+			// 负载均衡模式
+			if len(rule.LoadBalancerBackends) == 0 {
+				return fmt.Errorf("proxy rule %d: load balancer backends are required", i)
+			}
+
+			for j, backend := range rule.LoadBalancerBackends {
+				if backend.Host == "" {
+					return fmt.Errorf("proxy rule %d, backend %d: host is required", i, j)
+				}
+				if backend.Port <= 0 {
+					return fmt.Errorf("proxy rule %d, backend %d: invalid port: %d", i, j, backend.Port)
+				}
+
+				// 检测负载均衡后端的循环代理
+				if err := detectBackendLoop(config, &rule, &backend, listeningPorts); err != nil {
+					return fmt.Errorf("proxy rule %d (%s), backend %d: %w", i, rule.Domain, j, err)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// detectProxyLoop 检测单后端模式的循环代理
+func detectProxyLoop(config *Config, rule *ProxyRule, listeningPorts []int) error {
+	// 检查后端是否指向本地监听端口
+	if isLocalhost(rule.Target) && containsPort(listeningPorts, rule.Port) {
+		return fmt.Errorf("proxy loop detected: %s proxies to itself (%s:%d), this will cause infinite loop and resource exhaustion",
+			rule.Domain, rule.Target, rule.Port)
+	}
+
+	return nil
+}
+
+// detectBackendLoop 检测负载均衡后端的循环代理
+func detectBackendLoop(config *Config, rule *ProxyRule, backend *ProxyBackend, listeningPorts []int) error {
+	// 检查后端是否指向本地监听端口
+	if isLocalhost(backend.Host) && containsPort(listeningPorts, backend.Port) {
+		return fmt.Errorf("proxy loop detected: %s backend (%s:%d) points to sslcat itself, this will cause infinite loop",
+			rule.Domain, backend.Host, backend.Port)
+	}
+
+	return nil
+}
+
+// getListeningPorts 获取 sslcat 监听的所有端口
+func getListeningPorts(config *Config) []int {
+	ports := make([]int, 0, 3)
+
+	// 添加主端口
+	if config.Server.Port > 0 {
+		ports = append(ports, config.Server.Port)
+	}
+
+	// 添加 HTTP 端口（通常是 80）
+	if config.Server.PortMode == "standard" {
+		ports = append(ports, 80)  // HTTP 端口
+		ports = append(ports, 443) // HTTPS 端口
+	} else if config.Server.PortMode == "custom" {
+		if config.Server.CustomPort > 0 {
+			ports = append(ports, config.Server.CustomPort)
+		}
+	}
+
+	return ports
+}
+
+// isLocalhost 检查主机是否是本地地址
+func isLocalhost(host string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+
+	// 检查常见的本地地址
+	localAddresses := []string{
+		"localhost",
+		"127.0.0.1",
+		"::1",
+		"0.0.0.0",
+		"::",
+	}
+
+	for _, addr := range localAddresses {
+		if host == addr {
+			return true
+		}
+	}
+
+	// 检查 127.x.x.x 网段
+	if strings.HasPrefix(host, "127.") {
+		return true
+	}
+
+	return false
+}
+
+// containsPort 检查端口列表是否包含指定端口
+func containsPort(ports []int, port int) bool {
+	for _, p := range ports {
+		if p == port {
+			return true
+		}
+	}
+	return false
 }
 
 // getDefaultConfig 获取默认配置（提取自 Load 函数）

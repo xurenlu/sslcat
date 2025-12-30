@@ -29,6 +29,7 @@ import { CORS_PRESET } from '../constants/cors'
 import BackendConfig from '../components/BackendConfig'
 import WebSocketConfig from '../components/WebSocketConfig'
 import PathPrefixRulesConfig from '../components/PathPrefixRulesConfig'
+import { detectProxyLoopInBackends } from '../utils/proxyLoopDetection'
 
 interface ProxyAuthUser {
   username: string
@@ -358,6 +359,27 @@ const ProxyAdd: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // 检测代理循环
+    const loopErrors = detectProxyLoopInBackends(formData.backends)
+    if (loopErrors.length > 0) {
+      toast({
+        title: '配置错误',
+        description: (
+          <Box>
+            <Text mb={2}>检测到代理循环配置，无法保存：</Text>
+            {loopErrors.map((error, index) => (
+              <Text key={index} fontSize="sm">• {error}</Text>
+            ))}
+          </Box>
+        ),
+        status: 'error',
+        duration: 8000,
+        isClosable: true,
+      })
+      return
+    }
+    
     setLoading(true)
 
     try {
