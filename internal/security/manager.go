@@ -42,11 +42,20 @@ type BlockedIP struct {
 	ExpireTime time.Time `json:"expire_time"`
 }
 
+// BlockedUserAgent 被封禁的User-Agent信息
+type BlockedUserAgent struct {
+	UserAgent  string    `json:"user_agent"`
+	Reason     string    `json:"reason"`
+	BlockTime  time.Time `json:"block_time"`
+	ExpireTime time.Time `json:"expire_time"`
+}
+
 // Manager 安全管理器
 type Manager struct {
 	config        *config.Config
 	accessLogs    map[string][]AccessLog
 	blockedIPs    map[string]BlockedIP
+	blockedUserAgents map[string]BlockedUserAgent // User-Agent封禁列表
 	attemptCounts map[string]int
 	lastAttempts  map[string][]time.Time
 	// UA 违规计数：按IP维度记录
@@ -106,6 +115,7 @@ func NewManager(cfg *config.Config) *Manager {
 		config:                cfg,
 		accessLogs:            make(map[string][]AccessLog),
 		blockedIPs:            make(map[string]BlockedIP),
+		blockedUserAgents:     make(map[string]BlockedUserAgent),
 		attemptCounts:         make(map[string]int),
 		lastAttempts:          make(map[string][]time.Time),
 		uaInvalid1Min:         make(map[string][]time.Time),
@@ -431,6 +441,101 @@ func (m *Manager) blockIP(ip, reason string) {
 	m.log.Warnf("Blocked IP %s: %s", ip, reason)
 }
 
+// BlockIP 手动封禁IP（公开方法）
+func (m *Manager) BlockIP(ip string, duration time.Duration, reason string) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	now := time.Now()
+	expireTime := now.Add(duration)
+	
+	blocked := BlockedIP{
+		IP:         ip,
+		Reason:     reason,
+		BlockTime:  now,
+		ExpireTime: expireTime,
+	}
+	m.blockedIPs[ip] = blocked
+	m.saveBlockedIPs()
+	m.log.Warnf("Manually blocked IP %s: %s (duration: %v)", ip, reason, duration)
+}
+
+// BlockUserAgent 手动封禁User-Agent
+func (m *Manager) BlockUserAgent(userAgent string, duration time.Duration, reason string) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	if userAgent == "" {
+		return
+	}
+
+	now := time.Now()
+	expireTime := now.Add(duration)
+	if duration == 0 {
+		// 永久封禁（设置一个很远的未来时间）
+		expireTime = time.Now().Add(100 * 365 * 24 * time.Hour)
+	}
+
+	blocked := BlockedUserAgent{
+		UserAgent:  userAgent,
+		Reason:     reason,
+		BlockTime:  now,
+		ExpireTime: expireTime,
+	}
+	m.blockedUserAgents[userAgent] = blocked
+	m.log.Warnf("Manually blocked User-Agent %s: %s (duration: %v)", userAgent, reason, duration)
+}
+
+// UnblockUserAgent 解除User-Agent封禁
+func (m *Manager) UnblockUserAgent(userAgent string) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	if _, exists := m.blockedUserAgents[userAgent]; exists {
+		delete(m.blockedUserAgents, userAgent)
+		m.log.Infof("Manually unblocked User-Agent: %s", userAgent)
+	}
+}
+
+// GetBlockedUserAgents 获取被封禁的User-Agent列表
+func (m *Manager) GetBlockedUserAgents() []BlockedUserAgent {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	var blockedList []BlockedUserAgent
+	now := time.Now()
+	for _, blocked := range m.blockedUserAgents {
+		// 只返回未过期的User-Agent
+		if now.Before(blocked.ExpireTime) {
+			blockedList = append(blockedList, blocked)
+		}
+	}
+
+	return blockedList
+}
+
+// IsUserAgentBlocked 检查User-Agent是否被封禁
+func (m *Manager) IsUserAgentBlocked(userAgent string) bool {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	if userAgent == "" {
+		return false
+	}
+
+	blocked, exists := m.blockedUserAgents[userAgent]
+	if !exists {
+		return false
+	}
+
+	// 检查是否已过期
+	if time.Now().After(blocked.ExpireTime) {
+		return false
+	}
+
+	return true
+}
+
 // isValidUserAgent 检查User-Agent是否合法
 func (m *Manager) isValidUserAgent(userAgent string) bool {
 	if userAgent == "" {
@@ -612,6 +717,13 @@ func (m *Manager) cleanup() {
 	for ip, blocked := range m.blockedIPs {
 		if now.After(blocked.ExpireTime) {
 			delete(m.blockedIPs, ip)
+		}
+	}
+
+	// 清理过期的User-Agent封禁记录
+	for ua, blocked := range m.blockedUserAgents {
+		if now.After(blocked.ExpireTime) {
+			delete(m.blockedUserAgents, ua)
 		}
 	}
 
@@ -900,6 +1012,7 @@ func (m *Manager) UnblockIP(ip string) {
 		delete(m.blockedIPs, ip)
 		delete(m.attemptCounts, ip)
 		delete(m.lastAttempts, ip)
+		m.saveBlockedIPs()
 		m.log.Infof("Manually unblocked IP: %s", ip)
 	}
 }

@@ -33,6 +33,7 @@ import Monitoring from './pages/Monitoring'
 import ClusterStatus from './pages/ClusterStatus'
 import TemplateMarket from './pages/TemplateMarket'
 import TemplateDeploy from './pages/TemplateDeploy'
+import BlockManagement from './pages/BlockManagement'
 
 // 辅助组件：为需要 Layout 的页面添加 Layout
 const LayoutRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -164,6 +165,13 @@ const AppRoutes: React.FC = () => {
         <AuthGuard>
           <LayoutRoute>
             <Security />
+          </LayoutRoute>
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/block-management`} element={
+        <AuthGuard>
+          <LayoutRoute>
+            <BlockManagement />
           </LayoutRoute>
         </AuthGuard>
       } />

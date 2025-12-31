@@ -917,6 +917,13 @@ func (e *Engine) UnblockMultiDim(dimension BlockDimension, value string) {
 	}
 }
 
+// BlockMultiDim 手动封禁（多维度）
+func (e *Engine) BlockMultiDim(dimension BlockDimension, value string, duration time.Duration, reason string) {
+	if e.multiDimBlocker != nil {
+		e.multiDimBlocker.BlockByDimension(dimension, value, duration, reason)
+	}
+}
+
 // GetSubnetStats 获取 IP 段统计
 func (e *Engine) GetSubnetStats() map[string]int {
 	if e.multiDimBlocker == nil {

@@ -366,6 +366,33 @@ func (b *wafMultiDimBlocker) UnblockByDimension(dimension BlockDimension, value 
 	}
 }
 
+// BlockByDimension 手动封禁（公开方法）
+func (b *wafMultiDimBlocker) BlockByDimension(dimension BlockDimension, value string, duration time.Duration, reason string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if value == "" {
+		return
+	}
+
+	now := time.Now()
+	if duration == 0 {
+		// 永久封禁（设置一个很远的未来时间）
+		duration = 100 * 365 * 24 * time.Hour
+	}
+
+	switch dimension {
+	case DimensionIP:
+		b.blockIP(value, reason, duration, now)
+	case DimensionTLS:
+		b.blockTLS(value, reason, duration, now)
+	case DimensionSubnet:
+		b.blockSubnet(value, reason, duration, now)
+	default:
+		b.log.Warnf("WAF 多维度封禁：未知的封禁维度 %s", dimension)
+	}
+}
+
 // GetBlockedList 获取封禁列表
 func (b *wafMultiDimBlocker) GetBlockedList(dimension BlockDimension) []*BlockRecord {
 	b.mu.RLock()

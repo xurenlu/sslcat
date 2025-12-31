@@ -3,11 +3,14 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/xurenlu/sslcat/internal/config"
+	"github.com/xurenlu/sslcat/internal/security"
 )
 
 // Command 表示一个 CLI 命令
@@ -783,4 +786,155 @@ func (m *Manager) SetConfig(cfg *config.Config) {
 // SetConfigFile 设置配置文件路径
 func (m *Manager) SetConfigFile(configFile string) {
 	m.configFile = configFile
+}
+
+// RegisterBlockCommands 注册封禁管理命令
+func (m *Manager) RegisterBlockCommands() {
+	m.RegisterCommand(&Command{
+		Name:        "block",
+		Description: "Block IP or User-Agent",
+		Handler: func(args []string) error {
+			if len(args) < 2 {
+				return fmt.Errorf("usage: sslcat block <type> <value> [-duration <duration>] [-reason <reason>]\n  type: ip|user-agent\n  duration: 1h, 24h, 7d, 0 (permanent), default: 24h\n  reason: optional reason for blocking")
+			}
+
+			blockType := args[0]
+			value := args[1]
+
+			var duration time.Duration = 24 * time.Hour
+			reason := "Manual block via CLI"
+
+			// 解析可选参数
+			for i := 2; i < len(args); i++ {
+				switch args[i] {
+				case "-duration", "-d":
+					if i+1 >= len(args) {
+						return fmt.Errorf("duration value required")
+					}
+					dur, err := parseDuration(args[i+1])
+					if err != nil {
+						return fmt.Errorf("invalid duration: %v", err)
+					}
+					duration = dur
+					i++
+				case "-reason", "-r":
+					if i+1 >= len(args) {
+						return fmt.Errorf("reason value required")
+					}
+					reason = args[i+1]
+					i++
+				}
+			}
+
+			// 创建Security Manager实例
+			secMgr := security.NewManager(m.config)
+			secMgr.Start()
+			defer secMgr.Stop()
+
+			switch blockType {
+			case "ip":
+				if net.ParseIP(value) == nil {
+					return fmt.Errorf("invalid IP address: %s", value)
+				}
+				secMgr.BlockIP(value, duration, reason)
+				fmt.Printf("✅ IP %s blocked successfully (duration: %v, reason: %s)\n", value, duration, reason)
+
+			case "user-agent", "ua":
+				secMgr.BlockUserAgent(value, duration, reason)
+				fmt.Printf("✅ User-Agent blocked successfully (duration: %v, reason: %s)\n", duration, reason)
+
+			default:
+				return fmt.Errorf("unknown block type: %s (supported: ip, user-agent)", blockType)
+			}
+
+			return nil
+		},
+	})
+
+	m.RegisterCommand(&Command{
+		Name:        "unblock",
+		Description: "Unblock IP or User-Agent",
+		Handler: func(args []string) error {
+			if len(args) < 2 {
+				return fmt.Errorf("usage: sslcat unblock <type> <value>\n  type: ip|user-agent\n  value: IP address or User-Agent string")
+			}
+
+			blockType := args[0]
+			value := args[1]
+
+			// 创建Security Manager实例
+			secMgr := security.NewManager(m.config)
+			secMgr.Start()
+			defer secMgr.Stop()
+
+			switch blockType {
+			case "ip":
+				if net.ParseIP(value) == nil {
+					return fmt.Errorf("invalid IP address: %s", value)
+				}
+				secMgr.UnblockIP(value)
+				fmt.Printf("✅ IP %s unblocked successfully\n", value)
+
+			case "user-agent", "ua":
+				secMgr.UnblockUserAgent(value)
+				fmt.Printf("✅ User-Agent unblocked successfully\n")
+
+			default:
+				return fmt.Errorf("unknown block type: %s (supported: ip, user-agent)", blockType)
+			}
+
+			return nil
+		},
+	})
+
+	m.RegisterCommand(&Command{
+		Name:        "blocked",
+		Description: "List blocked IPs and User-Agents",
+		Handler: func(args []string) error {
+			// 创建Security Manager实例
+			secMgr := security.NewManager(m.config)
+			secMgr.Start()
+			defer secMgr.Stop()
+
+			fmt.Println("Blocked IPs:")
+			fmt.Println("============")
+			blockedIPs := secMgr.GetBlockedIPs()
+			if len(blockedIPs) == 0 {
+				fmt.Println("  (none)")
+			} else {
+				for _, blocked := range blockedIPs {
+					fmt.Printf("  IP: %s\n", blocked.IP)
+					fmt.Printf("    Reason: %s\n", blocked.Reason)
+					fmt.Printf("    Blocked at: %s\n", blocked.BlockTime.Format("2006-01-02 15:04:05"))
+					fmt.Printf("    Expires at: %s\n", blocked.ExpireTime.Format("2006-01-02 15:04:05"))
+					fmt.Println()
+				}
+			}
+
+			fmt.Println("Blocked User-Agents:")
+			fmt.Println("====================")
+			blockedUAs := secMgr.GetBlockedUserAgents()
+			if len(blockedUAs) == 0 {
+				fmt.Println("  (none)")
+			} else {
+				for _, blocked := range blockedUAs {
+					fmt.Printf("  User-Agent: %s\n", blocked.UserAgent)
+					fmt.Printf("    Reason: %s\n", blocked.Reason)
+					fmt.Printf("    Blocked at: %s\n", blocked.BlockTime.Format("2006-01-02 15:04:05"))
+					fmt.Printf("    Expires at: %s\n", blocked.ExpireTime.Format("2006-01-02 15:04:05"))
+					fmt.Println()
+				}
+			}
+
+			return nil
+		},
+	})
+}
+
+// parseDuration 解析时长字符串（如 "1h", "24h", "7d", "0"表示永久）
+func parseDuration(s string) (time.Duration, error) {
+	if s == "0" {
+		return 0, nil // 永久封禁
+	}
+	return time.ParseDuration(s)
 }

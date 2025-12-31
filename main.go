@@ -22,8 +22,10 @@ import (
 	"github.com/xurenlu/sslcat/internal/config"
 	"github.com/xurenlu/sslcat/internal/i18n"
 	"github.com/xurenlu/sslcat/internal/logger"
+	"github.com/xurenlu/sslcat/internal/monitor"
 	"github.com/xurenlu/sslcat/internal/notification"
 	"github.com/xurenlu/sslcat/internal/proxy"
+	"github.com/xurenlu/sslcat/internal/report"
 	"github.com/xurenlu/sslcat/internal/runner"
 	"github.com/xurenlu/sslcat/internal/security"
 	"github.com/xurenlu/sslcat/internal/ssl"
@@ -82,6 +84,7 @@ func main() {
 		cliManager.RegisterConfigCommands()
 		cliManager.RegisterProxyCommands()
 		cliManager.RegisterSSLCommands()
+		cliManager.RegisterBlockCommands()
 		cliManager.RegisterHelpCommand()
 		cliManager.RegisterConsoleCommand()
 
@@ -474,6 +477,56 @@ func main() {
 	// 启动内存监控
 	startMemoryMonitor(cdnCache, proxyManager)
 
+	// 初始化报告生成系统
+	var reportScheduler *report.ReportScheduler
+	if cfg.Report.Enabled {
+		// 获取必要的组件
+		wafEngine := webServer.GetWAFEngine()
+		ddosProtector := webServer.GetDDoSProtector()
+		statsCollector := webServer.GetStatisticsCollector()
+		monitorManager := webServer.GetMonitorManager()
+
+		var metricsStorage *monitor.MetricsStorage
+		if monitorManager != nil {
+			metricsStorage = monitorManager.GetMetricsStorage()
+		}
+
+		// 创建数据收集器
+		dataCollector := report.NewDataCollector(
+			metricsStorage,
+			wafEngine,
+			ddosProtector,
+			sslManager,
+			statsCollector,
+		)
+
+		// 创建AI报告生成器
+		aiReporter := report.NewAIReporter(&cfg.Report)
+		// 如果AI配置中没有APIKey，尝试从AISecurity配置中获取
+		if cfg.Report.AI.APIKey == "" && cfg.AISecurity.APIKey != "" {
+			cfg.Report.AI.APIKey = cfg.AISecurity.APIKey
+			cfg.Report.AI.APIEndpoint = cfg.AISecurity.APIEndpoint
+			aiReporter = report.NewAIReporter(&cfg.Report)
+		}
+
+		// 创建报告生成器
+		reportGenerator := report.NewReportGenerator(
+			dataCollector,
+			aiReporter,
+			notificationIntegrator,
+			cfg.Report.Enabled,
+		)
+
+		// 创建并启动调度器
+		reportScheduler = report.NewReportScheduler(reportGenerator, &cfg.Report)
+		reportScheduler.Start()
+
+		// 将报告生成器注入到webServer（用于API调用）
+		webServer.SetReportGenerator(reportGenerator)
+
+		log.Info("报告生成系统已启动")
+	}
+
 	// 等待信号
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
@@ -490,6 +543,11 @@ func main() {
 
 	// 停止 Runner 模块
 	gitServer.Stop()
+
+	// 停止报告调度器
+	if reportScheduler != nil {
+		reportScheduler.Stop()
+	}
 
 	// 停止 Web 服务器（包括隧道管理器）
 	webServer.Stop()

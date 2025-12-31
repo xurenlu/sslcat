@@ -86,6 +86,23 @@ func createTables(db *sql.DB) error {
 		message TEXT,
 		iocs_added INTEGER DEFAULT 0,
 		iocs_updated INTEGER DEFAULT 0,
+		data_size_bytes INTEGER DEFAULT 0,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	)`
+
+	// 创建数据源统计表
+	createSourceStatsTable := `
+	CREATE TABLE IF NOT EXISTS source_stats (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		source_name TEXT NOT NULL UNIQUE,
+		total_downloads INTEGER DEFAULT 0,
+		total_bytes_downloaded INTEGER DEFAULT 0,
+		total_iocs_cached INTEGER DEFAULT 0,
+		last_download_size INTEGER DEFAULT 0,
+		last_download_time DATETIME,
+		last_successful_update DATETIME,
+		update_errors INTEGER DEFAULT 0,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	)`
 
@@ -111,6 +128,10 @@ func createTables(db *sql.DB) error {
 
 	if _, err := db.Exec(createUpdateLogTable); err != nil {
 		return fmt.Errorf("failed to create update_logs table: %v", err)
+	}
+
+	if _, err := db.Exec(createSourceStatsTable); err != nil {
+		return fmt.Errorf("failed to create source_stats table: %v", err)
 	}
 
 	// 创建索引
@@ -293,18 +314,207 @@ func (tidb *ThreatIntelDB) GetSource(name string) (*ThreatIntelSource, error) {
 }
 
 // LogUpdate 记录更新日志
-func (tidb *ThreatIntelDB) LogUpdate(sourceName, status, message string, iocsAdded, iocsUpdated int) error {
+func (tidb *ThreatIntelDB) LogUpdate(sourceName, status, message string, iocsAdded, iocsUpdated int, dataSizeBytes int64) error {
 	query := `
 	INSERT INTO update_logs 
-	(source_name, status, status, message, iocs_added, iocs_updated, updated_at)
+	(source_name, status, message, iocs_added, iocs_updated, data_size_bytes, updated_at)
 	VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
 
-	_, err := tidb.db.Exec(query, sourceName, status, message, iocsAdded, iocsUpdated)
+	_, err := tidb.db.Exec(query, sourceName, status, message, iocsAdded, iocsUpdated, dataSizeBytes)
 	if err != nil {
 		return fmt.Errorf("failed to log update: %v", err)
 	}
 
 	return nil
+}
+
+// UpdateSourceStats 更新数据源统计信息
+func (tidb *ThreatIntelDB) UpdateSourceStats(sourceName string, dataSizeBytes int64, iocsAdded int, success bool) error {
+	now := time.Now()
+	
+	// 先尝试更新现有记录
+	query := `
+	UPDATE source_stats SET
+		total_downloads = total_downloads + 1,
+		total_bytes_downloaded = total_bytes_downloaded + ?,
+		total_iocs_cached = total_iocs_cached + ?,
+		last_download_size = ?,
+		last_download_time = ?,
+		update_errors = CASE WHEN ? = 0 THEN update_errors ELSE update_errors + 1 END,
+		last_successful_update = CASE WHEN ? = 1 THEN ? ELSE last_successful_update END,
+		updated_at = ?
+	WHERE source_name = ?`
+
+	result, err := tidb.db.Exec(query, dataSizeBytes, iocsAdded, dataSizeBytes, now, 
+		boolToInt(success), boolToInt(success), now, now, sourceName)
+	if err != nil {
+		return fmt.Errorf("failed to update source stats: %v", err)
+	}
+
+	// 如果没有更新任何行，则插入新记录
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		insertQuery := `
+		INSERT INTO source_stats 
+		(source_name, total_downloads, total_bytes_downloaded, total_iocs_cached, 
+		 last_download_size, last_download_time, last_successful_update, update_errors, updated_at)
+		VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?)`
+		
+		lastSuccessfulUpdate := now
+		if !success {
+			lastSuccessfulUpdate = time.Time{}
+		}
+		
+		_, err = tidb.db.Exec(insertQuery, sourceName, dataSizeBytes, iocsAdded, 
+			dataSizeBytes, now, lastSuccessfulUpdate, boolToInt(!success), now)
+		if err != nil {
+			return fmt.Errorf("failed to insert source stats: %v", err)
+		}
+	}
+
+	return nil
+}
+
+// GetSourceStats 获取数据源统计信息
+func (tidb *ThreatIntelDB) GetSourceStats(sourceName string) (map[string]interface{}, error) {
+	query := `
+	SELECT total_downloads, total_bytes_downloaded, total_iocs_cached, 
+	       last_download_size, last_download_time, last_successful_update, update_errors
+	FROM source_stats
+	WHERE source_name = ?`
+
+	var stats struct {
+		TotalDownloads      int
+		TotalBytesDownloaded int64
+		TotalIOCsCached     int
+		LastDownloadSize     int64
+		LastDownloadTime     sql.NullTime
+		LastSuccessfulUpdate sql.NullTime
+		UpdateErrors        int
+	}
+
+	err := tidb.db.QueryRow(query, sourceName).Scan(
+		&stats.TotalDownloads,
+		&stats.TotalBytesDownloaded,
+		&stats.TotalIOCsCached,
+		&stats.LastDownloadSize,
+		&stats.LastDownloadTime,
+		&stats.LastSuccessfulUpdate,
+		&stats.UpdateErrors,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// 返回空统计
+			return map[string]interface{}{
+				"total_downloads":       0,
+				"total_bytes_downloaded": 0,
+				"total_iocs_cached":     0,
+				"last_download_size":     0,
+				"last_download_time":     nil,
+				"last_successful_update": nil,
+				"update_errors":         0,
+			}, nil
+		}
+		return nil, fmt.Errorf("failed to get source stats: %v", err)
+	}
+
+	result := map[string]interface{}{
+		"total_downloads":       stats.TotalDownloads,
+		"total_bytes_downloaded": stats.TotalBytesDownloaded,
+		"total_iocs_cached":     stats.TotalIOCsCached,
+		"last_download_size":    stats.LastDownloadSize,
+		"update_errors":         stats.UpdateErrors,
+	}
+
+	if stats.LastDownloadTime.Valid {
+		result["last_download_time"] = stats.LastDownloadTime.Time
+	} else {
+		result["last_download_time"] = nil
+	}
+
+	if stats.LastSuccessfulUpdate.Valid {
+		result["last_successful_update"] = stats.LastSuccessfulUpdate.Time
+	} else {
+		result["last_successful_update"] = nil
+	}
+
+	return result, nil
+}
+
+// GetAllSourceStats 获取所有数据源统计信息
+func (tidb *ThreatIntelDB) GetAllSourceStats() (map[string]map[string]interface{}, error) {
+	query := `
+	SELECT source_name, total_downloads, total_bytes_downloaded, total_iocs_cached, 
+	       last_download_size, last_download_time, last_successful_update, update_errors
+	FROM source_stats`
+
+	rows, err := tidb.db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query source stats: %v", err)
+	}
+	defer rows.Close()
+
+	result := make(map[string]map[string]interface{})
+
+	for rows.Next() {
+		var sourceName string
+		var stats struct {
+			TotalDownloads      int
+			TotalBytesDownloaded int64
+			TotalIOCsCached     int
+			LastDownloadSize     int64
+			LastDownloadTime     sql.NullTime
+			LastSuccessfulUpdate sql.NullTime
+			UpdateErrors        int
+		}
+
+		err := rows.Scan(
+			&sourceName,
+			&stats.TotalDownloads,
+			&stats.TotalBytesDownloaded,
+			&stats.TotalIOCsCached,
+			&stats.LastDownloadSize,
+			&stats.LastDownloadTime,
+			&stats.LastSuccessfulUpdate,
+			&stats.UpdateErrors,
+		)
+		if err != nil {
+			continue
+		}
+
+		sourceStats := map[string]interface{}{
+			"total_downloads":       stats.TotalDownloads,
+			"total_bytes_downloaded": stats.TotalBytesDownloaded,
+			"total_iocs_cached":     stats.TotalIOCsCached,
+			"last_download_size":    stats.LastDownloadSize,
+			"update_errors":         stats.UpdateErrors,
+		}
+
+		if stats.LastDownloadTime.Valid {
+			sourceStats["last_download_time"] = stats.LastDownloadTime.Time
+		} else {
+			sourceStats["last_download_time"] = nil
+		}
+
+		if stats.LastSuccessfulUpdate.Valid {
+			sourceStats["last_successful_update"] = stats.LastSuccessfulUpdate.Time
+		} else {
+			sourceStats["last_successful_update"] = nil
+		}
+
+		result[sourceName] = sourceStats
+	}
+
+	return result, nil
+}
+
+// boolToInt 将布尔值转换为整数（用于SQL）
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 // GetThreatStats 获取威胁统计

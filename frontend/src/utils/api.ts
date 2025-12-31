@@ -437,6 +437,29 @@ export const apiService = {
   updateBasicSettings: (settings: Record<string, any>): Promise<any> => 
     api.post('/settings/basic', settings),
 
+  // 封禁管理
+  getBlockedList: async (): Promise<any> => {
+    const result = await api.get('/security/blocked-list')
+    return result
+  },
+  
+  blockItem: async (type: 'ip' | 'tls_fingerprint' | 'user_agent', value: string, duration: number, reason?: string): Promise<any> => {
+    const result = await api.post('/security/block', {
+      type,
+      value,
+      duration,
+      reason: reason || 'Manual block'
+    })
+    return result
+  },
+  
+  unblockItem: async (type: 'ip' | 'tls_fingerprint' | 'user_agent', value: string): Promise<any> => {
+    const result = await api.post('/security/unblock', {
+      type,
+      value
+    })
+    return result
+  },
   
   // 云存储检测
   detectCloudStorage: (target: string): Promise<any> => 

@@ -87,7 +87,19 @@ type ThreatIntelManager struct {
 
 	// 持久化
 	rotator *logger.Rotator
-	db      *ThreatIntelDB // SQLite数据库
+	DB      *ThreatIntelDB // SQLite数据库（公开以便访问）
+}
+
+// GetSources 获取所有数据源（线程安全）
+func (tim *ThreatIntelManager) GetSources() map[string]*ThreatIntelSource {
+	tim.mutex.RLock()
+	defer tim.mutex.RUnlock()
+	
+	result := make(map[string]*ThreatIntelSource)
+	for k, v := range tim.sources {
+		result[k] = v
+	}
+	return result
 }
 
 // NewThreatIntelManager 创建威胁情报管理器
@@ -111,7 +123,7 @@ func (tim *ThreatIntelManager) Start() {
 	if db, err := NewThreatIntelDB("./data/threat_intel.db"); err != nil {
 		tim.log.Errorf("Failed to initialize database: %v", err)
 	} else {
-		tim.db = db
+		tim.DB = db
 		tim.log.Info("SQLite database initialized")
 	}
 
@@ -140,30 +152,13 @@ func (tim *ThreatIntelManager) Stop() {
 	if tim.rotator != nil {
 		_ = tim.rotator.Close()
 	}
-	if tim.db != nil {
-		_ = tim.db.Close()
+	if tim.DB != nil {
+		_ = tim.DB.Close()
 	}
 }
 
 // initSources 初始化威胁情报源
 func (tim *ThreatIntelManager) initSources() {
-	// 商业威胁情报源（需要API密钥）
-	tim.sources["abuseipdb"] = &ThreatIntelSource{
-		Name:       "AbuseIPDB",
-		URL:        "https://api.abuseipdb.com/api/v2/check",
-		Enabled:    false, // 需要API密钥
-		UpdateFreq: 1 * time.Hour,
-		IOCs:       make(map[string]*IOC),
-	}
-
-	tim.sources["virustotal"] = &ThreatIntelSource{
-		Name:       "VirusTotal",
-		URL:        "https://www.virustotal.com/vtapi/v2/ip-address/report",
-		Enabled:    false, // 需要API密钥
-		UpdateFreq: 2 * time.Hour,
-		IOCs:       make(map[string]*IOC),
-	}
-
 	// 免费威胁情报源
 	tim.sources["malware_domains"] = &ThreatIntelSource{
 		Name:       "Malware Domains",
@@ -300,82 +295,154 @@ func (tim *ThreatIntelManager) updateAllSources() {
 func (tim *ThreatIntelManager) updateSource(name string, source *ThreatIntelSource) {
 	tim.log.Infof("Updating threat intelligence source: %s", name)
 
+	var iocsAdded int
+	var dataSizeBytes int64
+	var success bool
+	var errMsg string
+
 	switch name {
-	case "abuseipdb":
-		tim.updateAbuseIPDB(source)
-	case "virustotal":
-		tim.updateVirusTotal(source)
 	case "malware_domains":
-		tim.updateMalwareDomains(source)
+		iocsAdded, dataSizeBytes, success, errMsg = tim.updateMalwareDomains(source)
 	case "emerging_threats":
-		tim.updateEmergingThreats(source)
+		iocsAdded, dataSizeBytes, success, errMsg = tim.updateEmergingThreats(source)
 	case "spamhaus_drop":
-		tim.updateSpamhausDROP(source)
+		iocsAdded, dataSizeBytes, success, errMsg = tim.updateSpamhausDROP(source)
 	case "spamhaus_edrop":
-		tim.updateSpamhausEDROP(source)
+		iocsAdded, dataSizeBytes, success, errMsg = tim.updateSpamhausEDROP(source)
 	case "openphish":
-		tim.updateOpenPhish(source)
+		iocsAdded, dataSizeBytes, success, errMsg = tim.updateOpenPhish(source)
 	case "phishtank":
-		tim.updatePhishTank(source)
+		iocsAdded, dataSizeBytes, success, errMsg = tim.updatePhishTank(source)
 	case "blocklist_de":
-		tim.updateBlocklistDE(source)
+		iocsAdded, dataSizeBytes, success, errMsg = tim.updateBlocklistDE(source)
 	case "dshield":
-		tim.updateDShield(source)
+		iocsAdded, dataSizeBytes, success, errMsg = tim.updateDShield(source)
 	case "tor_exit_nodes":
-		tim.updateTorExitNodes(source)
+		iocsAdded, dataSizeBytes, success, errMsg = tim.updateTorExitNodes(source)
 	case "malware_bazaar":
-		tim.updateMalwareBazaar(source)
+		iocsAdded, dataSizeBytes, success, errMsg = tim.updateMalwareBazaar(source)
 	case "urlhaus":
-		tim.updateURLhaus(source)
+		iocsAdded, dataSizeBytes, success, errMsg = tim.updateURLhaus(source)
 	case "feodo_tracker":
-		tim.updateFeodoTracker(source)
+		iocsAdded, dataSizeBytes, success, errMsg = tim.updateFeodoTracker(source)
 	}
 
-	source.LastUpdate = time.Now()
-	tim.log.Infof("Updated threat intelligence source: %s", name)
-}
+	// 更新统计信息
+	if tim.DB != nil {
+		if err := tim.DB.UpdateSourceStats(name, dataSizeBytes, iocsAdded, success); err != nil {
+			tim.log.Errorf("Failed to update source stats for %s: %v", name, err)
+		}
 
-// updateAbuseIPDB 更新AbuseIPDB数据
-func (tim *ThreatIntelManager) updateAbuseIPDB(source *ThreatIntelSource) {
-	// 这里需要实际的API调用
-	// 由于没有API密钥，我们使用模拟数据
-	tim.log.Info("Updating AbuseIPDB data (simulated)")
-}
+		status := "success"
+		if !success {
+			status = "error"
+		}
+		message := fmt.Sprintf("下载 %d 字节，添加 %d 个 IOC", dataSizeBytes, iocsAdded)
+		if errMsg != "" {
+			message = errMsg
+		}
+		if err := tim.DB.LogUpdate(name, status, message, iocsAdded, 0, dataSizeBytes); err != nil {
+			tim.log.Errorf("Failed to log update for %s: %v", name, err)
+		}
+	}
 
-// updateVirusTotal 更新VirusTotal数据
-func (tim *ThreatIntelManager) updateVirusTotal(source *ThreatIntelSource) {
-	// 这里需要实际的API调用
-	tim.log.Info("Updating VirusTotal data (simulated)")
+	if success {
+		source.LastUpdate = time.Now()
+		tim.log.Infof("Updated threat intelligence source: %s (下载: %d 字节, IOC: %d)", name, dataSizeBytes, iocsAdded)
+	} else {
+		tim.log.Errorf("Failed to update threat intelligence source: %s - %s", name, errMsg)
+	}
 }
 
 // updateMalwareDomains 更新恶意域名列表
-func (tim *ThreatIntelManager) updateMalwareDomains(source *ThreatIntelSource) {
+// 返回: (iocsAdded, dataSizeBytes, success, errorMessage)
+func (tim *ThreatIntelManager) updateMalwareDomains(source *ThreatIntelSource) (int, int64, bool, string) {
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Get(source.URL)
 	if err != nil {
-		tim.log.Errorf("Failed to fetch malware domains: %v", err)
-		return
+		return 0, 0, false, fmt.Sprintf("下载失败: %v", err)
 	}
 	defer resp.Body.Close()
 
-	// 解析域名列表
-	// 这里需要实际的解析逻辑
-	tim.log.Info("Updated malware domains list")
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, 0, false, fmt.Sprintf("读取响应失败: %v", err)
+	}
+
+	dataSizeBytes := int64(len(body))
+	lines := strings.Split(string(body), "\n")
+	iocsAdded := 0
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		// 解析域名
+		if ValidateDomain(line) {
+			ioc := &IOC{
+				Value:       line,
+				Type:        IOCTypeDomain,
+				ThreatLevel: ThreatLevelHigh,
+				Source:      source.Name,
+				Description: "Malware Domains - 恶意域名",
+				FirstSeen:   time.Now(),
+				LastSeen:    time.Now(),
+				Tags:        []string{"malware", "domain"},
+				Confidence:  0.9,
+			}
+			tim.AddIOC(ioc)
+			iocsAdded++
+		}
+	}
+
+	return iocsAdded, dataSizeBytes, true, ""
 }
 
 // updateEmergingThreats 更新Emerging Threats数据
-func (tim *ThreatIntelManager) updateEmergingThreats(source *ThreatIntelSource) {
+// 返回: (iocsAdded, dataSizeBytes, success, errorMessage)
+func (tim *ThreatIntelManager) updateEmergingThreats(source *ThreatIntelSource) (int, int64, bool, string) {
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Get(source.URL)
 	if err != nil {
-		tim.log.Errorf("Failed to fetch emerging threats: %v", err)
-		return
+		return 0, 0, false, fmt.Sprintf("下载失败: %v", err)
 	}
 	defer resp.Body.Close()
 
-	// 解析IP列表
-	// 这里需要实际的解析逻辑
-	tim.log.Info("Updated emerging threats list")
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, 0, false, fmt.Sprintf("读取响应失败: %v", err)
+	}
+
+	dataSizeBytes := int64(len(body))
+	lines := strings.Split(string(body), "\n")
+	iocsAdded := 0
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		if ValidateIP(line) {
+			ioc := &IOC{
+				Value:       line,
+				Type:        IOCTypeIP,
+				ThreatLevel: ThreatLevelHigh,
+				Source:      source.Name,
+				Description: "Emerging Threats - 受感染IP",
+				FirstSeen:   time.Now(),
+				LastSeen:    time.Now(),
+				Tags:        []string{"compromised", "botnet"},
+				Confidence:  0.8,
+			}
+			tim.AddIOC(ioc)
+			iocsAdded++
+		}
+	}
+
+	return iocsAdded, dataSizeBytes, true, ""
 }
 
 // CheckIOC 检查IOC
@@ -473,8 +540,8 @@ func (tim *ThreatIntelManager) GetThreatScore(value string, iocType IOCType) flo
 // GetThreatStats 获取威胁统计
 func (tim *ThreatIntelManager) GetThreatStats() map[string]interface{} {
 	// 如果数据库可用，从数据库获取统计信息
-	if tim.db != nil {
-		return tim.db.GetThreatStats()
+	if tim.DB != nil {
+		return tim.DB.GetThreatStats()
 	}
 
 	// 否则从内存获取
@@ -564,22 +631,21 @@ func ValidateHash(hash string) bool {
 // 新增免费数据源更新函数
 
 // updateSpamhausDROP 更新Spamhaus DROP列表
-func (tim *ThreatIntelManager) updateSpamhausDROP(source *ThreatIntelSource) {
+// 返回: (iocsAdded, dataSizeBytes, success, errorMessage)
+func (tim *ThreatIntelManager) updateSpamhausDROP(source *ThreatIntelSource) (int, int64, bool, string) {
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Get(source.URL)
 	if err != nil {
-		tim.log.Errorf("Failed to fetch Spamhaus DROP: %v", err)
-		return
+		return 0, 0, false, fmt.Sprintf("下载失败: %v", err)
 	}
 	defer resp.Body.Close()
 
-	// 解析IP列表
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		tim.log.Errorf("Failed to read Spamhaus DROP response: %v", err)
-		return
+		return 0, 0, false, fmt.Sprintf("读取响应失败: %v", err)
 	}
 
+	dataSizeBytes := int64(len(body))
 	lines := strings.Split(string(body), "\n")
 	iocsAdded := 0
 
@@ -607,25 +673,25 @@ func (tim *ThreatIntelManager) updateSpamhausDROP(source *ThreatIntelSource) {
 		}
 	}
 
-	tim.log.Infof("Updated Spamhaus DROP list: %d IOCs added", iocsAdded)
+	return iocsAdded, dataSizeBytes, true, ""
 }
 
 // updateSpamhausEDROP 更新Spamhaus EDROP列表
-func (tim *ThreatIntelManager) updateSpamhausEDROP(source *ThreatIntelSource) {
+// 返回: (iocsAdded, dataSizeBytes, success, errorMessage)
+func (tim *ThreatIntelManager) updateSpamhausEDROP(source *ThreatIntelSource) (int, int64, bool, string) {
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Get(source.URL)
 	if err != nil {
-		tim.log.Errorf("Failed to fetch Spamhaus EDROP: %v", err)
-		return
+		return 0, 0, false, fmt.Sprintf("下载失败: %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		tim.log.Errorf("Failed to read Spamhaus EDROP response: %v", err)
-		return
+		return 0, 0, false, fmt.Sprintf("读取响应失败: %v", err)
 	}
 
+	dataSizeBytes := int64(len(body))
 	lines := strings.Split(string(body), "\n")
 	iocsAdded := 0
 
@@ -652,25 +718,25 @@ func (tim *ThreatIntelManager) updateSpamhausEDROP(source *ThreatIntelSource) {
 		}
 	}
 
-	tim.log.Infof("Updated Spamhaus EDROP list: %d IOCs added", iocsAdded)
+	return iocsAdded, dataSizeBytes, true, ""
 }
 
 // updateOpenPhish 更新OpenPhish钓鱼网站列表
-func (tim *ThreatIntelManager) updateOpenPhish(source *ThreatIntelSource) {
+// 返回: (iocsAdded, dataSizeBytes, success, errorMessage)
+func (tim *ThreatIntelManager) updateOpenPhish(source *ThreatIntelSource) (int, int64, bool, string) {
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Get(source.URL)
 	if err != nil {
-		tim.log.Errorf("Failed to fetch OpenPhish: %v", err)
-		return
+		return 0, 0, false, fmt.Sprintf("下载失败: %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		tim.log.Errorf("Failed to read OpenPhish response: %v", err)
-		return
+		return 0, 0, false, fmt.Sprintf("读取响应失败: %v", err)
 	}
 
+	dataSizeBytes := int64(len(body))
 	lines := strings.Split(string(body), "\n")
 	iocsAdded := 0
 
@@ -697,25 +763,25 @@ func (tim *ThreatIntelManager) updateOpenPhish(source *ThreatIntelSource) {
 		}
 	}
 
-	tim.log.Infof("Updated OpenPhish list: %d IOCs added", iocsAdded)
+	return iocsAdded, dataSizeBytes, true, ""
 }
 
 // updatePhishTank 更新PhishTank钓鱼网站列表
-func (tim *ThreatIntelManager) updatePhishTank(source *ThreatIntelSource) {
+// 返回: (iocsAdded, dataSizeBytes, success, errorMessage)
+func (tim *ThreatIntelManager) updatePhishTank(source *ThreatIntelSource) (int, int64, bool, string) {
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Get(source.URL)
 	if err != nil {
-		tim.log.Errorf("Failed to fetch PhishTank: %v", err)
-		return
+		return 0, 0, false, fmt.Sprintf("下载失败: %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		tim.log.Errorf("Failed to read PhishTank response: %v", err)
-		return
+		return 0, 0, false, fmt.Sprintf("读取响应失败: %v", err)
 	}
 
+	dataSizeBytes := int64(len(body))
 	lines := strings.Split(string(body), "\n")
 	iocsAdded := 0
 
@@ -747,25 +813,25 @@ func (tim *ThreatIntelManager) updatePhishTank(source *ThreatIntelSource) {
 		}
 	}
 
-	tim.log.Infof("Updated PhishTank list: %d IOCs added", iocsAdded)
+	return iocsAdded, dataSizeBytes, true, ""
 }
 
 // updateBlocklistDE 更新Blocklist.de列表
-func (tim *ThreatIntelManager) updateBlocklistDE(source *ThreatIntelSource) {
+// 返回: (iocsAdded, dataSizeBytes, success, errorMessage)
+func (tim *ThreatIntelManager) updateBlocklistDE(source *ThreatIntelSource) (int, int64, bool, string) {
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Get(source.URL)
 	if err != nil {
-		tim.log.Errorf("Failed to fetch Blocklist.de: %v", err)
-		return
+		return 0, 0, false, fmt.Sprintf("下载失败: %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		tim.log.Errorf("Failed to read Blocklist.de response: %v", err)
-		return
+		return 0, 0, false, fmt.Sprintf("读取响应失败: %v", err)
 	}
 
+	dataSizeBytes := int64(len(body))
 	lines := strings.Split(string(body), "\n")
 	iocsAdded := 0
 
@@ -792,25 +858,25 @@ func (tim *ThreatIntelManager) updateBlocklistDE(source *ThreatIntelSource) {
 		}
 	}
 
-	tim.log.Infof("Updated Blocklist.de list: %d IOCs added", iocsAdded)
+	return iocsAdded, dataSizeBytes, true, ""
 }
 
 // updateDShield 更新DShield威胁情报
-func (tim *ThreatIntelManager) updateDShield(source *ThreatIntelSource) {
+// 返回: (iocsAdded, dataSizeBytes, success, errorMessage)
+func (tim *ThreatIntelManager) updateDShield(source *ThreatIntelSource) (int, int64, bool, string) {
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Get(source.URL)
 	if err != nil {
-		tim.log.Errorf("Failed to fetch DShield: %v", err)
-		return
+		return 0, 0, false, fmt.Sprintf("下载失败: %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		tim.log.Errorf("Failed to read DShield response: %v", err)
-		return
+		return 0, 0, false, fmt.Sprintf("读取响应失败: %v", err)
 	}
 
+	dataSizeBytes := int64(len(body))
 	lines := strings.Split(string(body), "\n")
 	iocsAdded := 0
 
@@ -838,25 +904,25 @@ func (tim *ThreatIntelManager) updateDShield(source *ThreatIntelSource) {
 		}
 	}
 
-	tim.log.Infof("Updated DShield list: %d IOCs added", iocsAdded)
+	return iocsAdded, dataSizeBytes, true, ""
 }
 
 // updateTorExitNodes 更新Tor出口节点列表
-func (tim *ThreatIntelManager) updateTorExitNodes(source *ThreatIntelSource) {
+// 返回: (iocsAdded, dataSizeBytes, success, errorMessage)
+func (tim *ThreatIntelManager) updateTorExitNodes(source *ThreatIntelSource) (int, int64, bool, string) {
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Get(source.URL)
 	if err != nil {
-		tim.log.Errorf("Failed to fetch Tor exit nodes: %v", err)
-		return
+		return 0, 0, false, fmt.Sprintf("下载失败: %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		tim.log.Errorf("Failed to read Tor exit nodes response: %v", err)
-		return
+		return 0, 0, false, fmt.Sprintf("读取响应失败: %v", err)
 	}
 
+	dataSizeBytes := int64(len(body))
 	lines := strings.Split(string(body), "\n")
 	iocsAdded := 0
 
@@ -883,25 +949,25 @@ func (tim *ThreatIntelManager) updateTorExitNodes(source *ThreatIntelSource) {
 		}
 	}
 
-	tim.log.Infof("Updated Tor exit nodes list: %d IOCs added", iocsAdded)
+	return iocsAdded, dataSizeBytes, true, ""
 }
 
 // updateMalwareBazaar 更新Malware Bazaar恶意软件列表
-func (tim *ThreatIntelManager) updateMalwareBazaar(source *ThreatIntelSource) {
+// 返回: (iocsAdded, dataSizeBytes, success, errorMessage)
+func (tim *ThreatIntelManager) updateMalwareBazaar(source *ThreatIntelSource) (int, int64, bool, string) {
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Get(source.URL)
 	if err != nil {
-		tim.log.Errorf("Failed to fetch Malware Bazaar: %v", err)
-		return
+		return 0, 0, false, fmt.Sprintf("下载失败: %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		tim.log.Errorf("Failed to read Malware Bazaar response: %v", err)
-		return
+		return 0, 0, false, fmt.Sprintf("读取响应失败: %v", err)
 	}
 
+	dataSizeBytes := int64(len(body))
 	lines := strings.Split(string(body), "\n")
 	iocsAdded := 0
 
@@ -929,25 +995,25 @@ func (tim *ThreatIntelManager) updateMalwareBazaar(source *ThreatIntelSource) {
 		}
 	}
 
-	tim.log.Infof("Updated Malware Bazaar list: %d IOCs added", iocsAdded)
+	return iocsAdded, dataSizeBytes, true, ""
 }
 
 // updateURLhaus 更新URLhaus恶意URL列表
-func (tim *ThreatIntelManager) updateURLhaus(source *ThreatIntelSource) {
+// 返回: (iocsAdded, dataSizeBytes, success, errorMessage)
+func (tim *ThreatIntelManager) updateURLhaus(source *ThreatIntelSource) (int, int64, bool, string) {
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Get(source.URL)
 	if err != nil {
-		tim.log.Errorf("Failed to fetch URLhaus: %v", err)
-		return
+		return 0, 0, false, fmt.Sprintf("下载失败: %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		tim.log.Errorf("Failed to read URLhaus response: %v", err)
-		return
+		return 0, 0, false, fmt.Sprintf("读取响应失败: %v", err)
 	}
 
+	dataSizeBytes := int64(len(body))
 	lines := strings.Split(string(body), "\n")
 	iocsAdded := 0
 
@@ -975,25 +1041,25 @@ func (tim *ThreatIntelManager) updateURLhaus(source *ThreatIntelSource) {
 		}
 	}
 
-	tim.log.Infof("Updated URLhaus list: %d IOCs added", iocsAdded)
+	return iocsAdded, dataSizeBytes, true, ""
 }
 
 // updateFeodoTracker 更新Feodo Tracker僵尸网络列表
-func (tim *ThreatIntelManager) updateFeodoTracker(source *ThreatIntelSource) {
+// 返回: (iocsAdded, dataSizeBytes, success, errorMessage)
+func (tim *ThreatIntelManager) updateFeodoTracker(source *ThreatIntelSource) (int, int64, bool, string) {
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Get(source.URL)
 	if err != nil {
-		tim.log.Errorf("Failed to fetch Feodo Tracker: %v", err)
-		return
+		return 0, 0, false, fmt.Sprintf("下载失败: %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		tim.log.Errorf("Failed to read Feodo Tracker response: %v", err)
-		return
+		return 0, 0, false, fmt.Sprintf("读取响应失败: %v", err)
 	}
 
+	dataSizeBytes := int64(len(body))
 	lines := strings.Split(string(body), "\n")
 	iocsAdded := 0
 
@@ -1021,18 +1087,18 @@ func (tim *ThreatIntelManager) updateFeodoTracker(source *ThreatIntelSource) {
 		}
 	}
 
-	tim.log.Infof("Updated Feodo Tracker list: %d IOCs added", iocsAdded)
+	return iocsAdded, dataSizeBytes, true, ""
 }
 
 // loadSourcesFromDB 从数据库加载威胁情报源
 func (tim *ThreatIntelManager) loadSourcesFromDB() {
-	if tim.db == nil {
+	if tim.DB == nil {
 		return
 	}
 
 	for name, source := range tim.sources {
 		// 保存源到数据库
-		if err := tim.db.SaveSource(source); err != nil {
+		if err := tim.DB.SaveSource(source); err != nil {
 			tim.log.Errorf("Failed to save source %s to database: %v", name, err)
 		}
 	}
@@ -1046,9 +1112,9 @@ func (tim *ThreatIntelManager) cleanupLoop() {
 	for {
 		select {
 		case <-ticker.C:
-			if tim.db != nil {
+			if tim.DB != nil {
 				// 清理30天前的数据
-				if err := tim.db.CleanupOldData(30 * 24 * time.Hour); err != nil {
+				if err := tim.DB.CleanupOldData(30 * 24 * time.Hour); err != nil {
 					tim.log.Errorf("Failed to cleanup old data: %v", err)
 				}
 			}
@@ -1060,22 +1126,22 @@ func (tim *ThreatIntelManager) cleanupLoop() {
 
 // SaveIOCToDB 保存IOC到数据库
 func (tim *ThreatIntelManager) SaveIOCToDB(ioc *IOC) {
-	if tim.db == nil {
+	if tim.DB == nil {
 		return
 	}
 
-	if err := tim.db.SaveIOC(ioc); err != nil {
+	if err := tim.DB.SaveIOC(ioc); err != nil {
 		tim.log.Errorf("Failed to save IOC to database: %v", err)
 	}
 }
 
 // GetIOCFromDB 从数据库获取IOC
 func (tim *ThreatIntelManager) GetIOCFromDB(value string, iocType IOCType) (*IOC, bool) {
-	if tim.db == nil {
+	if tim.DB == nil {
 		return nil, false
 	}
 
-	ioc, err := tim.db.GetIOC(value, string(iocType))
+	ioc, err := tim.DB.GetIOC(value, string(iocType))
 	if err != nil {
 		tim.log.Errorf("Failed to get IOC from database: %v", err)
 		return nil, false

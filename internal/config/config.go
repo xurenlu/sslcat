@@ -51,6 +51,8 @@ type Config struct {
 	Monitoring MonitoringConfig `json:"monitoring"`
 	// 缓存预热配置
 	CacheWarmup CacheWarmupConfig `json:"cache_warmup"`
+	// 报告生成配置
+	Report ReportConfig `json:"report"`
 }
 
 // ServerConfig 服务器配置
@@ -1019,6 +1021,30 @@ func Load(configFile string) (*Config, error) {
 			Interval: 60, // 默认60分钟
 			BaseURL:  "",
 		},
+		Report: ReportConfig{
+			Enabled: false, // 默认禁用报告生成
+			Daily: DailyReportConfig{
+				Enabled: true,
+				Time:    "02:00",
+			},
+			Weekly: WeeklyReportConfig{
+				Enabled: true,
+				Day:     "monday",
+				Time:    "02:00",
+			},
+			Monthly: MonthlyReportConfig{
+				Enabled: true,
+				Day:     1,
+				Time:    "02:00",
+			},
+			AI: ReportAIConfig{
+				Enabled:     false, // 默认禁用AI报告
+				Model:       "gpt-4o-mini",
+				MaxTokens:   2000,
+				Temperature: 0.3,
+				Language:    "zh-CN",
+			},
+		},
 		ImageOptimization: ImageOptimizationConfig{
 			Enabled:       false,           // 默认禁用图片优化
 			AutoWebP:      false,           // 默认禁用 WebP 转换
@@ -1543,6 +1569,30 @@ func getDefaultConfig() *Config {
 			URLs:     []string{},
 			Interval: 60,
 			BaseURL:  "",
+		},
+		Report: ReportConfig{
+			Enabled: false,
+			Daily: DailyReportConfig{
+				Enabled: true,
+				Time:    "02:00",
+			},
+			Weekly: WeeklyReportConfig{
+				Enabled: true,
+				Day:     "monday",
+				Time:    "02:00",
+			},
+			Monthly: MonthlyReportConfig{
+				Enabled: true,
+				Day:     1,
+				Time:    "02:00",
+			},
+			AI: ReportAIConfig{
+				Enabled:     false,
+				Model:       "gpt-4o-mini",
+				MaxTokens:   2000,
+				Temperature: 0.3,
+				Language:    "zh-CN",
+			},
 		},
 		ImageOptimization: ImageOptimizationConfig{
 			Enabled:       false,
@@ -2671,5 +2721,45 @@ type CacheWarmupConfig struct {
 	URLs     []string `json:"urls"`     // 需要预热的URL列表
 	Interval int      `json:"interval"` // 预热间隔（分钟）
 	BaseURL  string   `json:"base_url"` // 基础URL（可选，默认自动检测）
+}
+
+// ReportConfig 报告生成配置
+type ReportConfig struct {
+	Enabled bool              `json:"enabled"` // 是否启用报告生成
+	Daily   DailyReportConfig `json:"daily"`  // 日报配置
+	Weekly  WeeklyReportConfig `json:"weekly"` // 周报配置
+	Monthly MonthlyReportConfig `json:"monthly"` // 月报配置
+	AI      ReportAIConfig    `json:"ai"`     // AI报告配置
+}
+
+// DailyReportConfig 日报配置
+type DailyReportConfig struct {
+	Enabled bool   `json:"enabled"` // 是否启用日报
+	Time    string `json:"time"`    // 生成时间（格式: "HH:MM"，默认 "02:00"）
+}
+
+// WeeklyReportConfig 周报配置
+type WeeklyReportConfig struct {
+	Enabled bool   `json:"enabled"` // 是否启用周报
+	Day     string `json:"day"`     // 生成日期（monday/tuesday/...，默认 "monday"）
+	Time    string `json:"time"`    // 生成时间（格式: "HH:MM"，默认 "02:00"）
+}
+
+// MonthlyReportConfig 月报配置
+type MonthlyReportConfig struct {
+	Enabled bool   `json:"enabled"` // 是否启用月报
+	Day     int    `json:"day"`     // 生成日期（每月几号，1-31，默认 1）
+	Time    string `json:"time"`    // 生成时间（格式: "HH:MM"，默认 "02:00"）
+}
+
+// ReportAIConfig AI报告配置
+type ReportAIConfig struct {
+	Enabled     bool    `json:"enabled"`      // 是否启用AI报告生成
+	APIKey      string  `json:"api_key"`      // OpenAI API Key（如果为空，使用ai_security的配置）
+	APIEndpoint string  `json:"api_endpoint"`  // API 端点（如果为空，使用ai_security的配置）
+	Model       string  `json:"model"`        // 使用的模型（默认 gpt-4o-mini）
+	MaxTokens   int     `json:"max_tokens"`   // 最大 token 数（默认 2000）
+	Temperature float64 `json:"temperature"`  // 温度参数（默认 0.3）
+	Language    string  `json:"language"`     // 报告语言（zh-CN/en-US，默认 zh-CN）
 }
 

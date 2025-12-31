@@ -31,6 +31,7 @@ import (
 	"github.com/xurenlu/sslcat/internal/notification"
 	"github.com/xurenlu/sslcat/internal/notify"
 	"github.com/xurenlu/sslcat/internal/proxy"
+	"github.com/xurenlu/sslcat/internal/report"
 	"github.com/xurenlu/sslcat/internal/runner"
 	"github.com/xurenlu/sslcat/internal/security"
 	"github.com/xurenlu/sslcat/internal/slowrequest"
@@ -128,6 +129,9 @@ type Server struct {
 	botDetector        *bot.Detector
 	botWhitelistMgr    *bot.WhitelistManager
 	botChallengeMgr    *bot.ChallengeManager
+
+	// 报告生成器
+	reportGenerator *report.ReportGenerator
 
 	// Cluster runtime status
 	clusterLastConfigSyncAt      time.Time
@@ -319,6 +323,11 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	// 将 GeoIP 服务设置到 DDoS 防护器
 	if secMgr != nil && secMgr.GetGeoIPService() != nil {
 		server.ddosProtector.SetGeoIPService(secMgr.GetGeoIPService())
+	}
+
+	// 将 Security Manager 设置到 DDoS 防护器（用于统一封禁管理）
+	if secMgr != nil {
+		server.ddosProtector.SetSecurityManager(secMgr)
 	}
 
 	// 初始化机器人检测组件
@@ -1044,6 +1053,14 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/waf/subnet-stats", s.handleAPIWAFSubnetStats)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/waf/tls-stats", s.handleAPIWAFTLSStats)
 
+	// 统一封禁管理 API
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/blocked-list", s.handleAPISecurityBlockedList)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/block", s.handleAPISecurityBlock)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/unblock", s.handleAPISecurityUnblock)
+	
+	// DDoS 攻击统计和监控 API
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/ddos-stats", s.handleAPIDDoSStats)
+
 	// Bot API 前缀查询接口（在管理面板下）
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/config/bot-api-prefix", s.handleAPIConfigBotAPIPrefix)
 
@@ -1105,6 +1122,9 @@ func (s *Server) setupRoutes() {
 	// 慢请求API
 	slowRequestAPI := NewSlowRequestAPI(s.slowRequestManager, s)
 	slowRequestAPI.RegisterRoutes(s.mux, s.config.AdminPrefix+"/api")
+
+	// 报告生成API
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/report/generate", s.handleAPIReportGenerate)
 
 	// Prometheus 指标
 	s.mux.Handle("/metrics", s.prometheusMetrics.Handler())
@@ -1489,6 +1509,17 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			
+			// 如果检测到高风险机器人，自动封禁IP
+			if result != nil && result.IsBot && result.RiskScore >= rule.BotDetectionConfig.HighRiskThreshold {
+				clientIP := s.getClientIP(r)
+				// 封禁高风险机器人IP（24小时）
+				if s.securityManager != nil {
+					reason := fmt.Sprintf("机器人检测: 风险评分%d (高风险阈值%d)", result.RiskScore, rule.BotDetectionConfig.HighRiskThreshold)
+					s.securityManager.BlockIP(clientIP, 24*time.Hour, reason)
+					s.log.Warnf("自动封禁高风险机器人IP: %s, 风险评分: %d, 原因: %s", clientIP, result.RiskScore, result.Reason)
+				}
+			}
+			
 			// 记录检测日志
 			if result != nil && s.botWhitelistMgr != nil {
 				go func() {
@@ -1565,6 +1596,13 @@ func (s *Server) securityMiddleware(w http.ResponseWriter, r *http.Request) bool
 	if s.securityManager.IsBlocked(clientIP) {
 		s.log.Warnf("Blocked IP attempted to access: %s", clientIP)
 		http.Error(w, "IP address blocked", http.StatusForbidden)
+		return false
+	}
+
+	// 检查User-Agent是否被封禁
+	if s.securityManager.IsUserAgentBlocked(userAgent) {
+		s.log.Warnf("Blocked User-Agent attempted to access: %s from %s", userAgent, clientIP)
+		http.Error(w, "User-Agent blocked", http.StatusForbidden)
 		return false
 	}
 
@@ -2284,6 +2322,26 @@ func (s *Server) updateMemoryMonitor(maxUsagePercent float64, cooldownSec int) {
 		ReleaseCooldown:     time.Duration(cooldownSec) * time.Second,
 	}
 	s.monitorManager.UpdateMemoryMonitorOptions(opts)
+}
+
+// GetWAFEngine 获取WAF引擎
+func (s *Server) GetWAFEngine() *waf.AdvancedEngine {
+	return s.wafEngine
+}
+
+// GetDDoSProtector 获取DDoS保护器
+func (s *Server) GetDDoSProtector() *ddos.Protector {
+	return s.ddosProtector
+}
+
+// GetStatisticsCollector 获取统计收集器
+func (s *Server) GetStatisticsCollector() *statistics.Collector {
+	return s.statisticsCollector
+}
+
+// GetMonitorManager 获取监控管理器
+func (s *Server) GetMonitorManager() *monitor.Manager {
+	return s.monitorManager
 }
 
 // Stop 停止 Web 服务器及其管理的资源

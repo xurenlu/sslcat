@@ -62,7 +62,7 @@ interface WhitelistEntry {
 }
 
 const BotDetectionConfig: React.FC<BotDetectionConfigProps> = ({ domain }) => {
-  const { config } = useConfig()
+  const { adminPrefix } = useConfig()
   const toast = useToast()
   
   const [enabled, setEnabled] = useState(false)
@@ -100,7 +100,7 @@ const BotDetectionConfig: React.FC<BotDetectionConfigProps> = ({ domain }) => {
 
   const loadBotAPIPrefix = async () => {
     try {
-      const response = await fetch(buildApiPath('/api/config/bot-api-prefix'), {
+      const response = await fetch(buildApiPath(adminPrefix, '/api/config/bot-api-prefix'), {
         credentials: 'include',
       })
       const data = await response.json()
@@ -119,7 +119,7 @@ const BotDetectionConfig: React.FC<BotDetectionConfigProps> = ({ domain }) => {
   const loadConfig = async () => {
     try {
       setLoading(true)
-      const response = await fetch(buildApiPath(`${botAPIPrefix}/config?domain=${domain}`), {
+      const response = await fetch(buildApiPath(adminPrefix, `${botAPIPrefix}/config?domain=${domain}`), {
         credentials: 'include',
       })
       const data = await response.json()
@@ -138,7 +138,7 @@ const BotDetectionConfig: React.FC<BotDetectionConfigProps> = ({ domain }) => {
 
   const loadWhitelist = async () => {
     try {
-      const response = await fetch(buildApiPath(`${botAPIPrefix}/whitelist?domain=${domain}`), {
+      const response = await fetch(buildApiPath(adminPrefix, `${botAPIPrefix}/whitelist?domain=${domain}`), {
         credentials: 'include',
       })
       const data = await response.json()
@@ -152,7 +152,7 @@ const BotDetectionConfig: React.FC<BotDetectionConfigProps> = ({ domain }) => {
 
   const loadStats = async () => {
     try {
-      const response = await fetch(buildApiPath(`${botAPIPrefix}/stats`), {
+      const response = await fetch(buildApiPath(adminPrefix, `${botAPIPrefix}/stats`), {
         credentials: 'include',
       })
       const data = await response.json()
@@ -167,7 +167,7 @@ const BotDetectionConfig: React.FC<BotDetectionConfigProps> = ({ domain }) => {
   const handleSave = async () => {
     try {
       setSaving(true)
-      const response = await fetch(buildApiPath(`${botAPIPrefix}/config`), {
+      const response = await fetch(buildApiPath(adminPrefix, `${botAPIPrefix}/config`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -206,7 +206,7 @@ const BotDetectionConfig: React.FC<BotDetectionConfigProps> = ({ domain }) => {
   const handleRemoveWhitelist = async (ip: string) => {
     try {
       const response = await fetch(
-        buildApiPath(`${botAPIPrefix}/whitelist?ip=${ip}&domain=${domain}`),
+        buildApiPath(adminPrefix, `${botAPIPrefix}/whitelist?ip=${ip}&domain=${domain}`),
         {
           method: 'DELETE',
           credentials: 'include',

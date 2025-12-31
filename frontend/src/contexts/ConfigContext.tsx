@@ -7,6 +7,7 @@ const ADMIN_PREFIX_STORAGE_KEY = 'adminPrefix'
 
 interface ConfigContextType {
   adminPrefix: string
+  version: string
   isLoading: boolean
   error: string | null
   refreshConfig: () => Promise<void>
@@ -22,6 +23,7 @@ interface ConfigProviderProps {
 
 export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
   const [adminPrefix, setAdminPrefix] = useState('')
+  const [version, setVersion] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -53,7 +55,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
   }, [])
 
   // 验证前缀是否有效
-  const validatePrefix = useCallback(async (prefix: string): Promise<{ valid: boolean; serverPrefix?: string }> => {
+  const validatePrefix = useCallback(async (prefix: string): Promise<{ valid: boolean; serverPrefix?: string; version?: string }> => {
     try {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 5000) // 5秒超时
@@ -67,9 +69,11 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
       
       if (response.ok) {
         const data = await response.json()
+        const settings = data.data || {}
         return { 
           valid: true, 
-          serverPrefix: data.admin_prefix || prefix 
+          serverPrefix: settings.admin_prefix || prefix,
+          version: settings.server_info?.version || ''
         }
       }
     } catch (error) {
@@ -227,6 +231,9 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
             const finalPrefix = validation.serverPrefix || storedPrefix
             console.log('localStorage 前缀验证成功，使用:', finalPrefix)
             updatePrefix(finalPrefix)
+            if (validation.version) {
+              setVersion(validation.version)
+            }
             setIsLoading(false)
             return
           }
@@ -262,12 +269,13 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
   // 使用useMemo优化context value，避免不必要的重新渲染
   const value: ConfigContextType = useMemo(() => ({
     adminPrefix,
+    version,
     isLoading,
     error,
     refreshConfig,
     updatePrefix,
     changeAdminPrefix,
-  }), [adminPrefix, isLoading, error, refreshConfig, updatePrefix, changeAdminPrefix])
+  }), [adminPrefix, version, isLoading, error, refreshConfig, updatePrefix, changeAdminPrefix])
 
   return (
     <ConfigContext.Provider value={value}>

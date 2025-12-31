@@ -106,6 +106,17 @@ type Protector struct {
 	threatDetector *threatintel.ThreatDetector
 	// GeoIP 服务
 	geoIPService *security.GeoIPService
+
+	// 全局攻击感知
+	lastAttackCheckTime time.Time
+	attackCheckInterval time.Duration
+	lastNotificationTime time.Time
+	notificationCooldown time.Duration
+	// 自动应对措施
+	autoEscalateEnabled bool
+	autoBlockEnabled bool
+	// Security Manager 引用（用于统一封禁管理）
+	securityManager *security.Manager
 }
 
 // ThresholdConfig 阈值配置
@@ -136,6 +147,10 @@ func NewProtectorWithThreatIntel(notificationIntegrator *notification.Notificati
 		maxClients:             10000,
 		maxAttacks:             1000,
 		notificationIntegrator: notificationIntegrator,
+		attackCheckInterval:    1 * time.Minute,  // 每分钟检查一次全局攻击
+		notificationCooldown:   5 * time.Minute,  // 通知冷却时间5分钟
+		autoEscalateEnabled:    true,             // 默认启用自动升级
+		autoBlockEnabled:       true,             // 默认启用自动封禁
 		log: logrus.WithFields(logrus.Fields{
 			"component": "ddos_protector",
 		}),
@@ -146,6 +161,9 @@ func NewProtectorWithThreatIntel(notificationIntegrator *notification.Notificati
 
 	// 启动清理协程
 	go p.cleanupRoutine()
+
+	// 启动全局攻击检测协程
+	go p.globalAttackDetectionRoutine()
 
 	// 初始化轮转器（10MB*10）
 	if rot, err := logger.NewRotator("./data/ddos_attacks.log", 10*1024*1024, 10); err == nil {
@@ -158,6 +176,14 @@ func NewProtectorWithThreatIntel(notificationIntegrator *notification.Notificati
 	}
 
 	return p
+}
+
+// SetSecurityManager 设置 Security Manager（用于统一封禁管理）
+func (p *Protector) SetSecurityManager(manager *security.Manager) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	p.securityManager = manager
+	p.log.Info("已设置 Security Manager 到 DDoS 防护器")
 }
 
 // SetGeoIPService 设置 GeoIP 服务
@@ -641,6 +667,13 @@ func (p *Protector) recordAttack(clientIP, userAgent, url, method, attackType, s
 		p.notificationIntegrator.SendDDoSAttackNotification(attackInfo)
 	}
 
+	// 如果被封禁，同时添加到统一封禁管理系统
+	if blocked && p.securityManager != nil {
+		// 获取封禁时长（使用当前防护级别的封禁时长）
+		threshold := p.thresholds[p.level]
+		p.securityManager.BlockIP(clientIP, threshold.BlockDuration, fmt.Sprintf("DDoS攻击: %s", reason))
+	}
+
 	if blocked {
 		p.log.Warnf("DDoS攻击已阻止: %s from %s, 原因: %s", attackType, clientIP, reason)
 	} else {
@@ -941,6 +974,22 @@ func (p *Protector) GetAttacks(limit int) []Attack {
 	return p.attacks[start:]
 }
 
+// GetAttacksByTimeRange 按时间范围获取攻击记录
+func (p *Protector) GetAttacksByTimeRange(startTime, endTime time.Time) []Attack {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+
+	var result []Attack
+	for _, attack := range p.attacks {
+		if (attack.Timestamp.After(startTime) || attack.Timestamp.Equal(startTime)) &&
+			(attack.Timestamp.Before(endTime) || attack.Timestamp.Equal(endTime)) {
+			result = append(result, attack)
+		}
+	}
+
+	return result
+}
+
 // UnblockIP 解除IP封禁
 func (p *Protector) UnblockIP(ip string) bool {
 	p.mutex.Lock()
@@ -981,4 +1030,172 @@ func (p *Protector) BlockIP(ip string, duration time.Duration, reason string) {
 func (p *Protector) Stop() {
 	p.log.Info("停止DDoS防护器")
 	close(p.stopChan)
+}
+
+// globalAttackDetectionRoutine 全局攻击检测协程
+func (p *Protector) globalAttackDetectionRoutine() {
+	ticker := time.NewTicker(p.attackCheckInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			p.detectGlobalAttack()
+		case <-p.stopChan:
+			return
+		}
+	}
+}
+
+// detectGlobalAttack 检测全局攻击（大规模DDoS攻击）
+func (p *Protector) detectGlobalAttack() {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	now := time.Now()
+	
+	// 检查最近1分钟内的攻击情况
+	recentWindow := 1 * time.Minute
+	cutoffTime := now.Add(-recentWindow)
+	
+	// 统计最近1分钟内的攻击
+	recentAttacks := 0
+	recentBlockedAttacks := 0
+	recentBlockedIPs := make(map[string]bool)
+	
+	for _, attack := range p.attacks {
+		if attack.Timestamp.After(cutoffTime) {
+			recentAttacks++
+			if attack.Blocked {
+				recentBlockedAttacks++
+				recentBlockedIPs[attack.ClientIP] = true
+			}
+		}
+	}
+	
+	// 统计当前被封禁的客户端数量
+	currentBlockedCount := 0
+	for _, client := range p.clients {
+		if now.Before(client.BlockedUntil) {
+			currentBlockedCount++
+		}
+	}
+	
+	// 检测大规模攻击的指标
+	// 1. 最近1分钟内超过50次攻击
+	// 2. 最近1分钟内超过20个不同IP被封禁
+	// 3. 当前被封禁的IP超过100个
+	isLargeScaleAttack := false
+	attackSeverity := "medium"
+	
+	if recentAttacks >= 50 || len(recentBlockedIPs) >= 20 || currentBlockedCount >= 100 {
+		isLargeScaleAttack = true
+		if recentAttacks >= 200 || len(recentBlockedIPs) >= 50 || currentBlockedCount >= 500 {
+			attackSeverity = "critical"
+		} else if recentAttacks >= 100 || len(recentBlockedIPs) >= 30 || currentBlockedCount >= 200 {
+			attackSeverity = "high"
+		}
+	}
+	
+	if isLargeScaleAttack {
+		// 检查是否需要发送通知（避免频繁通知）
+		shouldNotify := now.Sub(p.lastNotificationTime) >= p.notificationCooldown
+		
+		if shouldNotify {
+			p.lastNotificationTime = now
+			
+			// 发送大规模攻击通知
+			if p.notificationIntegrator != nil {
+				attackInfo := &notification.AttackInfo{
+					ClientIP:  "multiple",
+					UserAgent: "DDoS Attack",
+					URL:       "global",
+					Reason:    fmt.Sprintf("检测到大规模DDoS攻击: 最近1分钟%d次攻击, %d个IP被封禁, 当前%d个IP被封禁", 
+						recentAttacks, len(recentBlockedIPs), currentBlockedCount),
+					Severity:  attackSeverity,
+					Blocked:   true,
+				}
+				p.notificationIntegrator.SendDDoSAttackNotification(attackInfo)
+			}
+			
+			p.log.Warnf("🚨 检测到大规模DDoS攻击！最近1分钟: %d次攻击, %d个IP被封禁, 当前%d个IP被封禁, 严重程度: %s",
+				recentAttacks, len(recentBlockedIPs), currentBlockedCount, attackSeverity)
+			
+			// 自动应对措施
+			if p.autoEscalateEnabled {
+				p.autoEscalateProtection(attackSeverity)
+			}
+		}
+	}
+}
+
+// autoEscalateProtection 自动升级防护级别
+func (p *Protector) autoEscalateProtection(severity string) {
+	currentLevel := p.level
+	
+	switch severity {
+	case "critical":
+		// 严重攻击：升级到最高级别
+		if currentLevel < LevelExtreme {
+			p.level = LevelExtreme
+			p.log.Warnf("⚠️ 自动升级防护级别: %s -> %s (检测到严重DDoS攻击)", 
+				currentLevel.String(), p.level.String())
+		}
+	case "high":
+		// 高级攻击：升级到高级别
+		if currentLevel < LevelHigh {
+			p.level = LevelHigh
+			p.log.Warnf("⚠️ 自动升级防护级别: %s -> %s (检测到高级DDoS攻击)", 
+				currentLevel.String(), p.level.String())
+		}
+	case "medium":
+		// 中级攻击：升级到中高级别
+		if currentLevel < LevelMedium {
+			p.level = LevelMedium
+			p.log.Warnf("⚠️ 自动升级防护级别: %s -> %s (检测到中级DDoS攻击)", 
+				currentLevel.String(), p.level.String())
+		}
+	}
+}
+
+// GetGlobalAttackStats 获取全局攻击统计
+func (p *Protector) GetGlobalAttackStats() map[string]interface{} {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+
+	now := time.Now()
+	recentWindow := 1 * time.Minute
+	cutoffTime := now.Add(-recentWindow)
+	
+	recentAttacks := 0
+	recentBlockedAttacks := 0
+	recentBlockedIPs := make(map[string]bool)
+	currentBlockedCount := 0
+	
+	for _, attack := range p.attacks {
+		if attack.Timestamp.After(cutoffTime) {
+			recentAttacks++
+			if attack.Blocked {
+				recentBlockedAttacks++
+				recentBlockedIPs[attack.ClientIP] = true
+			}
+		}
+	}
+	
+	for _, client := range p.clients {
+		if now.Before(client.BlockedUntil) {
+			currentBlockedCount++
+		}
+	}
+	
+	return map[string]interface{}{
+		"recent_attacks_1min":      recentAttacks,
+		"recent_blocked_attacks":  recentBlockedAttacks,
+		"recent_blocked_ips":      len(recentBlockedIPs),
+		"current_blocked_ips":     currentBlockedCount,
+		"is_large_scale_attack":   recentAttacks >= 50 || len(recentBlockedIPs) >= 20 || currentBlockedCount >= 100,
+		"auto_escalate_enabled":   p.autoEscalateEnabled,
+		"auto_block_enabled":      p.autoBlockEnabled,
+		"current_protection_level": p.level.String(),
+	}
 }

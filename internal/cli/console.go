@@ -1,12 +1,15 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/xurenlu/sslcat/internal/assets"
 	"github.com/xurenlu/sslcat/internal/cli/ui"
 	"github.com/xurenlu/sslcat/internal/config"
+	"github.com/xurenlu/sslcat/internal/i18n"
 )
 
 // ConsoleModel 控制台主模型
@@ -17,6 +20,7 @@ type ConsoleModel struct {
 	menuModel   ui.MenuModel
 	width       int
 	height      int
+	translator  *i18n.Translator
 	
 	// 当前子视图模型
 	currentViewModel tea.Model
@@ -24,11 +28,17 @@ type ConsoleModel struct {
 
 // RunConsole 启动控制台
 func RunConsole(cfg *config.Config, configFile string) error {
+	// 初始化翻译器，默认使用中文
+	lang := i18n.LangZhCN
+	// 可以从环境变量或配置中获取语言设置，暂时使用默认中文
+	translator := initTranslator(lang)
+	
 	// 创建初始模型
 	model := ConsoleModel{
 		config:     cfg,
 		configFile: configFile,
-		menuModel:  ui.NewMenuModel(),
+		menuModel:  ui.NewMenuModel(translator),
+		translator: translator,
 	}
 
 	// 启动 bubbletea 程序
@@ -38,6 +48,24 @@ func RunConsole(cfg *config.Config, configFile string) error {
 	}
 
 	return nil
+}
+
+// initTranslator 初始化翻译器（从嵌入的资源加载）
+func initTranslator(defaultLang i18n.SupportedLanguage) *i18n.Translator {
+	translator := i18n.NewTranslator(defaultLang, "")
+	// 通过嵌入 i18n 文件加载翻译
+	if files, err := assets.ListI18nFiles(); err == nil {
+		for _, f := range files {
+			if b, err := assets.ReadI18nFile(f); err == nil {
+				code := i18n.SupportedLanguage(strings.TrimSuffix(f, ".json"))
+				var translations map[string]string
+				if err := json.Unmarshal(b, &translations); err == nil {
+					_ = translator.SaveTranslations(code, translations)
+				}
+			}
+		}
+	}
+	return translator
 }
 
 // Init 初始化模型
@@ -72,7 +100,7 @@ func (m ConsoleModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// 接收到返回到主菜单的消息
 		m.currentViewModel = nil
 		m.currentView = ""
-		m.menuModel = ui.NewMenuModel()
+		m.menuModel = ui.NewMenuModel(m.translator)
 		return m, nil
 
 	case tea.KeyMsg:
@@ -80,12 +108,12 @@ func (m ConsoleModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.currentViewModel != nil {
 			// 检查是否是退出键（q 或 esc）
 			if msg.String() == "q" || msg.String() == "esc" {
-				// 清除子视图，返回到主菜单
-				m.currentViewModel = nil
-				m.currentView = ""
-				// 重新初始化菜单
-				m.menuModel = ui.NewMenuModel()
-				return m, nil
+			// 清除子视图，返回到主菜单
+			m.currentViewModel = nil
+			m.currentView = ""
+			// 重新初始化菜单
+			m.menuModel = ui.NewMenuModel(m.translator)
+			return m, nil
 			}
 			
 			updated, cmd := m.currentViewModel.Update(msg)
@@ -94,7 +122,7 @@ func (m ConsoleModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if updated == nil {
 				m.currentViewModel = nil
 				m.currentView = ""
-				m.menuModel = ui.NewMenuModel()
+				m.menuModel = ui.NewMenuModel(m.translator)
 				return m, nil
 			}
 			
@@ -106,7 +134,7 @@ func (m ConsoleModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// 子视图请求退出，但不退出程序，而是返回到主菜单
 					m.currentViewModel = nil
 					m.currentView = ""
-					m.menuModel = ui.NewMenuModel()
+					m.menuModel = ui.NewMenuModel(m.translator)
 					return m, nil
 				}
 			}
@@ -199,6 +227,9 @@ func (m ConsoleModel) handleMenuSelection(selected string) (tea.Model, tea.Cmd) 
 
 	case "安全设置":
 		return m.runSecurityView()
+
+	case "封禁管理":
+		return m.runBlockManagementView()
 
 	case "系统设置":
 		return m.runSettingsView()
@@ -328,6 +359,20 @@ func (m ConsoleModel) runDNSView() (tea.Model, tea.Cmd) {
 func (m ConsoleModel) runSecurityView() (tea.Model, tea.Cmd) {
 	m.currentView = "security"
 	viewModel := ui.NewSecurityModel(m.config, m.configFile)
+	// 如果窗口大小已设置，立即更新子视图
+	if m.width > 0 && m.height > 0 {
+		updated, cmd := viewModel.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+		m.currentViewModel = updated
+		return m, cmd
+	}
+	m.currentViewModel = viewModel
+	return m, nil
+}
+
+// runBlockManagementView 运行封禁管理视图
+func (m ConsoleModel) runBlockManagementView() (tea.Model, tea.Cmd) {
+	m.currentView = "block-management"
+	viewModel := ui.NewBlockManagementModel(m.config, m.configFile)
 	// 如果窗口大小已设置，立即更新子视图
 	if m.width > 0 && m.height > 0 {
 		updated, cmd := viewModel.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})

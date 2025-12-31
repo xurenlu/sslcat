@@ -1,7 +1,6 @@
 package threatintel
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -32,158 +31,7 @@ func NewThreatIntelAPI(manager *ThreatIntelManager) *ThreatIntelAPI {
 	}
 }
 
-// AbuseIPDBResponse AbuseIPDB API响应
-type AbuseIPDBResponse struct {
-	Data struct {
-		IPAddress        string   `json:"ipAddress"`
-		IsPublic         bool     `json:"isPublic"`
-		IPVersion        int      `json:"ipVersion"`
-		IsWhitelisted    bool     `json:"isWhitelisted"`
-		AbuseConfidence  int      `json:"abuseConfidencePercentage"`
-		CountryCode      string   `json:"countryCode"`
-		UsageType        string   `json:"usageType"`
-		ISP              string   `json:"isp"`
-		Domain           string   `json:"domain"`
-		Hostnames        []string `json:"hostnames"`
-		TotalReports     int      `json:"totalReports"`
-		NumDistinctUsers int      `json:"numDistinctUsers"`
-		LastReportedAt   string   `json:"lastReportedAt"`
-		Reports          []struct {
-			ReportedAt string `json:"reportedAt"`
-			Comment    string `json:"comment"`
-			Categories []int  `json:"categories"`
-		} `json:"reports"`
-	} `json:"data"`
-}
 
-// VirusTotalResponse VirusTotal API响应
-type VirusTotalResponse struct {
-	ResponseCode int    `json:"response_code"`
-	VerboseMsg   string `json:"verbose_msg"`
-	Resource     string `json:"resource"`
-	ScanID       string `json:"scan_id"`
-	Permalink    string `json:"permalink"`
-	ScanDate     string `json:"scan_date"`
-	Positives    int    `json:"positives"`
-	Total        int    `json:"total"`
-	Scans        map[string]struct {
-		Detected bool   `json:"detected"`
-		Result   string `json:"result"`
-		Version  string `json:"version"`
-		Update   string `json:"update"`
-	} `json:"scans"`
-}
-
-// CheckIPWithAbuseIPDB 使用AbuseIPDB检查IP
-func (api *ThreatIntelAPI) CheckIPWithAbuseIPDB(ip string) (*IOC, error) {
-	if !ValidateIP(ip) {
-		return nil, fmt.Errorf("invalid IP address: %s", ip)
-	}
-
-	// 构建请求
-	url := fmt.Sprintf("https://api.abuseipdb.com/api/v2/check?ipAddress=%s&maxAgeInDays=90&verbose", ip)
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	// 添加API密钥（需要配置）
-	req.Header.Set("Key", "your-api-key-here")
-	req.Header.Set("Accept", "application/json")
-
-	// 发送请求
-	resp, err := api.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	// 解析响应
-	var abuseResp AbuseIPDBResponse
-	if err := json.NewDecoder(resp.Body).Decode(&abuseResp); err != nil {
-		return nil, err
-	}
-
-	// 转换为IOC
-	threatLevel := ThreatLevelLow
-	confidence := float64(abuseResp.Data.AbuseConfidence) / 100.0
-
-	if abuseResp.Data.AbuseConfidence >= 75 {
-		threatLevel = ThreatLevelCritical
-	} else if abuseResp.Data.AbuseConfidence >= 50 {
-		threatLevel = ThreatLevelHigh
-	} else if abuseResp.Data.AbuseConfidence >= 25 {
-		threatLevel = ThreatLevelMedium
-	}
-
-	ioc := &IOC{
-		Value:       ip,
-		Type:        IOCTypeIP,
-		ThreatLevel: threatLevel,
-		Source:      "AbuseIPDB",
-		Description: fmt.Sprintf("Abuse confidence: %d%%, Reports: %d",
-			abuseResp.Data.AbuseConfidence, abuseResp.Data.TotalReports),
-		FirstSeen:  time.Now(),
-		LastSeen:   time.Now(),
-		Confidence: confidence,
-		Tags:       []string{"abuse", "reported"},
-	}
-
-	return ioc, nil
-}
-
-// CheckIPWithVirusTotal 使用VirusTotal检查IP
-func (api *ThreatIntelAPI) CheckIPWithVirusTotal(ip string) (*IOC, error) {
-	if !ValidateIP(ip) {
-		return nil, fmt.Errorf("invalid IP address: %s", ip)
-	}
-
-	// 构建请求
-	url := fmt.Sprintf("https://www.virustotal.com/vtapi/v2/ip-address/report?apikey=your-api-key&ip=%s", ip)
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	// 发送请求
-	resp, err := api.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	// 解析响应
-	var vtResp VirusTotalResponse
-	if err := json.NewDecoder(resp.Body).Decode(&vtResp); err != nil {
-		return nil, err
-	}
-
-	// 转换为IOC
-	threatLevel := ThreatLevelLow
-	confidence := float64(vtResp.Positives) / float64(vtResp.Total)
-
-	if vtResp.Positives >= 5 {
-		threatLevel = ThreatLevelCritical
-	} else if vtResp.Positives >= 3 {
-		threatLevel = ThreatLevelHigh
-	} else if vtResp.Positives >= 1 {
-		threatLevel = ThreatLevelMedium
-	}
-
-	ioc := &IOC{
-		Value:       ip,
-		Type:        IOCTypeIP,
-		ThreatLevel: threatLevel,
-		Source:      "VirusTotal",
-		Description: fmt.Sprintf("Detected by %d/%d engines", vtResp.Positives, vtResp.Total),
-		FirstSeen:   time.Now(),
-		LastSeen:    time.Now(),
-		Confidence:  confidence,
-		Tags:        []string{"malware", "detected"},
-	}
-
-	return ioc, nil
-}
 
 // CheckDomainWithMalwareDomains 使用恶意域名列表检查域名
 func (api *ThreatIntelAPI) CheckDomainWithMalwareDomains(domain string) (*IOC, error) {
@@ -303,22 +151,6 @@ func (api *ThreatIntelAPI) BulkCheckIP(ips []string) map[string]*IOC {
 		go func(ipAddr string) {
 			defer wg.Done()
 			defer func() { <-semaphore }() // 释放信号量
-
-			// 检查AbuseIPDB
-			if ioc, err := api.CheckIPWithAbuseIPDB(ipAddr); err == nil && ioc != nil {
-				resultsMu.Lock()
-				results[ipAddr] = ioc
-				resultsMu.Unlock()
-				api.manager.AddIOC(ioc)
-			}
-
-			// 检查VirusTotal
-			if ioc, err := api.CheckIPWithVirusTotal(ipAddr); err == nil && ioc != nil {
-				resultsMu.Lock()
-				results[ipAddr] = ioc
-				resultsMu.Unlock()
-				api.manager.AddIOC(ioc)
-			}
 
 			// 检查Emerging Threats
 			if ioc, err := api.CheckIPWithEmergingThreats(ipAddr); err == nil && ioc != nil {

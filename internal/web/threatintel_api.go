@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -51,6 +52,7 @@ func (tia *ThreatIntelAPI) RegisterRoutes(router *http.ServeMux) {
 	// 统计和报告
 	router.HandleFunc("/api/threatintel/stats", tia.GetStats)
 	router.HandleFunc("/api/threatintel/report", tia.GetReport)
+	router.HandleFunc("/api/threatintel/sources/stats", tia.GetSourcesStats)
 
 	// 批量检查
 	router.HandleFunc("/api/threatintel/bulk/check", tia.BulkCheck)
@@ -324,24 +326,31 @@ func (tia *ThreatIntelAPI) DeleteIOCHandler(w http.ResponseWriter, r *http.Reque
 
 // ListSources 列出威胁情报源
 func (tia *ThreatIntelAPI) ListSources(w http.ResponseWriter, r *http.Request) {
-	// 这里应该返回配置的威胁情报源
-	sources := []map[string]interface{}{
-		{
-			"name":        "AbuseIPDB",
-			"enabled":     true,
-			"last_update": "2024-01-01T00:00:00Z",
-			"status":      "active",
-		},
-		{
-			"name":        "VirusTotal",
-			"enabled":     true,
-			"last_update": "2024-01-01T00:00:00Z",
-			"status":      "active",
-		},
+	sources := tia.manager.GetSources()
+	sourcesList := make([]map[string]interface{}, 0, len(sources))
+	
+	for name, source := range sources {
+		sourceInfo := map[string]interface{}{
+			"name":         name,
+			"display_name": source.Name,
+			"url":          source.URL,
+			"enabled":      source.Enabled,
+			"last_update":  source.LastUpdate,
+			"update_freq":  source.UpdateFreq.String(),
+		}
+
+		// 获取统计信息
+		if tia.manager.DB != nil {
+			if stats, err := tia.manager.DB.GetSourceStats(name); err == nil {
+				sourceInfo["stats"] = stats
+			}
+		}
+
+		sourcesList = append(sourcesList, sourceInfo)
 	}
 
 	tia.writeJSONResponse(w, map[string]interface{}{
-		"sources": sources,
+		"sources": sourcesList,
 	})
 }
 
@@ -450,5 +459,23 @@ func (tia *ThreatIntelAPI) writeErrorResponse(w http.ResponseWriter, message str
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"error":   true,
 		"message": message,
+	})
+}
+
+// GetSourcesStats 获取所有数据源统计信息
+func (tia *ThreatIntelAPI) GetSourcesStats(w http.ResponseWriter, r *http.Request) {
+	if tia.manager.DB == nil {
+		tia.writeErrorResponse(w, "Database not available", http.StatusInternalServerError)
+		return
+	}
+
+	stats, err := tia.manager.DB.GetAllSourceStats()
+	if err != nil {
+		tia.writeErrorResponse(w, fmt.Sprintf("Failed to get source stats: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	tia.writeJSONResponse(w, map[string]interface{}{
+		"sources_stats": stats,
 	})
 }
