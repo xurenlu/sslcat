@@ -243,6 +243,7 @@ export const deDE: Translation = {
     apiKey: 'API-Schlüssel',
     getOpenAIKey: 'OpenAI-Schlüssel erhalten',
     getPOEKey: 'POE-Schlüssel erhalten',
+    getDashScopeKey: 'DashScope-Schlüssel erhalten',
     apiEndpoint: 'API-Endpunkt',
     model: 'Analysemodell',
     checkInterval: 'Prüfintervall',

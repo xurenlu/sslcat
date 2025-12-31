@@ -243,6 +243,7 @@ export const ruRU: Translation = {
     apiKey: 'Ключ API',
     getOpenAIKey: 'Получить ключ OpenAI',
     getPOEKey: 'Получить ключ POE',
+    getDashScopeKey: 'Получить ключ DashScope',
     apiEndpoint: 'Конечная точка API',
     model: 'Модель анализа',
     checkInterval: 'Интервал проверки',

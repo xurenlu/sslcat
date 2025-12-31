@@ -263,6 +263,7 @@ export interface Translation {
     apiKey: string
     getOpenAIKey: string
     getPOEKey: string
+    getDashScopeKey: string
     apiEndpoint: string
     model: string
     checkInterval: string

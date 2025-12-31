@@ -243,6 +243,7 @@ export const frFR: Translation = {
     apiKey: 'Clé API',
     getOpenAIKey: 'Obtenir la Clé OpenAI',
     getPOEKey: 'Obtenir la Clé POE',
+    getDashScopeKey: 'Obtenir la Clé DashScope',
     apiEndpoint: 'Point de Terminaison API',
     model: 'Modèle d\'Analyse',
     checkInterval: 'Intervalle de Vérification',

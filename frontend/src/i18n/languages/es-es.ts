@@ -243,6 +243,7 @@ export const esES: Translation = {
     apiKey: 'Clave API',
     getOpenAIKey: 'Obtener Clave OpenAI',
     getPOEKey: 'Obtener Clave POE',
+    getDashScopeKey: 'Obtener Clave DashScope',
     apiEndpoint: 'Punto Final API',
     model: 'Modelo de Análisis',
     checkInterval: 'Intervalo de Verificación',

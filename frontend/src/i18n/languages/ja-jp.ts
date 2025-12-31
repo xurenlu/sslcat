@@ -243,6 +243,7 @@ export const jaJP: Translation = {
     apiKey: 'APIキー',
     getOpenAIKey: 'OpenAIキーを取得',
     getPOEKey: 'POEキーを取得',
+    getDashScopeKey: 'DashScopeキーを取得',
     apiEndpoint: 'APIエンドポイント',
     model: '分析モデル',
     checkInterval: 'チェック間隔',

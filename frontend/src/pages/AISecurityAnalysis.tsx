@@ -148,6 +148,8 @@ const AISecurityAnalysis: React.FC = () => {
           const endpoint = data.config.api_endpoint || ''
           if (endpoint.includes('poe.com')) {
             setApiProvider('poe')
+          } else if (endpoint.includes('dashscope.aliyuncs.com')) {
+            setApiProvider('dashscope')
           } else if (endpoint.includes('azure')) {
             setApiProvider('azure')
           } else if (endpoint && endpoint !== '' && endpoint !== 'https://api.openai.com/v1/chat/completions') {
@@ -172,6 +174,8 @@ const AISecurityAnalysis: React.FC = () => {
         endpoint = 'https://api.openai.com/v1/chat/completions'
       } else if (apiProvider === 'poe') {
         endpoint = 'https://api.poe.com/v1/chat/completions'
+      } else if (apiProvider === 'dashscope') {
+        endpoint = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
       }
 
       const saveData = { ...config, api_endpoint: endpoint }
@@ -232,6 +236,8 @@ const AISecurityAnalysis: React.FC = () => {
         endpoint = 'https://api.openai.com/v1/chat/completions'
       } else if (apiProvider === 'poe') {
         endpoint = 'https://api.poe.com/v1/chat/completions'
+      } else if (apiProvider === 'dashscope') {
+        endpoint = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
       }
 
       const response = await fetch(buildApiPath(adminPrefix, '/api/ai-security/test'), {
@@ -382,6 +388,7 @@ const AISecurityAnalysis: React.FC = () => {
                     >
                       <option value="openai">OpenAI 官方</option>
                       <option value="poe">POE ({t.aiSecurity.recommended})</option>
+                      <option value="dashscope">阿里云 DashScope</option>
                       <option value="azure">Azure OpenAI</option>
                       <option value="custom">自定义端点</option>
                     </Select>
@@ -402,6 +409,10 @@ const AISecurityAnalysis: React.FC = () => {
                       {' | '}
                       <Link href="https://poe.com/api_key" isExternal color="blue.500">
                         {t.aiSecurity.getPOEKey}
+                      </Link>
+                      {' | '}
+                      <Link href="https://dashscope.console.aliyun.com/apiKey" isExternal color="blue.500">
+                        {t.aiSecurity.getDashScopeKey}
                       </Link>
                     </Text>
                   </FormControl>
@@ -434,6 +445,12 @@ const AISecurityAnalysis: React.FC = () => {
                         <option value="Claude-3-Sonnet">Claude-3-Sonnet (性价比)</option>
                         <option value="Claude-3-Opus">Claude-3-Opus (最高准确度)</option>
                         <option value="GPT-3.5-Turbo">GPT-3.5-Turbo (最快)</option>
+                      </optgroup>
+                      <optgroup label="阿里云 DashScope">
+                        <option value="qwen-flash">qwen-flash (推荐)</option>
+                        <option value="qwen-plus">qwen-plus</option>
+                        <option value="qwen-max">qwen-max</option>
+                        <option value="qwen-turbo">qwen-turbo</option>
                       </optgroup>
                     </Select>
                   </FormControl>

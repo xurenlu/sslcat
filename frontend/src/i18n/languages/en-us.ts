@@ -299,6 +299,7 @@ export const enUS: Translation = {
     apiKey: 'API Key',
     getOpenAIKey: 'Get OpenAI Key',
     getPOEKey: 'Get POE Key',
+    getDashScopeKey: 'Get DashScope Key',
     apiEndpoint: 'API Endpoint',
     model: 'Analysis Model',
     checkInterval: 'Check Interval',

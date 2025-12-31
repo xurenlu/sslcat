@@ -295,6 +295,7 @@ export const zhCN: Translation = {
     apiKey: 'API Key',
     getOpenAIKey: '获取 OpenAI Key',
     getPOEKey: '获取 POE Key',
+    getDashScopeKey: '获取 DashScope Key',
     apiEndpoint: 'API 端点',
     model: '分析模型',
     checkInterval: '检查间隔',
