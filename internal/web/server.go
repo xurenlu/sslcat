@@ -1081,7 +1081,6 @@ func (s *Server) setupRoutes() {
 	// 记录机器人 API 前缀到日志（仅启动时记录一次）
 	s.log.Infof("Bot Detection API prefix: %s", botAPIPrefix)
 
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/unblock", s.handleAPISecurityUnblock)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/static-sites", s.handleAPIStaticSites)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/static-sites/delete", s.handleAPIStaticSitesDelete)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/static-sites/rename", s.handleAPIStaticSitesRename)
