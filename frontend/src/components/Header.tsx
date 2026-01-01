@@ -74,7 +74,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
       '/statistics': () => t.statistics.title,
       '/monitoring': () => t.monitoring.title,
       '/slow-requests': () => t.slowRequests.title,
-      '/cluster': () => t.clusterSettings.title,
+      '/cluster': () => t.cluster.title,
       '/cluster/status': () => t.clusterStatus.title,
       '/ai-security': () => t.aiSecurity.title,
       '/image-optimization': () => t.imageOptimization.title,
