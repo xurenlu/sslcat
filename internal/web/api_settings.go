@@ -426,37 +426,3 @@ func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) 
 		"updated_at":  time.Now().Format("2006-01-02 15:04:05"),
 	}, "基础设置保存成功")
 }
-
-// handleAPISecurityUnblock 解除IP封禁
-func (s *Server) handleAPISecurityUnblock(w http.ResponseWriter, r *http.Request) {
-	if !s.authorizeAPI(w, r, false) { // 需要写权限
-		return
-	}
-
-	if r.Method != "POST" {
-		s.writeErrorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
-		return
-	}
-
-	var req struct {
-		IP string `json:"ip"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		s.writeErrorResponse(w, http.StatusBadRequest, "Invalid JSON format")
-		return
-	}
-
-	if req.IP == "" {
-		s.writeErrorResponse(w, http.StatusBadRequest, "IP address is required")
-		return
-	}
-
-	// 解除封禁
-	s.securityManager.UnblockIP(req.IP)
-
-	s.writeSuccessResponse(w, map[string]interface{}{
-		"ip":           req.IP,
-		"unblocked_at": time.Now().Format("2006-01-02 15:04:05"),
-	}, "IP address unblocked successfully")
-}
