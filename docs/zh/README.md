@@ -61,7 +61,16 @@
 - [静态构建器Nginx](development/static-builder-nginx.md) - 静态构建器Nginx
 - [贡献指南](development/contributing.md) - 开发贡献指南
 
-### 第十部分：参考
+### 第十部分：安全功能
+- [安全功能总览](security/README.md) - 安全功能导航
+- [WAF 概述](security/waf-overview.md) - Web 应用防火墙
+- [WAF 多维度封禁](security/waf-multi-dim-blocking.md) - 多维度封禁策略
+- [WAF 频率限制](security/waf-rate-limiting.md) - 频率限制功能
+- [封禁管理](security/blocking-management.md) - IP 和 User-Agent 封禁
+- [威胁检测](security/threat-detection.md) - 威胁情报和机器人检测
+- [扫描器检测](security/scanner-detection.md) - 漏洞扫描器检测
+
+### 第十一部分：参考
 - [配置参考](reference/configuration-reference.md) - 完整配置选项
 
 ## 🚀 快速导航
@@ -75,6 +84,7 @@
 1. 查看[管理](administration/)部分
 2. 检查[部署](deployment/)指南
 3. 了解[监控](features/monitoring.md)
+4. 配置[安全功能](security/README.md)
 
 ### 开发者
 1. 探索[集成](integration/)指南

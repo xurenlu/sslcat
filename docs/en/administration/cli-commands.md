@@ -255,7 +255,91 @@ sslcat ssl delete -domain example.com
 
 ---
 
-### 4. Help Command (`help`)
+### 4. Blocking Management (`block`)
+
+Blocking management commands are used to manually block and unblock IP addresses or User-Agents.
+
+#### Block IP or User-Agent
+
+```bash
+# Block IP (default 24 hours)
+sslcat block ip 192.168.1.100
+
+# Block IP with specified duration
+sslcat block ip 192.168.1.100 -duration 1h
+sslcat block ip 192.168.1.100 -duration 7d
+sslcat block ip 192.168.1.100 -duration 0  # Permanent
+
+# Block IP with reason
+sslcat block ip 192.168.1.100 -reason "Malicious scanning"
+
+# Block User-Agent
+sslcat block user-agent "bad-bot/1.0" -duration 24h -reason "Malicious crawler"
+
+# Can also use ua as shorthand for user-agent
+sslcat block ua "bad-bot/1.0" -duration 24h
+```
+
+**Parameters:**
+- `ip <ip>` - IP address to block
+- `user-agent <ua>` or `ua <ua>` - User-Agent to block
+- `-duration <duration>` - Block duration: `1h` (1 hour), `24h` (24 hours), `7d` (7 days), `0` (permanent)
+- `-reason <reason>` - Block reason (optional)
+
+**Notes:**
+- Blocking takes effect immediately
+- IP blocking applies to both Security Manager and WAF
+- User-Agent blocking applies to Security Manager
+
+#### Unblock IP or User-Agent
+
+```bash
+# Unblock IP
+sslcat unblock ip 192.168.1.100
+
+# Unblock User-Agent
+sslcat unblock user-agent "bad-bot/1.0"
+
+# Can also use ua as shorthand
+sslcat unblock ua "bad-bot/1.0"
+```
+
+**Notes:**
+- Unblocking takes effect immediately
+- Unblocking IP removes blocks from both Security Manager and WAF
+- Unblocking User-Agent removes blocks from Security Manager
+
+#### View Block List
+
+```bash
+# View all blocked IPs and User-Agents
+sslcat blocked
+```
+
+**Example Output:**
+```
+Blocked IPs:
+============
+  IP: 192.168.1.100
+    Reason: Malicious scanning
+    Blocked at: 2025-01-29 10:30:00
+    Expires at: 2025-01-30 10:30:00
+
+Blocked User-Agents:
+====================
+  User-Agent: bad-bot/1.0
+    Reason: Malicious crawler
+    Blocked at: 2025-01-29 09:15:00
+    Expires at: 2025-01-30 09:15:00
+```
+
+**Related Documentation:**
+- [Blocking Management](../security/blocking-management.md) - Complete blocking management documentation
+- [WAF Multi-Dimensional Blocking](../security/waf-multi-dim-blocking.md) - WAF multi-dimensional blocking feature
+
+---
+
+### 5. Help Command (`help`)
 
 Display help information for all available commands.
 
@@ -515,6 +599,7 @@ tail -f /var/log/sslcat/sslcat.log
 
 - [User Management](user-management.md)
 - [Web Interface](web-interface.md)
+- [Blocking Management](../security/blocking-management.md) - Blocking management feature details
 - [Configuration Reference](../reference/configuration-reference.md)
 - [Troubleshooting](../troubleshooting/common-issues.md)
 - [Quick Start](../getting-started/quick-start.md)

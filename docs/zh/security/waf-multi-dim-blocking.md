@@ -540,7 +540,7 @@ WAF 多维度封禁：已解除 IP 192.168.1.100 的封禁
 
 ## 相关文档
 
-- [WAF 频率限制功能](./WAF_RATE_LIMITING.md)
-- [WAF 事件统计修复](./WAF_EVENT_TRACKING_FIX.md)
-- [按域名配置 WAF](./WAF_DOMAIN_CONFIG.md)
+- [WAF 频率限制功能](waf-rate-limiting.md)
+- [WAF 概述](waf-overview.md)
+- [封禁管理](blocking-management.md)
 

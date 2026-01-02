@@ -366,6 +366,7 @@ func (e *Engine) initDefaultRules() {
 		{"Zmap Scanner", `(?i)zmap`},
 		{"Shodan Scanner", `(?i)Shodan`},
 		{"Censys Scanner", `(?i)Censys`},
+		{"LeakIX Scanner", `(?i)leakix`},
 	}
 
 	for i, rule := range scannerRules {

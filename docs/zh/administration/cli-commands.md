@@ -255,7 +255,91 @@ sslcat ssl delete -domain example.com
 
 ---
 
-### 4. 帮助命令 (`help`)
+### 4. 封禁管理 (`block`)
+
+封禁管理命令用于手动封禁和解封 IP 地址或 User-Agent。
+
+#### 封禁 IP 或 User-Agent
+
+```bash
+# 封禁 IP（默认 24 小时）
+sslcat block ip 192.168.1.100
+
+# 封禁 IP，指定时长
+sslcat block ip 192.168.1.100 -duration 1h
+sslcat block ip 192.168.1.100 -duration 7d
+sslcat block ip 192.168.1.100 -duration 0  # 永久封禁
+
+# 封禁 IP，指定原因
+sslcat block ip 192.168.1.100 -reason "恶意扫描"
+
+# 封禁 User-Agent
+sslcat block user-agent "bad-bot/1.0" -duration 24h -reason "恶意爬虫"
+
+# 也可以使用 ua 作为 user-agent 的简写
+sslcat block ua "bad-bot/1.0" -duration 24h
+```
+
+**参数说明：**
+- `ip <ip>` - 要封禁的 IP 地址
+- `user-agent <ua>` 或 `ua <ua>` - 要封禁的 User-Agent
+- `-duration <duration>` - 封禁时长：`1h`（1小时）、`24h`（24小时）、`7d`（7天）、`0`（永久）
+- `-reason <reason>` - 封禁原因（可选）
+
+**注意事项：**
+- 封禁操作会立即生效
+- IP 封禁会同时应用到 Security Manager 和 WAF
+- User-Agent 封禁会应用到 Security Manager
+
+#### 解封 IP 或 User-Agent
+
+```bash
+# 解封 IP
+sslcat unblock ip 192.168.1.100
+
+# 解封 User-Agent
+sslcat unblock user-agent "bad-bot/1.0"
+
+# 也可以使用 ua 作为 user-agent 的简写
+sslcat unblock ua "bad-bot/1.0"
+```
+
+**注意事项：**
+- 解封操作会立即生效
+- 解封 IP 会同时解除 Security Manager 和 WAF 的封禁
+- 解封 User-Agent 会解除 Security Manager 的封禁
+
+#### 查看封禁列表
+
+```bash
+# 查看所有被封禁的 IP 和 User-Agent
+sslcat blocked
+```
+
+**输出示例：**
+```
+Blocked IPs:
+============
+  IP: 192.168.1.100
+    Reason: 恶意扫描
+    Blocked at: 2025-01-29 10:30:00
+    Expires at: 2025-01-30 10:30:00
+
+Blocked User-Agents:
+====================
+  User-Agent: bad-bot/1.0
+    Reason: 恶意爬虫
+    Blocked at: 2025-01-29 09:15:00
+    Expires at: 2025-01-30 09:15:00
+```
+
+**相关文档：**
+- [封禁管理](../security/blocking-management.md) - 完整的封禁管理文档
+- [WAF 多维度封禁](../security/waf-multi-dim-blocking.md) - WAF 多维度封禁功能
+
+---
+
+### 5. 帮助命令 (`help`)
 
 显示所有可用命令的帮助信息。
 
@@ -515,6 +599,7 @@ tail -f /var/log/sslcat/sslcat.log
 
 - [用户管理](user-management.md)
 - [Web 界面](web-interface.md)
+- [封禁管理](../security/blocking-management.md) - 封禁管理功能详解
 - [配置参考](../reference/configuration-reference.md)
 - [故障排查](../troubleshooting/common-issues.md)
 - [快速开始](../getting-started/quick-start.md)

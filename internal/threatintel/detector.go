@@ -145,6 +145,7 @@ func (td *ThreatDetector) checkUserAgent(userAgent string) *DetectionResult {
 		"havij", "pangolin", "sqlninja", "sqlsus",
 		"sqldumper", "sqlbf", "sqlmap", "sqliv",
 		"havij", "pangolin", "sqlninja", "sqlsus",
+		"leakix",
 	}
 
 	userAgentLower := strings.ToLower(userAgent)

@@ -460,7 +460,7 @@ func (dc *DataCollector) isSuspiciousUA(ua string) bool {
 		"bot", "crawler", "spider", "scraper", "scan",
 		"hack", "attack", "exploit", "injection",
 		"python", "curl", "wget", "masscan", "nmap",
-		"sqlmap", "nikto", "dirbuster", "burp",
+		"sqlmap", "nikto", "dirbuster", "burp", "leakix",
 	}
 
 	uaLower := ua

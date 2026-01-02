@@ -53,7 +53,16 @@ Welcome to the comprehensive documentation for SSLcat - the enterprise-grade SSL
 - [Builder Architecture](development/builder-architecture.md) - Builder architecture documentation
 - [Contributing](development/contributing.md) - How to contribute
 
-### Part X: Reference
+### Part X: Security Features
+- [Security Features Overview](security/README.md) - Security features navigation
+- [WAF Overview](security/waf-overview.md) - Web Application Firewall
+- [WAF Multi-Dimensional Blocking](security/waf-multi-dim-blocking.md) - Multi-dimensional blocking strategy
+- [WAF Rate Limiting](security/waf-rate-limiting.md) - Rate limiting feature
+- [Blocking Management](security/blocking-management.md) - IP and User-Agent blocking
+- [Threat Detection](security/threat-detection.md) - Threat intelligence and bot detection
+- [Scanner Detection](security/scanner-detection.md) - Vulnerability scanner detection
+
+### Part XI: Reference
 - [Configuration Reference](reference/configuration-reference.md) - Complete config options
 - [API Reference](reference/api-reference.md) - REST API
 
@@ -68,6 +77,7 @@ Welcome to the comprehensive documentation for SSLcat - the enterprise-grade SSL
 1. Review [Administration](administration/) section
 2. Check [Deployment](deployment/) guides
 3. Learn about [Monitoring](features/monitoring.md)
+4. Configure [Security Features](security/README.md)
 
 ### For Developers
 1. Explore [Integration](integration/) guides

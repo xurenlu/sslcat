@@ -304,7 +304,7 @@ type wafRateLimiter struct {
 
 ## 相关文档
 
-- [WAF 配置指南](./WAF_CONFIG.md)
-- [WAF 事件统计修复](./WAF_EVENT_TRACKING_FIX.md)
-- [按域名配置 WAF](./WAF_DOMAIN_CONFIG.md)
+- [WAF 多维度封禁](waf-multi-dim-blocking.md)
+- [WAF 概述](waf-overview.md)
+- [封禁管理](blocking-management.md)
 
