@@ -330,6 +330,11 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		server.ddosProtector.SetSecurityManager(secMgr)
 	}
 
+	// 从配置读取5分钟阈值并设置到 DDoS 防护器
+	if server.config.Security.MaxAttempts5Min > 0 {
+		server.ddosProtector.SetCustomRequestsPer5Minutes(server.config.Security.MaxAttempts5Min)
+	}
+
 	// 初始化机器人检测组件
 	botDBPath := filepath.Join(dataDir, "bot_detection.db")
 	botWhitelistMgr, err := bot.NewWhitelistManager(logrus.StandardLogger(), botDBPath)

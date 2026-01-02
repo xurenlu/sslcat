@@ -96,6 +96,8 @@ type Protector struct {
 
 	// 防护阈值
 	thresholds map[ProtectionLevel]ThresholdConfig
+	// 自定义5分钟阈值（如果设置，会覆盖当前级别的阈值）
+	customRequestsPer5Minutes int
 
 	log *logrus.Entry
 	// 持久化轮转
@@ -121,12 +123,13 @@ type Protector struct {
 
 // ThresholdConfig 阈值配置
 type ThresholdConfig struct {
-	RequestsPerMinute int           `json:"requests_per_minute"`
-	RequestsPerHour   int           `json:"requests_per_hour"`
-	BlockDuration     time.Duration `json:"block_duration"`
-	SuspiciousUA      bool          `json:"suspicious_ua"`
-	GeoBlocking       bool          `json:"geo_blocking"`
-	ChallengeMode     bool          `json:"challenge_mode"`
+	RequestsPerMinute   int           `json:"requests_per_minute"`
+	RequestsPer5Minutes int           `json:"requests_per_5minutes"` // 5分钟窗口阈值（优先使用）
+	RequestsPerHour     int           `json:"requests_per_hour"`
+	BlockDuration       time.Duration `json:"block_duration"`
+	SuspiciousUA        bool          `json:"suspicious_ua"`
+	GeoBlocking         bool          `json:"geo_blocking"`
+	ChallengeMode       bool          `json:"challenge_mode"`
 }
 
 // NewProtector 创建DDoS防护器
@@ -304,12 +307,20 @@ func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
 
 	// 获取当前阈值配置
 	threshold := p.thresholds[p.level]
+	
+	// 如果设置了自定义5分钟阈值，使用自定义值
+	if p.customRequestsPer5Minutes > 0 {
+		threshold.RequestsPer5Minutes = p.customRequestsPer5Minutes
+	}
 
 	// 对静态资源路径放宽限制（提高阈值）
 	isStaticResource := p.isStaticResourcePath(r.URL.Path)
 	if isStaticResource {
 		// 对于静态资源，阈值提高5倍
 		threshold.RequestsPerMinute *= 5
+		if threshold.RequestsPer5Minutes > 0 {
+			threshold.RequestsPer5Minutes *= 5
+		}
 		threshold.RequestsPerHour *= 5
 	}
 
@@ -470,8 +481,26 @@ func (p *Protector) isStaticResourcePath(urlPath string) bool {
 
 // checkRateLimit 检查请求频率限制
 func (p *Protector) checkRateLimit(client *ClientInfo, threshold ThresholdConfig, now time.Time) (bool, string) {
-	// 检查每分钟请求数 - 使用真正的滑动窗口统计
-	if threshold.RequestsPerMinute > 0 {
+	// 优先检查5分钟窗口（如果设置了）
+	if threshold.RequestsPer5Minutes > 0 {
+		fiveMinutesAgo := now.Add(-5 * time.Minute)
+
+		// 统计最近5分钟内的实际请求数
+		requestsInLast5Minutes := 0
+		for _, ts := range client.RequestTimestamps {
+			if ts.After(fiveMinutesAgo) {
+				requestsInLast5Minutes++
+			}
+		}
+
+		// 只有当最近5分钟的请求数超过阈值时才拦截
+		if requestsInLast5Minutes > threshold.RequestsPer5Minutes {
+			return true, fmt.Sprintf("5分钟内请求数超限: %d > %d", requestsInLast5Minutes, threshold.RequestsPer5Minutes)
+		}
+	}
+
+	// 检查每分钟请求数 - 使用真正的滑动窗口统计（仅在未设置5分钟阈值时使用）
+	if threshold.RequestsPerMinute > 0 && threshold.RequestsPer5Minutes == 0 {
 		minuteAgo := now.Add(-time.Minute)
 
 		// 统计最近1分钟内的实际请求数
@@ -854,6 +883,19 @@ func (p *Protector) SetLevel(level ProtectionLevel) {
 
 	p.level = level
 	p.log.Infof("DDoS防护级别已设置为: %s", level.String())
+}
+
+// SetCustomRequestsPer5Minutes 设置自定义5分钟阈值（会覆盖当前级别的阈值）
+func (p *Protector) SetCustomRequestsPer5Minutes(maxRequests int) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	p.customRequestsPer5Minutes = maxRequests
+	if maxRequests > 0 {
+		p.log.Infof("DDoS防护自定义5分钟阈值已设置为: %d", maxRequests)
+	} else {
+		p.log.Infof("DDoS防护自定义5分钟阈值已清除，将使用级别默认值")
+	}
 }
 
 // GetStats 获取统计信息

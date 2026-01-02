@@ -344,6 +344,10 @@ func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) 
 	if req.MaxRequestsPerMinute != "" {
 		if maxReq, err := strconv.Atoi(req.MaxRequestsPerMinute); err == nil && maxReq > 0 {
 			s.config.Security.MaxAttempts5Min = maxReq
+			// 同步更新 DDoS 防护器的阈值
+			if s.ddosProtector != nil {
+				s.ddosProtector.SetCustomRequestsPer5Minutes(maxReq)
+			}
 		}
 	}
 
