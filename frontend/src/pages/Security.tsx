@@ -122,9 +122,16 @@ const Security: React.FC = () => {
 
       if (logsResponse.ok) {
         const logsData = await logsResponse.json()
-        // 模拟统计信息
-        const totalEvents = logsData.logs ? logsData.logs.length : 0
-        const blockedIPs = logsData.logs ? logsData.logs.filter((log: any) => !log.success).length : 0
+        
+        // 先过滤出需要显示的安全事件（WAF 事件或被阻止的访问）
+        const securityEvents = logsData.logs ? logsData.logs.filter((log: any) => {
+          // 显示 WAF 事件或被阻止的访问
+          return log.type === 'waf' || !log.success
+        }) : []
+        
+        // 统计信息 - 使用过滤后的事件数量，与列表保持一致
+        const totalEvents = securityEvents.length
+        const blockedIPs = securityEvents.filter((log: any) => !log.success).length
         const activeThreats = Math.floor(blockedIPs * 0.1) // 模拟活跃威胁数量
         
         setStats({
@@ -135,11 +142,7 @@ const Security: React.FC = () => {
         })
         
         // 转换日志为事件格式 - 只显示有风险、可疑的事件
-        const events = logsData.logs ? logsData.logs
-          .filter((log: any) => {
-            // 显示 WAF 事件或被阻止的访问
-            return log.type === 'waf' || !log.success
-          })
+        const events = securityEvents
           .slice(0, 100) // 增加显示数量
           .map((log: any, index: number) => {
             // 根据日志类型生成描述
@@ -172,7 +175,7 @@ const Security: React.FC = () => {
               timestamp: new Date(log.timestamp).toLocaleString('zh-CN'),
               blocked: log.blocked !== undefined ? log.blocked : !log.success,
             }
-          }) : []
+          })
         
         setEvents(events)
       } else {
