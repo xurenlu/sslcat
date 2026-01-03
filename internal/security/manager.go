@@ -140,6 +140,53 @@ func NewManager(cfg *config.Config) *Manager {
 	}
 }
 
+// GetName 获取组件名称
+func (m *Manager) GetName() string {
+	return "SecurityManager"
+}
+
+// Reload 重载安全管理器配置
+func (m *Manager) Reload(newConfig *config.Config) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	m.log.Info("Reloading security manager configuration")
+	m.config = newConfig
+
+	// 重新初始化 CORS 中间件
+	corsConfig := CORSConfig{
+		Enabled:             newConfig.Security.CORS.Enabled,
+		AllowedOrigins:      newConfig.Security.CORS.AllowedOrigins,
+		AllowedMethods:      newConfig.Security.CORS.AllowedMethods,
+		AllowedHeaders:      newConfig.Security.CORS.AllowedHeaders,
+		ExposedHeaders:      newConfig.Security.CORS.ExposedHeaders,
+		AllowCredentials:    newConfig.Security.CORS.AllowCredentials,
+		MaxAge:              newConfig.Security.CORS.MaxAge,
+		AllowPrivateNetwork: newConfig.Security.CORS.AllowPrivateNetwork,
+	}
+	m.corsMiddleware = NewCORSMiddleware(corsConfig)
+
+	// 更新内存泄漏防护设置
+	m.maxAccessLogEntries = newConfig.Security.MaxAccessLogEntries
+	m.maxBlockedIPs = newConfig.Security.MaxBlockedIPs
+	m.maxAttemptCounts = newConfig.Security.MaxAttemptCounts
+	m.maxLastAttempts = newConfig.Security.MaxLastAttempts
+	m.maxUAInvalidEntries = newConfig.Security.UAInvalidMaxTotal
+	m.maxTLSFPEntries = newConfig.Security.TLSFingerprintMaxTotal
+
+	if newConfig.Security.CleanupIntervalMin > 0 {
+		m.cleanupInterval = time.Duration(newConfig.Security.CleanupIntervalMin) * time.Minute
+	}
+
+	return nil
+}
+
+// Validate 验证配置是否适用于此组件
+func (m *Manager) Validate(newConfig *config.Config) error {
+	// 基本验证已经在 config.Validate() 中完成
+	return nil
+}
+
 // Start 启动安全管理器
 func (m *Manager) Start() {
 	m.log.Info("Starting security manager")

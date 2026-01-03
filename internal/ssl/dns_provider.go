@@ -43,6 +43,13 @@ func (m *DNSProviderManager) UnregisterProvider(name string) {
 	}
 }
 
+// ClearProviders 清空所有DNS服务商
+func (m *DNSProviderManager) ClearProviders() {
+	m.providers = make(map[string]DNSProviderInterface)
+	m.priorities = make(map[string]int)
+	m.log.Infof("Cleared all DNS providers")
+}
+
 // GetProvider 获取指定的DNS服务商
 func (m *DNSProviderManager) GetProvider(name string) (DNSProviderInterface, error) {
 	provider, exists := m.providers[name]

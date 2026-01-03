@@ -37,7 +37,7 @@ import (
 )
 
 var (
-	version = "1.3.32-rc5"
+	version = "1.3.32-rc6"
 	build   = "dev"
 )
 
@@ -351,7 +351,9 @@ func main() {
 
 	// 注册可重载组件
 	reloadManager.RegisterComponent(proxyManager)
-	// 注意：其他组件（如sslManager, securityManager）也需要实现ReloadableComponent接口才能注册
+	reloadManager.RegisterComponent(sslManager)
+	reloadManager.RegisterComponent(securityManager)
+	// 注意：其他组件（如 gitServer 等）如果需要热重载，也需要实现 ReloadableComponent 接口并在此注册
 
 	// 用于记录配置重载开始时间
 	var reloadStartTime time.Time

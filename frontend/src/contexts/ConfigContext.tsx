@@ -199,10 +199,23 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
       // 1. 最高优先级：从当前URL检测前缀
       const urlPrefix = detectPrefixFromURL()
       
-      // 如果从 URL 检测到了前缀，直接使用（最可靠的来源）
+      // 如果从 URL 检测到了前缀，尝试使用它并验证版本
       if (urlPrefix) {
-        console.log('从 URL 检测到 admin prefix:', urlPrefix, '直接使用')
+        console.log('从 URL 检测到 admin prefix:', urlPrefix, '尝试验证...')
         updatePrefix(urlPrefix)
+        
+        try {
+          const validation = await validatePrefix(urlPrefix)
+          if (validation.valid) {
+            console.log('URL 前缀验证成功')
+            if (validation.version) {
+              setVersion(validation.version)
+            }
+          }
+        } catch (error) {
+          console.warn('URL 前缀验证失败:', error)
+        }
+        
         setIsLoading(false)
         return
       }

@@ -2536,6 +2536,40 @@ func (m *Manager) performDNSChallenge(domain, providerName string) error {
 	return nil
 }
 
+// GetName 获取组件名称
+func (m *Manager) GetName() string {
+	return "SSLManager"
+}
+
+// Reload 重载 SSL 管理器配置
+func (m *Manager) Reload(newConfig *config.Config) error {
+	m.log.Info("Reloading SSL manager configuration")
+	
+	// 更新配置引用
+	m.config = newConfig
+	
+	// 清空旧的 DNS 提供商并重新初始化
+	if m.dnsManager != nil {
+		m.dnsManager.ClearProviders()
+	}
+	m.initializeDNSProviders()
+	
+	// 如果配置了 Email，重新启用/更新 ACME
+	if strings.TrimSpace(newConfig.SSL.Email) != "" {
+		if err := m.EnableACME(); err != nil {
+			m.log.Warnf("Failed to reload ACME configuration: %v", err)
+		}
+	}
+	
+	return nil
+}
+
+// Validate 验证配置是否适用于此组件
+func (m *Manager) Validate(newConfig *config.Config) error {
+	// 基本验证已经在 config.Validate() 中完成
+	return nil
+}
+
 // supportsDNSChallenge 检查是否支持DNS验证
 func (m *Manager) supportsDNSChallenge() bool {
 	// 如果明确配置了 challenge_methods，检查是否包含 dns-01
