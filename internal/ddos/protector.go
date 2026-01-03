@@ -1124,17 +1124,19 @@ func (p *Protector) detectGlobalAttack() {
 	}
 	
 	// 检测大规模攻击的指标
-	// 1. 最近1分钟内超过50次攻击
+	// 主要关注被封禁的攻击，这才是真正的DDoS攻击
+	// 1. 最近1分钟内超过500次被封禁的攻击（提高阈值，避免误报）
 	// 2. 最近1分钟内超过20个不同IP被封禁
 	// 3. 当前被封禁的IP超过100个
 	isLargeScaleAttack := false
 	attackSeverity := "medium"
 	
-	if recentAttacks >= 50 || len(recentBlockedIPs) >= 20 || currentBlockedCount >= 100 {
+	// 优先使用被封禁的攻击数和被封禁的IP数作为判断标准
+	if recentBlockedAttacks >= 500 || len(recentBlockedIPs) >= 20 || currentBlockedCount >= 100 {
 		isLargeScaleAttack = true
-		if recentAttacks >= 200 || len(recentBlockedIPs) >= 50 || currentBlockedCount >= 500 {
+		if recentBlockedAttacks >= 2000 || len(recentBlockedIPs) >= 50 || currentBlockedCount >= 500 {
 			attackSeverity = "critical"
-		} else if recentAttacks >= 100 || len(recentBlockedIPs) >= 30 || currentBlockedCount >= 200 {
+		} else if recentBlockedAttacks >= 1000 || len(recentBlockedIPs) >= 30 || currentBlockedCount >= 200 {
 			attackSeverity = "high"
 		}
 	}
@@ -1152,16 +1154,16 @@ func (p *Protector) detectGlobalAttack() {
 					ClientIP:  "multiple",
 					UserAgent: "DDoS Attack",
 					URL:       "global",
-					Reason:    fmt.Sprintf("检测到大规模DDoS攻击: 最近1分钟%d次攻击, %d个IP被封禁, 当前%d个IP被封禁", 
-						recentAttacks, len(recentBlockedIPs), currentBlockedCount),
+					Reason:    fmt.Sprintf("检测到大规模DDoS攻击: 最近1分钟%d次攻击被拦截, %d个IP被封禁, 当前%d个IP被封禁", 
+						recentBlockedAttacks, len(recentBlockedIPs), currentBlockedCount),
 					Severity:  attackSeverity,
 					Blocked:   true,
 				}
 				p.notificationIntegrator.SendDDoSAttackNotification(attackInfo)
 			}
 			
-			p.log.Warnf("🚨 检测到大规模DDoS攻击！最近1分钟: %d次攻击, %d个IP被封禁, 当前%d个IP被封禁, 严重程度: %s",
-				recentAttacks, len(recentBlockedIPs), currentBlockedCount, attackSeverity)
+			p.log.Warnf("🚨 检测到大规模DDoS攻击！最近1分钟: %d次攻击被拦截, %d个IP被封禁, 当前%d个IP被封禁, 严重程度: %s",
+				recentBlockedAttacks, len(recentBlockedIPs), currentBlockedCount, attackSeverity)
 			
 			// 自动应对措施
 			if p.autoEscalateEnabled {
