@@ -328,6 +328,10 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	// 将 Security Manager 设置到 DDoS 防护器（用于统一封禁管理）
 	if secMgr != nil {
 		server.ddosProtector.SetSecurityManager(secMgr)
+		// 设置 WAF 白名单检查器
+		if server.wafEngine != nil && server.wafEngine.Engine != nil {
+			server.wafEngine.Engine.SetWhitelistChecker(secMgr.IsWhitelisted)
+		}
 	}
 
 	// 从配置读取5分钟阈值并设置到 DDoS 防护器
@@ -1062,6 +1066,9 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/blocked-list", s.handleAPISecurityBlockedList)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/block", s.handleAPISecurityBlock)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/unblock", s.handleAPISecurityUnblock)
+	// 白名单管理 API
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/whitelist", s.handleAPISecurityWhitelist)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/whitelist/delete", s.handleAPISecurityWhitelistDelete)
 	
 	// DDoS 攻击统计和监控 API
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/ddos-stats", s.handleAPIDDoSStats)
@@ -1414,18 +1421,23 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// WAF 检测（开启时才生效，支持按域名配置）
-	wafEnabled := s.config.Security.EnableWAF
-	// 检查是否有域名级别的 WAF 配置
-	if rule := s.proxyManager.FindRuleByDomain(r.Host); rule != nil && rule.WAFEnabled != nil {
-		wafEnabled = *rule.WAFEnabled
-	}
-	
-	if wafEnabled && s.wafEngine != nil {
-		// 提取 TLS 指纹
-		tlsFingerprint := s.extractTLSFingerprint(r)
+	// 先检查白名单，白名单中的IP跳过WAF检查
+	clientIP := s.getClientIP(r)
+	if s.securityManager != nil && s.securityManager.IsWhitelisted(clientIP) {
+		// 白名单IP跳过WAF检查，继续处理请求
+	} else {
+		wafEnabled := s.config.Security.EnableWAF
+		// 检查是否有域名级别的 WAF 配置
+		if rule := s.proxyManager.FindRuleByDomain(r.Host); rule != nil && rule.WAFEnabled != nil {
+			wafEnabled = *rule.WAFEnabled
+		}
 		
-		// 使用带 TLS 指纹的检查方法
-		if events, blocked := s.wafEngine.CheckRequestAdvancedWithTLS(r, tlsFingerprint); blocked {
+		if wafEnabled && s.wafEngine != nil {
+			// 提取 TLS 指纹
+			tlsFingerprint := s.extractTLSFingerprint(r)
+			
+			// 使用带 TLS 指纹的检查方法
+			if events, blocked := s.wafEngine.CheckRequestAdvancedWithTLS(r, tlsFingerprint); blocked {
 			s.log.Warnf("WAF blocked request from %s to %s: %d events detected", s.getClientIP(r), r.Host, len(events))
 			
 			// 构建详细的拦截页面
@@ -1486,6 +1498,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		} else if len(events) > 0 {
 			s.log.Infof("WAF detected %d security events from %s to %s", len(events), s.getClientIP(r), r.Host)
+		}
 		}
 	}
 
@@ -1595,6 +1608,13 @@ func (s *Server) securityMiddleware(w http.ResponseWriter, r *http.Request) bool
 	clientIP := s.getClientIP(r)
 	userAgent := r.Header.Get("User-Agent")
 	path := r.URL.Path
+
+	// 先检查白名单，白名单中的IP永远不会被封禁
+	if s.securityManager != nil && s.securityManager.IsWhitelisted(clientIP) {
+		// 白名单IP直接通过，跳过所有封禁检查
+		s.securityManager.LogAccess(clientIP, userAgent, path, true)
+		return true
+	}
 
 	// 检查是否被封禁
 	if s.securityManager.IsBlocked(clientIP) {

@@ -50,6 +50,14 @@ type BlockedUserAgent struct {
 	ExpireTime time.Time `json:"expire_time"`
 }
 
+// WhitelistEntry IP白名单条目
+type WhitelistEntry struct {
+	Value       string    `json:"value"`        // IP或CIDR（如 "192.168.1.1" 或 "192.168.1.0/24"）
+	Description string    `json:"description"`  // 描述信息（可选）
+	CreatedAt   time.Time `json:"created_at"`   // 创建时间
+	UpdatedAt   time.Time `json:"updated_at"`   // 更新时间
+}
+
 // Manager 安全管理器
 type Manager struct {
 	config        *config.Config
@@ -73,6 +81,9 @@ type Manager struct {
 	tlsFPRotator *logger.Rotator
 	geoIPService *GeoIPService
 	corsMiddleware *CORSMiddleware
+
+	// IP白名单
+	whitelistEntries map[string]WhitelistEntry // value -> WhitelistEntry
 
 	// 内存泄漏防护
 	maxAccessLogEntries int // 每个IP的访问日志最多保留多少条
@@ -126,6 +137,7 @@ func NewManager(cfg *config.Config) *Manager {
 		stopChan:              make(chan struct{}),
 		geoIPService:          geoIPService,
 		corsMiddleware:        corsMiddleware,
+		whitelistEntries:      make(map[string]WhitelistEntry),
 		log: logrus.WithFields(logrus.Fields{
 			"component": "security_manager",
 		}),
@@ -194,6 +206,9 @@ func (m *Manager) Start() {
 	// 加载被封禁的IP列表
 	m.loadBlockedIPs()
 
+	// 加载IP白名单
+	m.loadWhitelist()
+
 	// 启动清理任务
 	go m.cleanupTask()
 
@@ -230,6 +245,11 @@ func (m *Manager) AccessLogsSnapshot() map[string][]AccessLog {
 
 // IsBlocked 检查IP是否被封禁
 func (m *Manager) IsBlocked(ip string) bool {
+	// 先检查白名单，白名单中的IP永远不会被封禁
+	if m.IsWhitelisted(ip) {
+		return false
+	}
+
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
@@ -477,6 +497,12 @@ func (m *Manager) checkAndBlock(ip string) {
 
 // blockIP 封禁IP
 func (m *Manager) blockIP(ip, reason string) {
+	// 检查白名单，白名单中的IP不会被封禁
+	if m.IsWhitelisted(ip) {
+		m.log.Infof("Skipped blocking IP %s (in whitelist): %s", ip, reason)
+		return
+	}
+
 	blocked := BlockedIP{
 		IP:         ip,
 		Reason:     reason,
@@ -490,6 +516,12 @@ func (m *Manager) blockIP(ip, reason string) {
 
 // BlockIP 手动封禁IP（公开方法）
 func (m *Manager) BlockIP(ip string, duration time.Duration, reason string) {
+	// 检查白名单，白名单中的IP不会被封禁
+	if m.IsWhitelisted(ip) {
+		m.log.Infof("Skipped manually blocking IP %s (in whitelist): %s", ip, reason)
+		return
+	}
+
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -1242,4 +1274,302 @@ func (m *Manager) ClearTOTPOnlyLoginAttempts(ip string) {
 
 	delete(m.totpOnlyAttemptCounts, ip)
 	delete(m.totpOnlyLastAttempts, ip)
+}
+
+// getWhitelistFile 获取白名单文件路径
+func (m *Manager) getWhitelistFile() string {
+	// 使用与BlockFile相同的目录，文件名改为whitelist.json
+	blockFile := m.config.Security.BlockFile
+	dir := filepath.Dir(blockFile)
+	return filepath.Join(dir, "whitelist.json")
+}
+
+// loadWhitelist 加载IP白名单
+func (m *Manager) loadWhitelist() {
+	whitelistFile := m.getWhitelistFile()
+	if _, err := os.Stat(whitelistFile); os.IsNotExist(err) {
+		return
+	}
+
+	file, err := os.Open(whitelistFile)
+	if err != nil {
+		m.log.Errorf("Failed to open whitelist file: %v", err)
+		return
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		var entry WhitelistEntry
+		if err := json.Unmarshal(scanner.Bytes(), &entry); err != nil {
+			m.log.Errorf("Failed to parse whitelist record: %v", err)
+			continue
+		}
+
+		// 验证并规范化CIDR格式
+		normalized, err := m.parseCIDR(entry.Value)
+		if err != nil {
+			m.log.Warnf("Invalid whitelist entry %s: %v", entry.Value, err)
+			continue
+		}
+
+		entry.Value = normalized
+		m.whitelistEntries[normalized] = entry
+	}
+
+	m.log.Infof("Loaded %d whitelist entries", len(m.whitelistEntries))
+}
+
+// saveWhitelist 保存IP白名单
+func (m *Manager) saveWhitelist() {
+	whitelistFile := m.getWhitelistFile()
+
+	// 确保目录存在
+	dir := filepath.Dir(whitelistFile)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		m.log.Errorf("Failed to create whitelist file directory: %v", err)
+		return
+	}
+
+	file, err := os.Create(whitelistFile)
+	if err != nil {
+		m.log.Errorf("Failed to create whitelist file: %v", err)
+		return
+	}
+	defer file.Close()
+
+	for _, entry := range m.whitelistEntries {
+		data, err := json.Marshal(entry)
+		if err != nil {
+			m.log.Errorf("Failed to serialize whitelist record: %v", err)
+			continue
+		}
+
+		if _, err := file.Write(append(data, '\n')); err != nil {
+			m.log.Errorf("Failed to write whitelist record: %v", err)
+		}
+	}
+}
+
+// parseCIDR 解析和规范化CIDR格式
+func (m *Manager) parseCIDR(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", fmt.Errorf("empty value")
+	}
+
+	// 检查是否是单个IP地址
+	if !strings.Contains(value, "/") {
+		ip := net.ParseIP(value)
+		if ip == nil {
+			return "", fmt.Errorf("invalid IP address: %s", value)
+		}
+		// 转换为/32格式
+		if ip.To4() != nil {
+			return fmt.Sprintf("%s/32", ip.String()), nil
+		}
+		return fmt.Sprintf("%s/128", ip.String()), nil
+	}
+
+	// 验证CIDR格式
+	_, _, err := net.ParseCIDR(value)
+	if err != nil {
+		return "", fmt.Errorf("invalid CIDR format: %s, error: %v", value, err)
+	}
+
+	return value, nil
+}
+
+// IsWhitelisted 检查IP是否在白名单中
+func (m *Manager) IsWhitelisted(ip string) bool {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	if ip == "" {
+		return false
+	}
+
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil {
+		return false
+	}
+
+	// 先检查精确匹配（单个IP）
+	if _, exists := m.whitelistEntries[ip]; exists {
+		return true
+	}
+	// 检查/32和/128格式
+	if _, exists := m.whitelistEntries[fmt.Sprintf("%s/32", ip)]; exists {
+		return true
+	}
+	if _, exists := m.whitelistEntries[fmt.Sprintf("%s/128", ip)]; exists {
+		return true
+	}
+
+	// 检查CIDR网段匹配
+	for value := range m.whitelistEntries {
+		if strings.Contains(value, "/") {
+			_, network, err := net.ParseCIDR(value)
+			if err != nil {
+				continue
+			}
+			if network.Contains(parsedIP) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// AddWhitelistEntry 添加白名单条目
+func (m *Manager) AddWhitelistEntry(value, description string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	// 解析和规范化CIDR格式
+	normalized, err := m.parseCIDR(value)
+	if err != nil {
+		return fmt.Errorf("invalid IP or CIDR format: %v", err)
+	}
+
+	// 检查是否已存在
+	if _, exists := m.whitelistEntries[normalized]; exists {
+		return fmt.Errorf("whitelist entry already exists: %s", normalized)
+	}
+
+	now := time.Now()
+	entry := WhitelistEntry{
+		Value:       normalized,
+		Description: description,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	m.whitelistEntries[normalized] = entry
+	m.saveWhitelist()
+	m.log.Infof("Added whitelist entry: %s", normalized)
+
+	return nil
+}
+
+// RemoveWhitelistEntry 删除白名单条目
+func (m *Manager) RemoveWhitelistEntry(value string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	// 规范化值
+	normalized, err := m.parseCIDR(value)
+	if err != nil {
+		return fmt.Errorf("invalid IP or CIDR format: %v", err)
+	}
+
+	if _, exists := m.whitelistEntries[normalized]; !exists {
+		return fmt.Errorf("whitelist entry not found: %s", normalized)
+	}
+
+	delete(m.whitelistEntries, normalized)
+	m.saveWhitelist()
+	m.log.Infof("Removed whitelist entry: %s", normalized)
+
+	return nil
+}
+
+// UpdateWhitelistEntry 更新白名单条目
+func (m *Manager) UpdateWhitelistEntry(oldValue, newValue, description string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	// 规范化旧值
+	oldNormalized, err := m.parseCIDR(oldValue)
+	if err != nil {
+		return fmt.Errorf("invalid old IP or CIDR format: %v", err)
+	}
+
+	// 规范化新值
+	newNormalized, err := m.parseCIDR(newValue)
+	if err != nil {
+		return fmt.Errorf("invalid new IP or CIDR format: %v", err)
+	}
+
+	// 检查旧值是否存在
+	entry, exists := m.whitelistEntries[oldNormalized]
+	if !exists {
+		return fmt.Errorf("whitelist entry not found: %s", oldNormalized)
+	}
+
+	// 如果新值和旧值不同，检查新值是否已存在
+	if newNormalized != oldNormalized {
+		if _, exists := m.whitelistEntries[newNormalized]; exists {
+			return fmt.Errorf("whitelist entry already exists: %s", newNormalized)
+		}
+		// 删除旧值
+		delete(m.whitelistEntries, oldNormalized)
+	}
+
+	// 更新条目
+	entry.Value = newNormalized
+	entry.Description = description
+	entry.UpdatedAt = time.Now()
+	m.whitelistEntries[newNormalized] = entry
+
+	m.saveWhitelist()
+	m.log.Infof("Updated whitelist entry: %s -> %s", oldNormalized, newNormalized)
+
+	return nil
+}
+
+// GetWhitelistEntries 获取所有白名单条目
+func (m *Manager) GetWhitelistEntries() []WhitelistEntry {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	entries := make([]WhitelistEntry, 0, len(m.whitelistEntries))
+	for _, entry := range m.whitelistEntries {
+		entries = append(entries, entry)
+	}
+
+	// 按创建时间排序
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].CreatedAt.Before(entries[j].CreatedAt)
+	})
+
+	return entries
+}
+
+// GetCIDRType 获取CIDR类型描述
+func GetCIDRType(cidr string) string {
+	if !strings.Contains(cidr, "/") {
+		return "单个IP"
+	}
+
+	parts := strings.Split(cidr, "/")
+	if len(parts) != 2 {
+		return "其他网段"
+	}
+
+	maskStr := parts[1]
+	mask := 0
+	fmt.Sscanf(maskStr, "%d", &mask)
+
+	switch mask {
+	case 32:
+		return "单个IP"
+	case 24:
+		return "C段"
+	case 16:
+		return "B段"
+	case 8:
+		return "A段"
+	default:
+		if mask > 24 && mask < 32 {
+			return fmt.Sprintf("/%d网段", mask)
+		} else if mask > 16 && mask < 24 {
+			return fmt.Sprintf("/%d网段", mask)
+		} else if mask > 8 && mask < 16 {
+			return fmt.Sprintf("/%d网段", mask)
+		} else {
+			return fmt.Sprintf("/%d网段", mask)
+		}
+	}
 }

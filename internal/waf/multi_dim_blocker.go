@@ -72,6 +72,9 @@ type wafMultiDimBlocker struct {
 	log           *logrus.Entry
 	cleanupTicker *time.Ticker
 	stopChan      chan struct{}
+
+	// 白名单检查函数（可选）
+	whitelistChecker func(ip string) bool
 }
 
 // newWAFMultiDimBlocker 创建多维度封禁器
@@ -307,8 +310,20 @@ func (b *wafMultiDimBlocker) blockSubnet(cidr, reason string, duration time.Dura
 	b.log.Warnf("WAF 多维度封禁：IP 段 %s 已被封禁，原因：%s，到期时间：%v", cidr, reason, expireTime.Format(time.RFC3339))
 }
 
+// SetWhitelistChecker 设置白名单检查函数
+func (b *wafMultiDimBlocker) SetWhitelistChecker(checker func(ip string) bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.whitelistChecker = checker
+}
+
 // IsBlocked 检查是否被封禁
 func (b *wafMultiDimBlocker) IsBlocked(ip, tlsFingerprint string) (bool, BlockDimension, string) {
+	// 先检查白名单，白名单中的IP永远不会被封禁
+	if ip != "" && b.whitelistChecker != nil && b.whitelistChecker(ip) {
+		return false, "", ""
+	}
+
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 

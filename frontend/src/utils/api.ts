@@ -461,6 +461,37 @@ export const apiService = {
     return result
   },
   
+  // 白名单管理
+  getWhitelist: async (): Promise<any> => {
+    const result = await api.get('/security/whitelist')
+    return result
+  },
+  
+  addWhitelistEntry: async (value: string, description?: string): Promise<any> => {
+    const result = await api.post('/security/whitelist', {
+      value,
+      description: description || ''
+    })
+    return result
+  },
+  
+  updateWhitelistEntry: async (oldValue: string, newValue: string, description?: string): Promise<any> => {
+    const result = await api.put('/security/whitelist', {
+      old_value: oldValue,
+      value: newValue,
+      description: description || ''
+    })
+    return result
+  },
+  
+  removeWhitelistEntry: async (value: string): Promise<any> => {
+    // axios delete 不支持 body，使用 POST 方法删除
+    const result = await api.post('/security/whitelist/delete', {
+      value
+    })
+    return result
+  },
+  
   // 云存储检测
   detectCloudStorage: (target: string): Promise<any> => 
     api.get(`/cloud-storage/detect?target=${encodeURIComponent(target)}`),

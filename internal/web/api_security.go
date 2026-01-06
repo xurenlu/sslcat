@@ -291,3 +291,166 @@ func (s *Server) handleAPIDDoSStats(w http.ResponseWriter, r *http.Request) {
 
 	s.writeSuccessResponse(w, result, "DDoS statistics retrieved successfully")
 }
+
+// handleAPISecurityWhitelist 获取白名单列表
+func (s *Server) handleAPISecurityWhitelist(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizeAPI(w, r, true) {
+		return
+	}
+
+	if r.Method == http.MethodGet {
+		// 获取白名单列表
+		entries := s.securityManager.GetWhitelistEntries()
+		var result []map[string]interface{}
+		for _, entry := range entries {
+			result = append(result, map[string]interface{}{
+				"value":       entry.Value,
+				"description": entry.Description,
+				"created_at":  entry.CreatedAt,
+				"updated_at":  entry.UpdatedAt,
+			})
+		}
+		s.writeSuccessResponse(w, result, "Whitelist retrieved successfully")
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		// 添加白名单条目
+		if !s.authorizeAPI(w, r, false) {
+			return
+		}
+
+		var req struct {
+			Value       string `json:"value"`
+			Description string `json:"description"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, "Invalid JSON format")
+			return
+		}
+
+		if req.Value == "" {
+			s.writeErrorResponse(w, http.StatusBadRequest, "Value is required")
+			return
+		}
+
+		if err := s.securityManager.AddWhitelistEntry(req.Value, req.Description); err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("Failed to add whitelist entry: %v", err))
+			return
+		}
+
+		s.writeSuccessResponse(w, map[string]interface{}{
+			"value":       req.Value,
+			"description": req.Description,
+			"created_at":  time.Now(),
+		}, "Whitelist entry added successfully")
+		return
+	}
+
+	if r.Method == http.MethodPut {
+		// 更新白名单条目
+		if !s.authorizeAPI(w, r, false) {
+			return
+		}
+
+		var req struct {
+			OldValue    string `json:"old_value"`
+			Value       string `json:"value"`
+			Description string `json:"description"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, "Invalid JSON format")
+			return
+		}
+
+		if req.OldValue == "" || req.Value == "" {
+			s.writeErrorResponse(w, http.StatusBadRequest, "Old value and value are required")
+			return
+		}
+
+		if err := s.securityManager.UpdateWhitelistEntry(req.OldValue, req.Value, req.Description); err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("Failed to update whitelist entry: %v", err))
+			return
+		}
+
+		s.writeSuccessResponse(w, map[string]interface{}{
+			"old_value":   req.OldValue,
+			"value":       req.Value,
+			"description": req.Description,
+			"updated_at":  time.Now(),
+		}, "Whitelist entry updated successfully")
+		return
+	}
+
+	if r.Method == http.MethodDelete {
+		// 删除白名单条目
+		if !s.authorizeAPI(w, r, false) {
+			return
+		}
+
+		var req struct {
+			Value string `json:"value"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, "Invalid JSON format")
+			return
+		}
+
+		if req.Value == "" {
+			s.writeErrorResponse(w, http.StatusBadRequest, "Value is required")
+			return
+		}
+
+		if err := s.securityManager.RemoveWhitelistEntry(req.Value); err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("Failed to remove whitelist entry: %v", err))
+			return
+		}
+
+		s.writeSuccessResponse(w, map[string]interface{}{
+			"value":        req.Value,
+			"deleted_at":   time.Now().Format("2006-01-02 15:04:05"),
+		}, "Whitelist entry removed successfully")
+		return
+	}
+
+	s.writeErrorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
+}
+
+// handleAPISecurityWhitelistDelete 删除白名单条目（POST方法，因为前端axios.delete不支持body）
+func (s *Server) handleAPISecurityWhitelistDelete(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizeAPI(w, r, false) {
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		s.writeErrorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	var req struct {
+		Value string `json:"value"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, "Invalid JSON format")
+		return
+	}
+
+	if req.Value == "" {
+		s.writeErrorResponse(w, http.StatusBadRequest, "Value is required")
+		return
+	}
+
+	if err := s.securityManager.RemoveWhitelistEntry(req.Value); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("Failed to remove whitelist entry: %v", err))
+		return
+	}
+
+	s.writeSuccessResponse(w, map[string]interface{}{
+		"value":        req.Value,
+		"deleted_at":   time.Now().Format("2006-01-02 15:04:05"),
+	}, "Whitelist entry removed successfully")
+}

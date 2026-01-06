@@ -49,9 +49,11 @@ import {
   FiX,
   FiPlus,
   FiTrash2,
+  FiEdit2,
 } from 'react-icons/fi'
 import { apiService } from '../utils/api'
 import { useConfig } from '../contexts/ConfigContext'
+import { getCIDRTypeDescription, getCIDRTypeColor } from '../utils/cidr'
 
 interface BlockedIP {
   source?: string
@@ -81,6 +83,13 @@ interface BlockedListData {
   user_agents: BlockedUserAgent[]
 }
 
+interface WhitelistEntry {
+  value: string
+  description: string
+  created_at: string
+  updated_at: string
+}
+
 const BlockManagement: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [blockedData, setBlockedData] = useState<BlockedListData>({
@@ -90,7 +99,14 @@ const BlockManagement: React.FC = () => {
   })
   const { isOpen, onOpen, onClose } = useDisclosure()
   const { isOpen: isUnblockOpen, onOpen: onUnblockOpen, onClose: onUnblockClose } = useDisclosure()
+  const { isOpen: isWhitelistOpen, onOpen: onWhitelistOpen, onClose: onWhitelistClose } = useDisclosure()
+  const { isOpen: isWhitelistDeleteOpen, onOpen: onWhitelistDeleteOpen, onClose: onWhitelistDeleteClose } = useDisclosure()
   const [activeTab, setActiveTab] = useState(0)
+  const [whitelistEntries, setWhitelistEntries] = useState<WhitelistEntry[]>([])
+  const [whitelistValue, setWhitelistValue] = useState('')
+  const [whitelistDescription, setWhitelistDescription] = useState('')
+  const [editingWhitelist, setEditingWhitelist] = useState<WhitelistEntry | null>(null)
+  const [deletingWhitelistValue, setDeletingWhitelistValue] = useState('')
   const [blockType, setBlockType] = useState<'ip' | 'tls_fingerprint' | 'user_agent'>('ip')
   const [blockValue, setBlockValue] = useState('')
   const [blockDuration, setBlockDuration] = useState('24')
@@ -125,8 +141,27 @@ const BlockManagement: React.FC = () => {
     }
   }
 
+  const fetchWhitelist = async () => {
+    try {
+      const response = await apiService.getWhitelist()
+      if (response.success && response.data) {
+        setWhitelistEntries(response.data || [])
+      }
+    } catch (error) {
+      console.error('获取白名单失败:', error)
+      toast({
+        title: '获取失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+    }
+  }
+
   useEffect(() => {
     fetchBlockedList()
+    fetchWhitelist()
   }, [])
 
   const handleBlock = async () => {
@@ -225,6 +260,98 @@ const BlockManagement: React.FC = () => {
     onUnblockOpen()
   }
 
+  const openAddWhitelistModal = () => {
+    setEditingWhitelist(null)
+    setWhitelistValue('')
+    setWhitelistDescription('')
+    onWhitelistOpen()
+  }
+
+  const openEditWhitelistModal = (entry: WhitelistEntry) => {
+    setEditingWhitelist(entry)
+    setWhitelistValue(entry.value)
+    setWhitelistDescription(entry.description)
+    onWhitelistOpen()
+  }
+
+  const openDeleteWhitelistModal = (value: string) => {
+    setDeletingWhitelistValue(value)
+    onWhitelistDeleteOpen()
+  }
+
+  const handleWhitelistSubmit = async () => {
+    if (!whitelistValue.trim()) {
+      toast({
+        title: '请输入IP地址或CIDR网段',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      })
+      return
+    }
+
+    try {
+      if (editingWhitelist) {
+        // 更新
+        await apiService.updateWhitelistEntry(editingWhitelist.value, whitelistValue.trim(), whitelistDescription.trim())
+        toast({
+          title: '更新成功',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        })
+      } else {
+        // 添加
+        await apiService.addWhitelistEntry(whitelistValue.trim(), whitelistDescription.trim())
+        toast({
+          title: '添加成功',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        })
+      }
+      
+      onWhitelistClose()
+      setWhitelistValue('')
+      setWhitelistDescription('')
+      setEditingWhitelist(null)
+      fetchWhitelist()
+    } catch (error) {
+      console.error('操作失败:', error)
+      toast({
+        title: editingWhitelist ? '更新失败' : '添加失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+    }
+  }
+
+  const handleWhitelistDelete = async () => {
+    try {
+      await apiService.removeWhitelistEntry(deletingWhitelistValue)
+      toast({
+        title: '删除成功',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      })
+      onWhitelistDeleteClose()
+      setDeletingWhitelistValue('')
+      fetchWhitelist()
+    } catch (error) {
+      console.error('删除失败:', error)
+      toast({
+        title: '删除失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+    }
+  }
+
   return (
     <Box p={6}>
       <HStack justify="space-between" mb={6}>
@@ -232,22 +359,38 @@ const BlockManagement: React.FC = () => {
         <HStack>
           <Button
             leftIcon={<FiRefreshCw />}
-            onClick={fetchBlockedList}
+            onClick={() => {
+              fetchBlockedList()
+              if (activeTab === 3) {
+                fetchWhitelist()
+              }
+            }}
             isLoading={loading}
             loadingText="刷新中"
           >
             刷新
           </Button>
-          <Button
-            leftIcon={<FiPlus />}
-            colorScheme="blue"
-            onClick={() => {
-              const type = activeTab === 0 ? 'ip' : activeTab === 1 ? 'tls_fingerprint' : 'user_agent'
-              openBlockModal(type)
-            }}
-          >
-            手动封禁
-          </Button>
+          {activeTab !== 3 && (
+            <Button
+              leftIcon={<FiPlus />}
+              colorScheme="blue"
+              onClick={() => {
+                const type = activeTab === 0 ? 'ip' : activeTab === 1 ? 'tls_fingerprint' : 'user_agent'
+                openBlockModal(type)
+              }}
+            >
+              手动封禁
+            </Button>
+          )}
+          {activeTab === 3 && (
+            <Button
+              leftIcon={<FiPlus />}
+              colorScheme="green"
+              onClick={openAddWhitelistModal}
+            >
+              添加白名单
+            </Button>
+          )}
         </HStack>
       </HStack>
 
@@ -258,6 +401,7 @@ const BlockManagement: React.FC = () => {
               <Tab>IP封禁 ({blockedData.ips.length})</Tab>
               <Tab>TLS指纹封禁 ({blockedData.tls_fingerprints.length})</Tab>
               <Tab>User-Agent封禁 ({blockedData.user_agents.length})</Tab>
+              <Tab>IP白名单 ({whitelistEntries.length})</Tab>
             </TabList>
 
             <TabPanels>
@@ -425,10 +569,153 @@ const BlockManagement: React.FC = () => {
                   </Table>
                 )}
               </TabPanel>
+
+              {/* IP白名单列表 */}
+              <TabPanel>
+                {loading ? (
+                  <Center py={8}>
+                    <Spinner size="xl" />
+                  </Center>
+                ) : whitelistEntries.length === 0 ? (
+                  <Center py={8}>
+                    <Text color="gray.500">暂无白名单条目</Text>
+                  </Center>
+                ) : (
+                  <Table variant="simple">
+                    <Thead>
+                      <Tr>
+                        <Th>IP/网段</Th>
+                        <Th>类型</Th>
+                        <Th>描述</Th>
+                        <Th>创建时间</Th>
+                        <Th>更新时间</Th>
+                        <Th>操作</Th>
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {whitelistEntries.map((entry, index) => (
+                        <Tr key={index}>
+                          <Td>
+                            <Text fontFamily="mono" fontSize="sm">
+                              {entry.value}
+                            </Text>
+                          </Td>
+                          <Td>
+                            <Badge colorScheme={getCIDRTypeColor(entry.value)}>
+                              {getCIDRTypeDescription(entry.value)}
+                            </Badge>
+                          </Td>
+                          <Td>{entry.description || '-'}</Td>
+                          <Td>{formatTime(entry.created_at)}</Td>
+                          <Td>{formatTime(entry.updated_at)}</Td>
+                          <Td>
+                            <HStack spacing={2}>
+                              <IconButton
+                                aria-label="编辑"
+                                icon={<FiEdit2 />}
+                                size="sm"
+                                colorScheme="blue"
+                                variant="ghost"
+                                onClick={() => openEditWhitelistModal(entry)}
+                              />
+                              <IconButton
+                                aria-label="删除"
+                                icon={<FiTrash2 />}
+                                size="sm"
+                                colorScheme="red"
+                                variant="ghost"
+                                onClick={() => openDeleteWhitelistModal(entry.value)}
+                              />
+                            </HStack>
+                          </Td>
+                        </Tr>
+                      ))}
+                    </Tbody>
+                  </Table>
+                )}
+              </TabPanel>
             </TabPanels>
           </Tabs>
         </CardBody>
       </Card>
+
+      {/* 添加/编辑白名单模态框 */}
+      <Modal isOpen={isWhitelistOpen} onClose={onWhitelistClose} size="lg">
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>{editingWhitelist ? '编辑白名单' : '添加白名单'}</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={4}>
+              <FormControl isRequired>
+                <FormLabel>IP地址或CIDR网段</FormLabel>
+                <Input
+                  value={whitelistValue}
+                  onChange={(e) => setWhitelistValue(e.target.value)}
+                  placeholder="例如: 192.168.1.1 或 192.168.1.0/24"
+                />
+                <Text fontSize="sm" color="gray.500" mt={1}>
+                  支持单个IP（如 192.168.1.1）或CIDR网段（如 192.168.1.0/24、10.0.0.0/8、172.16.0.0/16）
+                </Text>
+              </FormControl>
+
+              <FormControl>
+                <FormLabel>描述（可选）</FormLabel>
+                <Input
+                  value={whitelistDescription}
+                  onChange={(e) => setWhitelistDescription(e.target.value)}
+                  placeholder="输入描述信息，例如：办公室IP"
+                />
+              </FormControl>
+            </VStack>
+          </ModalBody>
+
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onWhitelistClose}>
+              取消
+            </Button>
+            <Button colorScheme="blue" onClick={handleWhitelistSubmit}>
+              {editingWhitelist ? '确认修改' : '确认添加'}
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* 删除白名单确认对话框 */}
+      <AlertDialog
+        isOpen={isWhitelistDeleteOpen}
+        leastDestructiveRef={cancelRef}
+        onClose={onWhitelistDeleteClose}
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent>
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              确认删除白名单
+            </AlertDialogHeader>
+
+            <AlertDialogBody>
+              确定要删除以下白名单条目吗？
+              <Box mt={2} p={2} bg="gray.100" borderRadius="md">
+                <Text fontWeight="bold" fontFamily="mono" fontSize="sm">
+                  {deletingWhitelistValue}
+                </Text>
+                <Badge colorScheme={getCIDRTypeColor(deletingWhitelistValue)} mt={2}>
+                  {getCIDRTypeDescription(deletingWhitelistValue)}
+                </Badge>
+              </Box>
+            </AlertDialogBody>
+
+            <AlertDialogFooter>
+              <Button ref={cancelRef} onClick={onWhitelistDeleteClose}>
+                取消
+              </Button>
+              <Button colorScheme="red" onClick={handleWhitelistDelete} ml={3}>
+                确认删除
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
 
       {/* 手动封禁模态框 */}
       <Modal isOpen={isOpen} onClose={onClose} size="lg">

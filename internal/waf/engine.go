@@ -941,6 +941,13 @@ func (e *Engine) GetTLSStats() map[string]int {
 	return e.multiDimBlocker.GetTLSStats()
 }
 
+// SetWhitelistChecker 设置白名单检查函数
+func (e *Engine) SetWhitelistChecker(checker func(ip string) bool) {
+	if e.multiDimBlocker != nil {
+		e.multiDimBlocker.SetWhitelistChecker(checker)
+	}
+}
+
 // min 辅助函数
 func min(a, b int) int {
 	if a < b {
