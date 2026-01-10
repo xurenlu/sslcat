@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -42,6 +43,47 @@ func (s *Server) handleAISecurityConfigAPI(w http.ResponseWriter, r *http.Reques
 	}
 }
 
+// formatDurationForFrontend 将 Duration 格式化为前端能识别的格式
+// 例如：12h0m0s -> 12h, 3d0h0m0s -> 3d, 24h -> 24h
+func formatDurationForFrontend(d time.Duration) string {
+	if d <= 0 {
+		return "1h"
+	}
+
+	// 转换为整数小时、天等
+	totalHours := int(d.Hours())
+	days := totalHours / 24
+	hours := totalHours % 24
+	minutes := int(d.Minutes()) % 60
+
+	// 如果正好是24小时的倍数
+	if hours == 0 && minutes == 0 {
+		// 如果是24小时，返回 "24h"（前端有单独的24h选项）
+		if days == 1 {
+			return "24h"
+		}
+		// 如果是多天，返回天数（如 72h -> 3d）
+		if days > 1 {
+			return fmt.Sprintf("%dd", days)
+		}
+	}
+
+	// 如果有天数但还有余数，也使用天数（如 3d12h -> 3d，因为前端选项是整数天）
+	if days > 0 {
+		return fmt.Sprintf("%dd", days)
+	}
+	// 使用小时
+	if hours > 0 {
+		return fmt.Sprintf("%dh", hours)
+	}
+	// 使用分钟
+	if minutes > 0 {
+		return fmt.Sprintf("%dm", minutes)
+	}
+	// 默认返回1小时
+	return "1h"
+}
+
 // handleGetAISecurityConfig 获取 AI 安全配置
 func (s *Server) handleGetAISecurityConfig(w http.ResponseWriter, r *http.Request) {
 	// 将配置转换为前端需要的格式（Duration 转为字符串）
@@ -50,12 +92,12 @@ func (s *Server) handleGetAISecurityConfig(w http.ResponseWriter, r *http.Reques
 	// 设置默认值
 	checkInterval := "1h"
 	if cfg.CheckInterval > 0 {
-		checkInterval = cfg.CheckInterval.String()
+		checkInterval = formatDurationForFrontend(cfg.CheckInterval)
 	}
 
 	analysisWindow := "1h"
 	if cfg.AnalysisWindow > 0 {
-		analysisWindow = cfg.AnalysisWindow.String()
+		analysisWindow = formatDurationForFrontend(cfg.AnalysisWindow)
 	}
 
 	language := cfg.Language
@@ -122,8 +164,16 @@ func (s *Server) handleSaveAISecurityConfig(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// 解析 duration 字符串
-	checkInterval, err := time.ParseDuration(frontendConfig.CheckInterval)
+	// 解析 duration 字符串（支持 d 单位，如 "3d"）
+	checkIntervalStr := frontendConfig.CheckInterval
+	// 如果包含 "d"（天），转换为小时
+	if len(checkIntervalStr) > 1 && checkIntervalStr[len(checkIntervalStr)-1] == 'd' {
+		var days int
+		if _, err := fmt.Sscanf(checkIntervalStr, "%dd", &days); err == nil {
+			checkIntervalStr = fmt.Sprintf("%dh", days*24)
+		}
+	}
+	checkInterval, err := time.ParseDuration(checkIntervalStr)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -135,7 +185,15 @@ func (s *Server) handleSaveAISecurityConfig(w http.ResponseWriter, r *http.Reque
 
 	analysisWindow := checkInterval // 默认与检查间隔相同
 	if frontendConfig.AnalysisWindow != "" {
-		if parsed, err := time.ParseDuration(frontendConfig.AnalysisWindow); err == nil {
+		// 如果包含 "d"（天），转换为小时
+		analysisWindowStr := frontendConfig.AnalysisWindow
+		if len(analysisWindowStr) > 1 && analysisWindowStr[len(analysisWindowStr)-1] == 'd' {
+			var days int
+			if _, err := fmt.Sscanf(analysisWindowStr, "%dd", &days); err == nil {
+				analysisWindowStr = fmt.Sprintf("%dh", days*24)
+			}
+		}
+		if parsed, err := time.ParseDuration(analysisWindowStr); err == nil {
 			analysisWindow = parsed
 		}
 	}

@@ -467,6 +467,11 @@ const AISecurityAnalysis: React.FC = () => {
                       <option value="4h">4 小时</option>
                       <option value="6h">6 小时</option>
                       <option value="12h">12 小时</option>
+                      <option value="24h">24 小时</option>
+                      <option value="3d">3 天</option>
+                      <option value="7d">7 天</option>
+                      <option value="15d">15 天</option>
+                      <option value="30d">30 天</option>
                     </Select>
                   </FormControl>
 

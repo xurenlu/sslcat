@@ -37,7 +37,7 @@ import (
 )
 
 var (
-	version = "1.3.32-rc7"
+	version = "1.3.32-rc8"
 	build   = "dev"
 )
 
