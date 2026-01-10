@@ -91,14 +91,14 @@ const WAFStatsCard: React.FC<WAFStatsCardProps> = ({
           {enabled && (
             <HStack fontSize="xs" color="green.600">
               <Icon as={FiCheckCircle} />
-              <Text>WAF 正在保护您的应用</Text>
+              <Text>{t.security.wafProtecting || 'WAF is protecting your application'}</Text>
             </HStack>
           )}
 
           {!enabled && (
             <HStack fontSize="xs" color="orange.600">
               <Icon as={FiAlertTriangle} />
-              <Text>WAF 已禁用，建议启用以增强安全性</Text>
+              <Text>{t.security.wafDisabledWarning || 'WAF is disabled, it is recommended to enable it to enhance security'}</Text>
             </HStack>
           )}
         </VStack>

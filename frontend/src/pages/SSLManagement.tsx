@@ -219,7 +219,7 @@ const SSLManagement: React.FC = () => {
   const applyCertificate = async () => {
     if (!newDomain.trim()) {
       toast({
-        title: '请输入域名',
+        title: t.ssl.domainPlaceholder || 'Please enter domain',
         status: 'warning',
         duration: 3000,
         isClosable: true,
@@ -419,7 +419,7 @@ const SSLManagement: React.FC = () => {
   const uploadCertificate = async () => {
     if (!uploadDomain.trim()) {
       toast({
-        title: '请输入域名',
+        title: t.ssl.domainPlaceholder || 'Please enter domain',
         status: 'warning',
         duration: 3000,
         isClosable: true,
@@ -651,6 +651,10 @@ const SSLManagement: React.FC = () => {
   }
 
   const getStatusText = (status: string) => {
+    // 翻译后端返回的中文状态
+    if (status === '有效') return t.ssl.valid || 'Valid'
+    if (status === '即将过期') return t.ssl.expiringSoon || 'Expiring Soon'
+    if (status === '过期') return t.ssl.expired || 'Expired'
     return status
   }
 
@@ -707,7 +711,7 @@ const SSLManagement: React.FC = () => {
             mr={2}
             onClick={onUploadOpen}
           >
-            上传证书
+            {t.ssl.uploadCertificate || 'Upload Certificate'}
           </Button>
           <Button
             leftIcon={<Icon as={FiDownload} />}
@@ -716,7 +720,7 @@ const SSLManagement: React.FC = () => {
             onClick={downloadAllCertificates}
             isDisabled={certificates.length === 0}
           >
-            下载全部证书
+            {t.ssl.downloadAllCertificates || 'Download All Certificates'}
           </Button>
           <Button
             leftIcon={<Icon as={FiRefreshCw} />}
@@ -766,12 +770,12 @@ const SSLManagement: React.FC = () => {
                           <Badge colorScheme={getStatusColor(cert.status)}>
                             {getStatusText(cert.status)}
                           </Badge>
-                          {cert.status === '即将过期' && (
+                          {(cert.status === '即将过期' || cert.status === 'expiring_soon') && (
                             <Text fontSize="xs" color="orange.600">
                               {daysLeft} {t.ssl.daysUntilExpiry}
                             </Text>
                           )}
-                          {cert.status === '过期' && (
+                          {(cert.status === '过期' || cert.status === 'expired') && (
                             <Text fontSize="xs" color="red.600">
                               {t.ssl.expired} {Math.abs(daysLeft)} {t.ssl.expiredDays}
                             </Text>
@@ -781,7 +785,7 @@ const SSLManagement: React.FC = () => {
                       <Td>
                         <VStack align="start" spacing={1}>
                           <Text fontSize="sm">{formatDate(cert.expires_at)}</Text>
-                          {cert.status === '有效' && (
+                          {(cert.status === '有效' || cert.status === 'valid') && (
                             <Progress
                               size="sm"
                               value={Math.max(0, Math.min(100, (daysLeft / 90) * 100))}

@@ -225,6 +225,9 @@ export interface Translation {
     daysUntilExpiry: string
     expiredDays: string
     syncACMECertificates: string
+    uploadCertificate: string
+    downloadAllCertificates: string
+    valid: string
   }
   
   // 通知管理
@@ -542,6 +545,117 @@ export interface Translation {
     notification_config_save_failed: string
     select_min_notification_level: string
     webhook_placeholder: string
+    // 内存与缓存设置
+    memoryAndCacheSettings: string
+    sharedCacheMaxSizeMB: string
+    sharedCacheMaxSizeMBDesc: string
+    memoryMaxUsagePercent: string
+    memoryMaxUsagePercentDesc: string
+    memoryReleaseCooldownSec: string
+    memoryReleaseCooldownSecDesc: string
+    // SSL Staging 环境
+    sslStaging: string
+    sslStagingDesc: string
+    // 自定义端口详细设置
+    customPortConfigTitle: string
+    customPortWarning: string
+    customPortLabel: string
+    customPortSuggestion: string
+    enableHttpsDesc: string
+    // TOTP 双因素认证
+    totpTitle: string
+    totpEnabled: string
+    totpDisabled: string
+    totpDesc: string
+    totpDescWithEmergency: string
+    enableTotp: string
+    disableTotp: string
+    totpSetupTitle: string
+    totpStep1Title: string
+    totpStep1Desc: string
+    totpStep2Title: string
+    totpStep2Desc: string
+    totpSecret: string
+    totpEnableSuccess: string
+    totpEnableSuccessDesc: string
+    totpDisableSuccess: string
+    totpDisableSuccessDesc: string
+    totpDisableConfirm: string
+    totpDisableConfirmDesc: string
+    totpVerifyCodePlaceholder: string
+    totpVerifyCodeError: string
+    totpGenerateQrError: string
+    totpEnableError: string
+    totpDisableError: string
+    // WebAuthn
+    webauthnTitle: string
+    webauthnDesc: string
+    webauthnRegisterDevice: string
+    webauthnRegisteredDevices: string
+    webauthnUnnamedDevice: string
+    webauthnRegisteredAt: string
+    webauthnLastUsed: string
+    webauthnDeleteDevice: string
+    webauthnDeleteConfirm: string
+    webauthnDeleteConfirmDesc: string
+    webauthnRegisterTitle: string
+    webauthnRegisterStep1Title: string
+    webauthnRegisterStep1Desc: string
+    webauthnRegisterStep2Title: string
+    webauthnRegisterStep2Desc: string
+    webauthnDeviceName: string
+    webauthnDeviceNamePlaceholder: string
+    webauthnRegisterSuccess: string
+    webauthnRegisterSuccessDesc: string
+    webauthnRegisterError: string
+    webauthnDeleteSuccess: string
+    webauthnDeleteError: string
+    webauthnUserCanceled: string
+    webauthnVerificationFailed: string
+    webauthnGetUserInfoFailed: string
+    webauthnBeginRegisterFailed: string
+    webauthnFinishRegisterFailed: string
+    webauthnEnterDeviceName: string
+    // 压缩设置详细
+    compressionMinSizeBytes: string
+    compressionGzipLevelLabel: string
+    compressionBrotliLevelLabel: string
+    compressionTip: string
+    // 上游缓存详细
+    upstreamCacheMaxSizeMB: string
+    upstreamCacheDefaultTTLSeconds: string
+    upstreamCacheTip: string
+    // 通知级别选项
+    notificationLevelInfoOption: string
+    notificationLevelWarningOption: string
+    notificationLevelErrorOption: string
+    notificationLevelCriticalOption: string
+    minNotificationLevelDesc: string
+    // 邮件发送方式选项
+    emailMethodSmtp: string
+    emailMethodSendmail: string
+    emailMethodResend: string
+    emailMethodMailgun: string
+    emailMethodSendgrid: string
+    // Sendmail 配置
+    sendmailCommand: string
+    sendmailArgs: string
+    // Webhook 平台识别
+    webhookPlatformSlack: string
+    webhookPlatformWeChatWork: string
+    webhookPlatformFeishu: string
+    webhookPlatformDingTalk: string
+    webhookPlatformDiscord: string
+    webhookPlatformTelegram: string
+    webhookPlatformOther: string
+    webhookAutoDetectDesc: string
+    webhookAddMore: string
+    webhookDelete: string
+    // 其他
+    enableEmailNotification: string
+    enableWebhookNotification: string
+    saveChallengeMethodFailed: string
+    challengeMethodRequiredError: string
   }
   
   // 侧边栏
@@ -549,6 +663,15 @@ export interface Translation {
     sslProxyServer: string
     officialWebsite: string
     language: string
+    console: string
+    coreServices: string
+    advancedFeatures: string
+    securityProtection: string
+    clusterDeployment: string
+    systemManagement: string
+    blockManagement: string
+    templateMarket: string
+    searchPlaceholder: string
   }
 
   // 对话框和提示
@@ -572,6 +695,19 @@ export interface Translation {
     createSite: string
     edit: string
     delete: string
+    staticSiteList: string
+    addStaticSite: string
+    addFirstStaticSite: string
+    noStaticSites: string
+    noPHPSites: string
+    addFirstPHPSite: string
+    domain: string
+    rootDirectory: string
+    status: string
+    indexFile: string
+    pathPrefixRules: string
+    actions: string
+    rules: string
   }
 
   // CDN管理
@@ -1619,5 +1755,67 @@ export interface Translation {
     networkTimeout: string
     serverError: string
     unknownError: string
-  }
+  },
+  
+  // 模板市场
+  templates: {
+    title: string
+    searchPlaceholder: string
+    selectCategory: string
+    selectTag: string
+    clearFilters: string
+    foundTemplates: string
+    builtin: string
+    oneClickDeploy: string
+    noMatchingTemplates: string
+    loadFailed: string
+    loadFailedDesc: string
+  },
+  
+  // 封禁管理
+  blockManagement: {
+    title: string
+    refresh: string
+    manualBlock: string
+    ipBlock: string
+    tlsFingerprintBlock: string
+    userAgentBlock: string
+    ipWhitelist: string
+    noBlockedIPs: string
+    ipAddress: string
+    source: string
+    blockReason: string
+    blockTime: string
+    expireTime: string
+    actions: string
+    addWhitelist: string
+    editWhitelist: string
+    addWhitelistTitle: string
+    ipOrCidr: string
+    ipOrCidrPlaceholder: string
+    ipOrCidrDesc: string
+    description: string
+    descriptionPlaceholder: string
+    confirmAdd: string
+    confirmEdit: string
+    confirmDeleteWhitelist: string
+    confirmDeleteWhitelistDesc: string
+    blockType: string
+    blockDuration: string
+    blockDurationDesc: string
+    blockReasonPlaceholder: string
+    confirmBlock: string
+    confirmUnblock: string
+    confirmUnblockDesc: string
+    tlsFingerprint: string
+    tlsFingerprintPlaceholder: string
+    userAgentPlaceholder: string
+    noTlsFingerprints: string
+    noUserAgents: string
+    noWhitelistEntries: string
+    ipCidr: string
+    type: string
+    createdAt: string
+    updatedAt: string
+  },
 }

@@ -54,6 +54,7 @@ import {
 import { apiService } from '../utils/api'
 import { useConfig } from '../contexts/ConfigContext'
 import { getCIDRTypeDescription, getCIDRTypeColor } from '../utils/cidr'
+import { useTranslation } from '../hooks/useLanguage'
 
 interface BlockedIP {
   source?: string
@@ -115,6 +116,7 @@ const BlockManagement: React.FC = () => {
   const [unblockValue, setUnblockValue] = useState('')
   const cancelRef = React.useRef<HTMLButtonElement>(null)
   const toast = useToast()
+  const t = useTranslation()
 
   const fetchBlockedList = async () => {
     setLoading(true)
@@ -355,7 +357,7 @@ const BlockManagement: React.FC = () => {
   return (
     <Box p={6}>
       <HStack justify="space-between" mb={6}>
-        <Heading size="lg">封禁管理</Heading>
+        <Heading size="lg">{t.blockManagement?.title || t.sidebar.blockManagement || 'Block Management'}</Heading>
         <HStack>
           <Button
             leftIcon={<FiRefreshCw />}
@@ -366,9 +368,9 @@ const BlockManagement: React.FC = () => {
               }
             }}
             isLoading={loading}
-            loadingText="刷新中"
+            loadingText={t.common.loading}
           >
-            刷新
+            {t.blockManagement?.refresh || t.common.refresh}
           </Button>
           {activeTab !== 3 && (
             <Button
@@ -379,7 +381,7 @@ const BlockManagement: React.FC = () => {
                 openBlockModal(type)
               }}
             >
-              手动封禁
+              {t.blockManagement?.manualBlock || '+ Manual Block'}
             </Button>
           )}
           {activeTab === 3 && (
@@ -388,7 +390,7 @@ const BlockManagement: React.FC = () => {
               colorScheme="green"
               onClick={openAddWhitelistModal}
             >
-              添加白名单
+              {t.blockManagement?.addWhitelist || 'Add Whitelist'}
             </Button>
           )}
         </HStack>
@@ -398,10 +400,10 @@ const BlockManagement: React.FC = () => {
         <CardBody>
           <Tabs index={activeTab} onChange={setActiveTab}>
             <TabList>
-              <Tab>IP封禁 ({blockedData.ips.length})</Tab>
-              <Tab>TLS指纹封禁 ({blockedData.tls_fingerprints.length})</Tab>
-              <Tab>User-Agent封禁 ({blockedData.user_agents.length})</Tab>
-              <Tab>IP白名单 ({whitelistEntries.length})</Tab>
+              <Tab>{t.blockManagement?.ipBlock || 'IP Block'} ({blockedData.ips.length})</Tab>
+              <Tab>{t.blockManagement?.tlsFingerprintBlock || 'TLS Fingerprint Block'} ({blockedData.tls_fingerprints.length})</Tab>
+              <Tab>{t.blockManagement?.userAgentBlock || 'User-Agent Block'} ({blockedData.user_agents.length})</Tab>
+              <Tab>{t.blockManagement?.ipWhitelist || 'IP Whitelist'} ({whitelistEntries.length})</Tab>
             </TabList>
 
             <TabPanels>
@@ -413,18 +415,18 @@ const BlockManagement: React.FC = () => {
                   </Center>
                 ) : blockedData.ips.length === 0 ? (
                   <Center py={8}>
-                    <Text color="gray.500">暂无封禁的IP</Text>
+                    <Text color="gray.500">{t.blockManagement?.noBlockedIPs || 'No blocked IPs for now'}</Text>
                   </Center>
                 ) : (
                   <Table variant="simple">
                     <Thead>
                       <Tr>
-                        <Th>IP地址</Th>
-                        <Th>来源</Th>
-                        <Th>封禁原因</Th>
-                        <Th>封禁时间</Th>
-                        <Th>过期时间</Th>
-                        <Th>操作</Th>
+                        <Th>{t.blockManagement?.ipAddress || 'IP Address'}</Th>
+                        <Th>{t.blockManagement?.source || 'Source'}</Th>
+                        <Th>{t.blockManagement?.blockReason || 'Block Reason'}</Th>
+                        <Th>{t.blockManagement?.blockTime || 'Block Time'}</Th>
+                        <Th>{t.blockManagement?.expireTime || 'Expire Time'}</Th>
+                        <Th>{t.blockManagement?.actions || t.common.actions || 'Actions'}</Th>
                       </Tr>
                     </Thead>
                     <Tbody>
@@ -447,7 +449,7 @@ const BlockManagement: React.FC = () => {
                           </Td>
                           <Td>
                             <IconButton
-                              aria-label="解封"
+                              aria-label={t.common.delete || 'Unblock'}
                               icon={<FiTrash2 />}
                               size="sm"
                               colorScheme="red"
@@ -470,17 +472,17 @@ const BlockManagement: React.FC = () => {
                   </Center>
                 ) : blockedData.tls_fingerprints.length === 0 ? (
                   <Center py={8}>
-                    <Text color="gray.500">暂无封禁的TLS指纹</Text>
+                    <Text color="gray.500">{t.blockManagement?.noTlsFingerprints || 'No blocked TLS fingerprints'}</Text>
                   </Center>
                 ) : (
                   <Table variant="simple">
                     <Thead>
                       <Tr>
-                        <Th>TLS指纹</Th>
-                        <Th>封禁原因</Th>
-                        <Th>封禁时间</Th>
-                        <Th>过期时间</Th>
-                        <Th>操作</Th>
+                        <Th>TLS Fingerprint</Th>
+                        <Th>{t.blockManagement?.blockReason || 'Block Reason'}</Th>
+                        <Th>{t.blockManagement?.blockTime || 'Block Time'}</Th>
+                        <Th>{t.blockManagement?.expireTime || 'Expire Time'}</Th>
+                        <Th>{t.blockManagement?.actions || t.common.actions || 'Actions'}</Th>
                       </Tr>
                     </Thead>
                     <Tbody>
@@ -502,7 +504,7 @@ const BlockManagement: React.FC = () => {
                           </Td>
                           <Td>
                             <IconButton
-                              aria-label="解封"
+                              aria-label={t.common.delete || 'Unblock'}
                               icon={<FiTrash2 />}
                               size="sm"
                               colorScheme="red"
@@ -525,17 +527,17 @@ const BlockManagement: React.FC = () => {
                   </Center>
                 ) : blockedData.user_agents.length === 0 ? (
                   <Center py={8}>
-                    <Text color="gray.500">暂无封禁的User-Agent</Text>
+                    <Text color="gray.500">{t.blockManagement?.noUserAgents || 'No blocked User-Agents'}</Text>
                   </Center>
                 ) : (
                   <Table variant="simple">
                     <Thead>
                       <Tr>
                         <Th>User-Agent</Th>
-                        <Th>封禁原因</Th>
-                        <Th>封禁时间</Th>
-                        <Th>过期时间</Th>
-                        <Th>操作</Th>
+                        <Th>{t.blockManagement?.blockReason || 'Block Reason'}</Th>
+                        <Th>{t.blockManagement?.blockTime || 'Block Time'}</Th>
+                        <Th>{t.blockManagement?.expireTime || 'Expire Time'}</Th>
+                        <Th>{t.blockManagement?.actions || t.common.actions || 'Actions'}</Th>
                       </Tr>
                     </Thead>
                     <Tbody>
@@ -555,7 +557,7 @@ const BlockManagement: React.FC = () => {
                           </Td>
                           <Td>
                             <IconButton
-                              aria-label="解封"
+                              aria-label={t.common.delete || 'Unblock'}
                               icon={<FiTrash2 />}
                               size="sm"
                               colorScheme="red"
@@ -578,18 +580,18 @@ const BlockManagement: React.FC = () => {
                   </Center>
                 ) : whitelistEntries.length === 0 ? (
                   <Center py={8}>
-                    <Text color="gray.500">暂无白名单条目</Text>
+                    <Text color="gray.500">{t.blockManagement?.noWhitelistEntries || 'No whitelist entries'}</Text>
                   </Center>
                 ) : (
                   <Table variant="simple">
                     <Thead>
                       <Tr>
-                        <Th>IP/网段</Th>
-                        <Th>类型</Th>
-                        <Th>描述</Th>
-                        <Th>创建时间</Th>
-                        <Th>更新时间</Th>
-                        <Th>操作</Th>
+                        <Th>{t.blockManagement?.ipCidr || 'IP/CIDR'}</Th>
+                        <Th>{t.blockManagement?.type || 'Type'}</Th>
+                        <Th>{t.blockManagement?.description || 'Description'}</Th>
+                        <Th>{t.blockManagement?.createdAt || 'Created At'}</Th>
+                        <Th>{t.blockManagement?.updatedAt || 'Updated At'}</Th>
+                        <Th>{t.blockManagement?.actions || t.common.actions || 'Actions'}</Th>
                       </Tr>
                     </Thead>
                     <Tbody>
@@ -611,7 +613,7 @@ const BlockManagement: React.FC = () => {
                           <Td>
                             <HStack spacing={2}>
                               <IconButton
-                                aria-label="编辑"
+                                aria-label={t.common.edit || 'Edit'}
                                 icon={<FiEdit2 />}
                                 size="sm"
                                 colorScheme="blue"
@@ -619,7 +621,7 @@ const BlockManagement: React.FC = () => {
                                 onClick={() => openEditWhitelistModal(entry)}
                               />
                               <IconButton
-                                aria-label="删除"
+                                aria-label={t.common.delete || 'Delete'}
                                 icon={<FiTrash2 />}
                                 size="sm"
                                 colorScheme="red"
@@ -643,28 +645,28 @@ const BlockManagement: React.FC = () => {
       <Modal isOpen={isWhitelistOpen} onClose={onWhitelistClose} size="lg">
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>{editingWhitelist ? '编辑白名单' : '添加白名单'}</ModalHeader>
+          <ModalHeader>{editingWhitelist ? (t.blockManagement?.editWhitelist || 'Edit Whitelist') : (t.blockManagement?.addWhitelistTitle || t.blockManagement?.addWhitelist || 'Add Whitelist')}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             <VStack spacing={4}>
               <FormControl isRequired>
-                <FormLabel>IP地址或CIDR网段</FormLabel>
+                <FormLabel>{t.blockManagement?.ipOrCidr || 'IP Address or CIDR'}</FormLabel>
                 <Input
                   value={whitelistValue}
                   onChange={(e) => setWhitelistValue(e.target.value)}
-                  placeholder="例如: 192.168.1.1 或 192.168.1.0/24"
+                  placeholder={t.blockManagement?.ipOrCidrPlaceholder || 'e.g.: 192.168.1.1 or 192.168.1.0/24'}
                 />
                 <Text fontSize="sm" color="gray.500" mt={1}>
-                  支持单个IP（如 192.168.1.1）或CIDR网段（如 192.168.1.0/24、10.0.0.0/8、172.16.0.0/16）
+                  {t.blockManagement?.ipOrCidrDesc || 'Supports single IP (e.g. 192.168.1.1) or CIDR range (e.g. 192.168.1.0/24, 10.0.0.0/8, 172.16.0.0/16)'}
                 </Text>
               </FormControl>
 
               <FormControl>
-                <FormLabel>描述（可选）</FormLabel>
+                <FormLabel>{t.blockManagement?.description || 'Description (Optional)'}</FormLabel>
                 <Input
                   value={whitelistDescription}
                   onChange={(e) => setWhitelistDescription(e.target.value)}
-                  placeholder="输入描述信息，例如：办公室IP"
+                  placeholder={t.blockManagement?.descriptionPlaceholder || 'Enter description, e.g.: Office IP'}
                 />
               </FormControl>
             </VStack>
@@ -672,10 +674,10 @@ const BlockManagement: React.FC = () => {
 
           <ModalFooter>
             <Button variant="ghost" mr={3} onClick={onWhitelistClose}>
-              取消
+              {t.common.cancel}
             </Button>
             <Button colorScheme="blue" onClick={handleWhitelistSubmit}>
-              {editingWhitelist ? '确认修改' : '确认添加'}
+              {editingWhitelist ? (t.blockManagement?.confirmEdit || 'Confirm Edit') : (t.blockManagement?.confirmAdd || 'Confirm Add')}
             </Button>
           </ModalFooter>
         </ModalContent>
@@ -690,11 +692,11 @@ const BlockManagement: React.FC = () => {
         <AlertDialogOverlay>
           <AlertDialogContent>
             <AlertDialogHeader fontSize="lg" fontWeight="bold">
-              确认删除白名单
+              {t.blockManagement?.confirmDeleteWhitelist || 'Confirm Delete Whitelist'}
             </AlertDialogHeader>
 
             <AlertDialogBody>
-              确定要删除以下白名单条目吗？
+              {t.blockManagement?.confirmDeleteWhitelistDesc || 'Are you sure you want to delete the following whitelist entry?'}
               <Box mt={2} p={2} bg="gray.100" borderRadius="md">
                 <Text fontWeight="bold" fontFamily="mono" fontSize="sm">
                   {deletingWhitelistValue}
@@ -707,10 +709,10 @@ const BlockManagement: React.FC = () => {
 
             <AlertDialogFooter>
               <Button ref={cancelRef} onClick={onWhitelistDeleteClose}>
-                取消
+                {t.common.cancel}
               </Button>
               <Button colorScheme="red" onClick={handleWhitelistDelete} ml={3}>
-                确认删除
+                {t.common.delete}
               </Button>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -721,41 +723,41 @@ const BlockManagement: React.FC = () => {
       <Modal isOpen={isOpen} onClose={onClose} size="lg">
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>手动封禁</ModalHeader>
+          <ModalHeader>{t.blockManagement?.manualBlock || '+ Manual Block'}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             <VStack spacing={4}>
               <FormControl>
-                <FormLabel>封禁类型</FormLabel>
+                <FormLabel>{t.blockManagement?.blockType || 'Block Type'}</FormLabel>
                 <Select
                   value={blockType}
                   onChange={(e) => setBlockType(e.target.value as 'ip' | 'tls_fingerprint' | 'user_agent')}
                 >
-                  <option value="ip">IP地址</option>
-                  <option value="tls_fingerprint">TLS指纹</option>
+                  <option value="ip">{t.blockManagement?.ipAddress || 'IP Address'}</option>
+                  <option value="tls_fingerprint">{t.blockManagement?.tlsFingerprint || 'TLS Fingerprint'}</option>
                   <option value="user_agent">User-Agent</option>
                 </Select>
               </FormControl>
 
               <FormControl isRequired>
                 <FormLabel>
-                  {blockType === 'ip' ? 'IP地址' : blockType === 'tls_fingerprint' ? 'TLS指纹' : 'User-Agent'}
+                  {blockType === 'ip' ? (t.blockManagement?.ipAddress || 'IP Address') : blockType === 'tls_fingerprint' ? (t.blockManagement?.tlsFingerprint || 'TLS Fingerprint') : 'User-Agent'}
                 </FormLabel>
                 <Input
                   value={blockValue}
                   onChange={(e) => setBlockValue(e.target.value)}
                   placeholder={
                     blockType === 'ip' 
-                      ? '例如: 192.168.1.100' 
+                      ? (t.blockManagement?.ipOrCidrPlaceholder || 'e.g.: 192.168.1.100')
                       : blockType === 'tls_fingerprint'
-                      ? '输入TLS指纹'
-                      : '输入User-Agent字符串'
+                      ? (t.blockManagement?.tlsFingerprintPlaceholder || 'Enter TLS fingerprint')
+                      : (t.blockManagement?.userAgentPlaceholder || 'Enter User-Agent string')
                   }
                 />
               </FormControl>
 
               <FormControl>
-                <FormLabel>封禁时长（小时，0表示永久）</FormLabel>
+                <FormLabel>{t.blockManagement?.blockDuration || 'Block Duration (hours, 0 for permanent)'}</FormLabel>
                 <Input
                   type="number"
                   value={blockDuration}
@@ -767,11 +769,11 @@ const BlockManagement: React.FC = () => {
               </FormControl>
 
               <FormControl>
-                <FormLabel>封禁原因（可选）</FormLabel>
+                <FormLabel>{t.blockManagement?.blockReason || 'Block Reason'} ({t.common.optional || 'Optional'})</FormLabel>
                 <Input
                   value={blockReason}
                   onChange={(e) => setBlockReason(e.target.value)}
-                  placeholder="输入封禁原因"
+                  placeholder={t.blockManagement?.blockReasonPlaceholder || 'Enter block reason'}
                 />
               </FormControl>
             </VStack>
@@ -779,10 +781,10 @@ const BlockManagement: React.FC = () => {
 
           <ModalFooter>
             <Button variant="ghost" mr={3} onClick={onClose}>
-              取消
+              {t.common.cancel}
             </Button>
             <Button colorScheme="blue" onClick={handleBlock}>
-              确认封禁
+              {t.blockManagement?.confirmBlock || 'Confirm Block'}
             </Button>
           </ModalFooter>
         </ModalContent>
@@ -797,14 +799,14 @@ const BlockManagement: React.FC = () => {
         <AlertDialogOverlay>
           <AlertDialogContent>
             <AlertDialogHeader fontSize="lg" fontWeight="bold">
-              确认解封
+              {t.blockManagement?.confirmUnblock || 'Confirm Unblock'}
             </AlertDialogHeader>
 
             <AlertDialogBody>
-              确定要解封以下项吗？
+              {t.blockManagement?.confirmUnblockDesc || 'Are you sure you want to unblock the following item?'}
               <Box mt={2} p={2} bg="gray.100" borderRadius="md">
                 <Text fontWeight="bold">
-                  {unblockType === 'ip' ? 'IP地址' : unblockType === 'tls_fingerprint' ? 'TLS指纹' : 'User-Agent'}
+                  {unblockType === 'ip' ? (t.blockManagement?.ipAddress || 'IP Address') : unblockType === 'tls_fingerprint' ? (t.blockManagement?.tlsFingerprint || 'TLS Fingerprint') : 'User-Agent'}
                 </Text>
                 <Text fontFamily={unblockType === 'tls_fingerprint' ? 'mono' : 'inherit'} fontSize="sm">
                   {unblockValue.length > 50 ? `${unblockValue.substring(0, 50)}...` : unblockValue}
@@ -814,10 +816,10 @@ const BlockManagement: React.FC = () => {
 
             <AlertDialogFooter>
               <Button ref={cancelRef} onClick={onUnblockClose}>
-                取消
+                {t.common.cancel}
               </Button>
               <Button colorScheme="red" onClick={handleUnblock} ml={3}>
-                确认解封
+                {t.blockManagement?.confirmUnblock || 'Confirm Unblock'}
               </Button>
             </AlertDialogFooter>
           </AlertDialogContent>

@@ -183,7 +183,7 @@ const Settings: React.FC = () => {
   const beginWebauthnRegistration = async () => {
     if (!webauthnDeviceName.trim()) {
       toast({
-        title: '请输入设备名称',
+        title: t.settings.webauthnEnterDeviceName,
         status: 'warning',
         duration: TOAST_DURATION.SHORT,
         isClosable: true,
@@ -198,7 +198,7 @@ const Settings: React.FC = () => {
         credentials: 'include',
       })
       if (!meResponse.ok) {
-        throw new Error('获取用户信息失败')
+        throw new Error(t.settings.webauthnGetUserInfoFailed)
       }
       const meData = await meResponse.json()
       const username = meData.username
@@ -216,12 +216,12 @@ const Settings: React.FC = () => {
 
       if (!beginResponse.ok) {
         const errorData = await beginResponse.json()
-        throw new Error(errorData.error || '开始注册失败')
+        throw new Error(errorData.error || t.settings.webauthnBeginRegisterFailed)
       }
 
       const beginData = await beginResponse.json()
       if (!beginData.success) {
-        throw new Error(beginData.error || '开始注册失败')
+        throw new Error(beginData.error || t.settings.webauthnBeginRegisterFailed)
       }
 
       // 调试：打印接收到的数据
@@ -276,9 +276,9 @@ const Settings: React.FC = () => {
         }) as PublicKeyCredential
       } catch (err: any) {
         if (err.name === 'NotAllowedError') {
-          throw new Error('用户取消了验证')
+          throw new Error(t.settings.webauthnUserCanceled)
         }
-        throw new Error('生物识别验证失败: ' + (err.message || '未知错误'))
+        throw new Error(t.settings.webauthnVerificationFailed.replace('{error}', err.message || t.common.unknownError))
       }
 
       // 准备响应数据
@@ -308,8 +308,8 @@ const Settings: React.FC = () => {
       const finishData = await finishResponse.json()
       if (finishData.success) {
         toast({
-          title: 'WebAuthn 注册成功',
-          description: `设备 "${webauthnDeviceName}" 已成功注册`,
+          title: t.settings.webauthnRegisterSuccess,
+          description: t.settings.webauthnRegisterSuccessDesc.replace('{deviceName}', webauthnDeviceName),
           status: 'success',
           duration: TOAST_DURATION.SHORT,
           isClosable: true,
@@ -318,12 +318,12 @@ const Settings: React.FC = () => {
         setWebauthnDeviceName('')
         loadWebauthnCredentials()
       } else {
-        throw new Error(finishData.error || '注册失败')
+        throw new Error(finishData.error || t.settings.webauthnFinishRegisterFailed)
       }
     } catch (error) {
       toast({
-        title: '注册失败',
-        description: error instanceof Error ? error.message : '未知错误',
+        title: t.settings.webauthnRegisterError,
+        description: error instanceof Error ? error.message : t.common.unknownError,
         status: 'error',
         duration: TOAST_DURATION.SHORT,
         isClosable: true,
@@ -335,7 +335,7 @@ const Settings: React.FC = () => {
 
   // 删除 WebAuthn 凭证
   const deleteWebauthnCredential = async (credentialId: string) => {
-    if (!confirm('确定要删除此设备的 WebAuthn 凭证吗？删除后将无法使用该设备登录。')) {
+    if (!confirm(t.settings.webauthnDeleteConfirmDesc)) {
       return
     }
 
@@ -351,19 +351,19 @@ const Settings: React.FC = () => {
       const data = await response.json()
       if (data.success) {
         toast({
-          title: '凭证已删除',
+          title: t.settings.webauthnDeleteSuccess,
           status: 'success',
           duration: TOAST_DURATION.SHORT,
           isClosable: true,
         })
         loadWebauthnCredentials()
       } else {
-        throw new Error(data.error || '删除失败')
+        throw new Error(data.error || t.settings.webauthnDeleteError)
       }
     } catch (error) {
       toast({
-        title: '删除失败',
-        description: error instanceof Error ? error.message : '未知错误',
+        title: t.settings.webauthnDeleteError,
+        description: error instanceof Error ? error.message : t.common.unknownError,
         status: 'error',
         duration: TOAST_DURATION.SHORT,
         isClosable: true,
@@ -423,19 +423,19 @@ const Settings: React.FC = () => {
           setTotpSecret(data.secret)
           onTotpModalOpen()
         } else {
-          toast({
-            title: '生成二维码失败',
-            description: data.error,
-            status: 'error',
-            duration: TOAST_DURATION.SHORT,
-            isClosable: true,
-          })
+        toast({
+          title: t.settings.totpGenerateQrError,
+          description: data.error,
+          status: 'error',
+          duration: TOAST_DURATION.SHORT,
+          isClosable: true,
+        })
         }
       }
     } catch (error) {
       toast({
-        title: '生成二维码失败',
-        description: error instanceof Error ? error.message : '未知错误',
+        title: t.settings.totpGenerateQrError,
+        description: error instanceof Error ? error.message : t.common.unknownError,
         status: 'error',
         duration: TOAST_DURATION.SHORT,
         isClosable: true,
@@ -449,7 +449,7 @@ const Settings: React.FC = () => {
   const enableTotp = async () => {
     if (totpVerifyCode.length !== 6) {
       toast({
-        title: '请输入 6 位验证码',
+        title: t.settings.totpVerifyCodePlaceholder,
         status: 'warning',
         duration: TOAST_DURATION.SHORT,
         isClosable: true,
@@ -476,16 +476,16 @@ const Settings: React.FC = () => {
         setTotpQrCode('')
         setTotpSecret('')
         toast({
-          title: 'TOTP 已启用',
-          description: '双因素认证已成功开启，登录时需要输入验证码',
+          title: t.settings.totpEnableSuccess,
+          description: t.settings.totpEnableSuccessDesc,
           status: 'success',
           duration: TOAST_DURATION.SHORT,
           isClosable: true,
         })
       } else {
         toast({
-          title: '启用失败',
-          description: data.error || '验证码错误',
+          title: t.settings.totpEnableError,
+          description: data.error || t.settings.totpVerifyCodeError,
           status: 'error',
           duration: TOAST_DURATION.SHORT,
           isClosable: true,
@@ -494,8 +494,8 @@ const Settings: React.FC = () => {
       }
     } catch (error) {
       toast({
-        title: '启用失败',
-        description: error instanceof Error ? error.message : '未知错误',
+        title: t.settings.totpEnableError,
+        description: error instanceof Error ? error.message : t.common.unknownError,
         status: 'error',
         duration: TOAST_DURATION.SHORT,
         isClosable: true,
@@ -507,7 +507,7 @@ const Settings: React.FC = () => {
 
   // 禁用 TOTP
   const disableTotp = async () => {
-    if (!confirm('确定要禁用 TOTP 双因素认证吗？这会降低账户安全性。')) {
+    if (!confirm(t.settings.totpDisableConfirmDesc)) {
       return
     }
 
@@ -521,15 +521,15 @@ const Settings: React.FC = () => {
       if (data.success) {
         setTotpEnabled(false)
         toast({
-          title: 'TOTP 已禁用',
-          description: '双因素认证已关闭',
+          title: t.settings.totpDisableSuccess,
+          description: t.settings.totpDisableSuccessDesc,
           status: 'info',
           duration: TOAST_DURATION.SHORT,
           isClosable: true,
         })
       } else {
         toast({
-          title: '禁用失败',
+          title: t.settings.totpDisableError,
           description: data.error,
           status: 'error',
           duration: TOAST_DURATION.SHORT,
@@ -538,8 +538,8 @@ const Settings: React.FC = () => {
       }
     } catch (error) {
       toast({
-        title: '禁用失败',
-        description: error instanceof Error ? error.message : '未知错误',
+        title: t.settings.totpDisableError,
+        description: error instanceof Error ? error.message : t.common.unknownError,
         status: 'error',
         duration: TOAST_DURATION.SHORT,
         isClosable: true,
@@ -676,7 +676,7 @@ const Settings: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error('加载挑战方法配置失败:', error)
+      console.error(t.settings.basic_config_load_failed, error)
       // 失败时使用默认值
       setSettings(prev => ({
         ...prev,
@@ -712,8 +712,8 @@ const Settings: React.FC = () => {
       // 验证挑战方法
       if (!settings.challengeMethods || settings.challengeMethods.length === 0) {
         toast({
-          title: '保存失败',
-          description: '至少需要选择一种挑战方法',
+          title: t.settings.save_failed,
+          description: t.settings.challengeMethodRequiredError,
           status: 'error',
           duration: TOAST_DURATION.SHORT,
           isClosable: true,
@@ -834,7 +834,7 @@ const Settings: React.FC = () => {
       // 检查挑战方法配置保存结果
       if (!challengeResponse.ok) {
         const errorData = await challengeResponse.json()
-        throw new Error(errorData.error || '保存挑战方法配置失败')
+        throw new Error(errorData.error || t.settings.saveChallengeMethodFailed)
       }
 
       toast({
@@ -1059,7 +1059,7 @@ const Settings: React.FC = () => {
                         onChange={(e) => handleInputChange('enableHttps', e.target.checked)}
                       />
                       <Text fontSize="sm" color="gray.600">
-                        启用后会自动申请和管理 SSL 证书
+                        {t.settings.enableHttpsDesc}
                       </Text>
                     </FormControl>
                   </VStack>
@@ -1071,17 +1071,16 @@ const Settings: React.FC = () => {
                 <Box p={4} bg="orange.50" borderRadius="md">
                   <VStack spacing={3} align="stretch">
                     <Text fontWeight="bold" color="orange.700">
-                      自定义端口配置
+                      {t.settings.customPortConfigTitle}
                     </Text>
                     <Alert status="warning" borderRadius="md">
                       <AlertIcon />
                       <AlertDescription>
-                        自定义端口模式下，SSLcat 将仅监听指定端口，不支持 HTTPS 功能。
-                        如需 HTTPS，请使用标准模式或配置反向代理。
+                        {t.settings.customPortWarning}
                       </AlertDescription>
                     </Alert>
                     <FormControl>
-                      <FormLabel>监听端口</FormLabel>
+                      <FormLabel>{t.settings.customPortLabel}</FormLabel>
                       <Input
                         type="number"
                         value={settings.customPort}
@@ -1091,7 +1090,7 @@ const Settings: React.FC = () => {
                         max="65535"
                       />
                       <Text fontSize="sm" color="gray.600">
-                        建议使用 8080、3000、8000 等非特权端口
+                        {t.settings.customPortSuggestion}
                       </Text>
                     </FormControl>
                   </VStack>
@@ -1127,14 +1126,14 @@ const Settings: React.FC = () => {
               </FormControl>
 
               <FormControl display="flex" alignItems="center">
-                <FormLabel mb="0">使用 Staging 环境（测试）</FormLabel>
+                <FormLabel mb="0">{t.settings.sslStaging}</FormLabel>
                 <Switch
                   isChecked={settings.sslStaging}
                   onChange={(e) => handleInputChange('sslStaging', e.target.checked)}
                 />
               </FormControl>
               <Text fontSize="sm" color="orange.600">
-                ⚠️ Staging 环境签发的证书不被浏览器信任，仅用于测试。正式使用请关闭此选项。
+                {t.settings.sslStagingDesc}
               </Text>
 
               <Divider my={2} />
@@ -1241,17 +1240,16 @@ const Settings: React.FC = () => {
                 <FormLabel>
                   <HStack>
                     <Icon as={FiKey} />
-                    <Text>TOTP 双因素认证</Text>
+                    <Text>{t.settings.totpTitle}</Text>
                     {totpEnabled ? (
-                      <Badge colorScheme="green">已启用</Badge>
+                      <Badge colorScheme="green">{t.settings.totpEnabled}</Badge>
                     ) : (
-                      <Badge colorScheme="gray">未启用</Badge>
+                      <Badge colorScheme="gray">{t.settings.totpDisabled}</Badge>
                     )}
                   </HStack>
                 </FormLabel>
                 <Text fontSize="sm" color="gray.600" mb={3}>
-                  使用 Google Authenticator、Authy 等应用生成一次性密码，增强登录安全性。
-                  {totpEnabled && ' 启用后，忘记密码时也可使用 TOTP 紧急登录。'}
+                  {totpEnabled ? t.settings.totpDescWithEmergency : t.settings.totpDesc}
                 </Text>
                 <HStack>
                   {totpEnabled ? (
@@ -1263,7 +1261,7 @@ const Settings: React.FC = () => {
                       isLoading={totpLoading}
                       leftIcon={<Icon as={FiX} />}
                     >
-                      禁用 TOTP
+                      {t.settings.disableTotp}
                     </Button>
                   ) : (
                     <Button
@@ -1273,7 +1271,7 @@ const Settings: React.FC = () => {
                       isLoading={totpLoading}
                       leftIcon={<Icon as={FiShield} />}
                     >
-                      启用 TOTP
+                      {t.settings.enableTotp}
                     </Button>
                   )}
                 </HStack>
@@ -1287,17 +1285,17 @@ const Settings: React.FC = () => {
                 <FormLabel>
                   <HStack>
                     <Icon as={FiSmartphone} />
-                    <Text>WebAuthn 指纹/生物识别登录</Text>
+                    <Text>{t.settings.webauthnTitle}</Text>
                   </HStack>
                 </FormLabel>
                 <Text fontSize="sm" color="gray.600" mb={3}>
-                  使用设备的生物识别功能（指纹、Face ID、Touch ID）或 Windows Hello 快速登录，无需输入密码。
+                  {t.settings.webauthnDesc}
                 </Text>
                 
                 {/* 已注册的设备列表 */}
                 {webauthnCredentials.length > 0 && (
                   <VStack spacing={2} align="stretch" mb={3}>
-                    <Text fontSize="sm" fontWeight="bold">已注册的设备：</Text>
+                    <Text fontSize="sm" fontWeight="bold">{t.settings.webauthnRegisteredDevices}</Text>
                     {webauthnCredentials.map((cred) => (
                       <HStack
                         key={cred.id}
@@ -1309,15 +1307,15 @@ const Settings: React.FC = () => {
                       >
                         <VStack align="start" spacing={0}>
                           <Text fontSize="sm" fontWeight="medium">
-                            {cred.device_name || '未命名设备'}
+                            {cred.device_name || t.settings.webauthnUnnamedDevice}
                           </Text>
                           <Text fontSize="xs" color="gray.500">
-                            注册于 {new Date(cred.created_at).toLocaleString('zh-CN')}
-                            {cred.last_used_at && ` • 最后使用 ${new Date(cred.last_used_at).toLocaleString('zh-CN')}`}
+                            {t.settings.webauthnRegisteredAt} {new Date(cred.created_at).toLocaleString()}
+                            {cred.last_used_at && ` • ${t.settings.webauthnLastUsed} ${new Date(cred.last_used_at).toLocaleString()}`}
                           </Text>
                         </VStack>
                         <IconButton
-                          aria-label="删除设备"
+                          aria-label={t.settings.webauthnDeleteDevice}
                           icon={<FiTrash2 />}
                           size="sm"
                           colorScheme="red"
@@ -1337,7 +1335,7 @@ const Settings: React.FC = () => {
                   isLoading={webauthnLoading}
                   leftIcon={<Icon as={FiSmartphone} />}
                 >
-                  注册新设备
+                  {t.settings.webauthnRegisterDevice}
                 </Button>
               </FormControl>
               )}
@@ -1388,12 +1386,12 @@ const Settings: React.FC = () => {
       {/* 压缩设置 */}
       <Card mt={6}>
         <CardHeader>
-          <Heading size="md">内容压缩设置</Heading>
+          <Heading size="md">{t.settings.compressionSettings}</Heading>
         </CardHeader>
         <CardBody>
           <VStack spacing={4} align="stretch">
             <FormControl display="flex" alignItems="center">
-              <FormLabel mb="0">启用内容压缩</FormLabel>
+              <FormLabel mb="0">{t.settings.compressionEnabled}</FormLabel>
               <Switch
                 isChecked={settings.compressionEnabled}
                 onChange={(e) => handleInputChange('compressionEnabled', e.target.checked)}
@@ -1404,7 +1402,7 @@ const Settings: React.FC = () => {
               <>
                 <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
                   <FormControl>
-                    <FormLabel>最小文件大小 (字节)</FormLabel>
+                    <FormLabel>{t.settings.compressionMinSizeBytes}</FormLabel>
                     <Input
                       type="number"
                       value={settings.compressionMinSize}
@@ -1415,7 +1413,7 @@ const Settings: React.FC = () => {
                   </FormControl>
                   
                   <FormControl>
-                    <FormLabel>Gzip压缩级别</FormLabel>
+                    <FormLabel>{t.settings.compressionGzipLevelLabel}</FormLabel>
                     <Input
                       type="number"
                       value={settings.compressionGzipLevel}
@@ -1426,7 +1424,7 @@ const Settings: React.FC = () => {
                   </FormControl>
                   
                   <FormControl>
-                    <FormLabel>Brotli压缩级别</FormLabel>
+                    <FormLabel>{t.settings.compressionBrotliLevelLabel}</FormLabel>
                     <Input
                       type="number"
                       value={settings.compressionBrotliLevel}
@@ -1438,7 +1436,7 @@ const Settings: React.FC = () => {
                 </SimpleGrid>
                 
                 <Text fontSize="sm" color="gray.500">
-                  💡 Brotli压缩效果更好但CPU消耗稍高，Gzip兼容性更好。建议同时启用以获得最佳效果。
+                  {t.settings.compressionTip}
                 </Text>
               </>
             )}
@@ -1449,12 +1447,12 @@ const Settings: React.FC = () => {
       {/* 上游缓存设置 */}
       <Card mt={6}>
         <CardHeader>
-          <Heading size="md">上游缓存设置</Heading>
+          <Heading size="md">{t.settings.upstreamCacheSettings}</Heading>
         </CardHeader>
         <CardBody>
           <VStack spacing={4} align="stretch">
             <FormControl display="flex" alignItems="center">
-              <FormLabel mb="0">启用上游缓存</FormLabel>
+              <FormLabel mb="0">{t.settings.upstreamCacheEnabled}</FormLabel>
               <Switch
                 isChecked={settings.upstreamCacheEnabled}
                 onChange={(e) => handleInputChange('upstreamCacheEnabled', e.target.checked)}
@@ -1465,7 +1463,7 @@ const Settings: React.FC = () => {
               <>
                 <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
                   <FormControl>
-                    <FormLabel>缓存目录</FormLabel>
+                    <FormLabel>{t.settings.upstreamCacheDir}</FormLabel>
                     <Input
                       value={settings.upstreamCacheDir}
                       onChange={(e) => handleInputChange('upstreamCacheDir', e.target.value)}
@@ -1474,7 +1472,7 @@ const Settings: React.FC = () => {
                   </FormControl>
                   
                   <FormControl>
-                    <FormLabel>最大缓存大小 (MB)</FormLabel>
+                    <FormLabel>{t.settings.upstreamCacheMaxSizeMB}</FormLabel>
                     <Input
                       type="number"
                       value={settings.upstreamCacheMaxSize}
@@ -1485,7 +1483,7 @@ const Settings: React.FC = () => {
                   </FormControl>
                   
                   <FormControl>
-                    <FormLabel>默认TTL (秒)</FormLabel>
+                    <FormLabel>{t.settings.upstreamCacheDefaultTTLSeconds}</FormLabel>
                     <Input
                       type="number"
                       value={settings.upstreamCacheDefaultTTL}
@@ -1496,7 +1494,7 @@ const Settings: React.FC = () => {
                   </FormControl>
                   
                   <FormControl display="flex" alignItems="center">
-                    <FormLabel mb="0">遵循上游Cache-Control</FormLabel>
+                    <FormLabel mb="0">{t.settings.upstreamCacheRespectUpstream}</FormLabel>
                     <Switch
                       isChecked={settings.upstreamCacheRespectUpstream}
                       onChange={(e) => handleInputChange('upstreamCacheRespectUpstream', e.target.checked)}
@@ -1505,7 +1503,7 @@ const Settings: React.FC = () => {
                 </SimpleGrid>
                 
                 <Text fontSize="sm" color="gray.500">
-                  💡 上游缓存会自动缓存静态文件（CSS、JS、图片等），遵循Cache-Control策略，显著提升访问速度。
+                  {t.settings.upstreamCacheTip}
                 </Text>
               </>
             )}
@@ -1516,12 +1514,12 @@ const Settings: React.FC = () => {
       {/* 内存与缓存设置 */}
       <Card mt={6}>
         <CardHeader>
-          <Heading size="md">内存与缓存设置</Heading>
+          <Heading size="md">{t.settings.memoryAndCacheSettings}</Heading>
         </CardHeader>
         <CardBody>
           <VStack spacing={4} align="stretch">
             <FormControl>
-              <FormLabel>共享缓存最大容量 (MB)</FormLabel>
+              <FormLabel>{t.settings.sharedCacheMaxSizeMB}</FormLabel>
               <Input
                 type="number"
                 min={8}
@@ -1535,12 +1533,12 @@ const Settings: React.FC = () => {
                 }
               />
               <Text fontSize="sm" color="gray.500">
-                建议不低于 8 MB，根据实际业务流量可适当增大。
+                {t.settings.sharedCacheMaxSizeMBDesc}
               </Text>
             </FormControl>
 
             <FormControl>
-              <FormLabel>内存释放阈值 (占系统内存百分比)</FormLabel>
+              <FormLabel>{t.settings.memoryMaxUsagePercent}</FormLabel>
               <Input
                 type="number"
                 min={5}
@@ -1555,12 +1553,12 @@ const Settings: React.FC = () => {
                 }
               />
               <Text fontSize="sm" color="gray.500">
-                达到该占用比例时会执行 GC 并归还内存给操作系统，范围 5% ~ 90%。
+                {t.settings.memoryMaxUsagePercentDesc}
               </Text>
             </FormControl>
 
             <FormControl>
-              <FormLabel>内存释放冷却时间 (秒)</FormLabel>
+              <FormLabel>{t.settings.memoryReleaseCooldownSec}</FormLabel>
               <Input
                 type="number"
                 min={60}
@@ -1573,7 +1571,7 @@ const Settings: React.FC = () => {
                 }
               />
               <Text fontSize="sm" color="gray.500">
-                最小 60 秒，避免内存释放过于频繁导致性能抖动。
+                {t.settings.memoryReleaseCooldownSecDesc}
               </Text>
             </FormControl>
           </VStack>
@@ -1589,19 +1587,19 @@ const Settings: React.FC = () => {
           <VStack spacing={6} align="stretch">
             {/* 最小通知级别设置 */}
             <FormControl>
-              <FormLabel>最小通知级别</FormLabel>
+              <FormLabel>{t.settings.minNotificationLevel}</FormLabel>
               <Select
                 value={settings.minNotificationLevel}
                 onChange={(e) => handleInputChange('minNotificationLevel', e.target.value)}
                 placeholder={t.settings.select_min_notification_level}
               >
-                <option value="info">信息 (info) - 所有通知</option>
-                <option value="warning">警告 (warning) - 警告及以上</option>
-                <option value="error">错误 (error) - 错误及以上</option>
-                <option value="critical">严重 (critical) - 仅严重通知</option>
+                <option value="info">{t.settings.notificationLevelInfoOption}</option>
+                <option value="warning">{t.settings.notificationLevelWarningOption}</option>
+                <option value="error">{t.settings.notificationLevelErrorOption}</option>
+                <option value="critical">{t.settings.notificationLevelCriticalOption}</option>
               </Select>
               <Text fontSize="sm" color="gray.600" mt={1}>
-                设置最小通知级别，低于此级别的通知将不会发送邮件或推送
+                {t.settings.minNotificationLevelDesc}
               </Text>
             </FormControl>
             
@@ -1610,7 +1608,7 @@ const Settings: React.FC = () => {
               <HStack justify="space-between" mb={4}>
                 <Heading size="sm">{t.settings.emailNotification}</Heading>
                 <FormControl display="flex" alignItems="center" width="auto">
-                  <FormLabel mb="0" mr={2}>启用邮箱通知</FormLabel>
+                  <FormLabel mb="0" mr={2}>{t.settings.enableEmailNotification}</FormLabel>
                   <Switch
                     isChecked={settings.emailEnabled}
                     onChange={(e) => handleInputChange('emailEnabled', e.target.checked)}
@@ -1625,11 +1623,11 @@ const Settings: React.FC = () => {
                   value={settings.emailMethod || 'smtp'}
                   onChange={(e) => handleInputChange('emailMethod', e.target.value)}
                 >
-                  <option value="smtp">SMTP 服务器</option>
-                  <option value="sendmail">系统 Sendmail</option>
-                  <option value="resend">Resend 服务</option>
-                  <option value="mailgun">Mailgun 服务</option>
-                  <option value="sendgrid">SendGrid 服务</option>
+                  <option value="smtp">{t.settings.emailMethodSmtp}</option>
+                  <option value="sendmail">{t.settings.emailMethodSendmail}</option>
+                  <option value="resend">{t.settings.emailMethodResend}</option>
+                  <option value="mailgun">{t.settings.emailMethodMailgun}</option>
+                  <option value="sendgrid">{t.settings.emailMethodSendgrid}</option>
                 </Select>
               </FormControl>
 
@@ -1700,7 +1698,7 @@ const Settings: React.FC = () => {
               {settings.emailMethod === 'sendmail' && (
                 <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
                   <FormControl>
-                    <FormLabel>Sendmail 命令</FormLabel>
+                    <FormLabel>{t.settings.sendmailCommand}</FormLabel>
                     <Input
                       value={settings.sendmailCommand || ''}
                       onChange={(e) => handleInputChange('sendmailCommand', e.target.value)}
@@ -1708,7 +1706,7 @@ const Settings: React.FC = () => {
                     />
                   </FormControl>
                   <FormControl>
-                    <FormLabel>命令参数</FormLabel>
+                    <FormLabel>{t.settings.sendmailArgs}</FormLabel>
                     <Input
                       value={settings.sendmailArgs || ''}
                       onChange={(e) => handleInputChange('sendmailArgs', e.target.value)}
@@ -1716,7 +1714,7 @@ const Settings: React.FC = () => {
                     />
                   </FormControl>
                   <FormControl>
-                    <FormLabel>发件人</FormLabel>
+                    <FormLabel>{t.settings.sender}</FormLabel>
                     <Input
                       value={settings.smtpFrom || ''}
                       onChange={(e) => handleInputChange('smtpFrom', e.target.value)}
@@ -1724,7 +1722,7 @@ const Settings: React.FC = () => {
                     />
                   </FormControl>
                   <FormControl>
-                    <FormLabel>收件人</FormLabel>
+                    <FormLabel>{t.settings.recipient}</FormLabel>
                     <Input
                       value={settings.smtpTo || ''}
                       onChange={(e) => handleInputChange('smtpTo', e.target.value)}
@@ -1747,7 +1745,7 @@ const Settings: React.FC = () => {
                     />
                   </FormControl>
                   <FormControl>
-                    <FormLabel>发件人</FormLabel>
+                    <FormLabel>{t.settings.sender}</FormLabel>
                     <Input
                       value={settings.resendFrom || ''}
                       onChange={(e) => handleInputChange('resendFrom', e.target.value)}
@@ -1755,7 +1753,7 @@ const Settings: React.FC = () => {
                     />
                   </FormControl>
                   <FormControl>
-                    <FormLabel>收件人</FormLabel>
+                    <FormLabel>{t.settings.recipient}</FormLabel>
                     <Input
                       value={settings.resendTo || ''}
                       onChange={(e) => handleInputChange('resendTo', e.target.value)}
@@ -1786,7 +1784,7 @@ const Settings: React.FC = () => {
                     />
                   </FormControl>
                   <FormControl>
-                    <FormLabel>发件人</FormLabel>
+                    <FormLabel>{t.settings.sender}</FormLabel>
                     <Input
                       value={settings.mailgunFrom || ''}
                       onChange={(e) => handleInputChange('mailgunFrom', e.target.value)}
@@ -1794,7 +1792,7 @@ const Settings: React.FC = () => {
                     />
                   </FormControl>
                   <FormControl>
-                    <FormLabel>收件人</FormLabel>
+                    <FormLabel>{t.settings.recipient}</FormLabel>
                     <Input
                       value={settings.mailgunTo || ''}
                       onChange={(e) => handleInputChange('mailgunTo', e.target.value)}
@@ -1817,7 +1815,7 @@ const Settings: React.FC = () => {
                     />
                   </FormControl>
                   <FormControl>
-                    <FormLabel>发件人</FormLabel>
+                    <FormLabel>{t.settings.sender}</FormLabel>
                     <Input
                       value={settings.sendgridFrom || ''}
                       onChange={(e) => handleInputChange('sendgridFrom', e.target.value)}
@@ -1825,7 +1823,7 @@ const Settings: React.FC = () => {
                     />
                   </FormControl>
                   <FormControl>
-                    <FormLabel>收件人</FormLabel>
+                    <FormLabel>{t.settings.recipient}</FormLabel>
                     <Input
                       value={settings.sendgridTo || ''}
                       onChange={(e) => handleInputChange('sendgridTo', e.target.value)}
@@ -1839,9 +1837,9 @@ const Settings: React.FC = () => {
             {/* Webhook通知配置 */}
             <Box border="1px" borderColor="gray.200" borderRadius="md" p={4}>
               <HStack justify="space-between" mb={4}>
-                <Heading size="sm">Webhook 通知渠道</Heading>
+                <Heading size="sm">{t.settings.otherNotification}</Heading>
                 <FormControl display="flex" alignItems="center" width="auto">
-                  <FormLabel mb="0" mr={2}>启用 Webhook 通知</FormLabel>
+                  <FormLabel mb="0" mr={2}>{t.settings.enableWebhookNotification}</FormLabel>
                   <Switch
                     isChecked={settings.webhookEnabled}
                     onChange={(e) => handleInputChange('webhookEnabled', e.target.checked)}
@@ -1849,7 +1847,7 @@ const Settings: React.FC = () => {
                 </FormControl>
               </HStack>
               <Text fontSize="sm" color="gray.600" mb={4}>
-                支持多种平台的通知，包括 Slack、企业微信、飞书、钉钉、Discord、Telegram 等
+                {t.settings.supportDingtalk}
               </Text>
               <VStack spacing={3} align="stretch">
                 {settings.webhookUrls.map((url, index) => (
@@ -1857,12 +1855,12 @@ const Settings: React.FC = () => {
                     <FormControl flex={1}>
                       <FormLabel fontSize="sm" mb={1}>
                         Webhook URL {index + 1}
-                        {url.includes('hooks.slack.com') && <Badge ml={2} colorScheme="purple" size="sm">Slack</Badge>}
-                        {url.includes('qyapi.weixin.qq.com') && <Badge ml={2} colorScheme="green" size="sm">企业微信</Badge>}
-                        {url.includes('open.feishu.cn') && <Badge ml={2} colorScheme="blue" size="sm">飞书</Badge>}
-                        {url.includes('oapi.dingtalk.com') && <Badge ml={2} colorScheme="orange" size="sm">钉钉</Badge>}
-                        {url.includes('discord.com') && <Badge ml={2} colorScheme="purple" size="sm">Discord</Badge>}
-                        {url.includes('api.telegram.org') && <Badge ml={2} colorScheme="blue" size="sm">Telegram</Badge>}
+                        {url.includes('hooks.slack.com') && <Badge ml={2} colorScheme="purple" size="sm">{t.settings.webhookPlatformSlack}</Badge>}
+                        {url.includes('qyapi.weixin.qq.com') && <Badge ml={2} colorScheme="green" size="sm">{t.settings.webhookPlatformWeChatWork}</Badge>}
+                        {url.includes('open.feishu.cn') && <Badge ml={2} colorScheme="blue" size="sm">{t.settings.webhookPlatformFeishu}</Badge>}
+                        {url.includes('oapi.dingtalk.com') && <Badge ml={2} colorScheme="orange" size="sm">{t.settings.webhookPlatformDingTalk}</Badge>}
+                        {url.includes('discord.com') && <Badge ml={2} colorScheme="purple" size="sm">{t.settings.webhookPlatformDiscord}</Badge>}
+                        {url.includes('api.telegram.org') && <Badge ml={2} colorScheme="blue" size="sm">{t.settings.webhookPlatformTelegram}</Badge>}
                       </FormLabel>
                       <Input
                         value={url}
@@ -1885,7 +1883,7 @@ const Settings: React.FC = () => {
                         }}
                         mt={6}
                       >
-                        删除
+                        {t.settings.webhookDelete}
                       </Button>
                     )}
                   </HStack>
@@ -1899,32 +1897,32 @@ const Settings: React.FC = () => {
                   }}
                   alignSelf="flex-start"
                 >
-                  添加更多 Webhook
+                  {t.settings.webhookAddMore}
                 </Button>
                 <Text fontSize="sm" color="gray.500">
-                  支持自动格式适配的平台（输入URL后会自动识别）：
+                  {t.settings.webhookAutoDetectDesc}
                 </Text>
                 <VStack align="start" spacing={1}>
                   <Text fontSize="xs" color="purple.600">
-                    • <strong>Slack</strong>: hooks.slack.com/services/xxx
+                    • <strong>{t.settings.webhookPlatformSlack}</strong>: hooks.slack.com/services/xxx
                   </Text>
                   <Text fontSize="xs" color="green.600">
-                    • <strong>企业微信</strong>: qyapi.weixin.qq.com
+                    • <strong>{t.settings.webhookPlatformWeChatWork}</strong>: qyapi.weixin.qq.com
                   </Text>
                   <Text fontSize="xs" color="blue.600">
-                    • <strong>飞书</strong>: open.feishu.cn
+                    • <strong>{t.settings.webhookPlatformFeishu}</strong>: open.feishu.cn
                   </Text>
                   <Text fontSize="xs" color="orange.600">
-                    • <strong>钉钉</strong>: oapi.dingtalk.com
+                    • <strong>{t.settings.webhookPlatformDingTalk}</strong>: oapi.dingtalk.com
                   </Text>
                   <Text fontSize="xs" color="purple.600">
-                    • <strong>Discord</strong>: discord.com
+                    • <strong>{t.settings.webhookPlatformDiscord}</strong>: discord.com
                   </Text>
                   <Text fontSize="xs" color="blue.600">
-                    • <strong>Telegram</strong>: api.telegram.org
+                    • <strong>{t.settings.webhookPlatformTelegram}</strong>: api.telegram.org
                   </Text>
                   <Text fontSize="xs" color="gray.500">
-                    • <strong>其他</strong>: 通用JSON格式
+                    • <strong>{t.settings.webhookPlatformOther}</strong>: General JSON format
                   </Text>
                 </VStack>
               </VStack>
@@ -1952,7 +1950,7 @@ const Settings: React.FC = () => {
           <ModalHeader>
             <HStack>
               <Icon as={FiShield} color="green.500" />
-              <Text>设置 TOTP 双因素认证</Text>
+              <Text>{t.settings.totpSetupTitle}</Text>
             </HStack>
           </ModalHeader>
           <ModalCloseButton />
@@ -1961,8 +1959,8 @@ const Settings: React.FC = () => {
               <Alert status="info" borderRadius="md">
                 <AlertIcon />
                 <Box>
-                  <Text fontWeight="bold">步骤 1：扫描二维码</Text>
-                  <Text fontSize="sm">使用 Google Authenticator、Authy、Microsoft Authenticator 等应用扫描下方二维码</Text>
+                  <Text fontWeight="bold">{t.settings.totpStep1Title}</Text>
+                  <Text fontSize="sm">{t.settings.totpStep1Desc}</Text>
                 </Box>
               </Alert>
 
@@ -1977,7 +1975,7 @@ const Settings: React.FC = () => {
                     borderColor="gray.200"
                   />
                   <Text fontSize="xs" color="gray.500" mt={2}>
-                    密钥: {totpSecret}
+                    {t.settings.totpSecret} {totpSecret}
                   </Text>
                 </Box>
               )}
@@ -1985,9 +1983,9 @@ const Settings: React.FC = () => {
               <Divider />
 
               <Box>
-                <Text fontWeight="bold" mb={3}>步骤 2：输入验证码</Text>
+                <Text fontWeight="bold" mb={3}>{t.settings.totpStep2Title}</Text>
                 <Text fontSize="sm" color="gray.600" mb={3}>
-                  输入应用中显示的 6 位数字验证码以完成设置
+                  {t.settings.totpStep2Desc}
                 </Text>
                 <HStack justify="center">
                   <PinInput
@@ -2009,7 +2007,7 @@ const Settings: React.FC = () => {
           </ModalBody>
           <ModalFooter>
             <Button variant="ghost" mr={3} onClick={onTotpModalClose}>
-              取消
+              {t.common.cancel}
             </Button>
             <Button
               colorScheme="green"
@@ -2018,7 +2016,7 @@ const Settings: React.FC = () => {
               isDisabled={totpVerifyCode.length !== 6}
               leftIcon={<Icon as={FiCheck} />}
             >
-              启用 TOTP
+              {t.settings.enableTotp}
             </Button>
           </ModalFooter>
         </ModalContent>
@@ -2031,7 +2029,7 @@ const Settings: React.FC = () => {
           <ModalHeader>
             <HStack>
               <Icon as={FiSmartphone} color="blue.500" />
-              <Text>注册 WebAuthn 设备</Text>
+              <Text>{t.settings.webauthnRegisterTitle}</Text>
             </HStack>
           </ModalHeader>
           <ModalCloseButton />
@@ -2040,17 +2038,17 @@ const Settings: React.FC = () => {
               <Alert status="info" borderRadius="md">
                 <AlertIcon />
                 <Box>
-                  <Text fontWeight="bold">步骤 1：输入设备名称</Text>
-                  <Text fontSize="sm">为这个设备起一个容易识别的名称，如 "Chrome on MacBook"</Text>
+                  <Text fontWeight="bold">{t.settings.webauthnRegisterStep1Title}</Text>
+                  <Text fontSize="sm">{t.settings.webauthnRegisterStep1Desc}</Text>
                 </Box>
               </Alert>
 
               <FormControl isRequired>
-                <FormLabel>设备名称</FormLabel>
+                <FormLabel>{t.settings.webauthnDeviceName}</FormLabel>
                 <Input
                   value={webauthnDeviceName}
                   onChange={(e) => setWebauthnDeviceName(e.target.value)}
-                  placeholder="例如：Chrome on MacBook"
+                  placeholder={t.settings.webauthnDeviceNamePlaceholder}
                   isDisabled={webauthnLoading}
                   autoFocus
                 />
@@ -2059,15 +2057,15 @@ const Settings: React.FC = () => {
               <Alert status="warning" borderRadius="md">
                 <AlertIcon />
                 <Box>
-                  <Text fontWeight="bold">步骤 2：完成生物识别验证</Text>
-                  <Text fontSize="sm">点击"开始注册"后，浏览器会要求您进行指纹、Face ID 或其他生物识别验证</Text>
+                  <Text fontWeight="bold">{t.settings.webauthnRegisterStep2Title}</Text>
+                  <Text fontSize="sm">{t.settings.webauthnRegisterStep2Desc}</Text>
                 </Box>
               </Alert>
             </VStack>
           </ModalBody>
           <ModalFooter>
             <Button variant="ghost" mr={3} onClick={onWebauthnModalClose}>
-              取消
+              {t.common.cancel}
             </Button>
             <Button
               colorScheme="blue"
@@ -2076,7 +2074,7 @@ const Settings: React.FC = () => {
               isDisabled={!webauthnDeviceName.trim()}
               leftIcon={<Icon as={FiSmartphone} />}
             >
-              开始注册
+              {t.common.start || 'Start Registration'}
             </Button>
           </ModalFooter>
         </ModalContent>

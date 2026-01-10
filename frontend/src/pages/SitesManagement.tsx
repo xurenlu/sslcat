@@ -224,13 +224,13 @@ const SitesManagement: React.FC = () => {
           <TabPanel>
             <VStack spacing={6} align="stretch">
               <Flex justify="space-between" align="center">
-                <Text fontSize="lg" fontWeight="medium">静态站点列表</Text>
+                <Text fontSize="lg" fontWeight="medium">{t.sites.staticSiteList || 'Static Site List'}</Text>
                 <Button
                   leftIcon={<Icon as={FiPlus} />}
                   colorScheme="blue"
                   onClick={() => openCreateModal('static')}
                 >
-                  添加静态站点
+                  {t.sites.addStaticSite || '+ Add Static Site'}
                 </Button>
               </Flex>
 
@@ -240,12 +240,12 @@ const SitesManagement: React.FC = () => {
                     <Table variant="simple">
                       <Thead>
                         <Tr>
-                          <Th>域名</Th>
-                          <Th>根目录</Th>
-                          <Th>状态</Th>
-                          <Th>入口文件</Th>
-                          <Th>路径前缀规则</Th>
-                          <Th>操作</Th>
+                          <Th>{t.sites.domain || 'Domain'}</Th>
+                          <Th>{t.sites.rootDirectory || 'Root Directory'}</Th>
+                          <Th>{t.sites.status || 'Status'}</Th>
+                          <Th>{t.sites.indexFile || 'Index File'}</Th>
+                          <Th>{t.sites.pathPrefixRules || 'Path Prefix Rules'}</Th>
+                          <Th>{t.sites.actions || 'Actions'}</Th>
                         </Tr>
                       </Thead>
                       <Tbody>
@@ -264,13 +264,13 @@ const SitesManagement: React.FC = () => {
                             </Td>
                             <Td>
                               <Badge colorScheme={site.enabled ? 'green' : 'gray'}>
-                                {site.enabled ? '启用' : '禁用'}
+                                {site.enabled ? t.common.enable : t.common.disable}
                               </Badge>
                             </Td>
                             <Td>{site.indexFile}</Td>
                             <Td>
                               <Badge colorScheme="blue">
-                                {site.path_prefix_rules?.length || 0} 个规则
+                                {site.path_prefix_rules?.length || 0} {t.sites.rules || 'rules'}
                               </Badge>
                             </Td>
                             <Td>
@@ -299,13 +299,13 @@ const SitesManagement: React.FC = () => {
                   ) : (
                     <Box textAlign="center" py={8}>
                       <Icon as={FiFolder} boxSize={12} color="gray.300" mb={4} />
-                      <Text color="gray.500" mb={4}>暂无静态站点</Text>
+                      <Text color="gray.500" mb={4}>{t.sites.noStaticSites || 'No static sites yet'}</Text>
                       <Button
                         leftIcon={<Icon as={FiPlus} />}
                         colorScheme="blue"
                         onClick={() => openCreateModal('static')}
                       >
-                        添加第一个静态站点
+                        {t.sites.addFirstStaticSite || '+ Add First Static Site'}
                       </Button>
                     </Box>
                   )}
@@ -318,13 +318,13 @@ const SitesManagement: React.FC = () => {
           <TabPanel>
             <VStack spacing={6} align="stretch">
               <Flex justify="space-between" align="center">
-                <Text fontSize="lg" fontWeight="medium">PHP 站点列表</Text>
+                <Text fontSize="lg" fontWeight="medium">{t.sites.phpSites || 'PHP Sites'}</Text>
                 <Button
                   leftIcon={<Icon as={FiPlus} />}
                   colorScheme="green"
                   onClick={() => openCreateModal('php')}
                 >
-                  添加 PHP 站点
+                  {t.sites.createSite || '+ Add PHP Site'}
                 </Button>
               </Flex>
 
@@ -334,15 +334,15 @@ const SitesManagement: React.FC = () => {
                     <Table variant="simple">
                       <Thead>
                         <Tr>
-                          <Th>域名</Th>
-                          <Th>根目录</Th>
-                          <Th>PHP版本</Th>
-                          <Th>连接地址</Th>
-                          <Th>状态</Th>
-                          <Th>内存限制</Th>
-                          <Th>执行时间</Th>
-                          <Th>路径前缀规则</Th>
-                          <Th>操作</Th>
+                          <Th>{t.sites.domain || 'Domain'}</Th>
+                          <Th>{t.sites.rootDirectory || 'Root Directory'}</Th>
+                          <Th>PHP Version</Th>
+                          <Th>Connection Address</Th>
+                          <Th>{t.sites.status || 'Status'}</Th>
+                          <Th>Memory Limit</Th>
+                          <Th>Execution Time</Th>
+                          <Th>{t.sites.pathPrefixRules || 'Path Prefix Rules'}</Th>
+                          <Th>{t.sites.actions || 'Actions'}</Th>
                         </Tr>
                       </Thead>
                       <Tbody>
@@ -369,14 +369,14 @@ const SitesManagement: React.FC = () => {
                             </Td>
                             <Td>
                               <Badge colorScheme={site.enabled ? 'green' : 'gray'}>
-                                {site.enabled ? '启用' : '禁用'}
+                                {site.enabled ? t.common.enable : t.common.disable}
                               </Badge>
                             </Td>
                             <Td>{site.memoryLimit}</Td>
                             <Td>{site.maxExecutionTime}s</Td>
                             <Td>
                               <Badge colorScheme="green">
-                                {site.path_prefix_rules?.length || 0} 个规则
+                                {site.path_prefix_rules?.length || 0} {t.sites.rules || 'rules'}
                               </Badge>
                             </Td>
                             <Td>

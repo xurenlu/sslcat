@@ -25,6 +25,7 @@ import { SearchIcon, StarIcon } from '@chakra-ui/icons'
 import { useNavigate } from 'react-router-dom'
 import api from '../utils/api'
 import { useConfig, buildPath } from '../contexts/ConfigContext'
+import { useTranslation } from '../hooks/useLanguage'
 
 interface Template {
   id: string
@@ -50,6 +51,7 @@ const TemplateMarket: React.FC = () => {
   const navigate = useNavigate()
   const toast = useToast()
   const { adminPrefix } = useConfig()
+  const t = useTranslation()
 
   useEffect(() => {
     loadTemplates()
@@ -71,8 +73,8 @@ const TemplateMarket: React.FC = () => {
       }
     } catch (error: any) {
       toast({
-        title: '加载模板失败',
-        description: error.message || '无法加载模板列表',
+        title: t.templates?.loadFailed || 'Failed to load templates',
+        description: error.message || (t.templates?.loadFailedDesc || 'Unable to load template list'),
         status: 'error',
         duration: 3000,
       })
@@ -123,7 +125,7 @@ const TemplateMarket: React.FC = () => {
   return (
     <Box p={6}>
       <VStack spacing={6} align="stretch">
-        <Heading size="lg">模板市场</Heading>
+        <Heading size="lg">{t.templates?.title || t.sidebar.templateMarket || 'Template Market'}</Heading>
 
         {/* 搜索和筛选 */}
         <HStack spacing={4}>
@@ -132,13 +134,13 @@ const TemplateMarket: React.FC = () => {
               <SearchIcon color="gray.400" />
             </InputLeftElement>
             <Input
-              placeholder="搜索模板..."
+              placeholder={t.templates?.searchPlaceholder || 'Search templates...'}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </InputGroup>
           <Select
-            placeholder="选择分类"
+            placeholder={t.templates?.selectCategory || 'Select category'}
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
             maxW="200px"
@@ -150,7 +152,7 @@ const TemplateMarket: React.FC = () => {
             ))}
           </Select>
           <Select
-            placeholder="选择标签"
+            placeholder={t.templates?.selectTag || 'Select tags'}
             value={tagFilter}
             onChange={(e) => setTagFilter(e.target.value)}
             maxW="200px"
@@ -167,14 +169,14 @@ const TemplateMarket: React.FC = () => {
               setTagFilter('')
               setSearchQuery('')
             }}>
-              清除筛选
+              {t.templates?.clearFilters || 'Clear Filters'}
             </Button>
           )}
         </HStack>
 
         {/* 模板列表 */}
         <Text color="gray.500">
-          找到 {filteredTemplates.length} 个模板
+          {t.templates?.foundTemplates?.replace('{count}', filteredTemplates.length.toString()) || `Found ${filteredTemplates.length} templates`}
         </Text>
 
         <Grid templateColumns="repeat(auto-fill, minmax(300px, 1fr))" gap={4}>
@@ -187,7 +189,7 @@ const TemplateMarket: React.FC = () => {
                     <HStack>
                       <Badge colorScheme="blue">{template.category}</Badge>
                       {template.source === 'builtin' && (
-                        <Badge colorScheme="green">内置</Badge>
+                        <Badge colorScheme="green">{t.templates?.builtin || 'Built-in'}</Badge>
                       )}
                     </HStack>
                   </VStack>
@@ -212,7 +214,7 @@ const TemplateMarket: React.FC = () => {
                     onClick={() => handleDeploy(template.id)}
                     width="full"
                   >
-                    一键部署
+                    {t.templates?.oneClickDeploy || 'One-Click Deploy'}
                   </Button>
                 </VStack>
               </CardBody>
@@ -222,7 +224,7 @@ const TemplateMarket: React.FC = () => {
 
         {filteredTemplates.length === 0 && (
           <Center py={10}>
-            <Text color="gray.500">没有找到匹配的模板</Text>
+            <Text color="gray.500">{t.templates?.noMatchingTemplates || 'No matching templates found'}</Text>
           </Center>
         )}
       </VStack>

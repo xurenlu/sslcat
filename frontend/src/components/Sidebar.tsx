@@ -127,16 +127,16 @@ const SidebarContent = () => {
 
   const categories = useMemo(() => [
     {
-      title: '控制台',
+      title: t.sidebar.console,
       items: [
         { name: t.navigation.dashboard, icon: FiHome, path: buildPath(adminPrefix, '/dashboard'), keywords: 'home stats 首页 概览' },
         { name: t.navigation.statistics, icon: FiBarChart2, path: buildPath(adminPrefix, '/statistics'), keywords: 'stats requests traffic 流量 统计' },
-        { name: t.navigation.monitoring || '系统监控', icon: FiActivity, path: buildPath(adminPrefix, '/monitoring'), keywords: 'cpu memory watchdog 监控 性能' },
+        { name: t.navigation.monitoring || 'System Monitoring', icon: FiActivity, path: buildPath(adminPrefix, '/monitoring'), keywords: 'cpu memory watchdog 监控 性能' },
         { name: t.navigation.slowRequests, icon: FiClock, path: buildPath(adminPrefix, '/slow-requests'), keywords: 'performance slow delay 慢日志 延迟' },
       ]
     },
     {
-      title: '核心服务',
+      title: t.sidebar.coreServices,
       items: [
         { name: t.navigation.proxy, icon: FiZap, path: buildPath(adminPrefix, '/proxy'), keywords: 'proxy rules reverse 反代 规则' },
         { name: t.navigation.sites, icon: FiGlobe, path: buildPath(adminPrefix, '/sites'), keywords: 'static php website 网站 站点' },
@@ -145,31 +145,31 @@ const SidebarContent = () => {
       ]
     },
     {
-      title: '高级功能',
+      title: t.sidebar.advancedFeatures,
       items: [
         { name: t.navigation.cdnCache, icon: FiHardDrive, path: buildPath(adminPrefix, '/cdn'), keywords: 'cache speed cdn 缓存 加速' },
         { name: t.navigation.imageOptimization, icon: FiImage, path: buildPath(adminPrefix, '/image-optimization'), keywords: 'webp compression resize 图片 压缩' },
         { name: t.navigation.gitServer, icon: FiGitBranch, path: buildPath(adminPrefix, '/git-server'), keywords: 'deploy auto ci/cd 部署 自动化' },
-        { name: '模板市场', icon: FiPackage, path: buildPath(adminPrefix, '/templates'), keywords: 'market apps docker 模板 应用' },
+        { name: t.sidebar.templateMarket, icon: FiPackage, path: buildPath(adminPrefix, '/templates'), keywords: 'market apps docker 模板 应用' },
       ]
     },
     {
-      title: '安全防护',
+      title: t.sidebar.securityProtection,
       items: [
         { name: t.navigation.security, icon: FiShield, path: buildPath(adminPrefix, '/security'), keywords: 'waf ddos block 防火墙 拦截' },
-        { name: '封禁管理', icon: FiX, path: buildPath(adminPrefix, '/block-management'), keywords: 'block unblock ip tls fingerprint user agent 封禁 解封' },
+        { name: t.sidebar.blockManagement, icon: FiX, path: buildPath(adminPrefix, '/block-management'), keywords: 'block unblock ip tls fingerprint user agent 封禁 解封' },
         { name: t.navigation.aiSecurity || '🤖 AI 安全分析', icon: FaRobot, path: buildPath(adminPrefix, '/ai-security'), badge: 'AI', keywords: 'ai robot threat analysis 智能 分析' },
       ]
     },
     {
-      title: '集群与部署',
+      title: t.sidebar.clusterDeployment,
       items: [
-        { name: t.navigation.cluster || '集群设置', icon: FiServer, path: buildPath(adminPrefix, '/cluster'), keywords: 'master slave sync 集群 同步' },
-        { name: t.navigation.clusterStatus || '集群状态', icon: FiServer, path: buildPath(adminPrefix, '/cluster/status'), keywords: 'nodes health status 节点 健康' },
+        { name: t.navigation.cluster || 'Cluster', icon: FiServer, path: buildPath(adminPrefix, '/cluster'), keywords: 'master slave sync 集群 同步' },
+        { name: t.navigation.clusterStatus || 'Cluster Status', icon: FiServer, path: buildPath(adminPrefix, '/cluster/status'), keywords: 'nodes health status 节点 健康' },
       ]
     },
     {
-      title: '系统管理',
+      title: t.sidebar.systemManagement,
       items: [
         { name: t.navigation.settings, icon: FiSettings, path: buildPath(adminPrefix, '/settings'), keywords: 'config basic notification 配置 通知' },
         { name: t.navigation.userManagement, icon: FiUsers, path: buildPath(adminPrefix, '/users'), keywords: 'admin members roles 用户 权限' },
@@ -233,7 +233,7 @@ const SidebarContent = () => {
             <Icon as={FiSearch} color="gray.400" />
           </InputLeftElement>
           <Input
-            placeholder="搜索功能..."
+            placeholder={t.sidebar.searchPlaceholder || 'Search...'}
             variant="filled"
             bg="gray.50"
             _focus={{
