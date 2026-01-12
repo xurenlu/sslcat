@@ -37,7 +37,7 @@ import (
 )
 
 var (
-	version = "1.3.32-rc9"
+	version = "1.3.32-rc10"
 	build   = "dev"
 )
 
@@ -699,22 +699,52 @@ func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *s
 					return
 				}
 
-				// 其他管理面板路径：只有在有有效证书时才重定向到HTTPS
-				host := r.Host
-				if idx := strings.Index(host, ":"); idx != -1 {
-					host = host[:idx]
+			// 其他管理面板路径：只有在有有效证书时才重定向到HTTPS
+			// 但如果是代理到本地服务（localhost/127.0.0.1），不应该强制HTTPS
+			host := r.Host
+			if idx := strings.Index(host, ":"); idx != -1 {
+				host = host[:idx]
+			}
+			
+			// 检查是否有代理配置，如果是代理到本地，不强制HTTPS
+			rule := proxyManager.GetProxyConfig(host)
+			isLocalBackend := false
+			if rule != nil {
+				// 优先使用 Backends 数组，如果没有则使用旧的 Target 字段
+				backends := rule.GetEffectiveBackends()
+				if len(backends) > 0 {
+					// 检查第一个后端（通常只有一个）
+					backendHost := backends[0].Host
+					if backends[0].Port > 0 {
+						backendHost = fmt.Sprintf("%s:%d", backendHost, backends[0].Port)
+					}
+					isLocalBackend = strings.Contains(backendHost, "localhost") || 
+						strings.Contains(backendHost, "127.0.0.1") || 
+						strings.HasPrefix(backendHost, "127.")
+				} else if rule.Target != "" {
+					// 兼容旧配置格式
+					backendHost := rule.Target
+					if rule.Port > 0 {
+						backendHost = fmt.Sprintf("%s:%d", backendHost, rule.Port)
+					}
+					isLocalBackend = strings.Contains(backendHost, "localhost") || 
+						strings.Contains(backendHost, "127.0.0.1") || 
+						strings.HasPrefix(backendHost, "127.")
 				}
-				if sslManager.HasValidCertificate(host) {
-					httpsURL := fmt.Sprintf("https://%s%s", r.Host, r.RequestURI)
-					http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
-					return
-				}
-				// 没有证书时，直接用 HTTP 处理
-				webServer.ServeHTTP(w, r)
+			}
+			
+			// 只有在有有效证书且不是本地后端时才重定向到HTTPS
+			if !isLocalBackend && sslManager.HasValidCertificate(host) {
+				httpsURL := fmt.Sprintf("https://%s%s", r.Host, r.RequestURI)
+				http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
 				return
 			}
+			// 没有证书或是本地后端时，直接用 HTTP 处理
+			webServer.ServeHTTP(w, r)
+			return
+		}
 
-			// 其他路径通过代理处理（如果有配置）
+		// 其他路径通过代理处理（如果有配置）
 			if rule := proxyManager.GetProxyConfig(r.Host); rule != nil {
 				// 如果配置了SSLOnly且有有效证书，才重定向
 				host := r.Host
