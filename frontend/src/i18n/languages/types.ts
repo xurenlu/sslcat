@@ -853,6 +853,7 @@ export interface Translation {
     securitySettings: string
     wafProtection: string
     wafProtecting: string
+    wafDisabledWarning: string
     ddosProtection: string
     threatIntelligence: string
     autoBlockSuspiciousIPs: string
