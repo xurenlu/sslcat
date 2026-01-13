@@ -699,47 +699,9 @@ func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *s
 					return
 				}
 
-			// 其他管理面板路径：只有在有有效证书时才重定向到HTTPS
-			// 但如果是代理到本地服务（localhost/127.0.0.1），不应该强制HTTPS
-			host := r.Host
-			if idx := strings.Index(host, ":"); idx != -1 {
-				host = host[:idx]
-			}
-			
-			// 检查是否有代理配置，如果是代理到本地，不强制HTTPS
-			rule := proxyManager.GetProxyConfig(host)
-			isLocalBackend := false
-			if rule != nil {
-				// 优先使用 Backends 数组，如果没有则使用旧的 Target 字段
-				backends := rule.GetEffectiveBackends()
-				if len(backends) > 0 {
-					// 检查第一个后端（通常只有一个）
-					backendHost := backends[0].Host
-					if backends[0].Port > 0 {
-						backendHost = fmt.Sprintf("%s:%d", backendHost, backends[0].Port)
-					}
-					isLocalBackend = strings.Contains(backendHost, "localhost") || 
-						strings.Contains(backendHost, "127.0.0.1") || 
-						strings.HasPrefix(backendHost, "127.")
-				} else if rule.Target != "" {
-					// 兼容旧配置格式
-					backendHost := rule.Target
-					if rule.Port > 0 {
-						backendHost = fmt.Sprintf("%s:%d", backendHost, rule.Port)
-					}
-					isLocalBackend = strings.Contains(backendHost, "localhost") || 
-						strings.Contains(backendHost, "127.0.0.1") || 
-						strings.HasPrefix(backendHost, "127.")
-				}
-			}
-			
-			// 只有在有有效证书且不是本地后端时才重定向到HTTPS
-			if !isLocalBackend && sslManager.HasValidCertificate(host) {
-				httpsURL := fmt.Sprintf("https://%s%s", r.Host, r.RequestURI)
-				http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
-				return
-			}
-			// 没有证书或是本地后端时，直接用 HTTP 处理
+			// 管理面板路径：不强制重定向到HTTPS，允许HTTP访问
+			// 这样可以支持内网环境或特殊场景下的HTTP访问
+			// 如果用户需要HTTPS，可以通过浏览器直接访问HTTPS地址
 			webServer.ServeHTTP(w, r)
 			return
 		}
