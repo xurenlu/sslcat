@@ -77,6 +77,8 @@ export const zhCN: Translation = {
     startTime: '开始时间',
     endTime: '结束时间',
     auto: '自动检测',
+    actions: '操作',
+    start: '开始',
   },
   navigation: {
     dashboard: '仪表板',
@@ -189,7 +191,6 @@ export const zhCN: Translation = {
     syncACMECertificates: '同步 ACME 证书',
     uploadCertificate: '↑上传证书',
     downloadAllCertificates: '↓下载全部证书',
-    valid: '有效',
   },
   statistics: {
     title: '访问统计',
@@ -485,7 +486,6 @@ export const zhCN: Translation = {
     // 自定义端口详细设置
     customPortConfigTitle: '自定义端口配置',
     customPortWarning: '自定义端口模式下，SSLcat 将仅监听指定端口，不支持 HTTPS 功能。如需 HTTPS，请使用标准模式或配置反向代理。',
-    customPortLabel: '监听端口',
     customPortSuggestion: '建议使用 8080、3000、8000 等非特权端口',
     enableHttpsDesc: '启用后会自动申请和管理 SSL 证书',
     // TOTP 双因素认证

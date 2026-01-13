@@ -77,6 +77,8 @@ export const jaJP: Translation = {
     startTime: '開始時間',
     endTime: '終了時間',
     auto: '自動検出',
+    actions: '操作',
+    start: '開始',
   },
   navigation: {
     dashboard: 'ダッシュボード',

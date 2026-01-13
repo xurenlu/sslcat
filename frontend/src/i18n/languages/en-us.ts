@@ -77,6 +77,8 @@ export const enUS: Translation = {
     startTime: 'Start Time',
     endTime: 'End Time',
     auto: 'Auto Detect',
+    actions: 'Actions',
+    start: 'Start',
   },
   navigation: {
     dashboard: 'Dashboard',
@@ -193,7 +195,6 @@ export const enUS: Translation = {
     syncACMECertificates: 'Sync ACME Certificates',
     uploadCertificate: 'Upload Certificate',
     downloadAllCertificates: 'Download All Certificates',
-    valid: 'Valid',
   },
   statistics: {
     title: 'Access Statistics',
@@ -489,7 +490,6 @@ export const enUS: Translation = {
     // 自定义端口详细设置
     customPortConfigTitle: 'Custom Port Configuration',
     customPortWarning: 'In custom port mode, SSLcat will only listen on the specified port and does not support HTTPS functionality. For HTTPS, please use standard mode or configure a reverse proxy.',
-    customPortLabel: 'Listen Port',
     customPortSuggestion: 'Recommended to use non-privileged ports such as 8080, 3000, 8000',
     enableHttpsDesc: 'When enabled, SSL certificates will be automatically applied and managed',
     // TOTP 双因素认证

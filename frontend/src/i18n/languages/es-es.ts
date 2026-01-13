@@ -77,6 +77,8 @@ export const esES: Translation = {
     startTime: 'Hora de Inicio',
     endTime: 'Hora de Fin',
     auto: 'Detección Automática',
+    actions: 'Acciones',
+    start: 'Iniciar',
   },
   navigation: {
     dashboard: 'Panel de Control',

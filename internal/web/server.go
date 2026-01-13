@@ -1632,11 +1632,20 @@ func (s *Server) securityMiddleware(w http.ResponseWriter, r *http.Request) bool
 
 	// 检查User-Agent（localhost 请求豁免）
 	// 使用 isLocalhostRequest 来确保无法通过伪造 HTTP 头部绕过检查
-	if strings.HasPrefix(path, s.config.AdminPrefix) && !s.isLocalhostRequest(r) && (userAgent == "" || s.isCommonBotUserAgent(userAgent)) {
-		s.log.Warnf("Suspicious User-Agent attempted to access admin panel: %s from %s", userAgent, clientIP)
-		s.securityManager.LogAccess(clientIP, userAgent, path, false)
-		http.Error(w, "Access denied", http.StatusForbidden)
-		return false
+	// 注意：对于管理面板路径，即使是 curl/wget 等工具，也应该允许访问并重定向到登录页面
+	// 只有真正的爬虫（bot/crawler/spider/scraper）才应该被阻止
+	if strings.HasPrefix(path, s.config.AdminPrefix) && !s.isLocalhostRequest(r) {
+		if userAgent == "" {
+			// 空的 User-Agent 可能是恶意请求，但允许通过让认证系统处理
+			s.log.Debugf("Empty User-Agent accessing admin panel from %s", clientIP)
+		} else if s.isStrictBotUserAgent(userAgent) {
+			// 只阻止真正的爬虫，curl/wget 等工具允许通过
+			s.log.Warnf("Suspicious bot User-Agent attempted to access admin panel: %s from %s", userAgent, clientIP)
+			s.securityManager.LogAccess(clientIP, userAgent, path, false)
+			http.Error(w, "Access denied", http.StatusForbidden)
+			return false
+		}
+		// curl/wget 等工具允许通过，会由 checkAuth 重定向到登录页面
 	}
 
 	// 记录访问日志
@@ -1918,6 +1927,24 @@ func (s *Server) isCommonBotUserAgent(ua string) bool {
 	}
 	uaLower := strings.ToLower(ua)
 	for _, bot := range botUAs {
+		if strings.Contains(uaLower, bot) {
+			return true
+		}
+	}
+	return false
+}
+
+// isStrictBotUserAgent 检查是否为严格的爬虫 User-Agent（不包括 curl/wget 等工具）
+func (s *Server) isStrictBotUserAgent(ua string) bool {
+	// 只识别真正的爬虫，不包括 curl/wget 等命令行工具
+	strictBotUAs := []string{
+		"bot", "crawler", "spider", "scraper",
+		"googlebot", "bingbot", "slurp", "duckduckbot",
+		"baiduspider", "yandexbot", "facebookexternalhit",
+		"twitterbot", "linkedinbot", "whatsapp", "telegram",
+	}
+	uaLower := strings.ToLower(ua)
+	for _, bot := range strictBotUAs {
 		if strings.Contains(uaLower, bot) {
 			return true
 		}

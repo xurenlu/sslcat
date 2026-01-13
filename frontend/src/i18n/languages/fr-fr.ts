@@ -77,6 +77,8 @@ export const frFR: Translation = {
     startTime: 'Heure de Début',
     endTime: 'Heure de Fin',
     auto: 'Détection Automatique',
+    actions: 'Actions',
+    start: 'Démarrer',
   },
   navigation: {
     dashboard: 'Tableau de Bord',

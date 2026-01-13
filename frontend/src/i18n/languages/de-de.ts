@@ -77,6 +77,8 @@ export const deDE: Translation = {
     startTime: 'Startzeit',
     endTime: 'Endzeit',
     auto: 'Automatisch erkennen',
+    actions: 'Aktionen',
+    start: 'Starten',
   },
   navigation: {
     dashboard: 'Dashboard',

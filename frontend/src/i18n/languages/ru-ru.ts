@@ -77,6 +77,8 @@ export const ruRU: Translation = {
     startTime: 'Время начала',
     endTime: 'Время окончания',
     auto: 'Автоматическое определение',
+    actions: 'Действия',
+    start: 'Начать',
   },
   navigation: {
     dashboard: 'Панель управления',

@@ -77,6 +77,8 @@ export interface Translation {
     endTime: string
     info: string
     auto: string
+    actions: string
+    start: string
   }
   
   // 导航菜单
@@ -227,7 +229,6 @@ export interface Translation {
     syncACMECertificates: string
     uploadCertificate: string
     downloadAllCertificates: string
-    valid: string
   }
   
   // 通知管理
@@ -559,7 +560,6 @@ export interface Translation {
     // 自定义端口详细设置
     customPortConfigTitle: string
     customPortWarning: string
-    customPortLabel: string
     customPortSuggestion: string
     enableHttpsDesc: string
     // TOTP 双因素认证
@@ -852,6 +852,7 @@ export interface Translation {
     noSecurityEvents: string
     securitySettings: string
     wafProtection: string
+    wafProtecting: string
     ddosProtection: string
     threatIntelligence: string
     autoBlockSuspiciousIPs: string
