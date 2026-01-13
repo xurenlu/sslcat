@@ -480,6 +480,18 @@ func (m *Manager) GetCertificate(domain string) (*tls.Certificate, error) {
 	}
 	m.certMutex.RUnlock()
 
+	// 尝试查找通配符证书（例如 *.facev.app 匹配 f.facev.app）
+	if wildcardCert := m.findWildcardCert(domain); wildcardCert != nil {
+		m.log.Debugf("Domain %s matched wildcard certificate", domain)
+		return wildcardCert, nil
+	}
+
+	// 尝试从磁盘加载通配符证书
+	if cert := m.loadWildcardCertFromDisk(domain); cert != nil {
+		m.log.Debugf("Loaded wildcard certificate from disk for domain %s", domain)
+		return cert, nil
+	}
+
 	// 使用元数据缓存检查证书是否存在，避免频繁磁盘查找
 	metadata := m.getCertMetadata(domain)
 	if !metadata.exists {
@@ -760,6 +772,49 @@ func (m *Manager) findWildcardCert(domain string) *tls.Certificate {
 	}
 
 	return nil
+}
+
+// loadWildcardCertFromDisk 从磁盘加载通配符证书
+func (m *Manager) loadWildcardCertFromDisk(domain string) *tls.Certificate {
+	parts := strings.Split(domain, ".")
+	if len(parts) < 2 {
+		return nil
+	}
+
+	// 尝试匹配 *.domain.com 格式的通配符证书文件名
+	wildcardDomain := "*." + strings.Join(parts[1:], ".")
+	certPath := filepath.Join(m.config.SSL.CertDir, wildcardDomain+".crt")
+	keyPath := filepath.Join(m.config.SSL.KeyDir, wildcardDomain+".key")
+
+	// 检查文件是否存在
+	if _, err := os.Stat(certPath); err != nil {
+		return nil
+	}
+	if _, err := os.Stat(keyPath); err != nil {
+		return nil
+	}
+
+	// 加载证书
+	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+	if err != nil {
+		m.log.Errorf("Failed to load wildcard certificate %s: %v", wildcardDomain, err)
+		return nil
+	}
+
+	// 验证证书是否匹配域名
+	if !m.domainMatchesCert(domain, &cert) {
+		m.log.Debugf("Wildcard certificate %s does not match domain %s", wildcardDomain, domain)
+		return nil
+	}
+
+	// 加载成功，更新证书缓存
+	m.certMutex.Lock()
+	m.certCache[wildcardDomain] = &cert
+	m.certMutex.Unlock()
+	m.updateCertMetadata(wildcardDomain, &cert)
+
+	m.log.Debugf("Loaded wildcard certificate from disk: %s for domain %s", wildcardDomain, domain)
+	return &cert
 }
 
 // matchDomain 域名匹配函数，支持通配符
