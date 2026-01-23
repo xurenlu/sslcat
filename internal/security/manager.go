@@ -341,38 +341,54 @@ func (m *Manager) LogTLSFingerprint(fingerprint, ip string) {
 	if fingerprint == "" {
 		return
 	}
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	
+	// 先准备要写入的数据(在锁外面)
 	now := time.Now()
-	arr := append(m.tlsFPCounts[fingerprint], now)
-	// 清理窗口外
-	window := time.Duration(m.config.Security.TLSFingerprintWindowSec) * time.Second
-	if window <= 0 {
-		window = time.Minute
-	}
-	cut := now.Add(-window)
-	pruned := arr[:0]
-	for _, t := range arr {
-		if t.After(cut) {
-			pruned = append(pruned, t)
-		}
-	}
-	m.tlsFPCounts[fingerprint] = pruned
-	// 阈值告警
-	maxPerMin := m.config.Security.TLSFingerprintMaxPerMin
-	if maxPerMin <= 0 {
-		maxPerMin = 6000
-	}
-	if len(pruned) > maxPerMin {
-		m.log.Warnf("TLS fingerprint too active fp=%s count=%d ip=%s", fingerprint, len(pruned), ip)
-	}
-
-	// 追加写入 JSON Lines（轮转器优先）
 	rec := map[string]any{
-		"time": time.Now().Format(time.RFC3339),
+		"time": now.Format(time.RFC3339),
 		"fp":   fingerprint,
 		"ip":   ip,
 	}
+	
+	// 锁内只做内存操作,不做文件I/O
+	var shouldWarn bool
+	var warnCount int
+	func() {
+		m.mutex.Lock()
+		defer m.mutex.Unlock()
+		
+		arr := append(m.tlsFPCounts[fingerprint], now)
+		// 清理窗口外
+		window := time.Duration(m.config.Security.TLSFingerprintWindowSec) * time.Second
+		if window <= 0 {
+			window = time.Minute
+		}
+		cut := now.Add(-window)
+		pruned := arr[:0]
+		for _, t := range arr {
+			if t.After(cut) {
+				pruned = append(pruned, t)
+			}
+		}
+		m.tlsFPCounts[fingerprint] = pruned
+		
+		// 阈值告警检查(只记录是否需要告警,不在锁内打日志)
+		maxPerMin := m.config.Security.TLSFingerprintMaxPerMin
+		if maxPerMin <= 0 {
+			maxPerMin = 6000
+		}
+		if len(pruned) > maxPerMin {
+			shouldWarn = true
+			warnCount = len(pruned)
+		}
+	}()
+	
+	// 锁外执行告警日志
+	if shouldWarn {
+		m.log.Warnf("TLS fingerprint too active fp=%s count=%d ip=%s", fingerprint, warnCount, ip)
+	}
+
+	// 锁外执行文件I/O操作
 	if b, err := json.Marshal(rec); err == nil {
 		if m.tlsFPRotator != nil {
 			_, _ = m.tlsFPRotator.Write(append(b, '\n'))
@@ -1201,10 +1217,7 @@ func (m *Manager) UpdateGeoConfig(config config.GeoBlockingConfig) error {
 // CheckTOTPOnlyLoginSecurity 检查 TOTP-only 登录的安全性
 // 返回 (是否允许, 错误信息, 是否需要验证码)
 func (m *Manager) CheckTOTPOnlyLoginSecurity(ip string) (bool, string, bool) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	// 1. 检查 IP 是否被封禁
+	// 1. 检查 IP 是否被封禁 (在获取锁之前调用,避免死锁)
 	if blocked, reason := m.CheckIPAccess(ip); !blocked {
 		return false, reason, false
 	}
@@ -1212,7 +1225,11 @@ func (m *Manager) CheckTOTPOnlyLoginSecurity(ip string) (bool, string, bool) {
 		return false, "IP已被封禁", false
 	}
 
-	// 2. 检查 TOTP-only 登录失败次数（更严格的限制）
+	// 2. 获取锁并检查登录失败次数
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	// 3. 检查 TOTP-only 登录失败次数（更严格的限制）
 	now := time.Now()
 	
 	// 清理过期的失败记录（15分钟前）
@@ -1237,7 +1254,7 @@ func (m *Manager) CheckTOTPOnlyLoginSecurity(ip string) (bool, string, bool) {
 		}
 	}
 
-	// 3. 安全策略：
+	// 4. 安全策略：
 	// - 1分钟内超过3次失败：需要验证码
 	// - 15分钟内超过5次失败：封禁IP 15分钟
 	if oneMinAttempts >= 3 {
