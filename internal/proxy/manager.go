@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha1"
 	"crypto/tls"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net"
@@ -1638,48 +1640,137 @@ func (m *Manager) getPort(r *http.Request) string {
 	return "80"
 }
 
-// HandleWebSocket 处理WebSocket代理
+// HandleWebSocket 处理WebSocket代理（简单模式）
 func (m *Manager) HandleWebSocket(w http.ResponseWriter, r *http.Request, rule *config.ProxyRule) {
-	// 建立WebSocket连接
+	// 获取 WebSocket Key
+	wsKey := r.Header.Get("Sec-WebSocket-Key")
+	if wsKey == "" {
+		m.log.Error("Missing Sec-WebSocket-Key header")
+		http.Error(w, "Bad Request: Missing Sec-WebSocket-Key", http.StatusBadRequest)
+		return
+	}
+
+	// 建立到后端的连接
 	conn, err := net.Dial("tcp", net.JoinHostPort(rule.Target, strconv.Itoa(rule.Port)))
 	if err != nil {
+		m.log.Errorf("Failed to connect to backend WebSocket server: %v", err)
 		http.Error(w, "无法连接到目标服务器", http.StatusBadGateway)
 		return
 	}
 	defer conn.Close()
 
-	// 获取客户端连接
+	// 转发 WebSocket 握手请求到后端
+	// 注意：需要修改 Host 头部为后端地址
+	reqCopy := r.Clone(context.Background())
+	reqCopy.Host = net.JoinHostPort(rule.Target, strconv.Itoa(rule.Port))
+	reqCopy.RequestURI = "" // 清除 RequestURI，让 Write 方法自动生成
+	
+	err = reqCopy.Write(conn)
+	if err != nil {
+		m.log.Errorf("Failed to send WebSocket handshake to backend: %v", err)
+		http.Error(w, "Failed to send handshake", http.StatusBadGateway)
+		return
+	}
+
+	// 读取后端的握手响应
+	backendReader := bufio.NewReader(conn)
+	backendResp, err := http.ReadResponse(backendReader, reqCopy)
+	if err != nil {
+		m.log.Errorf("Failed to read WebSocket handshake response from backend: %v", err)
+		http.Error(w, "Failed to read backend response", http.StatusBadGateway)
+		return
+	}
+
+	// 检查后端是否同意升级
+	if backendResp.StatusCode != 101 {
+		m.log.Errorf("Backend refused WebSocket upgrade with status: %d", backendResp.StatusCode)
+		// 将后端的错误响应转发给客户端
+		for k, vv := range backendResp.Header {
+			for _, v := range vv {
+				w.Header().Add(k, v)
+			}
+		}
+		w.WriteHeader(backendResp.StatusCode)
+		io.Copy(w, backendResp.Body)
+		return
+	}
+
+	// 后端同意升级，劫持客户端连接
 	hj, ok := w.(http.Hijacker)
 	if !ok {
+		m.log.Error("ResponseWriter doesn't support hijacking")
 		http.Error(w, "无法劫持连接", http.StatusInternalServerError)
 		return
 	}
 
 	clientConn, _, err := hj.Hijack()
 	if err != nil {
+		m.log.Errorf("Failed to hijack client connection: %v", err)
 		http.Error(w, "无法劫持连接", http.StatusInternalServerError)
 		return
 	}
 	defer clientConn.Close()
 
-	// 发送HTTP响应
-	clientConn.Write([]byte("HTTP/1.1 101 Switching Protocols\r\n"))
-	clientConn.Write([]byte("Upgrade: websocket\r\n"))
-	clientConn.Write([]byte("Connection: Upgrade\r\n"))
-	clientConn.Write([]byte("\r\n"))
+	// 发送 101 响应给客户端
+	// 必须包含正确的 Sec-WebSocket-Accept 头部
+	acceptKey := computeAcceptKey(wsKey)
+	
+	response := fmt.Sprintf("HTTP/1.1 101 Switching Protocols\r\n"+
+		"Upgrade: websocket\r\n"+
+		"Connection: Upgrade\r\n"+
+		"Sec-WebSocket-Accept: %s\r\n", acceptKey)
+	
+	// 复制后端返回的其他 WebSocket 相关头部
+	if protocol := backendResp.Header.Get("Sec-WebSocket-Protocol"); protocol != "" {
+		response += fmt.Sprintf("Sec-WebSocket-Protocol: %s\r\n", protocol)
+	}
+	if extensions := backendResp.Header.Get("Sec-WebSocket-Extensions"); extensions != "" {
+		response += fmt.Sprintf("Sec-WebSocket-Extensions: %s\r\n", extensions)
+	}
+	
+	response += "\r\n"
+	
+	_, err = clientConn.Write([]byte(response))
+	if err != nil {
+		m.log.Errorf("Failed to send 101 response to client: %v", err)
+		return
+	}
+
+	m.log.Infof("WebSocket handshake successful for %s (simple mode)", r.Host)
+
+	// 检查后端缓冲区是否还有数据（WebSocket 帧）
+	if backendReader.Buffered() > 0 {
+		// 先转发缓冲区中的数据
+		buffered := make([]byte, backendReader.Buffered())
+		_, err = io.ReadFull(backendReader, buffered)
+		if err != nil {
+			m.log.Errorf("Failed to read buffered data: %v", err)
+			return
+		}
+		_, err = clientConn.Write(buffered)
+		if err != nil {
+			m.log.Errorf("Failed to write buffered data to client: %v", err)
+			return
+		}
+		m.log.Debugf("Forwarded %d bytes of buffered data from backend", len(buffered))
+	}
 
 	// 开始双向数据转发
-	// 修复：确保连接正确关闭
-	// copyData 只关闭源连接，所以需要确保两个方向都正确关闭
 	go func() {
 		m.copyData(clientConn, conn)
-		// 当从上游读取完成时，关闭客户端连接
 		clientConn.Close()
 	}()
-	// 主 goroutine 处理从客户端到上游的数据
 	m.copyData(conn, clientConn)
-	// 当从客户端读取完成时，关闭上游连接
 	conn.Close()
+}
+
+// computeAcceptKey 计算 WebSocket Accept Key
+// 根据 RFC 6455 规范：Sec-WebSocket-Accept = base64(SHA1(Sec-WebSocket-Key + magic string))
+func computeAcceptKey(challengeKey string) string {
+	const magic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+	h := sha1.New()
+	h.Write([]byte(challengeKey + magic))
+	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }
 
 // isWebSocketUpgrade 检查是否为WebSocket升级请求
@@ -1745,6 +1836,16 @@ func (m *Manager) HandleWebSocketOptimized(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// 检查握手是否成功
+	if resp.StatusCode != 101 {
+		m.log.Errorf("WebSocket handshake failed with status: %d", resp.StatusCode)
+		// 转发错误响应给客户端
+		resp.Write(clientConn)
+		clientConn.Close()
+		upstreamConn.Close()
+		return
+	}
+
 	// 转发握手响应到客户端
 	err = resp.Write(clientConn)
 	if err != nil {
@@ -1754,22 +1855,30 @@ func (m *Manager) HandleWebSocketOptimized(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// 检查握手是否成功
-	if resp.StatusCode != 101 {
-		m.log.Errorf("WebSocket handshake failed with status: %d", resp.StatusCode)
-		clientConn.Close()
-		upstreamConn.Close()
-		return
+	m.log.Infof("WebSocket handshake successful for %s (optimized mode)", r.Host)
+
+	// 检查上游缓冲区是否还有数据（WebSocket 帧）
+	// 这非常重要！bufio.Reader 可能已经读取了一些 WebSocket 数据帧到缓冲区
+	var bufferedData []byte
+	if upstreamReader.Buffered() > 0 {
+		bufferedData = make([]byte, upstreamReader.Buffered())
+		_, err = io.ReadFull(upstreamReader, bufferedData)
+		if err != nil {
+			m.log.Errorf("Failed to read buffered data from upstream: %v", err)
+			clientConn.Close()
+			upstreamConn.Close()
+			return
+		}
+		m.log.Debugf("Found %d bytes of buffered data in upstream reader", len(bufferedData))
 	}
 
-	m.log.Infof("WebSocket handshake successful for %s", r.Host)
-
 	// 开始优化的双向数据转发
-	m.startOptimizedWebSocketProxy(clientConn, upstreamConn, rule)
+	m.startOptimizedWebSocketProxy(clientConn, upstreamConn, rule, bufferedData)
 }
 
 // startOptimizedWebSocketProxy 启动优化的WebSocket代理
-func (m *Manager) startOptimizedWebSocketProxy(clientConn, upstreamConn net.Conn, rule *config.ProxyRule) {
+// bufferedData: 从 upstreamReader 缓冲区读取的数据，需要先发送给客户端
+func (m *Manager) startOptimizedWebSocketProxy(clientConn, upstreamConn net.Conn, rule *config.ProxyRule, bufferedData []byte) {
 	// 设置连接超时
 	timeout := time.Duration(rule.WebSocketTimeout) * time.Second
 	if timeout <= 0 {
@@ -1789,6 +1898,17 @@ func (m *Manager) startOptimizedWebSocketProxy(clientConn, upstreamConn net.Conn
 	// 创建带缓冲的通道用于数据传输
 	clientToUpstream := make(chan []byte, bufferSize)
 	upstreamToClient := make(chan []byte, bufferSize)
+
+	// 如果有缓冲数据，先发送到通道
+	if len(bufferedData) > 0 {
+		// 使用非阻塞发送，如果通道满了就记录错误
+		select {
+		case upstreamToClient <- bufferedData:
+			m.log.Debugf("Queued %d bytes of buffered data for client", len(bufferedData))
+		default:
+			m.log.Warnf("Failed to queue buffered data: channel full")
+		}
+	}
 
 	// 错误通道
 	errChan := make(chan error, 4)
