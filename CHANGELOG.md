@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.33-rc2] - 2026-02-01
+
+### 🐛 Bug 修复
+
+#### 访问控制
+- **禁用访问控制后仍需登录**: 修复禁用代理访问控制后，由于服务器 session 未清理导致用户仍然看到登录页面的问题
+  - 新增 `ClearDomainSessions` 方法，禁用访问控制时自动清理该域名的所有会话
+  - 新增 `GetSessionCookieName` 导出方法，便于外部获取 cookie 名称
+
 ## [1.3.30] - 2025-12-26
 
 ### 🚀 重大优化

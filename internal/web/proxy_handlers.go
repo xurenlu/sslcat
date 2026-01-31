@@ -263,6 +263,11 @@ func (s *Server) handleProxyEdit(w http.ResponseWriter, r *http.Request) {
 				s.config.Proxy.Rules[index].AuthUsers = nil
 				s.config.Proxy.Rules[index].AuthSessionTimeout = 0
 				s.config.Proxy.Rules[index].AuthCookieDomain = ""
+
+				// 清除该域名的所有会话，确保禁用访问控制后立即生效
+				if s.proxyAuthManager != nil {
+					s.proxyAuthManager.ClearDomainSessions(domain)
+				}
 			}
 
 			// 保存配置

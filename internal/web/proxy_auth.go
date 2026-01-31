@@ -223,9 +223,17 @@ func (p *ProxyAuthManager) ProcessLogin(w http.ResponseWriter, r *http.Request, 
 		return true
 	}
 
+	// 调试日志：显示配置中的用户数量
+	p.log.Infof("代理访问控制登录尝试: domain=%s, 输入用户名=%s, 配置用户数=%d",
+		rule.Domain, username, len(rule.AuthUsers))
+
 	// 验证用户名密码
 	var validUser *config.ProxyAuthUser
-	for _, user := range rule.AuthUsers {
+	for i, user := range rule.AuthUsers {
+		p.log.Infof("检查用户[%d]: 配置用户名=%q, 输入用户名=%q, 用户名匹配=%v, 密码匹配=%v",
+			i, user.Username, username,
+			user.Username == username,
+			user.Password == password)
 		if user.Username == username && user.Password == password {
 			validUser = &user
 			break
@@ -233,6 +241,7 @@ func (p *ProxyAuthManager) ProcessLogin(w http.ResponseWriter, r *http.Request, 
 	}
 
 	if validUser == nil {
+		p.log.Warnf("代理访问控制登录失败: domain=%s, username=%s", rule.Domain, username)
 		p.ShowLoginPage(w, r, rule, "用户名或密码错误")
 		return true
 	}
@@ -339,4 +348,25 @@ func (p *ProxyAuthManager) GetSessionInfo(domain string) map[string]interface{} 
 		"active_count": count,
 		"active_users": users,
 	}
+}
+
+// ClearDomainSessions 清除指定域名的所有会话
+// 当禁用访问控制时调用，确保之前的认证状态被清理
+func (p *ProxyAuthManager) ClearDomainSessions(domain string) int {
+	cleared := 0
+	for sessionID, session := range p.sessions {
+		if session.Domain == domain {
+			delete(p.sessions, sessionID)
+			cleared++
+		}
+	}
+	if cleared > 0 {
+		p.log.Infof("已清除域名 %s 的 %d 个会话", domain, cleared)
+	}
+	return cleared
+}
+
+// GetSessionCookieName 获取会话 cookie 名称（导出方法）
+func (p *ProxyAuthManager) GetSessionCookieName(domain string) string {
+	return p.getSessionCookieName(domain)
 }

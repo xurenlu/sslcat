@@ -539,12 +539,30 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 				// HTTP Host头部优化
 				s.config.Proxy.Rules[i].OptimizeHostHeader = req.OptimizeHostHeader
 
-				// 访问控制字段（仅在提供时更新）
-				if req.AuthEnabled || len(req.AuthUsers) > 0 || req.AuthSessionTimeout > 0 || req.AuthCookieDomain != "" {
-					s.config.Proxy.Rules[i].AuthEnabled = req.AuthEnabled
+				// 访问控制字段（始终更新，包括禁用访问控制的情况）
+				// 检查是否从启用变为禁用，需要清理 session
+				wasAuthEnabled := s.config.Proxy.Rules[i].AuthEnabled
+				s.config.Proxy.Rules[i].AuthEnabled = req.AuthEnabled
+				
+				if req.AuthEnabled {
+					// 启用访问控制时保存用户配置
 					s.config.Proxy.Rules[i].AuthUsers = req.AuthUsers
 					s.config.Proxy.Rules[i].AuthSessionTimeout = req.AuthSessionTimeout
-					s.config.Proxy.Rules[i].AuthCookieDomain = req.AuthCookieDomain
+					if req.AuthCookieDomain != "" {
+						s.config.Proxy.Rules[i].AuthCookieDomain = req.AuthCookieDomain
+					} else {
+						s.config.Proxy.Rules[i].AuthCookieDomain = domain
+					}
+				} else {
+					// 禁用访问控制时清空相关字段
+					s.config.Proxy.Rules[i].AuthUsers = nil
+					s.config.Proxy.Rules[i].AuthSessionTimeout = 0
+					s.config.Proxy.Rules[i].AuthCookieDomain = ""
+					
+					// 如果之前是启用状态，清除该域名的所有会话
+					if wasAuthEnabled && s.proxyAuthManager != nil {
+						s.proxyAuthManager.ClearDomainSessions(domain)
+					}
 				}
 
 				// 代理超时配置
