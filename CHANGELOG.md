@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.34-rc2] - 2026-02-02
+
+### 🐛 Bug 修復
+
+#### HTTP/2 協議錯誤修復
+- **修復 ERR_HTTP2_PROTOCOL_ERROR**: 解決複雜 SPA 網站首頁無法載入的問題
+  - **新增 FlushInterval 配置**: 為反向代理設置 `FlushInterval = -1`（立即刷新模式），支援 HTTP/2 流式響應
+  - **移除 Hop-by-hop 頭部**: 在響應中移除 HTTP/2 禁止的頭部（Connection、Keep-Alive、Transfer-Encoding 等）
+  - **優化 HTTP/2 服務器配置**: 降低 `MaxConcurrentStreams` 從 1000 到 250，減少資源競爭
+  - **新增上傳緩衝區配置**: 設置 `MaxUploadBufferPerConnection` 和 `MaxUploadBufferPerStream`
+  - **圖片優化安全性增強**: 確保 `Content-Length` 與響應體長度一致，同時設置 `resp.ContentLength`
+
+### 📝 技術細節
+
+根據 HTTP/2 RFC 7540，以下頭部在 HTTP/2 中是禁止的：
+- Connection
+- Keep-Alive  
+- Proxy-Connection
+- Transfer-Encoding（HTTP/2 使用 DATA frames）
+- Upgrade
+- TE
+
 ## [1.3.34-rc1] - 2026-02-02
 
 ### ✨ 新功能

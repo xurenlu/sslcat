@@ -651,10 +651,18 @@ func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *s
 		}
 
 		// 配置 HTTP/2 支持
+		// 優化參數以避免 ERR_HTTP2_PROTOCOL_ERROR：
+		// - MaxConcurrentStreams: 降低到 250 以減少資源競爭，適合複雜 SPA 網站
+		// - MaxReadFrameSize: 保持 1MB，足夠處理大多數請求
+		// - IdleTimeout: 保持 120 秒，允許連接複用
+		// - MaxUploadBufferPerConnection: 設置上傳緩衝區大小
+		// - MaxUploadBufferPerStream: 設置每個流的上傳緩衝區
 		http2.ConfigureServer(httpsServer, &http2.Server{
-			MaxConcurrentStreams: 1000,
-			MaxReadFrameSize:     1048576, // 1MB
-			IdleTimeout:          120 * time.Second,
+			MaxConcurrentStreams:         250,               // 降低併發流數量，減少資源競爭
+			MaxReadFrameSize:             1048576,           // 1MB
+			IdleTimeout:                  120 * time.Second, // 空閒超時
+			MaxUploadBufferPerConnection: 1 << 20,           // 1MB 連接級別上傳緩衝
+			MaxUploadBufferPerStream:     1 << 18,           // 256KB 流級別上傳緩衝
 		})
 
 		go func() {
@@ -699,14 +707,14 @@ func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *s
 					return
 				}
 
-			// 管理面板路径：不强制重定向到HTTPS，允许HTTP访问
-			// 这样可以支持内网环境或特殊场景下的HTTP访问
-			// 如果用户需要HTTPS，可以通过浏览器直接访问HTTPS地址
-			webServer.ServeHTTP(w, r)
-			return
-		}
+				// 管理面板路径：不强制重定向到HTTPS，允许HTTP访问
+				// 这样可以支持内网环境或特殊场景下的HTTP访问
+				// 如果用户需要HTTPS，可以通过浏览器直接访问HTTPS地址
+				webServer.ServeHTTP(w, r)
+				return
+			}
 
-		// 其他路径通过代理处理（如果有配置）
+			// 其他路径通过代理处理（如果有配置）
 			if rule := proxyManager.GetProxyConfig(r.Host); rule != nil {
 				// 如果配置了SSLOnly且有有效证书，才重定向
 				host := r.Host

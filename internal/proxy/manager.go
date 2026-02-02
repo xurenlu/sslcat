@@ -687,6 +687,19 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 				}
 			}
 
+			// 移除 HTTP/2 禁止的 Hop-by-hop 頭部
+			// 這是導致 ERR_HTTP2_PROTOCOL_ERROR 的常見原因
+			// HTTP/2 RFC 7540 規定這些頭部不能出現在 HTTP/2 響應中
+			hopByHopHeaders := []string{
+				"Connection",
+				"Keep-Alive",
+				"Proxy-Connection",
+				"Transfer-Encoding", // HTTP/2 使用 DATA frames，不需要 chunked encoding
+				"Upgrade",
+				"TE",
+			}
+			m.deleteHeadersBatch(resp.Header, hopByHopHeaders)
+
 			// 移除可能的安全头，让目标服务器自己设置
 			// 性能优化：批量删除
 			securityHeaders := []string{
@@ -775,7 +788,7 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 			if backendFromCtx != nil {
 				backendFromCtx.IncrementFailures()
 				backendFromCtx.DecrementConnections() // 确保连接计数正确
-				
+
 				// 使用错误日志限流器：相同错误每分钟最多记录一次
 				errorKey := fmt.Sprintf("backend:%s:%s:%v", backendFromCtx.ID, backendFromCtx.GetAddress(), err)
 				shouldLog, count := m.errorLogLimiter.shouldLog(errorKey)
@@ -1079,6 +1092,20 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 
 			// 记录响应详情
 			m.logResponseDetails(resp, ruleFromCtx)
+
+			// 移除 HTTP/2 禁止的 Hop-by-hop 頭部
+			// 這是導致 ERR_HTTP2_PROTOCOL_ERROR 的常見原因
+			// HTTP/2 RFC 7540 規定這些頭部不能出現在 HTTP/2 響應中
+			hopByHopHeaders := []string{
+				"Connection",
+				"Keep-Alive",
+				"Proxy-Connection",
+				"Transfer-Encoding", // HTTP/2 使用 DATA frames，不需要 chunked encoding
+				"Upgrade",
+				"TE",
+			}
+			m.deleteHeadersBatch(resp.Header, hopByHopHeaders)
+
 			// 移除可能的安全头，让目标服务器自己设置
 			// 性能优化：批量删除
 			securityHeaders := []string{
@@ -1106,11 +1133,13 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 			}
 
 			// 图片优化处理
+			// 注意：HTTP/2 對響應體修改非常敏感，需要謹慎處理
 			if m.responseProcessor != nil && (resp.Request.Method == "GET" || resp.Request.Method == "HEAD") {
 				// 检查是否为图片响应
 				contentType := resp.Header.Get("Content-Type")
 				if strings.HasPrefix(contentType, "image/") {
 					// 仅对已知且较小的图片做优化，避免大体积响应导致巨额内存占用
+					// 對於 ContentLength <= 0 的情況（chunked transfer），跳過優化避免 HTTP/2 協議錯誤
 					if resp.ContentLength <= 0 || resp.ContentLength > maxImageOptimizeBytes {
 						m.log.Debugf("Skip image optimization due to size (Content-Length=%d) for %s %s",
 							resp.ContentLength, resp.Request.Method, resp.Request.URL.Path)
@@ -1120,35 +1149,36 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 					body, err := io.ReadAll(resp.Body)
 					if err != nil {
 						m.log.Warnf("Failed to read response body for image optimization: %v", err)
-					} else {
-						// 关闭原始响应体
-						resp.Body.Close()
-
-						// 应用图片优化
-						optimizedData, newContentType, err := m.responseProcessor.ProcessResponse(body, contentType, resp.Request)
-						if err != nil {
-							m.log.Warnf("Image optimization failed: %v, using original", err)
-							// 如果优化失败，使用原始数据
-							optimizedData = body
-							newContentType = contentType
-						} else {
-							// 更新响应头
-							if newContentType != contentType {
-								resp.Header.Set("Content-Type", newContentType)
-							}
-							resp.Header.Set("Content-Length", strconv.Itoa(len(optimizedData)))
-
-							// 添加优化标识
-							if len(optimizedData) < len(body) {
-								resp.Header.Set("X-Image-Optimized", "true")
-								compressionRatio := float64(len(body)-len(optimizedData)) / float64(len(body)) * 100
-								resp.Header.Set("X-Image-Compression-Ratio", fmt.Sprintf("%.1f%%", compressionRatio))
-							}
-						}
-
-						// 设置新的响应体
-						resp.Body = io.NopCloser(bytes.NewReader(optimizedData))
+						return nil // 讀取失敗時直接返回，避免後續處理出錯
 					}
+					// 关闭原始响应体
+					resp.Body.Close()
+
+					// 应用图片优化
+					optimizedData, newContentType, err := m.responseProcessor.ProcessResponse(body, contentType, resp.Request)
+					if err != nil {
+						m.log.Warnf("Image optimization failed: %v, using original", err)
+						// 如果优化失败，使用原始数据
+						optimizedData = body
+						newContentType = contentType
+					} else {
+						// 更新响应头
+						if newContentType != contentType {
+							resp.Header.Set("Content-Type", newContentType)
+						}
+						// 添加优化标识
+						if len(optimizedData) < len(body) {
+							resp.Header.Set("X-Image-Optimized", "true")
+							compressionRatio := float64(len(body)-len(optimizedData)) / float64(len(body)) * 100
+							resp.Header.Set("X-Image-Compression-Ratio", fmt.Sprintf("%.1f%%", compressionRatio))
+						}
+					}
+
+					// 設置新的響應體和 Content-Length
+					// 重要：必須確保 Content-Length 與實際響應體長度一致，否則會導致 HTTP/2 協議錯誤
+					resp.ContentLength = int64(len(optimizedData))
+					resp.Header.Set("Content-Length", strconv.Itoa(len(optimizedData)))
+					resp.Body = io.NopCloser(bytes.NewReader(optimizedData))
 				}
 			}
 
@@ -1243,6 +1273,11 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
+
+	// 設置 FlushInterval 以支援 HTTP/2 流式響應
+	// 這對於 SSE、大文件傳輸和複雜 SPA 網站至關重要
+	// -1 表示立即刷新（streaming mode），0 表示不刷新（buffered mode）
+	proxy.FlushInterval = -1 // 立即刷新，避免 HTTP/2 協議錯誤
 
 	// 自定义 Director 函数以实现智能Host头转发
 	originalDirector := proxy.Director
@@ -1664,7 +1699,7 @@ func (m *Manager) HandleWebSocket(w http.ResponseWriter, r *http.Request, rule *
 	reqCopy := r.Clone(context.Background())
 	reqCopy.Host = net.JoinHostPort(rule.Target, strconv.Itoa(rule.Port))
 	reqCopy.RequestURI = "" // 清除 RequestURI，让 Write 方法自动生成
-	
+
 	err = reqCopy.Write(conn)
 	if err != nil {
 		m.log.Errorf("Failed to send WebSocket handshake to backend: %v", err)
@@ -1714,12 +1749,12 @@ func (m *Manager) HandleWebSocket(w http.ResponseWriter, r *http.Request, rule *
 	// 发送 101 响应给客户端
 	// 必须包含正确的 Sec-WebSocket-Accept 头部
 	acceptKey := computeAcceptKey(wsKey)
-	
+
 	response := fmt.Sprintf("HTTP/1.1 101 Switching Protocols\r\n"+
 		"Upgrade: websocket\r\n"+
 		"Connection: Upgrade\r\n"+
 		"Sec-WebSocket-Accept: %s\r\n", acceptKey)
-	
+
 	// 复制后端返回的其他 WebSocket 相关头部
 	if protocol := backendResp.Header.Get("Sec-WebSocket-Protocol"); protocol != "" {
 		response += fmt.Sprintf("Sec-WebSocket-Protocol: %s\r\n", protocol)
@@ -1727,9 +1762,9 @@ func (m *Manager) HandleWebSocket(w http.ResponseWriter, r *http.Request, rule *
 	if extensions := backendResp.Header.Get("Sec-WebSocket-Extensions"); extensions != "" {
 		response += fmt.Sprintf("Sec-WebSocket-Extensions: %s\r\n", extensions)
 	}
-	
+
 	response += "\r\n"
-	
+
 	_, err = clientConn.Write([]byte(response))
 	if err != nil {
 		m.log.Errorf("Failed to send 101 response to client: %v", err)
@@ -3005,7 +3040,7 @@ func (m *Manager) FindRuleByDomain(domain string) *config.ProxyRule {
 	if idx := strings.Index(domain, ":"); idx != -1 {
 		host = domain[:idx]
 	}
-	
+
 	for i := range m.config.Proxy.Rules {
 		rule := &m.config.Proxy.Rules[i]
 		if rule.Domain == host && rule.Enabled {

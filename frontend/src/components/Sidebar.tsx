@@ -297,7 +297,7 @@ const SidebarContent = () => {
           <HStack w="full" justify="space-between" px={1}>
             <VStack align="start" spacing={0}>
               <Text fontSize="xs" color="gray.400" fontWeight="bold">VERSION</Text>
-              <Text fontSize="sm" fontWeight="mono" color="brand.600">{version || 'v1.3.32-rc6'}</Text>
+              <Text fontSize="sm" fontWeight="mono" color="brand.600">{version || 'v1.3.34-rc2'}</Text>
             </VStack>
             <Tooltip label={t.navigation.logout} placement="top">
               <Button
