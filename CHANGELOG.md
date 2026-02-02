@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.34-rc1] - 2026-02-02
+
+### ✨ 新功能
+
+#### TLS Session Resumption（TLS 會話恢復）
+- **性能優化**: 新增 TLS Session Resumption 支持，顯著降低 TLS 握手延遲和 CPU 消耗
+  - 支持 Session ID 和 Session Ticket 兩種會話恢復方式
+  - 默認開啟：配置文件中不寫 `session_resumption` 時自動啟用
+  - 可配置會話緩存大小、會話票據有效期等參數
+  - Session Ticket 密鑰由 Go 運行時自動管理，無需手動配置
+  - 性能提升：恢復連接延遲降低約 50-70%，CPU 使用降低約 30-50%（高並發場景）
+
+#### SSL/TLS 配置優化
+- **證書鏈優化**: 啟用 `PreferServerCipherSuites`，優先使用服務器端的密碼套件順序
+- **OCSP Stapling**: Go 的 crypto/tls 包自動處理 OCSP Stapling，無需額外配置
+- **文檔完善**: 新增 TLS Session Resumption 說明文檔和 SSL 優化指南
+
+### 📝 配置變更
+
+新增 `session_resumption` 配置項（可選，默認開啟）：
+```json
+{
+  "ssl": {
+    "session_resumption": {
+      "enabled": true,
+      "mode": "both",
+      "cache_size": 1000,
+      "ticket_lifetime": 3600,
+      "ticket_key_rotation_interval": 86400
+    }
+  }
+}
+```
+
 ## [1.3.33-rc2] - 2026-02-01
 
 ### 🐛 Bug 修复

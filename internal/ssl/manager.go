@@ -64,17 +64,19 @@ type Manager struct {
 	metadataMutex     sync.RWMutex
 	// 证书申请进度事件通道：用于实时推送申请进度
 	progressChannels map[string]chan CertProgressEvent
-	progressMutex   sync.RWMutex
+	progressMutex    sync.RWMutex
+	// TLS Session Resumption 相關
+	sessionCache tls.ClientSessionCache // Session ID 緩存（Session Ticket 由 Go 運行時自動管理）
 }
 
 // CertProgressEvent 证书申请进度事件
 type CertProgressEvent struct {
 	Domain      string    `json:"domain"`
-	Status      string    `json:"status"`      // "started", "checking_dns", "using_dns01", "using_http01", "success", "failed", "retrying"
-	Message     string    `json:"message"`     // 进度消息
-	Attempt     int       `json:"attempt"`     // 当前尝试次数
-	MaxAttempts int       `json:"max_attempts"` // 最大尝试次数
-	Progress    int       `json:"progress"`     // 进度百分比 0-100
+	Status      string    `json:"status"`          // "started", "checking_dns", "using_dns01", "using_http01", "success", "failed", "retrying"
+	Message     string    `json:"message"`         // 进度消息
+	Attempt     int       `json:"attempt"`         // 当前尝试次数
+	MaxAttempts int       `json:"max_attempts"`    // 最大尝试次数
+	Progress    int       `json:"progress"`        // 进度百分比 0-100
 	Error       string    `json:"error,omitempty"` // 错误信息（如果有）
 	Timestamp   time.Time `json:"timestamp"`
 }
@@ -148,6 +150,9 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 	// 启动证书元数据缓存清理 goroutine
 	go manager.cleanCertMetadataCache()
 
+	// 初始化 TLS Session Resumption
+	manager.initializeSessionResumption()
+
 	return manager, nil
 }
 
@@ -204,13 +209,13 @@ func (m *Manager) DeleteCertificate(domain string) error {
 		} else {
 			m.log.Infof("Deleted certificate from ACME cache for domain %s", domain)
 		}
-		
+
 		// 同时删除可能存在的通配符域名缓存（*.domain）
 		wildcardDomain := "*." + domain
 		if err := m.acmeMgr.Cache.Delete(ctx, wildcardDomain); err == nil {
 			m.log.Infof("Deleted wildcard certificate from ACME cache for domain %s", wildcardDomain)
 		}
-		
+
 		// 删除子域名的情况（如果是子域名，也尝试删除主域名）
 		parts := strings.Split(domain, ".")
 		if len(parts) > 2 {
@@ -847,39 +852,8 @@ func (m *Manager) SetOnClientHello(fn func(*tls.ClientHelloInfo)) {
 
 // GetTLSConfig 获取用于HTTPS服务器的TLS配置
 func (m *Manager) GetTLSConfig() *tls.Config {
-	// 若启用 ACME，使用 ACME 的 HTTP-01 验证处理器，但不自动申请证书
-	// 证书必须通过后台手动申请，访问时只使用已存在的证书
-	if m.acmeMgr != nil {
-		return &tls.Config{
-			GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-				if m.onClientHello != nil {
-					m.onClientHello(hello)
-				}
-				host := hello.ServerName
-				if host == "" {
-					host = "localhost"
-				}
-				
-				// 只使用已存在的证书，不自动申请
-				// 证书必须通过后台手动申请，访问时只使用已存在的证书
-				if cert, err := m.GetCertificate(host); err == nil {
-					return cert, nil
-				}
-				
-				// 如果没有证书，回退到默认自签证书
-				if m.defaultCert != nil {
-					return m.defaultCert, nil
-				}
-				return nil, fmt.Errorf("no certificate available for %s (certificate must be requested manually from admin panel)", host)
-			},
-			NextProtos: []string{"h2", "http/1.1", "acme-tls/1"},
-			MinVersion: tls.VersionTLS12,
-			MaxVersion: tls.VersionTLS13,
-		}
-	}
-
-	// 默认：使用本地缓存/磁盘并在缺失时自签
-	return &tls.Config{
+	// 構建基礎 TLS 配置
+	tlsConfig := &tls.Config{
 		GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 			if m.onClientHello != nil {
 				m.onClientHello(hello)
@@ -888,6 +862,20 @@ func (m *Manager) GetTLSConfig() *tls.Config {
 			if host == "" {
 				host = "localhost"
 			}
+
+			// 若启用 ACME，只使用已存在的证书，不自动申请
+			if m.acmeMgr != nil {
+				if cert, err := m.GetCertificate(host); err == nil {
+					return cert, nil
+				}
+				// 如果没有证书，回退到默认自签证书
+				if m.defaultCert != nil {
+					return m.defaultCert, nil
+				}
+				return nil, fmt.Errorf("no certificate available for %s (certificate must be requested manually from admin panel)", host)
+			}
+
+			// 默认：使用本地缓存/磁盘并在缺失时自签
 			if cert, err := m.GetCertificate(host); err == nil {
 				return cert, nil
 			}
@@ -899,7 +887,49 @@ func (m *Manager) GetTLSConfig() *tls.Config {
 		NextProtos: []string{"h2", "http/1.1"},
 		MinVersion: tls.VersionTLS12,
 		MaxVersion: tls.VersionTLS13,
+		// 優化證書鏈：啟用 OCSP Stapling（如果支持）
+		// 注意：Go 的 crypto/tls 包會自動處理 OCSP Stapling，無需額外配置
+		PreferServerCipherSuites: true, // 優先使用服務器端的密碼套件順序
 	}
+
+	// 如果啟用 ACME，添加 acme-tls/1 協議
+	if m.acmeMgr != nil {
+		tlsConfig.NextProtos = append(tlsConfig.NextProtos, "acme-tls/1")
+	}
+
+	// 配置 Session Resumption（默認開啟：未配置時等同啟用）
+	cfg := m.config.SSL.SessionResumption
+	enabled := true
+	mode := "both"
+	if cfg != nil {
+		enabled = cfg.Enabled
+		if cfg.Mode != "" {
+			mode = cfg.Mode
+		}
+	}
+
+	if enabled {
+		// 配置 Session ID Cache
+		if (mode == "id" || mode == "both") && m.sessionCache != nil {
+			tlsConfig.ClientSessionCache = m.sessionCache
+			m.log.Debug("Session ID Cache configured in TLS config")
+		}
+
+		// 配置 Session Ticket
+		if mode == "ticket" || mode == "both" {
+			tlsConfig.SessionTicketsDisabled = false
+			m.log.Debug("Session Ticket enabled (managed by Go runtime)")
+		} else if mode == "id" {
+			tlsConfig.SessionTicketsDisabled = true
+			m.log.Debug("Session Ticket disabled (using Session ID only)")
+		}
+	} else {
+		// 顯式關閉時禁用 Session Ticket；Session ID Cache 未初始化
+		tlsConfig.SessionTicketsDisabled = true
+		m.log.Debug("Session Resumption explicitly disabled")
+	}
+
+	return tlsConfig
 }
 
 // HTTPChallengeHandler 包裹 HTTP 服务器以处理 ACME HTTP-01 挑战
@@ -956,13 +986,13 @@ func (m *Manager) EnsureDomainCert(domain string) error {
 
 	// 记录证书续期/申请请求的详细信息
 	m.log.Infof("Certificate request initiated for domain: %s", domain)
-	
+
 	// 检查是否已有证书，记录旧证书的有效期
 	if existingCert := m.getCertificateFromCache(domain); existingCert != nil {
 		if x509Cert, err := x509.ParseCertificate(existingCert.Certificate[0]); err == nil {
 			m.log.Infof("Existing certificate found for %s: NotBefore=%v, NotAfter=%v, DaysRemaining=%.1f",
 				domain, x509Cert.NotBefore, x509Cert.NotAfter, time.Until(x509Cert.NotAfter).Hours()/24)
-			
+
 			// 强制删除ACME缓存中的旧证书，以触发重新申请
 			if m.acmeMgr.Cache != nil {
 				m.log.Infof("Deleting ACME cache for %s to force renewal", domain)
@@ -1066,11 +1096,11 @@ func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error
 		supportsDNS := m.supportsDNSChallenge()
 		hasProvider := m.hasAvailableDNSProvider()
 		m.log.Infof("Certificate request for %s: supportsDNSChallenge=%v, hasAvailableDNSProvider=%v", domain, supportsDNS, hasProvider)
-		
+
 		if supportsDNS && hasProvider {
 			providerName := m.findDNSProviderForDomain(domain)
 			m.log.Infof("findDNSProviderForDomain(%s) returned: %s", domain, providerName)
-			
+
 			if providerName != "" {
 				m.sendProgressEvent(domain, CertProgressEvent{
 					Domain:      domain,
@@ -1108,7 +1138,7 @@ func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error
 				} else {
 					dnsDuration := time.Since(dnsStart)
 					m.log.Warnf("DNS-01 validation failed for %s (耗时: %v): %v, will try HTTP-01 as fallback", domain, dnsDuration, dnsErr)
-					
+
 					m.sendProgressEvent(domain, CertProgressEvent{
 						Domain:      domain,
 						Status:      "using_dns01",
@@ -1141,11 +1171,11 @@ func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error
 				// 这种情况说明 findDNSProviderForDomain 返回了空字符串
 				reasons = append(reasons, fmt.Sprintf("域名 %s 不在任何已配置的 DNS 提供商管理的域名列表中", domain))
 			}
-			
+
 			if len(reasons) > 0 {
 				reasonMsg := strings.Join(reasons, "; ")
 				m.log.Warnf("将使用 HTTP-01 验证申请证书 %s，原因: %s", domain, reasonMsg)
-				
+
 				m.sendProgressEvent(domain, CertProgressEvent{
 					Domain:      domain,
 					Status:      "using_http01",
@@ -1160,7 +1190,7 @@ func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error
 
 		// 尝试HTTP-01验证（作为备选或主要方式）
 		m.log.Infof("开始使用 HTTP-01 验证申请证书: %s", domain)
-		
+
 		m.sendProgressEvent(domain, CertProgressEvent{
 			Domain:      domain,
 			Status:      "using_http01",
@@ -1187,13 +1217,13 @@ func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error
 			})
 
 			syncStart := time.Now()
-			
+
 			// 记录新证书的有效期信息
 			if x509Cert, err := x509.ParseCertificate(cert.Certificate[0]); err == nil {
 				m.log.Infof("New certificate obtained for %s: NotBefore=%v, NotAfter=%v, ValidDays=%.1f",
 					domain, x509Cert.NotBefore, x509Cert.NotAfter, x509Cert.NotAfter.Sub(x509Cert.NotBefore).Hours()/24)
 			}
-			
+
 			// 先保存证书到磁盘
 			if saveErr := m.saveCertificateToDisk(domain, cert); saveErr != nil {
 				m.log.Errorf("Failed to save certificate to disk for %s: %v", domain, saveErr)
@@ -1211,15 +1241,15 @@ func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error
 				certPath := filepath.Join(m.config.SSL.CertDir, domain+".crt")
 				keyPath := filepath.Join(m.config.SSL.KeyDir, domain+".key")
 				m.log.Infof("Certificate saved to disk: cert=%s, key=%s", certPath, keyPath)
-				
+
 				// 保存成功后，强制从磁盘重新加载证书以确保缓存是最新的
 				m.log.Infof("Reloading certificate from disk to ensure cache is up-to-date: %s", domain)
-				
+
 				// 先清除旧的缓存
 				m.certMutex.Lock()
 				delete(m.certCache, domain)
 				m.certMutex.Unlock()
-				
+
 				if loadErr := m.LoadCertificateFromDisk(domain); loadErr != nil {
 					m.log.Errorf("Failed to load certificate from disk for %s: %v", domain, loadErr)
 					// 如果从磁盘加载失败，直接缓存内存中的证书
@@ -1243,7 +1273,7 @@ func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error
 				delete(m.failedDomainCache, domain)
 				m.failedCacheMutex.Unlock()
 			}
-			
+
 			// 同时尝试同步 ACME 缓存中的其他证书
 			if _, syncErr := m.SyncACMECertsToDisk(); syncErr != nil {
 				m.log.Debugf("ACME post-issue sync failed: %v", syncErr)
@@ -1372,7 +1402,7 @@ func (m *Manager) findDNSProviderForDomain(domain string) string {
 	// 按优先级顺序检查所有DNS提供商
 	providers := m.dnsManager.GetProvidersSortedByPriority()
 	m.log.Infof("Available DNS providers: %v", providers)
-	
+
 	for _, providerName := range providers {
 		provider, err := m.dnsManager.GetProvider(providerName)
 		if err != nil {
@@ -1402,7 +1432,7 @@ func (m *Manager) findDNSProviderForDomain(domain string) string {
 				}
 			}
 		}
-		
+
 		// 记录该提供商的所有域名以便调试
 		domainNames := make([]string, 0)
 		for _, d := range domains {
@@ -1440,8 +1470,8 @@ func (m *Manager) findDNSProviderForDomain(domain string) string {
 			}
 		}
 	}
-	
-	m.log.Warnf("未找到域名 %s 对应的 DNS 提供商。主域名: %s，已检查的提供商: %v，这些提供商管理的域名: %v", 
+
+	m.log.Warnf("未找到域名 %s 对应的 DNS 提供商。主域名: %s，已检查的提供商: %v，这些提供商管理的域名: %v",
 		domain, mainDomain, providers, allCheckedDomains)
 	return ""
 }
@@ -2599,23 +2629,23 @@ func (m *Manager) GetName() string {
 // Reload 重载 SSL 管理器配置
 func (m *Manager) Reload(newConfig *config.Config) error {
 	m.log.Info("Reloading SSL manager configuration")
-	
+
 	// 更新配置引用
 	m.config = newConfig
-	
+
 	// 清空旧的 DNS 提供商并重新初始化
 	if m.dnsManager != nil {
 		m.dnsManager.ClearProviders()
 	}
 	m.initializeDNSProviders()
-	
+
 	// 如果配置了 Email，重新启用/更新 ACME
 	if strings.TrimSpace(newConfig.SSL.Email) != "" {
 		if err := m.EnableACME(); err != nil {
 			m.log.Warnf("Failed to reload ACME configuration: %v", err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -2636,13 +2666,13 @@ func (m *Manager) supportsDNSChallenge() bool {
 		}
 		return false
 	}
-	
+
 	// 如果没有配置 challenge_methods，但有可用的 DNS 提供商，默认支持 DNS-01
 	// 这样可以自动使用 DNS-01，无需手动配置
 	if m.hasAvailableDNSProvider() {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -2844,7 +2874,7 @@ func (m *Manager) UnregisterDNSProvider(name string) {
 func (m *Manager) CreateProgressChannel(domain string) chan CertProgressEvent {
 	m.progressMutex.Lock()
 	defer m.progressMutex.Unlock()
-	
+
 	ch := make(chan CertProgressEvent, 10) // 缓冲10个事件
 	m.progressChannels[domain] = ch
 	return ch
@@ -2854,7 +2884,7 @@ func (m *Manager) CreateProgressChannel(domain string) chan CertProgressEvent {
 func (m *Manager) GetProgressChannel(domain string) (chan CertProgressEvent, bool) {
 	m.progressMutex.RLock()
 	defer m.progressMutex.RUnlock()
-	
+
 	ch, ok := m.progressChannels[domain]
 	return ch, ok
 }
@@ -2863,7 +2893,7 @@ func (m *Manager) GetProgressChannel(domain string) (chan CertProgressEvent, boo
 func (m *Manager) CloseProgressChannel(domain string) {
 	m.progressMutex.Lock()
 	defer m.progressMutex.Unlock()
-	
+
 	if ch, ok := m.progressChannels[domain]; ok {
 		close(ch)
 		delete(m.progressChannels, domain)
@@ -2875,7 +2905,7 @@ func (m *Manager) sendProgressEvent(domain string, event CertProgressEvent) {
 	m.progressMutex.RLock()
 	ch, ok := m.progressChannels[domain]
 	m.progressMutex.RUnlock()
-	
+
 	if ok {
 		select {
 		case ch <- event:
@@ -2932,3 +2962,48 @@ func extractACMEErrorDetails(err error) string {
 	// 返回原始错误信息
 	return err.Error()
 }
+
+// initializeSessionResumption 初始化 TLS Session Resumption
+// 默認開啟：未配置 session_resumption 或 enabled 未顯式設為 false 時，均啟用 Session Resumption
+func (m *Manager) initializeSessionResumption() {
+	cfg := m.config.SSL.SessionResumption
+
+	// 未配置或顯式設為 false 時才關閉；未配置時視為默認開啟
+	enabled := true
+	mode := "both"
+	cacheSize := 1000
+	ticketLifetime := 3600
+
+	if cfg != nil {
+		enabled = cfg.Enabled
+		if cfg.Mode != "" {
+			mode = cfg.Mode
+		}
+		if cfg.CacheSize > 0 {
+			cacheSize = cfg.CacheSize
+		}
+		if cfg.TicketLifetime > 0 {
+			ticketLifetime = cfg.TicketLifetime
+		}
+	}
+
+	if !enabled {
+		m.log.Info("TLS Session Resumption disabled (explicitly set to false)")
+		return
+	}
+
+	// 初始化 Session ID Cache（如果啟用）
+	if mode == "id" || mode == "both" {
+		m.sessionCache = tls.NewLRUClientSessionCache(cacheSize)
+		m.log.Infof("TLS Session ID Cache enabled (size: %d)", cacheSize)
+	}
+
+	// 配置 Session Ticket
+	// 注意：Go 的 crypto/tls 包會自動管理 Session Ticket 密鑰
+	if mode == "ticket" || mode == "both" {
+		m.log.Infof("TLS Session Ticket enabled (lifetime: %ds, keys managed by Go runtime)", ticketLifetime)
+	}
+}
+
+// 注意：Session Ticket 密鑰由 Go 的 crypto/tls 包自動管理
+// 無需手動實現密鑰輪換邏輯

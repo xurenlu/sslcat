@@ -17,15 +17,15 @@ import (
 
 // Config 应用配置结构
 type Config struct {
-	Server      ServerConfig   `json:"server"`
-	SSL         SSLConfig      `json:"ssl"`
-	Admin       AdminConfig    `json:"admin"`
-	Proxy       ProxyConfig    `json:"proxy"`
-	Security    SecurityConfig `json:"security"`
-	CDNCache    CDNCacheConfig `json:"cdn_cache"`
-	AdminPrefix string         `json:"admin_prefix"`
-	BotAPIPrefix string        `json:"bot_api_prefix"` // 机器人检测 API 前缀（随机生成）
-	ConfigFile  string         `json:"-"` // 配置文件路径，不序列化
+	Server       ServerConfig   `json:"server"`
+	SSL          SSLConfig      `json:"ssl"`
+	Admin        AdminConfig    `json:"admin"`
+	Proxy        ProxyConfig    `json:"proxy"`
+	Security     SecurityConfig `json:"security"`
+	CDNCache     CDNCacheConfig `json:"cdn_cache"`
+	AdminPrefix  string         `json:"admin_prefix"`
+	BotAPIPrefix string         `json:"bot_api_prefix"` // 机器人检测 API 前缀（随机生成）
+	ConfigFile   string         `json:"-"`              // 配置文件路径，不序列化
 
 	// 压缩配置
 	Compression CompressionConfig `json:"compression"`
@@ -89,7 +89,7 @@ type ServerConfig struct {
 	// Session 存储配置
 	SessionStorage string `json:"session_storage"` // memory|file (默认 file)
 	DataDir        string `json:"data_dir"`        // 数据目录（用于文件存储）
-	
+
 	// 安全密钥（用于 Token 签名等）
 	SecretKey string `json:"secret_key"`
 }
@@ -108,6 +108,19 @@ type SSLConfig struct {
 	DNSProviders       []DNSProvider `json:"dns_providers"`
 	DefaultDNSProvider string        `json:"default_dns_provider"`
 	ChallengeMethods   []string      `json:"challenge_methods"` // ["http-01", "dns-01"]
+
+	// TLS Session Resumption 配置
+	SessionResumption *SessionResumptionConfig `json:"session_resumption,omitempty"`
+}
+
+// SessionResumptionConfig TLS Session Resumption 配置
+// 默認開啟：未配置此塊或 enabled 未設為 false 時均啟用
+type SessionResumptionConfig struct {
+	Enabled                   bool   `json:"enabled"`                      // 是否啟用（默認 true，僅設為 false 時關閉）
+	Mode                      string `json:"mode"`                         // "id" | "ticket" | "both" (默認 "both")
+	CacheSize                 int    `json:"cache_size"`                   // Session ID 緩存大小（默認 1000）
+	TicketLifetime            int    `json:"ticket_lifetime"`              // Session Ticket 有效期（秒，默認 3600）
+	TicketKeyRotationInterval int    `json:"ticket_key_rotation_interval"` // Session Ticket 密鑰輪換間隔（秒，默認 86400）
 }
 
 // DNSProvider DNS服务商配置
@@ -222,15 +235,15 @@ type ProxyRule struct {
 	HealthCheckTimeoutSec    int `json:"health_check_timeout_sec"`    // 健康检查超时（秒），默认5
 
 	// WebSocket代理优化配置
-	WebSocketOptimized    bool `json:"websocket_optimized"`     // 是否启用WebSocket优化，默认true
-	
+	WebSocketOptimized bool `json:"websocket_optimized"` // 是否启用WebSocket优化，默认true
+
 	// WAF 配置（按域名）
-	WAFEnabled *bool `json:"waf_enabled,omitempty"` // 是否启用WAF，nil表示使用全局配置
-	WebSocketBufferSize   int  `json:"websocket_buffer_size"`   // WebSocket缓冲区大小，默认100
-	WebSocketReadTimeout  int  `json:"websocket_read_timeout"`  // WebSocket读取超时（秒），默认30
-	WebSocketWriteTimeout int  `json:"websocket_write_timeout"` // WebSocket写入超时（秒），默认10
-	WebSocketPingInterval int  `json:"websocket_ping_interval"` // WebSocket心跳间隔（秒），默认30
-	WebSocketTimeout      int  `json:"websocket_timeout"`       // WebSocket连接总超时（秒），默认1800
+	WAFEnabled            *bool `json:"waf_enabled,omitempty"`   // 是否启用WAF，nil表示使用全局配置
+	WebSocketBufferSize   int   `json:"websocket_buffer_size"`   // WebSocket缓冲区大小，默认100
+	WebSocketReadTimeout  int   `json:"websocket_read_timeout"`  // WebSocket读取超时（秒），默认30
+	WebSocketWriteTimeout int   `json:"websocket_write_timeout"` // WebSocket写入超时（秒），默认10
+	WebSocketPingInterval int   `json:"websocket_ping_interval"` // WebSocket心跳间隔（秒），默认30
+	WebSocketTimeout      int   `json:"websocket_timeout"`       // WebSocket连接总超时（秒），默认1800
 
 	// 自定义头部配置
 	UpstreamRequestHeaders map[string]string `json:"upstream_request_headers,omitempty"`
@@ -242,7 +255,7 @@ type ProxyRule struct {
 	GitDeployAppID     string `json:"git_deploy_app_id"`     // 关联的Git应用ID
 
 	// 机器人检测配置
-	BotDetectionEnabled bool                `json:"bot_detection_enabled"`           // 是否启用机器人检测
+	BotDetectionEnabled bool                `json:"bot_detection_enabled"`          // 是否启用机器人检测
 	BotDetectionConfig  *BotDetectionConfig `json:"bot_detection_config,omitempty"` // 机器人检测配置
 }
 
@@ -378,10 +391,10 @@ type SecurityConfig struct {
 	WAFTLSBlockDurationSec int  `json:"waf_tls_block_duration_sec"` // 封禁时长（秒），默认 3600
 
 	// IP 段封禁配置
-	WAFSubnetBlockEnabled      bool `json:"waf_subnet_block_enabled"`       // 是否启用 IP 段封禁
-	WAFSubnetMask              int  `json:"waf_subnet_mask"`                // 网段掩码，默认 24 (/24)
-	WAFSubnetThreshold         int  `json:"waf_subnet_threshold"`           // 同段被封IP数量阈值，默认 3
-	WAFSubnetBlockDurationSec  int  `json:"waf_subnet_block_duration_sec"`  // 封禁时长（秒），默认 7200
+	WAFSubnetBlockEnabled     bool `json:"waf_subnet_block_enabled"`      // 是否启用 IP 段封禁
+	WAFSubnetMask             int  `json:"waf_subnet_mask"`               // 网段掩码，默认 24 (/24)
+	WAFSubnetThreshold        int  `json:"waf_subnet_threshold"`          // 同段被封IP数量阈值，默认 3
+	WAFSubnetBlockDurationSec int  `json:"waf_subnet_block_duration_sec"` // 封禁时长（秒），默认 7200
 
 	// 人机验证配置
 	EnableCaptcha bool `json:"enable_captcha"`
@@ -867,12 +880,12 @@ func Load(configFile string) (*Config, error) {
 			PortMode:             "standard", // 默认标准模式
 			CustomPort:           8080,       // 默认自定义端口
 			EnableHTTPS:          true,       // 默认启用 HTTPS
-		AccessLogEnabled:     true,
-		AccessLogFormat:      "nginx",
-		AccessLogPath:        "./data/access.log",
-		AccessLogMaxSize:     100 * 1024 * 1024,
-		AccessLogMaxFiles:    10,
-		SharedCacheMaxSizeMB: 10, // 从64MB降低到10MB（资源受限模式）
+			AccessLogEnabled:     true,
+			AccessLogFormat:      "nginx",
+			AccessLogPath:        "./data/access.log",
+			AccessLogMaxSize:     100 * 1024 * 1024,
+			AccessLogMaxFiles:    10,
+			SharedCacheMaxSizeMB: 10,       // 从64MB降低到10MB（资源受限模式）
 			ReadTimeoutSec:       1800,     // 30分钟
 			WriteTimeoutSec:      1800,     // 30分钟
 			IdleTimeoutSec:       120,      // 2分钟（可调）
@@ -943,7 +956,7 @@ func Load(configFile string) (*Config, error) {
 			TLSFingerprintMaxTotal: 500,
 			CleanupIntervalMin:     5,
 		},
-		AdminPrefix: "/sslcat-panel",
+		AdminPrefix:  "/sslcat-panel",
 		BotAPIPrefix: generateBotAPIPrefix(),
 		Cluster: ClusterConfig{
 			Mode:     "standalone",
@@ -980,35 +993,35 @@ func Load(configFile string) (*Config, error) {
 				CleanupInterval: 7200, // 2小时
 			},
 		},
-	UpstreamCache: UpstreamCacheConfig{
-		Enabled:         false,              // 默认禁用，减少内存占用
-		CacheDir:        "./data/upstream-cache",
-		MaxSizeBytes:    50 * 1024 * 1024,  // 从1GB降低到50MB（资源受限模式）
-		DefaultTTL:      1 * time.Hour,     // 1小时
-		RespectUpstream: true,
-		MinFileSize:     1024,              // 1KB
-		MaxFileSize:     10 * 1024 * 1024,  // 从100MB降低到10MB
-		CacheableTypes: []string{
-			"image/jpeg", "image/png", "image/gif", "image/webp",
-			"text/css", "text/javascript", "application/javascript",
-			"font/woff", "font/woff2", "application/font-woff",
-			"video/mp4", "audio/mpeg",
+		UpstreamCache: UpstreamCacheConfig{
+			Enabled:         false, // 默认禁用，减少内存占用
+			CacheDir:        "./data/upstream-cache",
+			MaxSizeBytes:    50 * 1024 * 1024, // 从1GB降低到50MB（资源受限模式）
+			DefaultTTL:      1 * time.Hour,    // 1小时
+			RespectUpstream: true,
+			MinFileSize:     1024,             // 1KB
+			MaxFileSize:     10 * 1024 * 1024, // 从100MB降低到10MB
+			CacheableTypes: []string{
+				"image/jpeg", "image/png", "image/gif", "image/webp",
+				"text/css", "text/javascript", "application/javascript",
+				"font/woff", "font/woff2", "application/font-woff",
+				"video/mp4", "audio/mpeg",
+			},
 		},
-	},
 		Monitoring: MonitoringConfig{
 			Enabled:                  true, // 默认启用监控
 			MemoryMaxUsagePercent:    20.0, // 默认20%
 			MemoryReleaseCooldownSec: 300,  // 默认5分钟
 			// 看门狗默认配置
 			WatchdogEnabled:                     true, // 默认启用看门狗
-			WatchdogCheckIntervalSec:            30,    // 默认30秒
-			WatchdogCPUThresholdPercent:         30.0,  // 默认30%
-			WatchdogCPUIncreaseThresholdPercent: 15.0,  // 默认15%
-			WatchdogCPUIncreaseWindowSec:        180,   // 默认3分钟
-			WatchdogAlertCooldownSec:            3600,  // 默认1小时
+			WatchdogCheckIntervalSec:            30,   // 默认30秒
+			WatchdogCPUThresholdPercent:         30.0, // 默认30%
+			WatchdogCPUIncreaseThresholdPercent: 15.0, // 默认15%
+			WatchdogCPUIncreaseWindowSec:        180,  // 默认3分钟
+			WatchdogAlertCooldownSec:            3600, // 默认1小时
 			// 指标存储默认配置
 			MetricsStorage: MetricsStorageConfig{
-				Enabled:            true,  // 默认启用
+				Enabled:             true,  // 默认启用
 				SamplingInterval:    1,     // 默认1分钟（支持更细粒度的监控）
 				RetentionDays:       90,    // 默认保留90天
 				DetailRetentionDays: 7,     // 默认详细数据保留7天
@@ -1494,7 +1507,7 @@ func getDefaultConfig() *Config {
 			TLSFingerprintMaxTotal:  500,
 			CleanupIntervalMin:      5,
 		},
-		AdminPrefix: "/sslcat-panel",
+		AdminPrefix:  "/sslcat-panel",
 		BotAPIPrefix: generateBotAPIPrefix(),
 		Cluster: ClusterConfig{
 			Mode:     "standalone",
@@ -1557,7 +1570,7 @@ func getDefaultConfig() *Config {
 			WatchdogAlertCooldownSec:            3600,
 			// 指标存储默认配置
 			MetricsStorage: MetricsStorageConfig{
-				Enabled:            true,
+				Enabled:             true,
 				SamplingInterval:    1, // 默认1分钟
 				RetentionDays:       90,
 				DetailRetentionDays: 7,
@@ -2708,11 +2721,11 @@ type MonitoringConfig struct {
 
 // MetricsStorageConfig 指标存储配置
 type MetricsStorageConfig struct {
-	Enabled            bool `json:"enabled"`              // 是否启用指标存储
-	SamplingInterval   int  `json:"sampling_interval"`    // 采样间隔（分钟，默认15）
-	RetentionDays      int  `json:"retention_days"`      // 数据保留天数（默认90）
+	Enabled             bool `json:"enabled"`               // 是否启用指标存储
+	SamplingInterval    int  `json:"sampling_interval"`     // 采样间隔（分钟，默认15）
+	RetentionDays       int  `json:"retention_days"`        // 数据保留天数（默认90）
 	DetailRetentionDays int  `json:"detail_retention_days"` // 详细数据保留天数（默认7，超过此天数后聚合为天数据）
-	MaxRows            int  `json:"max_rows"`            // 最大行数限制（默认10000）
+	MaxRows             int  `json:"max_rows"`              // 最大行数限制（默认10000）
 }
 
 // CacheWarmupConfig 缓存预热配置
@@ -2725,11 +2738,11 @@ type CacheWarmupConfig struct {
 
 // ReportConfig 报告生成配置
 type ReportConfig struct {
-	Enabled bool              `json:"enabled"` // 是否启用报告生成
-	Daily   DailyReportConfig `json:"daily"`  // 日报配置
-	Weekly  WeeklyReportConfig `json:"weekly"` // 周报配置
+	Enabled bool                `json:"enabled"` // 是否启用报告生成
+	Daily   DailyReportConfig   `json:"daily"`   // 日报配置
+	Weekly  WeeklyReportConfig  `json:"weekly"`  // 周报配置
 	Monthly MonthlyReportConfig `json:"monthly"` // 月报配置
-	AI      ReportAIConfig    `json:"ai"`     // AI报告配置
+	AI      ReportAIConfig      `json:"ai"`      // AI报告配置
 }
 
 // DailyReportConfig 日报配置
@@ -2756,10 +2769,9 @@ type MonthlyReportConfig struct {
 type ReportAIConfig struct {
 	Enabled     bool    `json:"enabled"`      // 是否启用AI报告生成
 	APIKey      string  `json:"api_key"`      // OpenAI API Key（如果为空，使用ai_security的配置）
-	APIEndpoint string  `json:"api_endpoint"`  // API 端点（如果为空，使用ai_security的配置）
+	APIEndpoint string  `json:"api_endpoint"` // API 端点（如果为空，使用ai_security的配置）
 	Model       string  `json:"model"`        // 使用的模型（默认 gpt-4o-mini）
 	MaxTokens   int     `json:"max_tokens"`   // 最大 token 数（默认 2000）
 	Temperature float64 `json:"temperature"`  // 温度参数（默认 0.3）
 	Language    string  `json:"language"`     // 报告语言（zh-CN/en-US，默认 zh-CN）
 }
-
