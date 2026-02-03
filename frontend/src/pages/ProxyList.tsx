@@ -29,6 +29,7 @@ import {
   FiTrash2,
   FiZap,
   FiGlobe,
+  FiEye,
 } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
 import { useConfig, buildPath, buildApiPath } from '../contexts/ConfigContext'
@@ -282,6 +283,16 @@ const ProxyList: React.FC = () => {
                     </Td>
                     <Td>
                       <HStack spacing={2}>
+                        <Tooltip label={t.proxyList.view}>
+                          <IconButton
+                            aria-label={t.proxyList.view}
+                            icon={<FiEye />}
+                            size="sm"
+                            variant="ghost"
+                            colorScheme="teal"
+                            onClick={() => navigate(buildPath(adminPrefix, `/proxy/view?domain=${encodeURIComponent(rule.domain)}`))}
+                          />
+                        </Tooltip>
                         <IconButton
                           aria-label={t.proxyList.edit}
                           icon={<FiEdit />}

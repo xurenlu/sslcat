@@ -994,6 +994,18 @@ func (m *Manager) GetProxyConfig(domain string) *config.ProxyRule {
 	return m.config.GetProxyRule(domain)
 }
 
+// GetLoadBalancerStats 获取指定域名的负载均衡统计（含各后端健康与指标），仅多后端时有效
+func (m *Manager) GetLoadBalancerStats(domain string) *loadbalancer.LoadBalancerStats {
+	m.lbMutex.RLock()
+	lb, exists := m.loadBalancers[domain]
+	m.lbMutex.RUnlock()
+	if !exists || lb == nil {
+		return nil
+	}
+	stats := lb.GetStats()
+	return &stats
+}
+
 // GetCDNCache 返回缓存器（只读访问）
 func (m *Manager) GetCDNCache() interface{ Stats() map[string]any } {
 	return m.cdnCache

@@ -1495,8 +1495,36 @@ export interface Translation {
   proxyList: {
     edit: string
     delete: string
+    view: string
   }
 
+  // 代理域名详情
+  proxyDetail: {
+    title: string
+    overview: string
+    editBackend: string
+    forwardingRules: string
+    healthCheck: string
+    targetAddress: string
+    loadBalanceAlgorithm: string
+    sessionAffinity: string
+    backends: string
+    healthy: string
+    unhealthy: string
+    responseTime: string
+    lastCheck: string
+    lastFailure: string
+    activeConnections: string
+    totalRequests: string
+    failedRequests: string
+    successRate: string
+    singleUpstream: string
+    multiUpstream: string
+    noHealthCheckData: string
+    flowDiagram: string
+    clientToGateway: string
+    gatewayToUpstreams: string
+  }
 
   // 后端配置
   backend: {

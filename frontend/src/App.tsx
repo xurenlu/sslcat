@@ -11,6 +11,7 @@ import Dashboard from './pages/Dashboard'
 import ProxyList from './pages/ProxyList'
 import ProxyAdd from './pages/ProxyAdd'
 import ProxyEdit from './pages/ProxyEdit'
+import ProxyDomainDetail from './pages/ProxyDomainDetail'
 import SSLManagement from './pages/SSLManagement'
 import Settings from './pages/Settings'
 import Notifications from './pages/Notifications'
@@ -102,6 +103,13 @@ const AppRoutes: React.FC = () => {
         <AuthGuard>
           <LayoutRoute>
             <ProxyEdit />
+          </LayoutRoute>
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/proxy/view`} element={
+        <AuthGuard>
+          <LayoutRoute>
+            <ProxyDomainDetail />
           </LayoutRoute>
         </AuthGuard>
       } />

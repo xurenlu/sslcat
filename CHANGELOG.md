@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.39] - 2026-02-03
+
+### ✨ 新功能
+
+#### 代理配置 - 域名详情与多上游亮点
+- **域名详情页**：代理配置列表新增「查看」入口，可进入每个域名的详情页
+  - **概览**：目标地址、负载均衡策略、会话保持、健康/总请求等统计
+  - **编辑后端**：一键跳转到现有编辑页，继续编辑后端与高级选项
+- **转发规则可视化**：炫酷的流量走向图
+  - 客户端 → SSLcat Gateway → 上游服务器列表
+  - 多上游时展示负载均衡算法、各上游健康状态与权重
+- **健康检查结果**：当规则启用多上游且开启健康检查时
+  - 表格展示每个上游的健康状态、响应时间、上次检查时间、活跃连接、总请求、失败请求、成功率
+  - 单上游或未开启健康检查时提示「未开启健康检查或单上游无实时数据」
+- **多上游亮点**：负载均衡策略名称、各后端实时健康/不健康、响应时间、连接数、成功率等一目了然
+
+### 🔧 改进
+
+- **API**：`GET /api/proxy/rule?domain=xxx&detail=true` 增加 `load_balancer_stats` 返回（多后端时含各后端健康与指标）
+- **后端**：`proxy.Manager` 新增 `GetLoadBalancerStats(domain)`，供管理端按域名查询负载均衡与健康统计
+- **多语言**：代理详情相关文案补充 zh-CN、en-US、de-DE、es-ES、fr-FR、ja-JP、ru-RU
+
 ## [1.3.38] - 2026-02-03
 
 ### 🔧 改进

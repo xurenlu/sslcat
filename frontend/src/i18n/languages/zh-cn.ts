@@ -1582,6 +1582,35 @@ export const zhCN: Translation = {
   proxyList: {
     edit: '编辑',
     delete: '删除',
+    view: '查看',
+  },
+
+  // 代理域名详情（转发规则、健康检查、多上游亮点）
+  proxyDetail: {
+    title: '代理规则详情',
+    overview: '概览',
+    editBackend: '编辑后端',
+    forwardingRules: '转发规则',
+    healthCheck: '健康检查',
+    targetAddress: '目标地址',
+    loadBalanceAlgorithm: '负载均衡策略',
+    sessionAffinity: '会话保持',
+    backends: '上游服务器',
+    healthy: '健康',
+    unhealthy: '不健康',
+    responseTime: '响应时间',
+    lastCheck: '上次检查',
+    lastFailure: '上次失败',
+    activeConnections: '活跃连接',
+    totalRequests: '总请求数',
+    failedRequests: '失败请求',
+    successRate: '成功率',
+    singleUpstream: '单上游',
+    multiUpstream: '多上游',
+    noHealthCheckData: '未开启健康检查或单上游无实时数据',
+    flowDiagram: '流量走向',
+    clientToGateway: '客户端 → SSLcat',
+    gatewayToUpstreams: 'SSLcat → 上游',
   },
 
 

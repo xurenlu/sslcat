@@ -305,19 +305,28 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case "GET":
-		// 获取单个代理规则
+		// 获取单个代理规则；detail=1 时同时返回负载均衡与健康检查统计（多上游场景）
 		if domain == "" {
 			http.Error(w, "domain parameter is required", http.StatusBadRequest)
 			return
 		}
 
+		withDetail := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("detail"))) == "1" ||
+			strings.TrimSpace(strings.ToLower(r.URL.Query().Get("detail"))) == "true"
+
 		for _, rule := range s.config.Proxy.Rules {
 			if rule.Domain == domain {
-				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(map[string]interface{}{
+				resp := map[string]interface{}{
 					"success": true,
 					"data":    rule,
-				})
+				}
+				if withDetail && s.proxyManager != nil {
+					if lbStats := s.proxyManager.GetLoadBalancerStats(domain); lbStats != nil {
+						resp["load_balancer_stats"] = lbStats
+					}
+				}
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(resp)
 				return
 			}
 		}
