@@ -485,6 +485,10 @@ export const zhCN: Translation = {
     memoryMaxUsagePercentDesc: '达到该占用比例时会执行 GC 并归还内存给操作系统，范围 5% ~ 90%。',
     memoryReleaseCooldownSec: '内存释放冷却时间 (秒)',
     memoryReleaseCooldownSecDesc: '最小 60 秒，避免内存释放过于频繁导致性能抖动。',
+    // 代理性能设置
+    proxyPerformanceSettings: '代理性能设置',
+    responseHeaderTimeoutSec: '响应头超时（秒）',
+    responseHeaderTimeoutSecDesc: '等待后端返回响应头的最大时间，超时则快速失败。默认 3 秒，范围 1–120。',
     // SSL Staging 环境
     sslStaging: '使用 Staging 环境（测试）',
     sslStagingDesc: '⚠️ Staging 环境签发的证书不被浏览器信任，仅用于测试。正式使用请关闭此选项。',

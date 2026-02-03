@@ -563,6 +563,9 @@ export interface Translation {
     memoryMaxUsagePercentDesc: string
     memoryReleaseCooldownSec: string
     memoryReleaseCooldownSecDesc: string
+    proxyPerformanceSettings: string
+    responseHeaderTimeoutSec: string
+    responseHeaderTimeoutSecDesc: string
     // SSL Staging 环境
     sslStaging: string
     sslStagingDesc: string

@@ -93,6 +93,9 @@ const Settings: React.FC = () => {
     memoryMaxUsagePercent: 20,
     memoryReleaseCooldownSec: 300,
     
+    // 代理超时设置
+    responseHeaderTimeoutSec: 3,
+    
     // 压缩设置
     compressionEnabled: true,
     compressionAlgorithms: ['br', 'gzip'],
@@ -606,6 +609,9 @@ const Settings: React.FC = () => {
               sharedCacheMaxSizeMB: config.server?.shared_cache_max_size_mb || 64,
               memoryMaxUsagePercent: config.monitoring?.memory_max_usage_percent || 20,
               memoryReleaseCooldownSec: config.monitoring?.memory_release_cooldown_sec || 300,
+              
+              // 代理超时设置
+              responseHeaderTimeoutSec: config.proxy?.default_response_header_timeout_sec ?? 3,
             }))
           }
         }
@@ -778,6 +784,7 @@ const Settings: React.FC = () => {
             sharedCacheMaxSizeMB: settings.sharedCacheMaxSizeMB,
             memoryMaxUsagePercent: settings.memoryMaxUsagePercent,
             memoryReleaseCooldownSec: settings.memoryReleaseCooldownSec,
+            responseHeaderTimeoutSec: settings.responseHeaderTimeoutSec,
           }),
         }),
         // 保存通知设置
@@ -1641,6 +1648,35 @@ const Settings: React.FC = () => {
               />
               <Text fontSize="sm" color="gray.500">
                 {t.settings.memoryReleaseCooldownSecDesc}
+              </Text>
+            </FormControl>
+          </VStack>
+        </CardBody>
+      </Card>
+
+      {/* 代理性能设置 */}
+      <Card mt={6}>
+        <CardHeader>
+          <Heading size="md">{t.settings.proxyPerformanceSettings}</Heading>
+        </CardHeader>
+        <CardBody>
+          <VStack spacing={4} align="stretch">
+            <FormControl>
+              <FormLabel>{t.settings.responseHeaderTimeoutSec}</FormLabel>
+              <Input
+                type="number"
+                min={1}
+                max={60}
+                value={settings.responseHeaderTimeoutSec}
+                onChange={(e) =>
+                  handleInputChange(
+                    'responseHeaderTimeoutSec',
+                    parseInt(e.target.value) || 3
+                  )
+                }
+              />
+              <Text fontSize="sm" color="gray.500">
+                {t.settings.responseHeaderTimeoutSecDesc}
               </Text>
             </FormControl>
           </VStack>

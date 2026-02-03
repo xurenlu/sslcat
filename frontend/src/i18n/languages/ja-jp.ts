@@ -409,6 +409,9 @@ export const jaJP: Translation = {
     memoryMaxUsagePercentDesc: 'この占有比率に達すると、GCが実行され、メモリがオペレーティングシステムに返されます。範囲は5%~90%です。',
     memoryReleaseCooldownSec: 'メモリ解放クールダウン時間 (秒)',
     memoryReleaseCooldownSecDesc: '最小60秒、頻繁なメモリ解放によるパフォーマンスの変動を避けるため。',
+    proxyPerformanceSettings: 'プロキシパフォーマンス',
+    responseHeaderTimeoutSec: 'レスポンスヘッダータイムアウト（秒）',
+    responseHeaderTimeoutSecDesc: 'バックエンドのレスポンスヘッダー待ちの最大時間。超過で即失敗。デフォルト3秒、範囲1–120。',
     // SSL Staging 环境
     sslStaging: 'Staging環境を使用 (テスト)',
     sslStagingDesc: '⚠️ Staging環境で発行された証明書はブラウザーによって信頼されません。テスト専用です。本番使用ではこのオプションを無効にしてください。',

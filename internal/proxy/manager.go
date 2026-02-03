@@ -1498,6 +1498,13 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 	if expectContinueTimeout <= 0 {
 		expectContinueTimeout = 1 // 默认1秒
 	}
+	responseHeaderTimeout := rule.ResponseHeaderTimeoutSec
+	if responseHeaderTimeout <= 0 {
+		responseHeaderTimeout = m.config.Proxy.DefaultResponseHeaderTimeoutSec
+	}
+	if responseHeaderTimeout <= 0 {
+		responseHeaderTimeout = 3 // 默认3秒，快速失败避免长时间等待
+	}
 
 	// 自定义传输配置
 	baseTransport := &http.Transport{
@@ -1512,7 +1519,7 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 		IdleConnTimeout:        time.Duration(idleTimeout) * time.Second,
 		TLSHandshakeTimeout:    time.Duration(tlsHandshakeTimeout) * time.Second,
 		ExpectContinueTimeout:  time.Duration(expectContinueTimeout) * time.Second,
-		ResponseHeaderTimeout:  30 * time.Second, // 响应头超时，防止连接泄漏
+		ResponseHeaderTimeout:  time.Duration(responseHeaderTimeout) * time.Second, // 响应头超时，防止连接泄漏
 		MaxResponseHeaderBytes: 1 << 20,          // 限制响应头最大 1MB，防止内存攻击
 		ReadBufferSize:         32 * 1024,        // 32KB 读缓冲，减少小缓冲区频繁分配
 		WriteBufferSize:        32 * 1024,        // 32KB 写缓冲，减少小缓冲区频繁分配

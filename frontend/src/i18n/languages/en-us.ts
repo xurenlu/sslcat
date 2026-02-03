@@ -489,6 +489,10 @@ export const enUS: Translation = {
     memoryMaxUsagePercentDesc: 'When this occupancy ratio is reached, GC will be executed and memory will be returned to the operating system, range 5%~90%.',
     memoryReleaseCooldownSec: 'Memory Release Cooldown Time (seconds)',
     memoryReleaseCooldownSecDesc: 'Minimum 60 seconds, to avoid frequent memory release causing performance fluctuations.',
+    // Proxy performance
+    proxyPerformanceSettings: 'Proxy Performance',
+    responseHeaderTimeoutSec: 'Response Header Timeout (sec)',
+    responseHeaderTimeoutSecDesc: 'Max time to wait for backend response headers; request fails fast on timeout. Default 3 sec, range 1–120.',
     // SSL Staging 环境
     sslStaging: 'Use Staging Environment (Testing)',
     sslStagingDesc: '⚠️ Certificates issued by Staging environment are not trusted by browsers, for testing only. Please disable this option for production use.',

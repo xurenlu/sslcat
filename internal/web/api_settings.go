@@ -99,6 +99,9 @@ func (s *Server) handleAPISettings(w http.ResponseWriter, r *http.Request) {
 		"ssl_disable_self_signed":      s.config.SSL.DisableSelfSigned,
 		"proxy_unmatched_behavior":     s.config.Proxy.UnmatchedBehavior,
 		"proxy_unmatched_redirect_url": s.config.Proxy.UnmatchedRedirectURL,
+		"proxy": map[string]interface{}{
+			"default_response_header_timeout_sec": s.config.Proxy.DefaultResponseHeaderTimeoutSec,
+		},
 		"security": map[string]interface{}{
 			"enable_captcha":    s.config.Security.EnableCaptcha,
 			"enable_ddos":       s.config.Security.EnableDDOS,
@@ -317,6 +320,7 @@ func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) 
 		SharedCacheMaxSizeMB     *int     `json:"sharedCacheMaxSizeMB,omitempty"`
 		MemoryMaxUsagePercent    *float64 `json:"memoryMaxUsagePercent,omitempty"`
 		MemoryReleaseCooldownSec *int     `json:"memoryReleaseCooldownSec,omitempty"`
+		ResponseHeaderTimeoutSec *int     `json:"responseHeaderTimeoutSec,omitempty"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -427,6 +431,17 @@ func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) 
 		}
 		s.config.Monitoring.MemoryReleaseCooldownSec = cooldown
 		memoryOptionsChanged = true
+	}
+
+	if req.ResponseHeaderTimeoutSec != nil {
+		sec := *req.ResponseHeaderTimeoutSec
+		if sec < 1 {
+			sec = 1
+		}
+		if sec > 120 {
+			sec = 120
+		}
+		s.config.Proxy.DefaultResponseHeaderTimeoutSec = sec
 	}
 
 	if memoryOptionsChanged {

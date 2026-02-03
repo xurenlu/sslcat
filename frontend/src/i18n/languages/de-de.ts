@@ -409,6 +409,9 @@ export const deDE: Translation = {
     memoryMaxUsagePercentDesc: 'Wenn dieser Belegungsanteil erreicht wird, wird GC ausgeführt und Speicher an das Betriebssystem zurückgegeben, Bereich 5%~90%.',
     memoryReleaseCooldownSec: 'Abklingzeit der Speicherfreigabe (Sekunden)',
     memoryReleaseCooldownSecDesc: 'Mindestens 60 Sekunden, um häufige Speicherfreigaben zu vermeiden, die Leistungsschwankungen verursachen.',
+    proxyPerformanceSettings: 'Proxy-Leistung',
+    responseHeaderTimeoutSec: 'Response-Header-Timeout (Sek.)',
+    responseHeaderTimeoutSecDesc: 'Max. Wartezeit auf Backend-Response-Header; bei Überschreitung schneller Abbruch. Standard 3 Sek., Bereich 1–120.',
     // SSL Staging 环境
     sslStaging: 'Staging-Umgebung verwenden (Test)',
     sslStagingDesc: '⚠️ Von der Staging-Umgebung ausgestellte Zertifikate werden von Browsern nicht vertraut, nur für Tests. Bitte deaktivieren Sie diese Option für den Produktionseinsatz.',

@@ -409,6 +409,9 @@ export const frFR: Translation = {
     memoryMaxUsagePercentDesc: 'Lorsque ce ratio d\'occupation est atteint, GC sera exécuté et la mémoire sera renvoyée au système d\'exploitation, plage 5%~90%.',
     memoryReleaseCooldownSec: 'Temps de Refroidissement de Libération de Mémoire (secondes)',
     memoryReleaseCooldownSecDesc: 'Minimum 60 secondes, pour éviter les libérations fréquentes de mémoire causant des fluctuations de performance.',
+    proxyPerformanceSettings: 'Performances du proxy',
+    responseHeaderTimeoutSec: 'Délai d\'attente des en-têtes de réponse (s)',
+    responseHeaderTimeoutSecDesc: 'Temps max d\'attente des en-têtes backend ; échec rapide si dépassé. Par défaut 3 s, plage 1–120.',
     // SSL Staging 环境
     sslStaging: 'Utiliser l\'Environnement Staging (Test)',
     sslStagingDesc: '⚠️ Les certificats émis par l\'environnement Staging ne sont pas fiables pour les navigateurs, uniquement pour les tests. Veuillez désactiver cette option pour une utilisation en production.',
