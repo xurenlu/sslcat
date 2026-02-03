@@ -54,6 +54,16 @@ import {
 } from 'react-icons/fi'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
 import { useTranslation } from '../hooks/useLanguage'
+import { FeatureGate } from '../components/FeatureGate'
+import { CacheParticles } from '../components/CacheParticles'
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Legend,
+  Tooltip as RechartsTooltip,
+} from 'recharts'
 
 interface CacheStats {
   enabled: boolean
@@ -434,6 +444,60 @@ const CDNManagement: React.FC = () => {
             )}
           </CardBody>
         </Card>
+
+        {/* 缓存对象可视化 */}
+        {objects.length > 0 && (
+          <Card mb={6}>
+            <CardHeader>
+              <Heading size="md">缓存对象可视化</Heading>
+            </CardHeader>
+            <CardBody>
+              <FeatureGate
+                require={['canvas2d']}
+                fallback={
+                  <Box>
+                    <Text mb={4} fontSize="sm" color="gray.600">
+                      您的浏览器不支持 Canvas，使用图表视图
+                    </Text>
+                    <Box height="300px">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={[
+                              { name: '高命中率', value: objects.filter((o) => o.hit_count > 10).length },
+                              { name: '中命中率', value: objects.filter((o) => o.hit_count > 5 && o.hit_count <= 10).length },
+                              { name: '低命中率', value: objects.filter((o) => o.hit_count <= 5).length },
+                            ]}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                            outerRadius={80}
+                            fill="#8884d8"
+                            dataKey="value"
+                          >
+                            <Cell fill="#00ff00" />
+                            <Cell fill="#ffaa00" />
+                            <Cell fill="#ff0000" />
+                          </Pie>
+                          <RechartsTooltip />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </Box>
+                  </Box>
+                }
+                showFallbackNotice={false}
+              >
+                <CacheParticles
+                  objects={objects}
+                  hitRate={stats?.hit_rate || 0}
+                  height={400}
+                />
+              </FeatureGate>
+            </CardBody>
+          </Card>
+        )}
 
         {/* 缓存对象 */}
         <Card>

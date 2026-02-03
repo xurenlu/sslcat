@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react'
-import { Box, Heading, SimpleGrid, Card, CardHeader, CardBody, Text, Badge, HStack, Button, Icon, useToast } from '@chakra-ui/react'
+import { Box, Heading, SimpleGrid, Card, CardHeader, CardBody, Text, Badge, HStack, Button, Icon, useToast, VStack } from '@chakra-ui/react'
 import { FiServer, FiShield, FiLink, FiRefreshCw } from 'react-icons/fi'
 import { useConfig } from '../contexts/ConfigContext'
 import { useTranslation } from '../hooks/useLanguage'
+import { FeatureGate } from '../components/FeatureGate'
+import { ClusterTopology } from '../components/ClusterTopology'
+import { ClusterTopologySVG } from '../components/ClusterTopologySVG'
 
 const Labeled: React.FC<{ label: string; value: string | number | React.ReactNode }> = ({ label, value }) => (
   <HStack justify="space-between">
@@ -66,6 +69,43 @@ const ClusterStatus: React.FC = () => {
         </HStack>
       </HStack>
 
+      {/* 集群拓扑图 */}
+      {status && (
+        <Card mb={6}>
+          <CardHeader>
+            <Heading size="md">集群拓扑</Heading>
+          </CardHeader>
+          <CardBody>
+            <FeatureGate
+              require={['webgl']}
+              fallback={
+                <ClusterTopologySVG
+                  currentNode={status}
+                  masterNode={{
+                    host: status?.master,
+                    reachable: status?.master_last_reachable_at ? true : false,
+                  }}
+                  syncStatus={status?.sync}
+                />
+              }
+              showFallbackNotice={true}
+              fallbackMessage="您的浏览器不支持 WebGL，已切换到 SVG 简化视图"
+            >
+              <ClusterTopology
+                currentNode={status}
+                masterNode={{
+                  host: status?.master,
+                  reachable: status?.master_last_reachable_at ? true : false,
+                }}
+                syncStatus={status?.sync}
+                width={800}
+                height={500}
+              />
+            </FeatureGate>
+          </CardBody>
+        </Card>
+      )}
+
       <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6}>
         <Card>
           <CardHeader><HStack><Icon as={FiShield} /><Heading size="md">{t.clusterStatus.nodeInfo}</Heading></HStack></CardHeader>
@@ -112,7 +152,6 @@ const ClusterStatus: React.FC = () => {
   )
 }
 
-import { VStack } from '@chakra-ui/react'
 export default ClusterStatus
 
 

@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.41] - 2026-02-03
+
+### ✨ 新功能
+
+#### 查看类页面现代化改造 - 3D/Canvas 可视化 + Fallback
+- **浏览器特性检测系统**：自动检测 WebGL、Canvas、Web Animations API 等，智能选择渲染方案
+- **统一 Fallback 机制**：`FeatureGate` 组件提供渐进式降级（WebGL → Canvas → SVG → HTML）
+- **Dashboard**：3D 系统拓扑图（Three.js）+ SVG fallback，节点代表服务，连线表示数据流
+- **Monitoring**：Canvas 波形图（类似音频可视化）+ Recharts fallback
+- **SlowRequests**：Canvas 时间轴瀑布图 + 表格 fallback，每个请求为一条带，长度=响应时间
+- **ClusterStatus**：3D 集群拓扑图（Master/Slave 节点可视化）+ SVG fallback
+- **Security**：Canvas 攻击流可视化（粒子流，颜色=威胁等级）+ 表格 fallback
+- **AISecurityAnalysis**：Canvas 威胁雷达图 + SVG fallback
+- **CDNManagement**：Canvas 缓存粒子系统（粒子=缓存对象，颜色=命中率）+ Recharts fallback
+
+### 🔧 改进
+
+- **性能优化**：
+  - Web Workers 处理大数据集
+  - 虚拟滚动组件（`VirtualList`）支持大列表
+  - 粒子系统自动限制数量（最多 1000 个）
+  - Three.js 场景内存管理工具
+  - 帧率限制器（60fps）
+- **技术栈扩展**：
+  - 新增 `three`、`@react-three/fiber`、`@react-three/drei`（3D 可视化）
+  - 新增 `leaflet`、`react-leaflet`（地图）
+  - 新增 `@tweenjs/tween.js`（动画补间）
+- **工具函数库**：
+  - `browserFeatures.ts`：浏览器特性检测
+  - `webglUtils.ts`：Three.js 工具函数
+  - `canvasUtils.ts`：Canvas 工具函数（粒子、波形、瀑布图、雷达图）
+  - `performanceUtils.ts`：性能优化工具（Web Workers、虚拟滚动、内存监控）
+
+### 📝 文档
+
+- 新增 `docs/zh/features/modern-visualizations.md`：详细说明各页面可视化方案、Fallback 机制、浏览器兼容性、测试方法
+
 ## [1.3.40] - 2026-02-03
 
 ### 🎨 UI/UX 增强

@@ -35,6 +35,9 @@ import { useTranslation } from '../hooks/useLanguage'
 import { useConfig, buildPath, buildApiPath } from '../contexts/ConfigContext'
 import WAFStatsCard from '../components/WAFStatsCard'
 import { WAFStatsResponse } from '../types/waf'
+import { FeatureGate } from '../components/FeatureGate'
+import { Dashboard3D } from '../components/Dashboard3D'
+import { DashboardFallback } from '../components/DashboardFallback'
 
 interface DashboardStats {
   activeRules: number
@@ -234,6 +237,40 @@ const Dashboard: React.FC = () => {
           onClick={() => navigate(buildPath(adminPrefix, '/security'))}
         />
       </Box>
+
+      {/* 系统拓扑图 */}
+      <Card mb={8}>
+        <CardBody>
+          <Heading size="md" mb={4}>系统拓扑</Heading>
+          <FeatureGate
+            require={['webgl']}
+            fallback={
+              <DashboardFallback
+                stats={{
+                  activeRules: stats.activeRules,
+                  sslCertificates: stats.sslCertificates,
+                  wafEnabled: wafStats.enabled,
+                  wafBlocked: wafStats.totalBlocked,
+                }}
+              />
+            }
+            showFallbackNotice={true}
+            fallbackMessage="您的浏览器不支持 WebGL，已切换到 SVG 简化视图"
+            allowManualFallback={false}
+          >
+            <Dashboard3D
+              stats={{
+                activeRules: stats.activeRules,
+                sslCertificates: stats.sslCertificates,
+                wafEnabled: wafStats.enabled,
+                wafBlocked: wafStats.totalBlocked,
+              }}
+              width={800}
+              height={500}
+            />
+          </FeatureGate>
+        </CardBody>
+      </Card>
 
       {/* 统计卡片 */}
       <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={6} mb={8}>

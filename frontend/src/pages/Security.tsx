@@ -50,6 +50,8 @@ import { useTranslation } from '../hooks/useLanguage'
 import GeoIPConfig from '../components/GeoIPConfig'
 import WAFRulesList from '../components/WAFRulesList'
 import { WAFStatsResponse, WAFRulesResponse, WAFEventsResponse, WAFRule, WAFEvent } from '../types/waf'
+import { FeatureGate } from '../components/FeatureGate'
+import { AttackFlow } from '../components/AttackFlow'
 
 interface SecurityEvent {
   id: string
@@ -591,6 +593,28 @@ const Security: React.FC = () => {
                 </CardBody>
               </Card>
             </SimpleGrid>
+
+            {/* 攻击流可视化 */}
+            {events.length > 0 && (
+              <Card mb={6}>
+                <CardHeader>
+                  <Heading size="md">攻击流可视化</Heading>
+                </CardHeader>
+                <CardBody>
+                  <FeatureGate
+                    require={['canvas2d']}
+                    fallback={
+                      <Box p={4} textAlign="center" color="gray.500">
+                        <Text>您的浏览器不支持 Canvas，请使用表格视图查看安全事件</Text>
+                      </Box>
+                    }
+                    showFallbackNotice={false}
+                  >
+                    <AttackFlow events={events.slice(0, 20)} height={400} />
+                  </FeatureGate>
+                </CardBody>
+              </Card>
+            )}
 
             {/* 安全事件列表 */}
             <Card>

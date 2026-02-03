@@ -201,11 +201,10 @@ const ProxyDomainDetail: React.FC = () => {
         p={4}
         borderRadius="xl"
         bg="white"
-        _dark={{ bg: 'whiteAlpha.50' }}
         boxShadow="sm"
         borderWidth="1px"
         borderColor="gray.100"
-        _dark={{ borderColor: 'whiteAlpha.100' }}
+        _dark={{ bg: 'whiteAlpha.50', borderColor: 'whiteAlpha.100' }}
       >
         <HStack spacing={4}>
           <Button
@@ -365,12 +364,12 @@ const ProxyDomainDetail: React.FC = () => {
               <Card
                 overflow="hidden"
                 bg="linear-gradient(135deg, var(--chakra-colors-gray-50) 0%, var(--chakra-colors-white) 100%)"
-                _dark={{
-                  bg: 'linear-gradient(135deg, var(--chakra-colors-whiteAlpha-50) 0%, var(--chakra-colors-whiteAlpha-100) 0%)',
-                }}
                 borderWidth="1px"
                 borderColor="gray.200"
-                _dark={{ borderColor: 'whiteAlpha.200' }}
+                _dark={{
+                  bg: 'linear-gradient(135deg, var(--chakra-colors-whiteAlpha-50) 0%, var(--chakra-colors-whiteAlpha-100) 0%)',
+                  borderColor: 'whiteAlpha.200',
+                }}
               >
                 <CardBody p={6}>
                   <Text fontWeight="semibold" mb={5} fontSize="md" color="gray.700" _dark={{ color: 'gray.200' }}>
@@ -482,11 +481,11 @@ const ProxyDomainDetail: React.FC = () => {
                                 borderRadius="xl"
                                 borderWidth="2px"
                                 borderColor={healthy ? 'green.300' : 'red.300'}
+                                bg="white"
                                 _dark={{
                                   borderColor: healthy ? 'green.500' : 'red.500',
+                                  bg: 'gray.800',
                                 }}
-                                bg="white"
-                                _dark={{ bg: 'gray.800' }}
                                 boxShadow="md"
                                 position="relative"
                                 overflow="hidden"

@@ -10,6 +10,9 @@ import {
 // import { SearchIcon, DownloadIcon, DeleteIcon, ExternalLinkIcon } from '@chakra-ui/icons';
 import { useTranslation } from '../hooks/useLanguage';
 import api from '../utils/api';
+import { FeatureGate } from '../components/FeatureGate';
+import { RequestWaterfall } from '../components/RequestWaterfall';
+import { VirtualList } from '../components/VirtualList';
 
 interface SlowRequestRecord {
   id: string;
@@ -245,6 +248,28 @@ const SlowRequests: React.FC = () => {
             </HStack>
           </CardBody>
         </Card>
+
+        {/* 请求瀑布图 */}
+        {filteredRecords.length > 0 && (
+          <Card>
+            <CardHeader><Heading size="md">请求时间轴可视化</Heading></CardHeader>
+            <CardBody>
+              <FeatureGate
+                require={['canvas2d']}
+                fallback={
+                  <Box p={4} textAlign="center" color="gray.500">
+                    <Text>您的浏览器不支持 Canvas，请使用表格视图查看请求详情</Text>
+                  </Box>
+                }
+                showFallbackNotice={false}
+              >
+                <RequestWaterfall
+                  requests={filteredRecords.slice(0, 50)} // 限制显示数量
+                />
+              </FeatureGate>
+            </CardBody>
+          </Card>
+        )}
 
         <Card>
           <CardHeader><Heading size="md">{t.slowRequests.recentRecords}</Heading></CardHeader>

@@ -52,6 +52,8 @@ import { FaRobot } from 'react-icons/fa'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
 import { useTranslation } from '../hooks/useLanguage'
 import { TOAST_DURATION } from '../constants'
+import { FeatureGate } from '../components/FeatureGate'
+import { ThreatRadar } from '../components/ThreatRadar'
 
 interface AISecurityConfig {
   enabled: boolean
@@ -698,6 +700,21 @@ const AISecurityAnalysis: React.FC = () => {
                   {/* 威胁列表 */}
                   {lastAnalysis.threats && lastAnalysis.threats.length > 0 && (
                     <Box>
+                      {/* 威胁雷达图 */}
+                      <FeatureGate
+                        require={['canvas2d']}
+                        fallback={
+                          <Box p={4} textAlign="center" color="gray.500" mb={4}>
+                            <Text fontSize="sm">您的浏览器不支持 Canvas，请使用列表视图查看威胁详情</Text>
+                          </Box>
+                        }
+                        showFallbackNotice={false}
+                      >
+                        <Box mb={4}>
+                          <ThreatRadar threats={lastAnalysis.threats} height={300} />
+                        </Box>
+                      </FeatureGate>
+
                       <Text fontWeight="bold" mb={2}>🚨 {t.aiSecurity.detectedThreats}:</Text>
                       <Accordion allowMultiple>
                         {lastAnalysis.threats.map((threat, index) => (
