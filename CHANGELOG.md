@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.40] - 2026-02-03
+
+### 🎨 UI/UX 增强
+
+#### 代理域名详情页 - 视觉与动效升级
+- **整体动效**：整页淡入、卡片错峰入场、表格行渐显，提升页面流畅度
+- **转发规则可视化**：
+  - SVG 虚线箭头流动动画（`strokeDashoffset` 循环），模拟数据流动
+  - 客户端与 Gateway 节点采用渐变背景与阴影，Gateway 节点带闪电图标
+  - 上游卡片：健康状态流光边框动画（shimmer），逐个淡入 + 上移（stagger）
+- **健康检查表**：
+  - 状态列：健康节点绿点脉冲动画（scale + opacity）
+  - 响应时间：横向 Progress 条，按区间自动配色（绿 <100ms / 黄 / 橙 / 红）
+  - 成功率：横向 Progress 条，≥99% 绿、≥95% 黄、否则红
+- **统计卡片**：左侧彩色竖条（蓝/紫/绿/青），错峰淡入动画
+- **Tab 样式**：软圆角样式，选中时白底 + 阴影，更现代
+
+### 🔧 技术改进
+
+- **动画库**：使用 `framer-motion` 实现流畅的入场、脉冲、流光等动效
+- **SVG 动画**：统一 keyframes 管理，确保虚线流动动画稳定运行
+- **响应式**：优化移动端布局，卡片与表格自适应
+
 ## [1.3.39] - 2026-02-03
 
 ### ✨ 新功能
