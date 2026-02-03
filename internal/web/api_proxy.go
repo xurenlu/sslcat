@@ -463,6 +463,11 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// 立即重载代理配置
+		if err := s.proxyManager.Reload(s.config); err != nil {
+			s.log.Warnf("Proxy reload after config save: %v", err)
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": true,
@@ -629,6 +634,11 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
+				// 立即重载代理配置，使负载均衡器等使用新端口/后端配置
+				if err := s.proxyManager.Reload(s.config); err != nil {
+					s.log.Warnf("Proxy reload after config save: %v", err)
+				}
+
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(map[string]interface{}{
 					"success": true,
@@ -657,6 +667,11 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 					s.log.Errorf("Failed to save config: %v", err)
 					http.Error(w, "failed to save config", http.StatusInternalServerError)
 					return
+				}
+
+				// 立即重载代理配置
+				if err := s.proxyManager.Reload(s.config); err != nil {
+					s.log.Warnf("Proxy reload after config save: %v", err)
 				}
 
 				w.Header().Set("Content-Type", "application/json")

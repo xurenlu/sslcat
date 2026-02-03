@@ -455,7 +455,7 @@ func (m *Manager) handleLoadBalancedRequest(w http.ResponseWriter, r *http.Reque
 
 	if !exists {
 		m.log.Errorf("Load balancer not found for domain: %s", rule.Domain)
-		http.Error(w, "Service Unavailable", http.StatusServiceUnavailable)
+		m.write503WithDebugHeaders(w, rule, nil, "load balancer not found")
 		return
 	}
 
@@ -476,7 +476,11 @@ func (m *Manager) handleLoadBalancedRequest(w http.ResponseWriter, r *http.Reque
 
 	if err != nil {
 		m.log.Errorf("Failed to select backend for domain %s: %v", rule.Domain, err)
-		http.Error(w, "Service Unavailable", http.StatusServiceUnavailable)
+		var backends []loadbalancer.Backend
+		if typedLB, ok := lb.(*loadbalancer.LoadBalancer); ok {
+			backends = typedLB.GetAllBackends()
+		}
+		m.write503WithDebugHeaders(w, rule, backends, err.Error())
 		return
 	}
 
@@ -864,12 +868,12 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 					<p>Unable to connect to backend %s (%s)</p>
 					<p>Error: %v</p>
 					<hr>
-					<p><small>Powered by sslcat-%s</small></p>
+					<p><small>Powered by <a href="https://sslcat.com">sslcat</a>-%s</small></p>
 				</body>
 				</html>
 				`, backendFromCtx.ID, backendFromCtx.GetAddress(), err, m.version)
 			} else {
-				// 如果没有后端信息，使用通用错误处理
+				// 如果没有后端信息，使用通用错误处理；若启用调试则从 rule 补充上游信息
 				// 使用错误日志限流器
 				errorKey := fmt.Sprintf("generic:%v", err)
 				shouldLog, count := m.errorLogLimiter.shouldLog(errorKey)
@@ -881,37 +885,8 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 						m.log.Debugf("Proxy error (rate limited, %d skipped): %v", count, err)
 					}
 				}
-				w.Header().Set("Content-Type", "text/html; charset=utf-8")
-				w.WriteHeader(http.StatusServiceUnavailable)
-				fmt.Fprintf(w, `
-				<!DOCTYPE html>
-				<html>
-				<head>
-					<meta charset="UTF-8">
-					<title>503 Service Unavailable</title>
-					<style>
-						body { font-family: Arial, sans-serif; margin: 50px; background: #f5f5f5; }
-						.container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-						h1 { color: #ff9800; }
-						.info { background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0; }
-						.footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; color: #6c757d; font-size: 14px; }
-					</style>
-				</head>
-				<body>
-					<div class="container">
-						<h1>⚠️ 503 Service Unavailable</h1>
-						<div class="info">
-							<strong>服务暂时不可用</strong>
-						</div>
-						<p>抱歉，服务器暂时无法处理您的请求。请稍后重试。</p>
-						<div class="footer">
-							<p>如果问题持续存在，请联系网站管理员。</p>
-							<p><small>Powered by sslcat-%s</small></p>
-						</div>
-					</div>
-				</body>
-				</html>
-				`, m.version)
+				ruleFromCtx, _ := ctx.Value(proxyRuleKey).(*config.ProxyRule)
+				m.write503WithDebugHeaders(w, ruleFromCtx, nil, err.Error())
 			}
 		}
 	}
@@ -921,6 +896,62 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 
 	// 请求完成后减少连接计数
 	backend.DecrementConnections()
+}
+
+// write503WithDebugHeaders 写入 503 响应，并在启用调试时附加上游调试 header
+func (m *Manager) write503WithDebugHeaders(w http.ResponseWriter, rule *config.ProxyRule, backends []loadbalancer.Backend, errMsg string) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if rule != nil && rule.UpstreamDebugHeaders {
+		w.Header().Set("X-Upstream-Debug-Error", errMsg)
+		if len(backends) > 0 {
+			var addrs []string
+			for _, b := range backends {
+				addrs = append(addrs, b.ID+":"+b.GetAddress())
+			}
+			w.Header().Set("X-Upstream-Backends", strings.Join(addrs, ", "))
+		} else if rule.Target != "" {
+			addr := rule.Target
+			if rule.Port > 0 {
+				addr = fmt.Sprintf("%s:%d", rule.Target, rule.Port)
+			}
+			w.Header().Set("X-Upstream-Address", addr)
+			// 单后端时可用 rule 的 Backends[0].ID 或 domain_backend_1
+			if len(rule.Backends) > 0 && rule.Backends[0].ID != "" {
+				w.Header().Set("X-Upstream-Selected", rule.Backends[0].ID)
+			}
+		}
+		w.Header().Set("X-Proxy-By", "SSLcat/"+m.version)
+	}
+	w.WriteHeader(http.StatusServiceUnavailable)
+	fmt.Fprintf(w, `
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>503 Service Unavailable</title>
+	<style>
+		body { font-family: Arial, sans-serif; margin: 50px; background: #f5f5f5; }
+		.container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+		h1 { color: #ff9800; }
+		.info { background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0; }
+		.footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; color: #6c757d; font-size: 14px; }
+	</style>
+</head>
+<body>
+	<div class="container">
+		<h1>⚠️ 503 Service Unavailable</h1>
+		<div class="info">
+			<strong>服务暂时不可用</strong>
+		</div>
+		<p>抱歉，服务器暂时无法处理您的请求。请稍后重试。</p>
+		<div class="footer">
+			<p>如果问题持续存在，请联系网站管理员。</p>
+			<p><small>Powered by <a href="https://sslcat.com">sslcat</a>-%s</small></p>
+		</div>
+	</div>
+</body>
+</html>
+`, m.version)
 }
 
 // PurgeCDN 清理 CDN 缓存
@@ -1545,7 +1576,7 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 					<p>抱歉，服务器暂时无法处理您的请求。请稍后重试。</p>
 					<div class="footer">
 						<p>如果问题持续存在，请联系网站管理员。</p>
-						<p><small>Powered by sslcat-%s</small></p>
+						<p><small>Powered by <a href="https://sslcat.com">sslcat</a>-%s</small></p>
 					</div>
 				</div>
 			</body>

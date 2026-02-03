@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.38] - 2026-02-03
+
+### 🔧 改进
+
+- **错误页品牌链接**：503、502、404 等错误页及人机验证页脚中的「Powered by sslcat」为 sslcat 增加指向 https://sslcat.com 的链接
+  - 代理 502/503 错误页（`internal/proxy/manager.go`）
+  - 未匹配代理时返回的 502/503/404 页（`internal/web/server.go`）
+  - 人机验证页（`internal/web/bot_challenge_handler.go`）
+- **代理配置**：保存代理规则后立即触发代理重载，使负载均衡与后端配置变更无需重启即可生效（`internal/web/api_proxy.go`）
+
 ## [1.3.37] - 2026-02-03
 
 ### ✨ 新功能

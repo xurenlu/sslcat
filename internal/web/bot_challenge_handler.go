@@ -239,7 +239,7 @@ func (s *Server) renderBotChallengePage(challenge *bot.Challenge, originalURL st
         <div class="status-message" id="statusMessage"></div>
         
         <div class="footer">
-            <p>Powered by sslcat</p>
+            <p>Powered by <a href="https://sslcat.com">sslcat</a></p>
         </div>
     </div>
     
@@ -480,4 +480,3 @@ func (s *Server) HandleBotChallengeRefresh(w http.ResponseWriter, r *http.Reques
 		"challenge": newChallenge,
 	})
 }
-

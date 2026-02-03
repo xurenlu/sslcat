@@ -1799,24 +1799,24 @@ func (s *Server) proxyMiddleware(w http.ResponseWriter, r *http.Request) bool {
 	case "503":
 		// 低成本快速失败：减少日志与返回体大小
 		s.log.Debugf("Unmatched proxy for host=%s path=%s, returning 503", host, r.URL.Path)
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusServiceUnavailable)
-		_, _ = w.Write([]byte("503 Service Unavailable\n"))
+		w.Write([]byte("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>503 Service Unavailable</title></head><body><h1>503 Service Unavailable</h1><p><small>Powered by <a href=\"https://sslcat.com\">sslcat</a>-" + s.version + "</small></p></body></html>"))
 		return true
 	case "blank":
 		s.log.Warnf("Unmatched proxy for host=%s path=%s, returning blank", host, r.URL.Path)
 		w.WriteHeader(http.StatusOK)
 	case "404":
 		s.log.Warnf("Unmatched proxy for host=%s path=%s, returning 404", host, r.URL.Path)
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("404 Not Found\n"))
+		w.Write([]byte("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>404 Not Found</title></head><body><h1>404 Not Found</h1><p><small>Powered by <a href=\"https://sslcat.com\">sslcat</a>-" + s.version + "</small></p></body></html>"))
 		return true
 	default: // "502"
 		s.log.Warnf("Unmatched proxy for host=%s path=%s, returning 502", host, r.URL.Path)
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusBadGateway)
-		w.Write([]byte("502 Bad Gateway\n\nPowered by sslcat-" + s.version + "\n"))
+		w.Write([]byte("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>502 Bad Gateway</title></head><body><h1>502 Bad Gateway</h1><p><small>Powered by <a href=\"https://sslcat.com\">sslcat</a>-" + s.version + "</small></p></body></html>"))
 	}
 	return true
 }
