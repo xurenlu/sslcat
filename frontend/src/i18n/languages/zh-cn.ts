@@ -393,6 +393,11 @@ export const zhCN: Translation = {
     enableRateLimit: '启用访问限制',
     maxRequestsPerMinute: '5分钟最大请求数',
     enableAccessLog: '启用访问日志',
+    accessLogPath: '访问日志路径',
+    accessLogFormat: '访问日志格式',
+    accessLogFormatNginx: 'Nginx',
+    accessLogFormatApache: 'Apache',
+    accessLogFormatJson: 'JSON',
     enableErrorLog: '启用错误日志',
     logLevel: '日志级别',
     enableNotifications: '启用通知',
@@ -483,6 +488,10 @@ export const zhCN: Translation = {
     // SSL Staging 环境
     sslStaging: '使用 Staging 环境（测试）',
     sslStagingDesc: '⚠️ Staging 环境签发的证书不被浏览器信任，仅用于测试。正式使用请关闭此选项。',
+    http2Enabled: '启用 HTTP/2',
+    http2EnabledDesc: '启用 HTTP/2 协议支持，可提升性能（多路复用、头部压缩等）。默认关闭，可在各站点配置中单独覆盖。',
+    http3Enabled: '启用 HTTP/3',
+    http3EnabledDesc: '启用 HTTP/3（基于 QUIC）协议支持，可提升高延迟与移动网络下的性能。默认关闭，可在各站点配置中单独覆盖。',
     // 自定义端口详细设置
     customPortConfigTitle: '自定义端口配置',
     customPortWarning: '自定义端口模式下，SSLcat 将仅监听指定端口，不支持 HTTPS 功能。如需 HTTPS，请使用标准模式或配置反向代理。',

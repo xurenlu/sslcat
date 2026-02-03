@@ -317,6 +317,11 @@ export const ruRU: Translation = {
     enableRateLimit: 'Включить ограничение скорости',
     maxRequestsPerMinute: 'Максимум запросов за 5 минут',
     enableAccessLog: 'Включить журнал доступа',
+    accessLogPath: 'Путь к журналу доступа',
+    accessLogFormat: 'Формат журнала доступа',
+    accessLogFormatNginx: 'Nginx',
+    accessLogFormatApache: 'Apache',
+    accessLogFormatJson: 'JSON',
     enableErrorLog: 'Включить журнал ошибок',
     logLevel: 'Уровень журналирования',
     enableNotifications: 'Включить уведомления',
@@ -407,6 +412,10 @@ export const ruRU: Translation = {
     // SSL Staging 环境
     sslStaging: 'Использовать Окружение Staging (Тест)',
     sslStagingDesc: '⚠️ Сертификаты, выданные окружением Staging, не доверяются браузерами, только для тестирования. Пожалуйста, отключите эту опцию для использования в продакшене.',
+    http2Enabled: 'Включить HTTP/2',
+    http2EnabledDesc: 'Включить поддержку протокола HTTP/2 для улучшения производительности (мультиплексирование, сжатие заголовков и т.д.). По умолчанию отключено, можно переопределить для каждого сайта.',
+    http3Enabled: 'Включить HTTP/3',
+    http3EnabledDesc: 'Включить HTTP/3 (на базе QUIC) для лучшей производительности в сетях с высокой задержкой и мобильных. По умолчанию отключено, можно переопределить для каждого сайта.',
     // 自定义端口详细设置
     customPortConfigTitle: 'Конфигурация Пользовательского Порта',
     customPortWarning: 'В режиме пользовательского порта SSLcat будет прослушивать только указанный порт и не поддерживает функциональность HTTPS. Для HTTPS используйте стандартный режим или настройте обратный прокси.',

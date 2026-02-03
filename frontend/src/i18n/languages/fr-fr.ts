@@ -317,6 +317,11 @@ export const frFR: Translation = {
     enableRateLimit: 'Activer la Limitation de Débit',
     maxRequestsPerMinute: 'Nombre Maximum de Requêtes par 5 Minutes',
     enableAccessLog: 'Activer le Journal d\'Accès',
+    accessLogPath: 'Chemin du Journal d\'Accès',
+    accessLogFormat: 'Format du Journal d\'Accès',
+    accessLogFormatNginx: 'Nginx',
+    accessLogFormatApache: 'Apache',
+    accessLogFormatJson: 'JSON',
     enableErrorLog: 'Activer le Journal d\'Erreurs',
     logLevel: 'Niveau de Journal',
     enableNotifications: 'Activer les Notifications',
@@ -407,6 +412,10 @@ export const frFR: Translation = {
     // SSL Staging 环境
     sslStaging: 'Utiliser l\'Environnement Staging (Test)',
     sslStagingDesc: '⚠️ Les certificats émis par l\'environnement Staging ne sont pas fiables pour les navigateurs, uniquement pour les tests. Veuillez désactiver cette option pour une utilisation en production.',
+    http2Enabled: 'Activer HTTP/2',
+    http2EnabledDesc: 'Activer le support du protocole HTTP/2 pour améliorer les performances (multiplexage, compression des en-têtes, etc.). Désactivé par défaut, peut être remplacé par site.',
+    http3Enabled: 'Activer HTTP/3',
+    http3EnabledDesc: 'Activer HTTP/3 (basé sur QUIC) pour de meilleures performances sur les réseaux à haute latence et mobiles. Désactivé par défaut, peut être remplacé par site.',
     // 自定义端口详细设置
     customPortConfigTitle: 'Configuration de Port Personnalisé',
     customPortWarning: 'En mode port personnalisé, SSLcat n\'écoutera que sur le port spécifié et ne prend pas en charge la fonctionnalité HTTPS. Pour HTTPS, veuillez utiliser le mode standard ou configurer un proxy inverse.',

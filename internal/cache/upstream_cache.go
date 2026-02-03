@@ -47,7 +47,7 @@ type UpstreamCache struct {
 	respectUpstream bool  // 是否遵循上游的Cache-Control
 	minFileSize     int64 // 最小缓存文件大小
 	maxFileSize     int64 // 最大缓存文件大小
-	
+
 	// 清理器控制
 	stopCleaner    chan struct{}
 	cleanerOnce    sync.Once
@@ -276,7 +276,7 @@ func (uc *UpstreamCache) Store(req *http.Request, resp *http.Response) error {
 		return nil
 	}
 
-	// 修复：使用流式处理 + 大小限制，避免大文件占用过多内存
+	// 修復：使用流式處理 + 大小限制，避免大檔案占用過多記憶體
 	key := uc.generateCacheKey(req)
 	metaPath := uc.getMetaPath(key)
 	dataPath := uc.getDataPath(key)
@@ -293,20 +293,27 @@ func (uc *UpstreamCache) Store(req *http.Request, resp *http.Response) error {
 	tempPath := tempFile.Name()
 	defer func() {
 		tempFile.Close()
-		// 如果失败，清理临时文件
+		// 如果失敗，清理暫存檔
 		if _, err := os.Stat(tempPath); err == nil {
 			os.Remove(tempPath)
 		}
 	}()
 
-	// 使用 LimitedReader 限制读取大小（最大 100MB）
+	// 使用 LimitedReader 限制讀取大小（最大 100MB）
 	maxSize := int64(100 * 1024 * 1024)
 	if uc.maxSizeBytes > 0 && uc.maxSizeBytes < maxSize {
 		maxSize = uc.maxSizeBytes
 	}
+	// 若 Content-Length 不可用或超出限制，直接跳過快取以避免讀取 resp.Body
+	if resp.ContentLength <= 0 {
+		return nil
+	}
+	if resp.ContentLength > maxSize {
+		return nil
+	}
 	limitedReader := &io.LimitedReader{R: resp.Body, N: maxSize + 1}
 
-	// 流式写入临时文件，同时保存到缓冲区用于重置响应体
+	// 流式寫入暫存檔，同時保存到緩衝區用於重置響應體
 	var buf bytes.Buffer
 	teeReader := io.TeeReader(limitedReader, &buf)
 
@@ -777,20 +784,20 @@ func (uc *UpstreamCache) Clean() error {
 func (uc *UpstreamCache) StartCleaner() {
 	uc.cleanerMutex.Lock()
 	defer uc.cleanerMutex.Unlock()
-	
+
 	// 使用 sync.Once 确保只启动一次
 	if uc.cleanerStarted {
 		uc.log.Warn("Upstream cache cleaner already started, skipping")
 		return
 	}
-	
+
 	uc.cleanerStarted = true
 	uc.stopCleaner = make(chan struct{})
-	
+
 	go func() {
 		ticker := time.NewTicker(61 * time.Minute) // 使用质数间隔避免与其他定时器同时触发
 		defer ticker.Stop()
-		
+
 		uc.log.Info("Upstream cache cleaner started")
 
 		for {
@@ -811,11 +818,11 @@ func (uc *UpstreamCache) StartCleaner() {
 func (uc *UpstreamCache) StopCleaner() {
 	uc.cleanerMutex.Lock()
 	defer uc.cleanerMutex.Unlock()
-	
+
 	if !uc.cleanerStarted {
 		return
 	}
-	
+
 	if uc.stopCleaner != nil {
 		select {
 		case <-uc.stopCleaner:
@@ -824,7 +831,7 @@ func (uc *UpstreamCache) StopCleaner() {
 			close(uc.stopCleaner)
 		}
 	}
-	
+
 	uc.cleanerStarted = false
 	uc.log.Info("Upstream cache cleaner stop signal sent")
 }

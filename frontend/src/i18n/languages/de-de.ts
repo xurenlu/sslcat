@@ -317,6 +317,11 @@ export const deDE: Translation = {
     enableRateLimit: 'Ratenbegrenzung aktivieren',
     maxRequestsPerMinute: 'Maximale Anfragen pro 5 Minuten',
     enableAccessLog: 'Zugriffsprotokoll aktivieren',
+    accessLogPath: 'Zugriffsprotokoll-Pfad',
+    accessLogFormat: 'Zugriffsprotokoll-Format',
+    accessLogFormatNginx: 'Nginx',
+    accessLogFormatApache: 'Apache',
+    accessLogFormatJson: 'JSON',
     enableErrorLog: 'Fehlerprotokoll aktivieren',
     logLevel: 'Protokollebene',
     enableNotifications: 'Benachrichtigungen aktivieren',
@@ -407,6 +412,10 @@ export const deDE: Translation = {
     // SSL Staging 环境
     sslStaging: 'Staging-Umgebung verwenden (Test)',
     sslStagingDesc: '⚠️ Von der Staging-Umgebung ausgestellte Zertifikate werden von Browsern nicht vertraut, nur für Tests. Bitte deaktivieren Sie diese Option für den Produktionseinsatz.',
+    http2Enabled: 'HTTP/2 aktivieren',
+    http2EnabledDesc: 'HTTP/2-Protokollunterstützung aktivieren für verbesserte Leistung (Multiplexing, Header-Komprimierung usw.). Standardmäßig deaktiviert, kann pro Site überschrieben werden.',
+    http3Enabled: 'HTTP/3 aktivieren',
+    http3EnabledDesc: 'HTTP/3 (QUIC-basiert) aktivieren für bessere Leistung bei hoher Latenz und mobilen Netzwerken. Standardmäßig deaktiviert, kann pro Site überschrieben werden.',
     // 自定义端口详细设置
     customPortConfigTitle: 'Benutzerdefinierte Port-Konfiguration',
     customPortWarning: 'Im benutzerdefinierten Port-Modus lauscht SSLcat nur auf dem angegebenen Port und unterstützt keine HTTPS-Funktionalität. Für HTTPS verwenden Sie bitte den Standard-Modus oder konfigurieren Sie einen Reverse-Proxy.',

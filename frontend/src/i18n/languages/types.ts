@@ -457,6 +457,10 @@ export interface Translation {
     httpsPort: string
     autoSSL: string
     letsEncryptEmail: string
+    http2Enabled: string
+    http2EnabledDesc: string
+    http3Enabled: string
+    http3EnabledDesc: string
     challengeMethods: string
     challengeMethodHttp01: string
     challengeMethodDns01: string
@@ -467,6 +471,11 @@ export interface Translation {
     enableRateLimit: string
     maxRequestsPerMinute: string
     enableAccessLog: string
+    accessLogPath: string
+    accessLogFormat: string
+    accessLogFormatNginx: string
+    accessLogFormatApache: string
+    accessLogFormatJson: string
     enableErrorLog: string
     logLevel: string
     enableNotifications: string

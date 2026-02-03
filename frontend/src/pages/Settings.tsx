@@ -71,13 +71,20 @@ const Settings: React.FC = () => {
     sslStaging: false, // 是否使用 staging 环境
     challengeMethods: ['http-01'], // 挑战方法：['http-01', 'dns-01']
     
+    // HTTP/2 设置
+    http2Enabled: false, // 默认关闭
+    // HTTP/3 设置
+    http3Enabled: false, // 默认关闭
+    
     // 安全设置
     enableDDoSProtection: true,
     maxRequestsPerMinute: '1000',
     enableRateLimit: true,
     
     // 日志设置
-    enableAccessLog: false,
+    enableAccessLog: true,
+    accessLogPath: './data/access.log',
+    accessLogFormat: 'nginx',
     enableErrorLog: true,
     logLevel: 'info',
 
@@ -579,6 +586,11 @@ const Settings: React.FC = () => {
               letsEncryptEmail: config.ssl?.email || '',
               sslStaging: config.ssl?.staging || false,
               
+              // HTTP/2 设置
+              http2Enabled: config.server?.http2_enabled || false,
+              // HTTP/3 设置
+              http3Enabled: config.server?.http3_enabled || false,
+              
               // 安全设置
               enableDDoSProtection: config.security?.enable_ddos || false,
               maxRequestsPerMinute: config.security?.max_attempts_5min?.toString() || '1000',
@@ -586,6 +598,8 @@ const Settings: React.FC = () => {
               
               // 日志设置
               enableAccessLog: config.server?.access_log_enabled || false,
+              accessLogPath: config.server?.access_log_path ?? './data/access.log',
+              accessLogFormat: config.server?.access_log_format ?? 'nginx',
               logLevel: config.server?.log_level || 'info',
 
               // 缓存 & 内存
@@ -739,10 +753,14 @@ const Settings: React.FC = () => {
             letsEncryptEmail: settings.letsEncryptEmail,
             sslProvider: settings.sslProvider,
             sslStaging: settings.sslStaging,
+            http2Enabled: settings.http2Enabled,
+            http3Enabled: settings.http3Enabled,
             enableDDoSProtection: settings.enableDDoSProtection,
             maxRequestsPerMinute: settings.maxRequestsPerMinute,
             enableRateLimit: settings.enableRateLimit,
             enableAccessLog: settings.enableAccessLog,
+            accessLogPath: settings.accessLogPath,
+            accessLogFormat: settings.accessLogFormat,
             enableErrorLog: settings.enableErrorLog,
             logLevel: settings.logLevel,
             // 压缩设置
@@ -904,10 +922,14 @@ const Settings: React.FC = () => {
       sslProvider: 'letsencrypt',
       sslStaging: false,
       challengeMethods: ['http-01'],
+      http2Enabled: false,
+      http3Enabled: false,
       enableDDoSProtection: true,
       maxRequestsPerMinute: '1000',
       enableRateLimit: true,
-      enableAccessLog: false,
+      enableAccessLog: true,
+      accessLogPath: './data/access.log',
+      accessLogFormat: 'nginx',
       enableErrorLog: true,
       logLevel: 'info',
       // 缓存 & 内存设置
@@ -1138,6 +1160,32 @@ const Settings: React.FC = () => {
 
               <Divider my={2} />
 
+              {/* HTTP/2 设置 */}
+              <FormControl display="flex" alignItems="center">
+                <FormLabel mb="0">{t.settings.http2Enabled}</FormLabel>
+                <Switch
+                  isChecked={settings.http2Enabled}
+                  onChange={(e) => handleInputChange('http2Enabled', e.target.checked)}
+                />
+              </FormControl>
+              <Text fontSize="sm" color="gray.500">
+                {t.settings.http2EnabledDesc}
+              </Text>
+
+              {/* HTTP/3 设置 */}
+              <FormControl display="flex" alignItems="center">
+                <FormLabel mb="0">{t.settings.http3Enabled}</FormLabel>
+                <Switch
+                  isChecked={settings.http3Enabled}
+                  onChange={(e) => handleInputChange('http3Enabled', e.target.checked)}
+                />
+              </FormControl>
+              <Text fontSize="sm" color="gray.500">
+                {t.settings.http3EnabledDesc}
+              </Text>
+
+              <Divider my={2} />
+
               {/* 挑战方法配置 */}
               <FormControl>
                 <FormLabel>{t.settings.challengeMethods}</FormLabel>
@@ -1357,7 +1405,29 @@ const Settings: React.FC = () => {
                   onChange={(e) => handleInputChange('enableAccessLog', e.target.checked)}
                 />
               </FormControl>
-              
+              {settings.enableAccessLog && (
+                <>
+                  <FormControl>
+                    <FormLabel>{t.settings.accessLogPath}</FormLabel>
+                    <Input
+                      value={settings.accessLogPath}
+                      onChange={(e) => handleInputChange('accessLogPath', e.target.value)}
+                      placeholder="./data/access.log"
+                    />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel>{t.settings.accessLogFormat}</FormLabel>
+                    <Select
+                      value={settings.accessLogFormat}
+                      onChange={(e) => handleInputChange('accessLogFormat', e.target.value)}
+                    >
+                      <option value="nginx">{t.settings.accessLogFormatNginx}</option>
+                      <option value="apache">{t.settings.accessLogFormatApache}</option>
+                      <option value="json">{t.settings.accessLogFormatJson}</option>
+                    </Select>
+                  </FormControl>
+                </>
+              )}
               <FormControl display="flex" alignItems="center">
                 <FormLabel mb="0">{t.settings.enableErrorLog}</FormLabel>
                 <Switch
@@ -1365,7 +1435,6 @@ const Settings: React.FC = () => {
                   onChange={(e) => handleInputChange('enableErrorLog', e.target.checked)}
                 />
               </FormControl>
-              
               <FormControl>
                 <FormLabel>{t.settings.logLevel}</FormLabel>
                 <Select

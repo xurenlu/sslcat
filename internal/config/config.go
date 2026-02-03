@@ -68,6 +68,13 @@ type ServerConfig struct {
 	CustomPort  int    `json:"custom_port"`  // 自定义端口（仅在 custom 模式生效）
 	EnableHTTPS bool   `json:"enable_https"` // 是否启用 HTTPS（默认 true）
 
+	// HTTP/2 配置
+	HTTP2Enabled bool `json:"http2_enabled"` // 是否启用 HTTP/2（默认 false）
+
+	// HTTP/3 配置
+	HTTP3Enabled bool         `json:"http3_enabled"` // 是否启用 HTTP/3（默认 false）
+	HTTP3Config  *HTTP3Config `json:"http3_config,omitempty"`
+
 	// 访问日志
 	AccessLogEnabled  bool   `json:"access_log_enabled"`
 	AccessLogFormat   string `json:"access_log_format"` // nginx|apache|json
@@ -121,6 +128,14 @@ type SessionResumptionConfig struct {
 	CacheSize                 int    `json:"cache_size"`                   // Session ID 緩存大小（默認 1000）
 	TicketLifetime            int    `json:"ticket_lifetime"`              // Session Ticket 有效期（秒，默認 3600）
 	TicketKeyRotationInterval int    `json:"ticket_key_rotation_interval"` // Session Ticket 密鑰輪換間隔（秒，默認 86400）
+}
+
+// HTTP3Config HTTP/3 配置
+type HTTP3Config struct {
+	Enabled               bool   `json:"enabled"`
+	MaxIdleTimeout        string `json:"max_idle_timeout"`         // 默认 "120s"
+	MaxIncomingStreams    int64  `json:"max_incoming_streams"`     // 默认 1000
+	MaxIncomingUniStreams int64  `json:"max_incoming_uni_streams"` // 默认 1000
 }
 
 // DNSProvider DNS服务商配置
@@ -185,6 +200,9 @@ type ProxyRule struct {
 	SessionAffinityCookie  string `json:"session_affinity_cookie"`  // Cookie名称
 	SessionAffinityHeader  string `json:"session_affinity_header"`  // Header名称
 	SessionAffinityTTL     int    `json:"session_affinity_ttl"`     // 会话保持时间（秒）
+
+	// 上游调试（多后端时生效）：在响应头中输出当前服务的上游机器、会话保持状态等
+	UpstreamDebugHeaders bool `json:"upstream_debug_headers"` // 是否输出上游调试 header，默认关闭
 
 	// 性能监控配置
 	EnableTracing bool `json:"enable_tracing,omitempty"` // 是否启用请求追踪（会影响性能）
@@ -257,6 +275,15 @@ type ProxyRule struct {
 	// 机器人检测配置
 	BotDetectionEnabled bool                `json:"bot_detection_enabled"`          // 是否启用机器人检测
 	BotDetectionConfig  *BotDetectionConfig `json:"bot_detection_config,omitempty"` // 机器人检测配置
+
+	// 访问日志覆盖（nil 表示使用全局设置）
+	AccessLogEnabled *bool  `json:"access_log_enabled,omitempty"` // 是否记录访问日志，nil=继承全局
+	AccessLogPath    string `json:"access_log_path,omitempty"`    // 覆盖日志路径，空=使用全局
+
+	// HTTP/2 覆盖（nil 表示使用全局设置）
+	HTTP2Enabled *bool `json:"http2_enabled,omitempty"` // 是否启用 HTTP/2，nil=继承全局
+	// HTTP/3 覆盖（nil 表示使用全局设置）
+	HTTP3Enabled *bool `json:"http3_enabled,omitempty"` // 是否启用 HTTP/3，nil=继承全局
 }
 
 // PathPrefixRule 路径前缀规则
@@ -639,6 +666,15 @@ type StaticSite struct {
 
 	// 自定义响应头
 	ResponseHeaders map[string]string `json:"response_headers,omitempty"`
+
+	// 访问日志覆盖（仅 AccessLogEnabled 有值时生效，空路径表示使用全局）
+	AccessLogEnabled *bool  `json:"access_log_enabled,omitempty"`
+	AccessLogPath    string `json:"access_log_path,omitempty"`
+
+	// HTTP/2 覆盖（nil 表示使用全局设置）
+	HTTP2Enabled *bool `json:"http2_enabled,omitempty"`
+	// HTTP/3 覆盖（nil 表示使用全局设置）
+	HTTP3Enabled *bool `json:"http3_enabled,omitempty"`
 }
 
 // BotDetectionConfig 机器人检测配置
@@ -692,6 +728,15 @@ type PHPSite struct {
 
 	// 监控配置
 	MonitoringConfig *PHPMonitoringConfig `json:"monitoring_config,omitempty"`
+
+	// 访问日志覆盖（仅 AccessLogEnabled 有值时生效，空路径表示使用全局）
+	AccessLogEnabled *bool  `json:"access_log_enabled,omitempty"`
+	AccessLogPath    string `json:"access_log_path,omitempty"`
+
+	// HTTP/2 覆盖（nil 表示使用全局设置）
+	HTTP2Enabled *bool `json:"http2_enabled,omitempty"`
+	// HTTP/3 覆盖（nil 表示使用全局设置）
+	HTTP3Enabled *bool `json:"http3_enabled,omitempty"`
 }
 
 // PHPOptimizationConfig PHP 优化配置
@@ -880,6 +925,8 @@ func Load(configFile string) (*Config, error) {
 			PortMode:             "standard", // 默认标准模式
 			CustomPort:           8080,       // 默认自定义端口
 			EnableHTTPS:          true,       // 默认启用 HTTPS
+			HTTP2Enabled:         false,      // 默认禁用 HTTP/2
+			HTTP3Enabled:         false,      // 默认禁用 HTTP/3
 			AccessLogEnabled:     true,
 			AccessLogFormat:      "nginx",
 			AccessLogPath:        "./data/access.log",
@@ -1433,6 +1480,8 @@ func getDefaultConfig() *Config {
 			PortMode:          "standard",
 			CustomPort:        8080,
 			EnableHTTPS:       true,
+			HTTP2Enabled:      false, // 默认禁用 HTTP/2
+			HTTP3Enabled:      false, // 默认禁用 HTTP/3
 			AccessLogEnabled:  true,
 			AccessLogFormat:   "nginx",
 			AccessLogPath:     "./data/access.log",

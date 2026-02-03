@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/xurenlu/sslcat/internal/notification"
@@ -72,7 +73,7 @@ func (s *Server) handleAPISettingsPublic(w http.ResponseWriter, r *http.Request)
 		"security": map[string]interface{}{
 			"enable_captcha": s.config.Security.EnableCaptcha,
 		},
-		"totp_enabled":    s.config.Admin.EnableTOTP,
+		"totp_enabled":     s.config.Admin.EnableTOTP,
 		"webauthn_enabled": s.webauthnManager != nil, // WebAuthn 是否可用
 	}
 
@@ -110,7 +111,12 @@ func (s *Server) handleAPISettings(w http.ResponseWriter, r *http.Request) {
 		},
 		"server": map[string]interface{}{
 			"port":                     s.config.Server.Port,
+			"enable_https":             s.config.Server.EnableHTTPS,
+			"http2_enabled":            s.config.Server.HTTP2Enabled,
+			"http3_enabled":            s.config.Server.HTTP3Enabled,
 			"access_log_enabled":       s.config.Server.AccessLogEnabled,
+			"access_log_path":          s.config.Server.AccessLogPath,
+			"access_log_format":        s.config.Server.AccessLogFormat,
 			"debug":                    s.config.Server.Debug,
 			"log_level":                s.config.Server.LogLevel,
 			"shared_cache_max_size_mb": s.config.Server.SharedCacheMaxSizeMB,
@@ -125,7 +131,7 @@ func (s *Server) handleAPISettings(w http.ResponseWriter, r *http.Request) {
 			"memory_max_usage_percent":    s.config.Monitoring.MemoryMaxUsagePercent,
 			"memory_release_cooldown_sec": s.config.Monitoring.MemoryReleaseCooldownSec,
 		},
-		"totp_enabled": s.config.Admin.EnableTOTP,
+		"totp_enabled":     s.config.Admin.EnableTOTP,
 		"webauthn_enabled": s.webauthnManager != nil, // WebAuthn 是否可用
 		"server_info": map[string]interface{}{
 			"version":    s.version,
@@ -300,7 +306,12 @@ func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) 
 		EnableDDoSProtection     *bool    `json:"enableDDoSProtection,omitempty"`
 		MaxRequestsPerMinute     string   `json:"maxRequestsPerMinute,omitempty"`
 		EnableRateLimit          *bool    `json:"enableRateLimit,omitempty"`
+		EnableHTTPS              *bool    `json:"enableHttps,omitempty"`
+		HTTP2Enabled             *bool    `json:"http2Enabled,omitempty"`
+		HTTP3Enabled             *bool    `json:"http3Enabled,omitempty"`
 		EnableAccessLog          *bool    `json:"enableAccessLog,omitempty"`
+		AccessLogPath            *string  `json:"accessLogPath,omitempty"`
+		AccessLogFormat          *string  `json:"accessLogFormat,omitempty"`
 		EnableErrorLog           *bool    `json:"enableErrorLog,omitempty"`
 		LogLevel                 string   `json:"logLevel,omitempty"`
 		SharedCacheMaxSizeMB     *int     `json:"sharedCacheMaxSizeMB,omitempty"`
@@ -337,6 +348,18 @@ func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) 
 		s.config.SSL.Staging = *req.SSLStaging
 	}
 
+	if req.EnableHTTPS != nil {
+		s.config.Server.EnableHTTPS = *req.EnableHTTPS
+	}
+
+	if req.HTTP2Enabled != nil {
+		s.config.Server.HTTP2Enabled = *req.HTTP2Enabled
+	}
+
+	if req.HTTP3Enabled != nil {
+		s.config.Server.HTTP3Enabled = *req.HTTP3Enabled
+	}
+
 	if req.EnableDDoSProtection != nil {
 		s.config.Security.EnableDDOS = *req.EnableDDoSProtection
 	}
@@ -357,6 +380,16 @@ func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) 
 
 	if req.EnableAccessLog != nil {
 		s.config.Server.AccessLogEnabled = *req.EnableAccessLog
+	}
+
+	if req.AccessLogPath != nil {
+		s.config.Server.AccessLogPath = *req.AccessLogPath
+	}
+	if req.AccessLogFormat != nil && *req.AccessLogFormat != "" {
+		format := strings.ToLower(*req.AccessLogFormat)
+		if format == "nginx" || format == "apache" || format == "json" {
+			s.config.Server.AccessLogFormat = format
+		}
 	}
 
 	if req.LogLevel != "" {

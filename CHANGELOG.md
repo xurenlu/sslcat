@@ -5,6 +5,116 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.37] - 2026-02-03
+
+### ✨ 新功能
+
+#### HTTP/3 管理界面与站点级覆盖
+- **系统设置中的 HTTP/3 开关**：在系统设置 → SSL 设置中新增「启用 HTTP/3」全局开关（默认关闭）
+- **站点级 HTTP/3 覆盖**：在代理配置、静态站点、PHP 站点编辑页中新增「HTTP/3 覆盖」选项
+  - 可选：继承全局 / 启用 / 禁用，与 HTTP/2 覆盖行为一致
+  - 优先级：站点级配置 > 全局配置
+  - TLS ALPN 按域名动态决定是否协商 "h3"
+- **多语言**：为 HTTP/3 开关与说明补充 zh-CN、en-US、de-DE、es-ES、fr-FR、ja-JP、ru-RU 文案
+
+### 🔧 改进
+
+- **API**：系统设置、代理、静态站点、PHP 站点相关 API 支持 `http3_enabled` / `http3Enabled` 读写
+- **配置结构**：ProxyRule、StaticSite、PHPSite 增加 `http3_enabled` 可选字段（nil 表示继承全局）
+
+## [1.3.36] - 2026-02-03
+
+### ✨ 新功能
+
+#### 代理配置 - 上游调试 Header
+- **上游机器调试 Header**：在转发模式、多后端场景下，可开启「上游调试 header」选项
+  - 启用后，响应头会输出：当前服务的上游机器 ID、地址，是否启用会话保持，本次是否命中会话，以及会话 ID
+  - Header 包括：`X-Upstream-Selected`、`X-Upstream-Address`、`X-Upstream-Session-Affinity`、`X-Upstream-Session-Hit`、`X-Upstream-Session-ID`（会话保持时）
+  - 默认关闭，可在代理配置 → 后端服务器配置 → 负载均衡配置中开启
+
+## [1.3.35-rc3] - 2026-02-03
+
+### ✨ 新功能
+
+#### HTTP/3 支持
+- **HTTP/3 协议支持**：新增基于 QUIC 的 HTTP/3 协议支持
+  - 使用 `github.com/quic-go/quic-go` 库实现
+  - 支持基于 UDP 的 QUIC 传输协议
+  - 内置 TLS 1.3 加密
+  - 解决 TCP 队头阻塞问题，提升高延迟和移动网络场景下的性能
+  - 支持连接迁移（网络切换时保持连接）
+- **HTTP/3 配置**：在系统配置中新增 HTTP/3 开关和参数配置
+  - `server.http3_enabled`：全局 HTTP/3 开关（默认关闭）
+  - `server.http3_config`：HTTP/3 高级配置选项
+    - `max_idle_timeout`：最大空闲超时（默认 "120s"）
+    - `max_incoming_streams`：最大入站流数量（默认 1000）
+    - `max_incoming_uni_streams`：最大入站单向流数量（默认 1000）
+- **协议协商**：HTTP/3 与 HTTP/1.1、HTTP/2 并行运行，客户端自动选择最佳协议
+  - HTTP/3 服务器监听 UDP 443 端口
+  - TLS ALPN 协商支持 "h3" 协议标识
+  - 自动降级：HTTP/3 不可用时客户端自动降级到 HTTP/2 或 HTTP/1.1
+
+### 🔧 改进
+
+- **TLS 配置增强**：更新 TLS 配置以支持 HTTP/3 ALPN 协商
+  - HTTP/3 要求 TLS 1.3，自动确保 MinVersion >= TLS 1.3
+  - 在 NextProtos 中添加 "h3" 协议标识
+- **向后兼容**：HTTP/3 默认禁用，不影响现有 HTTP/1.1 和 HTTP/2 功能
+
+### 📝 技术细节
+
+- HTTP/3 服务器与 HTTP/1.1 和 HTTP/2 服务器共享相同的 Handler 接口
+- HTTP/3 启动失败不会导致整个程序退出，HTTP/1.1 和 HTTP/2 继续正常工作
+- 支持优雅关闭，HTTP/3 服务器会在程序退出时正确停止
+
+## [1.3.35-rc2] - 2026-02-03
+
+### ✨ 新功能
+
+#### HTTP/2 配置增强
+- **系统设置中 HTTP/2 开关**：在系统设置 → SSL设置中新增 HTTP/2 全局开关（默认关闭）
+  - 支持全局启用/禁用 HTTP/2 协议
+  - HTTP/2 默认关闭，需要手动启用
+- **站点级 HTTP/2 覆盖**：支持在代理规则、静态站点、PHP 站点中单独配置 HTTP/2
+  - **覆盖全局设置**：可为特定站点/代理启用或禁用 HTTP/2
+  - 优先级：站点级配置 > 全局配置
+  - 通过 TLS 配置的 `GetConfigForClient` 回调动态设置 NextProtos，实现站点级控制
+
+### 🔧 改进
+
+- **HTTP/2 默认关闭**：HTTP/2 功能默认禁用，提升兼容性和稳定性
+- **灵活的 HTTP/2 管理**：支持全局和站点级双重配置，满足不同场景需求
+
+## [1.3.35-rc1] - 2026-02-03
+
+### ✨ 新功能
+
+#### 访问日志配置增强
+- **系统设置中访问日志配置**：在系统设置 → 日志设置中新增访问日志路径和格式配置
+  - 支持配置访问日志文件路径（默认：`./data/access.log`）
+  - 支持选择日志格式：Nginx、Apache、JSON
+  - 访问日志默认开启
+- **站点级访问日志覆盖**：支持在代理规则、静态站点、PHP 站点中单独配置访问日志
+  - **关闭站点访问日志**：可为特定站点/代理关闭访问日志记录
+  - **自定义日志路径**：可为特定站点/代理指定独立的访问日志文件路径
+  - 优先级：站点级配置 > 全局配置
+  - 支持多路径日志记录器，自动管理不同路径的日志文件轮转
+
+### 🔧 改进
+
+- **访问日志默认开启**：访问日志功能默认启用，提升可观测性
+- **灵活的日志管理**：支持全局和站点级双重配置，满足不同场景需求
+
+## [1.3.34-rc3] - 2026-02-02
+
+### 🐛 Bug 修复
+
+#### HTTP/2 资源加载异常修复
+- **修复 ERR_HTTP2_PROTOCOL_ERROR 仍间歇发生的问题**
+  - **修正上游缓存异步读取**：移除 goroutine 中对 `resp.Body` 的读取，避免并发消耗响应体
+  - **快取存储安全检查**：当 `Content-Length` 不可用或超出限制时，直接跳过缓存写入
+  - **避免响应体被提前耗尽**：防止缓存写入导致下游得到空响应体
+
 ## [1.3.34-rc2] - 2026-02-02
 
 ### 🐛 Bug 修復

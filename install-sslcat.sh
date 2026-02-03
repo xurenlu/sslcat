@@ -120,9 +120,10 @@ create_directories() {
     log_info "创建必要的目录..."
     
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        # Linux 系统目录
+        # Linux 系统目录：数据统一在 /opt/sslcat（WorkingDirectory 为此目录，配置中用相对路径）
         mkdir -p /etc/sslcat
-        mkdir -p /opt/sslcat/{bin,data,logs}
+        mkdir -p /opt/sslcat/{bin,data,logs,scripts}
+        mkdir -p /opt/sslcat/data/{certs,keys,cache/static,runners/git,upstream-cache}
         mkdir -p /var/log/sslcat
         mkdir -p /var/lib/sslcat
         mkdir -p /var/www
@@ -412,22 +413,30 @@ create_default_config() {
     log_info "创建默认配置文件..."
     
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        # Linux 系统默认配置
+        # Linux 系统默认配置：数据统一在 /opt/sslcat，使用相对路径（进程 CWD 为 /opt/sslcat）
         cat > /etc/sslcat/sslcat.conf << 'EOF'
 {
   "server": {
     "host": "0.0.0.0",
     "port": 443,
-    "debug": false
+    "debug": false,
+    "data_dir": "./data",
+    "access_log_enabled": false,
+    "access_log_path": "./logs/access.log",
+    "access_log_max_size": 104857600,
+    "access_log_max_files": 10
   },
   "ssl": {
     "email": "admin@example.com",
     "staging": false,
-    "auto_renew": true
+    "auto_renew": true,
+    "cert_dir": "./data/certs",
+    "key_dir": "./data/keys"
   },
   "admin": {
     "username": "admin",
-    "password_file": "/opt/sslcat/data/admin.pass",
+    "password_file": "./data/admin.pass",
+    "totp_secret_file": "./data/admin.totp",
     "first_run": true
   },
   "proxy": {
@@ -436,7 +445,22 @@ create_default_config() {
   "security": {
     "max_attempts": 3,
     "block_duration": "5m",
-    "max_attempts_5min": 10
+    "max_attempts_5min": 10,
+    "block_file": "./data/sslcat.block"
+  },
+  "cdn_cache": {
+    "enabled": false,
+    "cache_dir": "./data/cache/static"
+  },
+  "upstream_cache": {
+    "enabled": true,
+    "cache_dir": "./data/upstream-cache"
+  },
+  "runners": {
+    "git": {
+      "enabled": false,
+      "repos_dir": "./data/runners/git"
+    }
   }
 }
 EOF

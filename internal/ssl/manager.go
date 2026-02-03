@@ -884,7 +884,6 @@ func (m *Manager) GetTLSConfig() *tls.Config {
 			}
 			return nil, fmt.Errorf("no certificate available for %s", host)
 		},
-		NextProtos: []string{"h2", "http/1.1"},
 		MinVersion: tls.VersionTLS12,
 		MaxVersion: tls.VersionTLS13,
 		// 優化證書鏈：啟用 OCSP Stapling（如果支持）
@@ -892,9 +891,75 @@ func (m *Manager) GetTLSConfig() *tls.Config {
 		PreferServerCipherSuites: true, // 優先使用服務器端的密碼套件順序
 	}
 
+	// 根据全局配置设置 NextProtos
+	nextProtos := []string{"http/1.1"}
+	if m.config.Server.HTTP2Enabled {
+		nextProtos = []string{"h2", "http/1.1"}
+	}
+	// 如果启用 HTTP/3，添加 h3（需要 TLS 1.3）
+	if m.config.Server.HTTP3Enabled {
+		// HTTP/3 需要 TLS 1.3
+		if tlsConfig.MinVersion < tls.VersionTLS13 {
+			tlsConfig.MinVersion = tls.VersionTLS13
+		}
+		// 将 h3 添加到最前面，优先协商 HTTP/3
+		nextProtos = append([]string{"h3"}, nextProtos...)
+	}
+	tlsConfig.NextProtos = nextProtos
+
 	// 如果啟用 ACME，添加 acme-tls/1 協議
 	if m.acmeMgr != nil {
 		tlsConfig.NextProtos = append(tlsConfig.NextProtos, "acme-tls/1")
+	}
+
+	// 使用 GetConfigForClient 支持站点级 HTTP/2 覆盖
+	// 注意：这需要 Go 1.8+，如果版本不支持则回退到全局配置
+	tlsConfig.GetConfigForClient = func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
+		host := hello.ServerName
+		if host == "" {
+			host = "localhost"
+		}
+
+		// 检查站点级 HTTP/2 配置
+		http2Enabled := m.config.Server.HTTP2Enabled // 默认使用全局配置
+		if m.shouldEnableHTTP2ForDomain(host) {
+			http2Enabled = true
+		} else if m.shouldDisableHTTP2ForDomain(host) {
+			http2Enabled = false
+		}
+
+		// 检查站点级 HTTP/3 配置
+		http3Enabled := m.config.Server.HTTP3Enabled // 默认使用全局配置
+		if m.shouldEnableHTTP3ForDomain(host) {
+			http3Enabled = true
+		} else if m.shouldDisableHTTP3ForDomain(host) {
+			http3Enabled = false
+		}
+
+		// 创建新的 TLS 配置副本
+		clientConfig := tlsConfig.Clone()
+
+		// 构建 NextProtos
+		nextProtos := []string{"http/1.1"}
+		if http2Enabled {
+			nextProtos = []string{"h2", "http/1.1"}
+		}
+		// 如果启用 HTTP/3，添加 h3（需要 TLS 1.3）
+		if http3Enabled {
+			// HTTP/3 需要 TLS 1.3
+			if clientConfig.MinVersion < tls.VersionTLS13 {
+				clientConfig.MinVersion = tls.VersionTLS13
+			}
+			// 将 h3 添加到最前面，优先协商 HTTP/3
+			nextProtos = append([]string{"h3"}, nextProtos...)
+		}
+		clientConfig.NextProtos = nextProtos
+
+		if m.acmeMgr != nil {
+			clientConfig.NextProtos = append(clientConfig.NextProtos, "acme-tls/1")
+		}
+
+		return clientConfig, nil
 	}
 
 	// 配置 Session Resumption（默認開啟：未配置時等同啟用）
@@ -930,6 +995,178 @@ func (m *Manager) GetTLSConfig() *tls.Config {
 	}
 
 	return tlsConfig
+}
+
+// shouldEnableHTTP2ForDomain 检查域名是否应该启用 HTTP/2（站点级覆盖）
+func (m *Manager) shouldEnableHTTP2ForDomain(domain string) bool {
+	domain = strings.ToLower(domain)
+
+	// 检查代理规则
+	for _, rule := range m.config.Proxy.Rules {
+		if !rule.Enabled {
+			continue
+		}
+		if strings.ToLower(rule.Domain) == domain {
+			if rule.HTTP2Enabled != nil && *rule.HTTP2Enabled {
+				return true
+			}
+		}
+	}
+
+	// 检查静态站点
+	for _, site := range m.config.StaticSites {
+		if !site.Enabled {
+			continue
+		}
+		if strings.ToLower(site.Domain) == domain {
+			if site.HTTP2Enabled != nil && *site.HTTP2Enabled {
+				return true
+			}
+		}
+	}
+
+	// 检查 PHP 站点
+	for _, site := range m.config.PHPSites {
+		if !site.Enabled {
+			continue
+		}
+		if strings.ToLower(site.Domain) == domain {
+			if site.HTTP2Enabled != nil && *site.HTTP2Enabled {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// shouldDisableHTTP2ForDomain 检查域名是否应该禁用 HTTP/2（站点级覆盖）
+func (m *Manager) shouldDisableHTTP2ForDomain(domain string) bool {
+	domain = strings.ToLower(domain)
+
+	// 检查代理规则
+	for _, rule := range m.config.Proxy.Rules {
+		if !rule.Enabled {
+			continue
+		}
+		if strings.ToLower(rule.Domain) == domain {
+			if rule.HTTP2Enabled != nil && !*rule.HTTP2Enabled {
+				return true
+			}
+		}
+	}
+
+	// 检查静态站点
+	for _, site := range m.config.StaticSites {
+		if !site.Enabled {
+			continue
+		}
+		if strings.ToLower(site.Domain) == domain {
+			if site.HTTP2Enabled != nil && !*site.HTTP2Enabled {
+				return true
+			}
+		}
+	}
+
+	// 检查 PHP 站点
+	for _, site := range m.config.PHPSites {
+		if !site.Enabled {
+			continue
+		}
+		if strings.ToLower(site.Domain) == domain {
+			if site.HTTP2Enabled != nil && !*site.HTTP2Enabled {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// shouldEnableHTTP3ForDomain 检查域名是否应该启用 HTTP/3（站点级覆盖）
+func (m *Manager) shouldEnableHTTP3ForDomain(domain string) bool {
+	domain = strings.ToLower(domain)
+
+	// 检查代理规则
+	for _, rule := range m.config.Proxy.Rules {
+		if !rule.Enabled {
+			continue
+		}
+		if strings.ToLower(rule.Domain) == domain {
+			if rule.HTTP3Enabled != nil && *rule.HTTP3Enabled {
+				return true
+			}
+		}
+	}
+
+	// 检查静态站点
+	for _, site := range m.config.StaticSites {
+		if !site.Enabled {
+			continue
+		}
+		if strings.ToLower(site.Domain) == domain {
+			if site.HTTP3Enabled != nil && *site.HTTP3Enabled {
+				return true
+			}
+		}
+	}
+
+	// 检查 PHP 站点
+	for _, site := range m.config.PHPSites {
+		if !site.Enabled {
+			continue
+		}
+		if strings.ToLower(site.Domain) == domain {
+			if site.HTTP3Enabled != nil && *site.HTTP3Enabled {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// shouldDisableHTTP3ForDomain 检查域名是否应该禁用 HTTP/3（站点级覆盖）
+func (m *Manager) shouldDisableHTTP3ForDomain(domain string) bool {
+	domain = strings.ToLower(domain)
+
+	// 检查代理规则
+	for _, rule := range m.config.Proxy.Rules {
+		if !rule.Enabled {
+			continue
+		}
+		if strings.ToLower(rule.Domain) == domain {
+			if rule.HTTP3Enabled != nil && !*rule.HTTP3Enabled {
+				return true
+			}
+		}
+	}
+
+	// 检查静态站点
+	for _, site := range m.config.StaticSites {
+		if !site.Enabled {
+			continue
+		}
+		if strings.ToLower(site.Domain) == domain {
+			if site.HTTP3Enabled != nil && !*site.HTTP3Enabled {
+				return true
+			}
+		}
+	}
+
+	// 检查 PHP 站点
+	for _, site := range m.config.PHPSites {
+		if !site.Enabled {
+			continue
+		}
+		if strings.ToLower(site.Domain) == domain {
+			if site.HTTP3Enabled != nil && !*site.HTTP3Enabled {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // HTTPChallengeHandler 包裹 HTTP 服务器以处理 ACME HTTP-01 挑战

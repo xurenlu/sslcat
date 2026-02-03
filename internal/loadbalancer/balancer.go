@@ -70,13 +70,24 @@ func NewLoadBalancer(config LoadBalancerConfig) *LoadBalancer {
 
 // SelectBackend 选择后端服务器
 func (lb *LoadBalancer) SelectBackend(req *http.Request) (*Backend, error) {
+	backend, _, err := lb.SelectBackendWithInfo(req)
+	return backend, err
+}
+
+// SelectBackendWithInfo 选择后端服务器并返回选择信息（用于调试 header）
+func (lb *LoadBalancer) SelectBackendWithInfo(req *http.Request) (*Backend, *SelectionInfo, error) {
 	atomic.AddInt64(&lb.totalRequests, 1)
+	info := &SelectionInfo{}
 
 	// 检查会话保持
 	if lb.config.SessionAffinityEnabled {
 		if backend, err := lb.GetSessionBackend(req); err == nil && backend != nil {
 			if backend.IsHealthy() {
-				return backend, nil
+				info.FromSession = true
+				info.SessionID = lb.getSessionID(req)
+				backend.IncrementRequests()
+				backend.IncrementConnections()
+				return backend, info, nil
 			}
 		}
 	}
@@ -85,7 +96,7 @@ func (lb *LoadBalancer) SelectBackend(req *http.Request) (*Backend, error) {
 	healthyBackends := lb.getHealthyBackends()
 	if len(healthyBackends) == 0 {
 		atomic.AddInt64(&lb.totalFailures, 1)
-		return nil, fmt.Errorf("no healthy backends available")
+		return nil, nil, fmt.Errorf("no healthy backends available")
 	}
 
 	var selectedBackend *Backend
@@ -110,18 +121,19 @@ func (lb *LoadBalancer) SelectBackend(req *http.Request) (*Backend, error) {
 
 	if selectedBackend == nil {
 		atomic.AddInt64(&lb.totalFailures, 1)
-		return nil, fmt.Errorf("failed to select backend")
+		return nil, nil, fmt.Errorf("failed to select backend")
 	}
 
 	// 设置会话保持
 	if lb.config.SessionAffinityEnabled {
 		_ = lb.SetSessionBackend(req, selectedBackend)
+		info.SessionID = lb.getSessionID(req)
 	}
 
 	selectedBackend.IncrementRequests()
 	selectedBackend.IncrementConnections()
 
-	return selectedBackend, err
+	return selectedBackend, info, err
 }
 
 // getHealthyBackends 获取健康的后端列表

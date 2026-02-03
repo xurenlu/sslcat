@@ -166,6 +166,12 @@ type BalancerInterface interface {
 	OnBackendRemoved(callback func(backend *Backend))
 }
 
+// SelectionInfo 后端选择信息（用于调试 header 输出）
+type SelectionInfo struct {
+	FromSession bool   // 是否从已有会话中选择（会话保持命中）
+	SessionID   string // 会话标识（用于调试）
+}
+
 // RequestContext 请求上下文信息
 type RequestContext struct {
 	Request      *http.Request

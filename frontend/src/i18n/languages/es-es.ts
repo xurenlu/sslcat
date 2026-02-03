@@ -317,6 +317,11 @@ export const esES: Translation = {
     enableRateLimit: 'Habilitar Límite de Velocidad',
     maxRequestsPerMinute: 'Máximas Solicitudes por 5 Minutos',
     enableAccessLog: 'Habilitar Registro de Acceso',
+    accessLogPath: 'Ruta del Registro de Acceso',
+    accessLogFormat: 'Formato del Registro de Acceso',
+    accessLogFormatNginx: 'Nginx',
+    accessLogFormatApache: 'Apache',
+    accessLogFormatJson: 'JSON',
     enableErrorLog: 'Habilitar Registro de Errores',
     logLevel: 'Nivel de Registro',
     enableNotifications: 'Habilitar Notificaciones',
@@ -407,6 +412,10 @@ export const esES: Translation = {
     // SSL Staging 环境
     sslStaging: 'Usar Entorno Staging (Prueba)',
     sslStagingDesc: '⚠️ Los certificados emitidos por el entorno Staging no son confiables para los navegadores, solo para pruebas. Por favor desactive esta opción para uso en producción.',
+    http2Enabled: 'Habilitar HTTP/2',
+    http2EnabledDesc: 'Habilitar soporte del protocolo HTTP/2 para mejorar el rendimiento (multiplexación, compresión de encabezados, etc.). Deshabilitado por defecto, se puede sobrescribir por sitio.',
+    http3Enabled: 'Habilitar HTTP/3',
+    http3EnabledDesc: 'Habilitar HTTP/3 (basado en QUIC) para mejor rendimiento en redes de alta latencia y móviles. Deshabilitado por defecto, se puede sobrescribir por sitio.',
     // 自定义端口详细设置
     customPortConfigTitle: 'Configuración de Puerto Personalizado',
     customPortWarning: 'En modo de puerto personalizado, SSLcat solo escuchará en el puerto especificado y no admite funcionalidad HTTPS. Para HTTPS, use el modo estándar o configure un proxy inverso.',

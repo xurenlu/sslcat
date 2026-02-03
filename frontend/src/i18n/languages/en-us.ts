@@ -397,6 +397,11 @@ export const enUS: Translation = {
     enableRateLimit: 'Enable Rate Limit',
     maxRequestsPerMinute: 'Max Requests Per 5 Minutes',
     enableAccessLog: 'Enable Access Log',
+    accessLogPath: 'Access Log Path',
+    accessLogFormat: 'Access Log Format',
+    accessLogFormatNginx: 'Nginx',
+    accessLogFormatApache: 'Apache',
+    accessLogFormatJson: 'JSON',
     enableErrorLog: 'Enable Error Log',
     logLevel: 'Log Level',
     enableNotifications: 'Enable Notifications',
@@ -487,6 +492,10 @@ export const enUS: Translation = {
     // SSL Staging 环境
     sslStaging: 'Use Staging Environment (Testing)',
     sslStagingDesc: '⚠️ Certificates issued by Staging environment are not trusted by browsers, for testing only. Please disable this option for production use.',
+    http2Enabled: 'Enable HTTP/2',
+    http2EnabledDesc: 'Enable HTTP/2 protocol support for improved performance (multiplexing, header compression, etc.). Disabled by default, can be overridden per site.',
+    http3Enabled: 'Enable HTTP/3',
+    http3EnabledDesc: 'Enable HTTP/3 (QUIC-based) protocol support for better performance on high-latency and mobile networks. Disabled by default, can be overridden per site.',
     // 自定义端口详细设置
     customPortConfigTitle: 'Custom Port Configuration',
     customPortWarning: 'In custom port mode, SSLcat will only listen on the specified port and does not support HTTPS functionality. For HTTPS, please use standard mode or configure a reverse proxy.',

@@ -29,12 +29,16 @@ func (s *Server) handleAPIStaticSites(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var req struct {
-			Domain          string                  `json:"domain"`
-			Root            string                  `json:"root"`
-			Index           string                  `json:"index"`
-			Enabled         bool                    `json:"enabled"`
-			Headers         map[string]string       `json:"headers"`
-			PathPrefixRules []config.PathPrefixRule `json:"path_prefix_rules"`
+			Domain           string                  `json:"domain"`
+			Root             string                  `json:"root"`
+			Index            string                  `json:"index"`
+			Enabled          bool                    `json:"enabled"`
+			Headers          map[string]string       `json:"headers"`
+			PathPrefixRules  []config.PathPrefixRule `json:"path_prefix_rules"`
+			AccessLogEnabled *bool                   `json:"access_log_enabled,omitempty"`
+			AccessLogPath    string                  `json:"access_log_path,omitempty"`
+			HTTP2Enabled     *bool                   `json:"http2_enabled,omitempty"`
+			HTTP3Enabled     *bool                   `json:"http3_enabled,omitempty"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -63,12 +67,16 @@ func (s *Server) handleAPIStaticSites(w http.ResponseWriter, r *http.Request) {
 		}
 
 		newSite := config.StaticSite{
-			Domain:          req.Domain,
-			Root:            req.Root,
-			Index:           req.Index,
-			Enabled:         req.Enabled,
-			ResponseHeaders: sanitizeHeaderMap(req.Headers),
-			PathPrefixRules: req.PathPrefixRules,
+			Domain:           req.Domain,
+			Root:             req.Root,
+			Index:            req.Index,
+			Enabled:          req.Enabled,
+			ResponseHeaders:  sanitizeHeaderMap(req.Headers),
+			PathPrefixRules:  req.PathPrefixRules,
+			AccessLogEnabled: req.AccessLogEnabled,
+			AccessLogPath:    req.AccessLogPath,
+			HTTP2Enabled:     req.HTTP2Enabled,
+			HTTP3Enabled:     req.HTTP3Enabled,
 		}
 
 		if existingIndex >= 0 {
@@ -107,12 +115,16 @@ func (s *Server) handleAPIStaticSites(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var req struct {
-			Domain          string                  `json:"domain"`
-			Root            string                  `json:"root"`
-			Index           string                  `json:"index"`
-			Enabled         bool                    `json:"enabled"`
-			Headers         map[string]string       `json:"headers"`
-			PathPrefixRules []config.PathPrefixRule `json:"path_prefix_rules"`
+			Domain           string                  `json:"domain"`
+			Root             string                  `json:"root"`
+			Index            string                  `json:"index"`
+			Enabled          bool                    `json:"enabled"`
+			Headers          map[string]string       `json:"headers"`
+			PathPrefixRules  []config.PathPrefixRule `json:"path_prefix_rules"`
+			AccessLogEnabled *bool                   `json:"access_log_enabled,omitempty"`
+			AccessLogPath    string                  `json:"access_log_path,omitempty"`
+			HTTP2Enabled     *bool                   `json:"http2_enabled,omitempty"`
+			HTTP3Enabled     *bool                   `json:"http3_enabled,omitempty"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -148,12 +160,16 @@ func (s *Server) handleAPIStaticSites(w http.ResponseWriter, r *http.Request) {
 
 		// 更新站点
 		s.config.StaticSites[existingIndex] = config.StaticSite{
-			Domain:          req.Domain,
-			Root:            req.Root,
-			Index:           req.Index,
-			Enabled:         req.Enabled,
-			ResponseHeaders: sanitizeHeaderMap(req.Headers),
-			PathPrefixRules: req.PathPrefixRules,
+			Domain:           req.Domain,
+			Root:             req.Root,
+			Index:            req.Index,
+			Enabled:          req.Enabled,
+			ResponseHeaders:  sanitizeHeaderMap(req.Headers),
+			PathPrefixRules:  req.PathPrefixRules,
+			AccessLogEnabled: req.AccessLogEnabled,
+			AccessLogPath:    req.AccessLogPath,
+			HTTP2Enabled:     req.HTTP2Enabled,
+			HTTP3Enabled:     req.HTTP3Enabled,
 		}
 
 		if err := s.config.Save(s.config.ConfigFile); err != nil {
@@ -195,14 +211,18 @@ func (s *Server) handleAPIPHPSites(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var req struct {
-			Domain          string                  `json:"domain"`
-			Root            string                  `json:"root"`
-			Index           string                  `json:"index"`
-			Enabled         bool                    `json:"enabled"`
-			FCGIAddr        string                  `json:"fcgi_addr"`
-			Vars            map[string]string       `json:"vars"`
-			Headers         map[string]string       `json:"headers"`
-			PathPrefixRules []config.PathPrefixRule `json:"path_prefix_rules"`
+			Domain           string                  `json:"domain"`
+			Root             string                  `json:"root"`
+			Index            string                  `json:"index"`
+			Enabled          bool                    `json:"enabled"`
+			FCGIAddr         string                  `json:"fcgi_addr"`
+			Vars             map[string]string       `json:"vars"`
+			Headers          map[string]string       `json:"headers"`
+			PathPrefixRules  []config.PathPrefixRule `json:"path_prefix_rules"`
+			AccessLogEnabled *bool                   `json:"access_log_enabled,omitempty"`
+			AccessLogPath    string                  `json:"access_log_path,omitempty"`
+			HTTP2Enabled     *bool                   `json:"http2_enabled,omitempty"`
+			HTTP3Enabled     *bool                   `json:"http3_enabled,omitempty"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -237,14 +257,18 @@ func (s *Server) handleAPIPHPSites(w http.ResponseWriter, r *http.Request) {
 		}
 
 		newSite := config.PHPSite{
-			Domain:          req.Domain,
-			Root:            req.Root,
-			Index:           req.Index,
-			Enabled:         req.Enabled,
-			FCGIAddr:        req.FCGIAddr,
-			Vars:            req.Vars,
-			ResponseHeaders: sanitizeHeaderMap(req.Headers),
-			PathPrefixRules: req.PathPrefixRules,
+			Domain:           req.Domain,
+			Root:             req.Root,
+			Index:            req.Index,
+			Enabled:          req.Enabled,
+			FCGIAddr:         req.FCGIAddr,
+			Vars:             req.Vars,
+			ResponseHeaders:  sanitizeHeaderMap(req.Headers),
+			PathPrefixRules:  req.PathPrefixRules,
+			AccessLogEnabled: req.AccessLogEnabled,
+			AccessLogPath:    req.AccessLogPath,
+			HTTP2Enabled:     req.HTTP2Enabled,
+			HTTP3Enabled:     req.HTTP3Enabled,
 		}
 
 		if existingIndex >= 0 {
@@ -283,14 +307,18 @@ func (s *Server) handleAPIPHPSites(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var req struct {
-			Domain          string                  `json:"domain"`
-			Root            string                  `json:"root"`
-			Index           string                  `json:"index"`
-			Enabled         bool                    `json:"enabled"`
-			FCGIAddr        string                  `json:"fcgi_addr"`
-			Vars            map[string]string       `json:"vars"`
-			Headers         map[string]string       `json:"headers"`
-			PathPrefixRules []config.PathPrefixRule `json:"path_prefix_rules"`
+			Domain           string                  `json:"domain"`
+			Root             string                  `json:"root"`
+			Index            string                  `json:"index"`
+			Enabled          bool                    `json:"enabled"`
+			FCGIAddr         string                  `json:"fcgi_addr"`
+			Vars             map[string]string       `json:"vars"`
+			Headers          map[string]string       `json:"headers"`
+			PathPrefixRules  []config.PathPrefixRule `json:"path_prefix_rules"`
+			AccessLogEnabled *bool                   `json:"access_log_enabled,omitempty"`
+			AccessLogPath    string                  `json:"access_log_path,omitempty"`
+			HTTP2Enabled     *bool                   `json:"http2_enabled,omitempty"`
+			HTTP3Enabled     *bool                   `json:"http3_enabled,omitempty"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -332,14 +360,18 @@ func (s *Server) handleAPIPHPSites(w http.ResponseWriter, r *http.Request) {
 
 		// 更新站点
 		s.config.PHPSites[existingIndex] = config.PHPSite{
-			Domain:          req.Domain,
-			Root:            req.Root,
-			Index:           req.Index,
-			Enabled:         req.Enabled,
-			FCGIAddr:        req.FCGIAddr,
-			Vars:            req.Vars,
-			ResponseHeaders: sanitizeHeaderMap(req.Headers),
-			PathPrefixRules: req.PathPrefixRules,
+			Domain:           req.Domain,
+			Root:             req.Root,
+			Index:            req.Index,
+			Enabled:          req.Enabled,
+			FCGIAddr:         req.FCGIAddr,
+			Vars:             req.Vars,
+			ResponseHeaders:  sanitizeHeaderMap(req.Headers),
+			PathPrefixRules:  req.PathPrefixRules,
+			AccessLogEnabled: req.AccessLogEnabled,
+			AccessLogPath:    req.AccessLogPath,
+			HTTP2Enabled:     req.HTTP2Enabled,
+			HTTP3Enabled:     req.HTTP3Enabled,
 		}
 
 		if err := s.config.Save(s.config.ConfigFile); err != nil {

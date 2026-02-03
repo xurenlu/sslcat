@@ -71,6 +71,9 @@ interface BackendConfigProps {
   // 负载均衡配置（自动启用）
   load_balancer_algorithm: string
   
+  // 上游调试 header（多后端时在响应头输出当前上游、会话保持状态等）
+  upstream_debug_headers?: boolean
+  
   // 会话保持配置
   session_affinity_enabled: boolean
   session_affinity_method: string
@@ -103,6 +106,7 @@ interface BackendConfigProps {
 const BackendConfig: React.FC<BackendConfigProps> = ({
   backends,
   load_balancer_algorithm,
+  upstream_debug_headers = false,
   session_affinity_enabled,
   session_affinity_method,
   session_affinity_cookie,
@@ -421,6 +425,25 @@ const BackendConfig: React.FC<BackendConfigProps> = ({
                 选择请求分发到后端服务器的方式
               </Text>
             </FormControl>
+
+            {/* 上游调试 header */}
+            <Box>
+              <FormControl display="flex" alignItems="center">
+                <HStack spacing={3} flex={1}>
+                  <FormLabel htmlFor="upstream-debug-headers" mb="0">
+                    上游调试 header
+                  </FormLabel>
+                  <Switch
+                    id="upstream-debug-headers"
+                    isChecked={upstream_debug_headers}
+                    onChange={(e) => onFieldChange('upstream_debug_headers', e.target.checked)}
+                  />
+                  <Text fontSize="sm" color="gray.500">
+                    在响应头中输出当前服务的上游机器、是否会话保持、会话保持状态，便于调试
+                  </Text>
+                </HStack>
+              </FormControl>
+            </Box>
 
             {/* 会话保持配置 */}
             <Box>

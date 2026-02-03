@@ -41,7 +41,7 @@ type CDNCache struct {
 	misses int64
 	// 正在处理的请求，避免相同URL并发穿透
 	processing sync.Map // key: request_key, value: *processingEntry
-	
+
 	// 清理器控制
 	stopProcessingCleaner chan struct{}
 	cleanerStarted        bool
@@ -76,10 +76,10 @@ func NewCDNCache(cfg *config.Config) *CDNCache {
 		mimeDetector:          mimeDetector,
 		stopProcessingCleaner: make(chan struct{}),
 	}
-	
+
 	// 启动 processing map 清理器，防止内存泄漏
 	cache.startProcessingCleaner()
-	
+
 	return cache
 }
 
@@ -123,17 +123,17 @@ func (c *CDNCache) ServeIfFreshWithConfig(w http.ResponseWriter, r *http.Request
 
 		// 检查是否有相同请求正在处理，避免并发穿透
 		requestKey := c.getRequestKey(r)
-		
+
 		// 创建新的 processing entry
 		newEntry := &processingEntry{
 			ch:        make(chan struct{}),
 			createdAt: time.Now(),
 		}
-		
+
 		if existingValue, loaded := c.processing.LoadOrStore(requestKey, newEntry); loaded {
 			// 有相同请求正在处理，等待其完成
 			c.log.Infof("CDN缓存等待相同请求完成: url=%s", r.URL.Path)
-			
+
 			// 获取已存在的 entry
 			existingEntry, ok := existingValue.(*processingEntry)
 			if !ok {
@@ -141,7 +141,7 @@ func (c *CDNCache) ServeIfFreshWithConfig(w http.ResponseWriter, r *http.Request
 				c.log.Warnf("CDN缓存 processing entry 格式无效: url=%s", r.URL.Path)
 				return false
 			}
-			
+
 			// 使用 select 添加超时保护，防止永久阻塞
 			select {
 			case <-existingEntry.ch:
@@ -323,7 +323,7 @@ func (c *CDNCache) MaybeStoreWithConfig(resp *http.Response, forceEnabled bool) 
 		return
 	}
 	if cc.maxAge >= 0 {
-		// 如果上游携带 max-age，取二者较小值
+		// 如果上游攜帶 max-age，取兩者較小值
 		if cc.maxAge < ttl {
 			ttl = cc.maxAge
 		}
@@ -333,8 +333,17 @@ func (c *CDNCache) MaybeStoreWithConfig(resp *http.Response, forceEnabled bool) 
 	if maxObj <= 0 {
 		maxObj = 20 * 1024 * 1024
 	}
+	// 若 Content-Length 不可用或超出限制，直接跳過快取以避免讀取 resp.Body
+	if resp.ContentLength <= 0 {
+		c.cleanupProcessing(req)
+		return
+	}
+	if resp.ContentLength > int64(maxObj) {
+		c.cleanupProcessing(req)
+		return
+	}
 
-	// 修复：使用流式处理 + 大小限制，避免大文件占用过多内存
+	// 修復：使用流式處理 + 大小限制，避免大檔案占用過多記憶體
 	filePath, metaPath := c.cachePaths(req)
 	_ = os.MkdirAll(filepath.Dir(filePath), 0755)
 
@@ -881,7 +890,7 @@ func (c *CDNCache) shouldCompressFile(filePath string, fileSize int64) bool {
 // 修复：不再每次请求都读取整个文件到内存并压缩，而是使用预压缩文件
 func (c *CDNCache) serveWithPrecompression(w http.ResponseWriter, r *http.Request, filePath string, meta *objectMeta) {
 	acceptEncoding := r.Header.Get("Accept-Encoding")
-	
+
 	// 检查客户端支持的压缩算法（按优先级）
 	supportsBr := strings.Contains(acceptEncoding, "br")
 	supportsGzip := strings.Contains(acceptEncoding, "gzip")
@@ -954,7 +963,7 @@ func (c *CDNCache) servePrecompressedFile(w http.ResponseWriter, compressedPath 
 // 请使用 serveWithPrecompression 代替
 func (c *CDNCache) serveWithAdvancedCompression(w http.ResponseWriter, r *http.Request, file io.Reader, meta *objectMeta) {
 	c.log.Warn("serveWithAdvancedCompression is deprecated and causes memory issues, please use serveWithPrecompression")
-	
+
 	// 读取文件内容
 	content, err := io.ReadAll(file)
 	if err != nil {
@@ -1071,19 +1080,19 @@ func (c *CDNCache) getSmartContentType(meta *objectMeta, path string) string {
 func (c *CDNCache) startProcessingCleaner() {
 	c.cleanerMutex.Lock()
 	defer c.cleanerMutex.Unlock()
-	
+
 	if c.cleanerStarted {
 		return
 	}
 	c.cleanerStarted = true
-	
+
 	go func() {
 		// 使用质数间隔避免与其他定时器同时触发（67秒）
 		ticker := time.NewTicker(67 * time.Second)
 		defer ticker.Stop()
-		
+
 		c.log.Info("CDN Cache processing map 清理器已启动")
-		
+
 		for {
 			select {
 			case <-ticker.C:
@@ -1100,13 +1109,13 @@ func (c *CDNCache) startProcessingCleaner() {
 func (c *CDNCache) cleanupStaleProcessingEntries() {
 	now := time.Now()
 	timeout := 5 * time.Minute // 5分钟超时
-	
+
 	count := 0
 	cleaned := 0
-	
+
 	c.processing.Range(func(key, value interface{}) bool {
 		count++
-		
+
 		entry, ok := value.(*processingEntry)
 		if !ok {
 			// 旧格式或无效条目，直接删除
@@ -1115,12 +1124,12 @@ func (c *CDNCache) cleanupStaleProcessingEntries() {
 			c.log.Warnf("清理无效的 processing 条目: %v", key)
 			return true
 		}
-		
+
 		// 检查是否超时
 		if now.Sub(entry.createdAt) > timeout {
-			c.log.Warnf("清理超时的 processing 条目: %v (创建于 %v, 已存在 %v)", 
+			c.log.Warnf("清理超时的 processing 条目: %v (创建于 %v, 已存在 %v)",
 				key, entry.createdAt, now.Sub(entry.createdAt))
-			
+
 			// 安全关闭 channel
 			select {
 			case <-entry.ch:
@@ -1128,14 +1137,14 @@ func (c *CDNCache) cleanupStaleProcessingEntries() {
 			default:
 				close(entry.ch)
 			}
-			
+
 			c.processing.Delete(key)
 			cleaned++
 		}
-		
+
 		return true
 	})
-	
+
 	// 如果 map 大小异常，记录警告
 	if count > 1000 {
 		c.log.Errorf("⚠️ CDN Cache processing map 大小异常: %d 个条目（已清理 %d 个）", count, cleaned)
@@ -1150,11 +1159,11 @@ func (c *CDNCache) cleanupStaleProcessingEntries() {
 func (c *CDNCache) StopCleaner() {
 	c.cleanerMutex.Lock()
 	defer c.cleanerMutex.Unlock()
-	
+
 	if !c.cleanerStarted {
 		return
 	}
-	
+
 	if c.stopProcessingCleaner != nil {
 		select {
 		case <-c.stopProcessingCleaner:
@@ -1163,7 +1172,7 @@ func (c *CDNCache) StopCleaner() {
 			close(c.stopProcessingCleaner)
 		}
 	}
-	
+
 	c.cleanerStarted = false
 	c.log.Info("CDN Cache 清理器已停止")
 }

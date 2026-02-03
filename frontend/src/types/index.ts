@@ -68,10 +68,13 @@ export interface SystemSettings {
   autoSSL: boolean
   letsEncryptEmail: string
   sslProvider: string
+  http2Enabled: boolean
   enableDDoSProtection: boolean
   maxRequestsPerMinute: string
   enableRateLimit: boolean
   enableAccessLog: boolean
+  accessLogPath: string
+  accessLogFormat: string
   enableErrorLog: boolean
   logLevel: string
   enableNotifications: boolean

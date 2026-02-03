@@ -104,6 +104,9 @@ interface ProxyRuleForm {
   // 负载均衡配置（自动启用）
   load_balancer_algorithm: string
   
+  // 上游调试 header
+  upstream_debug_headers: boolean
+  
   // 会话保持配置
   session_affinity_enabled: boolean
   session_affinity_method: string
@@ -158,8 +161,12 @@ interface ProxyRuleForm {
   websocket_read_timeout: number
   websocket_write_timeout: number
   websocket_ping_interval: number
-  upstream_request_headers: Record<string, string>
-  response_headers: Record<string, string>
+    upstream_request_headers: Record<string, string>
+    response_headers: Record<string, string>
+    access_log_enabled: boolean | null
+    access_log_path: string
+    http2_enabled: boolean | null
+    http3_enabled: boolean | null
 }
 
 const ProxyEdit: React.FC = () => {
@@ -217,6 +224,9 @@ const ProxyEdit: React.FC = () => {
     // 负载均衡配置（自动启用）
     load_balancer_algorithm: 'round_robin',
     
+    // 上游调试 header
+    upstream_debug_headers: false,
+    
     // 会话保持配置
     session_affinity_enabled: false,
     session_affinity_method: 'ip',
@@ -268,7 +278,10 @@ const ProxyEdit: React.FC = () => {
     websocket_ping_interval: 30,
     upstream_request_headers: {},
     response_headers: {},
-    
+    access_log_enabled: null as boolean | null,
+    access_log_path: '',
+    http2_enabled: null as boolean | null,
+    http3_enabled: null as boolean | null,
     // 性能监控配置
     enable_tracing: false,
     enable_metrics: false,
@@ -361,6 +374,9 @@ const ProxyEdit: React.FC = () => {
             // 负载均衡配置（自动启用）
             load_balancer_algorithm: rule.load_balancer_algorithm || 'round_robin',
             
+            // 上游调试 header
+            upstream_debug_headers: rule.upstream_debug_headers ?? false,
+            
             // 会话保持配置
             session_affinity_enabled: rule.session_affinity_enabled ?? false,
             session_affinity_method: rule.session_affinity_method || 'ip',
@@ -414,6 +430,13 @@ const ProxyEdit: React.FC = () => {
             // 性能监控配置
             enable_tracing: rule.enable_tracing || false,
             enable_metrics: rule.enable_metrics || false,
+            // 访问日志覆盖
+            access_log_enabled: rule.access_log_enabled ?? null,
+            access_log_path: rule.access_log_path || '',
+            // HTTP/2 覆盖
+            http2_enabled: rule.http2_enabled ?? null,
+            // HTTP/3 覆盖
+            http3_enabled: rule.http3_enabled ?? null,
           })
         }
       } catch (error) {
@@ -564,6 +587,7 @@ const ProxyEdit: React.FC = () => {
           backends: formData.backends,
           enabled: formData.enabled,
           ssl_only: formData.ssl_only,
+          upstream_debug_headers: formData.upstream_debug_headers,
           // WAF 配置
           waf_enabled: formData.waf_enabled,
           // 类CDN设置
@@ -580,6 +604,10 @@ const ProxyEdit: React.FC = () => {
           auth_cookie_domain: formData.auth_cookie_domain || formData.domain,
           upstream_request_headers: formData.upstream_request_headers,
           response_headers: formData.response_headers,
+          access_log_enabled: formData.access_log_enabled,
+          access_log_path: formData.access_log_path || undefined,
+          http2_enabled: formData.http2_enabled,
+          http3_enabled: formData.http3_enabled,
         }),
       })
 
@@ -713,6 +741,7 @@ const ProxyEdit: React.FC = () => {
                 <BackendConfig
                   backends={formData.backends}
                   load_balancer_algorithm={formData.load_balancer_algorithm}
+                  upstream_debug_headers={formData.upstream_debug_headers}
                   session_affinity_enabled={formData.session_affinity_enabled}
                   session_affinity_method={formData.session_affinity_method}
                   session_affinity_cookie={formData.session_affinity_cookie}
@@ -816,6 +845,100 @@ const ProxyEdit: React.FC = () => {
                         </Button>
                       </HStack>
                     </HStack>
+
+                    <Box>
+                      <FormLabel mb={2}>访问日志覆盖</FormLabel>
+                      <Text fontSize="sm" color="gray.500" mb={2}>
+                        可在此站点关闭访问日志或指定单独日志路径，留空则使用系统设置中的全局配置
+                      </Text>
+                      <VStack spacing={3} align="stretch">
+                        <FormControl display="flex" alignItems="center">
+                          <Switch
+                            id="access-log-off"
+                            isChecked={formData.access_log_enabled === false}
+                            onChange={(e) => handleInputChange('access_log_enabled', e.target.checked ? false : null)}
+                          />
+                          <FormLabel htmlFor="access-log-off" mb="0" ml={2}>
+                            关闭此站点访问日志
+                          </FormLabel>
+                        </FormControl>
+                        <FormControl>
+                          <FormLabel fontSize="sm">自定义访问日志路径（留空使用全局）</FormLabel>
+                          <Input
+                            value={formData.access_log_path}
+                            onChange={(e) => handleInputChange('access_log_path', e.target.value)}
+                            placeholder="./data/access.log"
+                            size="sm"
+                          />
+                        </FormControl>
+                      </VStack>
+                    </Box>
+
+                    <Box>
+                      <FormLabel mb={2}>HTTP/2 覆盖</FormLabel>
+                      <Text fontSize="sm" color="gray.500" mb={2}>
+                        可在此站点覆盖全局 HTTP/2 设置，留空则使用系统设置中的全局配置
+                      </Text>
+                      <HStack>
+                        <Button
+                          size="sm"
+                          variant={formData.http2_enabled === null ? 'solid' : 'outline'}
+                          colorScheme={formData.http2_enabled === null ? 'blue' : 'gray'}
+                          onClick={() => handleInputChange('http2_enabled', null)}
+                        >
+                          全局
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={formData.http2_enabled === true ? 'solid' : 'outline'}
+                          colorScheme={formData.http2_enabled === true ? 'green' : 'gray'}
+                          onClick={() => handleInputChange('http2_enabled', true)}
+                        >
+                          启用
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={formData.http2_enabled === false ? 'solid' : 'outline'}
+                          colorScheme={formData.http2_enabled === false ? 'red' : 'gray'}
+                          onClick={() => handleInputChange('http2_enabled', false)}
+                        >
+                          禁用
+                        </Button>
+                      </HStack>
+                    </Box>
+
+                    <Box>
+                      <FormLabel mb={2}>HTTP/3 覆盖</FormLabel>
+                      <Text fontSize="sm" color="gray.500" mb={2}>
+                        可在此站点覆盖全局 HTTP/3 设置，留空则使用系统设置中的全局配置
+                      </Text>
+                      <HStack>
+                        <Button
+                          size="sm"
+                          variant={formData.http3_enabled === null ? 'solid' : 'outline'}
+                          colorScheme={formData.http3_enabled === null ? 'blue' : 'gray'}
+                          onClick={() => handleInputChange('http3_enabled', null)}
+                        >
+                          全局
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={formData.http3_enabled === true ? 'solid' : 'outline'}
+                          colorScheme={formData.http3_enabled === true ? 'green' : 'gray'}
+                          onClick={() => handleInputChange('http3_enabled', true)}
+                        >
+                          启用
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={formData.http3_enabled === false ? 'solid' : 'outline'}
+                          colorScheme={formData.http3_enabled === false ? 'red' : 'gray'}
+                          onClick={() => handleInputChange('http3_enabled', false)}
+                        >
+                          禁用
+                        </Button>
+                      </HStack>
+                    </Box>
 
                     <HStack justify="space-between">
                       <Box>

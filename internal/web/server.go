@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/xurenlu/sslcat/internal/ai"
@@ -95,8 +96,11 @@ type Server struct {
 	ddosProtector *ddos.Protector
 	// 审计轮转器
 	auditRotator *logger.Rotator
-	// 访问日志记录器
+	// 访问日志记录器（全局）
 	accessLogger *logger.AccessLogger
+	// 按路径的访问日志记录器（站点级覆盖）
+	accessLoggersMu sync.RWMutex
+	accessLoggers   map[string]*logger.AccessLogger
 	// 代理访问控制管理器
 	proxyAuthManager *ProxyAuthManager
 	// 用户管理器
@@ -126,9 +130,9 @@ type Server struct {
 	webauthnManager *WebAuthnManager
 
 	// 机器人检测器
-	botDetector        *bot.Detector
-	botWhitelistMgr    *bot.WhitelistManager
-	botChallengeMgr    *bot.ChallengeManager
+	botDetector     *bot.Detector
+	botWhitelistMgr *bot.WhitelistManager
+	botChallengeMgr *bot.ChallengeManager
 
 	// 报告生成器
 	reportGenerator *report.ReportGenerator
@@ -167,9 +171,9 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		Name:            "shared_cache",
 		MaxEntries:      50, // 从 100 进一步降低到 50，减少预分配
 		MaxSizeBytes:    maxSharedCacheBytes,
-		MaxItemSize:     512 * 1024, // 从 1MB 降低到 512KB
-		DefaultTTL:      24 * time.Hour,  // 24小时
-		CleanupInterval: 5 * time.Minute, // 统一使用5分钟清理间隔
+		MaxItemSize:     512 * 1024,       // 从 1MB 降低到 512KB
+		DefaultTTL:      24 * time.Hour,   // 24小时
+		CleanupInterval: 5 * time.Minute,  // 统一使用5分钟清理间隔
 		BackendType:     cacheBackendType, // 使用配置的后端类型
 	})
 
@@ -244,27 +248,27 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		MaxHits:          cfg.Security.WAFRateLimitMaxHits,
 		BlockDurationSec: cfg.Security.WAFRateLimitBlockSec,
 	}
-	
+
 	multiDimConfig := &waf.MultiDimBlockConfig{
 		// IP 维度配置（使用频率限制配置）
 		IPEnabled:       cfg.Security.WAFRateLimitEnabled,
 		IPWindow:        time.Duration(cfg.Security.WAFRateLimitWindow) * time.Second,
 		IPMaxHits:       cfg.Security.WAFRateLimitMaxHits,
 		IPBlockDuration: time.Duration(cfg.Security.WAFRateLimitBlockSec) * time.Second,
-		
+
 		// TLS 指纹维度配置
 		TLSEnabled:       cfg.Security.WAFTLSBlockEnabled,
 		TLSWindow:        time.Duration(cfg.Security.WAFTLSBlockWindow) * time.Second,
 		TLSMaxHits:       cfg.Security.WAFTLSBlockMaxHits,
 		TLSBlockDuration: time.Duration(cfg.Security.WAFTLSBlockDurationSec) * time.Second,
-		
+
 		// IP 段维度配置
 		SubnetEnabled:       cfg.Security.WAFSubnetBlockEnabled,
 		SubnetMask:          cfg.Security.WAFSubnetMask,
 		SubnetThreshold:     cfg.Security.WAFSubnetThreshold,
 		SubnetBlockDuration: time.Duration(cfg.Security.WAFSubnetBlockDurationSec) * time.Second,
 	}
-	
+
 	wafEngine := waf.NewAdvancedEngine(rateLimitConfig, multiDimConfig)
 
 	// 初始化翻译器（从嵌入读取）
@@ -304,6 +308,7 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		wafEngine:          wafEngine,
 		slowRequestManager: slowRequestManager,
 		sharedCache:        sharedCache,
+		accessLoggers:      make(map[string]*logger.AccessLogger),
 		log: logrus.WithFields(logrus.Fields{
 			"component": "web_server",
 		}),
@@ -496,14 +501,14 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 
 		// 准备指标存储配置
 		metricsStorageOpts := monitor.MetricsStorageOptions{
-			Enabled:            cfg.Monitoring.MetricsStorage.Enabled,
-			DataDir:            dataDir,
-			SamplingInterval:   time.Duration(cfg.Monitoring.MetricsStorage.SamplingInterval) * time.Minute,
-			RetentionDays:      cfg.Monitoring.MetricsStorage.RetentionDays,
+			Enabled:             cfg.Monitoring.MetricsStorage.Enabled,
+			DataDir:             dataDir,
+			SamplingInterval:    time.Duration(cfg.Monitoring.MetricsStorage.SamplingInterval) * time.Minute,
+			RetentionDays:       cfg.Monitoring.MetricsStorage.RetentionDays,
 			DetailRetentionDays: cfg.Monitoring.MetricsStorage.DetailRetentionDays,
-			MaxRows:            cfg.Monitoring.MetricsStorage.MaxRows,
+			MaxRows:             cfg.Monitoring.MetricsStorage.MaxRows,
 		}
-		
+
 		// 如果未配置，使用默认值（1分钟）
 		if metricsStorageOpts.SamplingInterval == 0 {
 			metricsStorageOpts.SamplingInterval = 1 * time.Minute
@@ -525,7 +530,7 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 				MaxSystemUsageRatio: memoryUsagePercent / 100.0,
 				ReleaseCooldown:     time.Duration(releaseCooldownSec) * time.Second,
 			},
-			Watchdog: watchdogOpts,
+			Watchdog:       watchdogOpts,
 			MetricsStorage: metricsStorageOpts,
 		})
 		server.monitorManager.Start(server.notificationIntegrator)
@@ -1055,7 +1060,7 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/waf/rules", s.handleAPIWAFRules)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/waf/events", s.handleAPIWAFEvents)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/waf/config", s.handleAPIWAFConfig)
-	
+
 	// WAF 多维度封禁 API
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/waf/blocked-list", s.handleAPIWAFBlockedList)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/waf/unblock", s.handleAPIWAFUnblock)
@@ -1069,7 +1074,7 @@ func (s *Server) setupRoutes() {
 	// 白名单管理 API
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/whitelist", s.handleAPISecurityWhitelist)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/whitelist/delete", s.handleAPISecurityWhitelistDelete)
-	
+
 	// DDoS 攻击统计和监控 API
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/ddos-stats", s.handleAPIDDoSStats)
 
@@ -1085,11 +1090,11 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(botAPIPrefix+"/stats", s.handleAPIBotDetectionStats)
 	s.mux.HandleFunc(botAPIPrefix+"/whitelist", s.handleAPIBotDetectionWhitelist)
 	s.mux.HandleFunc(botAPIPrefix+"/logs", s.handleAPIBotDetectionLogs)
-	
+
 	// 机器人验证接口（公开访问）
 	s.mux.HandleFunc("/bot-challenge/verify", s.HandleBotChallengeVerify)
 	s.mux.HandleFunc("/bot-challenge/refresh", s.HandleBotChallengeRefresh)
-	
+
 	// 记录机器人 API 前缀到日志（仅启动时记录一次）
 	s.log.Infof("Bot Detection API prefix: %s", botAPIPrefix)
 
@@ -1352,10 +1357,18 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// 记录访问日志（保持现有功能）
-		if s.accessLogger != nil {
-			s.accessLogger.LogRequest(r, wrappedWriter.statusCode, wrappedWriter.written,
-				duration, "", 0)
+		// 记录访问日志（支持全局开关与站点级覆盖）
+		accessEnabled, accessPath := s.getAccessLogConfig(r, matchedRule)
+		if accessEnabled {
+			if accessPath != "" {
+				if al := s.getOrCreateAccessLogger(accessPath); al != nil {
+					al.LogRequest(r, wrappedWriter.statusCode, wrappedWriter.written,
+						duration, "", 0)
+				}
+			} else if s.accessLogger != nil {
+				s.accessLogger.LogRequest(r, wrappedWriter.statusCode, wrappedWriter.written,
+					duration, "", 0)
+			}
 		}
 
 		// 记录性能监控数据（如果监控系统启用）
@@ -1431,22 +1444,22 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if rule := s.proxyManager.FindRuleByDomain(r.Host); rule != nil && rule.WAFEnabled != nil {
 			wafEnabled = *rule.WAFEnabled
 		}
-		
+
 		if wafEnabled && s.wafEngine != nil {
 			// 提取 TLS 指纹
 			tlsFingerprint := s.extractTLSFingerprint(r)
-			
+
 			// 使用带 TLS 指纹的检查方法
 			if events, blocked := s.wafEngine.CheckRequestAdvancedWithTLS(r, tlsFingerprint); blocked {
-			s.log.Warnf("WAF blocked request from %s to %s: %d events detected", s.getClientIP(r), r.Host, len(events))
-			
-			// 构建详细的拦截页面
-			var reasons []string
-			for _, event := range events {
-				reasons = append(reasons, fmt.Sprintf("%s (%s)", event.RuleName, event.RuleType))
-			}
-			
-			blockPage := fmt.Sprintf(`<!DOCTYPE html>
+				s.log.Warnf("WAF blocked request from %s to %s: %d events detected", s.getClientIP(r), r.Host, len(events))
+
+				// 构建详细的拦截页面
+				var reasons []string
+				for _, event := range events {
+					reasons = append(reasons, fmt.Sprintf("%s (%s)", event.RuleName, event.RuleType))
+				}
+
+				blockPage := fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
@@ -1479,26 +1492,26 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
         </div>
     </div>
 </body>
-</html>`, 
-				func() string {
-					var html string
-					for _, reason := range reasons {
-						html += fmt.Sprintf(`<div class="reason-item">• %s</div>`, reason)
-					}
-					return html
-				}(),
-				events[0].ID,
-				time.Now().Format("2006-01-02 15:04:05"),
-				s.getClientIP(r),
-			)
-			
-			wrappedWriter.Header().Set("Content-Type", "text/html; charset=utf-8")
-			wrappedWriter.WriteHeader(http.StatusForbidden)
-			wrappedWriter.Write([]byte(blockPage))
-			return
-		} else if len(events) > 0 {
-			s.log.Infof("WAF detected %d security events from %s to %s", len(events), s.getClientIP(r), r.Host)
-		}
+</html>`,
+					func() string {
+						var html string
+						for _, reason := range reasons {
+							html += fmt.Sprintf(`<div class="reason-item">• %s</div>`, reason)
+						}
+						return html
+					}(),
+					events[0].ID,
+					time.Now().Format("2006-01-02 15:04:05"),
+					s.getClientIP(r),
+				)
+
+				wrappedWriter.Header().Set("Content-Type", "text/html; charset=utf-8")
+				wrappedWriter.WriteHeader(http.StatusForbidden)
+				wrappedWriter.Write([]byte(blockPage))
+				return
+			} else if len(events) > 0 {
+				s.log.Infof("WAF detected %d security events from %s to %s", len(events), s.getClientIP(r), r.Host)
+			}
 		}
 	}
 
@@ -1518,14 +1531,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if idx := strings.Index(host, ":"); idx != -1 {
 			host = host[:idx]
 		}
-		
+
 		if rule := s.proxyManager.GetProxyConfig(host); rule != nil && rule.BotDetectionEnabled && rule.BotDetectionConfig != nil {
 			result, needsChallenge := s.botDetector.CheckRequest(r, rule.BotDetectionConfig)
 			if needsChallenge && result != nil && result.Challenge != nil {
 				s.serveBotChallenge(wrappedWriter, r, result.Challenge)
 				return
 			}
-			
+
 			// 如果检测到高风险机器人，自动封禁IP
 			if result != nil && result.IsBot && result.RiskScore >= rule.BotDetectionConfig.HighRiskThreshold {
 				clientIP := s.getClientIP(r)
@@ -1536,7 +1549,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					s.log.Warnf("自动封禁高风险机器人IP: %s, 风险评分: %d, 原因: %s", clientIP, result.RiskScore, result.Reason)
 				}
 			}
-			
+
 			// 记录检测日志
 			if result != nil && s.botWhitelistMgr != nil {
 				go func() {
@@ -1869,10 +1882,10 @@ func (s *Server) extractTLSFingerprint(r *http.Request) string {
 	version := r.TLS.Version
 	cipherSuite := r.TLS.CipherSuite
 	serverName := r.TLS.ServerName
-	
+
 	// 构建指纹字符串
 	raw := fmt.Sprintf("v=%d;cs=%d;sni=%s", version, cipherSuite, serverName)
-	
+
 	// 计算 SHA256 哈希
 	hash := sha256.Sum256([]byte(raw))
 	return hex.EncodeToString(hash[:])
@@ -2319,6 +2332,103 @@ func (s *Server) findMatchingProxyRule(r *http.Request) *config.ProxyRule {
 	}
 
 	return nil
+}
+
+// getAccessLogConfig 返回当前请求是否记录访问日志及使用的路径（空表示使用全局）
+func (s *Server) getAccessLogConfig(r *http.Request, matchedRule *config.ProxyRule) (enabled bool, path string) {
+	host := r.Host
+	if idx := strings.Index(host, ":"); idx >= 0 {
+		host = host[:idx]
+	}
+
+	// 代理规则匹配：使用规则级覆盖
+	if matchedRule != nil {
+		if matchedRule.AccessLogEnabled != nil && !*matchedRule.AccessLogEnabled {
+			return false, ""
+		}
+		if matchedRule.AccessLogPath != "" {
+			return true, matchedRule.AccessLogPath
+		}
+		// 继承全局
+		return s.config.Server.AccessLogEnabled, ""
+	}
+
+	// 静态站点匹配
+	for i := range s.config.StaticSites {
+		site := &s.config.StaticSites[i]
+		if !site.Enabled {
+			continue
+		}
+		if !strings.EqualFold(site.Domain, host) {
+			continue
+		}
+		if site.AccessLogEnabled != nil && !*site.AccessLogEnabled {
+			return false, ""
+		}
+		if site.AccessLogPath != "" {
+			return true, site.AccessLogPath
+		}
+		return s.config.Server.AccessLogEnabled, ""
+	}
+
+	// PHP 站点匹配
+	for i := range s.config.PHPSites {
+		site := &s.config.PHPSites[i]
+		if !site.Enabled {
+			continue
+		}
+		if !strings.EqualFold(site.Domain, host) {
+			continue
+		}
+		if site.AccessLogEnabled != nil && !*site.AccessLogEnabled {
+			return false, ""
+		}
+		if site.AccessLogPath != "" {
+			return true, site.AccessLogPath
+		}
+		return s.config.Server.AccessLogEnabled, ""
+	}
+
+	// 全局
+	return s.config.Server.AccessLogEnabled, ""
+}
+
+// getOrCreateAccessLogger 按路径获取或创建访问日志记录器（站点覆盖用）
+func (s *Server) getOrCreateAccessLogger(logPath string) *logger.AccessLogger {
+	if logPath == "" {
+		return nil
+	}
+	s.accessLoggersMu.RLock()
+	al, ok := s.accessLoggers[logPath]
+	s.accessLoggersMu.RUnlock()
+	if ok && al != nil {
+		return al
+	}
+	s.accessLoggersMu.Lock()
+	defer s.accessLoggersMu.Unlock()
+	if al, ok = s.accessLoggers[logPath]; ok && al != nil {
+		return al
+	}
+	format := logger.FormatNginx
+	switch strings.ToLower(s.config.Server.AccessLogFormat) {
+	case "apache":
+		format = logger.FormatApache
+	case "json":
+		format = logger.FormatJSON
+	}
+	newAl, err := logger.NewAccessLogger(format, logPath, true)
+	if err != nil {
+		s.log.Warnf("创建站点访问日志记录器失败 path=%s: %v", logPath, err)
+		return nil
+	}
+	if s.config.Server.AccessLogMaxSize > 0 {
+		newAl.SetMaxSize(s.config.Server.AccessLogMaxSize)
+	}
+	if s.config.Server.AccessLogMaxFiles > 0 {
+		newAl.SetMaxFiles(s.config.Server.AccessLogMaxFiles)
+	}
+	s.accessLoggers[logPath] = newAl
+	return newAl
 }
 
 func (s *Server) updateSharedCache(sizeMB int) {

@@ -32,10 +32,11 @@ import (
 type contextKey string
 
 const (
-	proxyRuleKey      contextKey = "proxyRule"
-	proxyBackendKey   contextKey = "proxyBackend"
-	proxyStartTimeKey contextKey = "proxyStartTime"
-	cdnEnabledKey     contextKey = "cdnEnabled"
+	proxyRuleKey          contextKey = "proxyRule"
+	proxyBackendKey       contextKey = "proxyBackend"
+	proxyStartTimeKey     contextKey = "proxyStartTime"
+	cdnEnabledKey         contextKey = "cdnEnabled"
+	proxyUpstreamDebugKey contextKey = "proxyUpstreamDebug"
 
 	// 图片优化的最大可处理体积（4MB），避免大图/未知长度占用大量内存
 	maxImageOptimizeBytes = 4 * 1024 * 1024
@@ -458,8 +459,21 @@ func (m *Manager) handleLoadBalancedRequest(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// 选择后端服务器
-	backend, err := lb.SelectBackend(r)
+	var backend *loadbalancer.Backend
+	var selectionInfo *loadbalancer.SelectionInfo
+	var err error
+
+	// 当启用上游调试 header 时，使用 SelectBackendWithInfo 获取会话保持状态
+	if rule.UpstreamDebugHeaders {
+		if typedLB, ok := lb.(*loadbalancer.LoadBalancer); ok {
+			backend, selectionInfo, err = typedLB.SelectBackendWithInfo(r)
+		} else {
+			backend, err = lb.SelectBackend(r)
+		}
+	} else {
+		backend, err = lb.SelectBackend(r)
+	}
+
 	if err != nil {
 		m.log.Errorf("Failed to select backend for domain %s: %v", rule.Domain, err)
 		http.Error(w, "Service Unavailable", http.StatusServiceUnavailable)
@@ -479,12 +493,12 @@ func (m *Manager) handleLoadBalancedRequest(w http.ResponseWriter, r *http.Reque
 	r.Header.Set("X-Selected-Backend", backend.ID)
 	r.Header.Set("X-Backend-Address", backend.GetAddress())
 
-	// 使用传统的代理逻辑处理请求
-	m.proxyToBackend(w, r, &tempRule, backend)
+	// 使用传统的代理逻辑处理请求，传入 selectionInfo 以便响应头输出调试信息
+	m.proxyToBackend(w, r, &tempRule, backend, selectionInfo)
 }
 
-// proxyToBackend 代理请求到指定后端
-func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *config.ProxyRule, backend *loadbalancer.Backend) {
+// proxyToBackend 代理请求到指定后端，selectionInfo 为 nil 时表示非负载均衡或未启用调试 header
+func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *config.ProxyRule, backend *loadbalancer.Backend, selectionInfo *loadbalancer.SelectionInfo) {
 	startTime := time.Now()
 
 	// 上游缓存检查（仅对GET/HEAD请求）
@@ -649,29 +663,29 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 				responseTime = time.Since(startTimeFromCtx)
 			}
 
-			// 更新后端响应时间
+			// 更新後端響應時間
 			if backendFromCtx != nil {
 				backendFromCtx.UpdateResponseTime(responseTime)
 			}
 
-			// 记录响应详情
+			// 記錄響應詳情
 			m.logResponseDetails(resp, ruleFromCtx)
 
-			// 检查并记录慢请求
+			// 檢查並記錄慢請求
 			if m.slowRequestRecorder.IsSlowRequest(responseTime) {
-				// 获取内容大小
+				// 取得內容大小
 				contentSize := int64(0)
 				if resp.ContentLength > 0 {
 					contentSize = resp.ContentLength
 				}
 
-				// 获取规则名称（使用Domain作为规则名）
+				// 取得規則名稱（使用 Domain 作為規則名）
 				ruleName := ""
 				if ruleFromCtx != nil {
 					ruleName = ruleFromCtx.Domain
 				}
 
-				// 记录慢请求
+				// 記錄慢請求
 				if backendFromCtx != nil && ruleFromCtx != nil {
 					m.slowRequestRecorder.RecordSlowRequest(
 						resp.Request,
@@ -682,7 +696,7 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 						ruleFromCtx.Target,
 						ruleName,
 						contentSize,
-						nil, // 这里可以传递错误信息
+						nil, // 這裡可以傳遞錯誤資訊
 					)
 				}
 			}
@@ -700,8 +714,8 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 			}
 			m.deleteHeadersBatch(resp.Header, hopByHopHeaders)
 
-			// 移除可能的安全头，让目标服务器自己设置
-			// 性能优化：批量删除
+			// 移除可能的安全頭，讓目標伺服器自行設定
+			// 性能優化：批量刪除
 			securityHeaders := []string{
 				"Strict-Transport-Security",
 				"X-Frame-Options",
@@ -736,17 +750,40 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 				m.setHeadersBatch(resp.Header, backendHeaders)
 			}
 
-			// 上游缓存存储（仅对GET/HEAD请求的静态资源）
-			if m.upstreamCache != nil && (resp.Request.Method == "GET" || resp.Request.Method == "HEAD") {
-				// 异步存储到上游缓存，避免影响响应性能
-				go func() {
-					if err := m.upstreamCache.Store(resp.Request, resp); err != nil {
-						m.log.Debugf("Failed to store upstream cache for %s: %v", resp.Request.URL.String(), err)
+			// 上游调试 header：当启用时，输出当前上游机器、会话保持状态等
+			if ruleFromCtx != nil && ruleFromCtx.UpstreamDebugHeaders && backendFromCtx != nil {
+				debugInfoFromCtx, _ := ctx.Value(proxyUpstreamDebugKey).(*loadbalancer.SelectionInfo)
+				if debugInfoFromCtx != nil {
+					sessionAffinity := "false"
+					if ruleFromCtx.SessionAffinityEnabled {
+						sessionAffinity = "true"
 					}
-				}()
+					sessionHit := "false"
+					if debugInfoFromCtx.FromSession {
+						sessionHit = "true"
+					}
+					debugHeaders := map[string]string{
+						"X-Upstream-Selected":         backendFromCtx.ID,
+						"X-Upstream-Address":          backendFromCtx.GetAddress(),
+						"X-Upstream-Session-Affinity": sessionAffinity,
+						"X-Upstream-Session-Hit":      sessionHit,
+					}
+					if ruleFromCtx.SessionAffinityEnabled && debugInfoFromCtx.SessionID != "" {
+						debugHeaders["X-Upstream-Session-ID"] = debugInfoFromCtx.SessionID
+					}
+					m.setHeadersBatch(resp.Header, debugHeaders)
+				}
 			}
 
-			// CDN 缓存落盘（全局或域名启用）
+			// 上游快取存儲（僅對 GET/HEAD 請求的靜態資源）
+			// 注意：不可在 goroutine 中讀取 resp.Body，否則會導致 HTTP/2 協議錯誤
+			if m.upstreamCache != nil && (resp.Request.Method == "GET" || resp.Request.Method == "HEAD") {
+				if err := m.upstreamCache.Store(resp.Request, resp); err != nil {
+					m.log.Debugf("Failed to store upstream cache for %s: %v", resp.Request.URL.String(), err)
+				}
+			}
+
+			// CDN 快取落盤（全域或網域啟用）
 			if m.cdnCache != nil && cdnEnabledFromCtx {
 				if ruleFromCtx != nil && ruleFromCtx.CDNDefaultTTLSeconds > 0 {
 					resp.Header.Set("X-SSLcat-CDN-Default-TTL", strconv.Itoa(ruleFromCtx.CDNDefaultTTLSeconds))
@@ -775,6 +812,9 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 	ctx = context.WithValue(ctx, proxyBackendKey, backend)
 	ctx = context.WithValue(ctx, proxyStartTimeKey, startTime)
 	ctx = context.WithValue(ctx, cdnEnabledKey, cdnEnabled)
+	if selectionInfo != nil {
+		ctx = context.WithValue(ctx, proxyUpstreamDebugKey, selectionInfo)
+	}
 	r = r.WithContext(ctx)
 
 	// 设置错误处理
@@ -1182,7 +1222,7 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 				}
 			}
 
-			// CDN 缓存落盘（全局或域名启用）
+			// CDN 快取落盤（全域或網域啟用）
 			// 使用之前定义的cdnEnabled变量
 			if m.cdnCache != nil && cdnEnabledFromCtx {
 				if ruleFromCtx != nil && ruleFromCtx.CDNDefaultTTLSeconds > 0 {

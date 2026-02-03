@@ -100,6 +100,9 @@ func (v *ConfigValidator) ValidateConfig(cfg *Config) *ValidationResult {
 	// 验证CDN缓存配置
 	v.validateCDNCacheConfig(&cfg.CDNCache)
 
+	// 检查数据路径是否跨两个根目录（/var/lib/sslcat 与 /opt/sslcat），避免“两边漏文件”
+	v.validateDataPathsConsistency(cfg)
+
 	// 生成摘要
 	v.generateSummary(cfg)
 
@@ -413,6 +416,49 @@ func (v *ConfigValidator) validateCDNCacheConfig(cfg *CDNCacheConfig) {
 	}
 }
 
+// validateDataPathsConsistency 检查所有数据相关路径是否使用同一根目录，避免部分在 /var/lib/sslcat、部分在 /opt/sslcat 导致“两边漏文件”。
+func (v *ConfigValidator) validateDataPathsConsistency(cfg *Config) {
+	paths := []struct {
+		key  string
+		path string
+	}{
+		{"server.data_dir", cfg.Server.DataDir},
+		{"server.access_log.path", cfg.Server.AccessLogPath},
+		{"ssl.cert_dir", cfg.SSL.CertDir},
+		{"ssl.key_dir", cfg.SSL.KeyDir},
+		{"admin.password_file", cfg.Admin.PasswordFile},
+		{"admin.totp_secret_file", cfg.Admin.TOTPSecretFile},
+		{"security.block_file", cfg.Security.BlockFile},
+		{"cdn_cache.cache_dir", cfg.CDNCache.CacheDir},
+		{"upstream_cache.cache_dir", cfg.UpstreamCache.CacheDir},
+	}
+	var hasVarLib, hasOpt bool
+	var seenPaths []string
+	for _, p := range paths {
+		if p.path == "" {
+			continue
+		}
+		norm := strings.TrimRight(strings.TrimSpace(p.path), "/")
+		if norm == "" {
+			continue
+		}
+		seenPaths = append(seenPaths, p.key+":"+norm)
+		if strings.HasPrefix(norm, "/var/lib/sslcat") || norm == "/var/lib/sslcat" {
+			hasVarLib = true
+		}
+		if strings.HasPrefix(norm, "/opt/sslcat") || norm == "/opt/sslcat" {
+			hasOpt = true
+		}
+	}
+	if hasVarLib && hasOpt {
+		v.addWarning(
+			"data_paths_consistency",
+			"数据路径同时出现在 /var/lib/sslcat 与 /opt/sslcat，可能导致“两边漏文件”。建议统一为单一根目录（推荐 /var/lib/sslcat 存数据，/opt/sslcat 仅放程序与脚本）。",
+			strings.Join(seenPaths, "; "),
+		)
+	}
+}
+
 // generateSummary 生成验证摘要
 func (v *ConfigValidator) generateSummary(cfg *Config) {
 	summary := ValidationSummary{
@@ -480,19 +526,19 @@ func (v *ConfigValidator) isHTTPSURL(host string) bool {
 	if !strings.HasPrefix(strings.ToLower(host), "https://") {
 		return false
 	}
-	
+
 	// 解析URL
 	parsedURL, err := url.Parse(host)
 	if err != nil {
 		return false
 	}
-	
+
 	// 提取主机名（去除端口）
 	hostname := parsedURL.Hostname()
 	if hostname == "" {
 		return false
 	}
-	
+
 	// 检查主机名是否为IP地址
 	return net.ParseIP(hostname) == nil
 }

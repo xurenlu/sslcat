@@ -45,19 +45,19 @@ func isHTTPSURL(host string) bool {
 	if !strings.HasPrefix(strings.ToLower(host), "https://") {
 		return false
 	}
-	
+
 	// 解析URL
 	parsedURL, err := url.Parse(host)
 	if err != nil {
 		return false
 	}
-	
+
 	// 提取主机名（去除端口）
 	hostname := parsedURL.Hostname()
 	if hostname == "" {
 		return false
 	}
-	
+
 	// 检查主机名是否为IP地址
 	return net.ParseIP(hostname) == nil
 }
@@ -353,6 +353,17 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 			HealthCheckTimeoutSec    int               `json:"health_check_timeout_sec"`
 			UpstreamRequestHeaders   map[string]string `json:"upstream_request_headers"`
 			ResponseHeaders          map[string]string `json:"response_headers"`
+
+			// 访问日志覆盖
+			AccessLogEnabled *bool  `json:"access_log_enabled,omitempty"`
+			AccessLogPath    string `json:"access_log_path,omitempty"`
+
+			// HTTP/2 覆盖
+			HTTP2Enabled *bool `json:"http2_enabled,omitempty"`
+			// HTTP/3 覆盖
+			HTTP3Enabled *bool `json:"http3_enabled,omitempty"`
+			// 上游调试 header（多后端时）
+			UpstreamDebugHeaders bool `json:"upstream_debug_headers"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -390,7 +401,7 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		
+
 		// 如果存在HTTPS URL后端，限制只能配置一个后端
 		if hasHTTPSURLBackend && len(req.Backends) > 1 {
 			http.Error(w, "HTTPS URL后端仅支持单后端配置，不支持负载均衡", http.StatusBadRequest)
@@ -433,6 +444,14 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 			HealthCheckTimeoutSec:    req.HealthCheckTimeoutSec,
 			UpstreamRequestHeaders:   req.UpstreamRequestHeaders,
 			ResponseHeaders:          req.ResponseHeaders,
+
+			AccessLogEnabled: req.AccessLogEnabled,
+			AccessLogPath:    req.AccessLogPath,
+
+			HTTP2Enabled: req.HTTP2Enabled,
+			HTTP3Enabled: req.HTTP3Enabled,
+
+			UpstreamDebugHeaders: req.UpstreamDebugHeaders,
 		}
 
 		s.config.Proxy.Rules = append(s.config.Proxy.Rules, newRule)
@@ -485,6 +504,17 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 			HealthCheckTimeoutSec    int               `json:"health_check_timeout_sec"`
 			UpstreamRequestHeaders   map[string]string `json:"upstream_request_headers"`
 			ResponseHeaders          map[string]string `json:"response_headers"`
+
+			// 访问日志覆盖
+			AccessLogEnabled *bool  `json:"access_log_enabled,omitempty"`
+			AccessLogPath    string `json:"access_log_path,omitempty"`
+
+			// HTTP/2 覆盖
+			HTTP2Enabled *bool `json:"http2_enabled,omitempty"`
+			// HTTP/3 覆盖
+			HTTP3Enabled *bool `json:"http3_enabled,omitempty"`
+			// 上游调试 header（多后端时）
+			UpstreamDebugHeaders bool `json:"upstream_debug_headers"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -543,7 +573,7 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 				// 检查是否从启用变为禁用，需要清理 session
 				wasAuthEnabled := s.config.Proxy.Rules[i].AuthEnabled
 				s.config.Proxy.Rules[i].AuthEnabled = req.AuthEnabled
-				
+
 				if req.AuthEnabled {
 					// 启用访问控制时保存用户配置
 					s.config.Proxy.Rules[i].AuthUsers = req.AuthUsers
@@ -558,7 +588,7 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 					s.config.Proxy.Rules[i].AuthUsers = nil
 					s.config.Proxy.Rules[i].AuthSessionTimeout = 0
 					s.config.Proxy.Rules[i].AuthCookieDomain = ""
-					
+
 					// 如果之前是启用状态，清除该域名的所有会话
 					if wasAuthEnabled && s.proxyAuthManager != nil {
 						s.proxyAuthManager.ClearDomainSessions(domain)
@@ -574,6 +604,23 @@ func (s *Server) handleAPIProxyRule(w http.ResponseWriter, r *http.Request) {
 				s.config.Proxy.Rules[i].HealthCheckTimeoutSec = req.HealthCheckTimeoutSec
 				s.config.Proxy.Rules[i].UpstreamRequestHeaders = req.UpstreamRequestHeaders
 				s.config.Proxy.Rules[i].ResponseHeaders = req.ResponseHeaders
+
+				// 访问日志覆盖
+				if req.AccessLogEnabled != nil {
+					s.config.Proxy.Rules[i].AccessLogEnabled = req.AccessLogEnabled
+				}
+				s.config.Proxy.Rules[i].AccessLogPath = req.AccessLogPath
+
+				// HTTP/2 覆盖
+				if req.HTTP2Enabled != nil {
+					s.config.Proxy.Rules[i].HTTP2Enabled = req.HTTP2Enabled
+				}
+				// HTTP/3 覆盖
+				if req.HTTP3Enabled != nil {
+					s.config.Proxy.Rules[i].HTTP3Enabled = req.HTTP3Enabled
+				}
+
+				s.config.Proxy.Rules[i].UpstreamDebugHeaders = req.UpstreamDebugHeaders
 
 				// 保存配置
 				if err := s.config.Save(s.config.ConfigFile); err != nil {

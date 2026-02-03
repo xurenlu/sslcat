@@ -317,6 +317,11 @@ export const jaJP: Translation = {
     enableRateLimit: 'レート制限を有効にする',
     maxRequestsPerMinute: '5分間の最大リクエスト数',
     enableAccessLog: 'アクセスログを有効にする',
+    accessLogPath: 'アクセスログパス',
+    accessLogFormat: 'アクセスログ形式',
+    accessLogFormatNginx: 'Nginx',
+    accessLogFormatApache: 'Apache',
+    accessLogFormatJson: 'JSON',
     enableErrorLog: 'エラーログを有効にする',
     logLevel: 'ログレベル',
     enableNotifications: '通知を有効にする',
@@ -407,6 +412,10 @@ export const jaJP: Translation = {
     // SSL Staging 环境
     sslStaging: 'Staging環境を使用 (テスト)',
     sslStagingDesc: '⚠️ Staging環境で発行された証明書はブラウザーによって信頼されません。テスト専用です。本番使用ではこのオプションを無効にしてください。',
+    http2Enabled: 'HTTP/2を有効にする',
+    http2EnabledDesc: 'HTTP/2プロトコルサポートを有効にしてパフォーマンスを向上させます（多重化、ヘッダー圧縮など）。デフォルトでは無効で、サイトごとに上書きできます。',
+    http3Enabled: 'HTTP/3を有効にする',
+    http3EnabledDesc: 'HTTP/3（QUICベース）を有効にして、高遅延・モバイルネットワークでのパフォーマンスを向上させます。デフォルトでは無効で、サイトごとに上書きできます。',
     // 自定义端口详细设置
     customPortConfigTitle: 'カスタムポート設定',
     customPortWarning: 'カスタムポートモードでは、SSLcatは指定されたポートでのみリッスンし、HTTPS機能をサポートしません。HTTPSの場合は、標準モードを使用するか、リバースプロキシを設定してください。',

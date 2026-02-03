@@ -37,6 +37,10 @@ interface StaticSiteForm {
   headers: Record<string, string>
   path_prefix_rules: PathPrefixRule[]
   waf_enabled?: boolean | null
+  access_log_enabled: boolean | null
+  access_log_path: string
+  http2_enabled: boolean | null
+  http3_enabled: boolean | null
 }
 
 const StaticSiteEdit: React.FC = () => {
@@ -56,6 +60,10 @@ const StaticSiteEdit: React.FC = () => {
     headers: {},
     path_prefix_rules: [],
     waf_enabled: null,
+    access_log_enabled: null,
+    access_log_path: '',
+    http2_enabled: null,
+    http3_enabled: null,
   })
   
   const [loading, setLoading] = useState(false)
@@ -88,6 +96,10 @@ const StaticSiteEdit: React.FC = () => {
             headers: site.response_headers || {},
             path_prefix_rules: site.path_prefix_rules || [],
             waf_enabled: site.waf_enabled ?? null,
+            access_log_enabled: site.access_log_enabled ?? null,
+            access_log_path: site.access_log_path || '',
+            http2_enabled: site.http2_enabled ?? null,
+            http3_enabled: site.http3_enabled ?? null,
           })
         }
       } catch (error) {
@@ -154,6 +166,10 @@ const StaticSiteEdit: React.FC = () => {
           headers: formData.headers,
           path_prefix_rules: formData.path_prefix_rules,
           waf_enabled: formData.waf_enabled,
+          access_log_enabled: formData.access_log_enabled,
+          access_log_path: formData.access_log_path || undefined,
+          http2_enabled: formData.http2_enabled,
+          http3_enabled: formData.http3_enabled,
         }),
       })
 
@@ -299,6 +315,100 @@ const StaticSiteEdit: React.FC = () => {
                     </HStack>
                   </VStack>
                 </FormControl>
+
+                <Box gridColumn={{ base: '1', md: '1 / -1' }}>
+                  <FormLabel mb={2}>访问日志覆盖</FormLabel>
+                  <Text fontSize="sm" color="gray.500" mb={2}>
+                    可在此站点关闭访问日志或指定单独日志路径，留空则使用系统设置中的全局配置
+                  </Text>
+                  <VStack spacing={3} align="stretch">
+                    <FormControl display="flex" alignItems="center">
+                      <Switch
+                        id="static-access-log-off"
+                        isChecked={formData.access_log_enabled === false}
+                        onChange={(e) => handleInputChange('access_log_enabled', e.target.checked ? false : null)}
+                      />
+                      <FormLabel htmlFor="static-access-log-off" mb="0" ml={2}>
+                        关闭此站点访问日志
+                      </FormLabel>
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel fontSize="sm">自定义访问日志路径（留空使用全局）</FormLabel>
+                      <Input
+                        value={formData.access_log_path}
+                        onChange={(e) => handleInputChange('access_log_path', e.target.value)}
+                        placeholder="./data/access.log"
+                        size="sm"
+                      />
+                    </FormControl>
+                  </VStack>
+                </Box>
+
+                <Box gridColumn={{ base: '1', md: '1 / -1' }}>
+                  <FormLabel mb={2}>HTTP/2 覆盖</FormLabel>
+                  <Text fontSize="sm" color="gray.500" mb={2}>
+                    可在此站点覆盖全局 HTTP/2 设置，留空则使用系统设置中的全局配置
+                  </Text>
+                  <HStack>
+                    <Button
+                      size="sm"
+                      variant={formData.http2_enabled === null ? 'solid' : 'outline'}
+                      colorScheme={formData.http2_enabled === null ? 'blue' : 'gray'}
+                      onClick={() => handleInputChange('http2_enabled', null)}
+                    >
+                      全局
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={formData.http2_enabled === true ? 'solid' : 'outline'}
+                      colorScheme={formData.http2_enabled === true ? 'green' : 'gray'}
+                      onClick={() => handleInputChange('http2_enabled', true)}
+                    >
+                      启用
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={formData.http2_enabled === false ? 'solid' : 'outline'}
+                      colorScheme={formData.http2_enabled === false ? 'red' : 'gray'}
+                      onClick={() => handleInputChange('http2_enabled', false)}
+                    >
+                      禁用
+                    </Button>
+                  </HStack>
+                </Box>
+
+                <Box gridColumn={{ base: '1', md: '1 / -1' }}>
+                  <FormLabel mb={2}>HTTP/3 覆盖</FormLabel>
+                  <Text fontSize="sm" color="gray.500" mb={2}>
+                    可在此站点覆盖全局 HTTP/3 设置，留空则使用系统设置中的全局配置
+                  </Text>
+                  <HStack>
+                    <Button
+                      size="sm"
+                      variant={formData.http3_enabled === null ? 'solid' : 'outline'}
+                      colorScheme={formData.http3_enabled === null ? 'blue' : 'gray'}
+                      onClick={() => handleInputChange('http3_enabled', null)}
+                    >
+                      全局
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={formData.http3_enabled === true ? 'solid' : 'outline'}
+                      colorScheme={formData.http3_enabled === true ? 'green' : 'gray'}
+                      onClick={() => handleInputChange('http3_enabled', true)}
+                    >
+                      启用
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={formData.http3_enabled === false ? 'solid' : 'outline'}
+                      colorScheme={formData.http3_enabled === false ? 'red' : 'gray'}
+                      onClick={() => handleInputChange('http3_enabled', false)}
+                    >
+                      禁用
+                    </Button>
+                  </HStack>
+                </Box>
               </SimpleGrid>
             </VStack>
           </CardBody>

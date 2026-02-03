@@ -37,7 +37,7 @@ import (
 )
 
 var (
-	version = "1.3.34-rc1"
+	version = "1.3.37"
 	build   = "dev"
 )
 
@@ -466,14 +466,15 @@ func main() {
 	}
 
 	// 根据端口模式启动服务器
+	var http3Server *web.HTTP3Server
 	switch cfg.Server.PortMode {
 	case "standard":
-		startStandardMode(cfg, webServer, sslManager, proxyManager, readTimeout, writeTimeout, idleTimeout)
+		http3Server = startStandardMode(cfg, webServer, sslManager, proxyManager, readTimeout, writeTimeout, idleTimeout)
 	case "custom":
 		startCustomMode(cfg, webServer, readTimeout, writeTimeout, idleTimeout)
 	default:
 		// 默认使用标准模式
-		startStandardMode(cfg, webServer, sslManager, proxyManager, readTimeout, writeTimeout, idleTimeout)
+		http3Server = startStandardMode(cfg, webServer, sslManager, proxyManager, readTimeout, writeTimeout, idleTimeout)
 	}
 
 	// 启动内存监控
@@ -554,6 +555,13 @@ func main() {
 	// 停止 Web 服务器（包括隧道管理器）
 	webServer.Stop()
 
+	// 停止 HTTP/3 服务器
+	if http3Server != nil {
+		if err := http3Server.Stop(); err != nil {
+			logrus.Errorf("Failed to stop HTTP/3 server: %v", err)
+		}
+	}
+
 	// 停止通知管理器
 	if notificationIntegrator != nil && notificationIntegrator.GetManager() != nil {
 		notificationIntegrator.GetManager().Stop()
@@ -632,7 +640,8 @@ func extractDomainFromTLSError(msg string) string {
 }
 
 // startStandardMode 启动标准模式（监听 80 和 443 端口）
-func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *ssl.Manager, proxyManager *proxy.Manager, readTimeout, writeTimeout, idleTimeout time.Duration) {
+// 返回 HTTP/3 服务器实例（如果启用），用于在关闭时停止
+func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *ssl.Manager, proxyManager *proxy.Manager, readTimeout, writeTimeout, idleTimeout time.Duration) *web.HTTP3Server {
 	// 创建过滤的 ErrorLog
 	filteredLog := newFilteredErrorLog()
 
@@ -650,7 +659,9 @@ func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *s
 			ErrorLog:          log.New(filteredLog, "", 0), // 使用过滤的 ErrorLog
 		}
 
-		// 配置 HTTP/2 支持
+		// 配置 HTTP/2 支持（根据全局配置）
+		// 注意：即使全局关闭，站点级覆盖也可能启用 HTTP/2，所以总是配置 HTTP/2 服务器
+		// TLS 配置中的 NextProtos 会控制实际是否协商 HTTP/2
 		// 優化參數以避免 ERR_HTTP2_PROTOCOL_ERROR：
 		// - MaxConcurrentStreams: 降低到 250 以減少資源競爭，適合複雜 SPA 網站
 		// - MaxReadFrameSize: 保持 1MB，足夠處理大多數請求
@@ -666,11 +677,26 @@ func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *s
 		})
 
 		go func() {
-			logrus.Infof("HTTPS server listening on %s:443 (HTTP/2 enabled, multi-domain SSL supported)", cfg.Server.Host)
+			http2Status := "disabled"
+			if cfg.Server.HTTP2Enabled {
+				http2Status = "enabled"
+			}
+			logrus.Infof("HTTPS server listening on %s:443 (HTTP/2 %s, multi-domain SSL supported)", cfg.Server.Host, http2Status)
 			if err := httpsServer.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
 				logrus.Fatalf("failed to start HTTPS server: %v", err)
 			}
 		}()
+	}
+
+	// 启动 HTTP/3 服务器 (UDP:443)
+	var http3Server *web.HTTP3Server
+	if cfg.Server.EnableHTTPS && cfg.Server.HTTP3Enabled {
+		http3Server = web.NewHTTP3Server(cfg, webServer, sslManager)
+		if err := http3Server.Start(); err != nil {
+			logrus.Errorf("Failed to start HTTP/3 server: %v", err)
+			// HTTP/3 启动失败不应导致整个程序退出，继续运行 HTTP/1.1 和 HTTP/2
+			http3Server = nil // 如果启动失败，设置为 nil
+		}
 	}
 
 	// 启动 HTTP 重定向服务器 (80)
@@ -746,6 +772,8 @@ func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *s
 			logrus.Errorf("HTTP redirect server error: %v", err)
 		}
 	}()
+
+	return http3Server
 }
 
 // startCustomMode 启动自定义模式（监听单个端口）
