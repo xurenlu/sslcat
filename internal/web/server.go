@@ -1295,6 +1295,22 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// 记录请求开始时间（用于计算请求耗时）
 	startTime := time.Now()
 
+	// 添加 Alt-Svc 响应头，让浏览器知道服务器支持 HTTP/3
+	// 只在 HTTPS 连接上添加，且仅当 HTTP/3 已启用时
+	if r.TLS != nil && s.config.Server.HTTP3Enabled {
+		// 检查站点级 HTTP/3 配置
+		host := r.Host
+		if idx := strings.Index(host, ":"); idx != -1 {
+			host = host[:idx]
+		}
+		http3Enabled := s.shouldEnableHTTP3ForHost(host)
+		if http3Enabled {
+			// Alt-Svc 格式: h3=":443"; ma=86400
+			// ma (max-age) 设置为 24 小时（86400 秒）
+			w.Header().Set("Alt-Svc", `h3=":443"; ma=86400`)
+		}
+	}
+
 	// 根据转发规则决定是否启用追踪（减少 CPU 占用）
 	var span *tracing.Span
 	var ctx context.Context
@@ -1700,6 +1716,85 @@ func (s *Server) hasValidCertificate(domain string) bool {
 	}
 
 	return true
+}
+
+// shouldEnableHTTP3ForHost 检查是否应该为指定域名启用 HTTP/3
+// 考虑全局配置和站点级覆盖
+func (s *Server) shouldEnableHTTP3ForHost(host string) bool {
+	// 首先检查全局配置
+	if !s.config.Server.HTTP3Enabled {
+		// 全局禁用，检查是否有站点级覆盖启用
+		return s.checkSiteLevelHTTP3Override(host, true)
+	}
+
+	// 全局启用，检查是否有站点级覆盖禁用
+	if s.checkSiteLevelHTTP3Override(host, false) {
+		return false
+	}
+
+	return true
+}
+
+// checkSiteLevelHTTP3Override 检查站点级 HTTP/3 覆盖配置
+// lookForEnabled: true 表示查找启用的覆盖，false 表示查找禁用的覆盖
+func (s *Server) checkSiteLevelHTTP3Override(host string, lookForEnabled bool) bool {
+	host = strings.ToLower(host)
+
+	// 检查代理规则
+	for _, rule := range s.config.Proxy.Rules {
+		if !rule.Enabled {
+			continue
+		}
+		if strings.ToLower(rule.Domain) == host {
+			if rule.HTTP3Enabled != nil {
+				if lookForEnabled && *rule.HTTP3Enabled {
+					return true
+				}
+				if !lookForEnabled && !*rule.HTTP3Enabled {
+					return true
+				}
+			}
+			break
+		}
+	}
+
+	// 检查静态站点
+	for _, site := range s.config.StaticSites {
+		if !site.Enabled {
+			continue
+		}
+		if strings.ToLower(site.Domain) == host {
+			if site.HTTP3Enabled != nil {
+				if lookForEnabled && *site.HTTP3Enabled {
+					return true
+				}
+				if !lookForEnabled && !*site.HTTP3Enabled {
+					return true
+				}
+			}
+			break
+		}
+	}
+
+	// 检查 PHP 站点
+	for _, site := range s.config.PHPSites {
+		if !site.Enabled {
+			continue
+		}
+		if strings.ToLower(site.Domain) == host {
+			if site.HTTP3Enabled != nil {
+				if lookForEnabled && *site.HTTP3Enabled {
+					return true
+				}
+				if !lookForEnabled && !*site.HTTP3Enabled {
+					return true
+				}
+			}
+			break
+		}
+	}
+
+	return false
 }
 
 // domainMatchesCert 检查域名是否匹配证书

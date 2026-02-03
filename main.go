@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"fmt"
@@ -37,7 +38,7 @@ import (
 )
 
 var (
-	version = "1.3.41"
+	version = "1.3.42"
 	build   = "dev"
 )
 
@@ -466,15 +467,16 @@ func main() {
 	}
 
 	// 根据端口模式启动服务器
-	var http3Server *web.HTTP3Server
+	var serverManager *ServerManager
 	switch cfg.Server.PortMode {
 	case "standard":
-		http3Server = startStandardMode(cfg, webServer, sslManager, proxyManager, readTimeout, writeTimeout, idleTimeout)
+		serverManager = startStandardMode(cfg, webServer, sslManager, proxyManager, readTimeout, writeTimeout, idleTimeout)
 	case "custom":
 		startCustomMode(cfg, webServer, readTimeout, writeTimeout, idleTimeout)
+		serverManager = nil // 自定义模式不返回服务器管理器
 	default:
 		// 默认使用标准模式
-		http3Server = startStandardMode(cfg, webServer, sslManager, proxyManager, readTimeout, writeTimeout, idleTimeout)
+		serverManager = startStandardMode(cfg, webServer, sslManager, proxyManager, readTimeout, writeTimeout, idleTimeout)
 	}
 
 	// 启动内存监控
@@ -555,11 +557,9 @@ func main() {
 	// 停止 Web 服务器（包括隧道管理器）
 	webServer.Stop()
 
-	// 停止 HTTP/3 服务器
-	if http3Server != nil {
-		if err := http3Server.Stop(); err != nil {
-			logrus.Errorf("Failed to stop HTTP/3 server: %v", err)
-		}
+	// 停止所有 HTTP/HTTPS 服务器（包括 HTTP/2 和 HTTP/3）
+	if serverManager != nil {
+		serverManager.Stop()
 	}
 
 	// 停止通知管理器
@@ -639,11 +639,52 @@ func extractDomainFromTLSError(msg string) string {
 	return ""
 }
 
+// ServerManager 管理 HTTP/HTTPS 服务器实例，用于优雅关闭
+type ServerManager struct {
+	httpsServer    *http.Server
+	redirectServer *http.Server
+	http3Server    *web.HTTP3Server
+}
+
+// Stop 优雅关闭所有服务器
+func (sm *ServerManager) Stop() {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// 停止 HTTPS 服务器（包含 HTTP/2）
+	if sm.httpsServer != nil {
+		logrus.Info("Stopping HTTPS server (HTTP/1.1 and HTTP/2)...")
+		if err := sm.httpsServer.Shutdown(ctx); err != nil {
+			logrus.Errorf("Failed to shutdown HTTPS server: %v", err)
+		} else {
+			logrus.Info("HTTPS server stopped gracefully")
+		}
+	}
+
+	// 停止 HTTP 重定向服务器
+	if sm.redirectServer != nil {
+		logrus.Info("Stopping HTTP redirect server...")
+		if err := sm.redirectServer.Shutdown(ctx); err != nil {
+			logrus.Errorf("Failed to shutdown HTTP redirect server: %v", err)
+		} else {
+			logrus.Info("HTTP redirect server stopped gracefully")
+		}
+	}
+
+	// 停止 HTTP/3 服务器
+	if sm.http3Server != nil {
+		if err := sm.http3Server.Stop(); err != nil {
+			logrus.Errorf("Failed to stop HTTP/3 server: %v", err)
+		}
+	}
+}
+
 // startStandardMode 启动标准模式（监听 80 和 443 端口）
-// 返回 HTTP/3 服务器实例（如果启用），用于在关闭时停止
-func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *ssl.Manager, proxyManager *proxy.Manager, readTimeout, writeTimeout, idleTimeout time.Duration) *web.HTTP3Server {
+// 返回服务器管理器，用于在关闭时优雅停止所有服务器
+func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *ssl.Manager, proxyManager *proxy.Manager, readTimeout, writeTimeout, idleTimeout time.Duration) *ServerManager {
 	// 创建过滤的 ErrorLog
 	filteredLog := newFilteredErrorLog()
+	manager := &ServerManager{}
 
 	// 启动 HTTPS 服务器 (443)
 	if cfg.Server.EnableHTTPS {
@@ -658,6 +699,7 @@ func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *s
 			TLSConfig:         sslManager.GetTLSConfig(),
 			ErrorLog:          log.New(filteredLog, "", 0), // 使用过滤的 ErrorLog
 		}
+		manager.httpsServer = httpsServer
 
 		// 配置 HTTP/2 支持（根据全局配置）
 		// 注意：即使全局关闭，站点级覆盖也可能启用 HTTP/2，所以总是配置 HTTP/2 服务器
@@ -683,26 +725,28 @@ func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *s
 			}
 			logrus.Infof("HTTPS server listening on %s:443 (HTTP/2 %s, multi-domain SSL supported)", cfg.Server.Host, http2Status)
 			if err := httpsServer.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
-				logrus.Fatalf("failed to start HTTPS server: %v", err)
+				// HTTP/2 服务器启动失败不应导致整个程序退出，记录错误但继续运行
+				logrus.Errorf("HTTPS server (HTTP/2) error: %v", err)
+				logrus.Warn("HTTPS server failed, but continuing with other servers...")
 			}
 		}()
 	}
 
 	// 启动 HTTP/3 服务器 (UDP:443)
-	var http3Server *web.HTTP3Server
 	if cfg.Server.EnableHTTPS && cfg.Server.HTTP3Enabled {
-		http3Server = web.NewHTTP3Server(cfg, webServer, sslManager)
+		http3Server := web.NewHTTP3Server(cfg, webServer, sslManager)
 		if err := http3Server.Start(); err != nil {
 			logrus.Errorf("Failed to start HTTP/3 server: %v", err)
 			// HTTP/3 启动失败不应导致整个程序退出，继续运行 HTTP/1.1 和 HTTP/2
-			http3Server = nil // 如果启动失败，设置为 nil
+		} else {
+			manager.http3Server = http3Server
 		}
 	}
 
 	// 启动 HTTP 重定向服务器 (80)
 	redirectServer := &http.Server{
 		Addr:     fmt.Sprintf("%s:80", cfg.Server.Host),
-		ErrorLog: log.New(filteredLog, "", 0), // 使用过滤的 ErrorLog,
+		ErrorLog: log.New(filteredLog, "", 0), // 使用过滤的 ErrorLog
 		Handler: sslManager.HTTPChallengeHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// 检查Host是否为IP地址，如果是IP则不重定向到HTTPS
 			if isIPHost(r.Host) {
@@ -766,14 +810,17 @@ func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *s
 		IdleTimeout:       90 * time.Second, // 空闲连接超时
 	}
 
+	manager.redirectServer = redirectServer
 	go func() {
 		logrus.Infof("HTTP redirect server listening on %s:80", cfg.Server.Host)
 		if err := redirectServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			// HTTP 重定向服务器启动失败不应导致整个程序退出
 			logrus.Errorf("HTTP redirect server error: %v", err)
+			logrus.Warn("HTTP redirect server failed, but continuing with other servers...")
 		}
 	}()
 
-	return http3Server
+	return manager
 }
 
 // startCustomMode 启动自定义模式（监听单个端口）

@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.42] - 2026-02-03
+
+### 🐛 Bug 修复
+
+#### HTTP/2 和 HTTP/3 稳定性修复
+
+- **HTTP/3 服务器稳定性改进**：
+  - 添加自动重试机制（最多 5 次，指数退避：5s→10s→20s→40s→80s）
+  - 使用 `context.Context` 控制生命周期，避免关闭时卡死在 sleep 中
+  - 添加互斥锁保护服务器实例，避免并发问题
+  - 改进日志记录，区分首次启动和重试启动
+
+- **HTTP/2 服务器优雅关闭**：
+  - 新增 `ServerManager` 统一管理 HTTPS（HTTP/2）、HTTP 重定向和 HTTP/3 服务器
+  - 使用 `http.Server.Shutdown()` 实现优雅关闭（30 秒超时）
+  - 启动失败不再导致整个程序退出，改为记录错误并继续运行其他服务器
+
+- **添加 Alt-Svc 响应头**（关键修复）：
+  - 在 HTTPS 响应中添加 `Alt-Svc: h3=":443"; ma=86400` 响应头
+  - 让浏览器知道服务器支持 HTTP/3，从而自动升级连接
+  - 支持站点级配置覆盖（可单独为某些站点启用/禁用）
+
+### 🔧 改进
+
+- **服务器管理优化**：
+  - 所有服务器通过 `ServerManager` 统一管理
+  - 关闭时按顺序优雅停止：HTTPS → HTTP → HTTP/3
+  - 等待正在处理的请求完成后再关闭
+
 ## [1.3.41] - 2026-02-03
 
 ### ✨ 新功能

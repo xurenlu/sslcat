@@ -1,9 +1,11 @@
 package web
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/quic-go/quic-go/http3"
@@ -19,15 +21,27 @@ type HTTP3Server struct {
 	handler    http.Handler
 	sslManager *ssl.Manager
 	log        *logrus.Entry
+
+	// 稳定性改进：添加重试机制
+	ctx        context.Context
+	cancel     context.CancelFunc
+	wg         sync.WaitGroup
+	restartMu  sync.Mutex
+	retryCount int
+	maxRetries int
 }
 
 // NewHTTP3Server 创建新的 HTTP/3 服务器实例
 func NewHTTP3Server(cfg *config.Config, handler http.Handler, sslMgr *ssl.Manager) *HTTP3Server {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &HTTP3Server{
 		config:     cfg,
 		handler:    handler,
 		sslManager: sslMgr,
 		log:        logrus.WithField("component", "http3"),
+		ctx:        ctx,
+		cancel:     cancel,
+		maxRetries: 5, // 最多重试5次
 	}
 }
 
@@ -43,51 +57,126 @@ func (s *HTTP3Server) Start() error {
 		return nil
 	}
 
-	// 获取 TLS 配置
-	tlsConfig := s.getTLSConfigForHTTP3()
-	if tlsConfig == nil {
-		return fmt.Errorf("failed to get TLS config for HTTP/3")
-	}
-
-	// 创建 HTTP/3 服务器
-	s.server = &http3.Server{
-		Addr:      fmt.Sprintf("%s:443", s.config.Server.Host),
-		Handler:   s.handler,
-		TLSConfig: tlsConfig,
-	}
-
-	// 配置 QUIC 参数（如果配置了）
-	if s.config.Server.HTTP3Config != nil {
-		cfg := s.config.Server.HTTP3Config
-		if cfg.MaxIdleTimeout != "" {
-			if timeout, err := time.ParseDuration(cfg.MaxIdleTimeout); err == nil {
-				// 注意：quic-go 的配置需要通过 QUICConfig 设置
-				// 这里暂时记录，实际配置在 ListenAndServe 时通过 QUICConfig 传递
-				s.log.Debugf("HTTP/3 MaxIdleTimeout configured: %v", timeout)
-			}
-		}
-	}
-
-	s.log.Infof("HTTP/3 server starting on %s:443", s.config.Server.Host)
-
-	// 在 goroutine 中启动服务器
-	go func() {
-		if err := s.server.ListenAndServe(); err != nil {
-			// HTTP/3 服务器启动失败不应导致整个程序退出
-			// 记录错误，但允许 HTTP/1.1 和 HTTP/2 继续工作
-			s.log.Errorf("HTTP/3 server error: %v", err)
-		}
-	}()
+	// 启动服务器（带重试机制）
+	s.wg.Add(1)
+	go s.runWithRetry()
 
 	return nil
 }
 
+// runWithRetry 带重试机制的服务器运行函数
+func (s *HTTP3Server) runWithRetry() {
+	defer s.wg.Done()
+
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		default:
+		}
+
+		// 检查重试次数
+		if s.retryCount >= s.maxRetries {
+			s.log.Errorf("HTTP/3 server failed after %d retries, giving up", s.maxRetries)
+			return
+		}
+
+		// 获取 TLS 配置
+		tlsConfig := s.getTLSConfigForHTTP3()
+		if tlsConfig == nil {
+			s.log.Error("Failed to get TLS config for HTTP/3")
+			s.retryCount++
+			// 使用 select 来响应 context 取消
+			select {
+			case <-s.ctx.Done():
+				s.log.Info("HTTP/3 server shutdown requested during TLS config retry")
+				return
+			case <-time.After(5 * time.Second):
+				// 继续重试
+			}
+			continue
+		}
+
+		// 创建 HTTP/3 服务器
+		s.restartMu.Lock()
+		s.server = &http3.Server{
+			Addr:      fmt.Sprintf("%s:443", s.config.Server.Host),
+			Handler:   s.handler,
+			TLSConfig: tlsConfig,
+		}
+		s.restartMu.Unlock()
+
+		// 配置 QUIC 参数（如果配置了）
+		if s.config.Server.HTTP3Config != nil {
+			cfg := s.config.Server.HTTP3Config
+			if cfg.MaxIdleTimeout != "" {
+				if timeout, err := time.ParseDuration(cfg.MaxIdleTimeout); err == nil {
+					s.log.Debugf("HTTP/3 MaxIdleTimeout configured: %v", timeout)
+				}
+			}
+		}
+
+		if s.retryCount == 0 {
+			s.log.Infof("HTTP/3 server starting on %s:443", s.config.Server.Host)
+		} else {
+			s.log.Warnf("HTTP/3 server restarting (attempt %d/%d) on %s:443", s.retryCount+1, s.maxRetries, s.config.Server.Host)
+		}
+
+		// 启动服务器
+		err := s.server.ListenAndServe()
+
+		// 检查是否是正常关闭
+		if err == nil || err == http.ErrServerClosed {
+			s.log.Info("HTTP/3 server stopped normally")
+			return
+		}
+
+		// 记录错误
+		s.log.Errorf("HTTP/3 server error: %v (retry %d/%d)", err, s.retryCount+1, s.maxRetries)
+
+		// 增加重试计数
+		s.retryCount++
+
+		// 等待后重试（指数退避：5s, 10s, 20s, 40s, 80s）
+		// 使用 select 来响应 context 取消，避免在关闭时还要等待 sleep 完成
+		backoff := time.Duration(5*(1<<uint(s.retryCount-1))) * time.Second
+		if backoff > 80*time.Second {
+			backoff = 80 * time.Second
+		}
+		s.log.Debugf("Waiting %v before retry...", backoff)
+
+		select {
+		case <-s.ctx.Done():
+			s.log.Info("HTTP/3 server shutdown requested during retry backoff")
+			return
+		case <-time.After(backoff):
+			// 继续重试
+		}
+	}
+}
+
 // Stop 停止 HTTP/3 服务器
 func (s *HTTP3Server) Stop() error {
+	// 取消上下文，停止重试循环
+	s.cancel()
+
+	// 停止服务器
+	s.restartMu.Lock()
 	if s.server != nil {
 		s.log.Info("Stopping HTTP/3 server...")
-		return s.server.Close()
+		err := s.server.Close()
+		s.restartMu.Unlock()
+
+		// 等待 goroutine 结束
+		s.wg.Wait()
+
+		return err
 	}
+	s.restartMu.Unlock()
+
+	// 等待 goroutine 结束
+	s.wg.Wait()
+
 	return nil
 }
 
