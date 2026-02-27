@@ -170,11 +170,6 @@ func (c *Collector) RecordAccess(record *AccessRecord) {
 		return
 	}
 
-	// 采样检查（高流量时降低记录频率）
-	if c.samplingEnabled && !c.shouldSample() {
-		return
-	}
-
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -183,7 +178,16 @@ func (c *Collector) RecordAccess(record *AccessRecord) {
 		now = time.Now()
 	}
 
-	// 更新漏斗条目（带大小限制）
+	// 首先更新域名统计（真实数据，不采样）
+	c.updateDomainStats(record, now)
+
+	// 采样检查（仅用于漏斗模型的排行榜，不影响真实统计数据）
+	// 只有通过采样的请求才会被计入排行榜
+	if c.samplingEnabled && !c.shouldSampleForFunnel() {
+		return
+	}
+
+	// 更新漏斗条目（带大小限制）- 仅用于排行榜
 	c.ipFunnel.UpdateEntry(c.ipEntries, record.IP, now, c.maxIPEntries)
 	c.uaFunnel.UpdateEntry(c.uaEntries, record.UserAgent, now, c.maxUAEntries)
 
@@ -191,13 +195,12 @@ func (c *Collector) RecordAccess(record *AccessRecord) {
 	if c.geoIPEnabled && record.City != "" {
 		c.cityFunnel.UpdateEntry(c.cityEntries, record.City, now, c.maxCityEntries)
 	}
-
-	// 更新域名统计
-	c.updateDomainStats(record, now)
 }
 
-// shouldSample 判断是否应该记录此次访问（动态采样）- 使用atomic确保并发安全
-func (c *Collector) shouldSample() bool {
+// shouldSampleForFunnel 判断是否应该将此次访问计入排行榜（动态采样）
+// 注意：这个采样仅影响排行榜（Top IPs、Top UAs、Top Cities），不影响真实请求数统计
+// 真实请求数（total_requests、unique_ips等）始终会被完整记录
+func (c *Collector) shouldSampleForFunnel() bool {
 	// 获取当前条目数（不加锁，允许轻微不准确）
 	ipCount := len(c.ipEntries)
 
