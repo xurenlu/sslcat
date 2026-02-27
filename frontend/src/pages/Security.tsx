@@ -78,6 +78,14 @@ interface WAFStats {
   detectionRate: number
 }
 
+interface SecuritySettings {
+  enableWAF: boolean
+  enableDDoSProtection: boolean
+  enableThreatIntel: boolean
+  maxRequestsPerMinute: string
+  blockSuspiciousIPs: boolean
+}
+
 const Security: React.FC = () => {
   const [events, setEvents] = useState<SecurityEvent[]>([])
   const [stats, setStats] = useState<SecurityStats>({
@@ -86,13 +94,14 @@ const Security: React.FC = () => {
     activeThreats: 0,
     lastScan: '',
   })
-  const [settings, setSettings] = useState({
+  const [settings, setSettings] = useState<SecuritySettings>({
     enableWAF: true,
     enableDDoSProtection: true,
     enableThreatIntel: true,
     maxRequestsPerMinute: '1000',
     blockSuspiciousIPs: true,
   })
+  const [settingsLoaded, setSettingsLoaded] = useState(false)
   
   // WAF 相关状态
   const [wafStats, setWafStats] = useState<WAFStats>({
@@ -303,13 +312,35 @@ const Security: React.FC = () => {
 
   const saveSecuritySettings = async () => {
     try {
-      // TODO: 实际的 API 调用
-      toast({
-        title: '安全设置保存成功',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
+      const effectivePrefix = adminPrefix || '/sslcat-panel'
+      const response = await fetch(buildApiPath(effectivePrefix, '/api/settings'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          maxRequestsPerMinute: settings.maxRequestsPerMinute,
+        }),
       })
+
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success) {
+          toast({
+            title: '安全设置保存成功',
+            status: 'success',
+            duration: 3000,
+            isClosable: true,
+          })
+          // 重新加载设置以确保同步
+          await loadSecuritySettings()
+        } else {
+          throw new Error(result.message || '保存失败')
+        }
+      } else {
+        throw new Error('保存失败')
+      }
     } catch (error) {
       toast({
         title: '保存失败',
@@ -318,6 +349,33 @@ const Security: React.FC = () => {
         duration: 3000,
         isClosable: true,
       })
+    }
+  }
+
+  // 加载安全设置
+  const loadSecuritySettings = async () => {
+    try {
+      const effectivePrefix = adminPrefix || '/sslcat-panel'
+      const response = await fetch(buildApiPath(effectivePrefix, '/api/settings'), {
+        credentials: 'include',
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && result.data) {
+          const securitySettings = result.data.security || {}
+          setSettings({
+            enableWAF: securitySettings.enable_waf ?? true,
+            enableDDoSProtection: securitySettings.enable_ddos ?? true,
+            enableThreatIntel: true,
+            maxRequestsPerMinute: String(securitySettings.max_attempts_5min || 1000),
+            blockSuspiciousIPs: true,
+          })
+          setSettingsLoaded(true)
+        }
+      }
+    } catch (error) {
+      console.error('加载安全设置失败:', error)
     }
   }
 
@@ -345,6 +403,7 @@ const Security: React.FC = () => {
   useEffect(() => {
     refreshData()
     refreshWAFData()
+    loadSecuritySettings()
   }, [])
 
   const getSeverityColor = (severity: string) => {
