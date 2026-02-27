@@ -67,6 +67,9 @@ type Manager struct {
 	progressMutex    sync.RWMutex
 	// TLS Session Resumption 相關
 	sessionCache tls.ClientSessionCache // Session ID 緩存（Session Ticket 由 Go 運行時自動管理）
+	// ACME 账户密钥缓存：复用账户密钥避免重复创建
+	acmeAccountKey      *ecdsa.PrivateKey
+	acmeAccountKeyMutex sync.Mutex
 }
 
 // CertProgressEvent 证书申请进度事件
@@ -2696,11 +2699,19 @@ func (m *Manager) performDNSChallenge(domain, providerName string) error {
 		Message: fmt.Sprintf("正在初始化 DNS-01 验证，使用 %s", providerName),
 	})
 
-	// 生成账户密钥（如果还没有）
-	accountKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return fmt.Errorf("failed to generate account key: %w", err)
+	// 获取或生成账户密钥（复用避免重复创建账户）
+	m.acmeAccountKeyMutex.Lock()
+	if m.acmeAccountKey == nil {
+		accountKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			m.acmeAccountKeyMutex.Unlock()
+			return fmt.Errorf("failed to generate account key: %w", err)
+		}
+		m.acmeAccountKey = accountKey
+		m.log.Infof("生成新的 ACME 账户密钥")
 	}
+	accountKey := m.acmeAccountKey
+	m.acmeAccountKeyMutex.Unlock()
 
 	// 创建ACME客户端
 	client := &acme.Client{
@@ -2718,9 +2729,15 @@ func (m *Manager) performDNSChallenge(domain, providerName string) error {
 	}
 
 	ctx := context.Background()
-	account, err = client.Register(ctx, account, acme.AcceptTOS)
-	if err != nil {
-		return fmt.Errorf("failed to register ACME account: %w", err)
+	// 尝试注册账户，如果账户已存在则忽略错误
+	account, regErr := client.Register(ctx, account, acme.AcceptTOS)
+	if regErr != nil {
+		// 检查是否是账户已存在的错误
+		if ae, ok := regErr.(*acme.Error); ok && ae.StatusCode == 409 {
+			m.log.Infof("ACME 账户已存在，复用现有账户")
+		} else {
+			return fmt.Errorf("failed to register ACME account: %w", regErr)
+		}
 	}
 
 	m.sendProgressEvent(domain, CertProgressEvent{

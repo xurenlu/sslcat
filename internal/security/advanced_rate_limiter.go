@@ -671,11 +671,14 @@ func (tb *rateLimitTokenBucket) Allow() bool {
 	now := time.Now()
 	elapsed := now.Sub(tb.lastTime)
 
-	// 添加令牌
+	// 添加令牌 - 修复: 防止整数溢出导致令牌丢失
 	tokensToAdd := int(elapsed.Seconds()) * tb.rate
-	tb.tokens += tokensToAdd
-	if tb.tokens > tb.burst {
+	// 使用 int64 避免溢出，然后限制到 burst 容量
+	newTokens := int64(tb.tokens) + int64(tokensToAdd)
+	if newTokens > int64(tb.burst) {
 		tb.tokens = tb.burst
+	} else {
+		tb.tokens = int(newTokens)
 	}
 
 	tb.lastTime = now

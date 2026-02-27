@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -36,9 +37,9 @@ type CDNCache struct {
 	compressor   *compression.Compressor
 	mimeDetector *MIMEDetector
 	mutex        sync.Mutex
-	// 统计计数器
-	hits   int64
-	misses int64
+	// 统计计数器（使用原子操作避免竞态条件）
+	hits   atomic.Int64
+	misses atomic.Int64
 	// 正在处理的请求，避免相同URL并发穿透
 	processing sync.Map // key: request_key, value: *processingEntry
 
@@ -95,7 +96,7 @@ func (c *CDNCache) ServeIfFreshWithConfig(w http.ResponseWriter, r *http.Request
 	if c == nil || (!c.isEnabled() && !forceEnabled) {
 		// 统计未命中（未启用）
 		if c != nil {
-			c.misses++
+			c.misses.Add(1)
 			c.log.Infof("CDN缓存未启用: url=%s", r.URL.Path)
 		}
 		return false
@@ -103,7 +104,7 @@ func (c *CDNCache) ServeIfFreshWithConfig(w http.ResponseWriter, r *http.Request
 
 	// 如果强制启用，但基本配置不可用，仍然返回false
 	if forceEnabled && (c.cfg == nil || c.cfg.CDNCache.CacheDir == "") {
-		c.misses++
+		c.misses.Add(1)
 		c.log.Infof("CDN缓存配置不可用: url=%s", r.URL.Path)
 		return false
 	}
@@ -118,7 +119,7 @@ func (c *CDNCache) ServeIfFreshWithConfig(w http.ResponseWriter, r *http.Request
 	meta, err := c.readMeta(metaPath)
 	if err != nil || meta == nil {
 		// 统计未命中（无元数据）
-		c.misses++
+		c.misses.Add(1)
 		c.log.Infof("CDN缓存未命中(无元数据): url=%s, err=%v", r.URL.Path, err)
 
 		// 检查是否有相同请求正在处理，避免并发穿透
@@ -181,7 +182,7 @@ func (c *CDNCache) ServeIfFreshWithConfig(w http.ResponseWriter, r *http.Request
 					w.WriteHeader(http.StatusOK)
 					_, _ = io.Copy(w, f)
 					c.touch(metaPath, meta)
-					c.hits++
+					c.hits.Add(1)
 					return true
 				}
 			}
@@ -193,7 +194,7 @@ func (c *CDNCache) ServeIfFreshWithConfig(w http.ResponseWriter, r *http.Request
 		_ = os.Remove(filePath)
 		_ = os.Remove(metaPath)
 		// 统计未命中（已过期）
-		c.misses++
+		c.misses.Add(1)
 		return false
 	}
 	// 检查HTTP条件请求
@@ -242,7 +243,7 @@ func (c *CDNCache) ServeIfFreshWithConfig(w http.ResponseWriter, r *http.Request
 	// 更新访问时间
 	c.touch(metaPath, meta)
 	// 统计命中
-	c.hits++
+	c.hits.Add(1)
 	return true
 }
 
@@ -581,16 +582,18 @@ func (c *CDNCache) Stats() map[string]any {
 	})
 
 	hitRate := float64(0)
-	if c.hits+c.misses > 0 {
-		hitRate = float64(c.hits) / float64(c.hits+c.misses) * 100
+	hits := c.hits.Load()
+	misses := c.misses.Load()
+	if hits+misses > 0 {
+		hitRate = float64(hits) / float64(hits+misses) * 100
 	}
 
 	return map[string]any{
 		"enabled":     true,
 		"objects":     objectCount,
 		"total_size":  totalSize,
-		"hits":        c.hits,
-		"misses":      c.misses,
+		"hits":        hits,
+		"misses":      misses,
 		"hit_rate":    hitRate,
 		"max_size":    c.cfg.CDNCache.MaxSizeBytes,
 		"utilization": float64(totalSize) / float64(c.cfg.CDNCache.MaxSizeBytes) * 100,

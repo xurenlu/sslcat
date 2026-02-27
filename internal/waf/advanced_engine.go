@@ -1,6 +1,7 @@
 package waf
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -135,7 +136,7 @@ func (e *AdvancedEngine) registerDefaultActionHandlers() {
 
 // initAdvancedRules 初始化高级规则
 func (e *AdvancedEngine) initAdvancedRules() {
-	// SQL注入高级规则
+	// SQL注入高级规则 - 修复 ReDoS 漏洞：使用原子组或更具体的模式，避免嵌套量词
 	e.AddAdvancedRule(&AdvancedRule{
 		Rule: &Rule{
 			ID:          "advanced_sql_001",
@@ -150,12 +151,14 @@ func (e *AdvancedEngine) initAdvancedRules() {
 			{
 				Variable: "REQUEST_BODY",
 				Operator: "regex",
-				Value:    `(?i)(union.*select|select.*from.*where|insert.*into.*values|update.*set.*where|delete.*from.*where)`,
+				// 修复: 使用更精确的模式，避免 .* 嵌套导致的 ReDoS
+				Value: `(?i)\bunion\s+\w+\s+select|\bselect\s+\w+\s+from\b|\binsert\s+into\b|\bupdate\s+\w+\s+set\b|\bdelete\s+from\b`,
 			},
 			{
 				Variable: "REQUEST_URI",
 				Operator: "regex",
-				Value:    `(?i)(union.*select|select.*from.*where)`,
+				// 修复: 使用更精确的模式
+				Value: `(?i)\bunion\s+\w+\s+select|\bselect\s+\w+\s+from\b`,
 			},
 		},
 		Actions: []RuleAction{
@@ -176,7 +179,7 @@ func (e *AdvancedEngine) initAdvancedRules() {
 		Category:  "injection",
 	})
 
-	// XSS高级规则
+	// XSS高级规则 - 修复 ReDoS 漏洞：使用更精确的字符类
 	e.AddAdvancedRule(&AdvancedRule{
 		Rule: &Rule{
 			ID:          "advanced_xss_001",
@@ -191,7 +194,8 @@ func (e *AdvancedEngine) initAdvancedRules() {
 			{
 				Variable:  "ARGS",
 				Operator:  "regex",
-				Value:     `(?i)(<script|javascript:|on\w+\s*=|<iframe|<object|<embed)`,
+				// 修复: 使用更精确的模式，避免 \w+ 后面跟量词导致的 ReDoS
+				Value:     `(?i)<script[^>]*>|javascript:|on[a-z]+\s*=|<(iframe|object|embed)`,
 				Transform: []string{"urldecode", "htmldecode"},
 			},
 		},
@@ -513,10 +517,12 @@ func (e *AdvancedEngine) executeOperator(operator, value, pattern string) bool {
 func (e *AdvancedEngine) extractVariables(r *http.Request) map[string]string {
 	variables := make(map[string]string)
 
-	// 请求体
+	// 请求体 - 重要：读取后需要恢复，否则下游处理器无法读取
 	if r.Body != nil {
 		if bodyBytes, err := io.ReadAll(r.Body); err == nil {
 			variables["REQUEST_BODY"] = string(bodyBytes)
+			// 恢复请求体供下游处理器使用
+			r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 		}
 	}
 

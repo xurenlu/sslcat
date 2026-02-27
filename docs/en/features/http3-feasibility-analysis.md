@@ -342,6 +342,7 @@ Go standard library plans to support HTTP/3 in future versions, but it's not inc
 
 ## 📚 Reference Resources
 
+- [HTTP/3 Troubleshooting](./http3-troubleshooting.md) (when Alt-Svc is present but QUIC connection fails)
 - [quic-go Official Documentation](https://quic-go.net/docs/)
 - [HTTP/3 RFC 9114](https://www.rfc-editor.org/rfc/rfc9114)
 - [QUIC RFC 9000](https://www.rfc-editor.org/rfc/rfc9000)

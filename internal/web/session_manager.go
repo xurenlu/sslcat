@@ -127,49 +127,36 @@ func (sm *SessionManager) DeleteSession(sessionID string) {
 
 // SetSessionCookie 设置会话Cookie
 func (sm *SessionManager) SetSessionCookie(w http.ResponseWriter, sessionID string, secure bool) {
-	// 临时调试模式：完全开放的 Cookie 设置
-	// 移除所有安全限制以排查问题
+	// 安全配置：根据连接协议动态设置 Secure 属性
 	cookie := &http.Cookie{
 		Name:     "sslcat_session",
 		Value:    sessionID,
 		Path:     "/",
-		Domain:   "", // 不设置 Domain
+		Domain:   "", // 不设置 Domain，使用当前域
 		MaxAge:   8 * 3600, // 8小时
-		HttpOnly: false, // 临时禁用 HttpOnly 以便 JavaScript 可以访问
-		Secure:   false, // 禁用 Secure
-		// 完全不设置 SameSite
+		HttpOnly: true, // 启用 HttpOnly 防止 XSS 攻击
+		Secure:   secure, // 根据连接协议动态设置
+		SameSite: http.SameSiteStrictMode, // 启用 SameSite 防止 CSRF 攻击
 	}
-	
+
 	http.SetCookie(w, cookie)
-	
-	// 同时手动设置一个更简单的 Cookie 头（绕过 Go 的限制）
-	simpleCookie := fmt.Sprintf("sslcat_session=%s; Path=/; Max-Age=28800", sessionID)
-	w.Header().Add("Set-Cookie", simpleCookie)
-	
-	sm.log.Infof("✅ 设置 Session Cookie (调试模式) - sessionID=%s, 简化Cookie: %s", 
-		sessionID, simpleCookie)
+
+	sm.log.Infof("设置 Session Cookie - sessionID=%s, Secure=%v, HttpOnly=true, SameSite=Strict",
+		sessionID, secure)
 }
 
 // GetSessionFromRequest 从请求中获取会话
 func (sm *SessionManager) GetSessionFromRequest(r *http.Request) (*Session, bool) {
-	var sessionID string
-	
-	// 1. 优先从 Cookie 获取
+	// 只从 Cookie 获取 Session ID，不允许从 URL 参数获取
+	// 这是为了防止会话劫持攻击
 	cookie, err := r.Cookie("sslcat_session")
-	if err == nil {
-		sessionID = cookie.Value
-		sm.log.Debugf("✅ 从 Cookie 找到 Session: %s", sessionID)
-	} else {
-		// 2. 如果 Cookie 不存在，尝试从 URL 参数获取（调试用）
-		sessionID = r.URL.Query().Get("session")
-		if sessionID != "" {
-			sm.log.Warnf("⚠️  从 URL 参数获取 Session（不安全，仅用于调试）: %s", sessionID)
-		} else {
-			sm.log.Debugf("❌ 未找到 Session - Cookie错误: %v, 所有Cookies: %v, URL: %s", 
-				err, r.Cookies(), r.URL.String())
-			return nil, false
-		}
+	if err != nil {
+		sm.log.Debugf("未找到 Session Cookie: %v", err)
+		return nil, false
 	}
+
+	sessionID := cookie.Value
+	sm.log.Debugf("从 Cookie 找到 Session: %s", sessionID)
 
 	return sm.GetSession(sessionID)
 }

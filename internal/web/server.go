@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
@@ -353,10 +354,30 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		server.botWhitelistMgr = botWhitelistMgr
 	}
 
-	// 初始化挑战管理器（使用配置中的密钥或默认密钥）
+	// 初始化挑战管理器（使用配置中的密钥或自动生成安全密钥）
 	tokenSecret := cfg.Server.SecretKey
 	if tokenSecret == "" {
-		tokenSecret = "default-bot-token-secret-change-me"
+		// 尝试从 data 目录读取已保存的密钥
+		secretKeyFile := filepath.Join(dataDir, "secret_key")
+		if savedSecret, err := os.ReadFile(secretKeyFile); err == nil {
+			tokenSecret = strings.TrimSpace(string(savedSecret))
+			logrus.Infof("从文件加载 SecretKey: %s", secretKeyFile)
+		} else {
+			// 自动生成一个安全的随机密钥（32 字节 = 256 位）
+			secretBytes := make([]byte, 32)
+			if _, err := rand.Read(secretBytes); err != nil {
+				// 如果无法生成随机密钥，则拒绝启动服务
+				logrus.Fatalf("无法生成安全的 token 密钥: %v", err)
+			}
+			tokenSecret = hex.EncodeToString(secretBytes)
+
+			// 保存到文件以便重启后复用
+			if err := os.WriteFile(secretKeyFile, []byte(tokenSecret), 0600); err != nil {
+				logrus.Warnf("无法保存 SecretKey 到文件 %s: %v", secretKeyFile, err)
+			} else {
+				logrus.Infof("已生成并保存 SecretKey 到: %s", secretKeyFile)
+			}
+		}
 	}
 	server.botChallengeMgr = bot.NewChallengeManager(logrus.StandardLogger(), tokenSecret)
 
@@ -1296,7 +1317,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
 
 	// 添加 Alt-Svc 响应头，让浏览器知道服务器支持 HTTP/3
-	// 只在 HTTPS 连接上添加，且仅当 HTTP/3 已启用时
+	// 只在 HTTPS 连接上添加，且仅当 HTTP/3 已启用时。
+	// 注意：客户端只有在前端能直达本进程的 UDP 443 时才能建立 QUIC 连接；
+	// 若 SSLcat 前置有反向代理/负载均衡，需确保 UDP 443 已转发到本进程，否则会出现
+	// “Alt-Svc 有返回但 QUIC 连接无法建立”，详见 docs/*/features/http3-troubleshooting.md
 	if r.TLS != nil && s.config.Server.HTTP3Enabled {
 		// 检查站点级 HTTP/3 配置
 		host := r.Host

@@ -11,6 +11,33 @@ import (
 	"time"
 )
 
+// isValidDomain 检查域名是否有效，防止路径遍历攻击
+func isValidDomain(domain string) bool {
+	if domain == "" {
+		return false
+	}
+	// 检查域名长度（防止过长域名导致的问题）
+	if len(domain) > 253 {
+		return false
+	}
+	// 防止路径遍历攻击
+	if strings.Contains(domain, "..") || strings.Contains(domain, "/") || strings.Contains(domain, "\\") {
+		return false
+	}
+	// 防止绝对路径
+	if strings.HasPrefix(domain, "/") || strings.HasPrefix(domain, ".") {
+		return false
+	}
+	// 防止控制字符和空字符
+	for _, r := range domain {
+		if r < 32 || r == 127 {
+			return false
+		}
+	}
+	// 基本域名格式检查（简化版）
+	return true
+}
+
 func (s *Server) handleSSLDownloadAll(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
 		return
@@ -26,6 +53,11 @@ func (s *Server) handleSSLDownloadAll(w http.ResponseWriter, r *http.Request) {
 	// 按域名组织文件结构
 	for _, certInfo := range certs {
 		domain := certInfo.Domain
+		// 验证域名有效性，防止路径遍历攻击
+		if !isValidDomain(domain) {
+			s.log.Warnf("跳过无效域名: %s", domain)
+			continue
+		}
 		// 为每个域名创建文件夹
 		domainDir := domain + "/"
 

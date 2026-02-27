@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"html"
 	"net/http"
 	"strings"
 
@@ -16,10 +17,16 @@ func (s *Server) handleTokensPage(w http.ResponseWriter, r *http.Request) {
 	tokens := s.tokenStore.List()
 	var rows strings.Builder
 	for _, t := range tokens {
+		// 对所有动态内容进行 HTML 转义，防止 XSS 攻击
+		escapedToken := html.EscapeString(t.Token)
+		escapedRole := html.EscapeString(string(t.Role))
+		escapedTime := html.EscapeString(t.CreatedAt.Format("2006-01-02 15:04:05"))
+		escapedAdminPrefix := html.EscapeString(s.config.AdminPrefix)
+
 		rows.WriteString(fmt.Sprintf(`<tr><td>%s</td><td>%s</td><td>%s</td><td>
 			<a class="btn btn-sm btn-outline-danger" href="%s/tokens/delete?token=%s" onclick="return confirm('确认删除该Token?')">删除</a>
 		</td></tr>`,
-			t.Token, string(t.Role), t.CreatedAt.Format("2006-01-02 15:04:05"), s.config.AdminPrefix, t.Token))
+			escapedToken, escapedRole, escapedTime, escapedAdminPrefix, escapedToken))
 	}
 	if rows.Len() == 0 {
 		rows.WriteString(`<tr><td colspan="4" class="text-center">暂无Token</td></tr>`)

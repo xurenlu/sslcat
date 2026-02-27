@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -156,12 +157,11 @@ func fcgiServe(conn net.Conn, reqID uint16, w http.ResponseWriter) error {
 								k := line[:i]
 								v := strings.TrimSpace(line[i+1:])
 								if strings.EqualFold(k, "Status") {
-									// 格式: 200 OK
+									// 格式: 200 OK 或 404 Not Found
 									if sp := strings.SplitN(v, " ", 2); len(sp) > 0 {
-										if code := strings.TrimSpace(sp[0]); len(code) >= 3 {
-											// ignore err
-											if c := http.StatusText(200); c != "" { /* noop to silence import */
-											}
+										codeStr := strings.TrimSpace(sp[0])
+										if code, err := strconv.Atoi(codeStr); err == nil && code >= 100 && code < 600 {
+											statusCode = code
 										}
 									}
 								} else {

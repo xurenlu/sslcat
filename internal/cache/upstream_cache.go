@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/andybalholm/brotli"
@@ -35,10 +36,10 @@ type UpstreamCache struct {
 	// 缓存目录
 	cacheDir string
 
-	// 统计信息
-	hits   int64
-	misses int64
-	stores int64
+	// 统计信息（使用原子操作避免竞态条件）
+	hits   atomic.Int64
+	misses atomic.Int64
+	stores atomic.Int64
 
 	// 缓存配置
 	enabled         bool
@@ -223,26 +224,26 @@ func (uc *UpstreamCache) Get(req *http.Request) (*UpstreamCacheEntry, []byte, er
 
 	// 检查元数据文件是否存在
 	if _, err := os.Stat(metaPath); os.IsNotExist(err) {
-		uc.misses++
+		uc.misses.Add(1)
 		return nil, nil, fmt.Errorf("cache miss")
 	}
 
 	// 读取元数据
 	metaData, err := os.ReadFile(metaPath)
 	if err != nil {
-		uc.misses++
+		uc.misses.Add(1)
 		return nil, nil, fmt.Errorf("failed to read metadata: %w", err)
 	}
 
 	var entry UpstreamCacheEntry
 	if err := json.Unmarshal(metaData, &entry); err != nil {
-		uc.misses++
+		uc.misses.Add(1)
 		return nil, nil, fmt.Errorf("failed to parse metadata: %w", err)
 	}
 
 	// 检查是否过期
 	if time.Now().After(entry.ExpiresAt) {
-		uc.misses++
+		uc.misses.Add(1)
 		// 删除过期的缓存文件
 		os.Remove(metaPath)
 		os.Remove(dataPath)
@@ -252,7 +253,7 @@ func (uc *UpstreamCache) Get(req *http.Request) (*UpstreamCacheEntry, []byte, er
 	// 读取数据文件
 	data, err := os.ReadFile(dataPath)
 	if err != nil {
-		uc.misses++
+		uc.misses.Add(1)
 		return nil, nil, fmt.Errorf("failed to read data: %w", err)
 	}
 
@@ -264,7 +265,7 @@ func (uc *UpstreamCache) Get(req *http.Request) (*UpstreamCacheEntry, []byte, er
 	updatedMeta, _ := json.Marshal(entry)
 	os.WriteFile(metaPath, updatedMeta, 0644)
 
-	uc.hits++
+	uc.hits.Add(1)
 	uc.log.Debugf("Cache hit for %s", req.URL.String())
 
 	return &entry, data, nil
@@ -391,7 +392,7 @@ func (uc *UpstreamCache) Store(req *http.Request, resp *http.Response) error {
 		return fmt.Errorf("failed to write metadata file: %w", err)
 	}
 
-	uc.stores++
+	uc.stores.Add(1)
 	uc.log.Debugf("Stored cache entry for %s (expires: %v)", req.URL.String(), expiresAt)
 
 	return nil
@@ -705,16 +706,19 @@ func (uc *UpstreamCache) GetStats() map[string]interface{} {
 	defer uc.mutex.RUnlock()
 
 	hitRate := float64(0)
-	if uc.hits+uc.misses > 0 {
-		hitRate = float64(uc.hits) / float64(uc.hits+uc.misses) * 100
+	hits := uc.hits.Load()
+	misses := uc.misses.Load()
+	stores := uc.stores.Load()
+	if hits+misses > 0 {
+		hitRate = float64(hits) / float64(hits+misses) * 100
 	}
 
 	return map[string]interface{}{
 		"enabled":          uc.enabled,
 		"cache_dir":        uc.cacheDir,
-		"hits":             uc.hits,
-		"misses":           uc.misses,
-		"stores":           uc.stores,
+		"hits":             hits,
+		"misses":           misses,
+		"stores":           stores,
 		"hit_rate":         hitRate,
 		"default_ttl":      uc.defaultTTL.String(),
 		"respect_upstream": uc.respectUpstream,
@@ -852,9 +856,9 @@ func (uc *UpstreamCache) PurgeAll() error {
 
 	// 重置统计
 	uc.mutex.Lock()
-	uc.hits = 0
-	uc.misses = 0
-	uc.stores = 0
+	uc.hits.Store(0)
+	uc.misses.Store(0)
+	uc.stores.Store(0)
 	uc.mutex.Unlock()
 
 	uc.log.Info("All upstream cache purged")

@@ -351,6 +351,7 @@ Go 标准库计划在未来版本中支持 HTTP/3，但目前（Go 1.25）尚未
 
 ## 📚 参考资源
 
+- [HTTP/3 故障排除](./http3-troubleshooting.md)（Alt-Svc 有返回但 QUIC 无法建立时的排查）
 - [quic-go 官方文档](https://quic-go.net/docs/)
 - [HTTP/3 RFC 9114](https://www.rfc-editor.org/rfc/rfc9114)
 - [QUIC RFC 9000](https://www.rfc-editor.org/rfc/rfc9000)

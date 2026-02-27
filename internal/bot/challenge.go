@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"math"
-	mathrand "math/rand"
+	"math/big"
 	"sync"
 	"time"
 
@@ -76,8 +76,16 @@ func (cm *ChallengeManager) GenerateChallenge(clientIP, domain string) *Challeng
 	// 生成唯一 ID
 	challengeID := cm.generateID()
 
-	// 生成滑块验证挑战
-	target := 50 + (mathrand.Intn(40) - 20) // 30-70 之间的随机位置
+	// 使用 crypto/rand 生成安全的随机数（30-70 之间的随机位置）
+	// 这是一个防机器人挑战，使用安全随机数可以增加预测难度
+	offset, err := rand.Int(rand.Reader, big.NewInt(40))
+	if err != nil {
+		// 如果 crypto/rand 失败，记录错误并使用默认值
+		cm.logger.Errorf("生成随机数失败: %v", err)
+		offset = big.NewInt(20)
+	}
+	target := 50 + int(offset.Int64()) - 20 // 30-70 之间的随机位置
+
 	challenge := &Challenge{
 		ID:           challengeID,
 		ClientIP:     clientIP,

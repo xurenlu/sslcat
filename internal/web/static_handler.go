@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -83,22 +82,19 @@ func (h *StaticFileHandler) ServeFile(w http.ResponseWriter, r *http.Request, fi
 	// 设置自定义响应头
 	h.setCustomHeaders(w, r)
 
-	// 处理条件请求
+	// 处理条件请求（ETag/Last-Modified）
 	if h.handleConditionalRequest(w, r, fileInfo) {
 		return nil
 	}
 
-	// 设置内容长度
-	w.Header().Set("Content-Length", strconv.FormatInt(fileInfo.Size(), 10))
-
-	// 智能压缩处理
-	if h.shouldCompress(filePath, fileInfo.Size(), contentType) {
+	// 智能压缩处理（Range 请求不压缩）
+	if h.shouldCompress(filePath, fileInfo.Size(), contentType) && !h.isRangeRequest(r) {
 		return h.serveWithCompression(w, r, file, fileInfo)
 	}
 
-	// 直接复制文件内容
-	_, err = io.Copy(w, file)
-	return err
+	// 使用 ServeContent 正确处理 Range 请求
+	http.ServeContent(w, r, fileInfo.Name(), fileInfo.ModTime(), file)
+	return nil
 }
 
 // detectContentType 智能检测Content-Type
@@ -383,4 +379,21 @@ func (h *StaticFileHandler) isExecutableFile(filePath string) bool {
 		".scr": true,
 	}
 	return executableExts[ext]
+}
+
+// isRangeRequest 检查是否为 Range 请求
+func (h *StaticFileHandler) isRangeRequest(r *http.Request) bool {
+	return r.Header.Get("Range") != ""
+}
+
+// handleRangeRequest 处理 Range 请求（http.ServeContent 会自动处理，此函数保留用于日志）
+func (h *StaticFileHandler) handleRangeRequest(w http.ResponseWriter, r *http.Request, fileInfo os.FileInfo) bool {
+	if r.Header.Get("Range") == "" {
+		return false
+	}
+
+	// Range 请求存在，http.ServeContent 会处理
+	// 我们只需要设置正确的响应头
+	h.log.Debugf("Range request detected for %s: Range=%s", fileInfo.Name(), r.Header.Get("Range"))
+	return false // 让 ServeContent 处理
 }

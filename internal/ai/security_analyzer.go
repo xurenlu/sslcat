@@ -802,7 +802,21 @@ func (a *SecurityAnalyzer) tryFixTruncatedJSON(content string) string {
 	closeBraces := strings.Count(content, "}")
 	openBrackets := strings.Count(content, "[")
 	closeBrackets := strings.Count(content, "]")
-	quotes := strings.Count(content, "\"")
+
+	// 修复: 正确统计引号数量（忽略转义的引号）
+	quotes := 0
+	escapes := 0
+	for i := 0; i < len(content); i++ {
+		c := content[i]
+		if c == '\\' {
+			escapes++
+		} else if c == '"' && escapes%2 == 0 {
+			quotes++
+			escapes = 0
+		} else if c != '"' {
+			escapes = 0
+		}
+	}
 
 	addedQuotes := 0
 	addedBrackets := 0

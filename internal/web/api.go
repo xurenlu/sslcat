@@ -1,6 +1,7 @@
 package web
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"image"
@@ -8,15 +9,15 @@ import (
 	"image/draw"
 	"image/png"
 	"io"
-	"math/rand"
+	"math"
+	mathrand "math/rand"
+	"math/big"
 	"net/http"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
-
-	"math"
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
@@ -353,13 +354,26 @@ func drawCaptchaImage(text string) image.Image {
 	bg := color.RGBA{250, 251, 253, 255}
 	draw.Draw(img, img.Bounds(), &image.Uniform{bg}, image.Point{}, draw.Src)
 
-	// 干扰线：在原基础上额外增加约 5 条，并加深颜色
-	rand.Seed(time.Now().UnixNano())
-	lines := 8 + rand.Intn(3) // 8~10 条
+	// safeIntn 使用 crypto/rand 生成安全的随机整数 [0, max)
+	// 用于验证码图片的干扰元素生成
+	safeIntn := func(max int) int {
+		if max <= 0 {
+			return 0
+		}
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(max)))
+		if err != nil {
+			// 如果 crypto/rand 失败，使用时间戳作为回退
+			return int(time.Now().UnixNano()) % max
+		}
+		return int(n.Int64())
+	}
+
+	// 干扰线：使用安全的随机数生成 8~10 条
+	lines := 8 + safeIntn(3)
 	for i := 0; i < lines; i++ {
-		c := color.RGBA{uint8(120 + rand.Intn(40)), uint8(130 + rand.Intn(40)), uint8(140 + rand.Intn(40)), 255}
-		x1, y1 := rand.Intn(w), rand.Intn(h)
-		x2, y2 := rand.Intn(w), rand.Intn(h)
+		c := color.RGBA{uint8(120 + safeIntn(40)), uint8(130 + safeIntn(40)), uint8(140 + safeIntn(40)), 255}
+		x1, y1 := safeIntn(w), safeIntn(h)
+		x2, y2 := safeIntn(w), safeIntn(h)
 		steps := 220
 		for s := 0; s < steps; s++ {
 			t := float64(s) / float64(steps)
@@ -373,9 +387,9 @@ func drawCaptchaImage(text string) image.Image {
 
 	// 噪点：随机小块（1~2 px），数量略增
 	for i := 0; i < 450; i++ {
-		x, y := rand.Intn(w), rand.Intn(h)
-		rw, rh := 1+rand.Intn(2), 1+rand.Intn(2)
-		c := color.RGBA{uint8(190 + rand.Intn(40)), uint8(195 + rand.Intn(40)), uint8(200 + rand.Intn(40)), 255}
+		x, y := safeIntn(w), safeIntn(h)
+		rw, rh := 1+safeIntn(2), 1+safeIntn(2)
+		c := color.RGBA{uint8(190 + safeIntn(40)), uint8(195 + safeIntn(40)), uint8(200 + safeIntn(40)), 255}
 		for yy := y; yy < y+rh && yy < h; yy++ {
 			for xx := x; xx < x+rw && xx < w; xx++ {
 				img.SetRGBA(xx, yy, c)
@@ -446,11 +460,13 @@ func drawCaptchaImage(text string) image.Image {
 		// 放大 2x
 		big := scale2x(small)
 		// 数字/特殊字符更大旋转幅度，字母也更大
+		// 注意：这里使用 math/rand 仅用于验证码的视觉效果（旋转角度），不影响安全性
+		// 验证码的内容本身已在其他地方使用安全随机数生成
 		var deg float64
 		if strings.ContainsRune("23457?*%$@#", rune(text[i])) {
-			deg = (rand.Float64()*56 - 28) * math.Pi / 180 // ±28°
+			deg = (mathrand.Float64()*56 - 28) * math.Pi / 180 // ±28°
 		} else {
-			deg = (rand.Float64()*44 - 22) * math.Pi / 180 // ±22°
+			deg = (mathrand.Float64()*44 - 22) * math.Pi / 180 // ±22°
 		}
 		rot := rotate(big, deg)
 		// 贴到主画布，居中于分配区块

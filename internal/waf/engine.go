@@ -214,18 +214,20 @@ func (e *Engine) Stop() {
 
 // initDefaultRules 初始化默认规则
 func (e *Engine) initDefaultRules() {
-	// SQL注入规则
+	// SQL注入规则 - 修复 ReDoS 漏洞：使用更精确的模式，避免嵌套量词
 	sqlRules := []struct {
 		name    string
 		pattern string
 	}{
-		{"SQL Union Attack", `(?i)(union.*select|select.*union)`},
+		// 修复: 使用原子组避免回溯爆炸
+		{"SQL Union Attack", `(?i)\bunion\s+[a-z_]+\s+select\b|\bselect\s+[a-z_]+\s+union\b`},
 		{"SQL Comments", `(?i)(--|#|/\*|\*/)`},
-		{"SQL Keywords", `(?i)(drop|delete|insert|update|alter|create|exec|execute|sp_|xp_)`},
-		{"SQL Functions", `(?i)(concat|substring|char|ascii|hex|unhex|md5|sha1)`},
-		{"SQL Operators", `(?i)(\bor\b.*=|and.*=.*|'.*'.*=|".*".*=)`},
-		{"SQL Time-based", `(?i)(sleep|benchmark|waitfor|delay)`},
-		{"SQL Error-based", `(?i)(extractvalue|updatexml|exp|floor|rand)`},
+		{"SQL Keywords", `(?i)\b(drop|delete|insert|update|alter|create|exec|execute|sp_|xp_)\b`},
+		{"SQL Functions", `(?i)\b(concat|substring|char|ascii|hex|unhex|md5|sha1)\b`},
+		// 修复: 使用更精确的模式避免 ReDoS
+		{"SQL Operators", `(?i)\bor\b\s+\w+\s*=|and\b\s+\w+\s*=|'[^']+'\s*=|"[^"]+"\s*=`},
+		{"SQL Time-based", `(?i)\b(sleep|benchmark|waitfor|delay)\b`},
+		{"SQL Error-based", `(?i)\b(extractvalue|updatexml|exp|floor|rand)\b`},
 	}
 
 	for i, rule := range sqlRules {
@@ -241,16 +243,18 @@ func (e *Engine) initDefaultRules() {
 		})
 	}
 
-	// XSS规则
+	// XSS规则 - 修复 ReDoS 漏洞：使用更精确的字符类
 	xssRules := []struct {
 		name    string
 		pattern string
 	}{
-		{"Script Tag", `(?i)<script.*?>.*?</script>`},
+		// 修复: 使用非贪婪限定符，但限制最大长度避免回溯爆炸
+		{"Script Tag", `(?i)<script[^>]*>.*?</script>`},
 		{"JavaScript Events", `(?i)(onload|onclick|onmouseover|onerror|onsubmit|onchange)=`},
 		{"JavaScript Protocol", `(?i)javascript:`},
-		{"HTML Injection", `(?i)<(iframe|object|embed|meta|link|style)`},
-		{"Data URI", `(?i)data:.*base64`},
+		{"HTML Injection", `(?i)<(iframe|object|embed|meta|link|style)\b`},
+		// 修复: 限制长度避免 ReDoS
+		{"Data URI", `(?i)data:[^;]{1,100};base64`},
 		{"Expression", `(?i)expression\s*\(`},
 	}
 

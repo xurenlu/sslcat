@@ -3,6 +3,7 @@ package imageopt
 import (
 	"bytes"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -96,13 +97,13 @@ func (rw *ResponseWriter) Flush() error {
 	if newContentType != rw.contentType {
 		rw.ResponseWriter.Header().Set("Content-Type", newContentType)
 	}
-	rw.ResponseWriter.Header().Set("Content-Length", string(rune(len(optimizedData))))
+	rw.ResponseWriter.Header().Set("Content-Length", strconv.Itoa(len(optimizedData)))
 
 	// 添加优化标识
 	if len(optimizedData) < len(originalData) {
 		rw.ResponseWriter.Header().Set("X-Image-Optimized", "true")
 		compressionRatio := float64(len(originalData)-len(optimizedData)) / float64(len(originalData)) * 100
-		rw.ResponseWriter.Header().Set("X-Image-Compression-Ratio", string(rune(int(compressionRatio))))
+		rw.ResponseWriter.Header().Set("X-Image-Compression-Ratio", strconv.FormatFloat(compressionRatio, 'f', 2, 64))
 	}
 
 	// 写入响应
