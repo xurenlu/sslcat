@@ -56,7 +56,7 @@ import { TOAST_DURATION } from '../constants'
 const Settings: React.FC = () => {
   const { adminPrefix, refreshConfig, changeAdminPrefix } = useConfig()
   const t = useTranslation()
-  const [settings, setSettings] = useState({
+  const [settings, setSettings] = useState<{ adminPrefix: string; portMode: string; customPort: number; enableHttps: boolean; autoSSL: boolean; letsEncryptEmail: string; sslProvider: string; sslStaging: boolean; challengeMethods: string[]; http2Enabled: boolean; http3Enabled: boolean; enableDDoSProtection: boolean; maxRequestsPerMinute: string; enableRateLimit: boolean; enableAccessLog: boolean; accessLogPath: string; accessLogFormat: string; enableErrorLog: boolean; logLevel: string; sharedCacheMaxSizeMB: number; memoryMaxUsagePercent: number; memoryReleaseCooldownSec: number; responseHeaderTimeoutSec: number; compressionEnabled: boolean; compressionAlgorithms: string[]; compressionMinSize: number; compressionGzipLevel: number; compressionBrotliLevel: number; upstreamCacheEnabled: boolean; upstreamCacheDir: string; upstreamCacheMaxSize: number; upstreamCacheDefaultTTL: number; upstreamCacheRespectUpstream: boolean; notificationChannels: string; minNotificationLevel: string; emailEnabled: boolean; webhookEnabled: boolean; emailMethod: string; smtpHost: string; smtpPort: string; smtpUsername: string; smtpPassword: string; smtpFrom: string; smtpTo: string; smtpUseTLS: boolean; sendmailCommand: string; sendmailArgs: string; resendApiKey: string; resendFrom: string; resendTo: string; mailgunApiKey: string; mailgunDomain: string; mailgunFrom: string; mailgunTo: string; sendgridApiKey: string; sendgridFrom: string; sendgridTo: string; webhookUrls: string[] }>({
     // 基础设置
     adminPrefix: adminPrefix,
     // 新的端口配置
@@ -943,6 +943,8 @@ const Settings: React.FC = () => {
       sharedCacheMaxSizeMB: 64,
       memoryMaxUsagePercent: 20,
       memoryReleaseCooldownSec: 300,
+      // 代理超时设置
+      responseHeaderTimeoutSec: 3,
       // 压缩设置
       compressionEnabled: true,
       compressionAlgorithms: ['br', 'gzip'],
