@@ -252,38 +252,52 @@ export class WaveformRenderer {
 
     if (this.data.length === 0) return
 
-    const stepX = width / this.maxDataPoints
-    const centerY = height / 2
-    const maxValue = Math.max(...this.data.map(Math.abs), 1)
+    const stepX = width / Math.max(this.maxDataPoints, this.data.length)
+    const padding = 10
+    const drawHeight = height - padding * 2
 
+    // 计算Y轴范围：从0到最大值（支持百分比数据如CPU使用率）
+    const maxDataValue = Math.max(...this.data)
+    const maxValue = maxDataValue > 100 ? maxDataValue : 100
+
+    // 计算每个数据点的坐标
+    const points: Array<{ x: number; y: number }> = []
+    this.data.forEach((value, index) => {
+      const x = index * stepX
+      // Y坐标：值越大越靠上，0在底部
+      const y = height - padding - (value / maxValue) * drawHeight
+      points.push({ x, y })
+    })
+
+    // 先绘制填充区域
+    if (this.fillColor) {
+      ctx.beginPath()
+      ctx.moveTo(points[0]?.x || 0, height - padding)
+      points.forEach((point) => {
+        ctx.lineTo(point.x, point.y)
+      })
+      ctx.lineTo(points[points.length - 1]?.x || width, height - padding)
+      ctx.closePath()
+      ctx.fillStyle = this.fillColor
+      ctx.fill()
+    }
+
+    // 绘制波形线
     ctx.beginPath()
     ctx.strokeStyle = this.lineColor
     ctx.lineWidth = this.lineWidth
     ctx.lineJoin = 'round'
     ctx.lineCap = 'round'
 
-    // 绘制波形线
-    this.data.forEach((value, index) => {
-      const x = index * stepX
-      const y = centerY - (value / maxValue) * (centerY * 0.8)
-
+    points.forEach((point, index) => {
       if (index === 0) {
-        ctx.moveTo(x, y)
+        ctx.moveTo(point.x, point.y)
       } else {
-        ctx.lineTo(x, y)
+        ctx.lineTo(point.x, point.y)
       }
     })
 
     ctx.stroke()
-
-    // 填充区域
-    if (this.fillColor) {
-      ctx.lineTo(width, centerY)
-      ctx.lineTo(0, centerY)
-      ctx.closePath()
-      ctx.fillStyle = this.fillColor
-      ctx.fill()
-    }
   }
 }
 
