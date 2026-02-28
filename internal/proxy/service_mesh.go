@@ -90,6 +90,9 @@ type ServiceDiscoveryConfig struct {
 	HealthCheck      bool          `json:"health_check"`      // 启用健康检查
 	HealthCheckPath  string        `json:"health_check_path"` // 健康检查路径
 	HealthCheckInterval time.Duration `json:"health_check_interval"`
+	// 本地后端优先配置
+	LocalBackendFirst   bool `json:"local_backend_first"`   // 优先使用本地后端
+	AllowCrossNodeAccess bool `json:"allow_cross_node_access"` // 允许跨节点访问
 }
 
 // TrafficManagementConfig 流量管理配置
@@ -631,6 +634,19 @@ func (m *ServiceMeshManager) GetServiceEndpoint(serviceName string) (string, err
 // ShouldUseMesh 判断请求是否应该通过 Service Mesh
 func (m *ServiceMeshManager) ShouldUseMesh(req *http.Request) bool {
 	if m == nil || !m.config.Enabled {
+		return false
+	}
+
+	// 重要：ACME 挑战请求必须绕过 Service Mesh
+	// Let's Encrypt 需要直接访问 .well-known/acme-challenge/ 端点
+	if strings.Contains(req.URL.Path, "/.well-known/acme-challenge/") {
+		m.log.Debugf("Bypassing Service Mesh for ACME challenge: %s", req.URL.Path)
+		return false
+	}
+
+	// 其他 Let's Encrypt 相关路径也绕过
+	if strings.HasPrefix(req.URL.Path, "/.well-known/") {
+		m.log.Debugf("Bypassing Service Mesh for well-known path: %s", req.URL.Path)
 		return false
 	}
 
