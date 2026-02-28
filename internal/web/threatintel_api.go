@@ -32,36 +32,38 @@ func NewThreatIntelAPI(manager *threatintel.ThreatIntelManager) *ThreatIntelAPI 
 }
 
 // RegisterRoutes 注册路由
-func (tia *ThreatIntelAPI) RegisterRoutes(router *http.ServeMux) {
+func (tia *ThreatIntelAPI) RegisterRoutes(router *http.ServeMux, adminPrefix string) {
+	prefix := adminPrefix + "/api/threat-intel"
+
 	// IOC检测
-	router.HandleFunc("/api/threatintel/check/ip/", tia.CheckIPHandler)
-	router.HandleFunc("/api/threatintel/check/domain/", tia.CheckDomainHandler)
-	router.HandleFunc("/api/threatintel/check/url", tia.CheckURL)
-	router.HandleFunc("/api/threatintel/check/hash", tia.CheckHash)
+	router.HandleFunc(prefix+"/check/ip/", tia.CheckIPHandler)
+	router.HandleFunc(prefix+"/check/domain/", tia.CheckDomainHandler)
+	router.HandleFunc(prefix+"/check/url", tia.CheckURL)
+	router.HandleFunc(prefix+"/check/hash", tia.CheckHash)
 
 	// 威胁情报管理
-	router.HandleFunc("/api/threatintel/iocs", tia.ListIOCs)
-	router.HandleFunc("/api/threatintel/iocs/add", tia.AddIOC)
-	router.HandleFunc("/api/threatintel/iocs/", tia.GetIOCHandler)
-	router.HandleFunc("/api/threatintel/iocs/delete/", tia.DeleteIOCHandler)
+	router.HandleFunc(prefix+"/iocs", tia.ListIOCs)
+	router.HandleFunc(prefix+"/iocs/add", tia.AddIOC)
+	router.HandleFunc(prefix+"/iocs/", tia.GetIOCHandler)
+	router.HandleFunc(prefix+"/iocs/delete/", tia.DeleteIOCHandler)
 
 	// 威胁情报源管理
-	router.HandleFunc("/api/threatintel/sources", tia.ListSources)
-	router.HandleFunc("/api/threatintel/sources/update/", tia.UpdateSourceHandler)
+	router.HandleFunc(prefix+"/sources", tia.ListSources)
+	router.HandleFunc(prefix+"/sources/update/", tia.UpdateSourceHandler)
 
 	// 统计和报告
-	router.HandleFunc("/api/threatintel/stats", tia.GetStats)
-	router.HandleFunc("/api/threatintel/report", tia.GetReport)
-	router.HandleFunc("/api/threatintel/sources/stats", tia.GetSourcesStats)
+	router.HandleFunc(prefix+"/stats", tia.GetStats)
+	router.HandleFunc(prefix+"/report", tia.GetReport)
+	router.HandleFunc(prefix+"/sources/stats", tia.GetSourcesStats)
 
 	// 批量检查
-	router.HandleFunc("/api/threatintel/bulk/check", tia.BulkCheck)
+	router.HandleFunc(prefix+"/bulk/check", tia.BulkCheck)
 }
 
 // CheckIPHandler 检查IP地址处理器
 func (tia *ThreatIntelAPI) CheckIPHandler(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
-	ip := strings.TrimPrefix(path, "/api/threatintel/check/ip/")
+	ip := strings.TrimPrefix(path, "/api/threat-intel/check/ip/")
 
 	if ip == "" {
 		tia.writeErrorResponse(w, "IP address is required", http.StatusBadRequest)
@@ -97,7 +99,7 @@ func (tia *ThreatIntelAPI) CheckIPHandler(w http.ResponseWriter, r *http.Request
 // CheckDomainHandler 检查域名处理器
 func (tia *ThreatIntelAPI) CheckDomainHandler(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
-	domain := strings.TrimPrefix(path, "/api/threatintel/check/domain/")
+	domain := strings.TrimPrefix(path, "/api/threat-intel/check/domain/")
 
 	if domain == "" {
 		tia.writeErrorResponse(w, "Domain is required", http.StatusBadRequest)
@@ -280,7 +282,7 @@ func (tia *ThreatIntelAPI) AddIOC(w http.ResponseWriter, r *http.Request) {
 // GetIOCHandler 获取IOC详情处理器
 func (tia *ThreatIntelAPI) GetIOCHandler(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
-	id := strings.TrimPrefix(path, "/api/threatintel/iocs/")
+	id := strings.TrimPrefix(path, "/api/threat-intel/iocs/")
 
 	if id == "" {
 		tia.writeErrorResponse(w, "IOC ID is required", http.StatusBadRequest)
@@ -308,7 +310,7 @@ func (tia *ThreatIntelAPI) GetIOCHandler(w http.ResponseWriter, r *http.Request)
 // DeleteIOCHandler 删除IOC处理器
 func (tia *ThreatIntelAPI) DeleteIOCHandler(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
-	id := strings.TrimPrefix(path, "/api/threatintel/iocs/delete/")
+	id := strings.TrimPrefix(path, "/api/threat-intel/iocs/delete/")
 
 	if id == "" {
 		tia.writeErrorResponse(w, "IOC ID is required", http.StatusBadRequest)
@@ -357,7 +359,7 @@ func (tia *ThreatIntelAPI) ListSources(w http.ResponseWriter, r *http.Request) {
 // UpdateSourceHandler 更新威胁情报源处理器
 func (tia *ThreatIntelAPI) UpdateSourceHandler(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
-	name := strings.TrimPrefix(path, "/api/threatintel/sources/update/")
+	name := strings.TrimPrefix(path, "/api/threat-intel/sources/update/")
 
 	if name == "" {
 		tia.writeErrorResponse(w, "Source name is required", http.StatusBadRequest)

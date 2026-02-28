@@ -764,8 +764,8 @@ func (s *Server) SetThreatIntelManager(tim *threatintel.ThreatIntelManager) {
 	s.threatIntelManager = tim
 	s.threatIntelAPI = NewThreatIntelAPI(tim)
 
-	// 注册威胁情报API路由
-	s.threatIntelAPI.RegisterRoutes(s.mux)
+	// 注册威胁情报API路由，传入 adminPrefix
+	s.threatIntelAPI.RegisterRoutes(s.mux, s.config.AdminPrefix)
 
 	s.log.Info("Threat intelligence manager linked to web server")
 }
