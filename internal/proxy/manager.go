@@ -92,6 +92,9 @@ type Manager struct {
 
 	// Service Mesh 集成
 	serviceMeshManager *ServiceMeshManager
+
+	// Edge Routing 集成
+	edgeRoutingManager *EdgeRoutingManager
 }
 
 // NewManager 创建代理管理器
@@ -3151,6 +3154,16 @@ func (m *Manager) GetServiceMeshManager() *ServiceMeshManager {
 // SetServiceMeshManager 设置 Service Mesh 管理器
 func (m *Manager) SetServiceMeshManager(smm *ServiceMeshManager) {
 	m.serviceMeshManager = smm
+}
+
+// GetEdgeRoutingManager 获取 Edge Routing 管理器
+func (m *Manager) GetEdgeRoutingManager() *EdgeRoutingManager {
+	return m.edgeRoutingManager
+}
+
+// SetEdgeRoutingManager 设置 Edge Routing 管理器
+func (m *Manager) SetEdgeRoutingManager(erm *EdgeRoutingManager) {
+	m.edgeRoutingManager = erm
 }
 
 // Stop 停止错误日志限流器
