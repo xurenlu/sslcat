@@ -27,6 +27,7 @@ import {
   FormLabel,
   Input,
   useToast,
+  IconButton,
   Tabs,
   TabList,
   TabPanels,
@@ -34,6 +35,11 @@ import {
   TabPanel,
   Spinner,
   Center,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
+  MenuDivider,
 } from '@chakra-ui/react'
 import {
   FiShield,
@@ -44,11 +50,18 @@ import {
   FiX,
   FiGlobe,
   FiActivity,
+  FiPlus,
+  FiEdit,
+  FiTrash2,
+  FiUpload,
+  FiDownload,
 } from 'react-icons/fi'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
 import { useTranslation } from '../hooks/useLanguage'
 import GeoIPConfig from '../components/GeoIPConfig'
 import WAFRulesList from '../components/WAFRulesList'
+import WAFRuleEditor from '../components/WAFRuleEditor'
+import WAFRuleTestTool from '../components/WAFRuleTestTool'
 import { WAFStatsResponse, WAFRulesResponse, WAFEventsResponse, WAFRule, WAFEvent } from '../types/waf'
 import { FeatureGate } from '../components/FeatureGate'
 import { AttackFlow } from '../components/AttackFlow'
@@ -114,7 +127,12 @@ const Security: React.FC = () => {
   const [wafRules, setWafRules] = useState<WAFRule[]>([])
   const [wafEvents, setWafEvents] = useState<WAFEvent[]>([])
   const [wafLoading, setWafLoading] = useState(false)
-  
+
+  // WAF 规则管理状态
+  const [isRuleEditorOpen, setIsRuleEditorOpen] = useState(false)
+  const [editingRule, setEditingRule] = useState<WAFRule | null>(null)
+  const [activeRuleTab, setActiveRuleTab] = useState<'list' | 'test'>('list')
+
   const [loading, setLoading] = useState(false)
   const toast = useToast()
   const { adminPrefix } = useConfig()
@@ -310,6 +328,123 @@ const Security: React.FC = () => {
     }
   }
 
+  // WAF 规则管理函数
+  const handleOpenRuleEditor = (rule?: WAFRule) => {
+    setEditingRule(rule || null)
+    setIsRuleEditorOpen(true)
+  }
+
+  const handleCloseRuleEditor = () => {
+    setIsRuleEditorOpen(false)
+    setEditingRule(null)
+  }
+
+  const handleSaveRule = () => {
+    refreshWAFData()
+    handleCloseRuleEditor()
+  }
+
+  const handleDeleteRule = async (ruleId: string) => {
+    try {
+      const effectivePrefix = adminPrefix || '/sslcat-panel'
+      const response = await fetch(buildApiPath(effectivePrefix, `/api/waf/rule/delete?id=${ruleId}`), {
+        method: 'POST',
+        credentials: 'include',
+      })
+
+      if (response.ok) {
+        toast({
+          title: '规则已删除',
+          status: 'success',
+          duration: 3000,
+        })
+        refreshWAFData()
+      } else {
+        throw new Error('删除规则失败')
+      }
+    } catch (error) {
+      toast({
+        title: '删除失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: 5000,
+      })
+    }
+  }
+
+  const handleExportRules = async (format: 'json' | 'yaml') => {
+    try {
+      const effectivePrefix = adminPrefix || '/sslcat-panel'
+      const response = await fetch(buildApiPath(effectivePrefix, `/api/waf/rules/export?format=${format}`), {
+        method: 'GET',
+        credentials: 'include',
+      })
+
+      if (response.ok) {
+        const data = await response.text()
+        const blob = new Blob([data], { type: format === 'json' ? 'application/json' : 'text/yaml' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `waf-rules.${format}`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+
+        toast({
+          title: '导出成功',
+          status: 'success',
+          duration: 3000,
+        })
+      } else {
+        throw new Error('导出规则失败')
+      }
+    } catch (error) {
+      toast({
+        title: '导出失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: 5000,
+      })
+    }
+  }
+
+  const handleImportRules = async (file: File, format: 'json' | 'yaml') => {
+    try {
+      const text = await file.text()
+      const effectivePrefix = adminPrefix || '/sslcat-panel'
+      const response = await fetch(buildApiPath(effectivePrefix, `/api/waf/rules/import?format=${format}`), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: text,
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        toast({
+          title: '导入成功',
+          description: `成功导入 ${result.imported_count || 0} 条规则`,
+          status: 'success',
+          duration: 3000,
+        })
+        refreshWAFData()
+      } else {
+        throw new Error('导入规则失败')
+      }
+    } catch (error) {
+      toast({
+        title: '导入失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        status: 'error',
+        duration: 5000,
+      })
+    }
+  }
+
   const saveSecuritySettings = async () => {
     try {
       const effectivePrefix = adminPrefix || '/sslcat-panel'
@@ -465,6 +600,10 @@ const Security: React.FC = () => {
           <Tab>
             <Icon as={FiActivity} mr={2} />
             {t.security.wafTab}
+          </Tab>
+          <Tab>
+            <Icon as={FiEdit} mr={2} />
+            规则管理
           </Tab>
           <Tab>
             <Icon as={FiGlobe} mr={2} />
@@ -939,12 +1078,194 @@ const Security: React.FC = () => {
             )}
           </TabPanel>
 
+          {/* WAF 规则管理标签页 */}
+          <TabPanel px={0}>
+            <VStack spacing={6} align="stretch">
+              {/* 操作栏 */}
+              <Card>
+                <CardBody>
+                  <HStack justify="space-between">
+                    <Text fontSize="lg" fontWeight="bold">
+                      WAF 规则管理
+                    </Text>
+                    <HStack spacing={2}>
+                      <Button
+                        size="sm"
+                        colorScheme="blue"
+                        leftIcon={<FiPlus />}
+                        onClick={() => handleOpenRuleEditor()}
+                      >
+                        新建规则
+                      </Button>
+                      <Menu>
+                        <MenuButton as={Button} size="sm" variant="outline">
+                          导入/导出
+                        </MenuButton>
+                        <MenuList>
+                          <MenuItem icon={<FiDownload />} onClick={() => handleExportRules('json')}>
+                            导出为 JSON
+                          </MenuItem>
+                          <MenuItem icon={<FiDownload />} onClick={() => handleExportRules('yaml')}>
+                            导出为 YAML
+                          </MenuItem>
+                          <MenuDivider />
+                          <MenuItem icon={<FiUpload />}>
+                            <label htmlFor="import-json" style={{ cursor: 'pointer', width: '100%', display: 'block' }}>
+                              导入 JSON
+                            </label>
+                          </MenuItem>
+                          <MenuItem icon={<FiUpload />}>
+                            <label htmlFor="import-yaml" style={{ cursor: 'pointer', width: '100%', display: 'block' }}>
+                              导入 YAML
+                            </label>
+                          </MenuItem>
+                          <input
+                            id="import-json"
+                            type="file"
+                            accept=".json"
+                            style={{ display: 'none' }}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) handleImportRules(file, 'json')
+                            }}
+                          />
+                          <input
+                            id="import-yaml"
+                            type="file"
+                            accept=".yaml,.yml"
+                            style={{ display: 'none' }}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) handleImportRules(file, 'yaml')
+                            }}
+                          />
+                        </MenuList>
+                      </Menu>
+                    </HStack>
+                  </HStack>
+                </CardBody>
+              </Card>
+
+              {/* 规则列表和测试工具 */}
+              <Tabs>
+                <TabList>
+                  <Tab>规则列表</Tab>
+                  <Tab>测试工具</Tab>
+                </TabList>
+                <TabPanels>
+                  {/* 规则列表子标签页 */}
+                  <TabPanel>
+                    {wafLoading ? (
+                      <Center py={8}>
+                        <Spinner size="xl" color="blue.500" />
+                      </Center>
+                    ) : (
+                      <Card>
+                        <CardBody>
+                          {wafRules.length === 0 ? (
+                            <VStack py={8} spacing={4}>
+                              <Text color="gray.500">暂无 WAF 规则</Text>
+                              <Button
+                                colorScheme="blue"
+                                leftIcon={<FiPlus />}
+                                onClick={() => handleOpenRuleEditor()}
+                              >
+                                创建第一条规则
+                              </Button>
+                            </VStack>
+                          ) : (
+                            <Table variant="simple">
+                              <Thead>
+                                <Tr>
+                                  <Th>规则名称</Th>
+                                  <Th>类型</Th>
+                                  <Th>动作</Th>
+                                  <Th>状态</Th>
+                                  <Th>操作</Th>
+                                </Tr>
+                              </Thead>
+                              <Tbody>
+                                {wafRules.map((rule) => (
+                                  <Tr key={rule.id}>
+                                    <Td>
+                                      <VStack align="start" spacing={0}>
+                                        <Text fontWeight="medium">{rule.name}</Text>
+                                        <Text fontSize="xs" color="gray.500">
+                                          {rule.id}
+                                        </Text>
+                                      </VStack>
+                                    </Td>
+                                    <Td>
+                                      <Badge colorScheme="blue">{rule.type}</Badge>
+                                    </Td>
+                                    <Td>
+                                      <Badge colorScheme={
+                                        rule.action === 'block' ? 'red' :
+                                        rule.action === 'log' ? 'blue' : 'gray'
+                                      }>
+                                        {rule.action}
+                                      </Badge>
+                                    </Td>
+                                    <Td>
+                                      <Badge colorScheme={rule.enabled ? 'green' : 'gray'}>
+                                        {rule.enabled ? '启用' : '禁用'}
+                                      </Badge>
+                                    </Td>
+                                    <Td>
+                                      <HStack spacing={2}>
+                                        <IconButton
+                                          size="sm"
+                                          aria-label="编辑规则"
+                                          icon={<FiEdit />}
+                                          onClick={() => handleOpenRuleEditor(rule)}
+                                        />
+                                        <IconButton
+                                          size="sm"
+                                          aria-label="删除规则"
+                                          icon={<FiTrash2 />}
+                                          colorScheme="red"
+                                          variant="ghost"
+                                          onClick={() => {
+                                            if (window.confirm(`确定要删除规则 "${rule.name}" 吗？`)) {
+                                              handleDeleteRule(rule.id)
+                                            }
+                                          }}
+                                        />
+                                      </HStack>
+                                    </Td>
+                                  </Tr>
+                                ))}
+                              </Tbody>
+                            </Table>
+                          )}
+                        </CardBody>
+                      </Card>
+                    )}
+                  </TabPanel>
+
+                  {/* 测试工具子标签页 */}
+                  <TabPanel>
+                    <WAFRuleTestTool existingRules={wafRules} />
+                  </TabPanel>
+                </TabPanels>
+              </Tabs>
+            </VStack>
+          </TabPanel>
+
           {/* 地理位置过滤标签页 */}
           <TabPanel px={0}>
             <GeoIPConfig />
           </TabPanel>
         </TabPanels>
       </Tabs>
+
+      {/* WAF 规则编辑器模态框 */}
+      <WAFRuleEditor
+        isOpen={isRuleEditorOpen}
+        onClose={handleCloseRuleEditor}
+        onSave={handleSaveRule}
+        editRule={editingRule}
+      />
     </Box>
   )
 }

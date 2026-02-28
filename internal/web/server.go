@@ -1240,6 +1240,14 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/waf/subnet-stats", s.handleAPIWAFSubnetStats)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/waf/tls-stats", s.handleAPIWAFTLSStats)
 
+	// WAF 规则管理 API
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/waf/rule/create", s.handleAPIWAFCreateRule)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/waf/rule/update", s.handleAPIWAFUpdateRule)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/waf/rule/delete", s.handleAPIWAFDeleteRule)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/waf/rule/test", s.handleAPIWAFTestRule)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/waf/rules/export", s.handleAPIWAFExportRules)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/waf/rules/import", s.handleAPIWAFImportRules)
+
 	// 统一封禁管理 API
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/blocked-list", s.handleAPISecurityBlockedList)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/block", s.handleAPISecurityBlock)
