@@ -36,6 +36,7 @@ import TemplateMarket from './pages/TemplateMarket'
 import TemplateDeploy from './pages/TemplateDeploy'
 import BlockManagement from './pages/BlockManagement'
 import ConfigHistory from './pages/ConfigHistory'
+import AIAnalytics from './pages/AIAnalytics'
 
 // 辅助组件：为需要 Layout 的页面添加 Layout
 const LayoutRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -286,6 +287,13 @@ const AppRoutes: React.FC = () => {
         <AuthGuard>
           <LayoutRoute>
             <ConfigHistory />
+          </LayoutRoute>
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/ai-analytics`} element={
+        <AuthGuard>
+          <LayoutRoute>
+            <AIAnalytics />
           </LayoutRoute>
         </AuthGuard>
       } />

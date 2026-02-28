@@ -159,7 +159,7 @@ const SidebarContent = () => {
       items: [
         { name: t.navigation.security, icon: FiShield, path: buildPath(adminPrefix, '/security'), keywords: 'waf ddos block 防火墙 拦截' },
         { name: t.sidebar.blockManagement, icon: FiX, path: buildPath(adminPrefix, '/block-management'), keywords: 'block unblock ip tls fingerprint user agent 封禁 解封' },
-        { name: t.navigation.aiSecurity || '🤖 AI 安全分析', icon: FaRobot, path: buildPath(adminPrefix, '/ai-security'), badge: 'AI', keywords: 'ai robot threat analysis 智能 分析' },
+        { name: t.navigation.aiSecurity || 'AI 安全分析', icon: FaRobot, path: buildPath(adminPrefix, '/ai-analytics'), badge: 'AI', keywords: 'ai robot threat analysis 智能 分析 anomaly detection ml' },
       ]
     },
     {
