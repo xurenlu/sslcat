@@ -29,6 +29,7 @@ import (
 	"github.com/xurenlu/sslcat/internal/imageopt"
 	"github.com/xurenlu/sslcat/internal/logger"
 	"github.com/xurenlu/sslcat/internal/metrics"
+	"github.com/xurenlu/sslcat/internal/ml"
 	"github.com/xurenlu/sslcat/internal/monitor"
 	"github.com/xurenlu/sslcat/internal/notification"
 	"github.com/xurenlu/sslcat/internal/notify"
@@ -70,9 +71,10 @@ type Server struct {
 	sharedCache *cache.MemoryCache
 
 	// 配置热重载
-	configWatcher   *config.ConfigWatcher
-	reloadManager   *config.ReloadManager
-	configReloadAPI *ConfigReloadAPI
+	configWatcher         *config.ConfigWatcher
+	reloadManager         *config.ReloadManager
+	configReloadAPI       *ConfigReloadAPI
+	configVersionManager  *config.VersionManager
 
 	// Prometheus指标
 	prometheusMetrics *metrics.PrometheusMetrics
@@ -137,6 +139,13 @@ type Server struct {
 
 	// 报告生成器
 	reportGenerator *report.ReportGenerator
+
+	// ML/AI 异常检测系统
+	mlAPIHandler       *MLAPIHandler
+	mlInferenceEngine  *ml.InferenceEngine
+	mlFeatureExtractor *ml.FeatureExtractor
+	mlThreatScorer     *ml.ThreatScorer
+	mlForest           *ml.IsolationForest
 
 	// Cluster runtime status
 	clusterLastConfigSyncAt      time.Time
@@ -611,10 +620,90 @@ func (s *Server) SetupConfigReload(configWatcher *config.ConfigWatcher, reloadMa
 	s.reloadManager = reloadManager
 	s.configReloadAPI = NewConfigReloadAPI(s, configWatcher, reloadManager)
 
+	// 初始化配置版本管理器
+	s.configVersionManager = config.NewVersionManager(s.config.ConfigFile)
+	if err := s.configVersionManager.LoadVersions(); err != nil {
+		s.log.Warnf("Failed to load config versions: %v", err)
+	} else {
+		s.log.Infof("Loaded %d config versions", len(s.configVersionManager.GetVersions()))
+	}
+
+	// 初始化 ML/AI 异常检测系统
+	s.setupMLSystem()
+
 	// 设置API路由
 	s.configReloadAPI.SetupRoutes()
 
+	// 注册配置版本管理API路由
+	s.setupConfigVersionRoutes()
+
 	s.log.Info("Config hot reload functionality enabled")
+}
+
+// setupMLSystem 初始化 ML/AI 异常检测系统
+func (s *Server) setupMLSystem() {
+	s.log.Info("Initializing ML/AI anomaly detection system")
+
+	// 创建 ML 组件
+	s.mlAPIHandler = NewMLAPIHandler()
+	s.mlInferenceEngine = ml.NewInferenceEngine()
+	s.mlFeatureExtractor = ml.NewFeatureExtractor()
+	s.mlThreatScorer = ml.NewThreatScorer()
+
+	// 启动推理引擎
+	s.mlInferenceEngine.Start()
+
+	// 设置 API 处理器的引擎
+	s.mlAPIHandler.SetEngine(s.mlInferenceEngine, s.mlForest, s.mlFeatureExtractor, s.mlThreatScorer)
+
+	// 注册 ML API 路由
+	s.mlAPIHandler.RegisterRoutes(nil, s.config.AdminPrefix)
+
+	// 在 mux 中注册 ML API 路由
+	prefix := s.config.AdminPrefix + "/api/ml"
+	s.mux.HandleFunc(prefix+"/train", s.handleMLTrain)
+	s.mux.HandleFunc(prefix+"/stats", s.handleMLStats)
+	s.mux.HandleFunc(prefix+"/predict", s.handleMLPredict)
+	s.mux.HandleFunc(prefix+"/feedback", s.handleMLFeedback)
+	s.mux.HandleFunc(prefix+"/threat/score", s.handleMLThreatScore)
+	s.mux.HandleFunc(prefix+"/features/extract", s.handleMLExtractFeatures)
+
+	s.log.Info("ML/AI anomaly detection system initialized")
+}
+
+// StopMLSystem 停止 ML 系统
+func (s *Server) StopMLSystem() {
+	if s.mlInferenceEngine != nil {
+		s.mlInferenceEngine.Stop()
+		s.log.Info("ML inference engine stopped")
+	}
+}
+
+// setupConfigVersionRoutes 设置配置版本管理API路由
+func (s *Server) setupConfigVersionRoutes() {
+	prefix := s.config.AdminPrefix + "/api/config/versions"
+
+	// 版本列表
+	s.mux.HandleFunc(prefix, s.handleAPIConfigVersionList)
+
+	// 单个版本操作
+	s.mux.HandleFunc(prefix+"/get", s.handleAPIConfigVersionGet)
+	s.mux.HandleFunc(prefix+"/create", s.handleAPIConfigVersionCreate)
+	s.mux.HandleFunc(prefix+"/rollback", s.handleAPIConfigVersionRollback)
+	s.mux.HandleFunc(prefix+"/delete", s.handleAPIConfigVersionDelete)
+	s.mux.HandleFunc(prefix+"/update", s.handleAPIConfigVersionUpdateDescription)
+
+	// 版本比较
+	s.mux.HandleFunc(prefix+"/diff", s.handleAPIConfigVersionDiff)
+	s.mux.HandleFunc(prefix+"/compare-current", s.handleAPIConfigVersionCompareCurrent)
+
+	// 统计和其他操作
+	s.mux.HandleFunc(prefix+"/stats", s.handleAPIConfigVersionStats)
+	s.mux.HandleFunc(prefix+"/export", s.handleAPIConfigVersionExport)
+	s.mux.HandleFunc(prefix+"/import", s.handleAPIConfigVersionImport)
+	s.mux.HandleFunc(prefix+"/reload", s.handleAPIConfigVersionReloadVersions)
+
+	s.log.Info("Config version management API routes registered")
 }
 
 // UpdateConfig 更新服务器配置（热重载时调用）
@@ -2624,9 +2713,83 @@ func (s *Server) GetMonitorManager() *monitor.Manager {
 	return s.monitorManager
 }
 
+// GetMLEngine 获取ML推理引擎
+func (s *Server) GetMLEngine() *ml.InferenceEngine {
+	return s.mlInferenceEngine
+}
+
+// GetMLFeatureExtractor 获取ML特征提取器
+func (s *Server) GetMLFeatureExtractor() *ml.FeatureExtractor {
+	return s.mlFeatureExtractor
+}
+
+// GetMLThreatScorer 获取ML威胁评分器
+func (s *Server) GetMLThreatScorer() *ml.ThreatScorer {
+	return s.mlThreatScorer
+}
+
+// ML API 处理函数
+
+// handleMLTrain 处理模型训练请求
+func (s *Server) handleMLTrain(w http.ResponseWriter, r *http.Request) {
+	if s.mlAPIHandler == nil {
+		http.Error(w, "ML system not initialized", http.StatusServiceUnavailable)
+		return
+	}
+	s.mlAPIHandler.handleTrain(w, r)
+}
+
+// handleMLStats 处理获取模型统计请求
+func (s *Server) handleMLStats(w http.ResponseWriter, r *http.Request) {
+	if s.mlAPIHandler == nil {
+		http.Error(w, "ML system not initialized", http.StatusServiceUnavailable)
+		return
+	}
+	s.mlAPIHandler.handleStats(w, r)
+}
+
+// handleMLPredict 处理预测请求
+func (s *Server) handleMLPredict(w http.ResponseWriter, r *http.Request) {
+	if s.mlAPIHandler == nil {
+		http.Error(w, "ML system not initialized", http.StatusServiceUnavailable)
+		return
+	}
+	s.mlAPIHandler.handlePredict(w, r)
+}
+
+// handleMLFeedback 处理反馈请求
+func (s *Server) handleMLFeedback(w http.ResponseWriter, r *http.Request) {
+	if s.mlAPIHandler == nil {
+		http.Error(w, "ML system not initialized", http.StatusServiceUnavailable)
+		return
+	}
+	s.mlAPIHandler.handleFeedback(w, r)
+}
+
+// handleMLThreatScore 处理威胁评分请求
+func (s *Server) handleMLThreatScore(w http.ResponseWriter, r *http.Request) {
+	if s.mlAPIHandler == nil {
+		http.Error(w, "ML system not initialized", http.StatusServiceUnavailable)
+		return
+	}
+	s.mlAPIHandler.handleThreatScore(w, r)
+}
+
+// handleMLExtractFeatures 处理特征提取请求
+func (s *Server) handleMLExtractFeatures(w http.ResponseWriter, r *http.Request) {
+	if s.mlAPIHandler == nil {
+		http.Error(w, "ML system not initialized", http.StatusServiceUnavailable)
+		return
+	}
+	s.mlAPIHandler.handleExtractFeatures(w, r)
+}
+
 // Stop 停止 Web 服务器及其管理的资源
 func (s *Server) Stop() {
 	s.log.Info("Stopping web server")
+
+	// 停止 ML 系统
+	s.StopMLSystem()
 
 	s.log.Info("Web server stopped")
 }

@@ -43,29 +43,41 @@ type AccessLog struct {
 
 // AccessLogger 访问日志记录器
 type AccessLogger struct {
-	format      LogFormat
-	writer      io.Writer
-	file        *os.File
-	mutex       sync.Mutex
-	enabled     bool
-	logPath     string
-	maxSize     int64 // 最大文件大小 (字节)
-	maxFiles    int   // 最大文件数量
-	currentSize int64
-	log         *logrus.Entry
+	format       LogFormat
+	writer       io.Writer
+	file         *os.File
+	mutex        sync.Mutex
+	enabled      bool
+	logPath      string          // 原始日志路径模板（可能包含占位符）
+	logPathRaw   string          // 原始日志路径（未解析占位符）
+	currentDate  string          // 当前日志文件对应的日期
+	maxSize      int64           // 最大文件大小 (字节)
+	maxFiles     int             // 最大文件数量
+	currentSize  int64
+	log          *logrus.Entry
+	hasDatePattern bool          // 路径中是否包含日期占位符
 }
 
 // NewAccessLogger 创建访问日志记录器
 func NewAccessLogger(format LogFormat, logPath string, enabled bool) (*AccessLogger, error) {
+	now := time.Now()
+
 	logger := &AccessLogger{
 		format:   format,
 		enabled:  enabled,
-		logPath:  logPath,
+		logPathRaw: logPath,
 		maxSize:  100 * 1024 * 1024, // 100MB
 		maxFiles: 10,
 		log: logrus.WithFields(logrus.Fields{
 			"component": "access_logger",
 		}),
+	}
+
+	// 检查并解析日期占位符
+	if logPath != "" {
+		logger.hasDatePattern = containsDatePattern(logPath)
+		logger.logPath = logger.expandDatePattern(now)
+		logger.currentDate = getCurrentDateKey(now)
 	}
 
 	if enabled && logPath != "" {
@@ -161,6 +173,11 @@ func (a *AccessLogger) Log(accessLog *AccessLog) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
+	// 检查日期变化（如果有日期占位符）
+	if err := a.checkDateRotation(); err != nil {
+		a.log.Errorf("日期轮转检查失败: %v", err)
+	}
+
 	var logLine string
 	switch a.format {
 	case FormatNginx:
@@ -182,8 +199,8 @@ func (a *AccessLogger) Log(accessLog *AccessLog) {
 	// 更新文件大小
 	a.currentSize += int64(len(logLine) + 1)
 
-	// 检查是否需要轮转
-	if a.file != nil && a.currentSize > a.maxSize {
+	// 检查是否需要按大小轮转（不包含日期占位符的路径才需要大小轮转）
+	if !a.hasDatePattern && a.file != nil && a.currentSize > a.maxSize {
 		if err := a.rotateLogFile(); err != nil {
 			a.log.Errorf("轮转日志文件失败: %v", err)
 		}
@@ -354,4 +371,128 @@ func (a *AccessLogger) SetMaxFiles(n int) {
 	if n > 0 {
 		a.maxFiles = n
 	}
+}
+
+// 日期占位符常量
+const (
+	// strftime 风格占位符（兼容 nginx 语法）
+	datePatternYear     = "%Y"  // 4位年份：2025
+	datePatternMonth    = "%m"  // 2位月份：02
+	datePatternDay      = "%d"  // 2位日期：28
+	datePatternHour     = "%H"  // 2位小时：15
+	datePatternMinute   = "%M"  // 2位分钟：04
+	datePatternSecond   = "%S"  // 2位秒数：05
+	datePatternTime     = "%s"  // Unix时间戳
+
+	// Go 风格占位符（简化版）
+	goDatePatternYear     = "{yyyy}"  // 4位年份：2025
+	goDatePatternYear2    = "{yy}"    // 2位年份：25
+	goDatePatternMonth    = "{mm}"    // 2位月份：02
+	goDatePatternMonthN   = "{m}"     // 月份（无前导零）：2
+	goDatePatternDay      = "{dd}"    // 2位日期：28
+	goDatePatternDayN     = "{d}"     // 日期（无前导零）：8
+	goDatePatternHour     = "{HH}"    // 2位小时：15
+	goDatePatternHourN    = "{H}"     // 小时（无前导零）：5
+	goDatePatternMinute   = "{MM}"    // 2位分钟：04
+	goDatePatternMinuteN  = "{M}"     // 分钟（无前导零）：4
+	goDatePatternSecond   = "{SS}"    // 2位秒数：05
+	goDatePatternSecondN  = "{S}"     // 秒数（无前导零）：5
+	goDatePatternDate     = "{date}"  // 完整日期：2006-01-02
+	goDatePatternTime     = "{time}"  // 完整时间：15:04:05
+	goDatePatternDateTime = "{datetime}" // 日期时间：2006-01-02_15-04-05
+)
+
+// containsDatePattern 检查路径中是否包含日期占位符
+func containsDatePattern(path string) bool {
+	return strings.Contains(path, "%") ||
+		strings.Contains(path, "{") && strings.Contains(path, "}")
+}
+
+// expandDatePattern 展开日期占位符
+func (a *AccessLogger) expandDatePattern(t time.Time) string {
+	path := a.logPathRaw
+
+	// 先处理 Go 风格占位符
+	replacements := []struct {
+		pattern string
+		value   string
+	}{
+		{goDatePatternDateTime, t.Format("2006-01-02_15-04-05")},
+		{goDatePatternDate, t.Format("2006-01-02")},
+		{goDatePatternTime, t.Format("15:04:05")},
+		{goDatePatternYear, t.Format("2006")},
+		{goDatePatternYear2, t.Format("06")},
+		{goDatePatternMonth, t.Format("01")},
+		{goDatePatternMonthN, t.Format("1")},
+		{goDatePatternDay, t.Format("02")},
+		{goDatePatternDayN, t.Format("2")},
+		{goDatePatternHour, t.Format("15")},
+		{goDatePatternHourN, t.Format("3")},
+		{goDatePatternMinute, t.Format("04")},
+		{goDatePatternMinuteN, t.Format("4")},
+		{goDatePatternSecond, t.Format("05")},
+		{goDatePatternSecondN, t.Format("5")},
+	}
+
+	for _, repl := range replacements {
+		path = strings.ReplaceAll(path, repl.pattern, repl.value)
+	}
+
+	// 处理 strftime 风格占位符（nginx 兼容）
+	strftimeReplacements := []struct {
+		pattern string
+		value   string
+	}{
+		{datePatternYear, t.Format("2006")},
+		{datePatternMonth, t.Format("01")},
+		{datePatternDay, t.Format("02")},
+		{datePatternHour, t.Format("15")},
+		{datePatternMinute, t.Format("04")},
+		{datePatternSecond, t.Format("05")},
+		{datePatternTime, fmt.Sprintf("%d", t.Unix())},
+	}
+
+	for _, repl := range strftimeReplacements {
+		path = strings.ReplaceAll(path, repl.pattern, repl.value)
+	}
+
+	return path
+}
+
+// getCurrentDateKey 获取当前日期的键值（用于检测日期变化）
+func getCurrentDateKey(t time.Time) string {
+	return t.Format("2006-01-02")
+}
+
+// checkDateRotation 检查是否需要按日期轮转日志文件
+func (a *AccessLogger) checkDateRotation() error {
+	if !a.hasDatePattern {
+		return nil
+	}
+
+	now := time.Now()
+	newDate := getCurrentDateKey(now)
+
+	if newDate != a.currentDate {
+		a.log.Infof("日期已变更，切换日志文件: %s -> %s", a.currentDate, newDate)
+
+		// 关闭当前文件
+		if a.file != nil {
+			a.file.Close()
+			a.file = nil
+		}
+
+		// 更新日期和路径
+		a.currentDate = newDate
+		newPath := a.expandDatePattern(now)
+
+		// 如果路径发生变化，需要重新打开文件
+		if newPath != a.logPath {
+			a.logPath = newPath
+			a.currentSize = 0
+			return a.openLogFile()
+		}
+	}
+
+	return nil
 }

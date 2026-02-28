@@ -7,6 +7,7 @@ import {
   CardBody,
   FormControl,
   FormLabel,
+  FormHelperText,
   Input,
   Switch,
   HStack,
@@ -165,6 +166,8 @@ interface ProxyRuleForm {
     response_headers: Record<string, string>
     access_log_enabled: boolean | null
     access_log_path: string
+    error_log_enabled: boolean | null
+    error_log_path: string
     http2_enabled: boolean | null
     http3_enabled: boolean | null
 }
@@ -280,6 +283,8 @@ const ProxyEdit: React.FC = () => {
     response_headers: {},
     access_log_enabled: null as boolean | null,
     access_log_path: '',
+    error_log_enabled: null as boolean | null,
+    error_log_path: '',
     http2_enabled: null as boolean | null,
     http3_enabled: null as boolean | null,
     // 性能监控配置
@@ -433,6 +438,9 @@ const ProxyEdit: React.FC = () => {
             // 访问日志覆盖
             access_log_enabled: rule.access_log_enabled ?? null,
             access_log_path: rule.access_log_path || '',
+            // 错误日志覆盖
+            error_log_enabled: rule.error_log_enabled ?? null,
+            error_log_path: rule.error_log_path || '',
             // HTTP/2 覆盖
             http2_enabled: rule.http2_enabled ?? null,
             // HTTP/3 覆盖
@@ -606,6 +614,8 @@ const ProxyEdit: React.FC = () => {
           response_headers: formData.response_headers,
           access_log_enabled: formData.access_log_enabled,
           access_log_path: formData.access_log_path || undefined,
+          error_log_enabled: formData.error_log_enabled,
+          error_log_path: formData.error_log_path || undefined,
           http2_enabled: formData.http2_enabled,
           http3_enabled: formData.http3_enabled,
         }),
@@ -867,9 +877,39 @@ const ProxyEdit: React.FC = () => {
                           <Input
                             value={formData.access_log_path}
                             onChange={(e) => handleInputChange('access_log_path', e.target.value)}
-                            placeholder="./data/access.log"
+                            placeholder="./data/access-{yyyy}-{mm}-{dd}.log"
                             size="sm"
                           />
+                          <FormHelperText fontSize="xs">支持日期占位符: {'{yyyy}'}, {'{mm}'}, {'{dd}'}, {'{HH}'}, {'{MM}'}, {'{SS}'} 等</FormHelperText>
+                        </FormControl>
+                      </VStack>
+                    </Box>
+
+                    <Box>
+                      <FormLabel mb={2}>错误日志覆盖</FormLabel>
+                      <Text fontSize="sm" color="gray.500" mb={2}>
+                        可在此站点关闭错误日志或指定单独日志路径，留空则使用系统设置中的全局配置
+                      </Text>
+                      <VStack spacing={3} align="stretch">
+                        <FormControl display="flex" alignItems="center">
+                          <Switch
+                            id="error-log-off"
+                            isChecked={formData.error_log_enabled === false}
+                            onChange={(e) => handleInputChange('error_log_enabled', e.target.checked ? false : null)}
+                          />
+                          <FormLabel htmlFor="error-log-off" mb="0" ml={2}>
+                            关闭此站点错误日志
+                          </FormLabel>
+                        </FormControl>
+                        <FormControl>
+                          <FormLabel fontSize="sm">自定义错误日志路径（留空使用全局）</FormLabel>
+                          <Input
+                            value={formData.error_log_path}
+                            onChange={(e) => handleInputChange('error_log_path', e.target.value)}
+                            placeholder="./data/error-{yyyy}-{mm}-{dd}.log"
+                            size="sm"
+                          />
+                          <FormHelperText fontSize="xs">支持日期占位符: {'{yyyy}'}, {'{mm}'}, {'{dd}'}, {'{HH}'}, {'{MM}'}, {'{SS}'} 等</FormHelperText>
                         </FormControl>
                       </VStack>
                     </Box>

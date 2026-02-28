@@ -99,7 +99,8 @@ const RealtimeLogs: React.FC<RealtimeLogsProps> = ({
   const eventSourceRef = useRef<EventSource | null>(null)
   const wsKeyRef = useRef<string>(`logs-${appName}`)
   const logIdsRef = useRef<Set<string>>(new Set()) // 用于去重
-  
+  const isMountedRef = useRef(true) // 跟踪组件是否挂载，防止内存泄漏
+
   const bgColor = useColorModeValue('gray.50', 'gray.900')
   const borderColor = useColorModeValue('gray.200', 'gray.700')
 
@@ -262,10 +263,11 @@ const RealtimeLogs: React.FC<RealtimeLogsProps> = ({
       console.error('SSE stream error:', error)
       setIsConnected(false)
       setIsStreaming(false)
-      
-      // 自动重连
+
+      // 自动重连（仅在组件仍然挂载时）
       setTimeout(() => {
-        if (isStreaming) {
+        // 检查组件是否仍然挂载，防止内存泄漏
+        if (isMountedRef.current && isStreaming) {
           connectSSE()
         }
       }, 3000)
@@ -374,6 +376,8 @@ const RealtimeLogs: React.FC<RealtimeLogsProps> = ({
   useEffect(() => {
     loadHistoryLogs()
     return () => {
+      // 标记组件已卸载，防止内存泄漏
+      isMountedRef.current = false
       disconnectLogStream()
     }
   }, [appName])

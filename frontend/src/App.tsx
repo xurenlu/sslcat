@@ -35,6 +35,7 @@ import ClusterStatus from './pages/ClusterStatus'
 import TemplateMarket from './pages/TemplateMarket'
 import TemplateDeploy from './pages/TemplateDeploy'
 import BlockManagement from './pages/BlockManagement'
+import ConfigHistory from './pages/ConfigHistory'
 
 // 辅助组件：为需要 Layout 的页面添加 Layout
 const LayoutRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -278,6 +279,13 @@ const AppRoutes: React.FC = () => {
         <AuthGuard>
           <LayoutRoute>
             <ImageOptimization />
+          </LayoutRoute>
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/config-history`} element={
+        <AuthGuard>
+          <LayoutRoute>
+            <ConfigHistory />
           </LayoutRoute>
         </AuthGuard>
       } />

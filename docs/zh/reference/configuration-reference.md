@@ -373,7 +373,7 @@ monitoring:
     enabled: true
     level: "info"
     format: "json"
-    
+
     # 日志输出
     outputs:
       - type: "file"
@@ -381,18 +381,18 @@ monitoring:
         max_size: "100MB"
         max_files: 5
         compress: true
-      
+
       - type: "syslog"
         host: "localhost"
         port: 514
         facility: "local0"
-      
+
       - type: "elasticsearch"
         url: "http://elasticsearch:9200"
         index: "sslcat-logs"
         username: "elastic"
         password: "password"
-    
+
     # 结构化日志
     structured:
       enabled: true
@@ -403,6 +403,298 @@ monitoring:
         request_id: true
         trace_id: true
         span_id: true
+```
+
+### 访问日志配置
+
+SSLcat 支持灵活的访问日志配置，包括日期占位符、多种日志格式和自动轮转。
+
+#### 基本访问日志配置
+
+```json
+{
+  "server": {
+    "access_log_enabled": true,
+    "access_log_format": "nginx",
+    "access_log_path": "./data/access.log",
+    "access_log_max_size": 104857600,
+    "access_log_max_files": 10
+  }
+}
+```
+
+#### 日志路径日期占位符
+
+访问日志路径支持日期占位符，实现按日期自动轮转日志文件。
+
+**Go 风格占位符（推荐）**：
+
+| 占位符 | 说明 | 示例 |
+|--------|------|------|
+| `{yyyy}` | 4位年份 | `2025` |
+| `{yy}` | 2位年份 | `25` |
+| `{mm}` | 2位月份（带前导零） | `02` |
+| `{m}` | 月份（无前导零） | `2` |
+| `{dd}` | 2位日期（带前导零） | `28` |
+| `{d}` | 日期（无前导零） | `8` |
+| `{HH}` | 2位小时（24小时制） | `15` |
+| `{H}` | 小时（无前导零） | `5` |
+| `{MM}` | 2位分钟 | `04` |
+| `{M}` | 分钟（无前导零） | `4` |
+| `{SS}` | 2位秒数 | `05` |
+| `{S}` | 秒数（无前导零） | `5` |
+| `{date}` | 完整日期（YYYY-MM-DD） | `2025-02-28` |
+| `{time}` | 完整时间（HH:MM:SS） | `15:04:05` |
+| `{datetime}` | 日期时间（YYYY-MM-DD_HH-MM-SS） | `2025-02-28_15-04-05` |
+
+**strftime 风格占位符（Nginx 兼容）**：
+
+| 占位符 | 说明 | 示例 |
+|--------|------|------|
+| `%Y` | 4位年份 | `2025` |
+| `%m` | 2位月份 | `02` |
+| `%d` | 2位日期 | `28` |
+| `%H` | 2位小时 | `15` |
+| `%M` | 2位分钟 | `04` |
+| `%S` | 2位秒数 | `05` |
+| `%s` | Unix时间戳 | `1740739445` |
+
+#### 日期占位符示例
+
+**按日轮转日志**：
+```json
+{
+  "server": {
+    "access_log_path": "./data/access-{yyyy}-{mm}-{dd}.log"
+  }
+}
+```
+生成文件：`access-2025-02-28.log`
+
+**按月轮转日志**：
+```json
+{
+  "server": {
+    "access_log_path": "./logs/access-{yyyy}-{mm}.log"
+  }
+}
+```
+生成文件：`access-2025-02.log`
+
+**按小时轮转日志**：
+```json
+{
+  "server": {
+    "access_log_path": "./data/access-{yyyy}-{mm}-{dd}_{HH}.log"
+  }
+}
+```
+生成文件：`access-2025-02-28_15.log`
+
+**Nginx 风格日期路径**：
+```json
+{
+  "server": {
+    "access_log_path": "/var/log/nginx/access-%Y%m%d.log"
+  }
+}
+```
+生成文件：`access-20250228.log`
+
+**按日期目录组织日志**：
+```json
+{
+  "server": {
+    "access_log_path": "./logs/{yyyy}/{mm}/{dd}/access.log"
+  }
+}
+```
+生成目录：`./logs/2025/02/28/access.log`
+
+#### 日志格式
+
+支持三种日志格式：
+
+**Nginx 格式（默认）**：
+```
+192.168.1.100 - - [28/Feb/2025:15:04:05 +0800] "GET /api/users HTTP/1.1" 200 1234 "https://example.com" "Mozilla/5.0" 0.123 "backend:8080"
+```
+
+**Apache 格式**：
+```
+192.168.1.100 - - [28/Feb/2025:15:04:05 +0800] "GET /api/users HTTP/1.1" 200 1234 "https://example.com" "Mozilla/5.0"
+```
+
+**JSON 格式**：
+```json
+{"timestamp":"2025-02-28T15:04:05+08:00","client_ip":"192.168.1.100","method":"GET","url":"/api/users","protocol":"HTTP/1.1","status_code":200,"bytes_sent":1234,"referer":"https://example.com","user_agent":"Mozilla/5.0","request_time":0.123,"upstream_addr":"backend:8080","host":"example.com","request_id":"abc123"}
+```
+
+#### 日志轮转
+
+**按大小轮转（无日期占位符时）**：
+当日志文件超过 `access_log_max_size` 时自动轮转，保留最多 `access_log_max_files` 个旧文件。
+
+```json
+{
+  "server": {
+    "access_log_path": "./data/access.log",
+    "access_log_max_size": 104857600,
+    "access_log_max_files": 10
+  }
+}
+```
+
+轮转后的文件名：`access.log.20250228-150405`
+
+**按日期轮转（使用日期占位符）**：
+使用日期占位符时，系统会在日期变化时自动创建新的日志文件。此时 `access_log_max_size` 配置会被忽略。
+
+```json
+{
+  "server": {
+    "access_log_path": "./data/access-{yyyy}-{mm}-{dd}.log"
+  }
+}
+```
+
+每个日期会自动创建新文件：
+- `access-2025-02-27.log`
+- `access-2025-02-28.log`
+- `access-2025-03-01.log`
+
+#### 站点级别访问日志配置
+
+每个站点可以单独配置访问日志路径：
+
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "api.example.com",
+        "target": "http://localhost:8080",
+        "access_log_enabled": true,
+        "access_log_path": "./logs/api-{yyyy}-{mm}-{dd}.log"
+      },
+      {
+        "domain": "web.example.com",
+        "target": "http://localhost:8081",
+        "access_log_enabled": true,
+        "access_log_path": "./logs/web-{yyyy}-{mm}-{dd}.log"
+      }
+    ]
+  }
+}
+```
+
+### 错误日志配置
+
+SSLcat 支持灵活的错误日志配置，同样支持日期占位符和按站点独立配置。
+
+#### 基本错误日志配置
+
+```json
+{
+  "server": {
+    "error_log_enabled": true,
+    "error_log_path": "./data/error.log",
+    "error_log_max_size": 104857600,
+    "error_log_max_files": 10
+  }
+}
+```
+
+#### 错误日志日期占位符
+
+错误日志路径支持与访问日志相同的日期占位符：
+
+**按日轮转错误日志**：
+```json
+{
+  "server": {
+    "error_log_path": "./data/error-{yyyy}-{mm}-{dd}.log"
+  }
+}
+```
+生成文件：`error-2025-02-28.log`
+
+**按月轮转错误日志**：
+```json
+{
+  "server": {
+    "error_log_path": "./logs/error-{yyyy}-{mm}.log"
+  }
+}
+```
+生成文件：`error-2025-02.log`
+
+**按日期目录组织错误日志**：
+```json
+{
+  "server": {
+    "error_log_path": "./logs/{yyyy}/{mm}/{dd}/error.log"
+  }
+}
+```
+生成目录：`./logs/2025/02/28/error.log`
+
+#### 站点级别错误日志配置
+
+每个站点可以单独配置错误日志路径：
+
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "api.example.com",
+        "target": "http://localhost:8080",
+        "error_log_enabled": true,
+        "error_log_path": "./logs/api-error-{yyyy}-{mm}-{dd}.log"
+      },
+      {
+        "domain": "web.example.com",
+        "target": "http://localhost:8081",
+        "error_log_enabled": true,
+        "error_log_path": "./logs/web-error-{yyyy}-{mm}-{dd}.log"
+      }
+    ]
+  }
+}
+```
+
+#### 错误日志内容
+
+错误日志记录以下类型错误：
+- 应用程序运行时错误
+- PHP 执行错误（针对 PHP 站点）
+- 代理连接错误
+- SSL 证书错误
+- 其他系统级错误
+
+错误日志格式示例：
+```
+[2025-02-28 15:04:05] [ERROR] Connection refused domain=api.example.com type=proxy_error backend=192.168.1.100:8080
+[2025-02-28 15:05:10] [ERROR] PHP Fatal error domain=php.example.com type=php_error file=/var/www/index.php line=42
+```
+
+#### 关闭站点错误日志
+
+如果不需要为特定站点记录错误日志，可以单独关闭：
+
+```json
+{
+  "proxy": {
+    "rules": [
+      {
+        "domain": "internal.example.com",
+        "target": "http://localhost:8080",
+        "error_log_enabled": false
+      }
+    ]
+  }
+}
 ```
 
 ## 安全配置

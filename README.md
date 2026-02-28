@@ -207,6 +207,34 @@ git push sslcat main
 
 ---
 
+## ❓ FAQ / 常见问题
+
+### Q: 忘记登录密码了怎么办？ / How to reset forgotten password?
+
+如果你忘记了 Web 管理界面的登录密码，可以使用命令行工具重置：
+
+If you forget your web management interface login password, you can reset it using the command-line tool:
+
+```bash
+# 进入 sslcat 目录 / Go to sslcat directory
+cd /opt/sslcat  # 或你的 sslcat 安装目录 / or your sslcat installation directory
+
+# 重置密码 / Reset password
+# 用法: go run tools/cmd/reset_password/main.go <用户名> <新密码>
+# Usage: go run tools/cmd/reset_password/main.go <username> <new_password>
+go run tools/cmd/reset_password/main.go admin "your_new_password"
+
+# 示例 / Example:
+go run tools/cmd/reset_password/main.go admin "MyNewPass123!"
+```
+
+**注意 / Note**:
+- 密码必须包含字母和数字 / Password must contain letters and numbers
+- 重置后无需重启服务 / No need to restart service after reset
+- 默认管理员账号 / Default admin account: `admin` / `admin*9527`
+
+---
+
 ## 📖 Documentation / 文档
 
 For complete documentation, please visit / 完整文档请访问：

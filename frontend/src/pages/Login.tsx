@@ -84,6 +84,15 @@ const Login: React.FC = () => {
     }
   }, [systemConfig.require_captcha, adminPrefix])
 
+  // 清理验证码图片 URL，防止内存泄漏
+  useEffect(() => {
+    return () => {
+      if (captchaImageUrl) {
+        URL.revokeObjectURL(captchaImageUrl)
+      }
+    }
+  }, [captchaImageUrl])
+
   const loadSystemConfig = async () => {
     try {
       // 使用公开的 API 端点，无需认证

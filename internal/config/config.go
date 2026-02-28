@@ -82,6 +82,12 @@ type ServerConfig struct {
 	AccessLogMaxSize  int64  `json:"access_log_max_size"` // bytes
 	AccessLogMaxFiles int    `json:"access_log_max_files"`
 
+	// 错误日志
+	ErrorLogEnabled  bool   `json:"error_log_enabled"`
+	ErrorLogPath     string `json:"error_log_path"`
+	ErrorLogMaxSize  int64  `json:"error_log_max_size"` // bytes
+	ErrorLogMaxFiles int    `json:"error_log_max_files"`
+
 	// 共享内存缓存
 	SharedCacheMaxSizeMB int    `json:"shared_cache_max_size_mb"` // 共享缓存最大容量（MB）
 	CacheBackendType     string `json:"cache_backend_type"`       // 缓存后端类型：bigcache/simple/auto（默认simple）
@@ -282,6 +288,10 @@ type ProxyRule struct {
 	// 访问日志覆盖（nil 表示使用全局设置）
 	AccessLogEnabled *bool  `json:"access_log_enabled,omitempty"` // 是否记录访问日志，nil=继承全局
 	AccessLogPath    string `json:"access_log_path,omitempty"`    // 覆盖日志路径，空=使用全局
+
+	// 错误日志覆盖（nil 表示使用全局设置）
+	ErrorLogEnabled *bool  `json:"error_log_enabled,omitempty"` // 是否记录错误日志，nil=继承全局
+	ErrorLogPath    string `json:"error_log_path,omitempty"`    // 覆盖错误日志路径，空=使用全局
 
 	// HTTP/2 覆盖（nil 表示使用全局设置）
 	HTTP2Enabled *bool `json:"http2_enabled,omitempty"` // 是否启用 HTTP/2，nil=继承全局
@@ -674,6 +684,10 @@ type StaticSite struct {
 	AccessLogEnabled *bool  `json:"access_log_enabled,omitempty"`
 	AccessLogPath    string `json:"access_log_path,omitempty"`
 
+	// 错误日志覆盖（仅 ErrorLogEnabled 有值时生效，空路径表示使用全局）
+	ErrorLogEnabled *bool  `json:"error_log_enabled,omitempty"`
+	ErrorLogPath    string `json:"error_log_path,omitempty"`
+
 	// HTTP/2 覆盖（nil 表示使用全局设置）
 	HTTP2Enabled *bool `json:"http2_enabled,omitempty"`
 	// HTTP/3 覆盖（nil 表示使用全局设置）
@@ -735,6 +749,10 @@ type PHPSite struct {
 	// 访问日志覆盖（仅 AccessLogEnabled 有值时生效，空路径表示使用全局）
 	AccessLogEnabled *bool  `json:"access_log_enabled,omitempty"`
 	AccessLogPath    string `json:"access_log_path,omitempty"`
+
+	// 错误日志覆盖（仅 ErrorLogEnabled 有值时生效，空路径表示使用全局）
+	ErrorLogEnabled *bool  `json:"error_log_enabled,omitempty"`
+	ErrorLogPath    string `json:"error_log_path,omitempty"`
 
 	// HTTP/2 覆盖（nil 表示使用全局设置）
 	HTTP2Enabled *bool `json:"http2_enabled,omitempty"`
@@ -935,6 +953,10 @@ func Load(configFile string) (*Config, error) {
 			AccessLogPath:        "./data/access.log",
 			AccessLogMaxSize:     100 * 1024 * 1024,
 			AccessLogMaxFiles:    10,
+			ErrorLogEnabled:      true,
+			ErrorLogPath:         "./data/error.log",
+			ErrorLogMaxSize:      100 * 1024 * 1024,
+			ErrorLogMaxFiles:     10,
 			SharedCacheMaxSizeMB: 10,       // 从64MB降低到10MB（资源受限模式）
 			ReadTimeoutSec:       1800,     // 30分钟
 			WriteTimeoutSec:      1800,     // 30分钟
@@ -1490,6 +1512,10 @@ func getDefaultConfig() *Config {
 			AccessLogPath:     "./data/access.log",
 			AccessLogMaxSize:  100 * 1024 * 1024,
 			AccessLogMaxFiles: 10,
+			ErrorLogEnabled:   true,
+			ErrorLogPath:      "./data/error.log",
+			ErrorLogMaxSize:   100 * 1024 * 1024,
+			ErrorLogMaxFiles:  10,
 			ReadTimeoutSec:    1800,
 			WriteTimeoutSec:   1800,
 			IdleTimeoutSec:    120,

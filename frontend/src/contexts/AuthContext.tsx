@@ -173,22 +173,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('等待 ConfigContext 加载完成...')
       return
     }
-    
+
     // 只在有 adminPrefix 且不在登录页时检查认证
     if (adminPrefix && !window.location.pathname.includes('/login')) {
       console.log('Auth useEffect triggered, adminPrefix:', adminPrefix)
-      // 直接调用，不依赖 checkAuth 函数引用
-      const doCheck = async () => {
-        await checkAuth()
-      }
-      doCheck()
+      checkAuth()
     } else {
       // 在登录页面或没有 adminPrefix，直接设置加载完成
       console.log('跳过认证检查（登录页或无 adminPrefix）')
       setIsLoading(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminPrefix, configLoading]) // 依赖 adminPrefix 和 configLoading
+  }, [adminPrefix, configLoading, checkAuth]) // 包含所有依赖，checkAuth 已用 useCallback 稳定引用
 
   const value: AuthContextType = {
     user,
