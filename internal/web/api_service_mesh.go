@@ -81,14 +81,36 @@ func (s *Server) handleServiceMeshUpdateConfig(w http.ResponseWriter, r *http.Re
 			s.proxyManager,
 			s.config,
 		))
+	} else if s.proxyManager.GetServiceMeshManager() != nil && !req.Enabled {
+		// 禁用 Service Mesh
+		s.proxyManager.SetServiceMeshManager(nil)
 	} else if s.proxyManager.GetServiceMeshManager() != nil {
 		s.proxyManager.GetServiceMeshManager().UpdateConfig(req.Config)
 	}
 
-	s.sendJSON(w, map[string]interface{}{
-		"success": true,
-		"message": "Service Mesh configuration updated",
-	})
+	// 获取更新后的状态并发送回客户端
+	cfg := s.proxyManager.GetServiceMeshManager()
+	stats := proxy.ServiceMeshStats{}
+	services := []*proxy.ServiceInfo{}
+	breakers := map[string]*proxy.CircuitBreakerState{}
+	meshType := proxy.ServiceMeshType("istio")
+
+	if cfg != nil {
+		meshType = cfg.GetConfig().Type
+		stats = cfg.GetStats()
+		services = cfg.GetServices()
+		breakers = cfg.GetCircuitBreakerStates()
+	}
+
+	response := ServiceMeshResponse{
+		Enabled:         cfg != nil,
+		Type:            meshType,
+		Stats:           stats,
+		Services:        services,
+		CircuitBreakers: breakers,
+	}
+
+	s.sendJSON(w, response)
 }
 
 // handleServiceMeshStats 获取 Service Mesh 统计

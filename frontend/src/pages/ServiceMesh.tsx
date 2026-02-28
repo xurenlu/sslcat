@@ -127,7 +127,7 @@ const ServiceMesh: React.FC = () => {
 
   const handleToggleEnabled = async () => {
     try {
-      await axios.post(buildApiPath(adminPrefix, '/api/service-mesh/config'), {
+      const response = await axios.post(buildApiPath(adminPrefix, '/api/service-mesh/config'), {
         enabled: !config?.enabled,
         type: config?.type || 'istio',
         config: {
@@ -135,7 +135,8 @@ const ServiceMesh: React.FC = () => {
           type: config?.type || 'istio',
         },
       });
-      await fetchConfig();
+      // 直接使用服务器返回的最新配置
+      setConfig(response.data);
       toast({
         title: '成功',
         description: `Service Mesh 已${!config?.enabled ? '启用' : '禁用'}`,

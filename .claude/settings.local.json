@@ -47,7 +47,8 @@
       "Bash(go mod tidy:*)",
       "Bash(echo:*)",
       "Bash(pkill:*)",
-      "Bash(lsof:*)"
+      "Bash(lsof:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []
