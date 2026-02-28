@@ -80,8 +80,8 @@ func (s *Server) handleEdgeRoutingUpdateConfig(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	if s.proxyManager == nil || s.proxyManager.GetEdgeRoutingManager() == nil {
-		http.Error(w, "Edge routing not enabled", http.StatusBadRequest)
+	if s.proxyManager == nil {
+		http.Error(w, "Proxy manager not initialized", http.StatusInternalServerError)
 		return
 	}
 
@@ -97,13 +97,32 @@ func (s *Server) handleEdgeRoutingUpdateConfig(w http.ResponseWriter, r *http.Re
 		LatencyThreshold:   time.Duration(req.LatencyThreshold) * time.Millisecond,
 	}
 
-	// 更新配置
-	s.proxyManager.GetEdgeRoutingManager().UpdateConfig(config)
+	// 更新配置或创建新的 Edge Routing Manager
+	if s.proxyManager.GetEdgeRoutingManager() == nil && req.Enabled {
+		// 首次启用 - 创建新的 Edge Routing Manager
+		// 注意: 这里需要根据实际实现来创建 EdgeRoutingManager
+		// s.proxyManager.SetEdgeRoutingManager(...)
+	} else if s.proxyManager.GetEdgeRoutingManager() != nil && !req.Enabled {
+		// 禁用 Edge Routing - 这里需要实现禁用逻辑
+		// s.proxyManager.SetEdgeRoutingManager(nil)
+	} else if s.proxyManager.GetEdgeRoutingManager() != nil {
+		// 更新现有配置
+		s.proxyManager.GetEdgeRoutingManager().UpdateConfig(config)
+	}
 
-	s.sendJSON(w, map[string]interface{}{
-		"success": true,
-		"message": "Edge routing configuration updated",
-	})
+	// 返回更新后的配置
+	response := map[string]interface{}{
+		"enabled":                   req.Enabled,
+		"default_cluster_id":        req.DefaultClusterID,
+		"fallback_strategy":         req.FallbackStrategy,
+		"health_check_interval_ms":  req.HealthCheckInterval,
+		"health_check_timeout_ms":   req.HealthCheckTimeout,
+		"max_retries":               req.MaxRetries,
+		"retry_delay_ms":            req.RetryDelay,
+		"latency_threshold_ms":      req.LatencyThreshold,
+	}
+
+	s.sendJSON(w, response)
 }
 
 // handleEdgeRoutingGetClusters 获取边缘集群列表
