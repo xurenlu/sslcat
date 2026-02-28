@@ -282,11 +282,32 @@ const ConfigHistory: React.FC = () => {
       return
     }
 
+    // 找到对应的版本对象，按时间戳排序
+    const versionsToCompare = versions.filter(v => selectedArray.has(v.id))
+    if (versionsToCompare.length !== 2) {
+      toast({
+        title: '版本错误',
+        description: '无法找到选中的版本',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+      return
+    }
+
+    // 按时间戳排序，旧版本在前，新版本在后
+    versionsToCompare.sort((a, b) =>
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    )
+
+    const oldVersionId = versionsToCompare[0].id
+    const newVersionId = versionsToCompare[1].id
+
     try {
       const response = await fetch(
         buildApiPath(
           adminPrefix,
-          `/api/config/versions/diff?v1=${selectedArray[0]}&v2=${selectedArray[1]}`
+          `/api/config/versions/diff?v1=${oldVersionId}&v2=${newVersionId}`
         ),
         { credentials: 'include' }
       )
