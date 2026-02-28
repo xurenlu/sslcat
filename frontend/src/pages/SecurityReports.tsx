@@ -101,11 +101,22 @@ const SecurityReports: React.FC = () => {
   const handleGenerate = async () => {
     setGenerating(true)
     try {
+      // 转换为后端期望的蛇形命名格式
+      const requestBody = {
+        report_type: config.reportType,
+        start_date: config.startDate,
+        end_date: config.endDate,
+        include_charts: config.includeCharts,
+        include_attack_details: config.includeAttackDetails,
+        include_recommendations: config.includeRecommendations,
+        format: config.format,
+      }
+
       const response = await fetch(buildApiPath(adminPrefix, '/api/security-reports/generate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(config),
+        body: JSON.stringify(requestBody),
       })
 
       if (response.ok) {
