@@ -121,6 +121,17 @@ const EdgeRouting: React.FC = () => {
   const { isOpen: isLocationOpen, onOpen: onLocationOpen, onClose: onLocationClose } = useDisclosure();
   const { isOpen: isClusterOpen, onOpen: onClusterOpen, onClose: onClusterClose } = useDisclosure();
   const [editingLocation, setEditingLocation] = useState<EdgeLocation | null>(null);
+  const [locationForm, setLocationForm] = useState({
+    id: '',
+    name: '',
+    region: '',
+    country: '',
+    city: '',
+    latitude: 0,
+    longitude: 0,
+    priority: 1,
+    health_check: '',
+  });
 
   const fetchConfig = async () => {
     try {
@@ -254,6 +265,71 @@ const EdgeRouting: React.FC = () => {
     }
   };
 
+  const handleOpenAddLocationModal = () => {
+    setLocationForm({
+      id: '',
+      name: '',
+      region: '',
+      country: '',
+      city: '',
+      latitude: 0,
+      longitude: 0,
+      priority: 1,
+      health_check: '',
+    });
+    onLocationOpen();
+  };
+
+  const handleCloseLocationModal = () => {
+    setLocationForm({
+      id: '',
+      name: '',
+      region: '',
+      country: '',
+      city: '',
+      latitude: 0,
+      longitude: 0,
+      priority: 1,
+      health_check: '',
+    });
+    onLocationClose();
+  };
+
+  const handleSubmitLocation = async () => {
+    // 验证必填字段
+    if (!locationForm.id || !locationForm.name || !locationForm.region || !locationForm.country || !locationForm.city) {
+      toast({
+        title: '验证失败',
+        description: '请填写所有必填字段',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
+
+    try {
+      await axios.post(buildApiPath(adminPrefix, '/api/edge-routing/location'), {
+        cluster_id: 'default',
+        location: locationForm,
+      });
+      await fetchConfig();
+      handleCloseLocationModal();
+      toast({
+        title: '成功',
+        description: '边缘节点已添加',
+        status: 'success',
+        duration: 3000,
+      });
+    } catch (error) {
+      toast({
+        title: '操作失败',
+        description: '无法添加边缘节点',
+        status: 'error',
+        duration: 3000,
+      });
+    }
+  };
+
   if (loading) {
     return (
       <Container maxW="container.xl" py={8}>
@@ -374,7 +450,7 @@ const EdgeRouting: React.FC = () => {
                   <Card>
                     <CardHeader display="flex" justifyContent="space-between">
                       <Heading size="md">边缘节点列表</Heading>
-                      <Button leftIcon={<FiPlus />} size="sm" colorScheme="blue">
+                      <Button leftIcon={<FiPlus />} size="sm" colorScheme="blue" onClick={handleOpenAddLocationModal}>
                         添加节点
                       </Button>
                     </CardHeader>
@@ -675,6 +751,132 @@ const EdgeRouting: React.FC = () => {
           </>
         )}
       </VStack>
+
+      {/* Add Location Modal */}
+      <Modal isOpen={isLocationOpen} onClose={handleCloseLocationModal} size="lg">
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>添加边缘节点</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={4}>
+              <HStack spacing={4} width="100%">
+                <FormControl isRequired>
+                  <FormLabel>节点 ID</FormLabel>
+                  <Input
+                    placeholder="例如: cn-north-1"
+                    value={locationForm.id}
+                    onChange={(e) => setLocationForm({ ...locationForm, id: e.target.value })}
+                  />
+                </FormControl>
+                <FormControl isRequired>
+                  <FormLabel>节点名称</FormLabel>
+                  <Input
+                    placeholder="例如: 北京节点"
+                    value={locationForm.name}
+                    onChange={(e) => setLocationForm({ ...locationForm, name: e.target.value })}
+                  />
+                </FormControl>
+              </HStack>
+
+              <HStack spacing={4} width="100%">
+                <FormControl isRequired>
+                  <FormLabel>区域</FormLabel>
+                  <Input
+                    placeholder="例如: cn-north"
+                    value={locationForm.region}
+                    onChange={(e) => setLocationForm({ ...locationForm, region: e.target.value })}
+                  />
+                </FormControl>
+                <FormControl isRequired>
+                  <FormLabel>国家代码</FormLabel>
+                  <Input
+                    placeholder="例如: CN"
+                    value={locationForm.country}
+                    onChange={(e) => setLocationForm({ ...locationForm, country: e.target.value })}
+                  />
+                </FormControl>
+              </HStack>
+
+              <FormControl isRequired>
+                <FormLabel>城市</FormLabel>
+                <Input
+                  placeholder="例如: 北京"
+                  value={locationForm.city}
+                  onChange={(e) => setLocationForm({ ...locationForm, city: e.target.value })}
+                />
+              </FormControl>
+
+              <HStack spacing={4} width="100%">
+                <FormControl>
+                  <FormLabel>纬度</FormLabel>
+                  <NumberInput
+                    value={locationForm.latitude}
+                    onChange={(_, value) => setLocationForm({ ...locationForm, latitude: value })}
+                    precision={6}
+                    step={0.0001}
+                  >
+                    <NumberInputField />
+                    <NumberInputStepper>
+                      <NumberIncrementStepper />
+                      <NumberDecrementStepper />
+                    </NumberInputStepper>
+                  </NumberInput>
+                </FormControl>
+                <FormControl>
+                  <FormLabel>经度</FormLabel>
+                  <NumberInput
+                    value={locationForm.longitude}
+                    onChange={(_, value) => setLocationForm({ ...locationForm, longitude: value })}
+                    precision={6}
+                    step={0.0001}
+                  >
+                    <NumberInputField />
+                    <NumberInputStepper>
+                      <NumberIncrementStepper />
+                      <NumberDecrementStepper />
+                    </NumberInputStepper>
+                  </NumberInput>
+                </FormControl>
+              </HStack>
+
+              <HStack spacing={4} width="100%">
+                <FormControl>
+                  <FormLabel>优先级</FormLabel>
+                  <NumberInput
+                    value={locationForm.priority}
+                    onChange={(_, value) => setLocationForm({ ...locationForm, priority: value })}
+                    min={1}
+                    max={10}
+                  >
+                    <NumberInputField />
+                    <NumberInputStepper>
+                      <NumberIncrementStepper />
+                      <NumberDecrementStepper />
+                    </NumberInputStepper>
+                  </NumberInput>
+                </FormControl>
+                <FormControl>
+                  <FormLabel>健康检查 URL</FormLabel>
+                  <Input
+                    placeholder="例如: http://example.com/health"
+                    value={locationForm.health_check}
+                    onChange={(e) => setLocationForm({ ...locationForm, health_check: e.target.value })}
+                  />
+                </FormControl>
+              </HStack>
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={handleCloseLocationModal}>
+              取消
+            </Button>
+            <Button colorScheme="blue" onClick={handleSubmitLocation}>
+              添加
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </Container>
   );
 };

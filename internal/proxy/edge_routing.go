@@ -130,8 +130,8 @@ func (m *EdgeRoutingManager) Start() error {
 
 	m.log.Info("Starting edge routing manager")
 
-	// 初始化默认边缘节点
-	m.initDefaultEdges()
+	// 不再初始化默认边缘节点，由用户手动添加
+	// m.initDefaultEdges()
 
 	// 启动健康检查
 	go m.healthCheckLoop()
