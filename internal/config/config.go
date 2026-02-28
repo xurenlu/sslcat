@@ -1218,6 +1218,11 @@ func Load(configFile string) (*Config, error) {
 	// 执行代理规则迁移
 	config.migrateProxyRules()
 
+	// 支持通过环境变量覆盖 SSL email（用于 --email 命令行参数）
+	if email := os.Getenv("SSLCAT_SSL_EMAIL"); email != "" {
+		config.SSL.Email = email
+	}
+
 	// 验证配置（包括循环检测）
 	if err := ValidateConfigWithLoopDetection(config); err != nil {
 		return nil, fmt.Errorf("configuration validation failed: %w", err)

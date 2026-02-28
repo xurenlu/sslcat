@@ -248,6 +248,13 @@ func main() {
 		}
 	}()
 
+	// 如果提供了 --email 参数，需要先设置到环境变量或临时配置中
+	// 因为 config.Load 会验证 SSL email
+	if *email != "" {
+		// 设置环境变量供 config.Load 使用
+		os.Setenv("SSLCAT_SSL_EMAIL", *email)
+	}
+
 	// 加载配置
 	cfg, err := config.Load(*configFile)
 	if err != nil {
