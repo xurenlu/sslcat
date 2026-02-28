@@ -115,8 +115,9 @@ type Server struct {
 	// Runner 模块
 	gitServer *runner.GitServer
 	// 统计收集器和API
-	statisticsCollector *statistics.Collector
-	statisticsAPI       *StatisticsAPI
+	statisticsCollector        *statistics.Collector
+	statisticsAPI              *StatisticsAPI
+	apiPerformanceCollector    *statistics.APIPerformanceCollector
 	// 静态文件处理器
 	staticHandler *StaticFileHandler
 	// AI 安全分析器
@@ -479,6 +480,9 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	statsEnabled := true // 默认启用，可以通过配置控制
 	server.statisticsCollector = statistics.NewCollector("./data/statistics", statsEnabled)
 	server.statisticsAPI = NewStatisticsAPI(server.statisticsCollector, server)
+
+	// 初始化 API 性能收集器
+	server.apiPerformanceCollector = statistics.NewAPIPerformanceCollector()
 
 	// 设置慢请求记录器到代理管理器
 	slowRequestAdapter := slowrequest.NewAdapter(server.slowRequestManager)
@@ -1245,6 +1249,12 @@ func (s *Server) setupRoutes() {
 		s.statisticsAPI.RegisterRoutes(s.mux, s.config.AdminPrefix+"/api")
 	}
 
+	// API 性能监控 API
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/performance/apis", s.handleAPIPerformanceList)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/performance/detail", s.handleAPIPerformanceDetail)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/performance/summary", s.handleAPIPerformanceSummary)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/performance/config", s.handleAPIPerformanceConfig)
+
 	// 慢请求API
 	slowRequestAPI := NewSlowRequestAPI(s.slowRequestManager, s)
 	slowRequestAPI.RegisterRoutes(s.mux, s.config.AdminPrefix+"/api")
@@ -1505,6 +1515,21 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			perfMonitor := s.monitorManager.GetPerformanceMonitor()
 			isError := wrappedWriter.statusCode >= 400
 			perfMonitor.RecordRequest(duration, isError)
+		}
+
+		// 记录 API 性能数据（仅针对 API 路径）
+		if s.apiPerformanceCollector != nil && s.apiPerformanceCollector.IsEnabled() {
+			// 只记录 /api/ 开头的请求
+			if strings.HasPrefix(r.URL.Path, s.config.AdminPrefix+"/api/") {
+				entry := statistics.APIPerformanceEntry{
+					Path:         r.URL.Path,
+					Method:       r.Method,
+					Status:       wrappedWriter.statusCode,
+					ResponseTime: duration,
+					Timestamp:    time.Now(),
+				}
+				s.apiPerformanceCollector.Record(entry)
+			}
 		}
 	}()
 
@@ -2706,6 +2731,11 @@ func (s *Server) GetDDoSProtector() *ddos.Protector {
 // GetStatisticsCollector 获取统计收集器
 func (s *Server) GetStatisticsCollector() *statistics.Collector {
 	return s.statisticsCollector
+}
+
+// GetAPIPerformanceCollector 获取API性能收集器
+func (s *Server) GetAPIPerformanceCollector() *statistics.APIPerformanceCollector {
+	return s.apiPerformanceCollector
 }
 
 // GetMonitorManager 获取监控管理器

@@ -37,6 +37,7 @@ import TemplateDeploy from './pages/TemplateDeploy'
 import BlockManagement from './pages/BlockManagement'
 import ConfigHistory from './pages/ConfigHistory'
 import AIAnalytics from './pages/AIAnalytics'
+import APIPerformance from './pages/APIPerformance'
 
 // 辅助组件：为需要 Layout 的页面添加 Layout
 const LayoutRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -294,6 +295,13 @@ const AppRoutes: React.FC = () => {
         <AuthGuard>
           <LayoutRoute>
             <AIAnalytics />
+          </LayoutRoute>
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/api-performance`} element={
+        <AuthGuard>
+          <LayoutRoute>
+            <APIPerformance />
           </LayoutRoute>
         </AuthGuard>
       } />

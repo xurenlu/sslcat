@@ -45,6 +45,7 @@ import {
   FiSearch,
   FiX,
   FiArchive,
+  FiTrendingUp,
 } from 'react-icons/fi'
 import { FaRobot } from 'react-icons/fa'
 
@@ -132,6 +133,7 @@ const SidebarContent = () => {
       items: [
         { name: t.navigation.dashboard, icon: FiHome, path: buildPath(adminPrefix, '/dashboard'), keywords: 'home stats 首页 概览' },
         { name: t.navigation.statistics, icon: FiBarChart2, path: buildPath(adminPrefix, '/statistics'), keywords: 'stats requests traffic 流量 统计' },
+        { name: 'API 性能', icon: FiTrendingUp, path: buildPath(adminPrefix, '/api-performance'), keywords: 'api performance latency slow 响应 性能 排行榜' },
         { name: t.navigation.monitoring || 'System Monitoring', icon: FiActivity, path: buildPath(adminPrefix, '/monitoring'), keywords: 'cpu memory watchdog 监控 性能' },
         { name: t.navigation.slowRequests, icon: FiClock, path: buildPath(adminPrefix, '/slow-requests'), keywords: 'performance slow delay 慢日志 延迟' },
       ]
