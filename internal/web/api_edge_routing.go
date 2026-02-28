@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -10,14 +11,18 @@ import (
 
 // EdgeRoutingConfigRequest 边缘路由配置请求
 type EdgeRoutingConfigRequest struct {
-	Enabled              bool          `json:"enabled"`
-	DefaultClusterID     string        `json:"default_cluster_id"`
-	FallbackStrategy     string        `json:"fallback_strategy"`
-	HealthCheckInterval  int           `json:"health_check_interval"`  // 毫秒
-	HealthCheckTimeout   int           `json:"health_check_timeout"`   // 毫秒
-	MaxRetries           int           `json:"max_retries"`
-	RetryDelay           int           `json:"retry_delay"`            // 毫秒
-	LatencyThreshold     int           `json:"latency_threshold"`      // 毫秒
+	Enabled                  bool   `json:"enabled"`
+	DefaultClusterID         string `json:"default_cluster_id"`
+	FallbackStrategy         string `json:"fallback_strategy"`
+	HealthCheckInterval      int    `json:"health_check_interval"` // 毫秒
+	HealthCheckIntervalMs    int    `json:"health_check_interval_ms"`
+	HealthCheckTimeout       int    `json:"health_check_timeout"` // 毫秒
+	HealthCheckTimeoutMs     int    `json:"health_check_timeout_ms"`
+	MaxRetries               int    `json:"max_retries"`
+	RetryDelay               int    `json:"retry_delay"` // 毫秒
+	RetryDelayMs             int    `json:"retry_delay_ms"`
+	LatencyThreshold         int    `json:"latency_threshold"` // 毫秒
+	LatencyThresholdMs       int    `json:"latency_threshold_ms"`
 }
 
 // EdgeLocationRequest 边缘位置请求
@@ -39,6 +44,18 @@ type EdgeClusterRequest struct {
 	Name        string                  `json:"name"`
 	Locations   []EdgeLocationRequest   `json:"locations"`
 	LoadBalance string                  `json:"load_balance"`
+}
+
+// handleEdgeRoutingConfig 处理边缘路由配置的 GET 和 POST 请求
+func (s *Server) handleEdgeRoutingConfig(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		s.handleEdgeRoutingGetConfig(w, r)
+	case http.MethodPost:
+		s.handleEdgeRoutingUpdateConfig(w, r)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 // handleEdgeRoutingGetConfig 获取边缘路由配置
@@ -85,16 +102,37 @@ func (s *Server) handleEdgeRoutingUpdateConfig(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// 兼容两种字段命名格式：优先使用 _ms 后缀的值
+	healthCheckInterval := req.HealthCheckIntervalMs
+	if healthCheckInterval == 0 && req.HealthCheckInterval > 0 {
+		healthCheckInterval = req.HealthCheckInterval
+	}
+
+	healthCheckTimeout := req.HealthCheckTimeoutMs
+	if healthCheckTimeout == 0 && req.HealthCheckTimeout > 0 {
+		healthCheckTimeout = req.HealthCheckTimeout
+	}
+
+	retryDelay := req.RetryDelayMs
+	if retryDelay == 0 && req.RetryDelay > 0 {
+		retryDelay = req.RetryDelay
+	}
+
+	latencyThreshold := req.LatencyThresholdMs
+	if latencyThreshold == 0 && req.LatencyThreshold > 0 {
+		latencyThreshold = req.LatencyThreshold
+	}
+
 	// 转换请求为配置
 	config := &proxy.EdgeRoutingConfig{
 		Enabled:            req.Enabled,
 		DefaultClusterID:   req.DefaultClusterID,
 		FallbackStrategy:   req.FallbackStrategy,
-		HealthCheckInterval: time.Duration(req.HealthCheckInterval) * time.Millisecond,
-		HealthCheckTimeout:  time.Duration(req.HealthCheckTimeout) * time.Millisecond,
+		HealthCheckInterval: time.Duration(healthCheckInterval) * time.Millisecond,
+		HealthCheckTimeout:  time.Duration(healthCheckTimeout) * time.Millisecond,
 		MaxRetries:         req.MaxRetries,
-		RetryDelay:         time.Duration(req.RetryDelay) * time.Millisecond,
-		LatencyThreshold:   time.Duration(req.LatencyThreshold) * time.Millisecond,
+		RetryDelay:         time.Duration(retryDelay) * time.Millisecond,
+		LatencyThreshold:   time.Duration(latencyThreshold) * time.Millisecond,
 	}
 
 	// 更新配置或创建新的 Edge Routing Manager
@@ -110,16 +148,16 @@ func (s *Server) handleEdgeRoutingUpdateConfig(w http.ResponseWriter, r *http.Re
 		s.proxyManager.GetEdgeRoutingManager().UpdateConfig(config)
 	}
 
-	// 返回更新后的配置
+	// 返回更新后的配置 - 使用 _ms 后缀格式
 	response := map[string]interface{}{
 		"enabled":                   req.Enabled,
 		"default_cluster_id":        req.DefaultClusterID,
 		"fallback_strategy":         req.FallbackStrategy,
-		"health_check_interval_ms":  req.HealthCheckInterval,
-		"health_check_timeout_ms":   req.HealthCheckTimeout,
+		"health_check_interval_ms":  healthCheckInterval,
+		"health_check_timeout_ms":   healthCheckTimeout,
 		"max_retries":               req.MaxRetries,
-		"retry_delay_ms":            req.RetryDelay,
-		"latency_threshold_ms":      req.LatencyThreshold,
+		"retry_delay_ms":            retryDelay,
+		"latency_threshold_ms":      latencyThreshold,
 	}
 
 	s.sendJSON(w, response)
@@ -334,7 +372,7 @@ func (s *Server) handleEdgeRoutingRemoveLocation(w http.ResponseWriter, r *http.
 	})
 }
 
-// handleEdgeRoutingEnableLocation 启用边缘位置
+// handleEdgeRoutingEnableLocation 启用/禁用边缘位置（统一接口）
 func (s *Server) handleEdgeRoutingEnableLocation(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -343,6 +381,7 @@ func (s *Server) handleEdgeRoutingEnableLocation(w http.ResponseWriter, r *http.
 
 	var req struct {
 		LocationID string `json:"location_id"`
+		Enabled    bool   `json:"enabled"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -354,7 +393,14 @@ func (s *Server) handleEdgeRoutingEnableLocation(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if err := s.proxyManager.GetEdgeRoutingManager().EnableLocation(req.LocationID); err != nil {
+	var err error
+	if req.Enabled {
+		err = s.proxyManager.GetEdgeRoutingManager().EnableLocation(req.LocationID)
+	} else {
+		err = s.proxyManager.GetEdgeRoutingManager().DisableLocation(req.LocationID)
+	}
+
+	if err != nil {
 		s.sendJSON(w, map[string]interface{}{
 			"success": false,
 			"error":   err.Error(),
@@ -364,7 +410,7 @@ func (s *Server) handleEdgeRoutingEnableLocation(w http.ResponseWriter, r *http.
 
 	s.sendJSON(w, map[string]interface{}{
 		"success": true,
-		"message": "Edge location enabled",
+		"message": fmt.Sprintf("Edge location %s", map[bool]string{true: "enabled", false: "disabled"}[req.Enabled]),
 	})
 }
 

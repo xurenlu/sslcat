@@ -1375,6 +1375,21 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/service-mesh/health-check", s.handleServiceMeshHealthCheck)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/service-mesh/test-connection", s.handleServiceMeshTestConnection)
 
+	// Edge Routing API (Phase 5)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/edge-routing/config", s.handleEdgeRoutingConfig)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/edge-routing/clusters", s.handleEdgeRoutingGetClusters)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/edge-routing/locations", s.handleEdgeRoutingGetLocations)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/edge-routing/metrics", s.handleEdgeRoutingGetMetrics)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/edge-routing/cluster/add", s.handleEdgeRoutingAddCluster)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/edge-routing/cluster/remove", s.handleEdgeRoutingRemoveCluster)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/edge-routing/location/add", s.handleEdgeRoutingAddLocation)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/edge-routing/location/remove", s.handleEdgeRoutingRemoveLocation)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/edge-routing/location/enable", s.handleEdgeRoutingEnableLocation)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/edge-routing/location/disable", s.handleEdgeRoutingDisableLocation)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/edge-routing/config/export", s.handleEdgeRoutingExportConfig)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/edge-routing/config/import", s.handleEdgeRoutingImportConfig)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/edge-routing/select-best", s.handleEdgeRoutingSelectBest)
+
 	// 慢请求API
 	slowRequestAPI := NewSlowRequestAPI(s.slowRequestManager, s)
 	slowRequestAPI.RegisterRoutes(s.mux, s.config.AdminPrefix+"/api")
