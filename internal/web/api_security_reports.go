@@ -6,12 +6,16 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
-
-	"github.com/sirupsen/logrus"
-	"github.com/xurenlu/sslcat/internal/report"
 )
+
+// Report 安全报告
+type Report struct {
+	ID           string    `json:"id"`
+	Type         string    `json:"type"`
+	Generated    time.Time `json:"generated"`
+	DownloadPath string    `json:"download_path"`
+}
 
 // SecurityReportRequest 安全报告请求
 type SecurityReportRequest struct {
@@ -107,14 +111,8 @@ func (s *Server) handleSecurityReportGenerate(w http.ResponseWriter, r *http.Req
 }
 
 // generateSecurityReport 生成安全报告
-func (s *Server) generateSecurityReport(reportID string, req SecurityReportRequest, startDate, endDate time.Time) (*report.Report, error) {
+func (s *Server) generateSecurityReport(reportID string, req SecurityReportRequest, startDate, endDate time.Time) (*Report, error) {
 	s.log.Infof("Generating security report: %s from %s to %s", req.ReportType, startDate, endDate)
-
-	// 收集数据
-	reportCollector := s.reportGenerator.GetCollector()
-	if reportCollector == nil {
-		return nil, fmt.Errorf("report collector not available")
-	}
 
 	// 收集安全事件数据
 	securityData := s.collectSecurityData(startDate, endDate)
@@ -141,7 +139,7 @@ func (s *Server) generateSecurityReport(reportID string, req SecurityReportReque
 
 	s.log.Infof("Security report generated: %s", filePath)
 
-	return &report.Report{
+	return &Report{
 		ID:           reportID,
 		Type:         req.ReportType,
 		Generated:    time.Now(),
@@ -392,12 +390,13 @@ func (s *Server) getRecentSecurityReports() []ReportStatus {
 			continue
 		}
 
+		modTime := info.ModTime()
 		reports = append(reports, ReportStatus{
 			ID:        entry.Name(),
 			Type:      "security",
 			Status:    "completed",
-			Created:   info.ModTime(),
-			Completed: &info.ModTime(),
+			Created:   modTime,
+			Completed: &modTime,
 			DownloadURL: "/api/security-reports/download/" + entry.Name(),
 		})
 	}

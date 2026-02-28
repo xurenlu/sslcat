@@ -1,8 +1,6 @@
 package web
 
 import (
-	"encoding/json"
-	"net/http"
 	"sync"
 	"time"
 

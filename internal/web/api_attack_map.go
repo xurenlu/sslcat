@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/gorilla/websocket"
 	"github.com/xurenlu/sslcat/internal/waf"
 )
 
@@ -117,20 +117,11 @@ func (s *Server) getRecentAttackEvents(limit, hours int) []*waf.AttackEvent {
 
 // convertToMapData 转换为地图数据
 func (s *Server) convertToMapData(attacks []*waf.AttackEvent) []*AttackMapData {
-	// 按地理位置聚合
+	// 按IP地址聚合
 	locationMap := make(map[string]*AttackMapData)
 
 	for _, attack := range attacks {
-		// 获取地理位置信息
-		var geo *GeoLocation
-		if s.geoIP != nil {
-			geo = s.geoIP.Lookup(attack.ClientIP)
-		}
-
 		key := attack.ClientIP
-		if geo != nil {
-			key = geo.CountryCode + ":" + geo.City
-		}
 
 		data, exists := locationMap[key]
 		if !exists {
@@ -140,14 +131,12 @@ func (s *Server) convertToMapData(attacks []*waf.AttackEvent) []*AttackMapData {
 				Count:       0,
 				LastSeen:    attack.Timestamp,
 				Blocked:     attack.Blocked,
-			}
-
-			if geo != nil {
-				data.Country = geo.Country
-				data.CountryCode = geo.CountryCode
-				data.City = geo.City
-				data.Latitude = geo.Latitude
-				data.Longitude = geo.Longitude
+				// TODO: 添加 GeoIP 支持
+				Country:     "Unknown",
+				CountryCode: "--",
+				City:        "Unknown",
+				Latitude:    0,
+				Longitude:   0,
 			}
 
 			locationMap[key] = data

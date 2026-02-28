@@ -151,6 +151,10 @@ type Server struct {
 	mlThreatScorer     *ml.ThreatScorer
 	mlForest           *ml.IsolationForest
 
+	// Zero Trust Networking (Phase 5)
+	mtlsManager  *ssl.MTLSManager
+	rbacManager  *security.RBACManager
+
 	// Cluster runtime status
 	clusterLastConfigSyncAt      time.Time
 	clusterLastCertSyncAt        time.Time
@@ -601,6 +605,9 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		}
 	}
 
+	// 初始化 Zero Trust 组件 (Phase 5)
+	server.initZeroTrustComponents()
+
 	server.setupRoutes()
 
 	// 设置图片优化器到代理管理器
@@ -866,6 +873,39 @@ func (s *Server) initConfigWatch() {
 	}
 	go s.watchConfigFileLoop()
 	go s.watchConfigFileFS()
+}
+
+// initZeroTrustComponents 初始化 Zero Trust 组件 (Phase 5)
+func (s *Server) initZeroTrustComponents() {
+	// 初始化 RBAC 管理器
+	s.rbacManager = security.NewRBACManager()
+	s.log.Info("RBAC manager initialized")
+
+	// 初始化 mTLS 管理器（如果配置启用）
+	// TODO: 从配置读取 mTLS 设置
+	// 目前 mTLS 默认禁用，需要管理员手动配置并启用
+	mtlsConfig := &ssl.MTLSConfig{
+		Enabled:            false,
+		Mode:               "optional",
+		CADir:              "./data/mtls/ca",
+		ClientCADir:        "./data/mtls/client-ca",
+		CertFile:           "./data/mtls/server.crt",
+		KeyFile:            "./data/mtls/server.key",
+		ClientCertRequired: false,
+		CRLCheckEnabled:    false,
+		CRLUpdateInterval:  24 * time.Hour,
+		CertPinningEnabled: false,
+		AllowedCerts:       []string{},
+	}
+
+	mtlsMgr, err := ssl.NewMTLSManager(mtlsConfig)
+	if err != nil {
+		s.log.Warnf("Failed to initialize mTLS manager: %v", err)
+		// mTLS 可选，不阻塞服务启动
+	} else if mtlsMgr != nil {
+		s.mtlsManager = mtlsMgr
+		s.log.Info("mTLS manager initialized")
+	}
 }
 
 // watchConfigFileLoop 定时检查配置文件变化并热加载（仅在 Slave 模式生效）
@@ -1269,6 +1309,32 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security-reports/list", s.handleSecurityReportList)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security-reports/download/", s.handleSecurityReportDownload)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security-reports/config", s.handleSecurityReportConfig)
+
+	// Zero Trust Networking API (Phase 5)
+	// mTLS API
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/mtls/stats", s.handlemTLSStats)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/mtls/config", s.handlemTLSGetConfig)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/mtls/config/update", s.handlemTLSUpdateConfig)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/mtls/whitelist", s.handlemTLSWhitelist)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/mtls/blacklist", s.handlemTLSBlacklist)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/mtls/generate-client-cert", s.handlemTLSGenerateClientCert)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/mtls/verify-client-cert", s.handlemTLSVerifyClientCert)
+
+	// RBAC API
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/rbac/check", s.handleRBACCheckAccess)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/rbac/roles", s.handleRBACListRoles)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/rbac/roles/create", s.handleRBACCreateRole)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/rbac/roles/assign", s.handleRBACAssignRole)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/rbac/roles/revoke", s.handleRBACRevokeRole)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/rbac/policies", s.handleRBACListPolicies)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/rbac/policies/create", s.handleRBACCreatePolicy)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/rbac/policies/update", s.handleRBACUpdatePolicy)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/rbac/policies/delete", s.handleRBACDeletePolicy)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/rbac/audit", s.handleRBACAuditLog)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/rbac/user/roles", s.handleRBACGetUserRoles)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/rbac/user/permissions", s.handleRBACGetUserPermissions)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/rbac/export", s.handleRBACExport)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/rbac/import", s.handleRBACImport)
 
 	// 慢请求API
 	slowRequestAPI := NewSlowRequestAPI(s.slowRequestManager, s)

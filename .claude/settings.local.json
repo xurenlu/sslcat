@@ -42,7 +42,9 @@
       "Bash(find:*)",
       "Bash(ssh:*)",
       "Bash(ruby:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(go get:*)",
+      "Bash(go mod tidy:*)"
     ],
     "deny": [],
     "ask": []
