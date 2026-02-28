@@ -13,6 +13,19 @@ func atoi(s string) (int, error) {
 	return strconv.Atoi(s)
 }
 
+// rbacEnabled 检查 RBAC 是否已启用
+func (s *Server) rbacEnabled() bool {
+	return s.rbacManager != nil
+}
+
+// sendRBACDisabled 发送 RBAC 未启用的响应
+func (s *Server) sendRBACDisabled(w http.ResponseWriter) {
+	s.sendJSON(w, map[string]interface{}{
+		"error":   "RBAC is not enabled",
+		"message": "RBAC feature is not available. Please enable RBAC in the configuration.",
+	})
+}
+
 // RBACAccessRequest RBAC 访问检查请求
 type RBACAccessRequest struct {
 	Subject     string            `json:"subject"`
@@ -305,6 +318,16 @@ func (s *Server) handleRBACDeletePolicy(w http.ResponseWriter, r *http.Request) 
 
 // handleRBACAuditLog 获取审计日志
 func (s *Server) handleRBACAuditLog(w http.ResponseWriter, r *http.Request) {
+	// 检查 RBAC 管理器是否已初始化
+	if s.rbacManager == nil {
+		s.sendJSON(w, map[string]interface{}{
+			"audit_log": []interface{}{},
+			"count":     0,
+			"message":   "RBAC is not enabled",
+		})
+		return
+	}
+
 	query := r.URL.Query()
 	limit := 100
 
