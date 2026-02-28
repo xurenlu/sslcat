@@ -270,8 +270,7 @@ const ConfigHistory: React.FC = () => {
   }
 
   const handleCompareVersions = async () => {
-    const selectedArray = Array.from(selectedVersions)
-    if (selectedArray.length !== 2) {
+    if (selectedVersions.size !== 2) {
       toast({
         title: '请选择两个版本',
         description: '请选择两个版本进行比较',
@@ -283,7 +282,7 @@ const ConfigHistory: React.FC = () => {
     }
 
     // 找到对应的版本对象，按时间戳排序
-    const versionsToCompare = versions.filter(v => selectedArray.has(v.id))
+    const versionsToCompare = versions.filter(v => selectedVersions.has(v.id))
     if (versionsToCompare.length !== 2) {
       toast({
         title: '版本错误',
