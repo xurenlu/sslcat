@@ -48,6 +48,9 @@ import {
   FiTrendingUp,
   FiGlobe as FiGlobe2,
   FiFileText,
+  FiGrid,
+  FiMapPin,
+  FiLock,
 } from 'react-icons/fi'
 import { FaRobot } from 'react-icons/fa'
 
@@ -165,7 +168,17 @@ const SidebarContent = () => {
         { name: '攻击地图', icon: FiGlobe2, path: buildPath(adminPrefix, '/attack-map'), keywords: 'attack map realtime geo 攻击 地图 实时' },
         { name: '安全报告', icon: FiFileText, path: buildPath(adminPrefix, '/security-reports'), keywords: 'report pdf security download 安全 报告 下载' },
         { name: t.sidebar.blockManagement, icon: FiX, path: buildPath(adminPrefix, '/block-management'), keywords: 'block unblock ip tls fingerprint user agent 封禁 解封' },
+        { name: '威胁情报', icon: FiActivity, path: buildPath(adminPrefix, '/threat-intel'), keywords: 'threat intel ioc ip domain url 威胁 情报' },
+        { name: '审计日志', icon: FiFileText, path: buildPath(adminPrefix, '/audit-logs'), keywords: 'audit log trail operation 审计 日志 操作' },
         { name: t.navigation.aiSecurity || 'AI 安全分析', icon: FaRobot, path: buildPath(adminPrefix, '/ai-analytics'), badge: 'AI', keywords: 'ai robot threat analysis 智能 分析 anomaly detection ml' },
+      ]
+    },
+    {
+      title: '企业功能',
+      items: [
+        { name: 'Service Mesh', icon: FiGrid, path: buildPath(adminPrefix, '/service-mesh'), keywords: 'service mesh istio linkerd consul microservices 服务网格' },
+        { name: '边缘计算', icon: FiMapPin, path: buildPath(adminPrefix, '/edge-routing'), keywords: 'edge routing multi-region geo location 边缘 计算 多区域' },
+        { name: '零信任安全', icon: FiLock, path: buildPath(adminPrefix, '/security-mtls'), keywords: 'mtls rbac zero trust certificate mTLS 证书 权限' },
       ]
     },
     {

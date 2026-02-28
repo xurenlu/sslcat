@@ -40,6 +40,11 @@ import AIAnalytics from './pages/AIAnalytics'
 import APIPerformance from './pages/APIPerformance'
 import AttackMap from './pages/AttackMap'
 import SecurityReports from './pages/SecurityReports'
+import ServiceMesh from './pages/ServiceMesh'
+import ThreatIntel from './pages/ThreatIntel'
+import EdgeRouting from './pages/EdgeRouting'
+import SecurityMTLS from './pages/SecurityMTLS'
+import AuditLogs from './pages/AuditLogs'
 
 // 辅助组件：为需要 Layout 的页面添加 Layout
 const LayoutRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -318,6 +323,41 @@ const AppRoutes: React.FC = () => {
         <AuthGuard>
           <LayoutRoute>
             <SecurityReports />
+          </LayoutRoute>
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/service-mesh`} element={
+        <AuthGuard>
+          <LayoutRoute>
+            <ServiceMesh />
+          </LayoutRoute>
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/threat-intel`} element={
+        <AuthGuard>
+          <LayoutRoute>
+            <ThreatIntel />
+          </LayoutRoute>
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/edge-routing`} element={
+        <AuthGuard>
+          <LayoutRoute>
+            <EdgeRouting />
+          </LayoutRoute>
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/security-mtls`} element={
+        <AuthGuard>
+          <LayoutRoute>
+            <SecurityMTLS />
+          </LayoutRoute>
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/audit-logs`} element={
+        <AuthGuard>
+          <LayoutRoute>
+            <AuditLogs />
           </LayoutRoute>
         </AuthGuard>
       } />
