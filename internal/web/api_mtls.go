@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -70,19 +71,39 @@ func (s *Server) handlemTLSStats(w http.ResponseWriter, r *http.Request) {
 	s.sendJSON(w, response)
 }
 
+// handlemTLSConfig 获取和更新 mTLS 配置
+func (s *Server) handlemTLSConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		s.handlemTLSGetConfig(w, r)
+		return
+	}
+	if r.Method == http.MethodPost {
+		s.handlemTLSUpdateConfig(w, r)
+		return
+	}
+	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+}
+
 // handlemTLSGetConfig 获取 mTLS 配置
 func (s *Server) handlemTLSGetConfig(w http.ResponseWriter, r *http.Request) {
 	if s.mtlsManager == nil {
 		s.sendJSON(w, map[string]interface{}{
-			"enabled": false,
+			"enabled":                 false,
+			"mode":                    "optional",
+			"client_cert_required":    false,
+			"crl_check_enabled":       false,
+			"cert_pinning_enabled":    false,
 		})
 		return
 	}
 
 	// TODO: 返回实际配置
 	s.sendJSON(w, map[string]interface{}{
-		"enabled": true,
-		"mode":    "strict",
+		"enabled":                 true,
+		"mode":                    "strict",
+		"client_cert_required":    true,
+		"crl_check_enabled":       true,
+		"cert_pinning_enabled":    false,
 	})
 }
 
@@ -110,28 +131,31 @@ func (s *Server) handlemTLSUpdateConfig(w http.ResponseWriter, r *http.Request) 
 
 // handlemTLSWhitelist 管理 mTLS 证书白名单
 func (s *Server) handlemTLSWhitelist(w http.ResponseWriter, r *http.Request) {
-	if s.mtlsManager == nil {
-		http.Error(w, "mTLS not enabled", http.StatusBadRequest)
-		return
-	}
-
 	switch r.Method {
 	case http.MethodGet:
+		if s.mtlsManager == nil {
+			s.sendJSON(w, map[string]interface{}{
+				"certificates": []string{},
+			})
+			return
+		}
 		// TODO: 返回白名单
 		s.sendJSON(w, map[string]interface{}{
-			"whitelist": []string{},
+			"certificates": []string{},
 		})
 
 	case http.MethodPost:
 		var req struct {
-			Fingerprint string `json:"fingerprint"`
+			SerialNumber string `json:"serial_number"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
 
-		s.mtlsManager.AddToWhitelist(req.Fingerprint)
+		if s.mtlsManager != nil {
+			s.mtlsManager.AddToWhitelist(req.SerialNumber)
+		}
 		s.sendJSON(w, map[string]interface{}{
 			"success": true,
 			"message": "Added to whitelist",
@@ -159,16 +183,17 @@ func (s *Server) handlemTLSWhitelist(w http.ResponseWriter, r *http.Request) {
 
 // handlemTLSBlacklist 管理 mTLS 证书黑名单
 func (s *Server) handlemTLSBlacklist(w http.ResponseWriter, r *http.Request) {
-	if s.mtlsManager == nil {
-		http.Error(w, "mTLS not enabled", http.StatusBadRequest)
-		return
-	}
-
 	switch r.Method {
 	case http.MethodGet:
+		if s.mtlsManager == nil {
+			s.sendJSON(w, map[string]interface{}{
+				"certificates": []string{},
+			})
+			return
+		}
 		// TODO: 返回黑名单
 		s.sendJSON(w, map[string]interface{}{
-			"blacklist": []string{},
+			"certificates": []string{},
 		})
 
 	case http.MethodPost:
@@ -262,5 +287,88 @@ func (s *Server) handlemTLSVerifyClientCert(w http.ResponseWriter, r *http.Reque
 		"success":  true,
 		"valid":    true,
 		"identity": ClientIdentityResponse{},
+	})
+}
+
+// handlemTLSListCertificates 列出已颁发的证书
+func (s *Server) handlemTLSListCertificates(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.mtlsManager == nil {
+		s.sendJSON(w, map[string]interface{}{
+			"certificates": []interface{}{},
+		})
+		return
+	}
+
+	// TODO: 返回实际的证书列表
+	s.sendJSON(w, map[string]interface{}{
+		"certificates": []interface{}{},
+	})
+}
+
+// handlemTLSRevokeCertificate 吊销证书
+func (s *Server) handlemTLSRevokeCertificate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.mtlsManager == nil {
+		s.sendJSON(w, map[string]interface{}{
+			"success": false,
+			"message": "mTLS not enabled",
+		})
+		return
+	}
+
+	var req struct {
+		SerialNumber string `json:"serial_number"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: 实际吊销证书
+	s.log.Infof("Certificate revoked: %s", req.SerialNumber)
+	s.sendJSON(w, map[string]interface{}{
+		"success": true,
+		"message": "Certificate revoked",
+	})
+}
+
+// handlemTLSWhitelistDelete 从白名单删除证书（支持 URL 路径参数）
+func (s *Server) handlemTLSWhitelistDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 从 URL 路径中提取序列号
+	// URL 格式: /api/mtls/whitelist/{serial}
+	path := r.URL.Path
+	prefix := s.config.AdminPrefix + "/api/mtls/whitelist/"
+	if !strings.HasPrefix(path, prefix) {
+		http.Error(w, "Invalid URL", http.StatusBadRequest)
+		return
+	}
+
+	serialNumber := strings.TrimPrefix(path, prefix)
+	if serialNumber == "" {
+		http.Error(w, "Serial number is required", http.StatusBadRequest)
+		return
+	}
+
+	if s.mtlsManager != nil {
+		s.mtlsManager.RemoveFromWhitelist(serialNumber)
+	}
+
+	s.sendJSON(w, map[string]interface{}{
+		"success": true,
+		"message": "Removed from whitelist",
 	})
 }

@@ -1338,10 +1338,13 @@ func (s *Server) setupRoutes() {
 	// Zero Trust Networking API (Phase 5)
 	// mTLS API
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/mtls/stats", s.handlemTLSStats)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/mtls/config", s.handlemTLSGetConfig)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/mtls/config", s.handlemTLSConfig)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/mtls/config/update", s.handlemTLSUpdateConfig)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/mtls/whitelist", s.handlemTLSWhitelist)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/mtls/whitelist/", s.handlemTLSWhitelistDelete)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/mtls/blacklist", s.handlemTLSBlacklist)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/mtls/certificates", s.handlemTLSListCertificates)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/mtls/revoke", s.handlemTLSRevokeCertificate)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/mtls/generate-client-cert", s.handlemTLSGenerateClientCert)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/mtls/verify-client-cert", s.handlemTLSVerifyClientCert)
 
