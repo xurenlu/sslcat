@@ -46,6 +46,8 @@ import {
   FiX,
   FiArchive,
   FiTrendingUp,
+  FiGlobe as FiGlobe2,
+  FiFileText,
 } from 'react-icons/fi'
 import { FaRobot } from 'react-icons/fa'
 
@@ -160,6 +162,8 @@ const SidebarContent = () => {
       title: t.sidebar.securityProtection,
       items: [
         { name: t.navigation.security, icon: FiShield, path: buildPath(adminPrefix, '/security'), keywords: 'waf ddos block 防火墙 拦截' },
+        { name: '攻击地图', icon: FiGlobe2, path: buildPath(adminPrefix, '/attack-map'), keywords: 'attack map realtime geo 攻击 地图 实时' },
+        { name: '安全报告', icon: FiFileText, path: buildPath(adminPrefix, '/security-reports'), keywords: 'report pdf security download 安全 报告 下载' },
         { name: t.sidebar.blockManagement, icon: FiX, path: buildPath(adminPrefix, '/block-management'), keywords: 'block unblock ip tls fingerprint user agent 封禁 解封' },
         { name: t.navigation.aiSecurity || 'AI 安全分析', icon: FaRobot, path: buildPath(adminPrefix, '/ai-analytics'), badge: 'AI', keywords: 'ai robot threat analysis 智能 分析 anomaly detection ml' },
       ]

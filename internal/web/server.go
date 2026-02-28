@@ -141,6 +141,9 @@ type Server struct {
 	// 报告生成器
 	reportGenerator *report.ReportGenerator
 
+	// 安全事件中心
+	securityEventHub *SecurityEventHub
+
 	// ML/AI 异常检测系统
 	mlAPIHandler       *MLAPIHandler
 	mlInferenceEngine  *ml.InferenceEngine
@@ -1254,6 +1257,18 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/performance/detail", s.handleAPIPerformanceDetail)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/performance/summary", s.handleAPIPerformanceSummary)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/performance/config", s.handleAPIPerformanceConfig)
+
+	// 攻击地图 API
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/attack-map/ws", s.handleAttackMapWebSocket)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/attack-map/recent", s.handleGetRecentAttacks)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/attack-map/stats", s.handleGetAttackStats)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/attack-map/config", s.handleAttackMapConfig)
+
+	// 安全报告 API
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security-reports/generate", s.handleSecurityReportGenerate)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security-reports/list", s.handleSecurityReportList)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security-reports/download/", s.handleSecurityReportDownload)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security-reports/config", s.handleSecurityReportConfig)
 
 	// 慢请求API
 	slowRequestAPI := NewSlowRequestAPI(s.slowRequestManager, s)

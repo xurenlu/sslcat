@@ -38,6 +38,8 @@ import BlockManagement from './pages/BlockManagement'
 import ConfigHistory from './pages/ConfigHistory'
 import AIAnalytics from './pages/AIAnalytics'
 import APIPerformance from './pages/APIPerformance'
+import AttackMap from './pages/AttackMap'
+import SecurityReports from './pages/SecurityReports'
 
 // 辅助组件：为需要 Layout 的页面添加 Layout
 const LayoutRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -302,6 +304,20 @@ const AppRoutes: React.FC = () => {
         <AuthGuard>
           <LayoutRoute>
             <APIPerformance />
+          </LayoutRoute>
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/attack-map`} element={
+        <AuthGuard>
+          <LayoutRoute>
+            <AttackMap />
+          </LayoutRoute>
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/security-reports`} element={
+        <AuthGuard>
+          <LayoutRoute>
+            <SecurityReports />
           </LayoutRoute>
         </AuthGuard>
       } />
