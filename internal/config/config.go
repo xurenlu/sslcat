@@ -1360,9 +1360,9 @@ func ValidateConfigWithLoopDetection(config *Config) error {
 		return fmt.Errorf("invalid server port: %d", config.Server.Port)
 	}
 
-	// 验证SSL配置
-	if config.SSL.Email == "" {
-		return fmt.Errorf("SSL email is required")
+	// 验证SSL配置 - 只在禁用自签名证书时才需要 email（用于 ACME/Let's Encrypt）
+	if !config.SSL.DisableSelfSigned && config.SSL.Email == "" {
+		return fmt.Errorf("SSL email is required when self-signed certificates are disabled (needed for ACME/Let's Encrypt)")
 	}
 
 	// 验证管理员配置

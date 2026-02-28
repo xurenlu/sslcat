@@ -44,7 +44,10 @@
       "Bash(ruby:*)",
       "Bash(npm run build:*)",
       "Bash(go get:*)",
-      "Bash(go mod tidy:*)"
+      "Bash(go mod tidy:*)",
+      "Bash(echo:*)",
+      "Bash(pkill:*)",
+      "Bash(lsof:*)"
     ],
     "deny": [],
     "ask": []
