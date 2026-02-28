@@ -54,6 +54,7 @@ import {
   FiMapPin,
 } from 'react-icons/fi';
 import axios from 'axios';
+import { useConfig, buildApiPath } from '../contexts/ConfigContext';
 
 interface ThreatStats {
   total_iocs: number;
@@ -87,6 +88,7 @@ interface IOCDetail {
 }
 
 const ThreatIntel: React.FC = () => {
+  const { adminPrefix } = useConfig();
   const [stats, setStats] = useState<ThreatStats | null>(null);
   const [sources, setSources] = useState<ThreatSource[]>([]);
   const [recentIOCs, setRecentIOCs] = useState<IOCDetail[]>([]);
@@ -101,7 +103,7 @@ const ThreatIntel: React.FC = () => {
   const fetchStats = async () => {
     try {
       setRefreshing(true);
-      const response = await axios.get('/api/threat-intel/stats');
+      const response = await axios.get(buildApiPath(adminPrefix, '/api/threat-intel/stats'));
       setStats(response.data);
     } catch (error) {
       toast({
@@ -118,7 +120,7 @@ const ThreatIntel: React.FC = () => {
 
   const fetchSources = async () => {
     try {
-      const response = await axios.get('/api/threat-intel/sources');
+      const response = await axios.get(buildApiPath(adminPrefix, '/api/threat-intel/sources'));
       setSources(response.data.sources || []);
     } catch (error) {
       console.error('Failed to fetch sources:', error);
@@ -127,7 +129,7 @@ const ThreatIntel: React.FC = () => {
 
   const fetchRecentIOCs = async () => {
     try {
-      const response = await axios.get('/api/threat-intel/iocs?limit=20');
+      const response = await axios.get(buildApiPath(adminPrefix, '/api/threat-intel/iocs?limit=20'));
       setRecentIOCs(response.data.iocs || []);
     } catch (error) {
       console.error('Failed to fetch recent IOCs:', error);
@@ -146,7 +148,7 @@ const ThreatIntel: React.FC = () => {
 
     try {
       setSearching(true);
-      const response = await axios.post('/api/threat-intel/check', {
+      const response = await axios.post(buildApiPath(adminPrefix, '/api/threat-intel/check'), {
         value: searchValue,
         type: searchType,
       });
@@ -174,7 +176,7 @@ const ThreatIntel: React.FC = () => {
 
   const handleUpdateSource = async (sourceName: string) => {
     try {
-      await axios.post(`/api/threat-intel/sources/${sourceName}/update`);
+      await axios.post(buildApiPath(adminPrefix, `/api/threat-intel/sources/${sourceName}/update`));
       toast({
         title: '成功',
         description: `威胁情报源 ${sourceName} 更新已触发`,
@@ -195,7 +197,7 @@ const ThreatIntel: React.FC = () => {
 
   const handleToggleSource = async (sourceName: string, enabled: boolean) => {
     try {
-      await axios.put(`/api/threat-intel/sources/${sourceName}`, {
+      await axios.put(buildApiPath(adminPrefix, `/api/threat-intel/sources/${sourceName}`), {
         enabled,
       });
       await fetchSources();
