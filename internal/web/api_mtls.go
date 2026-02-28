@@ -123,9 +123,13 @@ func (s *Server) handlemTLSUpdateConfig(w http.ResponseWriter, r *http.Request) 
 	// TODO: 更新配置
 	s.log.Infof("mTLS config updated: enabled=%v, mode=%s", req.Enabled, req.Mode)
 
+	// 返回更新后的完整配置
 	s.sendJSON(w, map[string]interface{}{
-		"success": true,
-		"message": "Configuration updated",
+		"enabled":                req.Enabled,
+		"mode":                   req.Mode,
+		"client_cert_required":   req.ClientCertRequired,
+		"crl_check_enabled":      req.CRLCheckEnabled,
+		"cert_pinning_enabled":   req.CertPinningEnabled,
 	})
 }
 

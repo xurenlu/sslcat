@@ -206,11 +206,12 @@ const SecurityMTLS: React.FC = () => {
 
   const handleToggleMTLS = async () => {
     try {
-      await axios.post(buildApiPath(adminPrefix, '/api/mtls/config'), {
+      const response = await axios.post(buildApiPath(adminPrefix, '/api/mtls/config/update'), {
         ...mtlsConfig,
         enabled: !mtlsConfig?.enabled,
       });
-      await fetchMTLSConfig();
+      // 直接使用服务器返回的最新配置
+      setMtlsConfig(response.data);
       toast({
         title: '成功',
         description: `mTLS 已${!mtlsConfig?.enabled ? '启用' : '禁用'}`,

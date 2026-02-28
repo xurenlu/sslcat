@@ -42,20 +42,19 @@ export default defineConfig({
     port: 9980,
     host: '0.0.0.0',
     proxy: {
-      // 只代理 API 请求，不代理前端路由
-      '^/sslcat-panel2/api': {
-        target: 'http://localhost:80',
+      // 代理所有 API 请求到后端 (端口 8080)
+      '^/sslcat-panel/api': {
+        target: 'http://localhost:8080',
         changeOrigin: true,
         secure: false,
-        ws: true, // 启用 WebSocket 代理
+        ws: true,
       },
-      // 备用：直接匹配 /api 路径（如果前端直接调用 /api）
+      // 备用：直接匹配 /api 路径
       '^/api': {
-        target: 'http://localhost:80',
+        target: 'http://localhost:8080',
         changeOrigin: true,
         secure: false,
-        ws: true, // 启用 WebSocket 代理
-        // 移除rewrite规则，避免重复添加前缀
+        ws: true,
       },
     },
   },

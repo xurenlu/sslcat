@@ -48,7 +48,9 @@
       "Bash(echo:*)",
       "Bash(pkill:*)",
       "Bash(lsof:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(npm run dev:*)",
+      "Bash(yarn dev:*)"
     ],
     "deny": [],
     "ask": []

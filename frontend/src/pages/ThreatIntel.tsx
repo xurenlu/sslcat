@@ -475,8 +475,8 @@ const ThreatIntel: React.FC = () => {
                               {source.enabled ? '启用' : '禁用'}
                             </Badge>
                           </Td>
-                          <Td>{source.iocs_count.toLocaleString()}</Td>
-                          <Td>{source.update_freq / 3600}小时</Td>
+                          <Td>{source.iocs_count?.toLocaleString() ?? 0}</Td>
+                          <Td>{source.update_freq ? `${source.update_freq / 3600}小时` : '-'}</Td>
                           <Td fontSize="sm">
                             {source.last_update
                               ? new Date(source.last_update).toLocaleString()
