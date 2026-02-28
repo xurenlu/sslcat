@@ -59,6 +59,7 @@ import {
   FiPause,
 } from 'react-icons/fi';
 import axios from 'axios';
+import { useConfig, buildApiPath } from '../contexts/ConfigContext';
 
 interface ServiceMeshConfig {
   enabled: boolean;
@@ -93,6 +94,7 @@ interface CircuitBreakerState {
 }
 
 const ServiceMesh: React.FC = () => {
+  const { adminPrefix } = useConfig();
   const [config, setConfig] = useState<ServiceMeshConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -102,7 +104,7 @@ const ServiceMesh: React.FC = () => {
   const fetchConfig = async () => {
     try {
       setRefreshing(true);
-      const response = await axios.get('/api/service-mesh/config');
+      const response = await axios.get(buildApiPath(adminPrefix, '/api/service-mesh/config'));
       setConfig(response.data);
     } catch (error) {
       toast({
@@ -125,7 +127,7 @@ const ServiceMesh: React.FC = () => {
 
   const handleToggleEnabled = async () => {
     try {
-      await axios.post('/api/service-mesh/config', {
+      await axios.post(buildApiPath(adminPrefix, '/api/service-mesh/config'), {
         enabled: !config?.enabled,
         type: config?.type || 'istio',
         config: {
@@ -152,7 +154,7 @@ const ServiceMesh: React.FC = () => {
 
   const handleResetBreaker = async (service: string) => {
     try {
-      await axios.post('/api/service-mesh/circuit-breaker/reset', { service });
+      await axios.post(buildApiPath(adminPrefix, '/api/service-mesh/circuit-breaker/reset'), { service });
       await fetchConfig();
       toast({
         title: '成功',
@@ -172,7 +174,7 @@ const ServiceMesh: React.FC = () => {
 
   const handleDiscoverServices = async () => {
     try {
-      await axios.post('/api/service-mesh/discover');
+      await axios.post(buildApiPath(adminPrefix, '/api/service-mesh/discover'));
       await fetchConfig();
       toast({
         title: '成功',
@@ -192,7 +194,7 @@ const ServiceMesh: React.FC = () => {
 
   const handleHealthCheck = async () => {
     try {
-      await axios.post('/api/service-mesh/health-check');
+      await axios.post(buildApiPath(adminPrefix, '/api/service-mesh/health-check'));
       await fetchConfig();
       toast({
         title: '成功',

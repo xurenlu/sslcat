@@ -64,6 +64,7 @@ import {
   FiTrendingUp,
 } from 'react-icons/fi';
 import axios from 'axios';
+import { useConfig, buildApiPath } from '../contexts/ConfigContext';
 
 interface EdgeRoutingConfig {
   enabled: boolean;
@@ -108,6 +109,7 @@ interface EdgeMetrics {
 }
 
 const EdgeRouting: React.FC = () => {
+  const { adminPrefix } = useConfig();
   const [config, setConfig] = useState<EdgeRoutingConfig | null>(null);
   const [clusters, setClusters] = useState<Record<string, EdgeCluster>>({});
   const [locations, setLocations] = useState<Record<string, EdgeLocation>>({});
@@ -124,10 +126,10 @@ const EdgeRouting: React.FC = () => {
     try {
       setRefreshing(true);
       const [configRes, clustersRes, locationsRes, metricsRes] = await Promise.all([
-        axios.get('/api/edge-routing/config'),
-        axios.get('/api/edge-routing/clusters'),
-        axios.get('/api/edge-routing/locations'),
-        axios.get('/api/edge-routing/metrics'),
+        axios.get(buildApiPath(adminPrefix, '/api/edge-routing/config')),
+        axios.get(buildApiPath(adminPrefix, '/api/edge-routing/clusters')),
+        axios.get(buildApiPath(adminPrefix, '/api/edge-routing/locations')),
+        axios.get(buildApiPath(adminPrefix, '/api/edge-routing/metrics')),
       ]);
 
       setConfig(configRes.data);
@@ -155,7 +157,7 @@ const EdgeRouting: React.FC = () => {
 
   const handleToggleEnabled = async () => {
     try {
-      await axios.post('/api/edge-routing/config', {
+      await axios.post(buildApiPath(adminPrefix, '/api/edge-routing/config'), {
         ...config,
         enabled: !config?.enabled,
       });
@@ -178,7 +180,7 @@ const EdgeRouting: React.FC = () => {
 
   const handleUpdateConfig = async (newConfig: EdgeRoutingConfig) => {
     try {
-      await axios.post('/api/edge-routing/config', newConfig);
+      await axios.post(buildApiPath(adminPrefix, '/api/edge-routing/config'), newConfig);
       await fetchConfig();
       toast({
         title: '成功',
@@ -198,7 +200,7 @@ const EdgeRouting: React.FC = () => {
 
   const handleToggleLocation = async (locationId: string, enabled: boolean) => {
     try {
-      await axios.post('/api/edge-routing/location/enable', {
+      await axios.post(buildApiPath(adminPrefix, '/api/edge-routing/location/enable'), {
         location_id: locationId,
         enabled,
       });
@@ -221,7 +223,7 @@ const EdgeRouting: React.FC = () => {
 
   const handleTestBestEdge = async (clientIP: string) => {
     try {
-      const response = await axios.post('/api/edge-routing/select-best', { client_ip: clientIP });
+      const response = await axios.post(buildApiPath(adminPrefix, '/api/edge-routing/select-best'), { client_ip: clientIP });
       toast({
         title: '最佳边缘节点',
         description: `推荐节点: ${response.data.location?.name || '无'}`,

@@ -48,6 +48,7 @@ import {
   FiCopy,
 } from 'react-icons/fi';
 import axios from 'axios';
+import { useConfig, buildApiPath } from '../contexts/ConfigContext';
 
 interface AuditLog {
   id: string;
@@ -73,6 +74,7 @@ interface LogStats {
 }
 
 const AuditLogsPage: React.FC = () => {
+  const { adminPrefix } = useConfig();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [stats, setStats] = useState<LogStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -103,7 +105,7 @@ const AuditLogsPage: React.FC = () => {
       if (dateFrom) params.from = dateFrom;
       if (dateTo) params.to = dateTo;
 
-      const response = await axios.get('/api/audit/logs', { params });
+      const response = await axios.get(buildApiPath(adminPrefix, '/api/audit/logs'), { params });
       setLogs(response.data.logs || []);
       setStats(response.data.stats || null);
     } catch (error) {
@@ -133,7 +135,7 @@ const AuditLogsPage: React.FC = () => {
       if (dateFrom) params.from = dateFrom;
       if (dateTo) params.to = dateTo;
 
-      const response = await axios.get('/api/audit/logs/export', {
+      const response = await axios.get(buildApiPath(adminPrefix, '/api/audit/logs/export'), {
         params: { ...params, format },
         responseType: 'blob',
       });
