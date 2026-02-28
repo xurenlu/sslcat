@@ -359,11 +359,17 @@ const AttackMap: React.FC = () => {
                 </HStack>
 
                 <Box h="400px" borderRadius="md" overflow="hidden">
-                  <MapContainer
-                    center={[30, 0]}
-                    zoom={2}
-                    style={{ height: '100%', width: '100%' }}
-                  >
+                  {loading ? (
+                    <Box h="100%" display="flex" alignItems="center" justifyContent="center">
+                      <Spinner size="xl" />
+                    </Box>
+                  ) : (
+                    <MapContainer
+                      key={String(wsConnected)}
+                      center={[30, 0]}
+                      zoom={2}
+                      style={{ height: '100%', width: '100%' }}
+                    >
                     <TileLayer
                       attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -400,6 +406,7 @@ const AttackMap: React.FC = () => {
                       </CircleMarker>
                     ))}
                   </MapContainer>
+                  )}
                 </Box>
               </VStack>
             </CardBody>
