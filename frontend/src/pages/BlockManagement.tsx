@@ -43,6 +43,8 @@ import {
   AlertDialogHeader,
   AlertDialogContent,
   AlertDialogOverlay,
+  Alert,
+  AlertIcon,
 } from '@chakra-ui/react'
 import {
   FiRefreshCw,
@@ -50,6 +52,8 @@ import {
   FiPlus,
   FiTrash2,
   FiEdit2,
+  FiAlertTriangle,
+  FiClock,
 } from 'react-icons/fi'
 import { apiService } from '../utils/api'
 import { useConfig } from '../contexts/ConfigContext'
@@ -404,6 +408,8 @@ const BlockManagement: React.FC = () => {
               <Tab>{t.blockManagement?.tlsFingerprintBlock || 'TLS Fingerprint Block'} ({blockedData.tls_fingerprints.length})</Tab>
               <Tab>{t.blockManagement?.userAgentBlock || 'User-Agent Block'} ({blockedData.user_agents.length})</Tab>
               <Tab>{t.blockManagement?.ipWhitelist || 'IP Whitelist'} ({whitelistEntries.length})</Tab>
+              <Tab>地理位置控制</Tab>
+              <Tab>时间窗口控制</Tab>
             </TabList>
 
             <TabPanels>
@@ -635,6 +641,58 @@ const BlockManagement: React.FC = () => {
                     </Tbody>
                   </Table>
                 )}
+              </TabPanel>
+
+              {/* 地理位置控制 */}
+              <TabPanel>
+                <VStack spacing={4} align="stretch">
+                  <Alert status="info">
+                    <FiAlertTriangle />
+                    基于客户端 IP 的地理位置进行访问控制
+                  </Alert>
+
+                  <HStack justify="space-between">
+                    <Text fontSize="sm" color="gray.500">
+                      添加国家/地区规则来允许或拒绝访问
+                    </Text>
+                    <Button leftIcon={<FiPlus />} size="sm" colorScheme="blue">
+                      添加规则
+                    </Button>
+                  </HStack>
+
+                  <Box p={4} bg="gray.50" borderRadius="md" textAlign="center">
+                    <Text color="gray.500">暂无地理位置规则</Text>
+                    <Text fontSize="sm" color="gray.400" mt={2}>
+                      点击上方按钮添加第一条规则
+                    </Text>
+                  </Box>
+                </VStack>
+              </TabPanel>
+
+              {/* 时间窗口控制 */}
+              <TabPanel>
+                <VStack spacing={4} align="stretch">
+                  <Alert status="info">
+                    <FiClock />
+                    基于时间窗口的访问控制规则
+                  </Alert>
+
+                  <HStack justify="space-between">
+                    <Text fontSize="sm" color="gray.500">
+                      设置特定时间段内的访问控制规则
+                    </Text>
+                    <Button leftIcon={<FiPlus />} size="sm" colorScheme="orange">
+                      添加规则
+                    </Button>
+                  </HStack>
+
+                  <Box p={4} bg="gray.50" borderRadius="md" textAlign="center">
+                    <Text color="gray.500">暂无时间窗口规则</Text>
+                    <Text fontSize="sm" color="gray.400" mt={2}>
+                      点击上方按钮添加第一条规则
+                    </Text>
+                  </Box>
+                </VStack>
               </TabPanel>
             </TabPanels>
           </Tabs>
