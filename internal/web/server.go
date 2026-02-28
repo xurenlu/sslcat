@@ -675,8 +675,9 @@ func (s *Server) setupMLSystem() {
 	// 设置 API 处理器的引擎
 	s.mlAPIHandler.SetEngine(s.mlInferenceEngine, s.mlForest, s.mlFeatureExtractor, s.mlThreatScorer)
 
-	// 注册 ML API 路由
-	s.mlAPIHandler.RegisterRoutes(nil, s.config.AdminPrefix)
+	// 注册 ML API 路由 - 直接使用 s.mux 而不是 gorilla/mux
+	// 注意: RegisterRoutes 需要一个 gorilla/mux.Router，但这里我们使用标准库的 http.ServeMux
+	// 所以跳过 RegisterRoutes 调用，直接在下面注册路由
 
 	// 在 mux 中注册 ML API 路由
 	prefix := s.config.AdminPrefix + "/api/ml"
