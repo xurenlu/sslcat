@@ -29,6 +29,18 @@ type CircuitBreakerActionRequest struct {
 	Action string `json:"action"` // reset, open, close
 }
 
+// handleServiceMeshConfig 处理 Service Mesh 配置的 GET 和 POST 请求
+func (s *Server) handleServiceMeshConfig(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		s.handleServiceMeshGetConfig(w, r)
+	case http.MethodPost:
+		s.handleServiceMeshUpdateConfig(w, r)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
 // handleServiceMeshGetConfig 获取 Service Mesh 配置
 func (s *Server) handleServiceMeshGetConfig(w http.ResponseWriter, r *http.Request) {
 	if s.proxyManager == nil || s.proxyManager.GetServiceMeshManager() == nil {
@@ -73,19 +85,38 @@ func (s *Server) handleServiceMeshUpdateConfig(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	currentManager := s.proxyManager.GetServiceMeshManager()
+
+	// 构建 or 使用现有配置
+	config := req.Config
+	if config == nil && currentManager != nil {
+		config = currentManager.GetConfig()
+	}
+	if config == nil {
+		// 创建默认配置
+		config = &proxy.ServiceMeshConfig{
+			Enabled: req.Enabled,
+			Type:    req.Type,
+		}
+	} else {
+		// 更新配置中的 enabled 和 type
+		config.Enabled = req.Enabled
+		config.Type = req.Type
+	}
+
 	// 更新配置
-	if s.proxyManager.GetServiceMeshManager() == nil && req.Enabled {
+	if currentManager == nil && req.Enabled {
 		// 首次启用
 		s.proxyManager.SetServiceMeshManager(proxy.NewServiceMeshManager(
-			req.Config,
+			config,
 			s.proxyManager,
 			s.config,
 		))
-	} else if s.proxyManager.GetServiceMeshManager() != nil && !req.Enabled {
+	} else if currentManager != nil && !req.Enabled {
 		// 禁用 Service Mesh
 		s.proxyManager.SetServiceMeshManager(nil)
-	} else if s.proxyManager.GetServiceMeshManager() != nil {
-		s.proxyManager.GetServiceMeshManager().UpdateConfig(req.Config)
+	} else if currentManager != nil {
+		currentManager.UpdateConfig(config)
 	}
 
 	// 获取更新后的状态并发送回客户端

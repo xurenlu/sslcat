@@ -65,11 +65,14 @@ interface ServiceMeshConfig {
   enabled: boolean;
   type: string;
   stats: {
-    total_requests: number;
-    mesh_requests: number;
-    fallback_requests: number;
-    avg_latency: number;
-    error_rate: number;
+    services_discovered: number;
+    requests_via_mesh: number;
+    requests_direct: number;
+    retries_attempted: number;
+    circuit_breaker_trips: number;
+    last_discovery_time: string;
+    mesh_api_calls: number;
+    mesh_api_errors: number;
   };
   services: ServiceInfo[];
   circuit_breakers: Record<string, CircuitBreakerState>;
@@ -127,13 +130,10 @@ const ServiceMesh: React.FC = () => {
 
   const handleToggleEnabled = async () => {
     try {
+      const newEnabled = !config?.enabled;
       const response = await axios.post(buildApiPath(adminPrefix, '/api/service-mesh/config'), {
-        enabled: !config?.enabled,
+        enabled: newEnabled,
         type: config?.type || 'istio',
-        config: {
-          enabled: !config?.enabled,
-          type: config?.type || 'istio',
-        },
       });
       // 直接使用服务器返回的最新配置
       setConfig(response.data);
@@ -264,9 +264,9 @@ const ServiceMesh: React.FC = () => {
               <Card>
                 <CardBody>
                   <Stat>
-                    <StatLabel>总请求数</StatLabel>
-                    <StatNumber>{config.stats.total_requests.toLocaleString()}</StatNumber>
-                    <StatHelpText>累计请求</StatHelpText>
+                    <StatLabel>已发现服务</StatLabel>
+                    <StatNumber>{config.stats.services_discovered.toLocaleString()}</StatNumber>
+                    <StatHelpText>已注册服务</StatHelpText>
                   </Stat>
                 </CardBody>
               </Card>
@@ -275,7 +275,7 @@ const ServiceMesh: React.FC = () => {
                 <CardBody>
                   <Stat>
                     <StatLabel>Mesh 请求</StatLabel>
-                    <StatNumber>{config.stats.mesh_requests.toLocaleString()}</StatNumber>
+                    <StatNumber>{config.stats.requests_via_mesh.toLocaleString()}</StatNumber>
                     <StatHelpText>
                       通过 Service Mesh
                     </StatHelpText>
@@ -286,9 +286,9 @@ const ServiceMesh: React.FC = () => {
               <Card>
                 <CardBody>
                   <Stat>
-                    <StatLabel>平均延迟</StatLabel>
-                    <StatNumber>{config.stats.avg_latency.toFixed(2)}ms</StatNumber>
-                    <StatHelpText>响应时间</StatHelpText>
+                    <StatLabel>直接请求</StatLabel>
+                    <StatNumber>{config.stats.requests_direct.toLocaleString()}</StatNumber>
+                    <StatHelpText>绕过 Service Mesh</StatHelpText>
                   </Stat>
                 </CardBody>
               </Card>
@@ -296,11 +296,9 @@ const ServiceMesh: React.FC = () => {
               <Card>
                 <CardBody>
                   <Stat>
-                    <StatLabel>错误率</StatLabel>
-                    <StatNumber>
-                      {(config.stats.error_rate * 100).toFixed(2)}%
-                    </StatNumber>
-                    <StatHelpText>请求失败率</StatHelpText>
+                    <StatLabel>API 调用</StatLabel>
+                    <StatNumber>{config.stats.mesh_api_calls.toLocaleString()}</StatNumber>
+                    <StatHelpText>Mesh API 请求</StatHelpText>
                   </Stat>
                 </CardBody>
               </Card>
@@ -344,7 +342,7 @@ const ServiceMesh: React.FC = () => {
                       </Button>
                     </CardHeader>
                     <CardBody>
-                      {config.services.length === 0 ? (
+                      {!config.services || config.services.length === 0 ? (
                         <Alert status="info">
                           <AlertIcon />
                           暂无服务
@@ -362,7 +360,7 @@ const ServiceMesh: React.FC = () => {
                             </Tr>
                           </Thead>
                           <Tbody>
-                            {config.services.map((service) => (
+                            {(config.services || []).map((service) => (
                               <Tr key={service.name}>
                                 <Td>{service.name}</Td>
                                 <Td>{service.namespace}</Td>
@@ -423,7 +421,7 @@ const ServiceMesh: React.FC = () => {
                       </Button>
                     </CardHeader>
                     <CardBody>
-                      {Object.keys(config.circuit_breakers).length === 0 ? (
+                      {!config.circuit_breakers || Object.keys(config.circuit_breakers).length === 0 ? (
                         <Alert status="info">
                           <AlertIcon />
                           暂无熔断器
@@ -442,7 +440,7 @@ const ServiceMesh: React.FC = () => {
                             </Tr>
                           </Thead>
                           <Tbody>
-                            {Object.values(config.circuit_breakers).map((breaker) => (
+                            {Object.values(config.circuit_breakers || {}).map((breaker) => (
                               <Tr key={breaker.service}>
                                 <Td>{breaker.service}</Td>
                                 <Td>

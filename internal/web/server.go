@@ -1365,7 +1365,7 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/rbac/import", s.handleRBACImport)
 
 	// Service Mesh API (Phase 5)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/service-mesh/config", s.handleServiceMeshGetConfig)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/service-mesh/config", s.handleServiceMeshConfig)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/service-mesh/config/update", s.handleServiceMeshUpdateConfig)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/service-mesh/stats", s.handleServiceMeshStats)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/service-mesh/services", s.handleServiceMeshServices)

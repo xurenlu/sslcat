@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import {
   Box,
   Heading,
@@ -44,7 +44,6 @@ import {
 import { MapContainer, TileLayer, Marker, Popup, CircleMarker, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
-import { useTranslation } from '../hooks/useLanguage'
 
 // 修复 Leaflet 默认图标问题
 import L from 'leaflet'
@@ -87,12 +86,12 @@ interface AttackStats {
 
 const AttackMap: React.FC = () => {
   const { adminPrefix } = useConfig()
-  const t = useTranslation()
   const toast = useToast()
 
   const [attacks, setAttacks] = useState<AttackData[]>([])
   const [stats, setStats] = useState<AttackStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [mapReady, setMapReady] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [selectedHours, setSelectedHours] = useState(24)
   const [mapCenter, setMapCenter] = useState<[number, number]>([20, 0])
@@ -195,6 +194,14 @@ const AttackMap: React.FC = () => {
   useEffect(() => {
     loadData()
   }, [adminPrefix, selectedHours])
+
+  // Defer map rendering to avoid React 18 concurrent rendering issues with react-leaflet
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMapReady(true)
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [])
 
   const getAttackTypeColor = (type: string) => {
     const colors: { [key: string]: string } = {
@@ -359,13 +366,12 @@ const AttackMap: React.FC = () => {
                 </HStack>
 
                 <Box h="400px" borderRadius="md" overflow="hidden">
-                  {loading ? (
+                  {loading || !mapReady ? (
                     <Box h="100%" display="flex" alignItems="center" justifyContent="center">
                       <Spinner size="xl" />
                     </Box>
                   ) : (
                     <MapContainer
-                      key={String(wsConnected)}
                       center={[30, 0]}
                       zoom={2}
                       style={{ height: '100%', width: '100%' }}

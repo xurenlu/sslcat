@@ -29,7 +29,7 @@
     "react-dom": "^18.2.0",
     "react-i18next": "^16.0.0",
     "react-icons": "^4.12.0",
-    "react-leaflet": "^5.0.0",
+    "react-leaflet": "^4.2.1",
     "react-router-dom": "^6.20.1",
     "recharts": "^2.10.3",
     "three": "^0.182.0"
