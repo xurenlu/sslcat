@@ -30,6 +30,7 @@ import (
 	"github.com/xurenlu/sslcat/internal/runner"
 	"github.com/xurenlu/sslcat/internal/security"
 	"github.com/xurenlu/sslcat/internal/ssl"
+	"github.com/xurenlu/sslcat/internal/threatintel"
 	"github.com/xurenlu/sslcat/internal/web"
 
 	"github.com/sirupsen/logrus"
@@ -335,6 +336,12 @@ func main() {
 	// 设置SSL管理器的通知集成器
 	sslManager.SetNotificationIntegrator(notificationIntegrator)
 	securityManager := security.NewManager(cfg)
+
+	// 初始化威胁情报管理器
+	threatIntelManager := threatintel.NewThreatIntelManager(cfg)
+	// 将威胁情报管理器链接到安全管理器
+	securityManager.SetThreatIntelManager(threatIntelManager)
+
 	cdnCache := cache.NewCDNCache(cfg)
 	cdnCache.StartCleaner()
 	proxyManager := proxy.NewManager(cfg, sslManager, securityManager, cdnCache, version)
@@ -349,6 +356,9 @@ func main() {
 	gitServer.SetSSLManager(sslManager)
 
 	webServer := web.NewServer(cfg, proxyManager, securityManager, sslManager, gitServer, notificationIntegrator, version)
+
+	// 将威胁情报管理器链接到 Web 服务器
+	webServer.SetThreatIntelManager(threatIntelManager)
 
 	// 注册可重载组件
 	reloadManager.RegisterComponent(proxyManager)
@@ -435,6 +445,9 @@ func main() {
 		log.Fatalf("启动代理管理器失败: %v", err)
 	}
 	securityManager.Start()
+
+	// 启动威胁情报管理器
+	threatIntelManager.Start()
 
 	// 启动 Runner 模块
 	if err := gitServer.Start(); err != nil {
@@ -545,6 +558,9 @@ func main() {
 	securityManager.Stop()
 	proxyManager.Stop()
 	sslManager.Stop()
+
+	// 停止威胁情报管理器
+	threatIntelManager.Stop()
 
 	// 停止 Runner 模块
 	gitServer.Stop()

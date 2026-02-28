@@ -333,6 +333,7 @@ func (s *Server) generateGitServerManagementHTML(data map[string]interface{}) st
     
     <script src="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+    const adminPrefix = '%s';
     let currentAppName = null;
     let deployStatusInterval = null;
 
@@ -344,7 +345,7 @@ func (s *Server) generateGitServerManagementHTML(data map[string]interface{}) st
 
     // 加载应用列表
     function loadApps() {
-        fetch('%s/api/git-server/apps')
+        fetch(adminPrefix + '/api/git-server/apps')
             .then(r => r.json())
             .then(data => {
                 const container = document.getElementById('apps-container');
@@ -469,7 +470,7 @@ func (s *Server) generateGitServerManagementHTML(data map[string]interface{}) st
             auto_ssl: document.getElementById('autoSSL').checked
         };
 
-        fetch('%s/api/git-server/app/create', {
+        fetch(adminPrefix + '/api/git-server/app/create', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -498,7 +499,7 @@ func (s *Server) generateGitServerManagementHTML(data map[string]interface{}) st
     }
 
     function loadServerConfig() {
-        fetch('%s/api/git-server/config')
+        fetch(adminPrefix + '/api/git-server/config')
             .then(r => r.json())
             .then(data => {
                 if (data.success && data.data) {
@@ -527,7 +528,7 @@ func (s *Server) generateGitServerManagementHTML(data map[string]interface{}) st
             auto_domain: document.getElementById('autoDomain').checked
         };
 
-        fetch('%s/api/git-server/config/update', {
+        fetch(adminPrefix + '/api/git-server/config/update', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -549,24 +550,372 @@ func (s *Server) generateGitServerManagementHTML(data map[string]interface{}) st
     }
 
     function viewApp(appName) {
-        // TODO: 实现应用详情查看
-        showAlert('info', '应用详情功能正在开发中');
+        fetch(adminPrefix + '/api/git-server/app/get?name=' + appName)
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showAppDetailModal(data.data);
+                } else {
+                    showAlert('danger', '获取应用详情失败: ' + (data.message || '未知错误'));
+                }
+            })
+            .catch(error => {
+                showAlert('danger', '获取应用详情失败: ' + error.message);
+            });
+    }
+
+    function showAppDetailModal(app) {
+        // 创建详情模态框
+        const modalHtml = '<div class="modal fade" id="appDetailModal" tabindex="-1">' +
+            '<div class="modal-dialog modal-xl">' +
+                '<div class="modal-content">' +
+                    '<div class="modal-header">' +
+                        '<h5 class="modal-title">应用详情 - ' + (app.display_name || app.name) + '</h5>' +
+                        '<button type="button" class="btn-close" data-bs-dismiss="modal"></button>' +
+                    '</div>' +
+                    '<div class="modal-body">' +
+                        '<div class="row">' +
+                            '<div class="col-md-6">' +
+                                '<h6>基本信息</h6>' +
+                                '<table class="table table-sm">' +
+                                    '<tr><td>应用名称:</td><td><code>' + app.name + '</code></td></tr>' +
+                                    '<tr><td>应用类型:</td><td>' + getAppTypeBadge(app.app_type) + '</td></tr>' +
+                                    '<tr><td>状态:</td><td>' + getAppStatusBadge(app.status) + '</td></tr>' +
+                                    '<tr><td>域名:</td><td><code>' + (app.domain || '未分配') + '</code></td></tr>' +
+                                    '<tr><td>端口:</td><td><span class="badge bg-secondary">' + (app.port || '未分配') + '</span></td></tr>' +
+                                    '<tr><td>最后部署:</td><td>' + formatDate(app.last_deploy) + '</td></tr>' +
+                                    '<tr><td>最后提交:</td><td><code>' + (app.last_commit || '无') + '</code></td></tr>' +
+                                '</table>' +
+                            '</div>' +
+                            '<div class="col-md-6">' +
+                                '<h6>Git 配置</h6>' +
+                                '<table class="table table-sm">' +
+                                    '<tr><td>Git URL:</td><td><code>' + (app.git_url || '无') + '</code></td></tr>' +
+                                    '<tr><td>仓库目录:</td><td><code>' + (app.repo_dir || '无') + '</code></td></tr>' +
+                                    '<tr><td>日志目录:</td><td><code>' + (app.logs_dir || '无') + '</code></td></tr>' +
+                                    '<tr><td>Docker 镜像:</td><td><code>' + (app.docker_image || '无') + '</code></td></tr>' +
+                                    '<tr><td>启动命令:</td><td><code>' + (app.start_command || '无') + '</code></td></tr>' +
+                                    '<tr><td>自动 SSL:</td><td>' + (app.autoSSL ? '<span class="badge bg-success">是</span>' : '<span class="badge bg-secondary">否</span>') + '</td></tr>' +
+                                '</table>' +
+                            '</div>' +
+                        '</div>' +
+                        (app.deploy_status ? '<div class="mt-3"><h6>部署状态</h6><div class="card"><div class="card-body">' +
+                            '<p><strong>状态:</strong> ' + getAppStatusBadge(app.deploy_status.status) + '</p>' +
+                            '<p><strong>进度:</strong> ' + (app.deploy_status.progress || 0) + '%</p>' +
+                            '<div class="progress" style="height: 20px;"><div class="progress-bar" role="progressbar" style="width: ' + (app.deploy_status.progress || 0) + '%">' + (app.deploy_status.progress || 0) + '%</div></div>' +
+                            '<p class="mt-2"><strong>消息:</strong> ' + (app.deploy_status.message || '无') + '</p>' +
+                            (app.deploy_status.error ? '<p class="text-danger"><strong>错误:</strong> ' + app.deploy_status.error + '</p>' : '') +
+                        '</div></div></div>' : '') +
+                        (app.services && app.services.length > 0 ? '<div class="mt-3"><h6>服务信息</h6><div class="row">' +
+                            app.services.map(function(svc) {
+                                return '<div class="col-md-6"><div class="card"><div class="card-body">' +
+                                    '<h6 class="card-title">' + svc.name + '</h6>' +
+                                    '<p class="card-text"><small>镜像: ' + svc.image + '</small></p>' +
+                                    '<p class="card-text"><small>端口: ' + svc.ports.join(', ') + '</small></p>' +
+                                    '<p class="card-text"><small>状态: ' + svc.status + '</small></p>' +
+                                '</div></div></div>';
+                            }).join('') +
+                        '</div></div>' : '') +
+                        (app.env_vars && Object.keys(app.env_vars).length > 0 ? '<div class="mt-3"><h6>环境变量</h6><div class="card"><div class="card-body">' +
+                            Object.entries(app.env_vars).map(function(kv) {
+                                return '<p><code>' + kv[0] + '</code> = <code>' + kv[1] + '</code></p>';
+                            }).join('') +
+                        '</div></div></div>' : '') +
+                    '</div>' +
+                    '<div class="modal-footer">' +
+                        '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>' +
+                        '<button type="button" class="btn btn-primary" onclick="showDeployStatus(\'' + app.name + '\')">查看部署状态</button>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
+
+        // 移除旧的模态框（如果存在）
+        const oldModal = document.getElementById('appDetailModal');
+        if (oldModal) oldModal.remove();
+
+        // 添加新模态框
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        // 显示模态框
+        const modal = new bootstrap.Modal(document.getElementById('appDetailModal'));
+        modal.show();
     }
 
     function showDeployStatus(appName) {
         currentAppName = appName;
-        // TODO: 实现部署状态查看
-        showAlert('info', '部署状态功能正在开发中');
+        fetch(adminPrefix + '/api/git-server/app/get?name=' + appName)
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showDeployStatusModal(data.data);
+                    // 如果正在部署，设置自动刷新
+                    if (data.data.deploy_status &&
+                        (data.data.deploy_status.status === 'building' ||
+                         data.data.deploy_status.status === 'deploying')) {
+                        if (deployStatusInterval) clearInterval(deployStatusInterval);
+                        deployStatusInterval = setInterval(refreshDeployStatus, 3000);
+                    }
+                } else {
+                    showAlert('danger', '获取部署状态失败: ' + (data.message || '未知错误'));
+                }
+            })
+            .catch(error => {
+                showAlert('danger', '获取部署状态失败: ' + error.message);
+            });
+    }
+
+    function showDeployStatusModal(app) {
+        const deployStatus = app.deploy_status || {};
+        const deployHistory = app.deploy_history || [];
+
+        const modalHtml = '<div class="modal fade" id="deployStatusModal" tabindex="-1">' +
+            '<div class="modal-dialog modal-xl">' +
+                '<div class="modal-content">' +
+                    '<div class="modal-header">' +
+                        '<h5 class="modal-title">部署状态 - ' + (app.display_name || app.name) + '</h5>' +
+                        '<button type="button" class="btn-close" data-bs-dismiss="modal" onclick="clearDeployStatusInterval()"></button>' +
+                    '</div>' +
+                    '<div class="modal-body">' +
+                        '<div id="deployStatusContent">' +
+                            '<div class="row">' +
+                                '<div class="col-md-6">' +
+                                    '<h6>当前部署</h6>' +
+                                    '<div class="card">' +
+                                        '<div class="card-body">' +
+                                            '<p><strong>状态:</strong> ' + getAppStatusBadge(deployStatus.status || app.status) + '</p>' +
+                                            '<p><strong>进度:</strong> ' + (deployStatus.progress || 0) + '%</p>' +
+                                            '<div class="progress mb-3" style="height: 25px;">' +
+                                                '<div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: ' + (deployStatus.progress || 0) + '%">' + (deployStatus.progress || 0) + '%</div>' +
+                                            '</div>' +
+                                            '<p><strong>消息:</strong> ' + (deployStatus.message || '无') + '</p>' +
+                                            (deployStatus.deploy_id ? '<p><strong>部署ID:</strong> <code>' + deployStatus.deploy_id + '</code></p>' : '') +
+                                            (deployStatus.start_time ? '<p><strong>开始时间:</strong> ' + formatDate(deployStatus.start_time) + '</p>' : '') +
+                                            (deployStatus.error ? '<div class="alert alert-danger"><strong>错误:</strong> ' + deployStatus.error + '</div>' : '') +
+                                        '</div>' +
+                                    '</div>' +
+                                '</div>' +
+                                '<div class="col-md-6">' +
+                                    '<h6>部署日志</h6>' +
+                                    '<div class="card">' +
+                                        '<div class="card-body deploy-logs" style="max-height: 200px; overflow-y: auto; background: #f5f5f5; padding: 10px;">' +
+                                            (deployStatus.logs && deployStatus.logs.length > 0 ?
+                                                deployStatus.logs.map(function(log) { return '<div style="font-family: monospace; font-size: 0.8rem;">' + escapeHtml(log) + '</div>'; }).join('') :
+                                                '<p class="text-muted">暂无日志</p>') +
+                                        '</div>' +
+                                    '</div>' +
+                                '</div>' +
+                            '</div>' +
+                            (deployHistory.length > 0 ? '<div class="mt-4"><h6>部署历史</h6><div class="card"><div class="card-body"><div class="table-responsive"><table class="table table-sm"><thead><tr><th>时间</th><th>状态</th><th>提交</th><th>消息</th><th>耗时</th></tr></thead><tbody>' +
+                                deployHistory.slice(0, 10).map(function(record) {
+                                    return '<tr><td>' + formatDate(record.timestamp) + '</td>' +
+                                        '<td>' + getAppStatusBadge(record.status) + '</td>' +
+                                        '<td><code>' + record.commit_hash.substring(0, 8) + '</code></td>' +
+                                        '<td>' + (record.commit_message || '-') + '</td>' +
+                                        '<td>' + (record.duration ? Math.round(record.duration/1000) + 's' : '-') + '</td></tr>';
+                                }).join('') +
+                            '</tbody></table></div></div></div></div>' : '') +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="modal-footer">' +
+                        '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="clearDeployStatusInterval()">关闭</button>' +
+                        '<button type="button" class="btn btn-primary" onclick="refreshDeployStatus()"><i class="bi bi-arrow-clockwise"></i> 刷新</button>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
+
+        // 移除旧的模态框
+        const oldModal = document.getElementById('deployStatusModal');
+        if (oldModal) oldModal.remove();
+
+        // 添加新模态框
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        // 显示模态框
+        const modal = new bootstrap.Modal(document.getElementById('deployStatusModal'));
+        modal.show();
+    }
+
+    function refreshDeployStatus() {
+        if (!currentAppName) return;
+
+        fetch(adminPrefix + '/api/git-server/app/get?name=' + currentAppName)
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    // 更新模态框内容
+                    const oldModal = document.getElementById('deployStatusModal');
+                    if (oldModal) {
+                        // 保存当前滚动位置
+                        const scrollPos = document.querySelector('.deploy-logs')?.scrollTop || 0;
+
+                        // 更新内容
+                        oldModal.remove();
+                        showDeployStatusModal(data.data);
+
+                        // 恢复滚动位置
+                        setTimeout(function() {
+                            const logsDiv = document.querySelector('.deploy-logs');
+                            if (logsDiv) logsDiv.scrollTop = scrollPos;
+                        }, 100);
+                    }
+
+                    // 如果不再部署中，停止自动刷新
+                    if (!data.data.deploy_status ||
+                        (data.data.deploy_status.status !== 'building' &&
+                         data.data.deploy_status.status !== 'deploying')) {
+                        clearDeployStatusInterval();
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('刷新部署状态失败:', error);
+            });
+    }
+
+    function clearDeployStatusInterval() {
+        if (deployStatusInterval) {
+            clearInterval(deployStatusInterval);
+            deployStatusInterval = null;
+        }
     }
 
     function showAppLogs(appName) {
-        // TODO: 实现应用日志查看
-        showAlert('info', '应用日志功能正在开发中');
+        currentAppName = appName;
+
+        const modalHtml = '<div class="modal fade" id="appLogsModal" tabindex="-1">' +
+            '<div class="modal-dialog modal-xl">' +
+                '<div class="modal-content">' +
+                    '<div class="modal-header">' +
+                        '<h5 class="modal-title">应用日志 - ' + appName + '</h5>' +
+                        '<button type="button" class="btn-close" data-bs-dismiss="modal" onclick="clearLogStream()"></button>' +
+                    '</div>' +
+                    '<div class="modal-body">' +
+                        '<div class="mb-3">' +
+                            '<div class="btn-group btn-group-sm">' +
+                                '<button class="btn btn-outline-primary" onclick="loadAppLogs(\'' + appName + '\', 100)">最近100行</button>' +
+                                '<button class="btn btn-outline-primary" onclick="loadAppLogs(\'' + appName + '\', 500)">最近500行</button>' +
+                                '<button class="btn btn-outline-primary" onclick="loadAppLogs(\'' + appName + '\', 1000)">最近1000行</button>' +
+                            '</div>' +
+                            '<button class="btn btn-outline-success btn-sm ms-2" onclick="startLogStream(\'' + appName + '\')"><i class="bi bi-play-circle"></i> 实时日志</button>' +
+                            '<button class="btn btn-outline-secondary btn-sm" onclick="stopLogStream()"><i class="bi bi-stop-circle"></i> 停止</button>' +
+                            '<button class="btn btn-outline-danger btn-sm" onclick="clearLogs()"><i class="bi bi-trash"></i> 清空</button>' +
+                        '</div>' +
+                        '<div id="logsContent" class="card" style="max-height: 500px; overflow-y: auto;">' +
+                            '<div class="card-body deploy-logs" style="background: #1e1e1e; color: #d4d4d4; font-family: monospace; font-size: 0.85rem; padding: 15px; min-height: 300px;">' +
+                                '<p class="text-muted">点击上方按钮加载日志...</p>' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
+
+        // 移除旧的模态框
+        const oldModal = document.getElementById('appLogsModal');
+        if (oldModal) oldModal.remove();
+
+        // 添加新模态框
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        // 显示模态框
+        const modal = new bootstrap.Modal(document.getElementById('appLogsModal'));
+        modal.show();
+    }
+
+    function loadAppLogs(appName, lines) {
+        fetch(adminPrefix + '/api/git-server/logs?app=' + appName + '&lines=' + lines)
+            .then(r => r.json())
+            .then(data => {
+                const logsDiv = document.querySelector('#logsContent .card-body');
+                if (data.success && data.data) {
+                    if (data.data.length === 0) {
+                        logsDiv.innerHTML = '<p class="text-muted">暂无日志</p>';
+                    } else {
+                        logsDiv.innerHTML = data.data.map(function(log) {
+                            return '<div style="white-space: pre-wrap; word-break: break-all;">' + escapeHtml(log.message || log) + '</div>';
+                        }).join('');
+                    }
+                } else {
+                    logsDiv.innerHTML = '<p class="text-danger">加载日志失败: ' + (data.message || '未知错误') + '</p>';
+                }
+                // 滚动到底部
+                document.getElementById('logsContent').scrollTop = document.getElementById('logsContent').scrollHeight;
+            })
+            .catch(error => {
+                document.querySelector('#logsContent .card-body').innerHTML =
+                    '<p class="text-danger">加载日志失败: ' + error.message + '</p>';
+            });
+    }
+
+    var logEventSource = null;
+
+    function startLogStream(appName) {
+        if (logEventSource) {
+            logEventSource.close();
+        }
+
+        const logsDiv = document.querySelector('#logsContent .card-body');
+        logsDiv.innerHTML = '<p class="text-info">正在连接实时日志流...</p>';
+
+        // 使用 SSE 连接
+        logEventSource = new EventSource(adminPrefix + '/api/git-server/logs/stream?app=' + appName);
+
+        logEventSource.onmessage = function(event) {
+            const log = event.data;
+            const logLine = document.createElement('div');
+            logLine.style.whiteSpace = 'pre-wrap';
+            logLine.style.wordBreak = 'break-all';
+            logLine.textContent = log;
+            logsDiv.appendChild(logLine);
+
+            // 自动滚动到底部
+            document.getElementById('logsContent').scrollTop = document.getElementById('logsContent').scrollHeight;
+
+            // 限制日志行数，防止内存溢出
+            while (logsDiv.children.length > 1000) {
+                logsDiv.removeChild(logsDiv.firstChild);
+            }
+        };
+
+        logEventSource.onerror = function(error) {
+            logsDiv.innerHTML += '<p class="text-danger">实时日志连接断开</p>';
+            stopLogStream();
+        };
+
+        logEventSource.onopen = function() {
+            logsDiv.innerHTML = '<p class="text-success">已连接到实时日志流</p>';
+        };
+    }
+
+    function stopLogStream() {
+        if (logEventSource) {
+            logEventSource.close();
+            logEventSource = null;
+        }
+    }
+
+    function clearLogStream() {
+        stopLogStream();
+    }
+
+    function clearLogs() {
+        const logsDiv = document.querySelector('#logsContent .card-body');
+        if (logsDiv) {
+            logsDiv.innerHTML = '<p class="text-muted">日志已清空</p>';
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     function deleteApp(appName) {
         if (confirm('确定要删除应用 "' + appName + '" 吗？此操作不可恢复！')) {
-            fetch('%s/api/git-server/app/delete?name=' + appName, {method: 'POST'})
+            fetch(adminPrefix + '/api/git-server/app/delete?name=' + appName, {method: 'POST'})
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
@@ -611,6 +960,12 @@ func (s *Server) generateGitServerManagementHTML(data map[string]interface{}) st
 		data["AdminPrefix"].(string),
 		data["FunctionDescription"].(string),
 		data["Description"].(string),
+		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string),
+		data["AdminPrefix"].(string),
 		data["AdminPrefix"].(string),
 		data["AdminPrefix"].(string),
 		data["AdminPrefix"].(string),

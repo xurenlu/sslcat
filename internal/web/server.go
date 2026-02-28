@@ -40,6 +40,7 @@ import (
 	"github.com/xurenlu/sslcat/internal/slowrequest"
 	"github.com/xurenlu/sslcat/internal/ssl"
 	"github.com/xurenlu/sslcat/internal/statistics"
+	"github.com/xurenlu/sslcat/internal/threatintel"
 	"github.com/xurenlu/sslcat/internal/tracing"
 	"github.com/xurenlu/sslcat/internal/waf"
 
@@ -143,6 +144,10 @@ type Server struct {
 
 	// 安全事件中心
 	securityEventHub *SecurityEventHub
+
+	// 威胁情报管理器
+	threatIntelManager *threatintel.ThreatIntelManager
+	threatIntelAPI     *ThreatIntelAPI
 
 	// ML/AI 异常检测系统
 	mlAPIHandler       *MLAPIHandler
@@ -751,6 +756,17 @@ func (s *Server) UpdateConfig(newConfig *config.Config) {
 	}
 
 	s.log.Info("Server configuration updated successfully")
+}
+
+// SetThreatIntelManager 设置威胁情报管理器
+func (s *Server) SetThreatIntelManager(tim *threatintel.ThreatIntelManager) {
+	s.threatIntelManager = tim
+	s.threatIntelAPI = NewThreatIntelAPI(tim)
+
+	// 注册威胁情报API路由
+	s.threatIntelAPI.RegisterRoutes(s.mux)
+
+	s.log.Info("Threat intelligence manager linked to web server")
 }
 
 // cleanupOldConfigResources 清理旧配置相关的资源

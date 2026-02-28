@@ -727,6 +727,12 @@ func (gs *GitServer) Start() error {
 		return fmt.Errorf(gs.translator.T("git_server.unavailable")+": %w", err)
 	}
 
+	// 检查 Docker 是否可用，如果不可用则尝试启动
+	if err := gs.checkDocker(); err != nil {
+		gs.logger.Warnf("Docker 检查失败: %v", err)
+		// Docker 不是必需的，只是警告
+	}
+
 	// 尝试自动创建 git 用户（如果不存在）
 	if err := gs.createGitUser(); err != nil {
 		gs.logger.Warnf(gs.translator.T("git_server.create_user_failed")+": %v，如果需要请手动创建: sudo useradd -r -s /bin/bash -m -d /home/git git", err)
@@ -2499,6 +2505,50 @@ func (gs *GitServer) loadDockerRegistryConfig() error {
 func (gs *GitServer) checkGit() error {
 	cmd := exec.Command("git", "version")
 	return cmd.Run()
+}
+
+// checkDocker 检查 Docker 是否可用，如果不可用则尝试启动
+func (gs *GitServer) checkDocker() error {
+	// 首先检查 Docker 是否已经在运行
+	cmd := exec.Command("docker", "version")
+	if output, err := cmd.CombinedOutput(); err == nil {
+		gs.logger.Info("Docker 已经在运行")
+		return nil
+	} else {
+		gs.logger.Debugf("Docker 版本检查失败: %s, output: %s", err, string(output))
+	}
+
+	// Docker 没有运行，尝试启动 Docker 服务
+	gs.logger.Info("Docker 未运行，尝试启动 Docker 服务...")
+
+	// 尝试使用 systemctl 启动 Docker（适用于 systemd 系统）
+	startCmd := exec.Command("systemctl", "start", "docker")
+	if output, err := startCmd.CombinedOutput(); err != nil {
+		gs.logger.Debugf("systemctl start docker 失败: %s, output: %s", err, string(output))
+
+		// 如果 systemctl 失败，尝试使用 service 命令（适用于传统系统）
+		startCmd = exec.Command("service", "docker", "start")
+		if output, err := startCmd.CombinedOutput(); err != nil {
+			gs.logger.Debugf("service docker start 失败: %s, output: %s", err, string(output))
+
+			// 如果都失败，返回错误
+			return fmt.Errorf("无法启动 Docker 服务，请手动启动: sudo systemctl start docker 或 sudo service docker start")
+		}
+	}
+
+	gs.logger.Info("Docker 服务启动命令已执行，等待 Docker 就绪...")
+
+	// 等待 Docker 就绪（最多等待 30 秒）
+	for i := 0; i < 30; i++ {
+		cmd := exec.Command("docker", "version")
+		if err := cmd.Run(); err == nil {
+			gs.logger.Infof("Docker 已成功启动 (等待了 %d 秒)", i+1)
+			return nil
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	return fmt.Errorf("Docker 启动超时，请检查 Docker 服务状态")
 }
 
 // cleanupRoutine 清理协程

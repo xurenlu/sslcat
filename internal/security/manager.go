@@ -16,6 +16,7 @@ import (
 
 	"github.com/xurenlu/sslcat/internal/config"
 	"github.com/xurenlu/sslcat/internal/logger"
+	"github.com/xurenlu/sslcat/internal/threatintel"
 
 	"github.com/sirupsen/logrus"
 )
@@ -84,6 +85,9 @@ type Manager struct {
 
 	// IP白名单
 	whitelistEntries map[string]WhitelistEntry // value -> WhitelistEntry
+
+	// 威胁情报管理器
+	threatIntelManager *threatintel.ThreatIntelManager
 
 	// 内存泄漏防护
 	maxAccessLogEntries int // 每个IP的访问日志最多保留多少条
@@ -271,6 +275,25 @@ func (m *Manager) IsBlocked(ip string) bool {
 func (m *Manager) LogAccess(ip, userAgent, path string, success bool) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
+
+	// 检查请求URL/路径是否在威胁情报库中
+	if m.threatIntelManager != nil && path != "" {
+		// 提取域名（如果是完整URL）
+		if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
+			// 检查完整URL
+			if isThreat, level, desc := m.CheckThreatIntel(path, threatintel.IOCTypeURL); isThreat && level >= threatintel.ThreatLevelHigh {
+				m.log.Warnf("检测到恶意URL %s from %s: %s", path, ip, desc)
+			}
+			// 提取域名检查
+			parts := strings.Split(strings.TrimPrefix(path, "https://"), "/")
+			if len(parts) > 0 {
+				domain := parts[0]
+				if isThreat, level, desc := m.CheckThreatIntel(domain, threatintel.IOCTypeDomain); isThreat && level >= threatintel.ThreatLevelHigh {
+					m.log.Warnf("检测到恶意域名 %s from %s: %s", domain, ip, desc)
+				}
+			}
+		}
+	}
 
 	// 检查User-Agent是否合法
 	if m.config.Security.EnableUAFilter && !m.isValidUserAgent(userAgent) {
@@ -646,6 +669,11 @@ func (m *Manager) isValidUserAgent(userAgent string) bool {
 
 // CheckIPAccess 检查IP访问权限
 func (m *Manager) CheckIPAccess(ip string) (bool, string) {
+	// 先检查IP白名单（白名单优先级最高，即使在威胁情报库中也放行）
+	if m.IsWhitelisted(ip) {
+		return true, ""
+	}
+
 	// 检查IP黑名单
 	if m.isInBlacklist(ip) {
 		return false, "IP is in blacklist"
@@ -656,6 +684,17 @@ func (m *Manager) CheckIPAccess(ip string) (bool, string) {
 		if !m.isInWhitelist(ip) {
 			return false, "IP is not in whitelist"
 		}
+	}
+
+	// 检查威胁情报库
+	isThreat, threatLevel, description := m.CheckThreatIntel(ip, threatintel.IOCTypeIP)
+	if isThreat {
+		// 对于高危和严重威胁，直接拒绝
+		if threatLevel >= threatintel.ThreatLevelHigh {
+			return false, fmt.Sprintf("威胁情报阻断: %s", description)
+		}
+		// 对于中等威胁，记录日志但允许访问（可根据配置调整行为）
+		m.log.Warnf("检测到中等威胁IP %s: %s", ip, description)
 	}
 
 	return true, ""
@@ -1589,4 +1628,36 @@ func GetCIDRType(cidr string) string {
 			return fmt.Sprintf("/%d网段", mask)
 		}
 	}
+}
+
+// SetThreatIntelManager 设置威胁情报管理器
+func (m *Manager) SetThreatIntelManager(tim *threatintel.ThreatIntelManager) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.threatIntelManager = tim
+	m.log.Info("Threat intelligence manager linked to security manager")
+}
+
+// CheckThreatIntel 检查IP/域名/URL是否在威胁情报库中
+// 返回: (isThreat, threatLevel, description)
+func (m *Manager) CheckThreatIntel(value string, iocType threatintel.IOCType) (bool, threatintel.ThreatLevel, string) {
+	m.mutex.RLock()
+	tim := m.threatIntelManager
+	m.mutex.RUnlock()
+
+	if tim == nil {
+		return false, threatintel.ThreatLevelLow, ""
+	}
+
+	ioc, found := tim.CheckIOC(value, iocType)
+	if !found {
+		return false, threatintel.ThreatLevelLow, ""
+	}
+
+	// 只有中等及以上威胁级别才认为是威胁
+	if ioc.ThreatLevel >= threatintel.ThreatLevelMedium {
+		return true, ioc.ThreatLevel, fmt.Sprintf("[%s] %s - 来源: %s", ioc.ThreatLevel.String(), ioc.Description, ioc.Source)
+	}
+
+	return false, ioc.ThreatLevel, ioc.Description
 }
