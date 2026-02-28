@@ -107,20 +107,36 @@ func (s *Server) handleEdgeRoutingUpdateConfig(w http.ResponseWriter, r *http.Re
 	if healthCheckInterval == 0 && req.HealthCheckInterval > 0 {
 		healthCheckInterval = req.HealthCheckInterval
 	}
+	// 设置默认值：30秒
+	if healthCheckInterval <= 0 {
+		healthCheckInterval = 30000
+	}
 
 	healthCheckTimeout := req.HealthCheckTimeoutMs
 	if healthCheckTimeout == 0 && req.HealthCheckTimeout > 0 {
 		healthCheckTimeout = req.HealthCheckTimeout
+	}
+	// 设置默认值：5秒
+	if healthCheckTimeout <= 0 {
+		healthCheckTimeout = 5000
 	}
 
 	retryDelay := req.RetryDelayMs
 	if retryDelay == 0 && req.RetryDelay > 0 {
 		retryDelay = req.RetryDelay
 	}
+	// 设置默认值：1秒
+	if retryDelay <= 0 {
+		retryDelay = 1000
+	}
 
 	latencyThreshold := req.LatencyThresholdMs
 	if latencyThreshold == 0 && req.LatencyThreshold > 0 {
 		latencyThreshold = req.LatencyThreshold
+	}
+	// 设置默认值：500ms
+	if latencyThreshold <= 0 {
+		latencyThreshold = 500
 	}
 
 	// 转换请求为配置
@@ -138,11 +154,20 @@ func (s *Server) handleEdgeRoutingUpdateConfig(w http.ResponseWriter, r *http.Re
 	// 更新配置或创建新的 Edge Routing Manager
 	if s.proxyManager.GetEdgeRoutingManager() == nil && req.Enabled {
 		// 首次启用 - 创建新的 Edge Routing Manager
-		// 注意: 这里需要根据实际实现来创建 EdgeRoutingManager
-		// s.proxyManager.SetEdgeRoutingManager(...)
+		manager := proxy.NewEdgeRoutingManager(config, s.proxyManager)
+		s.proxyManager.SetEdgeRoutingManager(manager)
+		// 启动管理器
+		if err := manager.Start(); err != nil {
+			s.sendJSON(w, map[string]interface{}{
+				"success": false,
+				"error":   err.Error(),
+			})
+			return
+		}
 	} else if s.proxyManager.GetEdgeRoutingManager() != nil && !req.Enabled {
-		// 禁用 Edge Routing - 这里需要实现禁用逻辑
-		// s.proxyManager.SetEdgeRoutingManager(nil)
+		// 禁用 Edge Routing
+		s.proxyManager.GetEdgeRoutingManager().Stop()
+		s.proxyManager.SetEdgeRoutingManager(nil)
 	} else if s.proxyManager.GetEdgeRoutingManager() != nil {
 		// 更新现有配置
 		s.proxyManager.GetEdgeRoutingManager().UpdateConfig(config)

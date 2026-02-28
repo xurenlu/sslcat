@@ -125,17 +125,30 @@ const EdgeRouting: React.FC = () => {
   const fetchConfig = async () => {
     try {
       setRefreshing(true);
-      const [configRes, clustersRes, locationsRes, metricsRes] = await Promise.all([
-        axios.get(buildApiPath(adminPrefix, '/api/edge-routing/config')),
-        axios.get(buildApiPath(adminPrefix, '/api/edge-routing/clusters')),
-        axios.get(buildApiPath(adminPrefix, '/api/edge-routing/locations')),
-        axios.get(buildApiPath(adminPrefix, '/api/edge-routing/metrics')),
-      ]);
-
+      const configRes = await axios.get(buildApiPath(adminPrefix, '/api/edge-routing/config'));
       setConfig(configRes.data);
-      setClusters(clustersRes.data.clusters || {});
-      setLocations(locationsRes.data.locations || {});
-      setMetrics(metricsRes.data);
+
+      // 只有在 Edge Routing 启用时才获取详细数据
+      if (configRes.data.enabled) {
+        try {
+          const [clustersRes, locationsRes, metricsRes] = await Promise.all([
+            axios.get(buildApiPath(adminPrefix, '/api/edge-routing/clusters')),
+            axios.get(buildApiPath(adminPrefix, '/api/edge-routing/locations')),
+            axios.get(buildApiPath(adminPrefix, '/api/edge-routing/metrics')),
+          ]);
+          setClusters(clustersRes.data.clusters || {});
+          setLocations(locationsRes.data.locations || {});
+          setMetrics(metricsRes.data);
+        } catch (error) {
+          // 忽略启用后的数据获取错误
+          console.warn('Failed to fetch edge routing details:', error);
+        }
+      } else {
+        // 清空数据
+        setClusters({});
+        setLocations({});
+        setMetrics(null);
+      }
     } catch (error) {
       toast({
         title: '加载失败',

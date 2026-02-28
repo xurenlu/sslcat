@@ -50,7 +50,15 @@
       "Bash(lsof:*)",
       "Bash(git checkout:*)",
       "Bash(npm run dev:*)",
-      "Bash(yarn dev:*)"
+      "Bash(yarn dev:*)",
+      "Bash(yarn remove:*)",
+      "Bash(yarn add:*)",
+      "Bash(go clean:*)",
+      "Bash(nc:*)",
+      "Bash(sleep:*)",
+      "Bash(pgrep:*)",
+      "Bash(unset:*)",
+      "Bash(timeout:*)"
     ],
     "deny": [],
     "ask": []
