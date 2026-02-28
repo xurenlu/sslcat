@@ -48,12 +48,16 @@ import { useTranslation } from '../hooks/useLanguage'
 
 // 修复 Leaflet 默认图标问题
 import L from 'leaflet'
-delete (L.Icon.Default.prototype as any)._getIconUrl
-L.Icon.Default.mergeOptions({
+// 使用更安全的方式修复默认图标
+const DefaultIcon = L.icon({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
 })
+L.Marker.prototype.options.icon = DefaultIcon
 
 interface AttackData {
   source_ip: string
