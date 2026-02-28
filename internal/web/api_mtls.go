@@ -128,7 +128,7 @@ func (s *Server) handlemTLSUpdateConfig(w http.ResponseWriter, r *http.Request) 
 		"enabled":                req.Enabled,
 		"mode":                   req.Mode,
 		"client_cert_required":   req.ClientCertRequired,
-		"crl_check_enabled":      req.CRLCheckEnabled,
+		"crl_check_enabled":      false, // 默认值，因为请求结构体中没有这个字段
 		"cert_pinning_enabled":   req.CertPinningEnabled,
 	})
 }

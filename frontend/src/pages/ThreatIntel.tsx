@@ -70,7 +70,7 @@ interface ThreatSource {
   name: string;
   url: string;
   enabled: boolean;
-  update_freq: number;
+  update_freq: number | string; // 可以是数字（秒）或字符串（如 "1h0m0s"）
   last_update: string;
   iocs_count: number;
 }
@@ -439,7 +439,17 @@ const ThreatIntel: React.FC = () => {
                       <HStack justify="space-between">
                         <Text>总更新频率</Text>
                         <Text>
-                          {sources.reduce((acc, s) => acc + (s.enabled ? s.update_freq : 0), 0)} 次/小时
+                          {sources.reduce((acc: number, s) => {
+                            if (!s.enabled || !s.update_freq) return acc;
+                            // 如果 update_freq 是数字（秒），转换为小时
+                            if (typeof s.update_freq === 'number') {
+                              return acc + s.update_freq / 3600;
+                            }
+                            // 如果 update_freq 是字符串（如 "1h0m0s"），提取小时数
+                            const match = s.update_freq.match(/(\d+)h/);
+                            const hours = match ? parseInt(match[1], 10) : 0;
+                            return acc + hours;
+                          }, 0).toLocaleString()} 次/小时
                         </Text>
                       </HStack>
                     </VStack>
@@ -476,7 +486,13 @@ const ThreatIntel: React.FC = () => {
                             </Badge>
                           </Td>
                           <Td>{source.iocs_count?.toLocaleString() ?? 0}</Td>
-                          <Td>{source.update_freq ? `${source.update_freq / 3600}小时` : '-'}</Td>
+                          <Td>
+                            {source.update_freq
+                              ? typeof source.update_freq === 'number'
+                                ? `${source.update_freq / 3600}小时`
+                                : source.update_freq // 直接显示字符串格式（如 "1h0m0s"）
+                              : '-'}
+                          </Td>
                           <Td fontSize="sm">
                             {source.last_update
                               ? new Date(source.last_update).toLocaleString()
