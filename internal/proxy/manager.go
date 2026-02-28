@@ -89,6 +89,9 @@ type Manager struct {
 
 	// 错误日志限流器：防止大量重复错误日志导致 CPU 高占用
 	errorLogLimiter *errorLogRateLimiter
+
+	// Service Mesh 集成
+	serviceMeshManager *ServiceMeshManager
 }
 
 // NewManager 创建代理管理器
@@ -3138,6 +3141,16 @@ func (m *Manager) FindRuleByDomain(domain string) *config.ProxyRule {
 		}
 	}
 	return nil
+}
+
+// GetServiceMeshManager 获取 Service Mesh 管理器
+func (m *Manager) GetServiceMeshManager() *ServiceMeshManager {
+	return m.serviceMeshManager
+}
+
+// SetServiceMeshManager 设置 Service Mesh 管理器
+func (m *Manager) SetServiceMeshManager(smm *ServiceMeshManager) {
+	m.serviceMeshManager = smm
 }
 
 // Stop 停止错误日志限流器

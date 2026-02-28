@@ -1336,6 +1336,17 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/rbac/export", s.handleRBACExport)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/rbac/import", s.handleRBACImport)
 
+	// Service Mesh API (Phase 5)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/service-mesh/config", s.handleServiceMeshGetConfig)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/service-mesh/config/update", s.handleServiceMeshUpdateConfig)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/service-mesh/stats", s.handleServiceMeshStats)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/service-mesh/services", s.handleServiceMeshServices)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/service-mesh/circuit-breakers", s.handleServiceMeshCircuitBreakers)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/service-mesh/circuit-breakers/reset", s.handleServiceMeshResetBreaker)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/service-mesh/discover", s.handleServiceMeshDiscover)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/service-mesh/health-check", s.handleServiceMeshHealthCheck)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/service-mesh/test-connection", s.handleServiceMeshTestConnection)
+
 	// 慢请求API
 	slowRequestAPI := NewSlowRequestAPI(s.slowRequestManager, s)
 	slowRequestAPI.RegisterRoutes(s.mux, s.config.AdminPrefix+"/api")
