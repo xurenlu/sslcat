@@ -57,6 +57,7 @@ import {
   FiUpload,
 } from 'react-icons/fi';
 import axios from 'axios';
+import { useConfig, buildApiPath } from '../contexts/ConfigContext';
 
 interface MTLSConfig {
   enabled: boolean;
@@ -102,6 +103,7 @@ interface AuditLog {
 }
 
 const SecurityMTLS: React.FC = () => {
+  const { adminPrefix } = useConfig();
   const [mtlsConfig, setMtlsConfig] = useState<MTLSConfig | null>(null);
   const [whitelist, setWhitelist] = useState<string[]>([]);
   const [blacklist, setBlacklist] = useState<string[]>([]);
@@ -120,7 +122,7 @@ const SecurityMTLS: React.FC = () => {
 
   const fetchMTLSConfig = async () => {
     try {
-      const response = await axios.get('/api/mtls/config');
+      const response = await axios.get(buildApiPath(adminPrefix, '/api/mtls/config'));
       setMtlsConfig(response.data);
     } catch (error) {
       toast({
@@ -134,7 +136,7 @@ const SecurityMTLS: React.FC = () => {
 
   const fetchWhitelist = async () => {
     try {
-      const response = await axios.get('/api/mtls/whitelist');
+      const response = await axios.get(buildApiPath(adminPrefix, '/api/mtls/whitelist'));
       setWhitelist(response.data.certificates || []);
     } catch (error) {
       console.error('Failed to fetch whitelist:', error);
@@ -143,7 +145,7 @@ const SecurityMTLS: React.FC = () => {
 
   const fetchBlacklist = async () => {
     try {
-      const response = await axios.get('/api/mtls/blacklist');
+      const response = await axios.get(buildApiPath(adminPrefix, '/api/mtls/blacklist'));
       setBlacklist(response.data.certificates || []);
     } catch (error) {
       console.error('Failed to fetch blacklist:', error);
@@ -152,7 +154,7 @@ const SecurityMTLS: React.FC = () => {
 
   const fetchIssuedCerts = async () => {
     try {
-      const response = await axios.get('/api/mtls/certificates');
+      const response = await axios.get(buildApiPath(adminPrefix, '/api/mtls/certificates'));
       setIssuedCerts(response.data.certificates || []);
     } catch (error) {
       console.error('Failed to fetch issued certificates:', error);
@@ -161,7 +163,7 @@ const SecurityMTLS: React.FC = () => {
 
   const fetchRoles = async () => {
     try {
-      const response = await axios.get('/api/rbac/roles');
+      const response = await axios.get(buildApiPath(adminPrefix, '/api/rbac/roles'));
       setRoles(response.data.roles || []);
     } catch (error) {
       console.error('Failed to fetch roles:', error);
@@ -170,7 +172,7 @@ const SecurityMTLS: React.FC = () => {
 
   const fetchPolicies = async () => {
     try {
-      const response = await axios.get('/api/rbac/policies');
+      const response = await axios.get(buildApiPath(adminPrefix, '/api/rbac/policies'));
       setPolicies(response.data.policies || []);
     } catch (error) {
       console.error('Failed to fetch policies:', error);
@@ -179,7 +181,7 @@ const SecurityMTLS: React.FC = () => {
 
   const fetchAuditLogs = async () => {
     try {
-      const response = await axios.get('/api/rbac/audit');
+      const response = await axios.get(buildApiPath(adminPrefix, '/api/rbac/audit'));
       setAuditLogs(response.data.logs || []);
     } catch (error) {
       console.error('Failed to fetch audit logs:', error);
@@ -204,7 +206,7 @@ const SecurityMTLS: React.FC = () => {
 
   const handleToggleMTLS = async () => {
     try {
-      await axios.post('/api/mtls/config', {
+      await axios.post(buildApiPath(adminPrefix, '/api/mtls/config'), {
         ...mtlsConfig,
         enabled: !mtlsConfig?.enabled,
       });
@@ -227,7 +229,7 @@ const SecurityMTLS: React.FC = () => {
 
   const handleAddToWhitelist = async (serialNumber: string) => {
     try {
-      await axios.post('/api/mtls/whitelist', { serial_number: serialNumber });
+      await axios.post(buildApiPath(adminPrefix, '/api/mtls/whitelist'), { serial_number: serialNumber });
       await fetchWhitelist();
       toast({
         title: '成功',
@@ -247,7 +249,7 @@ const SecurityMTLS: React.FC = () => {
 
   const handleRemoveFromWhitelist = async (serialNumber: string) => {
     try {
-      await axios.delete(`/api/mtls/whitelist/${serialNumber}`);
+      await axios.delete(buildApiPath(adminPrefix, `/api/mtls/whitelist/${serialNumber}`));
       await fetchWhitelist();
       toast({
         title: '成功',
@@ -267,7 +269,7 @@ const SecurityMTLS: React.FC = () => {
 
   const handleRevokeCert = async (serialNumber: string) => {
     try {
-      await axios.post('/api/mtls/revoke', { serial_number: serialNumber });
+      await axios.post(buildApiPath(adminPrefix, '/api/mtls/revoke'), { serial_number: serialNumber });
       await fetchIssuedCerts();
       toast({
         title: '成功',
