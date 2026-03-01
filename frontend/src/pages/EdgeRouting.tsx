@@ -341,6 +341,15 @@ const EdgeRouting: React.FC = () => {
   return (
     <Container maxW="container.xl" py={8}>
       <VStack spacing={6} align="stretch">
+        {/* 实验性功能警告 */}
+        <Alert status="warning" borderRadius="md">
+          <AlertIcon />
+          <Box>
+            <Text fontWeight="bold">实验性功能</Text>
+            <Text fontSize="sm">边缘计算功能尚未完全实现，有待生产环境测试。请在测试环境中谨慎使用。</Text>
+          </Box>
+        </Alert>
+
         {/* Header */}
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <Box>

@@ -95,6 +95,9 @@ type Manager struct {
 
 	// Edge Routing 集成
 	edgeRoutingManager *EdgeRoutingManager
+
+	// API 性能追踪回调（由 web.Server 设置）
+	apiPerformanceTracker func(*http.Request, *http.Response, time.Duration, string)
 }
 
 // NewManager 创建代理管理器
@@ -810,6 +813,15 @@ func (m *Manager) proxyToBackend(w http.ResponseWriter, r *http.Request, rule *c
 				if ruleFromCtx != nil {
 					resp.Header.Del("X-SSLcat-CDN-Default-TTL")
 				}
+			}
+
+			// API 性能追踪：记录所有代理的 API 请求
+			if m.apiPerformanceTracker != nil {
+				backendAddress := ""
+				if backendFromCtx != nil {
+					backendAddress = backendFromCtx.GetAddress()
+				}
+				m.apiPerformanceTracker(resp.Request, resp, responseTime, backendAddress)
 			}
 
 			return nil
@@ -3164,6 +3176,11 @@ func (m *Manager) GetEdgeRoutingManager() *EdgeRoutingManager {
 // SetEdgeRoutingManager 设置 Edge Routing 管理器
 func (m *Manager) SetEdgeRoutingManager(erm *EdgeRoutingManager) {
 	m.edgeRoutingManager = erm
+}
+
+// SetAPIPerformanceTracker 设置 API 性能追踪回调
+func (m *Manager) SetAPIPerformanceTracker(tracker func(*http.Request, *http.Response, time.Duration, string)) {
+	m.apiPerformanceTracker = tracker
 }
 
 // Stop 停止错误日志限流器

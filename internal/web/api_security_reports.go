@@ -1,12 +1,15 @@
 package web
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/jung-kurt/gofpdf"
 )
 
 // Report 安全报告
@@ -118,22 +121,25 @@ func (s *Server) generateSecurityReport(reportID string, req SecurityReportReque
 	securityData := s.collectSecurityData(startDate, endDate)
 
 	// 生成报告内容
-	var content string
+	var content []byte
+	var err error
 	switch req.Format {
 	case "html":
-		content = s.generateHTMLReport(req, securityData)
+		content = []byte(s.generateHTMLReport(req, securityData))
 	case "json":
-		jsonData, _ := json.MarshalIndent(securityData, "", "  ")
-		content = string(jsonData)
+		content, _ = json.MarshalIndent(securityData, "", "  ")
 	default: // pdf
-		content = s.generateTextReport(req, securityData)
+		content, err = s.generatePDFReport(req, securityData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate PDF: %w", err)
+		}
 	}
 
 	// 保存报告
 	fileName := fmt.Sprintf("%s.%s", reportID, req.Format)
 	filePath := filepath.Join("./data/reports/security", fileName)
 
-	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(filePath, content, 0644); err != nil {
 		return nil, fmt.Errorf("failed to write report: %w", err)
 	}
 
@@ -316,6 +322,151 @@ func (s *Server) generateHTMLReport(req SecurityReportRequest, data map[string]i
 </body>
 </html>
 `, req.ReportType, req.StartDate, req.EndDate, time.Now().Format("2006-01-02 15:04:05"))
+}
+
+// generatePDFReport 生成 PDF 报告
+func (s *Server) generatePDFReport(req SecurityReportRequest, data map[string]interface{}) ([]byte, error) {
+	pdf := gofpdf.New("P", "mm", "A4", "")
+	pdf.AddPage()
+	pdf.SetFont("Arial", "B", 16)
+
+	// 标题
+	pdf.CellFormat(40, 10, "SSLcat Security Report", "", 0, "L", false, 0, "")
+	pdf.Ln(12)
+
+	// 报告信息
+	pdf.SetFont("Arial", "", 12)
+	pdf.CellFormat(0, 10, fmt.Sprintf("Report Type: %s", req.ReportType), "", 0, "L", false, 0, "")
+	pdf.Ln(6)
+	pdf.CellFormat(0, 10, fmt.Sprintf("Time Range: %s to %s", req.StartDate, req.EndDate), "", 0, "L", false, 0, "")
+	pdf.Ln(6)
+	pdf.CellFormat(0, 10, fmt.Sprintf("Generated: %s", time.Now().Format("2006-01-02 15:04:05")), "", 0, "L", false, 0, "")
+	pdf.Ln(10)
+
+	// 1. 总览
+	pdf.SetFont("Arial", "B", 14)
+	pdf.CellFormat(0, 10, "1. Overview", "", 0, "L", false, 0, "")
+	pdf.Ln(8)
+	pdf.SetFont("Arial", "", 11)
+	pdf.MultiCell(0, 6, "This report summarizes the security status and threat activities during the specified period.", "", "", false)
+	pdf.Ln(6)
+
+	// 2. WAF 防护统计
+	pdf.SetFont("Arial", "B", 14)
+	pdf.CellFormat(0, 10, "2. WAF Protection Statistics", "", 0, "L", false, 0, "")
+	pdf.Ln(8)
+	pdf.SetFont("Arial", "", 11)
+	pdf.MultiCell(0, 6, "Web Application Firewall (WAF) is the first line of defense protecting your application from malicious attacks.", "", "", false)
+	pdf.Ln(6)
+
+	// WAF 统计数据
+	if wafData, ok := data["waf"].(map[string]interface{}); ok {
+		if totalChecks, ok := wafData["total_checks"].(int); ok {
+			pdf.CellFormat(0, 6, fmt.Sprintf("Total Checks: %d", totalChecks), "", 0, "L", false, 0, "")
+			pdf.Ln(6)
+		}
+		if blockedRequests, ok := wafData["blocked_requests"].(int); ok {
+			pdf.CellFormat(0, 6, fmt.Sprintf("Blocked Requests: %d", blockedRequests), "", 0, "L", false, 0, "")
+			pdf.Ln(6)
+		}
+		if attackDetected, ok := wafData["attack_detected"].(int); ok {
+			pdf.CellFormat(0, 6, fmt.Sprintf("Attacks Detected: %d", attackDetected), "", 0, "L", false, 0, "")
+			pdf.Ln(6)
+		}
+	}
+	pdf.Ln(4)
+
+	// 攻击类型分布
+	pdf.SetFont("Arial", "B", 12)
+	pdf.CellFormat(0, 8, "Attack Types Detected:", "", 0, "L", false, 0, "")
+	pdf.Ln(6)
+	pdf.SetFont("Arial", "", 11)
+	attackTypesStr := formatAttackTypes(data["attack_types"])
+	if attackTypesStr == "  (no attack records)" || attackTypesStr == "  (data unavailable)" {
+		pdf.CellFormat(0, 6, "No attacks recorded during this period.", "", 0, "L", false, 0, "")
+	} else {
+		lines := splitLines(attackTypesStr)
+		for _, line := range lines {
+			if line != "" {
+				pdf.CellFormat(0, 5, line, "", 0, "L", false, 0, "")
+				pdf.Ln(5)
+			}
+		}
+	}
+	pdf.Ln(6)
+
+	// 3. 封禁统计
+	pdf.SetFont("Arial", "B", 14)
+	pdf.CellFormat(0, 10, "3. Blocking Statistics", "", 0, "L", false, 0, "")
+	pdf.Ln(8)
+	pdf.SetFont("Arial", "", 11)
+	pdf.MultiCell(0, 6, "The system automatically identifies and blocks malicious sources to protect your service from attacks.", "", "", false)
+	pdf.Ln(6)
+
+	// 封禁统计数据
+	if blockData, ok := data["blocks"].(map[string]interface{}); ok {
+		if blockedIPs, ok := blockData["blocked_ips"].(int); ok {
+			pdf.CellFormat(0, 6, fmt.Sprintf("Blocked IPs: %d", blockedIPs), "", 0, "L", false, 0, "")
+			pdf.Ln(6)
+		}
+		if blockedUAs, ok := blockData["blocked_uas"].(int); ok {
+			pdf.CellFormat(0, 6, fmt.Sprintf("Blocked User Agents: %d", blockedUAs), "", 0, "L", false, 0, "")
+			pdf.Ln(6)
+		}
+		if blockedFPs, ok := blockData["blocked_fingerprints"].(int); ok {
+			pdf.CellFormat(0, 6, fmt.Sprintf("Blocked Fingerprints: %d", blockedFPs), "", 0, "L", false, 0, "")
+			pdf.Ln(6)
+		}
+	}
+	pdf.Ln(6)
+
+	// 4. 建议
+	pdf.SetFont("Arial", "B", 14)
+	pdf.CellFormat(0, 10, "4. Recommendations", "", 0, "L", false, 0, "")
+	pdf.Ln(8)
+	pdf.SetFont("Arial", "", 11)
+	recommendations := []string{
+		"1. Regularly check security logs",
+		"2. Keep WAF rules up to date",
+		"3. Monitor abnormal traffic patterns",
+		"4. Update system patches in a timely manner",
+	}
+	for _, rec := range recommendations {
+		pdf.CellFormat(0, 6, rec, "", 0, "L", false, 0, "")
+		pdf.Ln(6)
+	}
+	pdf.Ln(6)
+
+	// 页脚
+	pdf.SetY(-30)
+	pdf.SetFont("Arial", "I", 8)
+	pdf.CellFormat(0, 10, "Generated by SSLcat Security System", "", 0, "C", false, 0, "")
+
+	// 生成 PDF 到字节数组
+	var buf bytes.Buffer
+	if err := pdf.Output(&buf); err != nil {
+		return nil, fmt.Errorf("failed to write PDF: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}
+
+// splitLines 将字符串按行分割
+func splitLines(s string) []string {
+	lines := make([]string, 0)
+	currentLine := ""
+	for _, ch := range s {
+		if ch == '\n' {
+			lines = append(lines, currentLine)
+			currentLine = ""
+		} else {
+			currentLine += string(ch)
+		}
+	}
+	if currentLine != "" {
+		lines = append(lines, currentLine)
+	}
+	return lines
 }
 
 // formatAttackTypes 格式化攻击类型

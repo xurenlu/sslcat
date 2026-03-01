@@ -48,7 +48,6 @@ import {
   FiTrendingUp,
   FiGlobe as FiGlobe2,
   FiFileText,
-  FiGrid,
   FiMapPin,
   FiLock,
 } from 'react-icons/fi'
@@ -176,7 +175,6 @@ const SidebarContent = () => {
     {
       title: '企业功能',
       items: [
-        { name: 'Service Mesh', icon: FiGrid, path: buildPath(adminPrefix, '/service-mesh'), keywords: 'service mesh istio linkerd consul microservices 服务网格' },
         { name: '边缘计算', icon: FiMapPin, path: buildPath(adminPrefix, '/edge-routing'), keywords: 'edge routing multi-region geo location 边缘 计算 多区域' },
         { name: '零信任安全', icon: FiLock, path: buildPath(adminPrefix, '/security-mtls'), keywords: 'mtls rbac zero trust certificate mTLS 证书 权限' },
       ]
@@ -184,7 +182,7 @@ const SidebarContent = () => {
     {
       title: t.sidebar.clusterDeployment,
       items: [
-        { name: t.navigation.cluster || 'Cluster', icon: FiServer, path: buildPath(adminPrefix, '/cluster'), keywords: 'master slave sync 集群 同步' },
+        { name: t.navigation.cluster || 'Cluster', icon: FiServer, path: buildPath(adminPrefix, '/cluster'), keywords: 'master slave sync cluster service mesh 集群 同步 服务网格' },
         { name: t.navigation.clusterStatus || 'Cluster Status', icon: FiServer, path: buildPath(adminPrefix, '/cluster/status'), keywords: 'nodes health status 节点 健康' },
       ]
     },

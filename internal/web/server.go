@@ -119,6 +119,7 @@ type Server struct {
 	statisticsCollector        *statistics.Collector
 	statisticsAPI              *StatisticsAPI
 	apiPerformanceCollector    *statistics.APIPerformanceCollector
+	responseAnalyzer           *statistics.ResponseAnalyzer
 	// 静态文件处理器
 	staticHandler *StaticFileHandler
 	// AI 安全分析器
@@ -496,9 +497,47 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	// 初始化 API 性能收集器
 	server.apiPerformanceCollector = statistics.NewAPIPerformanceCollector()
 
+	// 初始化响应分析器
+	server.responseAnalyzer = statistics.NewResponseAnalyzer()
+
 	// 设置慢请求记录器到代理管理器
 	slowRequestAdapter := slowrequest.NewAdapter(server.slowRequestManager)
 	server.proxyManager.SetSlowRequestRecorder(slowRequestAdapter)
+
+	// 设置 API 性能追踪回调到代理管理器
+	server.proxyManager.SetAPIPerformanceTracker(func(r *http.Request, resp *http.Response, responseTime time.Duration, backendAddress string) {
+		// 只追踪 API 请求
+		if !statistics.IsAPIRequest(r) {
+			return
+		}
+
+		// 复制响应体用于分析
+		body, err := statistics.CopyResponseBody(resp)
+		if err != nil {
+			return
+		}
+
+		// 分析响应以提取业务状态
+		var businessStatus *statistics.BusinessStatus
+		if server.responseAnalyzer != nil && len(body) > 0 {
+			businessStatus, _ = server.responseAnalyzer.AnalyzeResponse(resp, body, r.URL.Path)
+		}
+
+		// 记录 API 性能数据
+		if server.apiPerformanceCollector != nil && server.apiPerformanceCollector.IsEnabled() {
+			entry := statistics.APIPerformanceEntry{
+				Path:           r.URL.Path,
+				Method:         r.Method,
+				Status:         resp.StatusCode,
+				ResponseTime:   responseTime,
+				Timestamp:      time.Now(),
+				BusinessStatus: businessStatus,
+				IsProxiedAPI:   true, // 标记为代理的 API
+				BackendAddress: backendAddress,
+			}
+			server.apiPerformanceCollector.Record(entry)
+		}
+	})
 
 	// 初始化静态文件处理器
 	server.staticHandler = NewStaticFileHandler(cfg)
@@ -2871,6 +2910,11 @@ func (s *Server) GetStatisticsCollector() *statistics.Collector {
 // GetAPIPerformanceCollector 获取API性能收集器
 func (s *Server) GetAPIPerformanceCollector() *statistics.APIPerformanceCollector {
 	return s.apiPerformanceCollector
+}
+
+// GetResponseAnalyzer 获取响应分析器
+func (s *Server) GetResponseAnalyzer() *statistics.ResponseAnalyzer {
+	return s.responseAnalyzer
 }
 
 // GetMonitorManager 获取监控管理器

@@ -1,6 +1,7 @@
 package statistics
 
 import (
+	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -15,6 +16,12 @@ type APIPerformanceStats struct {
 	TotalRequests    int64         `json:"total_requests"`    // 总请求数
 	SuccessRequests  int64         `json:"success_requests"`  // 成功请求数 (2xx, 3xx)
 	ErrorRequests    int64         `json:"error_requests"`    // 错误请求数 (4xx, 5xx)
+
+	// 业务状态码统计
+	BusinessSuccessRequests int64            `json:"business_success_requests"` // 业务成功请求数
+	BusinessErrorRequests   int64            `json:"business_error_requests"`   // 业务失败请求数
+	BusinessStatusCodes     map[string]int64 `json:"business_status_codes"`     // 业务状态码分布 (code -> count)
+	BusinessStatusSource    string           `json:"business_status_source"`    // 业务状态字段来源 (如 "status", "code")
 
 	// 响应时间统计 (毫秒)
 	AvgResponseTime float64 `json:"avg_response_time"` // 平均响应时间
@@ -42,6 +49,19 @@ type APIPerformanceEntry struct {
 	Status       int           `json:"status"`
 	ResponseTime time.Duration `json:"response_time"` // 响应时间
 	Timestamp    time.Time     `json:"timestamp"`
+
+	// 业务状态（可选）
+	BusinessStatus       *BusinessStatus `json:"business_status,omitempty"` // 业务状态
+	IsProxiedAPI         bool            `json:"is_proxied_api"`          // 是否是代理的API
+	BackendAddress       string          `json:"backend_address,omitempty"` // 后端地址
+}
+
+// BusinessStatus 业务状态
+type BusinessStatus struct {
+	IsSuccess bool   `json:"is_success"` // 是否成功
+	Code      int    `json:"code"`       // 业务状态码
+	Message   string `json:"message"`    // 状态消息
+	Source    string `json:"source"`     // 来源字段（如 "status", "code" 等）
 }
 
 // APIPerformanceCollector API 性能收集器
@@ -127,12 +147,13 @@ func (apc *APIPerformanceCollector) Record(entry APIPerformanceEntry) {
 	stats, exists := apc.performanceStats[key]
 	if !exists {
 		stats = &APIPerformanceStats{
-			Path:              entry.Path,
-			Method:            entry.Method,
-			StatusCodes:       make(map[int]int64),
-			ResponseTimeBuckets: make(map[string]int64),
-			FirstSeen:         entry.Timestamp,
-			LastSeen:          entry.Timestamp,
+			Path:                 entry.Path,
+			Method:               entry.Method,
+			StatusCodes:          make(map[int]int64),
+			ResponseTimeBuckets:   make(map[string]int64),
+			BusinessStatusCodes:  make(map[string]int64),
+			FirstSeen:            entry.Timestamp,
+			LastSeen:             entry.Timestamp,
 		}
 		apc.performanceStats[key] = stats
 	}
@@ -149,6 +170,25 @@ func (apc *APIPerformanceCollector) Record(entry APIPerformanceEntry) {
 		stats.SuccessRequests++
 	} else {
 		stats.ErrorRequests++
+	}
+
+	// 更新业务状态码统计
+	if entry.BusinessStatus != nil {
+		// 更新业务状态来源
+		if stats.BusinessStatusSource == "" {
+			stats.BusinessStatusSource = entry.BusinessStatus.Source
+		}
+
+		// 更新业务状态码分布
+		statusKey := fmt.Sprintf("%d", entry.BusinessStatus.Code)
+		stats.BusinessStatusCodes[statusKey]++
+
+		// 更新业务成功/失败统计
+		if entry.BusinessStatus.IsSuccess {
+			stats.BusinessSuccessRequests++
+		} else {
+			stats.BusinessErrorRequests++
+		}
 	}
 
 	// 转换响应时间为毫秒
@@ -241,6 +281,10 @@ func (apc *APIPerformanceCollector) GetStats() []*APIPerformanceStats {
 		for k, v := range s.StatusCodes {
 			statsCopy.StatusCodes[k] = v
 		}
+		statsCopy.BusinessStatusCodes = make(map[string]int64)
+		for k, v := range s.BusinessStatusCodes {
+			statsCopy.BusinessStatusCodes[k] = v
+		}
 		stats = append(stats, &statsCopy)
 	}
 
@@ -272,6 +316,10 @@ func (apc *APIPerformanceCollector) GetStatsByPath(method, path string) *APIPerf
 	statsCopy.StatusCodes = make(map[int]int64)
 	for k, v := range stats.StatusCodes {
 		statsCopy.StatusCodes[k] = v
+	}
+	statsCopy.BusinessStatusCodes = make(map[string]int64)
+	for k, v := range stats.BusinessStatusCodes {
+		statsCopy.BusinessStatusCodes[k] = v
 	}
 
 	return &statsCopy

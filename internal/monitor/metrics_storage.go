@@ -669,14 +669,15 @@ func (ms *MetricsStorage) aggregateMetrics(rawMetrics []ProcessMetric, targetGra
 		}
 
 		if agg, exists := aggregatedMap[alignedTime]; exists {
-			// 聚合：使用平均值
-			count := float64(agg.SampleCount + 1)
-			agg.CPUPercent = (agg.CPUPercent*float64(agg.SampleCount) + raw.CPUPercent) / count
-			agg.MemoryMB = (agg.MemoryMB*float64(agg.SampleCount) + raw.MemoryMB) / count
-			agg.MemoryPercent = (agg.MemoryPercent*float64(agg.SampleCount) + raw.MemoryPercent) / count
+			// 聚合：累积总和（SampleCount存储累积的样本数）
+			// 使用累积总和而不是累积平均值，避免数值爆炸
+			// CPUPercent等字段暂时存储累积的总和，最后再除以样本数
+			agg.CPUPercent += raw.CPUPercent
+			agg.MemoryMB += raw.MemoryMB
+			agg.MemoryPercent += raw.MemoryPercent
 			agg.SampleCount++
 		} else {
-			// 创建新的聚合点
+			// 创建新的聚合点 - 直接存储原始值（只有一个样本时）
 			aggregatedMap[alignedTime] = &ProcessMetric{
 				ID:            0,
 				Timestamp:     alignedTime,
@@ -691,9 +692,20 @@ func (ms *MetricsStorage) aggregateMetrics(rawMetrics []ProcessMetric, targetGra
 	}
 
 	// 转换为切片并排序
+	// 将累积的总和转换为平均值
 	result := make([]ProcessMetric, 0, len(aggregatedMap))
 	for _, agg := range aggregatedMap {
-		result = append(result, *agg)
+		if agg.SampleCount > 1 {
+			// 多个样本：将累积的总和除以样本数得到平均值
+			metric := *agg
+			metric.CPUPercent = agg.CPUPercent / float64(agg.SampleCount)
+			metric.MemoryMB = agg.MemoryMB / float64(agg.SampleCount)
+			metric.MemoryPercent = agg.MemoryPercent / float64(agg.SampleCount)
+			result = append(result, metric)
+		} else {
+			// 单个样本：直接使用
+			result = append(result, *agg)
+		}
 	}
 
 	// 按时间排序
