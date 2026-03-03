@@ -33,6 +33,7 @@ import {
 } from '@chakra-ui/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FiArrowLeft, FiEdit, FiGlobe, FiZap, FiActivity, FiServer } from 'react-icons/fi'
+import BotDetectionConfig from '../components/BotDetectionConfig'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useConfig, buildPath, buildApiPath } from '../contexts/ConfigContext'
 import { useTranslation } from '../hooks/useLanguage'
@@ -274,6 +275,9 @@ const ProxyDomainDetail: React.FC = () => {
           </Tab>
           <Tab _selected={{ bg: 'white', shadow: 'sm', color: 'blue.600' }} _dark={{ _selected: { bg: 'gray.800' } }}>
             {t.proxyDetail.healthCheck}
+          </Tab>
+          <Tab _selected={{ bg: 'white', shadow: 'sm', color: 'blue.600' }} _dark={{ _selected: { bg: 'gray.800' } }}>
+            {t.proxyDetail.botDetection}
           </Tab>
         </TabList>
 
@@ -690,6 +694,15 @@ const ProxyDomainDetail: React.FC = () => {
                 </CardBody>
               </Card>
             )}
+          </TabPanel>
+
+          {/* 机器人检测 */}
+          <TabPanel px={0}>
+            <Card>
+              <CardBody>
+                <BotDetectionConfig domain={rule.domain} />
+              </CardBody>
+            </Card>
           </TabPanel>
         </TabPanels>
       </Tabs>

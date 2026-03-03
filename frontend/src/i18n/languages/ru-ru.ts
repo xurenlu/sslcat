@@ -1557,6 +1557,7 @@ export const ruRU: Translation = {
     flowDiagram: 'Traffic Flow',
     clientToGateway: 'Client → SSLcat',
     gatewayToUpstreams: 'SSLcat → Upstreams',
+    botDetection: 'Обнаружение ботов',
   },
 
   backend: {

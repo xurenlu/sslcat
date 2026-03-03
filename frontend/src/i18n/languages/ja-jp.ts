@@ -1557,6 +1557,7 @@ export const jaJP: Translation = {
     flowDiagram: 'トラフィックフロー',
     clientToGateway: 'クライアント → SSLcat',
     gatewayToUpstreams: 'SSLcat → アップストリーム',
+    botDetection: 'ボット検出',
   },
 
   backend: {

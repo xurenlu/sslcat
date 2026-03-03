@@ -1557,6 +1557,7 @@ export const frFR: Translation = {
     flowDiagram: 'Flux trafic',
     clientToGateway: 'Client → SSLcat',
     gatewayToUpstreams: 'SSLcat → Upstreams',
+    botDetection: 'Détection de bots',
   },
 
   backend: {

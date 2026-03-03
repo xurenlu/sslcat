@@ -1557,6 +1557,7 @@ export const esES: Translation = {
     flowDiagram: 'Flujo de tráfico',
     clientToGateway: 'Cliente → SSLcat',
     gatewayToUpstreams: 'SSLcat → Upstreams',
+    botDetection: 'Detección de bots',
   },
 
   backend: {

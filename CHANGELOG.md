@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.6] - 2026-03-03
+
+### ✨ 新功能
+
+- **代理域名详情页机器人检测 Tab**：
+  - 在代理规则详情页（ProxyDomainDetail）新增「机器人检测」Tab
+  - 无需进入编辑页即可直接配置该域名的机器人检测，支持模式、阈值、白名单等
+
+### 🔧 改进
+
+- **国际化**：
+  - 补全 `proxyDetail.botDetection` 多语言翻译（中/英/西/法/德/日/俄）
+  - ProxyEdit 中「机器人检测」标签改为使用 i18n
+
 ## [1.3.43] - 2026-02-03
 
 ### 🐛 Bug 修复

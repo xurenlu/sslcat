@@ -1527,6 +1527,7 @@ export interface Translation {
     flowDiagram: string
     clientToGateway: string
     gatewayToUpstreams: string
+    botDetection: string
   }
 
   // 后端配置

@@ -30,6 +30,7 @@ import { CORS_PRESET } from '../constants/cors'
 import BackendConfig from '../components/BackendConfig'
 import WebSocketConfig from '../components/WebSocketConfig'
 import PathPrefixRulesConfig from '../components/PathPrefixRulesConfig'
+import BotDetectionConfig from '../components/BotDetectionConfig'
 import { detectProxyLoopInBackends } from '../utils/proxyLoopDetection'
 
 interface ProxyAuthUser {
@@ -855,6 +856,20 @@ const ProxyEdit: React.FC = () => {
                         </Button>
                       </HStack>
                     </HStack>
+
+                    <Box>
+                      <FormLabel mb={2}>{t.proxyDetail.botDetection}</FormLabel>
+                      <Text fontSize="sm" color="gray.500" mb={2}>
+                        识别爬虫和自动化访问，可要求可疑请求完成滑块验证
+                      </Text>
+                      {(domain || formData.domain) ? (
+                        <BotDetectionConfig domain={domain || formData.domain} />
+                      ) : (
+                        <Text fontSize="sm" color="gray.500">
+                          请先保存规则并填写域名后配置
+                        </Text>
+                      )}
+                    </Box>
 
                     <Box>
                       <FormLabel mb={2}>访问日志覆盖</FormLabel>

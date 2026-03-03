@@ -1618,6 +1618,7 @@ export const enUS: Translation = {
     flowDiagram: 'Traffic Flow',
     clientToGateway: 'Client → SSLcat',
     gatewayToUpstreams: 'SSLcat → Upstreams',
+    botDetection: 'Bot Detection',
   },
 
   backend: {

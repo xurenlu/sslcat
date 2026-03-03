@@ -1615,6 +1615,7 @@ export const zhCN: Translation = {
     flowDiagram: '流量走向',
     clientToGateway: '客户端 → SSLcat',
     gatewayToUpstreams: 'SSLcat → 上游',
+    botDetection: '机器人检测',
   },
 
 

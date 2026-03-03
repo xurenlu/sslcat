@@ -1557,6 +1557,7 @@ export const deDE: Translation = {
     flowDiagram: 'Datenfluss',
     clientToGateway: 'Client → SSLcat',
     gatewayToUpstreams: 'SSLcat → Upstreams',
+    botDetection: 'Bot-Erkennung',
   },
 
   backend: {
