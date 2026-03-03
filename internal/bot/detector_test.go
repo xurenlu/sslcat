@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
@@ -77,6 +78,8 @@ func TestDetector_CheckRequest(t *testing.T) {
 
 	config := DefaultConfig()
 	config.Mode = "challenge"
+	// 已知爬虫（Scrapy）得分约 35（UA 30 + JS 能力 5），需将阈值设为 34 才能触发 challenge（score >= threshold）
+	config.MediumRiskThreshold = 34
 
 	tests := []struct {
 		name           string
@@ -238,8 +241,8 @@ func TestWhitelistManager(t *testing.T) {
 	domain := "example.com"
 	token := "test-token"
 
-	// 添加到白名单
-	err = wm.Add(ip, domain, token, 3600)
+	// 添加到白名单（3600 秒 = 1 小时）
+	err = wm.Add(ip, domain, token, 3600*time.Second)
 	if err != nil {
 		t.Errorf("Add() error = %v", err)
 	}
@@ -253,6 +256,7 @@ func TestWhitelistManager(t *testing.T) {
 	entry, exists := wm.Get(ip, domain)
 	if !exists {
 		t.Error("Get() exists = false, expected true")
+		return
 	}
 
 	if entry.IP != ip || entry.Domain != domain {
