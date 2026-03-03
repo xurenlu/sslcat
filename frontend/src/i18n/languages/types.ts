@@ -1859,5 +1859,21 @@ export interface Translation {
     type: string
     createdAt: string
     updatedAt: string
+    addRule: string
+    geoRuleAddHint: string
+    geoRuleGoToSecurity: string
+    geoRuleGoToBtn: string
+    timeWindowComingSoon: string
+    timeWindowComingSoonDesc: string
+    geoControl: string
+    timeWindowControl: string
+    geoControlDesc: string
+    geoAddRuleHint: string
+    geoNoRules: string
+    geoClickToAdd: string
+    timeWindowControlDesc: string
+    timeWindowAddRuleHint: string
+    timeWindowNoRules: string
+    timeWindowClickToAdd: string
   },
 }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Box,
   Heading,
@@ -56,7 +57,7 @@ import {
   FiClock,
 } from 'react-icons/fi'
 import { apiService } from '../utils/api'
-import { useConfig } from '../contexts/ConfigContext'
+import { useConfig, buildPath } from '../contexts/ConfigContext'
 import { getCIDRTypeDescription, getCIDRTypeColor } from '../utils/cidr'
 import { useTranslation } from '../hooks/useLanguage'
 
@@ -121,6 +122,8 @@ const BlockManagement: React.FC = () => {
   const cancelRef = React.useRef<HTMLButtonElement>(null)
   const toast = useToast()
   const t = useTranslation()
+  const navigate = useNavigate()
+  const { adminPrefix } = useConfig()
 
   const fetchBlockedList = async () => {
     setLoading(true)
@@ -285,6 +288,46 @@ const BlockManagement: React.FC = () => {
     onWhitelistDeleteOpen()
   }
 
+  const handleGeoAddRule = () => {
+    toast({
+      title: t.blockManagement?.geoRuleAddHint || '地理位置规则配置',
+      description: t.blockManagement?.geoRuleGoToSecurity || '请前往「安全中心」→「地理位置过滤」进行配置',
+      status: 'info',
+      duration: 6000,
+      isClosable: true,
+      position: 'top',
+      render: ({ onClose }) => (
+        <Box p={3} bg="white" borderRadius="md" boxShadow="lg">
+          <Text fontWeight="medium" mb={2}>
+            {t.blockManagement?.geoRuleAddHint || '地理位置规则配置'}
+          </Text>
+          <Text fontSize="sm" color="gray.600" mb={3}>
+            {t.blockManagement?.geoRuleGoToSecurity || '请前往「安全中心」→「地理位置过滤」进行配置'}
+          </Text>
+          <HStack>
+            <Button size="sm" colorScheme="blue" onClick={() => { navigate(buildPath(adminPrefix || '/sslcat-panel', '/security')); onClose() }}>
+              {t.blockManagement?.geoRuleGoToBtn || '前往安全中心'}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={onClose}>
+              {t.common.cancel}
+            </Button>
+          </HStack>
+        </Box>
+      ),
+    })
+  }
+
+  const handleTimeWindowAddRule = () => {
+    toast({
+      title: t.blockManagement?.timeWindowComingSoon || '功能开发中',
+      description: t.blockManagement?.timeWindowComingSoonDesc || '时间窗口控制功能开发中，敬请期待',
+      status: 'info',
+      duration: 4000,
+      isClosable: true,
+      position: 'top',
+    })
+  }
+
   const handleWhitelistSubmit = async () => {
     if (!whitelistValue.trim()) {
       toast({
@@ -408,8 +451,8 @@ const BlockManagement: React.FC = () => {
               <Tab>{t.blockManagement?.tlsFingerprintBlock || 'TLS Fingerprint Block'} ({blockedData.tls_fingerprints.length})</Tab>
               <Tab>{t.blockManagement?.userAgentBlock || 'User-Agent Block'} ({blockedData.user_agents.length})</Tab>
               <Tab>{t.blockManagement?.ipWhitelist || 'IP Whitelist'} ({whitelistEntries.length})</Tab>
-              <Tab>地理位置控制</Tab>
-              <Tab>时间窗口控制</Tab>
+              <Tab>{t.blockManagement?.geoControl || '地理位置控制'}</Tab>
+              <Tab>{t.blockManagement?.timeWindowControl || '时间窗口控制'}</Tab>
             </TabList>
 
             <TabPanels>
@@ -648,22 +691,22 @@ const BlockManagement: React.FC = () => {
                 <VStack spacing={4} align="stretch">
                   <Alert status="info">
                     <FiAlertTriangle />
-                    基于客户端 IP 的地理位置进行访问控制
+                    {t.blockManagement?.geoControlDesc || '基于客户端 IP 的地理位置进行访问控制'}
                   </Alert>
 
                   <HStack justify="space-between">
                     <Text fontSize="sm" color="gray.500">
-                      添加国家/地区规则来允许或拒绝访问
+                      {t.blockManagement?.geoAddRuleHint || '添加国家/地区规则来允许或拒绝访问'}
                     </Text>
-                    <Button leftIcon={<FiPlus />} size="sm" colorScheme="blue">
-                      添加规则
+                    <Button leftIcon={<FiPlus />} size="sm" colorScheme="blue" onClick={handleGeoAddRule}>
+                      {t.blockManagement?.addRule || '添加规则'}
                     </Button>
                   </HStack>
 
                   <Box p={4} bg="gray.50" borderRadius="md" textAlign="center">
-                    <Text color="gray.500">暂无地理位置规则</Text>
+                    <Text color="gray.500">{t.blockManagement?.geoNoRules || '暂无地理位置规则'}</Text>
                     <Text fontSize="sm" color="gray.400" mt={2}>
-                      点击上方按钮添加第一条规则
+                      {t.blockManagement?.geoClickToAdd || '点击上方按钮添加第一条规则'}
                     </Text>
                   </Box>
                 </VStack>
@@ -674,22 +717,22 @@ const BlockManagement: React.FC = () => {
                 <VStack spacing={4} align="stretch">
                   <Alert status="info">
                     <FiClock />
-                    基于时间窗口的访问控制规则
+                    {t.blockManagement?.timeWindowControlDesc || '基于时间窗口的访问控制规则'}
                   </Alert>
 
                   <HStack justify="space-between">
                     <Text fontSize="sm" color="gray.500">
-                      设置特定时间段内的访问控制规则
+                      {t.blockManagement?.timeWindowAddRuleHint || '设置特定时间段内的访问控制规则'}
                     </Text>
-                    <Button leftIcon={<FiPlus />} size="sm" colorScheme="orange">
-                      添加规则
+                    <Button leftIcon={<FiPlus />} size="sm" colorScheme="orange" onClick={handleTimeWindowAddRule}>
+                      {t.blockManagement?.addRule || '添加规则'}
                     </Button>
                   </HStack>
 
                   <Box p={4} bg="gray.50" borderRadius="md" textAlign="center">
-                    <Text color="gray.500">暂无时间窗口规则</Text>
+                    <Text color="gray.500">{t.blockManagement?.timeWindowNoRules || '暂无时间窗口规则'}</Text>
                     <Text fontSize="sm" color="gray.400" mt={2}>
-                      点击上方按钮添加第一条规则
+                      {t.blockManagement?.timeWindowClickToAdd || '点击上方按钮添加第一条规则'}
                     </Text>
                   </Box>
                 </VStack>
