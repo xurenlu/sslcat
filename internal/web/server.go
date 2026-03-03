@@ -368,6 +368,9 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		server.ddosProtector.SetCustomRequestsPer5Minutes(server.config.Security.MaxAttempts5Min)
 	}
 
+	// 过老浏览器 UA 检测开关
+	server.ddosProtector.SetOutdatedBrowserEnabled(server.config.Security.OutdatedBrowser.Enabled)
+
 	// 初始化机器人检测组件
 	botDBPath := filepath.Join(dataDir, "bot_detection.db")
 	botWhitelistMgr, err := bot.NewWhitelistManager(logrus.StandardLogger(), botDBPath)
@@ -786,6 +789,14 @@ func (s *Server) UpdateConfig(newConfig *config.Config) {
 	if s.notificationIntegrator != nil {
 		s.log.Info("Reloading notification manager configuration")
 		s.notificationIntegrator.ReloadFromConfig(newConfig.Notification)
+	}
+
+	// 更新 DDoS 防护器配置
+	if s.ddosProtector != nil {
+		s.ddosProtector.SetOutdatedBrowserEnabled(newConfig.Security.OutdatedBrowser.Enabled)
+		if newConfig.Security.MaxAttempts5Min > 0 {
+			s.ddosProtector.SetCustomRequestsPer5Minutes(newConfig.Security.MaxAttempts5Min)
+		}
 	}
 
 	// 如果管理面板前缀发生变化，需要重新设置路由
@@ -1969,6 +1980,16 @@ func (s *Server) securityMiddleware(w http.ResponseWriter, r *http.Request) bool
 		s.log.Warnf("Blocked User-Agent attempted to access: %s from %s", userAgent, clientIP)
 		http.Error(w, "User-Agent blocked", http.StatusForbidden)
 		return false
+	}
+
+	// 过老浏览器 UA 直接拦截（localhost 豁免）
+	if !s.isLocalhostRequest(r) && s.config.Security.OutdatedBrowser.Enabled && s.config.Security.OutdatedBrowser.BlockVeryOutdated {
+		if userAgent != "" && security.IsVeryOutdatedBrowser(userAgent) {
+			s.log.Warnf("Very outdated browser User-Agent blocked: %s from %s", userAgent, clientIP)
+			s.securityManager.LogAccess(clientIP, userAgent, path, false)
+			http.Error(w, "Access denied: outdated browser", http.StatusForbidden)
+			return false
+		}
 	}
 
 	// 检查User-Agent（localhost 请求豁免）

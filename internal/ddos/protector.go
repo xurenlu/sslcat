@@ -98,6 +98,8 @@ type Protector struct {
 	thresholds map[ProtectionLevel]ThresholdConfig
 	// 自定义5分钟阈值（如果设置，会覆盖当前级别的阈值）
 	customRequestsPer5Minutes int
+	// 过老浏览器 UA 检测开关（由配置注入）
+	outdatedBrowserEnabled bool
 
 	log *logrus.Entry
 	// 持久化轮转
@@ -187,6 +189,13 @@ func (p *Protector) SetSecurityManager(manager *security.Manager) {
 	defer p.mutex.Unlock()
 	p.securityManager = manager
 	p.log.Info("已设置 Security Manager 到 DDoS 防护器")
+}
+
+// SetOutdatedBrowserEnabled 设置过老浏览器 UA 检测开关
+func (p *Protector) SetOutdatedBrowserEnabled(enabled bool) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	p.outdatedBrowserEnabled = enabled
 }
 
 // SetGeoIPService 设置 GeoIP 服务
@@ -346,15 +355,34 @@ func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
 		}
 	}
 
+	// 极老浏览器 UA：直接拦截（多为爬虫）
+	if p.outdatedBrowserEnabled && userAgent != "" && security.IsVeryOutdatedBrowser(userAgent) {
+		p.blockClient(client, threshold.BlockDuration, now)
+		p.recordAttack(clientIP, userAgent, r.URL.String(), r.Method,
+			"outdated_browser", "high", "极老浏览器 UA", true)
+		return true, "极老浏览器 UA"
+	}
+
+	// 较老浏览器 UA：标记 + 使用更严格的速率限制
+	rateLimitThreshold := threshold
+	if p.outdatedBrowserEnabled && userAgent != "" && security.IsOutdatedBrowser(userAgent) {
+		client.Suspicious = true
+		p.recordAttack(clientIP, userAgent, r.URL.String(), r.Method,
+			"outdated_browser", "medium", "较老浏览器 UA", false)
+		rateLimitThreshold.RequestsPerMinute = max(1, threshold.RequestsPerMinute/2)
+		rateLimitThreshold.RequestsPer5Minutes = max(1, threshold.RequestsPer5Minutes/2)
+		rateLimitThreshold.RequestsPerHour = max(1, threshold.RequestsPerHour/2)
+	}
+
 	// 检查请求频率
-	if blocked, reason := p.checkRateLimit(client, threshold, now); blocked {
+	if blocked, reason := p.checkRateLimit(client, rateLimitThreshold, now); blocked {
 		p.blockClient(client, threshold.BlockDuration, now)
 		p.recordAttack(clientIP, userAgent, r.URL.String(), r.Method,
 			"rate_limit", "high", reason, true)
 		return true, reason
 	}
 
-	// 检查可疑User-Agent
+	// 检查可疑User-Agent（非过老浏览器的其他可疑 UA）
 	if threshold.SuspiciousUA && p.isSuspiciousUserAgent(userAgent) {
 		p.recordAttack(clientIP, userAgent, r.URL.String(), r.Method,
 			"suspicious_ua", "medium", "可疑的User-Agent", false)

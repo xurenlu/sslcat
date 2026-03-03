@@ -350,6 +350,14 @@ func (tia *ThreatIntelAPI) ListSources(w http.ResponseWriter, r *http.Request) {
 			if stats, err := tia.manager.DB.GetSourceStats(name); err == nil {
 				sourceInfo["stats"] = stats
 			}
+			// 从 iocs 表按来源统计实际数量，与总 IOC 数口径一致
+			if count, err := tia.manager.DB.GetIOCCountBySource(source.Name); err == nil {
+				sourceInfo["iocs_count"] = count
+			} else {
+				sourceInfo["iocs_count"] = 0
+			}
+		} else {
+			sourceInfo["iocs_count"] = 0
 		}
 
 		sourcesList = append(sourcesList, sourceInfo)

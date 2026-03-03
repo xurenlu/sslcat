@@ -188,6 +188,12 @@ func (cd *ChangeDetector) detectSecurityChanges(old, new *SecurityConfig) {
 	if old.EnableDDOS != new.EnableDDOS {
 		cd.addChange("Security.EnableDDOS", old.EnableDDOS, new.EnableDDOS, SoftReload, "DDoS防护开关变更")
 	}
+
+	// 过老浏览器检测变更 - 软重载
+	if old.OutdatedBrowser.Enabled != new.OutdatedBrowser.Enabled ||
+		old.OutdatedBrowser.BlockVeryOutdated != new.OutdatedBrowser.BlockVeryOutdated {
+		cd.addChange("Security.OutdatedBrowser", old.OutdatedBrowser, new.OutdatedBrowser, SoftReload, "过老浏览器检测配置变更")
+	}
 }
 
 // detectCompressionChanges 检测压缩配置变更

@@ -440,6 +440,9 @@ type SecurityConfig struct {
 	EnableCaptcha bool `json:"enable_captcha"`
 	MinFormMs     int  `json:"min_form_ms"`
 
+	// 过老浏览器 UA 检测配置
+	OutdatedBrowser OutdatedBrowserConfig `json:"outdated_browser"`
+
 	// 解析后的时间字段
 	BlockDuration time.Duration `json:"-"`
 
@@ -451,6 +454,12 @@ type SecurityConfig struct {
 	UAInvalidMaxTotal      int `json:"u-invalid_max_total"`       // 最多保留多少个IP的UA违规记录，默认500
 	TLSFingerprintMaxTotal int `json:"tls_fingerprint_max_total"` // 最多保留多少个TLS指纹计数，默认500
 	CleanupIntervalMin     int `json:"cleanup_interval_min"`      // 清理间隔（分钟），默认5
+}
+
+// OutdatedBrowserConfig 过老浏览器 UA 检测配置
+type OutdatedBrowserConfig struct {
+	Enabled           bool `json:"enabled"`             // 是否启用过老 UA 检测
+	BlockVeryOutdated bool `json:"block_very_outdated"` // 极老是否直接拦截（默认 true）
 }
 
 // GeoBlockingConfig 地理位置过滤配置
@@ -1019,6 +1028,10 @@ func Load(configFile string) (*Config, error) {
 			EnableDDOS:              true,
 			EnableCaptcha:           false,
 			MinFormMs:               800,
+			OutdatedBrowser: OutdatedBrowserConfig{
+				Enabled:           true,
+				BlockVeryOutdated: true,
+			},
 			// 安全管理器内存泄漏防护默认值
 			MaxAccessLogEntries:    3000,
 			MaxBlockedIPs:          1000,
@@ -1582,6 +1595,10 @@ func getDefaultConfig() *Config {
 			EnableDDOS:              true,
 			EnableCaptcha:           false,
 			MinFormMs:               800,
+			OutdatedBrowser: OutdatedBrowserConfig{
+				Enabled:           true,
+				BlockVeryOutdated: true,
+			},
 			MaxAccessLogEntries:     3000,
 			MaxBlockedIPs:           1000,
 			MaxAttemptCounts:        1000,

@@ -8,6 +8,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/xurenlu/sslcat/internal/config"
+	"github.com/xurenlu/sslcat/internal/security"
 )
 
 // BehaviorAnalyzer 行为分析器
@@ -97,6 +98,13 @@ func (ba *BehaviorAnalyzer) analyzeUserAgent(userAgent string) int {
 	// 检查是否为已知机器人
 	if IsKnownBot(userAgent) {
 		return 30
+	}
+
+	// 过老浏览器 UA 风险加成（多为爬虫）
+	if security.IsVeryOutdatedBrowser(userAgent) {
+		score += 25
+	} else if security.IsOutdatedBrowser(userAgent) {
+		score += 15
 	}
 
 	// User-Agent 过短

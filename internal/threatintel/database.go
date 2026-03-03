@@ -509,6 +509,16 @@ func (tidb *ThreatIntelDB) GetAllSourceStats() (map[string]map[string]interface{
 	return result, nil
 }
 
+// GetIOCCountBySource 按来源（display name）统计 iocs 表中的 IOC 数量
+func (tidb *ThreatIntelDB) GetIOCCountBySource(sourceDisplayName string) (int, error) {
+	var count int
+	err := tidb.db.QueryRow("SELECT COUNT(*) FROM iocs WHERE source = ?", sourceDisplayName).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 // boolToInt 将布尔值转换为整数（用于SQL）
 func boolToInt(b bool) int {
 	if b {
