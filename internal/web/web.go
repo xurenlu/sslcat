@@ -214,6 +214,22 @@ func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request) bool {
 				http.NotFound(w, r)
 				return true
 			}
+			// 路径不存在：若启用 try_files 则回退到 index（SPA 前端路由支持）
+			if _, err := os.Stat(full); err != nil {
+				if site.TryFiles {
+					idxFile := filepath.Join(site.Root, site.Index)
+					if _, err := os.Stat(idxFile); err == nil {
+						if contentType := mime.TypeByExtension(filepath.Ext(idxFile)); contentType != "" {
+							w.Header().Set("Content-Type", contentType)
+						}
+						s.applyCustomSiteHeaders(w, site.ResponseHeaders)
+						http.ServeFile(w, r, idxFile)
+						return true
+					}
+				}
+				http.NotFound(w, r)
+				return true
+			}
 			// 在 http.ServeFile 之前先设置正确的 MIME 类型
 			if contentType := mime.TypeByExtension(filepath.Ext(full)); contentType != "" {
 				s.log.Debugf("Setting Content-Type for %s: %s", full, contentType)

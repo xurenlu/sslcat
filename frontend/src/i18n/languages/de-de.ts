@@ -573,6 +573,10 @@ export const deDE: Translation = {
     pathPrefixRules: 'Pfad-Präfix-Regeln',
     actions: 'Aktionen',
     rules: 'Regeln',
+    tryFiles: 'Try Files (SPA-Fallback)',
+    tryFilesEnabled: 'Aktiviert',
+    tryFilesDisabled: 'Deaktiviert',
+    tryFilesHelp: 'Bei Aktivierung Fallback auf Index-Datei wenn Pfad nicht gefunden, für Vue/React Router SPA',
   },
   cdn: {
     title: 'CDN-Cache-Verwaltung',

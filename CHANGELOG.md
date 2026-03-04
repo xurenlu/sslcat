@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.7] - 2026-03-04
+
+### ✨ 新功能
+
+- **静态站点 Try Files 支持**：
+  - 在静态站点配置中新增「Try Files (SPA 回退)」选项
+  - 启用后，当请求路径对应的文件不存在时，回退到默认 index 文件
+  - 用于 Vue Router、React Router 等 SPA 的前端路由支持（类似 nginx `try_files $uri $uri/ /index.html`）
+  - 代理配置为转发模式，无需此功能
+
 ## [1.4.6] - 2026-03-03
 
 ### ✨ 新功能

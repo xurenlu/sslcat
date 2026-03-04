@@ -35,6 +35,7 @@ interface StaticSiteForm {
   root: string
   index: string
   enabled: boolean
+  try_files: boolean
   headers: Record<string, string>
   path_prefix_rules: PathPrefixRule[]
   waf_enabled?: boolean | null
@@ -60,6 +61,7 @@ const StaticSiteEdit: React.FC = () => {
     root: '',
     index: 'index.html',
     enabled: true,
+    try_files: false,
     headers: {},
     path_prefix_rules: [],
     waf_enabled: null,
@@ -98,6 +100,7 @@ const StaticSiteEdit: React.FC = () => {
             root: site.root || '',
             index: site.index || 'index.html',
             enabled: site.enabled ?? true,
+            try_files: site.try_files ?? false,
             headers: site.response_headers || {},
             path_prefix_rules: site.path_prefix_rules || [],
             waf_enabled: site.waf_enabled ?? null,
@@ -170,6 +173,7 @@ const StaticSiteEdit: React.FC = () => {
           root: formData.root,
           index: formData.index,
           enabled: formData.enabled,
+          try_files: formData.try_files,
           headers: formData.headers,
           path_prefix_rules: formData.path_prefix_rules,
           waf_enabled: formData.waf_enabled,
@@ -268,6 +272,22 @@ const StaticSiteEdit: React.FC = () => {
                     onChange={(e) => handleInputChange('index', e.target.value)}
                     placeholder="index.html"
                   />
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel>{t.sites.tryFiles ?? 'Try Files (SPA)'}</FormLabel>
+                  <VStack align="stretch" spacing={1}>
+                    <HStack>
+                      <Switch
+                        isChecked={formData.try_files}
+                        onChange={(e) => handleInputChange('try_files', e.target.checked)}
+                      />
+                      <Text>{formData.try_files ? (t.sites.tryFilesEnabled ?? '已启用') : (t.sites.tryFilesDisabled ?? '已禁用')}</Text>
+                    </HStack>
+                    <FormHelperText fontSize="xs">
+                      {t.sites.tryFilesHelp ?? '启用后，请求路径不存在时回退到默认文件，用于 Vue/React Router 等 SPA 前端路由'}
+                    </FormHelperText>
+                  </VStack>
                 </FormControl>
 
                 <FormControl>

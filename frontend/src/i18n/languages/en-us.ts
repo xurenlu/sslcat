@@ -647,6 +647,10 @@ export const enUS: Translation = {
     pathPrefixRules: 'Path Prefix Rules',
     actions: 'Actions',
     rules: 'rules',
+    tryFiles: 'Try Files (SPA fallback)',
+    tryFilesEnabled: 'Enabled',
+    tryFilesDisabled: 'Disabled',
+    tryFilesHelp: 'When enabled, fallback to index file when path not found, for Vue/React Router SPA',
   },
 
   cdn: {

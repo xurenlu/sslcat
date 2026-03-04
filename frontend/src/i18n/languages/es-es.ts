@@ -573,6 +573,10 @@ export const esES: Translation = {
     pathPrefixRules: 'Reglas de Prefijo de Ruta',
     actions: 'Acciones',
     rules: 'reglas',
+    tryFiles: 'Try Files (fallback SPA)',
+    tryFilesEnabled: 'Habilitado',
+    tryFilesDisabled: 'Deshabilitado',
+    tryFilesHelp: 'Si está habilitado, usar archivo índice cuando la ruta no existe, para Vue/React Router SPA',
   },
   cdn: {
     title: 'Gestión de Caché CDN',

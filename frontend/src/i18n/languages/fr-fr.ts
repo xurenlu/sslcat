@@ -573,6 +573,10 @@ export const frFR: Translation = {
     pathPrefixRules: 'Règles de Préfixe de Chemin',
     actions: 'Actions',
     rules: 'règles',
+    tryFiles: 'Try Files (repli SPA)',
+    tryFilesEnabled: 'Activé',
+    tryFilesDisabled: 'Désactivé',
+    tryFilesHelp: 'Si activé, repli sur le fichier index si le chemin n\'existe pas, pour Vue/React Router SPA',
   },
   cdn: {
     title: 'Gestion du Cache CDN',

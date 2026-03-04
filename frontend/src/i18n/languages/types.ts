@@ -720,6 +720,10 @@ export interface Translation {
     pathPrefixRules: string
     actions: string
     rules: string
+    tryFiles: string
+    tryFilesEnabled: string
+    tryFilesDisabled: string
+    tryFilesHelp: string
   }
 
   // CDN管理

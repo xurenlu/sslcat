@@ -573,6 +573,10 @@ export const jaJP: Translation = {
     pathPrefixRules: 'パスプレフィックスルール',
     actions: '操作',
     rules: 'ルール',
+    tryFiles: 'Try Files (SPAフォールバック)',
+    tryFilesEnabled: '有効',
+    tryFilesDisabled: '無効',
+    tryFilesHelp: '有効にすると、パスが存在しない場合にデフォルトファイルにフォールバック。Vue/React Router などの SPA 用',
   },
   cdn: {
     title: 'CDNキャッシュ管理',

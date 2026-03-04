@@ -39,6 +39,7 @@ func (s *Server) handleAPIStaticSites(w http.ResponseWriter, r *http.Request) {
 			AccessLogPath    string                  `json:"access_log_path,omitempty"`
 			HTTP2Enabled     *bool                   `json:"http2_enabled,omitempty"`
 			HTTP3Enabled     *bool                   `json:"http3_enabled,omitempty"`
+			TryFiles         bool                    `json:"try_files"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -77,6 +78,7 @@ func (s *Server) handleAPIStaticSites(w http.ResponseWriter, r *http.Request) {
 			AccessLogPath:    req.AccessLogPath,
 			HTTP2Enabled:     req.HTTP2Enabled,
 			HTTP3Enabled:     req.HTTP3Enabled,
+			TryFiles:         req.TryFiles,
 		}
 
 		if existingIndex >= 0 {
@@ -125,6 +127,7 @@ func (s *Server) handleAPIStaticSites(w http.ResponseWriter, r *http.Request) {
 			AccessLogPath    string                  `json:"access_log_path,omitempty"`
 			HTTP2Enabled     *bool                   `json:"http2_enabled,omitempty"`
 			HTTP3Enabled     *bool                   `json:"http3_enabled,omitempty"`
+			TryFiles         bool                    `json:"try_files"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -170,6 +173,7 @@ func (s *Server) handleAPIStaticSites(w http.ResponseWriter, r *http.Request) {
 			AccessLogPath:    req.AccessLogPath,
 			HTTP2Enabled:     req.HTTP2Enabled,
 			HTTP3Enabled:     req.HTTP3Enabled,
+			TryFiles:         req.TryFiles,
 		}
 
 		if err := s.config.Save(s.config.ConfigFile); err != nil {

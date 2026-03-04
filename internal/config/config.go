@@ -701,6 +701,10 @@ type StaticSite struct {
 	HTTP2Enabled *bool `json:"http2_enabled,omitempty"`
 	// HTTP/3 覆盖（nil 表示使用全局设置）
 	HTTP3Enabled *bool `json:"http3_enabled,omitempty"`
+
+	// TryFiles 启用时，当请求路径不存在则回退到 index 文件（类似 nginx try_files）
+	// 用于 SPA（Vue Router、React Router 等）的前端路由支持
+	TryFiles bool `json:"try_files"`
 }
 
 // BotDetectionConfig 机器人检测配置

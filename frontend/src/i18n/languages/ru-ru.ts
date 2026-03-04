@@ -573,6 +573,10 @@ export const ruRU: Translation = {
     pathPrefixRules: 'Правила префикса пути',
     actions: 'Действия',
     rules: 'правил',
+    tryFiles: 'Try Files (резерв SPA)',
+    tryFilesEnabled: 'Включено',
+    tryFilesDisabled: 'Выключено',
+    tryFilesHelp: 'При включении резерв на индексный файл при отсутствии пути, для Vue/React Router SPA',
   },
   cdn: {
     title: 'Управление CDN-кешем',

@@ -643,6 +643,10 @@ export const zhCN: Translation = {
     pathPrefixRules: '路径前缀规则',
     actions: '操作',
     rules: '个规则',
+    tryFiles: 'Try Files (SPA 回退)',
+    tryFilesEnabled: '已启用',
+    tryFilesDisabled: '已禁用',
+    tryFilesHelp: '启用后，请求路径不存在时回退到默认文件，用于 Vue/React Router 等 SPA 前端路由',
   },
 
   cdn: {
