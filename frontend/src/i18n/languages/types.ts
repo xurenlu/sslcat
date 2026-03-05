@@ -417,6 +417,12 @@ export interface Translation {
     exportSuccess: string
     exportError: string
   }
+
+  // API 性能排行榜
+  apiPerformance?: {
+    domainFilter: string
+    domainFilterAll: string
+  }
   
   // 监控页面
   monitoring?: {

@@ -238,6 +238,10 @@ export const frFR: Translation = {
     cityMinOccurrences: 'Ville minimum',
     visits: 'visites',
   },
+  apiPerformance: {
+    domainFilter: 'Domaine',
+    domainFilterAll: 'Tous les domaines',
+  },
   aiSecurity: {
     title: 'Analyse de Sécurité IA',
     config: 'Configuration de l\'Analyse IA',

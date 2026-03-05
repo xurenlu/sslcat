@@ -294,6 +294,10 @@ export const enUS: Translation = {
     exportSuccess: 'Export successful',
     exportError: 'Export failed',
   },
+  apiPerformance: {
+    domainFilter: 'Domain',
+    domainFilterAll: 'All domains',
+  },
   aiSecurity: {
     title: 'AI Security Analysis',
     config: 'AI Analysis Configuration',

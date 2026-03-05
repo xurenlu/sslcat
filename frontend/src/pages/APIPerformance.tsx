@@ -57,6 +57,7 @@ import { useTranslation } from '../hooks/useLanguage'
 
 interface APIPerformanceStats {
   path: string
+  domain?: string
   method: string
   total_requests: number
   success_requests: number
@@ -103,6 +104,8 @@ const APIPerformance: React.FC = () => {
   const [sortBy, setSortBy] = useState<'slow' | 'error' | 'business_error' | 'active'>('slow')
   const [methodFilter, setMethodFilter] = useState<string>('')
   const [pathFilter, setPathFilter] = useState('')
+  const [domainFilter, setDomainFilter] = useState('')
+  const [domains, setDomains] = useState<string[]>([])
   const [limit, setLimit] = useState(50)
 
   const bgColor = useColorModeValue('white', 'gray.800')
@@ -110,15 +113,30 @@ const APIPerformance: React.FC = () => {
 
   const loadSummary = async () => {
     try {
-      const response = await fetch(buildApiPath(adminPrefix, '/api/performance/summary'), {
-        credentials: 'include',
-      })
+      const url = domainFilter
+        ? buildApiPath(adminPrefix, `/api/performance/summary?domain=${encodeURIComponent(domainFilter)}`)
+        : buildApiPath(adminPrefix, '/api/performance/summary')
+      const response = await fetch(url, { credentials: 'include' })
       if (response.ok) {
         const data = await response.json()
         setSummary(data)
       }
     } catch (error) {
       console.error('Error loading summary:', error)
+    }
+  }
+
+  const loadDomains = async () => {
+    try {
+      const response = await fetch(buildApiPath(adminPrefix, '/api/performance/domains'), {
+        credentials: 'include',
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setDomains(data.domains || [])
+      }
+    } catch (error) {
+      console.error('Error loading domains:', error)
     }
   }
 
@@ -130,6 +148,7 @@ const APIPerformance: React.FC = () => {
       })
       if (methodFilter) params.append('method', methodFilter)
       if (pathFilter) params.append('path_prefix', pathFilter)
+      if (domainFilter) params.append('domain', domainFilter)
 
       const response = await fetch(buildApiPath(adminPrefix, `/api/performance/apis?${params}`), {
         credentials: 'include',
@@ -152,7 +171,7 @@ const APIPerformance: React.FC = () => {
 
   const loadData = async () => {
     setLoading(true)
-    await Promise.all([loadSummary(), loadAPIs()])
+    await Promise.all([loadDomains(), loadSummary(), loadAPIs()])
     setLoading(false)
   }
 
@@ -170,7 +189,7 @@ const APIPerformance: React.FC = () => {
 
   useEffect(() => {
     loadData()
-  }, [adminPrefix, sortBy, methodFilter, limit])
+  }, [adminPrefix, sortBy, methodFilter, domainFilter, limit])
 
   const getResponseTimeColor = (ms: number) => {
     if (ms < 100) return 'green'
@@ -358,6 +377,23 @@ const APIPerformance: React.FC = () => {
                     <option value="error">HTTP 错误率最高</option>
                     <option value="business_error">业务失败率最高</option>
                     <option value="active">请求量最大</option>
+                  </Select>
+                </Box>
+
+                <Box flex="1" minW="180px">
+                  <Text fontSize="sm" mb={2} fontWeight="medium">
+                    {t.apiPerformance?.domainFilter ?? '域名'}
+                  </Text>
+                  <Select
+                    value={domainFilter}
+                    onChange={(e) => setDomainFilter(e.target.value)}
+                  >
+                    <option value="">{t.apiPerformance?.domainFilterAll ?? '全部域名'}</option>
+                    {domains.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
                   </Select>
                 </Box>
 

@@ -3,6 +3,7 @@ package statistics
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -11,7 +12,8 @@ import (
 
 // APIPerformanceStats API 性能统计
 type APIPerformanceStats struct {
-	Path             string        `json:"path"`              // API 路径
+	Path             string        `json:"path"`              // API 路径（可能含 domain:pathPattern）
+	Domain           string        `json:"domain,omitempty"`  // 域名，从 Path 解析，便于筛选
 	Method           string        `json:"method"`            // HTTP 方法
 	TotalRequests    int64         `json:"total_requests"`    // 总请求数
 	SuccessRequests  int64         `json:"success_requests"`  // 成功请求数 (2xx, 3xx)
@@ -71,7 +73,7 @@ type APIPerformanceCollector struct {
 	log     *logrus.Entry
 
 	// 按路径+方法索引的性能统计
-	// key: "METHOD:PATH" 例如: "GET:/api/users"
+	// key: "METHOD:PATH" 例如: "GET:example.com:/api/users/*"
 	performanceStats map[string]*APIPerformanceStats
 
 	// 响应时间样本存储（用于计算百分位数）
@@ -146,8 +148,10 @@ func (apc *APIPerformanceCollector) Record(entry APIPerformanceEntry) {
 	// 获取或创建统计对象
 	stats, exists := apc.performanceStats[key]
 	if !exists {
+		domain, _ := parseDomainFromPath(entry.Path)
 		stats = &APIPerformanceStats{
 			Path:                 entry.Path,
+			Domain:               domain,
 			Method:               entry.Method,
 			StatusCodes:          make(map[int]int64),
 			ResponseTimeBuckets:   make(map[string]int64),
@@ -156,6 +160,9 @@ func (apc *APIPerformanceCollector) Record(entry APIPerformanceEntry) {
 			LastSeen:             entry.Timestamp,
 		}
 		apc.performanceStats[key] = stats
+	} else if stats.Domain == "" {
+		// 兼容旧数据：按需解析 Domain
+		stats.Domain, _ = parseDomainFromPath(entry.Path)
 	}
 
 	// 更新统计
@@ -264,13 +271,16 @@ func percentileIndex(samples []time.Duration, p int) int {
 	return int(index)
 }
 
-// GetStats 获取所有性能统计
-func (apc *APIPerformanceCollector) GetStats() []*APIPerformanceStats {
+// GetStats 获取所有性能统计，domainFilter 为空时不过滤
+func (apc *APIPerformanceCollector) GetStats(domainFilter string) []*APIPerformanceStats {
 	apc.mu.RLock()
 	defer apc.mu.RUnlock()
 
 	stats := make([]*APIPerformanceStats, 0, len(apc.performanceStats))
 	for _, s := range apc.performanceStats {
+		if domainFilter != "" && s.Domain != domainFilter {
+			continue
+		}
 		// 深拷贝避免数据竞争
 		statsCopy := *s
 		statsCopy.ResponseTimeBuckets = make(map[string]int64)
@@ -294,6 +304,25 @@ func (apc *APIPerformanceCollector) GetStats() []*APIPerformanceStats {
 	})
 
 	return stats
+}
+
+// GetDomains 获取所有出现过的域名列表，按字典序排序。省内存：遍历时去重，不额外存储
+func (apc *APIPerformanceCollector) GetDomains() []string {
+	apc.mu.RLock()
+	defer apc.mu.RUnlock()
+
+	seen := make(map[string]struct{})
+	for _, s := range apc.performanceStats {
+		if s.Domain != "" {
+			seen[s.Domain] = struct{}{}
+		}
+	}
+	domains := make([]string, 0, len(seen))
+	for d := range seen {
+		domains = append(domains, d)
+	}
+	sort.Strings(domains)
+	return domains
 }
 
 // GetStatsByPath 获取特定路径的统计
@@ -325,28 +354,30 @@ func (apc *APIPerformanceCollector) GetStatsByPath(method, path string) *APIPerf
 	return &statsCopy
 }
 
-// GetTopSlowAPIs 获取最慢的 API 列表
-func (apc *APIPerformanceCollector) GetTopSlowAPIs(n int) []*APIPerformanceStats {
-	stats := apc.GetStats()
+// GetTopSlowAPIs 获取最慢的 API 列表，domainFilter 为空时不过滤
+func (apc *APIPerformanceCollector) GetTopSlowAPIs(n int, domainFilter string) []*APIPerformanceStats {
+	stats := apc.GetStats(domainFilter)
 	if n > 0 && len(stats) > n {
 		stats = stats[:n]
 	}
 	return stats
 }
 
-// GetTopErrorAPIs 获取错误率最高的 API 列表
-func (apc *APIPerformanceCollector) GetTopErrorAPIs(n int) []*APIPerformanceStats {
+// GetTopErrorAPIs 获取错误率最高的 API 列表，domainFilter 为空时不过滤
+func (apc *APIPerformanceCollector) GetTopErrorAPIs(n int, domainFilter string) []*APIPerformanceStats {
 	apc.mu.RLock()
 	defer apc.mu.RUnlock()
 
-	// 计算错误率并排序
 	type errorRate struct {
-		stats      *APIPerformanceStats
-		errorRate  float64
+		stats     *APIPerformanceStats
+		errorRate float64
 	}
 
 	rates := make([]errorRate, 0, len(apc.performanceStats))
 	for _, s := range apc.performanceStats {
+		if domainFilter != "" && s.Domain != domainFilter {
+			continue
+		}
 		if s.TotalRequests == 0 {
 			continue
 		}
@@ -357,12 +388,10 @@ func (apc *APIPerformanceCollector) GetTopErrorAPIs(n int) []*APIPerformanceStat
 		})
 	}
 
-	// 按错误率排序
 	sort.Slice(rates, func(i, j int) bool {
 		return rates[i].errorRate > rates[j].errorRate
 	})
 
-	// 返回前 N 个
 	result := make([]*APIPerformanceStats, 0, n)
 	for i := 0; i < len(rates) && (n <= 0 || i < n); i++ {
 		result = append(result, rates[i].stats)
@@ -371,8 +400,8 @@ func (apc *APIPerformanceCollector) GetTopErrorAPIs(n int) []*APIPerformanceStat
 	return result
 }
 
-// GetTopBusinessErrorAPIs 获取业务失败率最高的 API 列表（JSON 内 code/status 判定）
-func (apc *APIPerformanceCollector) GetTopBusinessErrorAPIs(n int) []*APIPerformanceStats {
+// GetTopBusinessErrorAPIs 获取业务失败率最高的 API 列表（JSON 内 code/status 判定），domainFilter 为空时不过滤
+func (apc *APIPerformanceCollector) GetTopBusinessErrorAPIs(n int, domainFilter string) []*APIPerformanceStats {
 	apc.mu.RLock()
 	defer apc.mu.RUnlock()
 
@@ -382,6 +411,9 @@ func (apc *APIPerformanceCollector) GetTopBusinessErrorAPIs(n int) []*APIPerform
 	}
 	rates := make([]bizRate, 0, len(apc.performanceStats))
 	for _, s := range apc.performanceStats {
+		if domainFilter != "" && s.Domain != domainFilter {
+			continue
+		}
 		total := s.BusinessSuccessRequests + s.BusinessErrorRequests
 		if total == 0 {
 			continue
@@ -399,14 +431,16 @@ func (apc *APIPerformanceCollector) GetTopBusinessErrorAPIs(n int) []*APIPerform
 	return result
 }
 
-// GetMostActiveAPIs 获取请求量最多的 API 列表
-func (apc *APIPerformanceCollector) GetMostActiveAPIs(n int) []*APIPerformanceStats {
+// GetMostActiveAPIs 获取请求量最多的 API 列表，domainFilter 为空时不过滤
+func (apc *APIPerformanceCollector) GetMostActiveAPIs(n int, domainFilter string) []*APIPerformanceStats {
 	apc.mu.RLock()
 	defer apc.mu.RUnlock()
 
-	// 按请求数排序
 	stats := make([]*APIPerformanceStats, 0, len(apc.performanceStats))
 	for _, s := range apc.performanceStats {
+		if domainFilter != "" && s.Domain != domainFilter {
+			continue
+		}
 		stats = append(stats, s)
 	}
 
@@ -485,4 +519,22 @@ func (apc *APIPerformanceCollector) Stop() {
 // buildAPIKey 构建统计键
 func buildAPIKey(method, path string) string {
 	return method + ":" + path
+}
+
+// parseDomainFromPath 从 Path 解析域名。Path 格式: "domain:pathPattern" 或 "pathPattern"
+// 返回 (domain, pathPart)，无域名时 domain 为空
+func parseDomainFromPath(path string) (domain, pathPart string) {
+	if path == "" {
+		return "", ""
+	}
+	idx := strings.Index(path, ":")
+	if idx <= 0 {
+		return "", path
+	}
+	// 避免把 /api/v1:xxx 这种误判为域名（域名不含 /）
+	candidate := path[:idx]
+	if strings.Contains(candidate, "/") {
+		return "", path
+	}
+	return candidate, path[idx+1:]
 }

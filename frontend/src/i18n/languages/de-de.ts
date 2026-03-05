@@ -238,6 +238,10 @@ export const deDE: Translation = {
     cityMinOccurrences: 'Stadt-Minimum',
     visits: 'Besuche',
   },
+  apiPerformance: {
+    domainFilter: 'Domain',
+    domainFilterAll: 'Alle Domains',
+  },
   aiSecurity: {
     title: 'KI-Sicherheitsanalyse',
     config: 'KI-Analysekonfiguration',

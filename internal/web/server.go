@@ -1371,6 +1371,7 @@ func (s *Server) setupRoutes() {
 
 	// API 性能监控 API
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/performance/apis", s.handleAPIPerformanceList)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/performance/domains", s.handleAPIPerformanceDomains)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/performance/detail", s.handleAPIPerformanceDetail)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/performance/summary", s.handleAPIPerformanceSummary)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/performance/config", s.handleAPIPerformanceConfig)

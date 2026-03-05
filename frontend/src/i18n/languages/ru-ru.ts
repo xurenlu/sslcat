@@ -238,6 +238,10 @@ export const ruRU: Translation = {
     cityMinOccurrences: 'Город минимум',
     visits: 'посещений',
   },
+  apiPerformance: {
+    domainFilter: 'Домен',
+    domainFilterAll: 'Все домены',
+  },
   aiSecurity: {
     title: 'Анализ безопасности ИИ',
     config: 'Настройка анализа ИИ',

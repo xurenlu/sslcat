@@ -290,6 +290,10 @@ export const zhCN: Translation = {
     exportSuccess: '导出成功',
     exportError: '导出失败',
   },
+  apiPerformance: {
+    domainFilter: '域名',
+    domainFilterAll: '全部域名',
+  },
   aiSecurity: {
     title: 'AI 安全分析',
     config: 'AI 分析配置',

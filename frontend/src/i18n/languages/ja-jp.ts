@@ -238,6 +238,10 @@ export const jaJP: Translation = {
     cityMinOccurrences: '都市最小',
     visits: '回訪問',
   },
+  apiPerformance: {
+    domainFilter: 'ドメイン',
+    domainFilterAll: 'すべてのドメイン',
+  },
   aiSecurity: {
     title: 'AIセキュリティ分析',
     config: 'AI分析設定',

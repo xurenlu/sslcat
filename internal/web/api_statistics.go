@@ -23,6 +23,7 @@ func (s *Server) handleAPIPerformanceList(w http.ResponseWriter, r *http.Request
 	limitStr := query.Get("limit")
 	method := query.Get("method")
 	pathPrefix := query.Get("path_prefix")
+	domain := query.Get("domain")
 
 	limit := 50 // 默认返回前50个
 	if limitStr != "" {
@@ -31,17 +32,17 @@ func (s *Server) handleAPIPerformanceList(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	// 根据排序类型获取数据
+	// 根据排序类型获取数据，支持按域名筛选
 	var stats []*statistics.APIPerformanceStats
 	switch sortBy {
 	case "error":
-		stats = s.apiPerformanceCollector.GetTopErrorAPIs(limit)
+		stats = s.apiPerformanceCollector.GetTopErrorAPIs(limit, domain)
 	case "business_error":
-		stats = s.apiPerformanceCollector.GetTopBusinessErrorAPIs(limit)
+		stats = s.apiPerformanceCollector.GetTopBusinessErrorAPIs(limit, domain)
 	case "active":
-		stats = s.apiPerformanceCollector.GetMostActiveAPIs(limit)
+		stats = s.apiPerformanceCollector.GetMostActiveAPIs(limit, domain)
 	default: // "slow" or empty
-		stats = s.apiPerformanceCollector.GetTopSlowAPIs(limit)
+		stats = s.apiPerformanceCollector.GetTopSlowAPIs(limit, domain)
 	}
 
 	// 应用过滤条件
@@ -67,14 +68,31 @@ func (s *Server) handleAPIPerformanceList(w http.ResponseWriter, r *http.Request
 	}
 
 	response := map[string]interface{}{
-		"sort_by":    sortBy,
-		"limit":      limit,
-		"count":      len(filteredStats),
-		"generated":  time.Now(),
-		"apis":       filteredStats,
+		"sort_by":   sortBy,
+		"limit":     limit,
+		"domain":    domain,
+		"count":     len(filteredStats),
+		"generated": time.Now(),
+		"apis":      filteredStats,
 	}
 
 	s.sendJSON(w, response)
+}
+
+// handleAPIPerformanceDomains 获取 API 性能监控中出现的域名列表（省内存：遍历时去重）
+func (s *Server) handleAPIPerformanceDomains(w http.ResponseWriter, r *http.Request) {
+	if s.apiPerformanceCollector == nil {
+		http.Error(w, "API performance collector not initialized", http.StatusServiceUnavailable)
+		return
+	}
+
+	domains := s.apiPerformanceCollector.GetDomains()
+
+	s.sendJSON(w, map[string]interface{}{
+		"domains":   domains,
+		"count":     len(domains),
+		"generated": time.Now(),
+	})
 }
 
 // handleAPIPerformanceDetail 获取单个 API 的详细性能统计
@@ -109,7 +127,8 @@ func (s *Server) handleAPIPerformanceSummary(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	stats := s.apiPerformanceCollector.GetStats()
+	domain := r.URL.Query().Get("domain")
+	stats := s.apiPerformanceCollector.GetStats(domain)
 
 	if len(stats) == 0 {
 		s.sendJSON(w, map[string]interface{}{

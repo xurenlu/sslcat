@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.11] - 2026-03-05
+
+### ✨ 新功能
+
+- **API 性能排行榜按域名筛选**：
+  - 支持按域名筛选过滤 API 性能数据，多域名场景下可快速查看单站点表现
+  - 新增 `/api/performance/domains` 端点，返回域名列表（省内存：遍历时去重，不额外存储）
+  - 域名从 Path 解析（格式 `host:pathPattern`），无需额外字段，兼容旧数据
+
 ## [1.4.10] - 2026-03-05
 
 ### ✨ 新功能
