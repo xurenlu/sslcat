@@ -39,7 +39,7 @@ import (
 )
 
 var (
-	version = "1.6.2"
+	version = "1.6.2-rc2"
 	build   = "dev"
 )
 
@@ -497,6 +497,14 @@ func main() {
 	default:
 		// 默认使用标准模式
 		serverManager = startStandardMode(cfg, webServer, sslManager, proxyManager, readTimeout, writeTimeout, idleTimeout)
+	}
+
+	// 启用 mutex 和 block profiling（在 pprof 启用时）
+	// 这可以帮助诊断锁竞争和阻塞问题
+	if cfg.Server.EnablePprof {
+		runtime.SetMutexProfileFraction(10)  // 采样 10% 的 mutex 争用
+		runtime.SetBlockProfileRate(1)         // 记录所有阻塞操作
+		logrus.Info("Mutex 和 Block profiling 已启用")
 	}
 
 	// 启动内存监控
