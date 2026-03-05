@@ -58,8 +58,6 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts'
-import { FeatureGate } from '../components/FeatureGate'
-import { PerformanceWaveform } from '../components/PerformanceWaveform'
 
 interface MonitoringConfig {
   enabled: boolean
@@ -435,57 +433,43 @@ const Monitoring: React.FC = () => {
               </TabList>
               <TabPanels>
                 <TabPanel>
-                  <FeatureGate
-                    require={['canvas2d']}
-                    fallback={
-                      <Box height="400px">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={metricsData.data.map((item) => ({
-                            time: new Date(item.timestamp).toLocaleString('zh-CN', {
-                              month: 'short',
-                              day: 'numeric',
-                              hour: timeRange === 'today' ? '2-digit' : undefined,
-                              minute: timeRange === 'today' ? '2-digit' : undefined,
-                            }),
-                            timestamp: item.timestamp,
-                            value: item.cpu_percent,
-                          }))}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis
-                              dataKey="time"
-                              angle={-45}
-                              textAnchor="end"
-                              height={80}
-                              interval="preserveStartEnd"
-                            />
-                            <YAxis label={{ value: 'CPU (%)', angle: -90, position: 'insideLeft' }} />
-                            <Tooltip
-                              formatter={(value: any) => [`${Number(value).toFixed(2)}%`, 'CPU 使用率']}
-                              labelFormatter={(label) => `时间: ${label}`}
-                            />
-                            <Legend />
-                            <Line
-                              type="monotone"
-                              dataKey="value"
-                              stroke="#3182CE"
-                              strokeWidth={2}
-                              dot={{ r: 3 }}
-                              name="CPU 使用率"
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </Box>
-                    }
-                    showFallbackNotice={false}
-                  >
-                    <PerformanceWaveform
-                      data={metricsData.data.map((item) => item.cpu_percent)}
-                      label="CPU 使用率"
-                      color="#3182CE"
-                      fillColor="rgba(49, 130, 206, 0.2)"
-                      height={400}
-                    />
-                  </FeatureGate>
+                  <Box height="400px">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={metricsData.data.map((item) => ({
+                        time: new Date(item.timestamp).toLocaleString('zh-CN', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: timeRange === 'today' ? '2-digit' : undefined,
+                          minute: timeRange === 'today' ? '2-digit' : undefined,
+                        }),
+                        timestamp: item.timestamp,
+                        value: item.cpu_percent,
+                      }))}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis
+                          dataKey="time"
+                          angle={-45}
+                          textAnchor="end"
+                          height={80}
+                          interval="preserveStartEnd"
+                        />
+                        <YAxis label={{ value: 'CPU (%)', angle: -90, position: 'insideLeft' }} />
+                        <Tooltip
+                          formatter={(value: any) => [`${Number(value).toFixed(2)}%`, 'CPU 使用率']}
+                          labelFormatter={(label) => `时间: ${label}`}
+                        />
+                        <Legend />
+                        <Line
+                          type="monotone"
+                          dataKey="value"
+                          stroke="#3182CE"
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                          name="CPU 使用率"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </Box>
                   {metricsData.summary && (
                     <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4} mt={4}>
                       <Stat>
