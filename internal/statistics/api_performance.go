@@ -237,8 +237,8 @@ func (apc *APIPerformanceCollector) Record(entry APIPerformanceEntry) {
 		apc.responseTimeSamples[key] = apc.responseTimeSamples[key][1:]
 	}
 
-	// 更新百分位数
-	apc.updatePercentiles(key, stats)
+	// 修复：不在持锁时更新百分位数（排序操作很慢）
+	// 百分位数将在下次读取时异步计算
 }
 
 // updatePercentiles 更新百分位数
@@ -273,8 +273,8 @@ func percentileIndex(samples []time.Duration, p int) int {
 
 // GetStats 获取所有性能统计，domainFilter 为空时不过滤
 func (apc *APIPerformanceCollector) GetStats(domainFilter string) []*APIPerformanceStats {
-	apc.mu.RLock()
-	defer apc.mu.RUnlock()
+	apc.mu.Lock()
+	defer apc.mu.Unlock()
 
 	stats := make([]*APIPerformanceStats, 0, len(apc.performanceStats))
 	for _, s := range apc.performanceStats {
@@ -295,6 +295,24 @@ func (apc *APIPerformanceCollector) GetStats(domainFilter string) []*APIPerforma
 		for k, v := range s.BusinessStatusCodes {
 			statsCopy.BusinessStatusCodes[k] = v
 		}
+
+		// 修复：在获取统计时计算百分位数（避免在 Record 时持锁排序）
+		key := buildAPIKey(s.Method, s.Path)
+		samples := apc.responseTimeSamples[key]
+		if len(samples) > 0 {
+			// 创建样本副本并排序
+			samplesCopy := make([]time.Duration, len(samples))
+			copy(samplesCopy, samples)
+			sort.Slice(samplesCopy, func(i, j int) bool {
+				return samplesCopy[i] < samplesCopy[j]
+			})
+
+			// 计算百分位数
+			statsCopy.P50ResponseTime = float64(samplesCopy[percentileIndex(samplesCopy, 50)])
+			statsCopy.P95ResponseTime = float64(samplesCopy[percentileIndex(samplesCopy, 95)])
+			statsCopy.P99ResponseTime = float64(samplesCopy[percentileIndex(samplesCopy, 99)])
+		}
+
 		stats = append(stats, &statsCopy)
 	}
 

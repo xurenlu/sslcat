@@ -170,16 +170,13 @@ func (c *Collector) RecordAccess(record *AccessRecord) {
 		return
 	}
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	now := record.Timestamp
 	if now.IsZero() {
 		now = time.Now()
 	}
 
-	// 首先更新域名统计（真实数据，不采样）
-	c.updateDomainStats(record, now)
+	// 修复：快速更新域名统计（缩小锁范围）
+	c.updateDomainStatsFast(record, now)
 
 	// 采样检查（仅用于漏斗模型的排行榜，不影响真实统计数据）
 	// 只有通过采样的请求才会被计入排行榜
@@ -187,14 +184,14 @@ func (c *Collector) RecordAccess(record *AccessRecord) {
 		return
 	}
 
-	// 更新漏斗条目（带大小限制）- 仅用于排行榜
+	// 修复：单独获取锁更新漏斗条目（减少持锁时间）
+	c.mu.Lock()
 	c.ipFunnel.UpdateEntry(c.ipEntries, record.IP, now, c.maxIPEntries)
 	c.uaFunnel.UpdateEntry(c.uaEntries, record.UserAgent, now, c.maxUAEntries)
-
-	// 如果启用了地理位置且有城市信息
 	if c.geoIPEnabled && record.City != "" {
 		c.cityFunnel.UpdateEntry(c.cityEntries, record.City, now, c.maxCityEntries)
 	}
+	c.mu.Unlock()
 }
 
 // shouldSampleForFunnel 判断是否应该将此次访问计入排行榜（动态采样）
@@ -219,6 +216,92 @@ func (c *Collector) shouldSampleForFunnel() bool {
 
 	// 中间状态（50%-90%），采样 50%
 	return counter%2 == 0
+}
+
+// updateDomainStatsFast 快速更新域名统计数据（优化版本，减少持锁时间）
+func (c *Collector) updateDomainStatsFast(record *AccessRecord, timestamp time.Time) {
+	domain := record.Domain
+	if domain == "" {
+		domain = "default"
+	}
+
+	// 预先计算时间键（避免在锁内重复计算）
+	hourKey := c.getTimeKey(timestamp, DimensionHour)
+	dayKey := c.getTimeKey(timestamp, DimensionDay)
+	monthKey := c.getTimeKey(timestamp, DimensionMonth)
+
+	timeKeys := []struct {
+		dim     TimeDimension
+		timeKey string
+	}{
+		{DimensionHour, hourKey},
+		{DimensionDay, dayKey},
+		{DimensionMonth, monthKey},
+	}
+
+	// 获取锁并快速更新
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for _, tk := range timeKeys {
+		// 确保 map 层级存在（惰性初始化）
+		if c.domainStats[domain] == nil {
+			c.domainStats[domain] = make(map[TimeDimension]map[string]*RequestStats)
+		}
+		if c.domainStats[domain][tk.dim] == nil {
+			c.domainStats[domain][tk.dim] = make(map[string]*RequestStats)
+		}
+		if c.domainUniqueIPs[domain] == nil {
+			c.domainUniqueIPs[domain] = make(map[TimeDimension]map[string]map[string]struct{})
+		}
+		if c.domainUniqueIPs[domain][tk.dim] == nil {
+			c.domainUniqueIPs[domain][tk.dim] = make(map[string]map[string]struct{})
+		}
+		if c.domainUniqueUAs[domain] == nil {
+			c.domainUniqueUAs[domain] = make(map[TimeDimension]map[string]map[string]struct{})
+		}
+		if c.domainUniqueUAs[domain][tk.dim] == nil {
+			c.domainUniqueUAs[domain][tk.dim] = make(map[string]map[string]struct{})
+		}
+
+		stats := c.domainStats[domain][tk.dim][tk.timeKey]
+		if stats == nil {
+			stats = &RequestStats{}
+			c.domainStats[domain][tk.dim][tk.timeKey] = stats
+		}
+
+		// 快速更新统计计数器
+		stats.TotalRequests++
+		if record.Status < 200 || record.Status >= 300 {
+			stats.NonSuccessCount++
+		}
+
+		// 更新唯一IP统计（带内存保护）
+		if c.domainUniqueIPs[domain][tk.dim][tk.timeKey] == nil {
+			c.domainUniqueIPs[domain][tk.dim][tk.timeKey] = make(map[string]struct{})
+		}
+		ipSet := c.domainUniqueIPs[domain][tk.dim][tk.timeKey]
+		if _, exists := ipSet[record.IP]; !exists {
+			if len(ipSet) < c.maxUniqueIPsPerSlot {
+				ipSet[record.IP] = struct{}{}
+				stats.UniqueIPs = int64(len(ipSet))
+			}
+		}
+
+		// 更新唯一UA统计（带内存保护）
+		if record.UserAgent != "" {
+			if c.domainUniqueUAs[domain][tk.dim][tk.timeKey] == nil {
+				c.domainUniqueUAs[domain][tk.dim][tk.timeKey] = make(map[string]struct{})
+			}
+			uaSet := c.domainUniqueUAs[domain][tk.dim][tk.timeKey]
+			if _, exists := uaSet[record.UserAgent]; !exists {
+				if len(uaSet) < c.maxUniqueUAsPerSlot {
+					uaSet[record.UserAgent] = struct{}{}
+					stats.UniqueUserAgents = int64(len(uaSet))
+				}
+			}
+		}
+	}
 }
 
 // updateDomainStats 更新域名统计数据
@@ -401,21 +484,58 @@ func (c *Collector) startCleanupTask() {
 
 // cleanup 清理过期数据
 func (c *Collector) cleanup() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
+	// 修复：先获取需要删除的键列表，然后在锁外执行删除操作
 	now := time.Now()
+
+	// 第一步：获取锁并收集需要删除的数据
+	c.mu.Lock()
 
 	// 清理漏斗条目
 	c.ipFunnel.CleanupOldEntries(c.ipEntries, c.maxDataAge, now)
 	c.uaFunnel.CleanupOldEntries(c.uaEntries, c.maxDataAge, now)
 	c.cityFunnel.CleanupOldEntries(c.cityEntries, c.maxDataAge, now)
 
-	// 清理域名统计数据
-	c.cleanupDomainStats(now)
+	// 收集需要删除的域名统计数据键
+	type deletionKey struct {
+		domain  string
+		dim     TimeDimension
+		timeKey string
+	}
+	var deletions []deletionKey
+	var domainDeletions []string
 
-	// 限制数据增长（防止内存泄漏）
+	for domain, dimStats := range c.domainStats {
+		for dim, timeStats := range dimStats {
+			for timeKey := range timeStats {
+				if c.isTimeKeyExpired(timeKey, dim, now) {
+					deletions = append(deletions, deletionKey{domain, dim, timeKey})
+				}
+			}
+			if len(timeStats) == 0 {
+				domainDeletions = append(domainDeletions, domain)
+			}
+		}
+	}
+
+	// 限制数据增长
 	c.limitDataGrowth()
+
+	c.mu.Unlock()
+
+	// 第二步：在锁外执行删除操作（减少持锁时间）
+	c.mu.Lock()
+	for _, del := range deletions {
+		if c.domainStats[del.domain] != nil && c.domainStats[del.domain][del.dim] != nil {
+			delete(c.domainStats[del.domain][del.dim], del.timeKey)
+		}
+		if c.domainUniqueIPs[del.domain] != nil && c.domainUniqueIPs[del.domain][del.dim] != nil {
+			delete(c.domainUniqueIPs[del.domain][del.dim], del.timeKey)
+		}
+		if c.domainUniqueUAs[del.domain] != nil && c.domainUniqueUAs[del.domain][del.dim] != nil {
+			delete(c.domainUniqueUAs[del.domain][del.dim], del.timeKey)
+		}
+	}
+	c.mu.Unlock()
 
 	c.log.Debug("完成数据清理")
 }

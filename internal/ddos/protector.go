@@ -17,6 +17,14 @@ import (
 	"github.com/xurenlu/sslcat/internal/threatintel"
 )
 
+// max 返回两个整数中的最大值
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 // ProtectionLevel 防护级别
 type ProtectionLevel int
 
@@ -252,6 +260,19 @@ func (p *Protector) initThresholds() {
 	}
 }
 
+// attackRecord 用于异步记录攻击
+type attackRecord struct {
+	clientIP   string
+	userAgent  string
+	url        string
+	method     string
+	attackType string
+	severity   string
+	reason     string
+	blocked    bool
+	timestamp  time.Time
+}
+
 // CheckRequest 检查请求
 func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
 	if !p.enabled || p.level == LevelOff {
@@ -259,64 +280,19 @@ func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
 	}
 
 	clientIP := p.getClientIP(r)
-	
+
 	// 排除内网IP，不对内网请求进行DDoS检测
 	if p.isPrivateIP(clientIP) {
 		return false, ""
 	}
-	
+
 	userAgent := r.Header.Get("User-Agent")
 	now := time.Now()
 
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-
-	// 获取或创建客户端信息
-	client, exists := p.clients[clientIP]
-	if !exists {
-		client = &ClientInfo{
-			IP:                clientIP,
-			RequestCount:      0,
-			FirstRequest:      now,
-			UserAgent:         userAgent,
-			RequestTimestamps: make([]time.Time, 0),
-		}
-		p.clients[clientIP] = client
-	}
-
-	// 检查是否已被封禁
-	if now.Before(client.BlockedUntil) {
-		p.recordAttack(clientIP, userAgent, r.URL.String(), r.Method,
-			"rate_limit", "high", "IP仍在封禁期内", true)
-		return true, "IP已被封禁"
-	}
-
-	// 更新客户端信息
-	client.RequestCount++
-	client.LastRequest = now
-
-	// 添加当前请求时间戳到滑动窗口
-	client.RequestTimestamps = append(client.RequestTimestamps, now)
-
-	// 清理滑动窗口：移除1小时前的请求记录（保留足够长的历史用于每小时限制检查）
-	cutoffTime := now.Add(-time.Hour)
-	validTimestamps := make([]time.Time, 0, len(client.RequestTimestamps))
-	for _, ts := range client.RequestTimestamps {
-		if ts.After(cutoffTime) {
-			validTimestamps = append(validTimestamps, ts)
-		}
-	}
-	client.RequestTimestamps = validTimestamps
-
-	// 计算请求速率（使用滑动窗口）
-	duration := now.Sub(client.FirstRequest)
-	if duration > 0 {
-		client.RequestRate = float64(client.RequestCount) / duration.Minutes()
-	}
-
-	// 获取当前阈值配置
+	// 修复：缩小锁范围，只在访问共享数据时持锁
+	// 获取当前阈值配置（不需要锁，只读）
 	threshold := p.thresholds[p.level]
-	
+
 	// 如果设置了自定义5分钟阈值，使用自定义值
 	if p.customRequestsPer5Minutes > 0 {
 		threshold.RequestsPer5Minutes = p.customRequestsPer5Minutes
@@ -333,21 +309,95 @@ func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
 		threshold.RequestsPerHour *= 5
 	}
 
+	// 修复：预先检查不需要锁的条件
+	// 极老浏览器 UA：直接拦截（多为爬虫）
+	if p.outdatedBrowserEnabled && userAgent != "" && security.IsVeryOutdatedBrowser(userAgent) {
+		// 需要锁来更新客户端状态
+		p.blockClientAndUpdate(clientIP, userAgent, r.URL.String(), r.Method,
+			"outdated_browser", "high", "极老浏览器 UA", true, threshold.BlockDuration, now)
+		return true, "极老浏览器 UA"
+	}
+
+	// 修复：使用读锁获取客户端信息
+	p.mutex.RLock()
+	client, exists := p.clients[clientIP]
+	var blockedUntil time.Time
+	if exists {
+		blockedUntil = client.BlockedUntil
+	}
+	p.mutex.RUnlock()
+
+	// 检查是否已被封禁（不需要锁）
+	if now.Before(blockedUntil) {
+		// 异步记录攻击，避免持锁
+		go p.recordAttackAsync(clientIP, userAgent, r.URL.String(), r.Method,
+			"rate_limit", "high", "IP仍在封禁期内", true)
+		return true, "IP已被封禁"
+	}
+
+	// 修复：只在需要更新时获取写锁，并且缩小临界区
+	p.mutex.Lock()
+
+	// 获取或创建客户端信息
+	client, exists = p.clients[clientIP]
+	if !exists {
+		client = &ClientInfo{
+			IP:                clientIP,
+			RequestCount:      0,
+			FirstRequest:      now,
+			UserAgent:         userAgent,
+			RequestTimestamps: make([]time.Time, 0, 100), // 预分配容量
+		}
+		p.clients[clientIP] = client
+	}
+
+	// 更新客户端信息（快速操作）
+	client.RequestCount++
+	client.LastRequest = now
+	client.RequestTimestamps = append(client.RequestTimestamps, now)
+
+	// 清理滑动窗口：移除1小时前的请求记录
+	cutoffTime := now.Add(-time.Hour)
+	validTimestamps := client.RequestTimestamps[:0] // 重用切片
+	for _, ts := range client.RequestTimestamps {
+		if ts.After(cutoffTime) {
+			validTimestamps = append(validTimestamps, ts)
+		}
+	}
+	client.RequestTimestamps = validTimestamps
+
+	// 计算请求速率
+	duration := now.Sub(client.FirstRequest)
+	if duration > 0 {
+		client.RequestRate = float64(client.RequestCount) / duration.Minutes()
+	}
+
+	// 复制需要的数据用于后续检查
+	clientCopy := *client
+
+	p.mutex.Unlock()
+
+	// 修复：所有耗时操作和 I/O 操作都在锁外执行
+
 	// 使用威胁情报检测（如果可用）
 	if p.threatDetector != nil {
 		threatResult := p.threatDetector.CheckRequest(r)
 		if threatResult.IsThreat {
-			// 根据威胁等级决定是否封禁
 			shouldBlock := threatResult.ThreatLevel >= threatintel.ThreatLevelHigh
 			severity := threatResult.ThreatLevel.String()
 
 			if shouldBlock {
-				p.blockClient(client, threshold.BlockDuration, now)
+				p.blockClientAndUpdate(clientIP, userAgent, r.URL.String(), r.Method,
+					"threat_intel", severity,
+					fmt.Sprintf("威胁情报检测: %s (置信度: %.2f)", threatResult.Description, threatResult.Confidence),
+					shouldBlock, threshold.BlockDuration, now)
+			} else {
+				// 异步记录，不阻塞请求
+				go p.recordAttackAsync(clientIP, userAgent, r.URL.String(), r.Method,
+					"threat_intel", severity,
+					fmt.Sprintf("威胁情报检测: %s (置信度: %.2f)", threatResult.Description, threatResult.Confidence),
+					false)
 			}
-
-			p.recordAttack(clientIP, userAgent, r.URL.String(), r.Method,
-				"threat_intel", severity, fmt.Sprintf("威胁情报检测: %s (置信度: %.2f)", threatResult.Description, threatResult.Confidence), shouldBlock)
-			client.Suspicious = true
 
 			if shouldBlock {
 				return true, fmt.Sprintf("威胁情报检测: %s", threatResult.Description)
@@ -355,45 +405,58 @@ func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
 		}
 	}
 
-	// 极老浏览器 UA：直接拦截（多为爬虫）
-	if p.outdatedBrowserEnabled && userAgent != "" && security.IsVeryOutdatedBrowser(userAgent) {
-		p.blockClient(client, threshold.BlockDuration, now)
-		p.recordAttack(clientIP, userAgent, r.URL.String(), r.Method,
-			"outdated_browser", "high", "极老浏览器 UA", true)
-		return true, "极老浏览器 UA"
-	}
-
 	// 较老浏览器 UA：标记 + 使用更严格的速率限制
 	rateLimitThreshold := threshold
 	if p.outdatedBrowserEnabled && userAgent != "" && security.IsOutdatedBrowser(userAgent) {
-		client.Suspicious = true
-		p.recordAttack(clientIP, userAgent, r.URL.String(), r.Method,
+		// 异步记录，避免持锁
+		go p.recordAttackAsync(clientIP, userAgent, r.URL.String(), r.Method,
 			"outdated_browser", "medium", "较老浏览器 UA", false)
+
+		// 更新客户端可疑状态（需要锁）
+		p.mutex.Lock()
+		if c, ok := p.clients[clientIP]; ok {
+			c.Suspicious = true
+		}
+		p.mutex.Unlock()
+
 		rateLimitThreshold.RequestsPerMinute = max(1, threshold.RequestsPerMinute/2)
 		rateLimitThreshold.RequestsPer5Minutes = max(1, threshold.RequestsPer5Minutes/2)
 		rateLimitThreshold.RequestsPerHour = max(1, threshold.RequestsPerHour/2)
 	}
 
-	// 检查请求频率
-	if blocked, reason := p.checkRateLimit(client, rateLimitThreshold, now); blocked {
-		p.blockClient(client, threshold.BlockDuration, now)
-		p.recordAttack(clientIP, userAgent, r.URL.String(), r.Method,
-			"rate_limit", "high", reason, true)
+	// 检查请求频率（使用客户端副本）
+	if blocked, reason := p.checkRateLimit(&clientCopy, rateLimitThreshold, now); blocked {
+		p.blockClientAndUpdate(clientIP, userAgent, r.URL.String(), r.Method,
+			"rate_limit", "high", reason, true, threshold.BlockDuration, now)
 		return true, reason
 	}
 
 	// 检查可疑User-Agent（非过老浏览器的其他可疑 UA）
 	if threshold.SuspiciousUA && p.isSuspiciousUserAgent(userAgent) {
-		p.recordAttack(clientIP, userAgent, r.URL.String(), r.Method,
+		// 异步记录
+		go p.recordAttackAsync(clientIP, userAgent, r.URL.String(), r.Method,
 			"suspicious_ua", "medium", "可疑的User-Agent", false)
-		client.Suspicious = true
+
+		// 更新状态（快速加锁）
+		p.mutex.Lock()
+		if c, ok := p.clients[clientIP]; ok {
+			c.Suspicious = true
+		}
+		p.mutex.Unlock()
 	}
 
 	// 检查请求模式
-	if p.isSuspiciousPattern(r, client) {
-		p.recordAttack(clientIP, userAgent, r.URL.String(), r.Method,
+	if p.isSuspiciousPattern(r, &clientCopy) {
+		// 异步记录
+		go p.recordAttackAsync(clientIP, userAgent, r.URL.String(), r.Method,
 			"suspicious_pattern", "medium", "可疑的请求模式", false)
-		client.Suspicious = true
+
+		// 更新状态（快速加锁）
+		p.mutex.Lock()
+		if c, ok := p.clients[clientIP]; ok {
+			c.Suspicious = true
+		}
+		p.mutex.Unlock()
 	}
 
 	return false, ""
@@ -644,7 +707,119 @@ func (p *Protector) isSuspiciousPattern(r *http.Request, client *ClientInfo) boo
 	return false
 }
 
-// recordAttack 记录攻击
+// blockClientAndUpdate 封禁客户端并更新状态（组合操作，减少锁持有时间）
+func (p *Protector) blockClientAndUpdate(clientIP, userAgent, url, method, attackType, severity, reason string, blocked bool, blockDuration time.Duration, now time.Time) {
+	// 快速获取锁并更新状态
+	p.mutex.Lock()
+	if client, exists := p.clients[clientIP]; exists {
+		client.BlockedUntil = now.Add(blockDuration)
+		client.BlockCount++
+	}
+	p.mutex.Unlock()
+
+	// 异步记录攻击，包含所有 I/O 操作
+	go p.recordAttackAsync(clientIP, userAgent, url, method, attackType, severity, reason, blocked)
+}
+
+// recordAttackAsync 异步记录攻击（避免在持锁时调用）
+func (p *Protector) recordAttackAsync(clientIP, userAgent, url, method, attackType, severity, reason string, blocked bool) {
+	attack := Attack{
+		ID:         p.generateAttackID(),
+		ClientIP:   clientIP,
+		UserAgent:  userAgent,
+		URL:        url,
+		Method:     method,
+		AttackType: attackType,
+		Severity:   severity,
+		Timestamp:  time.Now(),
+		Blocked:    blocked,
+		Reason:     reason,
+	}
+
+	// 查询 GeoIP 信息（可能在锁外进行网络请求）
+	if p.geoIPService != nil {
+		if geoLoc, err := p.geoIPService.GetLocation(clientIP); err == nil && geoLoc != nil {
+			attack.Country = geoLoc.Country
+			attack.CountryCode = geoLoc.CountryCode
+			attack.ISP = geoLoc.ISP
+		}
+	}
+
+	// 更新攻击记录（需要锁，但操作快速）
+	p.mutex.Lock()
+	p.attacks = append(p.attacks, attack)
+	// 保持攻击记录数量限制
+	if len(p.attacks) > p.maxAttacks {
+		p.attacks = p.attacks[1:]
+	}
+	p.mutex.Unlock()
+
+	// JSON Lines 持久化（I/O 操作，在锁外执行）
+	rec := map[string]any{
+		"time":     attack.Timestamp.Format(time.RFC3339),
+		"id":       attack.ID,
+		"ip":       attack.ClientIP,
+		"ua":       attack.UserAgent,
+		"url":      attack.URL,
+		"method":   attack.Method,
+		"type":     attack.AttackType,
+		"severity": attack.Severity,
+		"blocked":  attack.Blocked,
+		"reason":   attack.Reason,
+	}
+
+	// 添加 GeoIP 信息到日志
+	if attack.Country != "" {
+		rec["country"] = attack.Country
+	}
+	if attack.CountryCode != "" {
+		rec["country_code"] = attack.CountryCode
+	}
+	if attack.ISP != "" {
+		rec["isp"] = attack.ISP
+	}
+	if b, err := json.Marshal(rec); err == nil {
+		if p.rotator != nil {
+			_, _ = p.rotator.Write(append(b, '\n'))
+		} else {
+			_ = os.MkdirAll("./data", 0755)
+			if f, err := os.OpenFile("./data/ddos_attacks.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+				_, _ = f.Write(append(b, '\n'))
+				_ = f.Close()
+			}
+		}
+	}
+
+	// 只对实际被阻止的攻击发送通知（可能在锁外进行网络请求）
+	if p.notificationIntegrator != nil && blocked {
+		attackInfo := &notification.AttackInfo{
+			ClientIP:  clientIP,
+			UserAgent: userAgent,
+			URL:       url,
+			Reason:    reason,
+			Severity:  severity,
+			Blocked:   blocked,
+		}
+		p.notificationIntegrator.SendDDoSAttackNotification(attackInfo)
+	}
+
+	// 如果被封禁，同时添加到统一封禁管理系统（可能涉及 I/O）
+	if blocked && p.securityManager != nil {
+		// 获取封禁时长（使用当前防护级别的封禁时长）
+		p.mutex.RLock()
+		threshold := p.thresholds[p.level]
+		p.mutex.RUnlock()
+		p.securityManager.BlockIP(clientIP, threshold.BlockDuration, fmt.Sprintf("DDoS攻击: %s", reason))
+	}
+
+	if blocked {
+		p.log.Warnf("DDoS攻击已阻止: %s from %s, 原因: %s", attackType, clientIP, reason)
+	} else {
+		p.log.Infof("检测到可疑活动: %s from %s, 原因: %s", attackType, clientIP, reason)
+	}
+}
+
+// recordAttack 记录攻击（保留用于向后兼容）
 func (p *Protector) recordAttack(clientIP, userAgent, url, method, attackType, severity, reason string, blocked bool) {
 	attack := Attack{
 		ID:         p.generateAttackID(),

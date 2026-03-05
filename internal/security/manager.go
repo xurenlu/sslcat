@@ -273,12 +273,8 @@ func (m *Manager) IsBlocked(ip string) bool {
 
 // LogAccess 记录访问日志
 func (m *Manager) LogAccess(ip, userAgent, path string, success bool) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	// 检查请求URL/路径是否在威胁情报库中
+	// 修复：先在锁外进行威胁情报检查（避免持锁执行复杂操作）
 	if m.threatIntelManager != nil && path != "" {
-		// 提取域名（如果是完整URL）
 		if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
 			// 检查完整URL
 			if isThreat, level, desc := m.CheckThreatIntel(path, threatintel.IOCTypeURL); isThreat && level >= threatintel.ThreatLevelHigh {
@@ -294,6 +290,9 @@ func (m *Manager) LogAccess(ip, userAgent, path string, success bool) {
 			}
 		}
 	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
 	// 检查User-Agent是否合法
 	if m.config.Security.EnableUAFilter && !m.isValidUserAgent(userAgent) {
@@ -561,20 +560,23 @@ func (m *Manager) BlockIP(ip string, duration time.Duration, reason string) {
 		return
 	}
 
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	now := time.Now()
 	expireTime := now.Add(duration)
-	
+
 	blocked := BlockedIP{
 		IP:         ip,
 		Reason:     reason,
 		BlockTime:  now,
 		ExpireTime: expireTime,
 	}
+
+	// 修复：快速更新内存，然后在锁外执行 I/O
+	m.mutex.Lock()
 	m.blockedIPs[ip] = blocked
-	m.saveBlockedIPs()
+	m.mutex.Unlock()
+
+	// 异步保存到文件（避免持锁执行 I/O）
+	go m.saveBlockedIPs()
 	m.log.Warnf("Manually blocked IP %s: %s (duration: %v)", ip, reason, duration)
 }
 
@@ -1140,13 +1142,17 @@ func (m *Manager) GetBlockedIPs() []BlockedIP {
 // UnblockIP 解除IP封禁
 func (m *Manager) UnblockIP(ip string) {
 	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	if _, exists := m.blockedIPs[ip]; exists {
+	_, exists := m.blockedIPs[ip]
+	if exists {
 		delete(m.blockedIPs, ip)
 		delete(m.attemptCounts, ip)
 		delete(m.lastAttempts, ip)
-		m.saveBlockedIPs()
+	}
+	m.mutex.Unlock()
+
+	if exists {
+		// 异步保存到文件（避免持锁执行 I/O）
+		go m.saveBlockedIPs()
 		m.log.Infof("Manually unblocked IP: %s", ip)
 	}
 }

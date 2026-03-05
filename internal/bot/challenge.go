@@ -255,22 +255,17 @@ func (cm *ChallengeManager) VerifyToken(token, clientIP, userAgent string) bool 
 
 // RefreshChallenge 刷新挑战
 func (cm *ChallengeManager) RefreshChallenge(challengeID, clientIP, domain string) *Challenge {
+	// 修复：先删除旧挑战，然后调用 GenerateChallenge（它会自己获取锁）
 	cm.mutex.Lock()
-	defer cm.mutex.Unlock()
-
-	// 删除旧挑战
 	if old, exists := cm.challenges[challengeID]; exists {
 		if old.ClientIP == clientIP {
 			delete(cm.challenges, challengeID)
 		}
 	}
-
-	// 生成新挑战
 	cm.mutex.Unlock()
-	newChallenge := cm.GenerateChallenge(clientIP, domain)
-	cm.mutex.Lock()
 
-	return newChallenge
+	// 生成新挑战（GenerateChallenge 会自己获取锁）
+	return cm.GenerateChallenge(clientIP, domain)
 }
 
 // GetChallenge 获取挑战
