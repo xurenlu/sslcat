@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 新增 `/api/performance/domains` 端点，返回域名列表（省内存：遍历时去重，不额外存储）
   - 域名从 Path 解析（格式 `host:pathPattern`），无需额外字段，兼容旧数据
 
+- **API 端点列压缩显示**：
+  - 表格中域名部分用 `***` 替代，节省空间，路径部分完整展示
+  - 悬停 tooltip 显示完整 URL（含域名）
+
 ## [1.4.10] - 2026-03-05
 
 ### ✨ 新功能
