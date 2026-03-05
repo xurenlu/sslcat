@@ -3,6 +3,13 @@ set -euo pipefail
 
 # SSLcat 安装脚本 / SSLcat Install Script
 # 用于从 release 包中安装 SSLcat / Install SSLcat from release package
+#
+# 静默升级模式 / Silent Upgrade Mode:
+#   ./install-sslcat.sh --silent-upgrade  或  -s
+#   安装二进制、重启服务，不覆盖配置文件，无交互
+#   Install binary, restart service, never overwrite config, no prompts
+
+SILENT_UPGRADE=false
 
 # =============================================================================
 # 语言检测与选择 / Locale Detection & Language Selection
@@ -156,6 +163,7 @@ init_messages() {
         MSG_macos_stop="停止服务: 按 Ctrl+C 或 kill 进程"
         MSG_macos_background="后台运行: nohup sslcat --config /usr/local/etc/sslcat/sslcat.conf &"
         MSG_start_install="开始安装 SSLcat..."
+        MSG_upgrade_done="SSLcat 已升级，服务已重启（配置已保留）"
     else
         MSG_need_root="This script requires root privileges"
         MSG_use_sudo="Please use: sudo $0"
@@ -251,6 +259,7 @@ init_messages() {
         MSG_macos_stop="Stop: Ctrl+C or kill process"
         MSG_macos_background="Background: nohup sslcat --config /usr/local/etc/sslcat/sslcat.conf &"
         MSG_start_install="Starting SSLcat installation..."
+        MSG_upgrade_done="SSLcat upgraded, service restarted (config preserved)"
     fi
 }
 
@@ -363,6 +372,14 @@ check_system() {
 # =============================================================================
 
 check_existing_installation() {
+    if [[ "$SILENT_UPGRADE" == "true" ]]; then
+        # 静默升级：直接停止服务并允许覆盖，无交互
+        if [[ "$OSTYPE" == "linux-gnu"* ]] && systemctl is-active --quiet sslcat 2>/dev/null; then
+            systemctl stop sslcat || true
+        fi
+        return 0
+    fi
+
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
         if systemctl is-active --quiet sslcat 2>/dev/null; then
             log_warning "$(msg service_running)"
@@ -530,6 +547,10 @@ install_git_hook() {
 # =============================================================================
 
 create_git_hook_config() {
+    if [[ "$SILENT_UPGRADE" == "true" ]]; then
+        return 0
+    fi
+
     log_info "$(msg creating_hook_config)"
     
     local admin_prefix="/sslcat-panel"
@@ -623,6 +644,11 @@ show_config_diff() {
 # =============================================================================
 
 install_config() {
+    if [[ "$SILENT_UPGRADE" == "true" ]]; then
+        # 静默升级：不覆盖配置文件
+        return 0
+    fi
+
     log_info "$(msg installing_config)"
     
     if [[ -f "./sslcat.conf" ]]; then
@@ -858,11 +884,15 @@ set_permissions() {
 
 start_service() {
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        log_info "$(msg starting_service)"
-        
-        systemctl start sslcat
-        sleep 2
-        
+        if [[ "$SILENT_UPGRADE" == "true" ]]; then
+            systemctl restart sslcat
+            sleep 2
+        else
+            log_info "$(msg starting_service)"
+            systemctl start sslcat
+            sleep 2
+        fi
+
         if systemctl is-active --quiet sslcat; then
             log_success "$(msg service_started)"
         else
@@ -872,8 +902,10 @@ start_service() {
             exit 1
         fi
     elif [[ "$OSTYPE" == "darwin"* ]]; then
-        log_info "$(msg macos_skip_start)"
-        log_info "$(msg manual_start_macos)"
+        if [[ "$SILENT_UPGRADE" != "true" ]]; then
+            log_info "$(msg macos_skip_start)"
+            log_info "$(msg manual_start_macos)"
+        fi
     fi
 }
 
@@ -948,10 +980,24 @@ show_installation_info() {
 # =============================================================================
 
 main() {
-    # 1. 语言选择（在 check_root 之前，因为非 root 时也要能显示语言选择）
-    select_language
+    # 解析静默升级参数
+    for arg in "$@"; do
+        case "$arg" in
+            --silent-upgrade|-s)
+                SILENT_UPGRADE=true
+                break
+                ;;
+        esac
+    done
+
+    # 1. 语言选择（静默模式跳过，使用检测语言）
+    if [[ "$SILENT_UPGRADE" != "true" ]]; then
+        select_language
+    else
+        INSTALL_LANG=$(detect_locale)
+    fi
     init_messages "$INSTALL_LANG"
-    
+
     # 2. 检查 root（必须在安装步骤前）
     check_root
     check_system
@@ -964,9 +1010,13 @@ main() {
     install_systemd_service
     set_permissions
     start_service
-    show_installation_info
-    
-    log_success "$(msg install_complete)"
+
+    if [[ "$SILENT_UPGRADE" != "true" ]]; then
+        show_installation_info
+        log_success "$(msg install_complete)"
+    else
+        log_success "$(msg upgrade_done)"
+    fi
 }
 
 main "$@"
