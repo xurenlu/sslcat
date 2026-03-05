@@ -27,7 +27,11 @@ type ResponseAnalyzer struct {
 	learnedPatterns map[string][]ResponsePattern
 	// 模式学习数据（API路径 -> 字段统计）
 	patternLearning map[string]*patternStats
-	mutex           sync.RWMutex
+	// 失败检测器（error 字段、短响应、Isolation Forest）
+	failureDetector *FailureDetector
+	// 值分布学习器：学习 code/status 等字段的成功/失败值（替代写死的 SuccessValues）
+	valueLearner *ValueLearner
+	mutex        sync.RWMutex
 }
 
 // patternStats 模式统计数据
@@ -43,6 +47,8 @@ func NewResponseAnalyzer() *ResponseAnalyzer {
 		patterns:        make(map[string][]ResponsePattern),
 		learnedPatterns: make(map[string][]ResponsePattern),
 		patternLearning: make(map[string]*patternStats),
+		failureDetector: NewFailureDetector(),
+		valueLearner:    NewValueLearner(),
 	}
 
 	// 初始化内置常见模式
@@ -62,12 +68,12 @@ func (ra *ResponseAnalyzer) initBuiltinPatterns() {
 		},
 	}
 
-	// 模式2: {"code": 0} 或 {"code": 200}
+	// 模式2: {"code": 0/200/2000} 等（很多 API 用 200 表示成功，非 HTTP 状态码）
 	ra.patterns["code_int"] = []ResponsePattern{
 		{
-			FieldPath:    "code",
-			SuccessValues: []interface{}{0, 200, "0", "200"},
-			Enabled:      true,
+			FieldPath:     "code",
+			SuccessValues: []interface{}{0, 200, 2000, 1000, 10000, "0", "200", "2000"},
+			Enabled:       true,
 		},
 	}
 
@@ -80,12 +86,21 @@ func (ra *ResponseAnalyzer) initBuiltinPatterns() {
 		},
 	}
 
-	// 模式4: {"error": null/""} 或 {"error": false}
+	// 模式4: {"error": null/""} 或 {"error": false}（非空/true 表示失败）
 	ra.patterns["error_field"] = []ResponsePattern{
 		{
-			FieldPath:    "error",
+			FieldPath:     "error",
 			SuccessValues: []interface{}{nil, "", false, "null", "false"},
-			Enabled:      true,
+			Enabled:       true,
+		},
+	}
+
+	// 模式4b: {"errmsg": ""} 或 {"message": "ok"}（微信/常见风格）
+	ra.patterns["errmsg_field"] = []ResponsePattern{
+		{
+			FieldPath:     "errmsg",
+			SuccessValues: []interface{}{"", "ok", "success"},
+			Enabled:       true,
 		},
 	}
 
@@ -127,16 +142,21 @@ func (ra *ResponseAnalyzer) initBuiltinPatterns() {
 }
 
 // AnalyzeResponse 分析响应，提取业务状态码
-func (ra *ResponseAnalyzer) AnalyzeResponse(resp *http.Response, body []byte, apiPath string) (*BusinessStatus, error) {
+// host 为空时仅按 path 学习；否则按 host:pathPattern 学习，使不同域名的同 path 分开
+func (ra *ResponseAnalyzer) AnalyzeResponse(resp *http.Response, body []byte, host, path string) (*BusinessStatus, error) {
 	if len(body) == 0 {
 		return nil, nil
 	}
+
+	// 二次学习：host + 归一化 path 为 pattern
+	// log.17push.com + /api/v1/ingest -> log.17push.com:/api/v1/*
+	pathPattern := BuildAPIPatternKey(host, path)
 
 	// 检查是否是JSON响应
 	contentType := resp.Header.Get("Content-Type")
 	if !strings.Contains(contentType, "application/json") {
 		// 非JSON响应，尝试学习
-		ra.learnFromResponse(apiPath, body, false)
+		ra.learnFromResponse(pathPattern, body, false)
 		return nil, nil
 	}
 
@@ -147,10 +167,15 @@ func (ra *ResponseAnalyzer) AnalyzeResponse(resp *http.Response, body []byte, ap
 		return nil, err
 	}
 
-	// 优先使用学习到的模式
+	// 优先使用学习到的模式（按 pattern 查找）
 	ra.mutex.RLock()
-	learnedPatterns, hasLearned := ra.learnedPatterns[apiPath]
+	learnedPatterns, hasLearned := ra.learnedPatterns[pathPattern]
 	ra.mutex.RUnlock()
+
+	statusCode := 200
+	if resp != nil {
+		statusCode = resp.StatusCode
+	}
 
 	if hasLearned && len(learnedPatterns) > 0 {
 		// 使用学习到的模式
@@ -158,7 +183,7 @@ func (ra *ResponseAnalyzer) AnalyzeResponse(resp *http.Response, body []byte, ap
 			if !pattern.Enabled {
 				continue
 			}
-			if status := ra.tryPattern(data, pattern); status != nil {
+			if status := ra.tryPattern(data, pattern, pathPattern, statusCode); status != nil {
 				return status, nil
 			}
 		}
@@ -170,34 +195,56 @@ func (ra *ResponseAnalyzer) AnalyzeResponse(resp *http.Response, body []byte, ap
 			if !pattern.Enabled {
 				continue
 			}
-			if status := ra.tryPattern(data, pattern); status != nil {
-				// 学习成功模式
-				ra.learnPattern(apiPath, pattern)
+			if status := ra.tryPattern(data, pattern, pathPattern, statusCode); status != nil {
+				// 学习成功模式（按 pattern 存储）
+				ra.learnPattern(pathPattern, pattern)
 				return status, nil
 			}
 		}
 	}
 
 	// 没有匹配的模式，尝试学习新模式
-	ra.learnFromResponse(apiPath, body, true)
+	ra.learnFromResponse(pathPattern, body, true)
+
+	// Fallback: 失败检测器（error 字段、短响应启发式、Isolation Forest）
+	if ra.failureDetector != nil {
+		if status := ra.failureDetector.DetectFailure(resp, body, pathPattern); status != nil {
+			return status, nil
+		}
+	}
 
 	return nil, nil
 }
 
 // tryPattern 尝试使用指定模式解析
-func (ra *ResponseAnalyzer) tryPattern(data interface{}, pattern ResponsePattern) *BusinessStatus {
+func (ra *ResponseAnalyzer) tryPattern(data interface{}, pattern ResponsePattern, apiPath string, statusCode int) *BusinessStatus {
 	value := ra.extractFieldValue(data, pattern.FieldPath)
 	if value == nil {
 		return nil
 	}
 
+	valueStr := ra.stringify(value)
+
+	// 记录样本供 ValueLearner 学习（基于 HTTP 2xx vs 4xx/5xx 分布）
+	if ra.valueLearner != nil {
+		ra.valueLearner.Record(apiPath, pattern.FieldPath, valueStr, statusCode)
+	}
+
+	// 优先使用学习到的成功值，否则用内置 SuccessValues
+	successValues := pattern.SuccessValues
+	if ra.valueLearner != nil {
+		if learned := ra.valueLearner.GetLearnedSuccessValues(apiPath, pattern.FieldPath); len(learned) > 0 {
+			successValues = learned
+		}
+	}
+
 	// 检查值是否在成功列表中
-	for _, successVal := range pattern.SuccessValues {
+	for _, successVal := range successValues {
 		if ra.compareValues(value, successVal) {
 			return &BusinessStatus{
 				IsSuccess: true,
 				Code:      ra.convertToInt(value),
-				Message:   ra.stringify(value),
+				Message:   valueStr,
 				Source:    pattern.FieldPath,
 			}
 		}
@@ -207,7 +254,7 @@ func (ra *ResponseAnalyzer) tryPattern(data interface{}, pattern ResponsePattern
 	return &BusinessStatus{
 		IsSuccess: false,
 		Code:      ra.convertToInt(value),
-		Message:   ra.stringify(value),
+		Message:   valueStr,
 		Source:    pattern.FieldPath,
 	}
 }
@@ -547,4 +594,13 @@ func IsAPIRequest(r *http.Request) bool {
 	}
 
 	return false
+}
+
+// IsJSONResponse 判断响应是否为 JSON 类型（用于自动识别代理转发的 API）
+func IsJSONResponse(resp *http.Response) bool {
+	if resp == nil || resp.Header == nil {
+		return false
+	}
+	ct := resp.Header.Get("Content-Type")
+	return strings.Contains(ct, "application/json")
 }

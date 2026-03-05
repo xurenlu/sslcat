@@ -61,6 +61,10 @@ interface APIPerformanceStats {
   total_requests: number
   success_requests: number
   error_requests: number
+  business_success_requests?: number
+  business_error_requests?: number
+  business_status_source?: string
+  business_status_codes?: { [key: string]: number }
   avg_response_time: number
   min_response_time: number
   max_response_time: number
@@ -78,6 +82,8 @@ interface PerformanceSummary {
   total_requests: number
   avg_response_time: number
   error_rate: number
+  business_success_rate?: number
+  business_requests?: number
   slow_apis_count: number
   fast_apis_count: number
   generated: string
@@ -94,7 +100,7 @@ const APIPerformance: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false)
 
   // 筛选和排序
-  const [sortBy, setSortBy] = useState<'slow' | 'error' | 'active'>('slow')
+  const [sortBy, setSortBy] = useState<'slow' | 'error' | 'business_error' | 'active'>('slow')
   const [methodFilter, setMethodFilter] = useState<string>('')
   const [pathFilter, setPathFilter] = useState('')
   const [limit, setLimit] = useState(50)
@@ -201,6 +207,18 @@ const APIPerformance: React.FC = () => {
     return (api.error_requests / api.total_requests * 100).toFixed(2)
   }
 
+  // 业务成功率（JSON 内 code/status 等字段判定，非 HTTP 状态码）
+  const calculateBusinessSuccessRate = (api: APIPerformanceStats) => {
+    const ok = api.business_success_requests ?? 0
+    const err = api.business_error_requests ?? 0
+    const total = ok + err
+    if (total === 0) return null
+    return ((ok / total) * 100).toFixed(2)
+  }
+
+  const hasBusinessStats = (api: APIPerformanceStats) =>
+    (api.business_success_requests ?? 0) + (api.business_error_requests ?? 0) > 0
+
   if (loading) {
     return (
       <Box p={6} display="flex" justifyContent="center" alignItems="center" minH="400px">
@@ -267,7 +285,7 @@ const APIPerformance: React.FC = () => {
                 <Stat>
                   <StatLabel display="flex" alignItems="center">
                     <Icon as={FiAlertCircle} mr={2} color="orange.500" />
-                    错误率
+                    HTTP 错误率
                   </StatLabel>
                   <StatNumber>{summary.error_rate.toFixed(2)}%</StatNumber>
                   <StatHelpText>
@@ -276,6 +294,35 @@ const APIPerformance: React.FC = () => {
                 </Stat>
               </CardBody>
             </Card>
+
+            {(summary.business_requests ?? 0) > 0 && (
+              <Card bg={bgColor} borderColor={borderColor} borderWidth="1px">
+                <CardBody>
+                  <Stat>
+                    <Tooltip label="JSON 内 code/status 等业务字段判定的成功率">
+                      <StatLabel display="flex" alignItems="center" cursor="help">
+                        <Icon as={FiCheckCircle} mr={2} color="teal.500" />
+                        业务成功率
+                      </StatLabel>
+                    </Tooltip>
+                    <StatNumber
+                      color={
+                        (summary.business_success_rate ?? 0) >= 99
+                          ? 'green.500'
+                          : (summary.business_success_rate ?? 0) >= 95
+                            ? 'yellow.500'
+                            : 'red.500'
+                      }
+                    >
+                      {(summary.business_success_rate ?? 0).toFixed(2)}%
+                    </StatNumber>
+                    <StatHelpText>
+                      {summary.business_requests?.toLocaleString()} 条业务判定
+                    </StatHelpText>
+                  </Stat>
+                </CardBody>
+              </Card>
+            )}
 
             <Card bg={bgColor} borderColor={borderColor} borderWidth="1px">
               <CardBody>
@@ -308,7 +355,8 @@ const APIPerformance: React.FC = () => {
                     onChange={(e) => setSortBy(e.target.value as any)}
                   >
                     <option value="slow">最慢的 API</option>
-                    <option value="error">错误率最高</option>
+                    <option value="error">HTTP 错误率最高</option>
+                    <option value="business_error">业务失败率最高</option>
                     <option value="active">请求量最大</option>
                   </Select>
                 </Box>
@@ -392,7 +440,16 @@ const APIPerformance: React.FC = () => {
                         <Th>平均响应</Th>
                         <Th>P95</Th>
                         <Th>P99</Th>
-                        <Th>错误率</Th>
+                        <Th>
+                          <Tooltip label="HTTP 4xx/5xx 占比">
+                            <Text as="span" cursor="help">HTTP 错误率</Text>
+                          </Tooltip>
+                        </Th>
+                        <Th>
+                          <Tooltip label="JSON 内 code/status 等业务字段判定的成功率">
+                            <Text as="span" cursor="help">业务成功率</Text>
+                          </Tooltip>
+                        </Th>
                         <Th>性能评级</Th>
                       </Tr>
                     </Thead>
@@ -454,11 +511,31 @@ const APIPerformance: React.FC = () => {
                                 {calculateErrorRate(api)}%
                               </Text>
                               {api.error_requests > 0 && (
-                                <Tooltip label={`${api.error_requests} 个错误请求`}>
+                                <Tooltip label={`${api.error_requests} 个 HTTP 错误`}>
                                   <Icon as={FiAlertCircle} color="orange.500" />
                                 </Tooltip>
                               )}
                             </HStack>
+                          </Td>
+                          <Td>
+                            {hasBusinessStats(api) ? (
+                              <Tooltip label={`来源: ${api.business_status_source || 'code/status'}`}>
+                                <Text
+                                  fontWeight="bold"
+                                  color={
+                                    parseFloat(calculateBusinessSuccessRate(api)!) >= 99
+                                      ? 'green.500'
+                                      : parseFloat(calculateBusinessSuccessRate(api)!) >= 95
+                                        ? 'yellow.500'
+                                        : 'red.500'
+                                  }
+                                >
+                                  {calculateBusinessSuccessRate(api)}%
+                                </Text>
+                              </Tooltip>
+                            ) : (
+                              <Text fontSize="sm" color="gray.500">—</Text>
+                            )}
                           </Td>
                           <Td>
                             <Badge

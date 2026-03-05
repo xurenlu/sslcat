@@ -1,6 +1,7 @@
 package web
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -509,8 +510,8 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 
 	// 设置 API 性能追踪回调到代理管理器
 	server.proxyManager.SetAPIPerformanceTracker(func(r *http.Request, resp *http.Response, responseTime time.Duration, backendAddress string) {
-		// 只追踪 API 请求
-		if !statistics.IsAPIRequest(r) {
+		// 追踪 API：请求特征符合 或 响应为 JSON（自动学习识别代理转发的 API）
+		if !statistics.IsAPIRequest(r) && !statistics.IsJSONResponse(resp) {
 			return
 		}
 
@@ -520,16 +521,17 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 			return
 		}
 
-		// 分析响应以提取业务状态
+		// 分析响应以提取业务状态（按 host+path 学习，不同域名分开）
 		var businessStatus *statistics.BusinessStatus
 		if server.responseAnalyzer != nil && len(body) > 0 {
-			businessStatus, _ = server.responseAnalyzer.AnalyzeResponse(resp, body, r.URL.Path)
+			businessStatus, _ = server.responseAnalyzer.AnalyzeResponse(resp, body, r.Host, r.URL.Path)
 		}
 
-		// 记录 API 性能数据
+		// 记录 API 性能数据（Path 用 host:pathPattern 便于按域名分组展示）
 		if server.apiPerformanceCollector != nil && server.apiPerformanceCollector.IsEnabled() {
+			apiPath := statistics.BuildAPIPatternKey(r.Host, r.URL.Path)
 			entry := statistics.APIPerformanceEntry{
-				Path:           r.URL.Path,
+				Path:           apiPath,
 				Method:         r.Method,
 				Status:         resp.StatusCode,
 				ResponseTime:   responseTime,
@@ -1706,8 +1708,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if s.apiPerformanceCollector != nil && s.apiPerformanceCollector.IsEnabled() {
 			// 只记录 /api/ 开头的请求
 			if strings.HasPrefix(r.URL.Path, s.config.AdminPrefix+"/api/") {
+				apiPath := statistics.BuildAPIPatternKey(r.Host, r.URL.Path)
 				entry := statistics.APIPerformanceEntry{
-					Path:         r.URL.Path,
+					Path:         apiPath,
 					Method:       r.Method,
 					Status:       wrappedWriter.statusCode,
 					ResponseTime: duration,
@@ -2192,6 +2195,11 @@ func (s *Server) proxyMiddleware(w http.ResponseWriter, r *http.Request) bool {
 		} else {
 			s.log.Debugf("Request path %s matches prefix for domain %s", r.URL.Path, host)
 
+			// 代理请求也需要纳入访问统计（此前仅 mux 请求被记录，导致代理流量统计缺失）
+			if s.statisticsCollector != nil {
+				w = newProxyRecordingWriter(w, r, s.statisticsCollector)
+			}
+
 			// 若仅允许HTTPS且当前为HTTP，需要检查是否有有效证书
 			if rule.SSLOnly && r.TLS == nil {
 				// 检查是否为本地IP或localhost，这些不需要强制HTTPS
@@ -2247,6 +2255,58 @@ func (s *Server) proxyMiddleware(w http.ResponseWriter, r *http.Request) bool {
 		w.Write([]byte("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>502 Bad Gateway</title></head><body><h1>502 Bad Gateway</h1><p><small>Powered by <a href=\"https://sslcat.com\">sslcat</a>-" + s.version + "</small></p></body></html>"))
 	}
 	return true
+}
+
+// proxyRecordingWriter 包装 ResponseWriter，在代理响应时记录访问统计
+type proxyRecordingWriter struct {
+	http.ResponseWriter
+	req      *http.Request
+	collector *statistics.Collector
+	recorded bool
+	statusCode int
+}
+
+func newProxyRecordingWriter(w http.ResponseWriter, r *http.Request, c *statistics.Collector) *proxyRecordingWriter {
+	return &proxyRecordingWriter{
+		ResponseWriter: w,
+		req:           r,
+		collector:     c,
+		statusCode:    200,
+	}
+}
+
+func (p *proxyRecordingWriter) WriteHeader(code int) {
+	p.statusCode = code
+	if !p.recorded {
+		p.recorded = true
+		p.collector.RecordAccessFromHTTP(p.req, code)
+	}
+	p.ResponseWriter.WriteHeader(code)
+}
+
+func (p *proxyRecordingWriter) Write(b []byte) (int, error) {
+	if !p.recorded {
+		p.recorded = true
+		p.collector.RecordAccessFromHTTP(p.req, p.statusCode)
+	}
+	return p.ResponseWriter.Write(b)
+}
+
+func (p *proxyRecordingWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if !p.recorded {
+		p.recorded = true
+		p.collector.RecordAccessFromHTTP(p.req, 101) // WebSocket/升级场景通常无 WriteHeader
+	}
+	if h, ok := p.ResponseWriter.(http.Hijacker); ok {
+		return h.Hijack()
+	}
+	return nil, nil, fmt.Errorf("responseWriter does not implement http.Hijacker")
+}
+
+func (p *proxyRecordingWriter) Flush() {
+	if f, ok := p.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
 }
 
 // 工具函数

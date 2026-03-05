@@ -66,6 +66,49 @@ func TestIsAPIRequest(t *testing.T) {
 	}
 }
 
+// TestIsJSONResponse 测试 JSON 响应识别（用于自动识别代理转发的 API）
+func TestIsJSONResponse(t *testing.T) {
+	tests := []struct {
+		name     string
+		response *http.Response
+		want     bool
+	}{
+		{
+			name: "application/json",
+			response: &http.Response{
+				Header: http.Header{"Content-Type": []string{"application/json"}},
+			},
+			want: true,
+		},
+		{
+			name: "application/json with charset",
+			response: &http.Response{
+				Header: http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			},
+			want: true,
+		},
+		{
+			name: "text/html",
+			response: &http.Response{
+				Header: http.Header{"Content-Type": []string{"text/html"}},
+			},
+			want: false,
+		},
+		{
+			name:     "nil response",
+			response: nil,
+			want:     false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsJSONResponse(tt.response); got != tt.want {
+				t.Errorf("IsJSONResponse() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 // TestResponseAnalyzer_AnalyzeResponse 测试响应分析器
 func TestResponseAnalyzer_AnalyzeResponse(t *testing.T) {
 	analyzer := NewResponseAnalyzer()
@@ -111,7 +154,7 @@ func TestResponseAnalyzer_AnalyzeResponse(t *testing.T) {
 		},
 		{
 			name: "Errcode field success (errcode=0)",
-			body: `{"errcode": 0, "errmsg": "success"}`,
+			body: `{"errcode": 0}`,
 			apiPath: "/api/test",
 			wantStatus: &BusinessStatus{
 				IsSuccess: true,
@@ -159,6 +202,39 @@ func TestResponseAnalyzer_AnalyzeResponse(t *testing.T) {
 			apiPath: "/api/test",
 			wantStatus: nil,
 		},
+		{
+			name: "Code 200 as success",
+			body: `{"code": 200, "data": {}}`,
+			apiPath: "/api/test",
+			wantStatus: &BusinessStatus{
+				IsSuccess: true,
+				Code:      200,
+				Message:   "200",
+				Source:    "code",
+			},
+		},
+		{
+			name: "Error field non-empty (failure)",
+			body: `{"error": "invalid token"}`,
+			apiPath: "/api/test",
+			wantStatus: &BusinessStatus{
+				IsSuccess: false,
+				Code:      0,
+				Message:   "invalid token",
+				Source:    "error",
+			},
+		},
+		{
+			name: "Success false (failure)",
+			body: `{"success": false, "message": "failed"}`,
+			apiPath: "/api/test",
+			wantStatus: &BusinessStatus{
+				IsSuccess: false,
+				Code:      0,
+				Message:   "false",
+				Source:    "success",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -175,8 +251,8 @@ func TestResponseAnalyzer_AnalyzeResponse(t *testing.T) {
 				resp.Header.Set("Content-Type", "application/json")
 			}
 
-			// 分析响应
-			gotStatus, err := analyzer.AnalyzeResponse(resp, body, tt.apiPath)
+			// 分析响应（host 为空时仅按 path 学习）
+			gotStatus, err := analyzer.AnalyzeResponse(resp, body, "", tt.apiPath)
 
 			// 检查错误
 			if err != nil && tt.wantStatus != nil {
@@ -223,7 +299,7 @@ func TestResponseAnalyzer_LearnPattern(t *testing.T) {
 			StatusCode: 200,
 			Header:     http.Header{"Content-Type": []string{"application/json"}},
 		}
-		analyzer.AnalyzeResponse(resp, body, apiPath)
+		analyzer.AnalyzeResponse(resp, body, "", apiPath)
 	}
 
 	// 检查是否学习到了模式

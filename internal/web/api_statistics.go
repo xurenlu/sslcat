@@ -36,6 +36,8 @@ func (s *Server) handleAPIPerformanceList(w http.ResponseWriter, r *http.Request
 	switch sortBy {
 	case "error":
 		stats = s.apiPerformanceCollector.GetTopErrorAPIs(limit)
+	case "business_error":
+		stats = s.apiPerformanceCollector.GetTopBusinessErrorAPIs(limit)
 	case "active":
 		stats = s.apiPerformanceCollector.GetMostActiveAPIs(limit)
 	default: // "slow" or empty
@@ -123,6 +125,8 @@ func (s *Server) handleAPIPerformanceSummary(w http.ResponseWriter, r *http.Requ
 	var totalRequests int64
 	var totalResponseTime float64
 	var totalErrors int64
+	var businessSuccess int64
+	var businessErrors int64
 	var slowAPIs int
 	var fastAPIs int
 
@@ -130,6 +134,8 @@ func (s *Server) handleAPIPerformanceSummary(w http.ResponseWriter, r *http.Requ
 		totalRequests += stat.TotalRequests
 		totalResponseTime += stat.AvgResponseTime * float64(stat.TotalRequests)
 		totalErrors += stat.ErrorRequests
+		businessSuccess += stat.BusinessSuccessRequests
+		businessErrors += stat.BusinessErrorRequests
 
 		// 定义慢API: >500ms
 		if stat.AvgResponseTime > 500 {
@@ -151,14 +157,21 @@ func (s *Server) handleAPIPerformanceSummary(w http.ResponseWriter, r *http.Requ
 		errorRate = float64(totalErrors) / float64(totalRequests) * 100
 	}
 
+	businessSuccessRate := 0.0
+	if businessSuccess+businessErrors > 0 {
+		businessSuccessRate = float64(businessSuccess) / float64(businessSuccess+businessErrors) * 100
+	}
+
 	response := map[string]interface{}{
-		"total_apis":        len(stats),
-		"total_requests":    totalRequests,
-		"avg_response_time": avgResponseTime,
-		"error_rate":        errorRate,
-		"slow_apis_count":   slowAPIs,
-		"fast_apis_count":   fastAPIs,
-		"generated":         time.Now(),
+		"total_apis":           len(stats),
+		"total_requests":       totalRequests,
+		"avg_response_time":   avgResponseTime,
+		"error_rate":          errorRate,
+		"business_success_rate": businessSuccessRate,
+		"business_requests":   businessSuccess + businessErrors,
+		"slow_apis_count":     slowAPIs,
+		"fast_apis_count":     fastAPIs,
+		"generated":           time.Now(),
 	}
 
 	s.sendJSON(w, response)

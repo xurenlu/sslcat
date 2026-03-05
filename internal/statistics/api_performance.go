@@ -371,6 +371,34 @@ func (apc *APIPerformanceCollector) GetTopErrorAPIs(n int) []*APIPerformanceStat
 	return result
 }
 
+// GetTopBusinessErrorAPIs 获取业务失败率最高的 API 列表（JSON 内 code/status 判定）
+func (apc *APIPerformanceCollector) GetTopBusinessErrorAPIs(n int) []*APIPerformanceStats {
+	apc.mu.RLock()
+	defer apc.mu.RUnlock()
+
+	type bizRate struct {
+		stats   *APIPerformanceStats
+		errRate float64
+	}
+	rates := make([]bizRate, 0, len(apc.performanceStats))
+	for _, s := range apc.performanceStats {
+		total := s.BusinessSuccessRequests + s.BusinessErrorRequests
+		if total == 0 {
+			continue
+		}
+		rates = append(rates, bizRate{
+			stats:   s,
+			errRate: float64(s.BusinessErrorRequests) / float64(total),
+		})
+	}
+	sort.Slice(rates, func(i, j int) bool { return rates[i].errRate > rates[j].errRate })
+	result := make([]*APIPerformanceStats, 0, n)
+	for i := 0; i < len(rates) && (n <= 0 || i < n); i++ {
+		result = append(result, rates[i].stats)
+	}
+	return result
+}
+
 // GetMostActiveAPIs 获取请求量最多的 API 列表
 func (apc *APIPerformanceCollector) GetMostActiveAPIs(n int) []*APIPerformanceStats {
 	apc.mu.RLock()

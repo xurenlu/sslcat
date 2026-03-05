@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.9] - 2026-03-05
+
+### ✨ 新功能
+
+- **二次学习：URL pattern → 响应内容**：
+  - 第一层：将具体 path 归一化为 pattern（数字/UUID/长 hex 等替换为 `*`）
+  - 第二层：按 pattern 学习响应内容（code、status、ValueLearner、FailureDetector）
+  - 例：`/api/users/123`、`/api/users/456` → `/api/users/*`，共享学习结果，新 path `/api/users/999` 直接受益
+  - **域名参与学习**：按 `host:pathPattern` 作为 key（如 `log.17push.com:/api/v1/*`），不同域名的同 path 分开学习，避免跨域干扰
+
+- **ValueLearner：code/status 成功失败值学习**：
+  - 不再写死 SuccessValues，改为基于分布学习
+  - 策略1：HTTP 有 2xx/4xx/5xx 混合时，2xx 占比 ≥60% 的值判为成功
+  - 策略2：全 2xx 时用多数派，出现最多的值 = 成功
+  - 支持「反直觉」API（如 code=1 成功、code=0 失败）和自定义码（如 code=999）
+
+- **非 RESTful API 失败率智能检测**：
+  - 支持通过 JSON 内 `error`、`success`、`code` 等字段判断业务成功/失败，不依赖 HTTP 状态码
+  - 扩展 `code` 成功值：支持 200、2000、1000、10000 等常见业务成功码
+  - 新增 `errmsg` 等字段模式
+  - **FailureDetector**：当模式无法匹配时，使用三层 fallback：
+    1. **error 类字段检测**：`error`、`errmsg`、`message` 等非空即判失败
+    2. **短响应启发式**：per-path 响应长度画像，低于 p15 且含 error 结构 → 失败（失败响应通常更短）
+    3. **Isolation Forest 异常检测**：基于 [body_length, status_code, has_error, error_len, has_success_false, num_keys, depth] 特征，无监督识别异常
+
+## [1.4.8-rc1] - 2026-03-05
+
+### 🐛 Bug 修复
+
+- **修复代理请求未被访问统计记录的问题**：
+  - 此前仅 mux 路由（管理面板、API 等）会进入 RecordMiddleware，代理转发的请求在 proxyMiddleware 中直接 return，导致代理流量（如 log.17push.com）完全未被统计
+  - 现在代理请求也会通过 proxyRecordingWriter 记录到访问统计，业务侧日志量与 sslcat 访问统计将一致
+
+## [1.4.8] - 2026-03-05
+
+### ✨ 新功能
+
+- **API 性能自动识别 JSON 响应**：
+  - 代理转发的请求，若响应 `Content-Type` 为 `application/json`，自动视为 API 并纳入性能统计
+  - 不再仅依赖请求特征（路径、Accept 等），可自动学习识别后端返回 JSON 的接口
+
 ## [1.4.7] - 2026-03-04
 
 ### ✨ 新功能
