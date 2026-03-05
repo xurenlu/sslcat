@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.10] - 2026-03-05
+
+### ✨ 新功能
+
+- **install-sslcat.sh 多语言支持**：
+  - 启动时先让用户选择语言 [1] 中文 / [2] English
+  - 默认根据终端 LANG/LC_ALL/LC_MESSAGES 自动判断（zh* → 中文，其他 → English）
+  - 5 秒无输入则使用自动检测的语言
+
 ## [1.4.9] - 2026-03-05
 
 ### ✨ 新功能
