@@ -238,6 +238,15 @@ const APIPerformance: React.FC = () => {
   const hasBusinessStats = (api: APIPerformanceStats) =>
     (api.business_success_requests ?? 0) + (api.business_error_requests ?? 0) > 0
 
+  // 压缩域名显示：domain:path -> ***:path，节省空间，完整 URL 放 tooltip
+  const compressPathDisplay = (path: string) => {
+    const idx = path.indexOf(':')
+    if (idx > 0 && !path.slice(0, idx).includes('/')) {
+      return '***' + path.slice(idx)
+    }
+    return path
+  }
+
   if (loading) {
     return (
       <Box p={6} display="flex" justifyContent="center" alignItems="center" minH="400px">
@@ -498,9 +507,11 @@ const APIPerformance: React.FC = () => {
                                 <Badge colorScheme={getMethodColor(api.method)}>
                                   {api.method}
                                 </Badge>
-                                <Text fontSize="sm" fontFamily="mono" noOfLines={1} maxW="400px">
-                                  {api.path}
-                                </Text>
+                                <Tooltip label={api.path} placement="top" hasArrow>
+                                  <Text fontSize="sm" fontFamily="mono" noOfLines={1} maxW="400px" cursor="help">
+                                    {compressPathDisplay(api.path)}
+                                  </Text>
+                                </Tooltip>
                               </HStack>
                               <Text fontSize="xs" color="gray.500">
                                 首次: {new Date(api.first_seen).toLocaleString('zh-CN')}
