@@ -24,6 +24,7 @@ import (
 	"github.com/xurenlu/sslcat/internal/bot"
 	"github.com/xurenlu/sslcat/internal/cache"
 	"github.com/xurenlu/sslcat/internal/compression"
+	"github.com/xurenlu/sslcat/internal/httputil"
 	"github.com/xurenlu/sslcat/internal/config"
 	"github.com/xurenlu/sslcat/internal/ddos"
 	"github.com/xurenlu/sslcat/internal/i18n"
@@ -1104,7 +1105,8 @@ func (s *Server) applyConfigInPlace(newCfg *config.Config) {
 
 // setupRoutes 设置路由
 func (s *Server) setupRoutes() {
-	// 性能分析路由 (pprof) - 用于调试性能问题，仅允许本地访问
+	// 性能分析路由 (pprof) - 必须在最前面，避免被前端 SPA 路由拦截
+	// 用于调试性能问题，仅允许本地访问
 	if s.config.Server.EnablePprof {
 		s.mux.HandleFunc("/debug/pprof/", func(w http.ResponseWriter, r *http.Request) {
 			// 安全检查：只允许本地访问
@@ -1115,7 +1117,79 @@ func (s *Server) setupRoutes() {
 			}
 			http.DefaultServeMux.ServeHTTP(w, r)
 		})
-		s.log.Info("pprof 性能分析端点已启用: /debug/pprof/")
+		s.mux.HandleFunc("/debug/pprof/cmdline", func(w http.ResponseWriter, r *http.Request) {
+			clientIP := s.getClientIP(r)
+			if !s.isPrivateIP(clientIP) && clientIP != "127.0.0.1" && clientIP != "::1" {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			http.DefaultServeMux.ServeHTTP(w, r)
+		})
+		s.mux.HandleFunc("/debug/pprof/profile", func(w http.ResponseWriter, r *http.Request) {
+			clientIP := s.getClientIP(r)
+			if !s.isPrivateIP(clientIP) && clientIP != "127.0.0.1" && clientIP != "::1" {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			http.DefaultServeMux.ServeHTTP(w, r)
+		})
+		s.mux.HandleFunc("/debug/pprof/symbol", func(w http.ResponseWriter, r *http.Request) {
+			clientIP := s.getClientIP(r)
+			if !s.isPrivateIP(clientIP) && clientIP != "127.0.0.1" && clientIP != "::1" {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			http.DefaultServeMux.ServeHTTP(w, r)
+		})
+		s.mux.HandleFunc("/debug/pprof/heap", func(w http.ResponseWriter, r *http.Request) {
+			clientIP := s.getClientIP(r)
+			if !s.isPrivateIP(clientIP) && clientIP != "127.0.0.1" && clientIP != "::1" {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			http.DefaultServeMux.ServeHTTP(w, r)
+		})
+		s.mux.HandleFunc("/debug/pprof/goroutine", func(w http.ResponseWriter, r *http.Request) {
+			clientIP := s.getClientIP(r)
+			if !s.isPrivateIP(clientIP) && clientIP != "127.0.0.1" && clientIP != "::1" {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			http.DefaultServeMux.ServeHTTP(w, r)
+		})
+		s.mux.HandleFunc("/debug/pprof/allocs", func(w http.ResponseWriter, r *http.Request) {
+			clientIP := s.getClientIP(r)
+			if !s.isPrivateIP(clientIP) && clientIP != "127.0.0.1" && clientIP != "::1" {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			http.DefaultServeMux.ServeHTTP(w, r)
+		})
+		s.mux.HandleFunc("/debug/pprof/block", func(w http.ResponseWriter, r *http.Request) {
+			clientIP := s.getClientIP(r)
+			if !s.isPrivateIP(clientIP) && clientIP != "127.0.0.1" && clientIP != "::1" {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			http.DefaultServeMux.ServeHTTP(w, r)
+		})
+		s.mux.HandleFunc("/debug/pprof/threadcreate", func(w http.ResponseWriter, r *http.Request) {
+			clientIP := s.getClientIP(r)
+			if !s.isPrivateIP(clientIP) && clientIP != "127.0.0.1" && clientIP != "::1" {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			http.DefaultServeMux.ServeHTTP(w, r)
+		})
+		s.mux.HandleFunc("/debug/pprof/mutex", func(w http.ResponseWriter, r *http.Request) {
+			clientIP := s.getClientIP(r)
+			if !s.isPrivateIP(clientIP) && clientIP != "127.0.0.1" && clientIP != "::1" {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			http.DefaultServeMux.ServeHTTP(w, r)
+		})
+		s.log.Info("pprof 性能分析端点已启用: /debug/pprof/*")
 	}
 
 	// 根路径重定向
@@ -2689,17 +2763,8 @@ func (s *Server) refreshLEPreferredHost() {
 }
 
 func (s *Server) fetchPublicIPv4() string {
-	// 使用更短的超时时间，避免阻塞
-	client := &http.Client{
-		Timeout: 2 * time.Second,
-		// 禁用 DNS 缓存，避免潜在的 CGO 问题
-		Transport: &http.Transport{
-			DialContext: (&net.Dialer{
-				Timeout:   1 * time.Second,
-				KeepAlive: 0,
-			}).DialContext,
-		},
-	}
+	// 使用共享的短生命周期客户端，避免连接泄漏
+	client := httputil.GetShortLivedClient(2 * time.Second)
 
 	req, err := http.NewRequest("GET", "https://ip4.dev/myip", nil)
 	if err != nil {

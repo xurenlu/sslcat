@@ -59,7 +59,8 @@
       "Bash(pgrep:*)",
       "Bash(unset:*)",
       "Bash(timeout:*)",
-      "Bash(# 添加所有修改文件\ngit add -A && git commit -m \"\"$(cat <<''EOF''\nfeat: 添加企业功能实验性警告和PDF报告生成\n\n- 为边缘计算、零信任安全、Service Mesh 添加实验性功能警告提示\n- 实现真正的 PDF 安全报告生成（使用 gofpdf 库）\n- 整合 Service Mesh 到集群设置页面，使用标签页切换\n- 添加 API 性能监控和响应分析器\n- 优化配置历史管理界面\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\"\")"
+      "Bash(# 添加所有修改文件\ngit add -A && git commit -m \"\"$(cat <<''EOF''\nfeat: 添加企业功能实验性警告和PDF报告生成\n\n- 为边缘计算、零信任安全、Service Mesh 添加实验性功能警告提示\n- 实现真正的 PDF 安全报告生成（使用 gofpdf 库）\n- 整合 Service Mesh 到集群设置页面，使用标签页切换\n- 添加 API 性能监控和响应分析器\n- 优化配置历史管理界面\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\"\")",
+      "Bash(make:*)"
     ],
     "deny": [],
     "ask": []
