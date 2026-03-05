@@ -504,6 +504,7 @@ func (ms *MetricsStorage) cleanupLoop() {
 }
 
 // GetMetrics 查询历史指标数据
+// 优化：对 5min/15min/daily 使用 SQL 层聚合，避免拉取全量 1min 数据再内存聚合，显著减少数据传输和耗时
 func (ms *MetricsStorage) GetMetrics(startTime, endTime time.Time, granularity string) (*MetricsQueryResult, error) {
 	if !ms.enabled {
 		return nil, fmt.Errorf("指标存储未启用")
@@ -524,34 +525,33 @@ func (ms *MetricsStorage) GetMetrics(startTime, endTime time.Time, granularity s
 		}
 	}
 
+	// 使用 SQL 层聚合：直接返回聚合结果，避免拉取 1 万+ 行再内存聚合
+	if granularity == "5min" || granularity == "15min" || granularity == "daily" {
+		return ms.getMetricsWithSQLAggregation(startTime, endTime, granularity)
+	}
+
+	// 1min、all：直接查询
 	var querySQL string
 	var rows *sql.Rows
 	var err error
 
-	// 对于需要聚合的粒度，先查询1分钟数据，然后在代码中聚合
-	needAggregation := granularity == "5min" || granularity == "15min" || granularity == "daily"
-	queryGranularity := "1min"
-	if granularity == "all" {
-		queryGranularity = ""
-	} else if !needAggregation {
-		queryGranularity = granularity
-	}
+	startStr := startTime.Format("2006-01-02 15:04:05")
+	endStr := endTime.Format("2006-01-02 15:04:05")
 
-	// 构建查询SQL
-	if queryGranularity == "" {
+	if granularity == "all" {
 		querySQL = `
 		SELECT id, timestamp, granularity, cpu_percent, memory_mb, memory_percent, sample_count, created_at
 		FROM process_metrics
 		WHERE timestamp >= ? AND timestamp <= ?
 		ORDER BY timestamp ASC`
-		rows, err = ms.db.Query(querySQL, startTime, endTime)
+		rows, err = ms.db.Query(querySQL, startStr, endStr)
 	} else {
 		querySQL = `
 		SELECT id, timestamp, granularity, cpu_percent, memory_mb, memory_percent, sample_count, created_at
 		FROM process_metrics
 		WHERE timestamp >= ? AND timestamp <= ? AND granularity = ?
 		ORDER BY timestamp ASC`
-		rows, err = ms.db.Query(querySQL, startTime, endTime, queryGranularity)
+		rows, err = ms.db.Query(querySQL, startStr, endStr, granularity)
 	}
 
 	if err != nil {
@@ -559,8 +559,7 @@ func (ms *MetricsStorage) GetMetrics(startTime, endTime time.Time, granularity s
 	}
 	defer rows.Close()
 
-	// 先读取所有原始数据
-	var rawMetrics []ProcessMetric
+	var metrics []ProcessMetric
 	for rows.Next() {
 		var metric ProcessMetric
 		var timestampStr string
@@ -579,26 +578,13 @@ func (ms *MetricsStorage) GetMetrics(startTime, endTime time.Time, granularity s
 			return nil, fmt.Errorf("扫描指标数据失败: %v", err)
 		}
 
-		// 解析时间戳（SQLite返回的格式）
-		timestampTime, err = time.Parse("2006-01-02 15:04:05", timestampStr)
+		timestampTime, err = ms.parseTimestamp(timestampStr)
 		if err != nil {
-			// 尝试RFC3339格式
-			timestampTime, err = time.Parse(time.RFC3339, timestampStr)
-			if err != nil {
-				ms.log.Warnf("解析时间戳失败: %v, 原始值: %s", err, timestampStr)
-				continue
-			}
+			ms.log.Warnf("解析时间戳失败: %v, 原始值: %s", err, timestampStr)
+			continue
 		}
 		metric.Timestamp = timestampTime
-		rawMetrics = append(rawMetrics, metric)
-	}
-
-	// 如果需要聚合，执行聚合逻辑
-	var metrics []ProcessMetric
-	if needAggregation && len(rawMetrics) > 0 {
-		metrics = ms.aggregateMetrics(rawMetrics, granularity)
-	} else {
-		metrics = rawMetrics
+		metrics = append(metrics, metric)
 	}
 
 	// 计算汇总信息
@@ -634,7 +620,105 @@ func (ms *MetricsStorage) GetMetrics(startTime, endTime time.Time, granularity s
 	}, nil
 }
 
-// aggregateMetrics 聚合指标数据到指定粒度
+// parseTimestamp 解析 SQLite 返回的时间戳
+func (ms *MetricsStorage) parseTimestamp(s string) (time.Time, error) {
+	if t, err := time.Parse("2006-01-02 15:04:05", s); err == nil {
+		return t, nil
+	}
+	return time.Parse(time.RFC3339, s)
+}
+
+// getMetricsWithSQLAggregation 使用 SQL GROUP BY 聚合，避免拉取全量 1min 数据
+func (ms *MetricsStorage) getMetricsWithSQLAggregation(startTime, endTime time.Time, granularity string) (*MetricsQueryResult, error) {
+	startStr := startTime.Format("2006-01-02 15:04:05")
+	endStr := endTime.Format("2006-01-02 15:04:05")
+
+	var groupExpr string
+	switch granularity {
+	case "5min":
+		groupExpr = "strftime('%s', timestamp) / 300"
+	case "15min":
+		groupExpr = "strftime('%s', timestamp) / 900"
+	case "daily":
+		groupExpr = "date(timestamp)"
+	default:
+		return nil, fmt.Errorf("不支持的聚合粒度: %s", granularity)
+	}
+
+	querySQL := fmt.Sprintf(`
+		SELECT
+			min(timestamp) as timestamp,
+			? as granularity,
+			avg(cpu_percent) as cpu_percent,
+			avg(memory_mb) as memory_mb,
+			avg(memory_percent) as memory_percent,
+			count(*) as sample_count
+		FROM process_metrics
+		WHERE timestamp >= ? AND timestamp <= ? AND granularity = '1min'
+		GROUP BY %s
+		ORDER BY timestamp ASC`, groupExpr)
+
+	rows, err := ms.db.Query(querySQL, granularity, startStr, endStr)
+	if err != nil {
+		return nil, fmt.Errorf("查询聚合指标失败: %v", err)
+	}
+	defer rows.Close()
+
+	var metrics []ProcessMetric
+	for rows.Next() {
+		var metric ProcessMetric
+		var timestampStr string
+
+		if err := rows.Scan(
+			&timestampStr,
+			&metric.Granularity,
+			&metric.CPUPercent,
+			&metric.MemoryMB,
+			&metric.MemoryPercent,
+			&metric.SampleCount,
+		); err != nil {
+			return nil, fmt.Errorf("扫描聚合数据失败: %v", err)
+		}
+
+		metric.Timestamp, err = ms.parseTimestamp(timestampStr)
+		if err != nil {
+			ms.log.Warnf("解析时间戳失败: %v, 原始值: %s", err, timestampStr)
+			continue
+		}
+		metrics = append(metrics, metric)
+	}
+
+	var totalCPU, totalMemoryMB float64
+	var maxCPU, maxMemoryMB float64
+	totalSamples := len(metrics)
+	for _, metric := range metrics {
+		totalCPU += metric.CPUPercent
+		totalMemoryMB += metric.MemoryMB
+		if metric.CPUPercent > maxCPU {
+			maxCPU = metric.CPUPercent
+		}
+		if metric.MemoryMB > maxMemoryMB {
+			maxMemoryMB = metric.MemoryMB
+		}
+	}
+
+	summary := MetricsQuerySummary{
+		TotalSamples: totalSamples,
+		MaxCPU:       maxCPU,
+		MaxMemoryMB:  maxMemoryMB,
+	}
+	if totalSamples > 0 {
+		summary.AvgCPU = totalCPU / float64(totalSamples)
+		summary.AvgMemoryMB = totalMemoryMB / float64(totalSamples)
+	}
+
+	return &MetricsQueryResult{
+		Data:    metrics,
+		Summary: summary,
+	}, nil
+}
+
+// aggregateMetrics 聚合指标数据到指定粒度（保留用于兼容，现优先使用 SQL 聚合）
 func (ms *MetricsStorage) aggregateMetrics(rawMetrics []ProcessMetric, targetGranularity string) []ProcessMetric {
 	if len(rawMetrics) == 0 {
 		return nil

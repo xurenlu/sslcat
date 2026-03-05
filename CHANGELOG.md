@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.12] - 2026-03-05
+
+### 🐛 修复
+
+- **监控指标 API 慢查询优化**：
+  - `/api/monitoring/metrics` 对 5min/15min/daily 粒度改用 SQL 层 `GROUP BY` 聚合
+  - 原先拉取全量 1min 数据（约 1 万行）再内存聚合，现由 SQLite 直接返回聚合结果（约 2 千行）
+  - 显著减少数据传输、内存分配和 JSON 序列化，缓解 7–10 秒慢请求问题
+
+- **慢请求排查工具**：
+  - 新增 `scripts/diagnose-slow-requests.sh` 诊断脚本
+  - 新增 `docs/zh/troubleshooting/SLOW_REQUEST_DIAGNOSIS.md` 排查指南
+
 ## [1.4.11] - 2026-03-05
 
 ### ✨ 新功能
