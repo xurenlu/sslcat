@@ -190,6 +190,11 @@ func (ms *MetricsStorage) Stop() {
 	ms.log.Info("指标存储管理器已停止")
 }
 
+// IsEnabled 返回指标存储是否已启用
+func (ms *MetricsStorage) IsEnabled() bool {
+	return ms.enabled
+}
+
 // collectionLoop 采集循环
 func (ms *MetricsStorage) collectionLoop() {
 	// 立即执行一次

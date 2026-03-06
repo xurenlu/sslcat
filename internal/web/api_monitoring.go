@@ -32,6 +32,11 @@ type MonitoringConfigResponse struct {
 	// 自动退出
 	WatchdogExitOnMemoryThreshold bool `json:"watchdog_exit_on_memory_threshold"`
 	WatchdogExitOnCPUThreshold    bool `json:"watchdog_exit_on_cpu_threshold"`
+
+	// 指标存储配置
+	MetricsStorageEnabled         bool `json:"metrics_storage_enabled"`
+	MetricsStorageSamplingInterval int  `json:"metrics_storage_sampling_interval"`
+	MetricsStorageRetentionDays    int  `json:"metrics_storage_retention_days"`
 }
 
 // MonitoringStatsResponse 实时监控统计响应
@@ -51,6 +56,7 @@ func (s *Server) handleAPIMonitoringConfig(w http.ResponseWriter, r *http.Reques
 	if r.Method == "GET" {
 		// 获取配置
 		cfg := s.config.Monitoring
+		metricsCfg := cfg.MetricsStorage
 		response := MonitoringConfigResponse{
 			Enabled:                  cfg.Enabled,
 			MemoryMaxUsagePercent:    cfg.MemoryMaxUsagePercent,
@@ -70,6 +76,10 @@ func (s *Server) handleAPIMonitoringConfig(w http.ResponseWriter, r *http.Reques
 
 			WatchdogExitOnMemoryThreshold: cfg.WatchdogExitOnMemoryThreshold,
 			WatchdogExitOnCPUThreshold:    cfg.WatchdogExitOnCPUThreshold,
+
+			MetricsStorageEnabled:         metricsCfg.Enabled,
+			MetricsStorageSamplingInterval: metricsCfg.SamplingInterval,
+			MetricsStorageRetentionDays:    metricsCfg.RetentionDays,
 		}
 
 		s.writeSuccessResponse(w, response, "Monitoring config retrieved successfully")
@@ -167,6 +177,26 @@ func (s *Server) handleAPIMonitoringConfig(w http.ResponseWriter, r *http.Reques
 		cfg.WatchdogExitOnMemoryThreshold = req.WatchdogExitOnMemoryThreshold
 		cfg.WatchdogExitOnCPUThreshold = req.WatchdogExitOnCPUThreshold
 
+		// 指标存储配置
+		metricsCfg := cfg.MetricsStorage
+		metricsCfg.Enabled = req.MetricsStorageEnabled
+		if req.MetricsStorageSamplingInterval > 0 {
+			if req.MetricsStorageSamplingInterval < 1 || req.MetricsStorageSamplingInterval > 60 {
+				s.writeErrorResponse(w, http.StatusBadRequest, "metrics_storage_sampling_interval must be between 1 and 60")
+				return
+			}
+			metricsCfg.SamplingInterval = req.MetricsStorageSamplingInterval
+		}
+		if req.MetricsStorageRetentionDays > 0 {
+			if req.MetricsStorageRetentionDays < 7 || req.MetricsStorageRetentionDays > 365 {
+				s.writeErrorResponse(w, http.StatusBadRequest, "metrics_storage_retention_days must be between 7 and 365")
+				return
+			}
+			metricsCfg.RetentionDays = req.MetricsStorageRetentionDays
+		}
+		cfg.MetricsStorage = metricsCfg
+		s.config.Monitoring = cfg
+
 		// 保存配置到文件
 		if err := s.config.Save(s.config.ConfigFile); err != nil {
 			s.log.Errorf("保存监控配置失败: %v", err)
@@ -212,6 +242,19 @@ func (s *Server) handleAPIMonitoringConfig(w http.ResponseWriter, r *http.Reques
 				// 如果禁用了看门狗，停止它
 				if watchdogMonitor := s.monitorManager.GetWatchdogMonitor(); watchdogMonitor != nil {
 					watchdogMonitor.Stop()
+				}
+			}
+
+			// 更新指标存储配置
+			if metricsStorage := s.monitorManager.GetMetricsStorage(); metricsStorage != nil {
+				if metricsCfg.Enabled && !metricsStorage.IsEnabled() {
+					// 启用指标存储
+					s.log.Info("启用指标存储")
+					metricsStorage.Start()
+				} else if !metricsCfg.Enabled && metricsStorage.IsEnabled() {
+					// 禁用指标存储
+					s.log.Info("禁用指标存储")
+					metricsStorage.Stop()
 				}
 			}
 		}

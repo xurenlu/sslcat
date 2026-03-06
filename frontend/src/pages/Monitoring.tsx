@@ -75,6 +75,9 @@ interface MonitoringConfig {
   watchdog_memory_increase_window_sec: number
   watchdog_exit_on_memory_threshold: boolean
   watchdog_exit_on_cpu_threshold: boolean
+  metrics_storage_enabled: boolean
+  metrics_storage_sampling_interval: number
+  metrics_storage_retention_days: number
 }
 
 interface MonitoringStats {
@@ -126,6 +129,9 @@ const Monitoring: React.FC = () => {
     watchdog_memory_increase_window_sec: 0,
     watchdog_exit_on_memory_threshold: false,
     watchdog_exit_on_cpu_threshold: false,
+    metrics_storage_enabled: false,
+    metrics_storage_sampling_interval: 15,
+    metrics_storage_retention_days: 90,
   })
 
   const [stats, setStats] = useState<MonitoringStats>({
@@ -911,6 +917,80 @@ const Monitoring: React.FC = () => {
                     }
                   />
                 </FormControl>
+              </>
+            )}
+          </VStack>
+        </CardBody>
+      </Card>
+
+      {/* 指标存储配置 */}
+      <Card mb={6}>
+        <CardHeader>
+          <Heading size="md">历史数据存储配置</Heading>
+        </CardHeader>
+        <CardBody>
+          <VStack spacing={6} align="stretch">
+            <FormControl display="flex" alignItems="center">
+              <FormLabel mb={0} flex="1">
+                启用历史数据存储
+              </FormLabel>
+              <Switch
+                isChecked={config.metrics_storage_enabled}
+                onChange={(e) =>
+                  setConfig({ ...config, metrics_storage_enabled: e.target.checked })
+                }
+              />
+            </FormControl>
+
+            {config.metrics_storage_enabled && (
+              <>
+                <Divider />
+                <Text fontSize="sm" color="gray.600">
+                  启用后，系统将定期采集 CPU 和内存使用率数据，用于生成历史数据图表。
+                </Text>
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                  <FormControl>
+                    <FormLabel>采样间隔（分钟）</FormLabel>
+                    <NumberInput
+                      value={config.metrics_storage_sampling_interval}
+                      min={1}
+                      max={60}
+                      onChange={(_, value) =>
+                        setConfig({
+                          ...config,
+                          metrics_storage_sampling_interval: value || 15,
+                        })
+                      }
+                    >
+                      <NumberInputField />
+                      <NumberInputStepper>
+                        <NumberIncrementStepper />
+                        <NumberDecrementStepper />
+                      </NumberInputStepper>
+                    </NumberInput>
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel>数据保留天数</FormLabel>
+                    <NumberInput
+                      value={config.metrics_storage_retention_days}
+                      min={7}
+                      max={365}
+                      onChange={(_, value) =>
+                        setConfig({
+                          ...config,
+                          metrics_storage_retention_days: value || 90,
+                        })
+                      }
+                    >
+                      <NumberInputField />
+                      <NumberInputStepper>
+                        <NumberIncrementStepper />
+                        <NumberDecrementStepper />
+                      </NumberInputStepper>
+                    </NumberInput>
+                  </FormControl>
+                </SimpleGrid>
               </>
             )}
           </VStack>
