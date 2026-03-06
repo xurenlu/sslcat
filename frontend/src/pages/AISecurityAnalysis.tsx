@@ -37,6 +37,19 @@ import {
   Link,
   Spinner,
   Center,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalFooter,
+  ModalBody,
+  ModalCloseButton,
+  Table,
+  Thead,
+  Tbody,
+  Tr,
+  Th,
+  Td,
 } from '@chakra-ui/react'
 import {
   FiRefreshCw,
@@ -47,6 +60,8 @@ import {
   FiSave,
   FiZap,
   FiShield,
+  FiList,
+  FiExternalLink,
 } from 'react-icons/fi'
 import { FaRobot } from 'react-icons/fa'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
@@ -94,6 +109,43 @@ interface AnalysisResult {
   confidence: number
 }
 
+interface AttackDetail {
+  id: string
+  client_ip: string
+  user_agent: string
+  url: string
+  method: string
+  attack_type: string
+  severity: string
+  timestamp: string
+  timestamp_raw: string
+  blocked: boolean
+  reason: string
+  country?: string
+  country_code?: string
+  isp?: string
+}
+
+interface AttackDetailsResponse {
+  success: boolean
+  stats: {
+    total_count: number
+    attack_type: string
+    time_range: {
+      hours: number
+      start: string
+      end: string
+    }
+    blocked_count?: number
+    unique_ips?: number
+    unique_urls?: number
+    unique_countries?: number
+    top_ips?: Array<{ ip: string; count: number }>
+  }
+  attacks: AttackDetail[]
+  message?: string
+}
+
 const AISecurityAnalysis: React.FC = () => {
   const [config, setConfig] = useState<AISecurityConfig>({
     enabled: false,
@@ -112,7 +164,14 @@ const AISecurityAnalysis: React.FC = () => {
   const [testing, setTesting] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const [apiProvider, setApiProvider] = useState('openai')
-  
+
+  // 攻击详情 Modal 状态
+  const [selectedAttackType, setSelectedAttackType] = useState<string | null>(null)
+  const [attackDetails, setAttackDetails] = useState<AttackDetail[]>([])
+  const [attackStats, setAttackStats] = useState<AttackDetailsResponse['stats'] | null>(null)
+  const [loadingDetails, setLoadingDetails] = useState(false)
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+
   const toast = useToast()
   const { adminPrefix } = useConfig()
   const t = useTranslation()
@@ -324,6 +383,57 @@ const AISecurityAnalysis: React.FC = () => {
     } finally {
       setAnalyzing(false)
     }
+  }
+
+  // 查看攻击详情
+  const viewAttackDetails = async (attackType: string) => {
+    setSelectedAttackType(attackType)
+    setLoadingDetails(true)
+    setIsDetailsModalOpen(true)
+
+    try {
+      const response = await fetch(
+        buildApiPath(adminPrefix, `/api/security/attack-details?type=${encodeURIComponent(attackType)}&limit=100&hours=24`),
+        { credentials: 'include' }
+      )
+
+      const data: AttackDetailsResponse = await response.json()
+      if (data.success && data.attacks) {
+        setAttackDetails(data.attacks)
+        setAttackStats(data.stats)
+      } else {
+        toast({
+          title: t.common.error,
+          description: data.message || 'Failed to load attack details',
+          status: 'error',
+          duration: TOAST_DURATION.MEDIUM,
+          isClosable: true,
+        })
+        setAttackDetails([])
+        setAttackStats(null)
+      }
+    } catch (error) {
+      console.error('Failed to load attack details:', error)
+      toast({
+        title: t.common.error,
+        description: String(error),
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      })
+      setAttackDetails([])
+      setAttackStats(null)
+    } finally {
+      setLoadingDetails(false)
+    }
+  }
+
+  // 关闭详情 Modal
+  const closeDetailsModal = () => {
+    setIsDetailsModalOpen(false)
+    setSelectedAttackType(null)
+    setAttackDetails([])
+    setAttackStats(null)
   }
 
   const getThreatColor = (level: string) => {
@@ -769,6 +879,19 @@ const AISecurityAnalysis: React.FC = () => {
                                     <Text fontSize="sm" color="gray.700">{threat.action_en}</Text>
                                   </Box>
                                 )}
+                                {/* 查看详情按钮 */}
+                                <Box pt={2}>
+                                  <Button
+                                    size="sm"
+                                    leftIcon={<FiList />}
+                                    rightIcon={<FiExternalLink />}
+                                    colorScheme="blue"
+                                    variant="outline"
+                                    onClick={() => viewAttackDetails(threat.type)}
+                                  >
+                                    查看详细记录 (View Details)
+                                  </Button>
+                                </Box>
                               </VStack>
                             </AccordionPanel>
                           </AccordionItem>
@@ -864,6 +987,138 @@ const AISecurityAnalysis: React.FC = () => {
           </Card>
         </>
       )}
+
+      {/* 攻击详情 Modal */}
+      <Modal isOpen={isDetailsModalOpen} onClose={closeDetailsModal} size="6xl" scrollBehavior="inside">
+        <ModalOverlay />
+        <ModalContent maxW="90vw">
+          <ModalHeader>
+            <HStack>
+              <Icon as={FiList} />
+              <Text>🔍 攻击详情: {selectedAttackType}</Text>
+            </HStack>
+          </ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={4} align="stretch">
+              {/* 统计信息 */}
+              {attackStats && (
+                <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
+                  <Box p={3} bg="blue.50" borderRadius="md">
+                    <Text fontSize="xs" color="gray.600">总记录数</Text>
+                    <Text fontSize="xl" fontWeight="bold">{attackStats.total_count}</Text>
+                  </Box>
+                  {attackStats.blocked_count !== undefined && (
+                    <Box p={3} bg="red.50" borderRadius="md">
+                      <Text fontSize="xs" color="gray.600">已拦截</Text>
+                      <Text fontSize="xl" fontWeight="bold">{attackStats.blocked_count}</Text>
+                    </Box>
+                  )}
+                  {attackStats.unique_ips !== undefined && (
+                    <Box p={3} bg="purple.50" borderRadius="md">
+                      <Text fontSize="xs" color="gray.600">唯一 IP</Text>
+                      <Text fontSize="xl" fontWeight="bold">{attackStats.unique_ips}</Text>
+                    </Box>
+                  )}
+                  {attackStats.unique_urls !== undefined && (
+                    <Box p={3} bg="green.50" borderRadius="md">
+                      <Text fontSize="xs" color="gray.600">唯一 URL</Text>
+                      <Text fontSize="xl" fontWeight="bold">{attackStats.unique_urls}</Text>
+                    </Box>
+                  )}
+                </SimpleGrid>
+              )}
+
+              {/* 加载状态 */}
+              {loadingDetails && (
+                <Center py={8}>
+                  <VStack>
+                    <Spinner size="xl" />
+                    <Text>加载中...</Text>
+                  </VStack>
+                </Center>
+              )}
+
+              {/* 攻击列表 */}
+              {!loadingDetails && attackDetails.length > 0 && (
+                <Box overflowX="auto">
+                  <Table size="sm">
+                    <Thead position="sticky" top={0} bg="gray.50" zIndex={1}>
+                      <Tr>
+                        <Th>时间</Th>
+                        <Th>IP 地址</Th>
+                        <Th>国家/地区</Th>
+                        <Th>URL</Th>
+                        <Th>方法</Th>
+                        <Th>严重程度</Th>
+                        <Th>已拦截</Th>
+                        <Th>原因</Th>
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {attackDetails.map((attack) => (
+                        <Tr key={attack.id}>
+                          <Td whiteSpace="nowrap" fontSize="xs">
+                            {attack.timestamp}
+                          </Td>
+                          <Td whiteSpace="nowrap" fontSize="xs">
+                            <Code fontSize="xs">{attack.client_ip}</Code>
+                          </Td>
+                          <Td whiteSpace="nowrap" fontSize="xs">
+                            {attack.country ? (
+                              <HStack>
+                                <Text>{attack.country}</Text>
+                                {attack.isp && <Text fontSize="xs" color="gray.500">({attack.isp})</Text>}
+                              </HStack>
+                            ) : (
+                              <Text color="gray.400">-</Text>
+                            )}
+                          </Td>
+                          <Td maxW="200px" fontSize="xs">
+                            <Text noOfLines={1} title={attack.url}>
+                              {attack.url}
+                            </Text>
+                          </Td>
+                          <Td whiteSpace="nowrap" fontSize="xs">
+                            <Badge size="sm">{attack.method}</Badge>
+                          </Td>
+                          <Td whiteSpace="nowrap" fontSize="xs">
+                            <Badge colorScheme={getThreatColor(attack.severity)}>
+                              {attack.severity}
+                            </Badge>
+                          </Td>
+                          <Td whiteSpace="nowrap" fontSize="xs">
+                            {attack.blocked ? (
+                              <Badge colorScheme="red">已拦截</Badge>
+                            ) : (
+                              <Badge colorScheme="gray">未拦截</Badge>
+                            )}
+                          </Td>
+                          <Td maxW="200px" fontSize="xs">
+                            <Text noOfLines={2} title={attack.reason}>
+                              {attack.reason}
+                            </Text>
+                          </Td>
+                        </Tr>
+                      ))}
+                    </Tbody>
+                  </Table>
+                </Box>
+              )}
+
+              {/* 无数据 */}
+              {!loadingDetails && attackDetails.length === 0 && (
+                <Center py={8}>
+                  <Text color="gray.500">暂无详细记录</Text>
+                </Center>
+              )}
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button onClick={closeDetailsModal}>关闭</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </Box>
   )
 }

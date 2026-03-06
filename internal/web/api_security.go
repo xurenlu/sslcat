@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -453,4 +454,156 @@ func (s *Server) handleAPISecurityWhitelistDelete(w http.ResponseWriter, r *http
 		"value":        req.Value,
 		"deleted_at":   time.Now().Format("2006-01-02 15:04:05"),
 	}, "Whitelist entry removed successfully")
+}
+
+// handleAPIAttackDetails 获取特定攻击类型的详细信息
+// 用于 AI 分析页面查看具体检测详情（如 SQL 注入的具体 URL、IP、时间等）
+func (s *Server) handleAPIAttackDetails(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizeAPI(w, r, true) {
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		s.writeErrorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	// 检查DDoS防护器是否可用
+	if s.ddosProtector == nil {
+		s.writeErrorResponse(w, http.StatusServiceUnavailable, "DDoS protector not available")
+		return
+	}
+
+	query := r.URL.Query()
+	attackType := query.Get("type")
+	limitStr := query.Get("limit")
+	hoursStr := query.Get("hours")
+
+	// 默认参数
+	limit := 100
+	if limitStr != "" {
+		if n, err := strconv.Atoi(limitStr); err == nil && n > 0 && n <= 1000 {
+			limit = n
+		}
+	}
+
+	hours := 24
+	if hoursStr != "" {
+		if n, err := strconv.Atoi(hoursStr); err == nil && n > 0 && n <= 168 { // 最多7天
+			hours = n
+		}
+	}
+
+	// 获取所有攻击记录
+	allAttacks := s.ddosProtector.GetAttacks(limit * 2) // 获取更多记录用于筛选
+
+	// 按时间范围筛选
+	cutoffTime := time.Now().Add(-time.Duration(hours) * time.Hour)
+
+	var filteredAttacks []map[string]interface{}
+	for _, attack := range allAttacks {
+		// 时间筛选
+		if attack.Timestamp.Before(cutoffTime) {
+			continue
+		}
+
+		// 攻击类型筛选
+		if attackType != "" && attack.AttackType != attackType {
+			continue
+		}
+
+		// 构建详细信息
+		attackDetail := map[string]interface{}{
+			"id":           attack.ID,
+			"client_ip":    attack.ClientIP,
+			"user_agent":   attack.UserAgent,
+			"url":          attack.URL,
+			"method":       attack.Method,
+			"attack_type":  attack.AttackType,
+			"severity":     attack.Severity,
+			"timestamp":    attack.Timestamp.Format("2006-01-02 15:04:05"),
+			"timestamp_raw": attack.Timestamp,
+			"blocked":      attack.Blocked,
+			"reason":       attack.Reason,
+		}
+
+		// 添加地理位置信息（如果有）
+		if attack.Country != "" {
+			attackDetail["country"] = attack.Country
+		}
+		if attack.CountryCode != "" {
+			attackDetail["country_code"] = attack.CountryCode
+		}
+		if attack.ISP != "" {
+			attackDetail["isp"] = attack.ISP
+		}
+
+		filteredAttacks = append(filteredAttacks, attackDetail)
+
+		// 限制返回数量
+		if len(filteredAttacks) >= limit {
+			break
+		}
+	}
+
+	// 统计信息
+	stats := map[string]interface{}{
+		"total_count":   len(filteredAttacks),
+		"attack_type":   attackType,
+		"time_range": map[string]interface{}{
+			"hours": hours,
+			"start": cutoffTime.Format("2006-01-02 15:04:05"),
+			"end":   time.Now().Format("2006-01-02 15:04:05"),
+		},
+	}
+
+	// 如果指定了攻击类型，统计该类型的各种信息
+	if attackType != "" && len(filteredAttacks) > 0 {
+		// 按IP统计
+		ipCount := make(map[string]int)
+		// 按URL统计
+		urlCount := make(map[string]int)
+		// 按国家统计
+		countryCount := make(map[string]int)
+		blockedCount := 0
+
+		for _, attack := range filteredAttacks {
+			if ip, ok := attack["client_ip"].(string); ok {
+				ipCount[ip]++
+			}
+			if url, ok := attack["url"].(string); ok {
+				urlCount[url]++
+			}
+			if country, ok := attack["country"].(string); ok && country != "" {
+				countryCount[country]++
+			}
+			if blocked, ok := attack["blocked"].(bool); ok && blocked {
+				blockedCount++
+			}
+		}
+
+		stats["blocked_count"] = blockedCount
+		stats["unique_ips"] = len(ipCount)
+		stats["unique_urls"] = len(urlCount)
+		stats["unique_countries"] = len(countryCount)
+
+		// 获取前5个IP
+		topIPs := make([]map[string]interface{}, 0)
+		for ip, count := range ipCount {
+			topIPs = append(topIPs, map[string]interface{}{
+				"ip":    ip,
+				"count": count,
+			})
+		}
+		// 简单排序（取前5）
+		if len(topIPs) > 5 {
+			topIPs = topIPs[:5]
+		}
+		stats["top_ips"] = topIPs
+	}
+
+	s.writeSuccessResponse(w, map[string]interface{}{
+		"stats":   stats,
+		"attacks": filteredAttacks,
+	}, "Attack details retrieved successfully")
 }

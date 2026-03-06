@@ -1385,6 +1385,8 @@ func (s *Server) setupRoutes() {
 
 	// DDoS 攻击统计和监控 API
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/ddos-stats", s.handleAPIDDoSStats)
+	// 攻击详情查询 API（用于 AI 安全分析页面显示具体检测记录）
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/security/attack-details", s.handleAPIAttackDetails)
 
 	// Bot API 前缀查询接口（在管理面板下）
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/config/bot-api-prefix", s.handleAPIConfigBotAPIPrefix)
@@ -1449,6 +1451,7 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/performance/detail", s.handleAPIPerformanceDetail)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/performance/summary", s.handleAPIPerformanceSummary)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/performance/config", s.handleAPIPerformanceConfig)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/performance/failed-samples", s.handleAPIPerformanceFailedSamples)
 
 	// 攻击地图 API
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/attack-map/ws", s.handleAttackMapWebSocket)
@@ -1784,12 +1787,20 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// 只记录 /api/ 开头的请求
 			if strings.HasPrefix(r.URL.Path, s.config.AdminPrefix+"/api/") {
 				apiPath := statistics.BuildAPIPatternKey(r.Host, r.URL.Path)
+
+				// 获取响应 body 摘要（仅失败请求）
+				var bodySnippet string
+				if wrappedWriter.statusCode >= 400 {
+					bodySnippet = wrappedWriter.GetResponseBodySnippet()
+				}
+
 				entry := statistics.APIPerformanceEntry{
-					Path:         apiPath,
-					Method:       r.Method,
-					Status:       wrappedWriter.statusCode,
-					ResponseTime: duration,
-					Timestamp:    time.Now(),
+					Path:               apiPath,
+					Method:             r.Method,
+					Status:             wrappedWriter.statusCode,
+					ResponseTime:       duration,
+					Timestamp:          time.Now(),
+					ResponseBodySnippet: bodySnippet,
 				}
 				s.apiPerformanceCollector.Record(entry)
 			}
