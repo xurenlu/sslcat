@@ -19,10 +19,21 @@ type ThreatIntelDB struct {
 
 // NewThreatIntelDB 创建威胁情报数据库
 func NewThreatIntelDB(dbPath string) (*ThreatIntelDB, error) {
-	db, err := sql.Open("sqlite3", dbPath)
+	// 添加 SQLite 连接参数：启用 WAL 模式和设置 busy timeout
+	// _journal_mode=WAL: 使用 Write-Ahead Logging 模式，支持并发读写
+	// _timeout=5000: 当数据库被锁定时等待 5 秒
+	// _txlock=immediate: 事务立即获取 reserved 锁
+	dbPathWithParams := dbPath + "?_journal_mode=WAL&_timeout=5000&_txlock=immediate"
+	db, err := sql.Open("sqlite3", dbPathWithParams)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %v", err)
 	}
+
+	// 设置连接池参数防止并发写入问题
+	// SQLite 在写入时需要独占访问，限制最大打开连接数为 1
+	db.SetMaxOpenConns(1) // 同时只允许一个连接进行写入
+	db.SetMaxIdleConns(1) // 保持一个空闲连接
+	db.SetConnMaxLifetime(5 * time.Minute)
 
 	// 创建表
 	if err := createTables(db); err != nil {
