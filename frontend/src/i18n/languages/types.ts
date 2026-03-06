@@ -104,6 +104,12 @@ export interface Translation {
     imageOptimization: string
     cluster?: string
     clusterStatus?: string
+    attackMap?: string
+    securityReports?: string
+    threatIntel?: string
+    auditLogs?: string
+    apiPerformance?: string
+    configHistory?: string
   }
   
   // 仪表板
@@ -314,6 +320,61 @@ export interface Translation {
     monthlyCost: string
     unlimited: string
     recommended: string
+  }
+  
+  // AI 异常检测分析 (AIAnalytics)
+  aiAnalytics?: {
+    title: string
+    trainModel: string
+    modelNotLoaded: string
+    trainModelFirst: string
+    trainNow: string
+    trainingSamples: string
+    totalSamples: string
+    featureDimension: string
+    dimensions: string
+    forestSize: string
+    trees: string
+    totalPredictions: string
+    continuouslyGrowing: string
+    modelConfig: string
+    contaminationThreshold: string
+    anomalyThreshold: string
+    avgTreeDepth: string
+    anomalyDetectionRate: string
+    anomalyCountTotalPrediction: string
+    anomaly: string
+    total: string
+    lastTrainingTime: string
+    recentDetection: string
+    time: string
+    level: string
+    score: string
+    reason: string
+    noPredictions: string
+    isolationForest: string
+    isolationForestDesc: string
+    multiDimFeatures: string
+    multiDimFeaturesDesc: string
+    smartThreatScore: string
+    smartThreatScoreDesc: string
+    trainModalTitle: string
+    trainDescription: string
+    trainDescriptionDetail: string
+    treeCount: string
+    treeCountHint: string
+    maxSamples: string
+    maxSamplesHint: string
+    contamination: string
+    contaminationHint: string
+    cancel: string
+    startTraining: string
+    training: string
+    threatLevelCritical?: string
+    threatLevelHigh?: string
+    threatLevelMedium?: string
+    threatLevelLow?: string
+    threatLevelNormal?: string
   }
   
   // 访问统计
@@ -752,6 +813,9 @@ export interface Translation {
     blockManagement: string
     templateMarket: string
     searchPlaceholder: string
+    enterpriseFeatures?: string
+    edgeComputing?: string
+    zeroTrustSecurity?: string
   }
 
   // 对话框和提示
@@ -1948,5 +2012,52 @@ export interface Translation {
     timeWindowAddRuleHint: string
     timeWindowNoRules: string
     timeWindowClickToAdd: string
-  },
+  }
+
+  // 攻击地图
+  attackMap?: {
+    title: string
+    realtimeConnected: string
+    offline: string
+  }
+
+  // 威胁情报
+  threatIntel?: {
+    title: string
+    subtitle: string
+    sources: string
+    loadStatsFailed: string
+    indicatorNotFound: string
+    queryFailed: string
+    sourceUpdateTriggered: string
+    sourceUpdateFailed: string
+    sourceStatusUpdated: string
+  }
+
+  // 审计日志
+  auditLogs?: {
+    title: string
+    loadFailed: string
+    exportFailed: string
+  }
+
+  // 安全报告
+  securityReports?: {
+    title: string
+    createFirstDesc: string
+    monthlyReportDesc: string
+  }
+
+  // 边缘计算
+  edgeRouting?: {
+    title: string
+    notReadyDesc: string
+  }
+
+  // 零信任安全
+  securityMTLS?: {
+    title: string
+    notReadyDesc: string
+    auditLogs: string
+  }
 }

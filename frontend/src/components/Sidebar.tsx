@@ -137,7 +137,7 @@ const SidebarContent = () => {
       items: [
         { name: t.navigation.dashboard, icon: FiHome, path: buildPath(adminPrefix, '/dashboard'), keywords: 'home stats 首页 概览' },
         { name: t.navigation.statistics, icon: FiBarChart2, path: buildPath(adminPrefix, '/statistics'), keywords: 'stats requests traffic 流量 统计' },
-        { name: 'API 性能', icon: FiTrendingUp, path: buildPath(adminPrefix, '/api-performance'), keywords: 'api performance latency slow 响应 性能 排行榜' },
+        { name: t.navigation.apiPerformance ?? 'API 性能', icon: FiTrendingUp, path: buildPath(adminPrefix, '/api-performance'), keywords: 'api performance latency slow 响应 性能 排行榜' },
         { name: t.navigation.monitoring || 'System Monitoring', icon: FiActivity, path: buildPath(adminPrefix, '/monitoring'), keywords: 'cpu memory watchdog 监控 性能' },
         { name: t.navigation.slowRequests, icon: FiClock, path: buildPath(adminPrefix, '/slow-requests'), keywords: 'performance slow delay 慢日志 延迟' },
       ]
@@ -164,19 +164,19 @@ const SidebarContent = () => {
       title: t.sidebar.securityProtection,
       items: [
         { name: t.navigation.security, icon: FiShield, path: buildPath(adminPrefix, '/security'), keywords: 'waf ddos block 防火墙 拦截' },
-        { name: '攻击地图', icon: FiGlobe2, path: buildPath(adminPrefix, '/attack-map'), keywords: 'attack map realtime geo 攻击 地图 实时' },
-        { name: '安全报告', icon: FiFileText, path: buildPath(adminPrefix, '/security-reports'), keywords: 'report pdf security download 安全 报告 下载' },
+        { name: t.navigation.attackMap ?? '攻击地图', icon: FiGlobe2, path: buildPath(adminPrefix, '/attack-map'), keywords: 'attack map realtime geo 攻击 地图 实时' },
+        { name: t.navigation.securityReports ?? '安全报告', icon: FiFileText, path: buildPath(adminPrefix, '/security-reports'), keywords: 'report pdf security download 安全 报告 下载' },
         { name: t.sidebar.blockManagement, icon: FiX, path: buildPath(adminPrefix, '/block-management'), keywords: 'block unblock ip tls fingerprint user agent 封禁 解封' },
-        { name: '威胁情报', icon: FiActivity, path: buildPath(adminPrefix, '/threat-intel'), keywords: 'threat intel ioc ip domain url 威胁 情报' },
-        { name: '审计日志', icon: FiFileText, path: buildPath(adminPrefix, '/audit-logs'), keywords: 'audit log trail operation 审计 日志 操作' },
-        { name: t.navigation.aiSecurity || 'AI 安全分析', icon: FaRobot, path: buildPath(adminPrefix, '/ai-analytics'), badge: 'AI', keywords: 'ai robot threat analysis 智能 分析 anomaly detection ml' },
+        { name: t.navigation.threatIntel ?? '威胁情报', icon: FiActivity, path: buildPath(adminPrefix, '/threat-intel'), keywords: 'threat intel ioc ip domain url 威胁 情报' },
+        { name: t.navigation.auditLogs ?? '审计日志', icon: FiFileText, path: buildPath(adminPrefix, '/audit-logs'), keywords: 'audit log trail operation 审计 日志 操作' },
+        { name: t.navigation.aiSecurity ?? 'AI 安全分析', icon: FaRobot, path: buildPath(adminPrefix, '/ai-analytics'), badge: 'AI', keywords: 'ai robot threat analysis 智能 分析 anomaly detection ml' },
       ]
     },
     {
-      title: '企业功能',
+      title: t.sidebar.enterpriseFeatures ?? '企业功能',
       items: [
-        { name: '边缘计算', icon: FiMapPin, path: buildPath(adminPrefix, '/edge-routing'), keywords: 'edge routing multi-region geo location 边缘 计算 多区域' },
-        { name: '零信任安全', icon: FiLock, path: buildPath(adminPrefix, '/security-mtls'), keywords: 'mtls rbac zero trust certificate mTLS 证书 权限' },
+        { name: t.sidebar.edgeComputing ?? '边缘计算', icon: FiMapPin, path: buildPath(adminPrefix, '/edge-routing'), keywords: 'edge routing multi-region geo location 边缘 计算 多区域' },
+        { name: t.sidebar.zeroTrustSecurity ?? '零信任安全', icon: FiLock, path: buildPath(adminPrefix, '/security-mtls'), keywords: 'mtls rbac zero trust certificate mTLS 证书 权限' },
       ]
     },
     {
@@ -192,7 +192,7 @@ const SidebarContent = () => {
         { name: t.navigation.settings, icon: FiSettings, path: buildPath(adminPrefix, '/settings'), keywords: 'config basic notification 配置 通知' },
         { name: t.navigation.userManagement, icon: FiUsers, path: buildPath(adminPrefix, '/users'), keywords: 'admin members roles 用户 权限' },
         { name: t.navigation.changePassword, icon: FiKey, path: buildPath(adminPrefix, '/change-password'), keywords: 'security auth password 密码 安全' },
-        { name: '配置历史', icon: FiArchive, path: buildPath(adminPrefix, '/config-history'), keywords: 'config history version backup rollback 配置历史 版本 备份 回滚' },
+        { name: t.navigation.configHistory ?? '配置历史', icon: FiArchive, path: buildPath(adminPrefix, '/config-history'), keywords: 'config history version backup rollback 配置历史 版本 备份 回滚' },
       ]
     }
   ], [t, adminPrefix])

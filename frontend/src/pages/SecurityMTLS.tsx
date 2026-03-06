@@ -58,6 +58,7 @@ import {
 } from 'react-icons/fi';
 import axios from 'axios';
 import { useConfig, buildApiPath } from '../contexts/ConfigContext';
+import { useTranslation } from '../hooks/useLanguage';
 
 interface MTLSConfig {
   enabled: boolean;
@@ -104,6 +105,7 @@ interface AuditLog {
 
 const SecurityMTLS: React.FC = () => {
   const { adminPrefix } = useConfig();
+  const t = useTranslation();
   const [mtlsConfig, setMtlsConfig] = useState<MTLSConfig | null>(null);
   const [whitelist, setWhitelist] = useState<string[]>([]);
   const [blacklist, setBlacklist] = useState<string[]>([]);
@@ -304,7 +306,7 @@ const SecurityMTLS: React.FC = () => {
           <AlertIcon />
           <Box>
             <Text fontWeight="bold">实验性功能</Text>
-            <Text fontSize="sm">零信任安全（mTLS）功能尚未完全实现，有待生产环境测试。请在测试环境中谨慎使用。</Text>
+            <Text fontSize="sm">{t.securityMTLS?.notReadyDesc ?? '零信任安全（mTLS）功能尚未完全实现，有待生产环境测试。请在测试环境中谨慎使用。'}</Text>
           </Box>
         </Alert>
 
@@ -313,7 +315,7 @@ const SecurityMTLS: React.FC = () => {
           <Box>
             <Heading size="lg" display="flex" alignItems="center" gap={2}>
               <FiShield />
-              零信任安全中心
+              {t.securityMTLS?.title ?? '零信任安全中心'}
             </Heading>
             <Text color="gray.500" mt={2}>
               管理 mTLS、RBAC 和访问控制
@@ -401,7 +403,7 @@ const SecurityMTLS: React.FC = () => {
           <TabList>
             <Tab>mTLS 配置</Tab>
             <Tab>RBAC 管理</Tab>
-            <Tab>审计日志</Tab>
+            <Tab>{t.securityMTLS?.auditLogs ?? '审计日志'}</Tab>
           </TabList>
 
           <TabPanels>
@@ -660,7 +662,7 @@ const SecurityMTLS: React.FC = () => {
             <TabPanel>
               <Card>
                 <CardHeader display="flex" justifyContent="space-between">
-                  <Heading size="md">审计日志</Heading>
+                  <Heading size="md">{t.securityMTLS?.auditLogs ?? t.auditLogs?.title ?? '审计日志'}</Heading>
                   <HStack>
                     <Button leftIcon={<FiDownload />} size="sm" variant="outline">
                       导出

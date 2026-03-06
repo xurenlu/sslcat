@@ -186,7 +186,7 @@ const SecurityReports: React.FC = () => {
         {/* Header */}
         <Heading size="lg" display="flex" alignItems="center">
           <Icon as={FiFileText} mr={3} />
-          安全报告
+          {t.securityReports?.title ?? '安全报告'}
         </Heading>
 
         <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
@@ -311,7 +311,7 @@ const SecurityReports: React.FC = () => {
                     <AlertIcon />
                     <Box>
                       <Text fontWeight="bold">暂无报告</Text>
-                      <Text fontSize="sm">生成第一份安全报告来查看系统安全状况</Text>
+                      <Text fontSize="sm">{t.securityReports?.createFirstDesc ?? '生成第一份安全报告来查看系统安全状况'}</Text>
                     </Box>
                   </Alert>
                 ) : (
@@ -432,7 +432,7 @@ const SecurityReports: React.FC = () => {
                       <Box>
                         <Heading size="sm" mb={2}>适用场景</Heading>
                         <Text fontSize="sm" color="gray.600">
-                          月度安全报告，用于管理层汇报和长期安全策略规划。
+                          {t.securityReports?.monthlyReportDesc ?? '月度安全报告，用于管理层汇报和长期安全策略规划。'}
                         </Text>
                       </Box>
                     </SimpleGrid>

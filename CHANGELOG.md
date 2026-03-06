@@ -68,6 +68,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **整体预期：系统吞吐量提升 3-5 倍，响应延迟降低 80%+！**
 
+## [1.6.2-rc4] - 2026-03-06
+
+### 🌐 国际化
+
+- **全面补齐硬编码翻译**：
+  - **Sidebar**：攻击地图、安全报告、威胁情报、审计日志、企业功能、边缘计算、零信任安全、API 性能、配置历史
+  - **AIAnalytics**：训练样本、模型配置、污染率/异常阈值、训练弹窗等 50+ 键
+  - **AttackMap**：实时攻击地图、连接状态
+  - **ThreatIntel**：威胁情报中心、toast 消息
+  - **AuditLogs**：审计日志、加载/导出失败
+  - **SecurityReports**：安全报告、生成说明
+  - **EdgeRouting**：边缘计算管理、实验性提示
+  - **SecurityMTLS**：零信任安全中心、审计日志 Tab
+
 ## [1.6.2-rc3] - 2026-03-06
 
 ### 🌐 国际化

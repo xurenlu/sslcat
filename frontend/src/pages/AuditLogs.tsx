@@ -49,6 +49,7 @@ import {
 } from 'react-icons/fi';
 import axios from 'axios';
 import { useConfig, buildApiPath } from '../contexts/ConfigContext';
+import { useTranslation } from '../hooks/useLanguage';
 
 interface AuditLog {
   id: string;
@@ -75,6 +76,7 @@ interface LogStats {
 
 const AuditLogsPage: React.FC = () => {
   const { adminPrefix } = useConfig();
+  const t = useTranslation();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [stats, setStats] = useState<LogStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -111,7 +113,7 @@ const AuditLogsPage: React.FC = () => {
     } catch (error) {
       toast({
         title: '加载失败',
-        description: '无法加载审计日志',
+        description: t.auditLogs?.loadFailed ?? '无法加载审计日志',
         status: 'error',
         duration: 3000,
       });
@@ -159,7 +161,7 @@ const AuditLogsPage: React.FC = () => {
     } catch (error) {
       toast({
         title: '导出失败',
-        description: '无法导出审计日志',
+        description: t.auditLogs?.exportFailed ?? '无法导出审计日志',
         status: 'error',
         duration: 3000,
       });
@@ -209,7 +211,7 @@ const AuditLogsPage: React.FC = () => {
           <Box>
             <Heading size="lg" display="flex" alignItems="center" gap={2}>
               <FiFileText />
-              审计日志
+              {t.auditLogs?.title ?? '审计日志'}
             </Heading>
             <Text color="gray.500" mt={2}>
               查看和搜索系统操作日志

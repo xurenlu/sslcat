@@ -44,6 +44,7 @@ import {
 import { MapContainer, TileLayer, Marker, Popup, CircleMarker, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
+import { useTranslation } from '../hooks/useLanguage'
 
 // 修复 Leaflet 默认图标问题
 import L from 'leaflet'
@@ -86,6 +87,7 @@ interface AttackStats {
 
 const AttackMap: React.FC = () => {
   const { adminPrefix } = useConfig()
+  const t = useTranslation()
   const toast = useToast()
 
   const [attacks, setAttacks] = useState<AttackData[]>([])
@@ -256,11 +258,11 @@ const AttackMap: React.FC = () => {
         <HStack justify="space-between">
           <Heading size="lg" display="flex" alignItems="center">
             <Icon as={FiGlobe} mr={3} />
-            实时攻击地图
+            {t.attackMap?.title ?? '实时攻击地图'}
           </Heading>
           <HStack>
             <Badge colorScheme={wsConnected ? 'green' : 'gray'}>
-              {wsConnected ? '实时连接' : '离线'}
+              {wsConnected ? (t.attackMap?.realtimeConnected ?? '实时连接') : (t.attackMap?.offline ?? '离线')}
             </Badge>
             <Button
               leftIcon={<Icon as={FiRefreshCw} />}
@@ -268,7 +270,7 @@ const AttackMap: React.FC = () => {
               onClick={handleRefresh}
               isLoading={refreshing}
             >
-              刷新
+              {t.common.refresh}
             </Button>
           </HStack>
         </HStack>

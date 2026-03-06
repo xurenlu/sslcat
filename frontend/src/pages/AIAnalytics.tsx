@@ -228,15 +228,15 @@ const AIAnalytics: React.FC = () => {
   const getThreatLevelLabel = (level: string) => {
     switch (level) {
       case 'critical':
-        return '严重'
+        return t.aiAnalytics?.threatLevelCritical ?? '严重'
       case 'high':
-        return '高'
+        return t.aiAnalytics?.threatLevelHigh ?? '高'
       case 'medium':
-        return '中'
+        return t.aiAnalytics?.threatLevelMedium ?? '中'
       case 'low':
-        return '低'
+        return t.aiAnalytics?.threatLevelLow ?? '低'
       default:
-        return '正常'
+        return t.aiAnalytics?.threatLevelNormal ?? '正常'
     }
   }
 
@@ -262,7 +262,7 @@ const AIAnalytics: React.FC = () => {
         <HStack justify="space-between">
           <Heading size="lg" display="flex" alignItems="center">
             <Icon as={FaBrain} mr={3} />
-            AI 安全分析
+            {t.aiAnalytics?.title ?? t.aiSecurity?.title ?? 'AI 安全分析'}
           </Heading>
           <HStack>
             <Button
@@ -270,14 +270,14 @@ const AIAnalytics: React.FC = () => {
               variant="outline"
               onClick={() => Promise.all([loadStats(), loadPredictions()])}
             >
-              刷新
+              {t.common.refresh}
             </Button>
             <Button
               leftIcon={<Icon as={FiPlay} />}
               colorScheme="blue"
               onClick={onTrainModalOpen}
             >
-              训练模型
+              {t.aiAnalytics?.trainModel ?? '训练模型'}
             </Button>
           </HStack>
         </HStack>
@@ -287,11 +287,11 @@ const AIAnalytics: React.FC = () => {
           <Alert status="warning" variant="left-accent">
             <AlertIcon />
             <Box flex="1">
-              <Text fontWeight="bold">模型未加载</Text>
-              <Text fontSize="sm">请先训练模型以启用 AI 异常检测功能</Text>
+              <Text fontWeight="bold">{t.aiAnalytics?.modelNotLoaded ?? '模型未加载'}</Text>
+              <Text fontSize="sm">{t.aiAnalytics?.trainModelFirst ?? '请先训练模型以启用 AI 异常检测功能'}</Text>
             </Box>
             <Button size="sm" colorScheme="blue" onClick={onTrainModalOpen}>
-              立即训练
+              {t.aiAnalytics?.trainNow ?? '立即训练'}
             </Button>
           </Alert>
         )}
@@ -304,10 +304,10 @@ const AIAnalytics: React.FC = () => {
                 <Stat>
                   <StatLabel display="flex" alignItems="center">
                     <Icon as={FiDatabase} mr={2} />
-                    训练样本
+                    {t.aiAnalytics?.trainingSamples ?? '训练样本'}
                   </StatLabel>
                   <StatNumber>{stats?.total_samples?.toLocaleString() || 0}</StatNumber>
-                  <StatHelpText>总样本数</StatHelpText>
+                  <StatHelpText>{t.aiAnalytics?.totalSamples ?? '总样本数'}</StatHelpText>
                 </Stat>
               </StatGroup>
             </CardBody>
@@ -319,10 +319,10 @@ const AIAnalytics: React.FC = () => {
                 <Stat>
                   <StatLabel display="flex" alignItems="center">
                     <Icon as={FiTarget} mr={2} />
-                    特征维度
+                    {t.aiAnalytics?.featureDimension ?? '特征维度'}
                   </StatLabel>
                   <StatNumber>{stats?.feature_dim || 0}</StatNumber>
-                  <StatHelpText>维度</StatHelpText>
+                  <StatHelpText>{t.aiAnalytics?.dimensions ?? '维度'}</StatHelpText>
                 </Stat>
               </StatGroup>
             </CardBody>
@@ -334,10 +334,10 @@ const AIAnalytics: React.FC = () => {
                 <Stat>
                   <StatLabel display="flex" alignItems="center">
                     <Icon as={FiCpu} mr={2} />
-                    森林规模
+                    {t.aiAnalytics?.forestSize ?? '森林规模'}
                   </StatLabel>
                   <StatNumber>{stats?.n_trees?.toLocaleString() || 0}</StatNumber>
-                  <StatHelpText>棵树</StatHelpText>
+                  <StatHelpText>{t.aiAnalytics?.trees ?? '棵树'}</StatHelpText>
                 </Stat>
               </StatGroup>
             </CardBody>
@@ -349,12 +349,12 @@ const AIAnalytics: React.FC = () => {
                 <Stat>
                   <StatLabel display="flex" alignItems="center">
                     <Icon as={FiActivity} mr={2} />
-                    总预测次数
+                    {t.aiAnalytics?.totalPredictions ?? '总预测次数'}
                   </StatLabel>
                   <StatNumber>{stats?.total_predictions?.toLocaleString() || 0}</StatNumber>
                   <StatHelpText>
                     <StatArrow type="increase" />
-                    持续增长
+                    {t.aiAnalytics?.continuouslyGrowing ?? '持续增长'}
                   </StatHelpText>
                 </Stat>
               </StatGroup>
@@ -370,13 +370,13 @@ const AIAnalytics: React.FC = () => {
               <VStack spacing={4} align="stretch">
                 <Heading size="md" display="flex" alignItems="center">
                   <Icon as={FiShield} mr={2} />
-                  模型配置
+                  {t.aiAnalytics?.modelConfig ?? '模型配置'}
                 </Heading>
 
                 <SimpleGrid columns={2} spacing={4}>
                   <Box>
                     <Text fontSize="sm" color="gray.500" mb={1}>
-                      污染率阈值
+                      {t.aiAnalytics?.contaminationThreshold ?? '污染率阈值'}
                     </Text>
                     <Text fontSize="xl" fontWeight="bold">
                       {stats?.contamination || 0}
@@ -385,7 +385,7 @@ const AIAnalytics: React.FC = () => {
 
                   <Box>
                     <Text fontSize="sm" color="gray.500" mb={1}>
-                      异常阈值
+                      {t.aiAnalytics?.anomalyThreshold ?? '异常阈值'}
                     </Text>
                     <Text fontSize="xl" fontWeight="bold">
                       {stats?.threshold?.toFixed(4) || 0}
@@ -394,7 +394,7 @@ const AIAnalytics: React.FC = () => {
 
                   <Box>
                     <Text fontSize="sm" color="gray.500" mb={1}>
-                      平均树深度
+                      {t.aiAnalytics?.avgTreeDepth ?? '平均树深度'}
                     </Text>
                     <Text fontSize="xl" fontWeight="bold">
                       {stats?.avg_tree_depth?.toFixed(2) || 0}
@@ -403,7 +403,7 @@ const AIAnalytics: React.FC = () => {
 
                   <Box>
                     <Text fontSize="sm" color="gray.500" mb={1}>
-                      异常检测率
+                      {t.aiAnalytics?.anomalyDetectionRate ?? '异常检测率'}
                     </Text>
                     <HStack>
                       <Text fontSize="xl" fontWeight="bold" color={parseFloat(anomalyRate) > 5 ? 'red.500' : 'green.500'}>
@@ -418,7 +418,7 @@ const AIAnalytics: React.FC = () => {
 
                 <Box>
                   <Text fontSize="sm" color="gray.500" mb={2}>
-                    异常计数 / 总预测
+                    {t.aiAnalytics?.anomalyCountTotalPrediction ?? '异常计数 / 总预测'}
                   </Text>
                   <Progress
                     value={parseFloat(anomalyRate)}
@@ -428,10 +428,10 @@ const AIAnalytics: React.FC = () => {
                   />
                   <HStack justify="space-between" mt={2}>
                     <Text fontSize="xs" color="gray.500">
-                      异常: {stats?.anomaly_count || 0}
+                      {t.aiAnalytics?.anomaly ?? '异常'}: {stats?.anomaly_count || 0}
                     </Text>
                     <Text fontSize="xs" color="gray.500">
-                      总计: {stats?.total_predictions || 0}
+                      {t.aiAnalytics?.total ?? '总计'}: {stats?.total_predictions || 0}
                     </Text>
                   </HStack>
                 </Box>
@@ -439,7 +439,7 @@ const AIAnalytics: React.FC = () => {
                 {stats?.last_training && (
                   <Box>
                     <Text fontSize="sm" color="gray.500">
-                      最后训练时间: {new Date(stats.last_training).toLocaleString('zh-CN')}
+                      {t.aiAnalytics?.lastTrainingTime ?? '最后训练时间'}: {new Date(stats.last_training).toLocaleString()}
                     </Text>
                   </Box>
                 )}
@@ -453,31 +453,31 @@ const AIAnalytics: React.FC = () => {
               <VStack spacing={4} align="stretch">
                 <Heading size="md" display="flex" alignItems="center">
                   <Icon as={FiTrendingUp} mr={2} />
-                  最近检测
+                  {t.aiAnalytics?.recentDetection ?? '最近检测'}
                 </Heading>
 
                 <Box overflowX="auto" maxH="300px" overflowY="auto">
                   <Table size="sm">
                     <Thead position="sticky" top={0} bg="white" zIndex={1}>
                       <Tr>
-                        <Th>时间</Th>
-                        <Th>等级</Th>
-                        <Th>分数</Th>
-                        <Th>原因</Th>
+                        <Th>{t.aiAnalytics?.time ?? '时间'}</Th>
+                        <Th>{t.aiAnalytics?.level ?? '等级'}</Th>
+                        <Th>{t.aiAnalytics?.score ?? '分数'}</Th>
+                        <Th>{t.aiAnalytics?.reason ?? '原因'}</Th>
                       </Tr>
                     </Thead>
                     <Tbody>
                       {predictions.length === 0 ? (
                         <Tr>
                           <Td colSpan={4} textAlign="center" py={8}>
-                            <Text color="gray.500">暂无预测记录</Text>
+                            <Text color="gray.500">{t.aiAnalytics?.noPredictions ?? '暂无预测记录'}</Text>
                           </Td>
                         </Tr>
                       ) : (
                         predictions.map((pred, idx) => (
                           <Tr key={idx}>
                             <Td whiteSpace="nowrap">
-                              {new Date(pred.timestamp).toLocaleTimeString('zh-CN')}
+                              {new Date(pred.timestamp).toLocaleTimeString()}
                             </Td>
                             <Td>
                               <Badge colorScheme={getThreatLevelColor(pred.level)}>
@@ -509,9 +509,9 @@ const AIAnalytics: React.FC = () => {
             <CardBody>
               <VStack spacing={3} align="start">
                 <Icon as={FaBrain} boxSize={8} color="blue.500" />
-                <Heading size="sm">Isolation Forest</Heading>
+                <Heading size="sm">{t.aiAnalytics?.isolationForest ?? 'Isolation Forest'}</Heading>
                 <Text fontSize="sm" color="gray.600">
-                  使用隔离森林算法进行无监督异常检测，无需标注数据即可识别异常模式
+                  {t.aiAnalytics?.isolationForestDesc ?? '使用隔离森林算法进行无监督异常检测，无需标注数据即可识别异常模式'}
                 </Text>
               </VStack>
             </CardBody>
@@ -521,9 +521,9 @@ const AIAnalytics: React.FC = () => {
             <CardBody>
               <VStack spacing={3} align="start">
                 <Icon as={FiTarget} boxSize={8} color="green.500" />
-                <Heading size="sm">多维特征提取</Heading>
+                <Heading size="sm">{t.aiAnalytics?.multiDimFeatures ?? '多维特征提取'}</Heading>
                 <Text fontSize="sm" color="gray.600">
-                  从HTTP请求中提取40+维特征，包括URL模式、IP信誉、时序特征和行为模式
+                  {t.aiAnalytics?.multiDimFeaturesDesc ?? '从HTTP请求中提取40+维特征，包括URL模式、IP信誉、时序特征和行为模式'}
                 </Text>
               </VStack>
             </CardBody>
@@ -533,9 +533,9 @@ const AIAnalytics: React.FC = () => {
             <CardBody>
               <VStack spacing={3} align="start">
                 <Icon as={FiShield} boxSize={8} color="purple.500" />
-                <Heading size="sm">智能威胁评分</Heading>
+                <Heading size="sm">{t.aiAnalytics?.smartThreatScore ?? '智能威胁评分'}</Heading>
                 <Text fontSize="sm" color="gray.600">
-                  综合异常检测、IP信誉、行为分析和时序趋势，计算综合威胁评分
+                  {t.aiAnalytics?.smartThreatScoreDesc ?? '综合异常检测、IP信誉、行为分析和时序趋势，计算综合威胁评分'}
                 </Text>
               </VStack>
             </CardBody>
@@ -547,22 +547,22 @@ const AIAnalytics: React.FC = () => {
       <Modal isOpen={isTrainModalOpen} onClose={onTrainModalClose} size="md">
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>训练 ML 模型</ModalHeader>
+          <ModalHeader>{t.aiAnalytics?.trainModalTitle ?? '训练 ML 模型'}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             <VStack spacing={4}>
               <Alert status="info" variant="left-accent">
                 <AlertIcon />
                 <Box>
-                  <Text fontWeight="bold">训练说明</Text>
+                  <Text fontWeight="bold">{t.aiAnalytics?.trainDescription ?? '训练说明'}</Text>
                   <Text fontSize="sm">
-                    模型将从历史请求数据中学习正常模式，训练后可自动检测异常行为
+                    {t.aiAnalytics?.trainDescriptionDetail ?? '模型将从历史请求数据中学习正常模式，训练后可自动检测异常行为'}
                   </Text>
                 </Box>
               </Alert>
 
               <FormControl>
-                <FormLabel>树数量</FormLabel>
+                <FormLabel>{t.aiAnalytics?.treeCount ?? '树数量'}</FormLabel>
                 <NumberInput
                   value={nTrees}
                   onChange={(_, value) => setNTrees(value)}
@@ -576,12 +576,12 @@ const AIAnalytics: React.FC = () => {
                   </NumberInputStepper>
                 </NumberInput>
                 <Text fontSize="xs" color="gray.500" mt={1}>
-                  更多树可提高准确性，但会增加训练时间和内存使用
+                  {t.aiAnalytics?.treeCountHint ?? '更多树可提高准确性，但会增加训练时间和内存使用'}
                 </Text>
               </FormControl>
 
               <FormControl>
-                <FormLabel>最大样本数</FormLabel>
+                <FormLabel>{t.aiAnalytics?.maxSamples ?? '最大样本数'}</FormLabel>
                 <NumberInput
                   value={maxSamples}
                   onChange={(_, value) => setMaxSamples(value)}
@@ -595,12 +595,12 @@ const AIAnalytics: React.FC = () => {
                   </NumberInputStepper>
                 </NumberInput>
                 <Text fontSize="xs" color="gray.500" mt={1}>
-                  每棵树使用的样本数，影响树的最大深度
+                  {t.aiAnalytics?.maxSamplesHint ?? '每棵树使用的样本数，影响树的最大深度'}
                 </Text>
               </FormControl>
 
               <FormControl>
-                <FormLabel>污染率</FormLabel>
+                <FormLabel>{t.aiAnalytics?.contamination ?? '污染率'}</FormLabel>
                 <NumberInput
                   value={contamination}
                   onChange={(_, value) => setContamination(value)}
@@ -616,22 +616,22 @@ const AIAnalytics: React.FC = () => {
                   </NumberInputStepper>
                 </NumberInput>
                 <Text fontSize="xs" color="gray.500" mt={1}>
-                  预期异常数据比例，用于设置异常阈值
+                  {t.aiAnalytics?.contaminationHint ?? '预期异常数据比例，用于设置异常阈值'}
                 </Text>
               </FormControl>
             </VStack>
           </ModalBody>
           <ModalFooter>
             <Button variant="ghost" onClick={onTrainModalClose} isDisabled={training}>
-              取消
+              {t.aiAnalytics?.cancel ?? t.common.cancel}
             </Button>
             <Button
               colorScheme="blue"
               onClick={handleTrain}
               isLoading={training}
-              loadingText="训练中..."
+              loadingText={t.aiAnalytics?.training ?? '训练中...'}
             >
-              开始训练
+              {t.aiAnalytics?.startTraining ?? '开始训练'}
             </Button>
           </ModalFooter>
         </ModalContent>

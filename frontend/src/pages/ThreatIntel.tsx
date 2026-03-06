@@ -55,6 +55,7 @@ import {
 } from 'react-icons/fi';
 import axios from 'axios';
 import { useConfig, buildApiPath } from '../contexts/ConfigContext';
+import { useTranslation } from '../hooks/useLanguage';
 
 interface ThreatStats {
   total_iocs: number;
@@ -89,6 +90,7 @@ interface IOCDetail {
 
 const ThreatIntel: React.FC = () => {
   const { adminPrefix } = useConfig();
+  const t = useTranslation();
   const [stats, setStats] = useState<ThreatStats | null>(null);
   const [sources, setSources] = useState<ThreatSource[]>([]);
   const [recentIOCs, setRecentIOCs] = useState<IOCDetail[]>([]);
@@ -108,7 +110,7 @@ const ThreatIntel: React.FC = () => {
     } catch (error) {
       toast({
         title: '加载失败',
-        description: '无法加载威胁情报统计',
+        description: t.threatIntel?.loadStatsFailed ?? '无法加载威胁情报统计',
         status: 'error',
         duration: 3000,
       });
@@ -157,7 +159,7 @@ const ThreatIntel: React.FC = () => {
       if (!response.data.ioc) {
         toast({
           title: '未找到威胁',
-          description: '该指标未在威胁情报库中找到',
+          description: t.threatIntel?.indicatorNotFound ?? '该指标未在威胁情报库中找到',
           status: 'info',
           duration: 3000,
         });
@@ -165,7 +167,7 @@ const ThreatIntel: React.FC = () => {
     } catch (error) {
       toast({
         title: '搜索失败',
-        description: '无法查询威胁情报',
+        description: t.threatIntel?.queryFailed ?? '无法查询威胁情报',
         status: 'error',
         duration: 3000,
       });
@@ -179,7 +181,7 @@ const ThreatIntel: React.FC = () => {
       await axios.post(buildApiPath(adminPrefix, `/api/threat-intel/sources/${sourceName}/update`));
       toast({
         title: '成功',
-        description: `威胁情报源 ${sourceName} 更新已触发`,
+        description: (t.threatIntel?.sourceUpdateTriggered ?? '威胁情报源 {name} 更新已触发').replace('{name}', sourceName),
         status: 'success',
         duration: 3000,
       });
@@ -188,7 +190,7 @@ const ThreatIntel: React.FC = () => {
     } catch (error) {
       toast({
         title: '更新失败',
-        description: '无法更新威胁情报源',
+        description: t.threatIntel?.sourceUpdateFailed ?? '无法更新威胁情报源',
         status: 'error',
         duration: 3000,
       });
@@ -203,14 +205,14 @@ const ThreatIntel: React.FC = () => {
       await fetchSources();
       toast({
         title: '成功',
-        description: `威胁情报源 ${sourceName} 已${enabled ? '启用' : '禁用'}`,
+        description: (t.threatIntel?.sourceStatusUpdated ?? '威胁情报源 {name} 已{status}').replace('{name}', sourceName).replace('{status}', enabled ? '启用' : '禁用'),
         status: 'success',
         duration: 3000,
       });
     } catch (error) {
       toast({
         title: '操作失败',
-        description: '无法更新威胁情报源',
+        description: t.threatIntel?.sourceUpdateFailed ?? '无法更新威胁情报源',
         status: 'error',
         duration: 3000,
       });
@@ -274,10 +276,10 @@ const ThreatIntel: React.FC = () => {
           <Box>
             <Heading size="lg" display="flex" alignItems="center" gap={2}>
               <FiShield />
-              威胁情报中心
+              {t.threatIntel?.title ?? '威胁情报中心'}
             </Heading>
             <Text color="gray.500" mt={2}>
-              实时监控和管理安全威胁情报
+              {t.threatIntel?.subtitle ?? '实时监控和管理安全威胁情报'}
             </Text>
           </Box>
           <IconButton
@@ -462,7 +464,7 @@ const ThreatIntel: React.FC = () => {
             <TabPanel>
               <Card>
                 <CardHeader>
-                  <Heading size="md">威胁情报源</Heading>
+                  <Heading size="md">{t.threatIntel?.sources ?? '威胁情报源'}</Heading>
                 </CardHeader>
                 <CardBody>
                   <Table variant="simple">

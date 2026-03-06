@@ -65,6 +65,7 @@ import {
 } from 'react-icons/fi';
 import axios from 'axios';
 import { useConfig, buildApiPath } from '../contexts/ConfigContext';
+import { useTranslation } from '../hooks/useLanguage';
 
 interface EdgeRoutingConfig {
   enabled: boolean;
@@ -110,6 +111,7 @@ interface EdgeMetrics {
 
 const EdgeRouting: React.FC = () => {
   const { adminPrefix } = useConfig();
+  const t = useTranslation();
   const [config, setConfig] = useState<EdgeRoutingConfig | null>(null);
   const [clusters, setClusters] = useState<Record<string, EdgeCluster>>({});
   const [locations, setLocations] = useState<Record<string, EdgeLocation>>({});
@@ -346,7 +348,7 @@ const EdgeRouting: React.FC = () => {
           <AlertIcon />
           <Box>
             <Text fontWeight="bold">实验性功能</Text>
-            <Text fontSize="sm">边缘计算功能尚未完全实现，有待生产环境测试。请在测试环境中谨慎使用。</Text>
+            <Text fontSize="sm">{t.edgeRouting?.notReadyDesc ?? '边缘计算功能尚未完全实现，有待生产环境测试。请在测试环境中谨慎使用。'}</Text>
           </Box>
         </Alert>
 
@@ -355,7 +357,7 @@ const EdgeRouting: React.FC = () => {
           <Box>
             <Heading size="lg" display="flex" alignItems="center" gap={2}>
               <FiGlobe />
-              边缘计算管理
+              {t.edgeRouting?.title ?? '边缘计算管理'}
             </Heading>
             <Text color="gray.500" mt={2}>
               管理多区域部署和智能路由
