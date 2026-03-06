@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.3] - 2026-03-06
+
+### ✨ 新功能
+
+- **AI 安全分析攻击详情** - 在 AI 安全分析页面的威胁检测结果中添加"查看详细记录"功能
+  - 新增 API 端点 `/api/security/attack-details`，支持按攻击类型筛选查询
+  - 返回完整的攻击记录详情：IP 地址、URL、HTTP 方法、时间戳、国家/ISP、拦截状态等
+  - 弹窗展示统计信息和详细记录表格，方便快速定位安全事件
+- **API 性能统计** - 新增 API 性能监控功能
+  - 记录响应时间、状态码分布等性能指标
+  - 新增 `/api/statistics` 端点获取统计数据
+
+### 🔧 改进
+
+- 更新前端资源，优化界面交互体验
+
 ## [1.7.2] - 2026-03-06
 
 ### 🔧 改进
