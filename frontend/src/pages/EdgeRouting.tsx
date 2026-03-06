@@ -347,7 +347,7 @@ const EdgeRouting: React.FC = () => {
         <Alert status="warning" borderRadius="md">
           <AlertIcon />
           <Box>
-            <Text fontWeight="bold">实验性功能</Text>
+            <Text fontWeight="bold">{t.edgeRouting?.experimentalFeature ?? '实验性功能'}</Text>
             <Text fontSize="sm">{t.edgeRouting?.notReadyDesc ?? '边缘计算功能尚未完全实现，有待生产环境测试。请在测试环境中谨慎使用。'}</Text>
           </Box>
         </Alert>
@@ -360,7 +360,7 @@ const EdgeRouting: React.FC = () => {
               {t.edgeRouting?.title ?? '边缘计算管理'}
             </Heading>
             <Text color="gray.500" mt={2}>
-              管理多区域部署和智能路由
+              {t.edgeRouting?.manageMultiRegionDesc ?? '管理多区域部署和智能路由'}
             </Text>
           </Box>
           <HStack>
@@ -381,7 +381,7 @@ const EdgeRouting: React.FC = () => {
         {!config?.enabled && (
           <Alert status="warning">
             <AlertIcon />
-            边缘路由当前未启用
+            {t.edgeRouting?.edgeRoutingNotEnabled ?? '边缘路由当前未启用'}
           </Alert>
         )}
 

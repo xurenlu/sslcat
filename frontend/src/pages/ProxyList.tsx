@@ -210,7 +210,7 @@ const ProxyList: React.FC = () => {
             isLoading={loading}
             variant="outline"
           >
-{t.common.refresh}
+{t.common?.refresh ?? '刷新'}
           </Button>
           <Button
             leftIcon={<Icon as={FiPlus} />}
@@ -229,10 +229,10 @@ const ProxyList: React.FC = () => {
               <Thead>
                 <Tr>
                   <Th>{t.ssl.domain}</Th>
-                  <Th>目标地址</Th>
+                  <Th>{t.proxy?.targetAddress ?? t.proxyDetail?.targetAddress ?? '目标地址'}</Th>
                   <Th>{t.ssl.status}</Th>
                   <Th>SSL</Th>
-                  <Th>功能</Th>
+                  <Th>{t.proxy?.features ?? '功能'}</Th>
                   <Th>{t.ssl.actions}</Th>
                 </Tr>
               </Thead>

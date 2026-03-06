@@ -172,8 +172,8 @@ const AuditLogsPage: React.FC = () => {
     const text = JSON.stringify(log, null, 2);
     navigator.clipboard.writeText(text);
     toast({
-      title: '已复制',
-      description: '日志详情已复制到剪贴板',
+      title: t.auditLogs?.copied ?? '已复制',
+      description: t.auditLogs?.logDetailCopied ?? '日志详情已复制到剪贴板',
       status: 'success',
       duration: 2000,
     });
@@ -198,7 +198,7 @@ const AuditLogsPage: React.FC = () => {
   if (loading) {
     return (
       <Container maxW="container.xl" py={8}>
-        <Text>加载中...</Text>
+        <Text>{t.auditLogs?.loading ?? '加载中...'}</Text>
       </Container>
     );
   }
@@ -214,16 +214,16 @@ const AuditLogsPage: React.FC = () => {
               {t.auditLogs?.title ?? '审计日志'}
             </Heading>
             <Text color="gray.500" mt={2}>
-              查看和搜索系统操作日志
+              {t.auditLogs?.viewSearchLogs ?? '查看和搜索系统操作日志'}
             </Text>
           </Box>
           <Menu>
             <MenuButton as={Button} rightIcon={<FiChevronDown />} colorScheme="blue">
-              <FiDownload /> 导出
+              <FiDownload /> {t.auditLogs?.export ?? '导出'}
             </MenuButton>
             <MenuList>
-              <MenuItem onClick={() => handleExport('csv')}>导出为 CSV</MenuItem>
-              <MenuItem onClick={() => handleExport('json')}>导出为 JSON</MenuItem>
+              <MenuItem onClick={() => handleExport('csv')}>{t.auditLogs?.exportCsv ?? '导出为 CSV'}</MenuItem>
+              <MenuItem onClick={() => handleExport('json')}>{t.auditLogs?.exportJson ?? '导出为 JSON'}</MenuItem>
             </MenuList>
           </Menu>
         </Box>
@@ -231,25 +231,25 @@ const AuditLogsPage: React.FC = () => {
         {/* Stats Cards */}
         <SimpleGrid columns={{ base: 1, md: 4 }} spacing={4}>
           <StatCard
-            label="总日志数"
+            label={t.auditLogs?.totalLogs ?? '总日志数'}
             value={stats?.total_logs || 0}
             icon={FiFileText}
             color="blue"
           />
           <StatCard
-            label="允许操作"
+            label={t.auditLogs?.allowedOps ?? '允许操作'}
             value={stats?.allowed_actions || 0}
             icon={FiShield}
             color="green"
           />
           <StatCard
-            label="拒绝操作"
+            label={t.auditLogs?.deniedOps ?? '拒绝操作'}
             value={stats?.denied_actions || 0}
             icon={FiActivity}
             color="red"
           />
           <StatCard
-            label="活跃用户"
+            label={t.auditLogs?.activeUsers ?? '活跃用户'}
             value={stats?.unique_users || 0}
             icon={FiUser}
             color="orange"
@@ -261,7 +261,7 @@ const AuditLogsPage: React.FC = () => {
           <CardHeader>
             <Heading size="md" display="flex" alignItems="center" gap={2}>
               <FiFilter />
-              筛选条件
+              {t.auditLogs?.filterConditions ?? '筛选条件'}
             </Heading>
           </CardHeader>
           <CardBody>
@@ -273,7 +273,7 @@ const AuditLogsPage: React.FC = () => {
                       <FiSearch color="gray.300" />
                     </InputLeftElement>
                     <Input
-                      placeholder="搜索日志..."
+                      placeholder={t.auditLogs?.searchLogsPlaceholder ?? '搜索日志...'}
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -282,7 +282,7 @@ const AuditLogsPage: React.FC = () => {
 
                 <FormControl>
                   <Input
-                    placeholder="用户名"
+                    placeholder={t.auditLogs?.username ?? '用户名'}
                     value={filterUser}
                     onChange={(e) => setFilterUser(e.target.value)}
                   />
@@ -290,7 +290,7 @@ const AuditLogsPage: React.FC = () => {
 
                 <FormControl>
                   <Input
-                    placeholder="资源"
+                    placeholder={t.auditLogs?.resource ?? '资源'}
                     value={filterResource}
                     onChange={(e) => setFilterResource(e.target.value)}
                   />
@@ -301,16 +301,16 @@ const AuditLogsPage: React.FC = () => {
                     value={filterAllowed}
                     onChange={(e) => setFilterAllowed(e.target.value)}
                   >
-                    <option value="all">全部状态</option>
-                    <option value="allowed">仅允许</option>
-                    <option value="denied">仅拒绝</option>
+                    <option value="all">{t.auditLogs?.allStatus ?? '全部状态'}</option>
+                    <option value="allowed">{t.auditLogs?.onlyAllowed ?? '仅允许'}</option>
+                    <option value="denied">{t.auditLogs?.onlyDenied ?? '仅拒绝'}</option>
                   </Select>
                 </FormControl>
               </SimpleGrid>
 
               <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
                 <FormControl>
-                  <FormLabel>开始日期</FormLabel>
+                  <FormLabel>{t.auditLogs?.startDate ?? '开始日期'}</FormLabel>
                   <Input
                     type="datetime-local"
                     value={dateFrom}
@@ -319,7 +319,7 @@ const AuditLogsPage: React.FC = () => {
                 </FormControl>
 
                 <FormControl>
-                  <FormLabel>结束日期</FormLabel>
+                  <FormLabel>{t.auditLogs?.endDate ?? '结束日期'}</FormLabel>
                   <Input
                     type="datetime-local"
                     value={dateTo}
@@ -333,7 +333,7 @@ const AuditLogsPage: React.FC = () => {
                     onClick={fetchLogs}
                     width="full"
                   >
-                    <FiSearch /> 搜索
+                    <FiSearch /> {t.auditLogs?.search ?? '搜索'}
                   </Button>
                 </FormControl>
               </SimpleGrid>
@@ -345,7 +345,7 @@ const AuditLogsPage: React.FC = () => {
         <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={4}>
           <Card>
             <CardHeader>
-              <Heading size="sm">最常访问资源</Heading>
+              <Heading size="sm">{t.auditLogs?.mostAccessedResources ?? '最常访问资源'}</Heading>
             </CardHeader>
             <CardBody>
               <VStack spacing={2} align="stretch">
@@ -363,7 +363,7 @@ const AuditLogsPage: React.FC = () => {
 
           <Card>
             <CardHeader>
-              <Heading size="sm">最活跃用户</Heading>
+              <Heading size="sm">{t.auditLogs?.mostActiveUsers ?? '最活跃用户'}</Heading>
             </CardHeader>
             <CardBody>
               <VStack spacing={2} align="stretch">

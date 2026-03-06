@@ -158,6 +158,8 @@ export interface Translation {
     syncCertsFromMaster: string
     syncCertsSuccess: string
     slaveNotice: string
+    nodeConfig?: string
+    experimentalFeature?: string
   }
 
   // 集群状态
@@ -190,6 +192,8 @@ export interface Translation {
     createFirst: string
     username: string
     password: string
+    targetAddress?: string
+    features?: string
     performance_monitoring: string
     enable_tracing: string
     enable_metrics: string
@@ -555,6 +559,35 @@ export interface Translation {
     basic_config: string
     cpu_usage: string
     memory_usage: string
+    realtime_cpu_usage?: string
+    memory_realtime_usage?: string
+    update_time?: string
+    last_refresh_time?: string
+    today?: string
+    last7days?: string
+    last30days?: string
+    last90days?: string
+    one_min?: string
+    five_min?: string
+    fifteen_min?: string
+    loading_history_data?: string
+    no_history_data?: string
+    history_data_will_collect?: string
+    memory_max_usage_percent?: string
+    memory_release_cooldown_sec?: string
+    cpu_monitor_config?: string
+    memory_monitor_config?: string
+    alert_config?: string
+    auto_exit_config?: string
+    zero_disable?: string
+    avg_cpu?: string
+    max_cpu?: string
+    data_points?: string
+    avg_memory?: string
+    max_memory?: string
+    memory_mb?: string
+    memory_percent?: string
+    time_label?: string
     watchdog_enabled: string
     cpu_threshold: string
     cpu_increase_threshold: string
@@ -2019,6 +2052,31 @@ export interface Translation {
     title: string
     realtimeConnected: string
     offline: string
+    totalAttacks?: string
+    lastHours?: string
+    blocked?: string
+    attackSources?: string
+    countriesRegions?: string
+    activeIPs?: string
+    attackSourceIPCount?: string
+    attackSourceMap?: string
+    oneHour?: string
+    twentyFourHours?: string
+    sevenDays?: string
+    attackDetails?: string
+    securityStatusGood?: string
+    noAttacksDetected?: string
+    location?: string
+    type?: string
+    count?: string
+    status?: string
+    notBlocked?: string
+    blockedRate?: string
+    attackTypeDistribution?: string
+    refreshSuccess?: string
+    loading?: string
+    lastSeen?: string
+    attackCount?: string
   }
 
   // 威胁情报
@@ -2032,6 +2090,29 @@ export interface Translation {
     sourceUpdateTriggered: string
     sourceUpdateFailed: string
     sourceStatusUpdated: string
+    totalIOCs?: string
+    totalThreatIndicators?: string
+    criticalThreats?: string
+    needsImmediateAttention?: string
+    highRiskThreats?: string
+    highPriorityProcessing?: string
+    intelSourceCount?: string
+    activeDataSources?: string
+    overview?: string
+    iocQuery?: string
+    latestThreats?: string
+    threatLevelDistribution?: string
+    systemStatus?: string
+    activeIntelSources?: string
+    lastUpdated?: string
+    unknown?: string
+    totalUpdateFreq?: string
+    feedbackIssue?: string
+    severe?: string
+    high?: string
+    medium?: string
+    low?: string
+    loading?: string
   }
 
   // 审计日志
@@ -2039,6 +2120,29 @@ export interface Translation {
     title: string
     loadFailed: string
     exportFailed: string
+    viewSearchLogs?: string
+    export?: string
+    exportCsv?: string
+    exportJson?: string
+    totalLogs?: string
+    allowedOps?: string
+    deniedOps?: string
+    activeUsers?: string
+    filterConditions?: string
+    searchLogsPlaceholder?: string
+    username?: string
+    resource?: string
+    allStatus?: string
+    onlyAllowed?: string
+    onlyDenied?: string
+    search?: string
+    startDate?: string
+    endDate?: string
+    mostAccessedResources?: string
+    mostActiveUsers?: string
+    copied?: string
+    logDetailCopied?: string
+    loading?: string
   }
 
   // 安全报告
@@ -2100,6 +2204,9 @@ export interface Translation {
   edgeRouting?: {
     title: string
     notReadyDesc: string
+    experimentalFeature?: string
+    manageMultiRegionDesc?: string
+    edgeRoutingNotEnabled?: string
   }
 
   // 零信任安全
@@ -2107,5 +2214,17 @@ export interface Translation {
     title: string
     notReadyDesc: string
     auditLogs: string
+    experimentalFeature?: string
+    manageMTLSDesc?: string
+    certsIssued?: string
+    roleCount?: string
+    accessPolicies?: string
+    mtlsStatus?: string
+    disabled?: string
+    enabled?: string
+    mtlsConfig?: string
+    rbacManagement?: string
+    mtlsSettings?: string
   }
+
 }

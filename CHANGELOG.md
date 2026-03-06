@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🔧 改进
 
-- **安全报告页面国际化**：将 SecurityReports 页面所有硬编码中文替换为 i18n，补全 zh-CN、en-US、ja-JP、es-ES、fr-FR、de-DE、ru-RU 七种语言的 securityReports 翻译 key
+- **安全报告页面国际化**：将 SecurityReports 页面所有硬编码中文替换为 i18n，补全 zh-CN、en-US 等语言的 securityReports 翻译 key
+- **多页面国际化**：Monitoring、ProxyList、AttackMap、ThreatIntel、AuditLogs、EdgeRouting、SecurityMTLS、ClusterSettings 等页面硬编码中文改为 i18n，补全 zh-CN、en-US 翻译
 
 ## [1.7.0] - 2026-03-06
 

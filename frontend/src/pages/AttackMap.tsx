@@ -143,12 +143,12 @@ const AttackMap: React.FC = () => {
     setRefreshing(true)
     await loadData()
     setRefreshing(false)
-    toast({
-      title: '刷新成功',
-      status: 'success',
-      duration: 2000,
-      isClosable: true,
-    })
+      toast({
+        title: t.attackMap?.refreshSuccess ?? '刷新成功',
+        status: 'success',
+        duration: 2000,
+        isClosable: true,
+      })
   }
 
   // WebSocket 连接
@@ -245,7 +245,7 @@ const AttackMap: React.FC = () => {
       <Box p={6} display="flex" justifyContent="center" alignItems="center" minH="400px">
         <VStack spacing={4}>
           <Spinner size="xl" thickness="4px" speed="0.65s" emptyColor="gray.200" color="blue.500" />
-          <Text>加载中...</Text>
+          <Text>{t.attackMap?.loading ?? '加载中...'}</Text>
         </VStack>
       </Box>
     )
@@ -270,7 +270,7 @@ const AttackMap: React.FC = () => {
               onClick={handleRefresh}
               isLoading={refreshing}
             >
-              {t.common.refresh}
+              {t.common?.refresh ?? '刷新'}
             </Button>
           </HStack>
         </HStack>
@@ -283,10 +283,10 @@ const AttackMap: React.FC = () => {
                 <Stat>
                   <StatLabel display="flex" alignItems="center">
                     <Icon as={FiTarget} mr={2} color="blue.500" />
-                    总攻击次数
+                    {t.attackMap?.totalAttacks ?? '总攻击次数'}
                   </StatLabel>
                   <StatNumber>{stats.total_attacks.toLocaleString()}</StatNumber>
-                  <StatHelpText>过去 {selectedHours} 小时</StatHelpText>
+                  <StatHelpText>{(t.attackMap?.lastHours ?? '过去 {n} 小时').replace('{n}', String(selectedHours))}</StatHelpText>
                 </Stat>
               </CardBody>
             </Card>
@@ -296,12 +296,12 @@ const AttackMap: React.FC = () => {
                 <Stat>
                   <StatLabel display="flex" alignItems="center">
                     <Icon as={FiShield} mr={2} color="green.500" />
-                    已阻止
+                    {t.attackMap?.blocked ?? '已阻止'}
                   </StatLabel>
                   <StatNumber>{stats.blocked_attacks.toLocaleString()}</StatNumber>
                   <StatHelpText>
                     {stats.total_attacks > 0
-                      ? `${((stats.blocked_attacks / stats.total_attacks) * 100).toFixed(1)}% 阻止率`
+                      ? `${((stats.blocked_attacks / stats.total_attacks) * 100).toFixed(1)}% ${t.attackMap?.blockedRate ?? '阻止率'}`
                       : '-'}
                   </StatHelpText>
                 </Stat>
@@ -313,10 +313,10 @@ const AttackMap: React.FC = () => {
                 <Stat>
                   <StatLabel display="flex" alignItems="center">
                     <Icon as={FiActivity} mr={2} color="purple.500" />
-                    攻击来源
+                    {t.attackMap?.attackSources ?? '攻击来源'}
                   </StatLabel>
                   <StatNumber>{Object.keys(stats.by_country).length}</StatNumber>
-                  <StatHelpText>个国家/地区</StatHelpText>
+                  <StatHelpText>{t.attackMap?.countriesRegions ?? '个国家/地区'}</StatHelpText>
                 </Stat>
               </CardBody>
             </Card>
@@ -326,10 +326,10 @@ const AttackMap: React.FC = () => {
                 <Stat>
                   <StatLabel display="flex" alignItems="center">
                     <Icon as={FiAlertTriangle} mr={2} color="orange.500" />
-                    活跃IP
+                    {t.attackMap?.activeIPs ?? '活跃IP'}
                   </StatLabel>
                   <StatNumber>{stats.top_ips.length}</StatNumber>
-                  <StatHelpText>攻击源IP数量</StatHelpText>
+                  <StatHelpText>{t.attackMap?.attackSourceIPCount ?? '攻击源IP数量'}</StatHelpText>
                 </Stat>
               </CardBody>
             </Card>
@@ -343,27 +343,27 @@ const AttackMap: React.FC = () => {
             <CardBody>
               <VStack spacing={4} align="stretch">
                 <HStack justify="space-between">
-                  <Heading size="md">攻击来源地图</Heading>
+                  <Heading size="md">{t.attackMap?.attackSourceMap ?? '攻击来源地图'}</Heading>
                   <Button
                     size="sm"
                     variant={selectedHours === 1 ? 'solid' : 'outline'}
                     onClick={() => setSelectedHours(1)}
                   >
-                    1小时
+                    {t.attackMap?.oneHour ?? '1小时'}
                   </Button>
                   <Button
                     size="sm"
                     variant={selectedHours === 24 ? 'solid' : 'outline'}
                     onClick={() => setSelectedHours(24)}
                   >
-                    24小时
+                    {t.attackMap?.twentyFourHours ?? '24小时'}
                   </Button>
                   <Button
                     size="sm"
                     variant={selectedHours === 168 ? 'solid' : 'outline'}
                     onClick={() => setSelectedHours(168)}
                   >
-                    7天
+                    {t.attackMap?.sevenDays ?? '7天'}
                   </Button>
                 </HStack>
 
@@ -400,14 +400,14 @@ const AttackMap: React.FC = () => {
                             <Badge colorScheme={getAttackTypeColor(attack.attack_type)}>
                               {getAttackTypeLabel(attack.attack_type)}
                             </Badge>
-                            <Text fontSize="sm">攻击次数: {attack.count}</Text>
+                            <Text fontSize="sm">{t.attackMap?.attackCount ?? '攻击次数'}: {attack.count}</Text>
                             <Text fontSize="sm">
-                              最后一次: {new Date(attack.last_seen).toLocaleString('zh-CN')}
+                              {t.attackMap?.lastSeen ?? '最后一次'}: {new Date(attack.last_seen).toLocaleString()}
                             </Text>
                             {attack.blocked ? (
-                              <Badge colorScheme="red">已阻止</Badge>
+                              <Badge colorScheme="red">{t.attackMap?.blocked ?? '已阻止'}</Badge>
                             ) : (
-                              <Badge colorScheme="yellow">未阻止</Badge>
+                              <Badge colorScheme="yellow">{t.attackMap?.notBlocked ?? '未阻止'}</Badge>
                             )}
                           </VStack>
                         </Popup>
@@ -424,14 +424,14 @@ const AttackMap: React.FC = () => {
           <Card bg={bgColor} borderColor={borderColor} borderWidth="1px">
             <CardBody>
               <VStack spacing={4} align="stretch">
-                <Heading size="md">攻击详情</Heading>
+                <Heading size="md">{t.attackMap?.attackDetails ?? '攻击详情'}</Heading>
 
                 {attacks.length === 0 ? (
                   <Alert status="success">
                     <AlertIcon />
                     <Box>
-                      <Text fontWeight="bold">安全状态良好</Text>
-                      <Text fontSize="sm">过去 {selectedHours} 小时内未检测到攻击</Text>
+                      <Text fontWeight="bold">{t.attackMap?.securityStatusGood ?? '安全状态良好'}</Text>
+                      <Text fontSize="sm">{(t.attackMap?.noAttacksDetected ?? '过去 {n} 小时内未检测到攻击').replace('{n}', String(selectedHours))}</Text>
                     </Box>
                   </Alert>
                 ) : (
@@ -439,10 +439,10 @@ const AttackMap: React.FC = () => {
                     <Table size="sm">
                       <Thead position="sticky" top={0} bg="white" zIndex={1}>
                         <Tr>
-                          <Th>位置</Th>
-                          <Th>类型</Th>
-                          <Th>次数</Th>
-                          <Th>状态</Th>
+                          <Th>{t.attackMap?.location ?? '位置'}</Th>
+                          <Th>{t.attackMap?.type ?? '类型'}</Th>
+                          <Th>{t.attackMap?.count ?? '次数'}</Th>
+                          <Th>{t.attackMap?.status ?? '状态'}</Th>
                         </Tr>
                       </Thead>
                       <Tbody>
@@ -473,12 +473,12 @@ const AttackMap: React.FC = () => {
                               {attack.blocked ? (
                                 <Badge colorScheme="red" display="flex" alignItems="center" gap={1}>
                                   <Icon as={FiCheckCircle} boxSize={3} />
-                                  已阻止
+                                  {t.attackMap?.blocked ?? '已阻止'}
                                 </Badge>
                               ) : (
                                 <Badge colorScheme="yellow" display="flex" alignItems="center" gap={1}>
                                   <Icon as={FiXCircle} boxSize={3} />
-                                  未阻止
+                                  {t.attackMap?.notBlocked ?? '未阻止'}
                                 </Badge>
                               )}
                             </Td>
@@ -497,7 +497,7 @@ const AttackMap: React.FC = () => {
         {stats && stats.by_type && Object.keys(stats.by_type).length > 0 && (
           <Card bg={bgColor} borderColor={borderColor} borderWidth="1px">
             <CardBody>
-              <Heading size="md" mb={4}>攻击类型分布</Heading>
+              <Heading size="md" mb={4}>{t.attackMap?.attackTypeDistribution ?? '攻击类型分布'}</Heading>
               <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={4}>
                 {Object.entries(stats.by_type).map(([type, count]) => (
                   <Box key={type}>

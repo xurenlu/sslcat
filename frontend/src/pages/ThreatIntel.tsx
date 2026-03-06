@@ -248,22 +248,22 @@ const ThreatIntel: React.FC = () => {
   const getThreatLevelLabel = (level: string) => {
     switch (level) {
       case 'critical':
-        return '严重';
+        return t.threatIntel?.severe ?? '严重';
       case 'high':
-        return '高';
+        return t.threatIntel?.high ?? '高';
       case 'medium':
-        return '中';
+        return t.threatIntel?.medium ?? '中';
       case 'low':
-        return '低';
+        return t.threatIntel?.low ?? '低';
       default:
-        return '未知';
+        return t.threatIntel?.unknown ?? '未知';
     }
   };
 
   if (loading) {
     return (
       <Container maxW="container.xl" py={8}>
-        <Text>加载中...</Text>
+        <Text>{t.threatIntel?.loading ?? '加载中...'}</Text>
       </Container>
     );
   }
@@ -299,9 +299,9 @@ const ThreatIntel: React.FC = () => {
           <Card>
             <CardBody>
               <Stat>
-                <StatLabel>总 IOC 数</StatLabel>
+                <StatLabel>{t.threatIntel?.totalIOCs ?? '总 IOC 数'}</StatLabel>
                 <StatNumber>{stats?.total_iocs.toLocaleString()}</StatNumber>
-                <StatHelpText>威胁指标总数</StatHelpText>
+                <StatHelpText>{t.threatIntel?.totalThreatIndicators ?? '威胁指标总数'}</StatHelpText>
               </Stat>
             </CardBody>
           </Card>
@@ -309,9 +309,9 @@ const ThreatIntel: React.FC = () => {
           <Card>
             <CardBody>
               <Stat>
-                <StatLabel color="red.500">严重威胁</StatLabel>
+                <StatLabel color="red.500">{t.threatIntel?.criticalThreats ?? '严重威胁'}</StatLabel>
                 <StatNumber color="red.500">{stats?.critical_count}</StatNumber>
-                <StatHelpText>需要立即处理</StatHelpText>
+                <StatHelpText>{t.threatIntel?.needsImmediateAttention ?? '需要立即处理'}</StatHelpText>
               </Stat>
             </CardBody>
           </Card>
@@ -319,9 +319,9 @@ const ThreatIntel: React.FC = () => {
           <Card>
             <CardBody>
               <Stat>
-                <StatLabel color="orange.500">高危威胁</StatLabel>
+                <StatLabel color="orange.500">{t.threatIntel?.highRiskThreats ?? '高危威胁'}</StatLabel>
                 <StatNumber color="orange.500">{stats?.high_count}</StatNumber>
-                <StatHelpText>高优先级处理</StatHelpText>
+                <StatHelpText>{t.threatIntel?.highPriorityProcessing ?? '高优先级处理'}</StatHelpText>
               </Stat>
             </CardBody>
           </Card>
@@ -329,9 +329,9 @@ const ThreatIntel: React.FC = () => {
           <Card>
             <CardBody>
               <Stat>
-                <StatLabel>情报源数量</StatLabel>
+                <StatLabel>{t.threatIntel?.intelSourceCount ?? '情报源数量'}</StatLabel>
                 <StatNumber>{stats?.sources_count}</StatNumber>
-                <StatHelpText>活跃数据源</StatHelpText>
+                <StatHelpText>{t.threatIntel?.activeDataSources ?? '活跃数据源'}</StatHelpText>
               </Stat>
             </CardBody>
           </Card>
@@ -343,25 +343,25 @@ const ThreatIntel: React.FC = () => {
             <Tab>
               <Box display="flex" alignItems="center" gap={2}>
                 <FiActivity />
-                概览
+                {t.threatIntel?.overview ?? '概览'}
               </Box>
             </Tab>
             <Tab>
               <Box display="flex" alignItems="center" gap={2}>
                 <FiDatabase />
-                情报源
+                {t.threatIntel?.sources ?? '情报源'}
               </Box>
             </Tab>
             <Tab>
               <Box display="flex" alignItems="center" gap={2}>
                 <FiSearch />
-                IOC 查询
+                {t.threatIntel?.iocQuery ?? 'IOC 查询'}
               </Box>
             </Tab>
             <Tab>
               <Box display="flex" alignItems="center" gap={2}>
                 <FiGlobe />
-                最新威胁
+                {t.threatIntel?.latestThreats ?? '最新威胁'}
               </Box>
             </Tab>
           </TabList>
@@ -372,13 +372,13 @@ const ThreatIntel: React.FC = () => {
               <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
                 <Card>
                   <CardHeader>
-                    <Heading size="md">威胁等级分布</Heading>
+                    <Heading size="md">{t.threatIntel?.threatLevelDistribution ?? '威胁等级分布'}</Heading>
                   </CardHeader>
                   <CardBody>
                     <VStack spacing={3} align="stretch">
                       <Box>
                         <HStack justify="space-between" mb={2}>
-                          <Text>严重</Text>
+                          <Text>{t.threatIntel?.severe ?? '严重'}</Text>
                           <Text>{stats?.critical_count}</Text>
                         </HStack>
                         <Progress
@@ -388,7 +388,7 @@ const ThreatIntel: React.FC = () => {
                       </Box>
                       <Box>
                         <HStack justify="space-between" mb={2}>
-                          <Text>高</Text>
+                          <Text>{t.threatIntel?.high ?? '高'}</Text>
                           <Text>{stats?.high_count}</Text>
                         </HStack>
                         <Progress
@@ -398,7 +398,7 @@ const ThreatIntel: React.FC = () => {
                       </Box>
                       <Box>
                         <HStack justify="space-between" mb={2}>
-                          <Text>中</Text>
+                          <Text>{t.threatIntel?.medium ?? '中'}</Text>
                           <Text>{stats?.medium_count}</Text>
                         </HStack>
                         <Progress
@@ -408,7 +408,7 @@ const ThreatIntel: React.FC = () => {
                       </Box>
                       <Box>
                         <HStack justify="space-between" mb={2}>
-                          <Text>低</Text>
+                          <Text>{t.threatIntel?.low ?? '低'}</Text>
                           <Text>{stats?.low_count}</Text>
                         </HStack>
                         <Progress
@@ -422,24 +422,24 @@ const ThreatIntel: React.FC = () => {
 
                 <Card>
                   <CardHeader>
-                    <Heading size="md">系统状态</Heading>
+                    <Heading size="md">{t.threatIntel?.systemStatus ?? '系统状态'}</Heading>
                   </CardHeader>
                   <CardBody>
                     <VStack spacing={3} align="stretch">
                       <HStack justify="space-between">
-                        <Text>活跃情报源</Text>
+                        <Text>{t.threatIntel?.activeIntelSources ?? '活跃情报源'}</Text>
                         <Badge colorScheme="green">{sources.filter((s) => s.enabled).length}</Badge>
                       </HStack>
                       <HStack justify="space-between">
-                        <Text>最后更新</Text>
+                        <Text>{t.threatIntel?.lastUpdated ?? '最后更新'}</Text>
                         <Text fontSize="sm">
                           {stats?.last_update
                             ? new Date(stats.last_update).toLocaleString()
-                            : '未知'}
+                            : (t.threatIntel?.unknown ?? '未知')}
                         </Text>
                       </HStack>
                       <HStack justify="space-between">
-                        <Text>总更新频率</Text>
+                        <Text>{t.threatIntel?.totalUpdateFreq ?? '总更新频率'}</Text>
                         <Text>
                           {sources.reduce((acc: number, s) => {
                             if (!s.enabled || !s.update_freq) return acc;

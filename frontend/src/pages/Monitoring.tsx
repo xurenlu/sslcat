@@ -347,7 +347,7 @@ const Monitoring: React.FC = () => {
                   `${stats.cpu_percent.toFixed(2)}%`
                 )}
               </StatNumber>
-              <StatHelpText>实时 CPU 占用</StatHelpText>
+              <StatHelpText>{t.monitoring?.realtime_cpu_usage ?? '实时 CPU 占用'}</StatHelpText>
             </Stat>
             <Stat>
               <StatLabel>
@@ -364,17 +364,17 @@ const Monitoring: React.FC = () => {
               <StatHelpText>
                 {stats.memory_rss_mb > 0
                   ? `${stats.memory_rss_mb.toFixed(0)} MB`
-                  : '实时内存占用'}
+                  : (t.monitoring?.memory_realtime_usage ?? '实时内存占用')}
               </StatHelpText>
             </Stat>
             <Stat>
-              <StatLabel>更新时间</StatLabel>
+              <StatLabel>{t.monitoring?.update_time ?? '更新时间'}</StatLabel>
               <StatNumber fontSize="md">
                 {stats.timestamp
-                  ? new Date(stats.timestamp).toLocaleTimeString('zh-CN')
+                  ? new Date(stats.timestamp).toLocaleTimeString()
                   : '-'}
               </StatNumber>
-              <StatHelpText>最后刷新时间</StatHelpText>
+              <StatHelpText>{t.monitoring?.last_refresh_time ?? '最后刷新时间'}</StatHelpText>
             </Stat>
           </SimpleGrid>
         </CardBody>
@@ -394,19 +394,19 @@ const Monitoring: React.FC = () => {
                 onChange={(e) => setTimeRange(e.target.value as any)}
                 width="150px"
               >
-                <option value="today">今天</option>
-                <option value="7days">最近7天</option>
-                <option value="30days">最近30天</option>
-                <option value="90days">最近90天</option>
+                <option value="today">{t.monitoring?.today ?? '今天'}</option>
+                <option value="7days">{t.monitoring?.last7days ?? '最近7天'}</option>
+                <option value="30days">{t.monitoring?.last30days ?? '最近30天'}</option>
+                <option value="90days">{t.monitoring?.last90days ?? '最近90天'}</option>
               </Select>
               <Select
                 value={granularity}
                 onChange={(e) => setGranularity(e.target.value as '1min' | '5min' | '15min')}
                 width="120px"
               >
-                <option value="1min">1分钟</option>
-                <option value="5min">5分钟</option>
-                <option value="15min">15分钟</option>
+                <option value="1min">{t.monitoring?.one_min ?? '1分钟'}</option>
+                <option value="5min">{t.monitoring?.five_min ?? '5分钟'}</option>
+                <option value="15min">{t.monitoring?.fifteen_min ?? '15分钟'}</option>
               </Select>
               <Button
                 size="sm"
@@ -414,7 +414,7 @@ const Monitoring: React.FC = () => {
                 onClick={() => loadMetrics(timeRange, granularity)}
                 isLoading={metricsLoading}
               >
-                刷新
+                {t.common?.refresh ?? '刷新'}
               </Button>
             </HStack>
           </HStack>
@@ -423,13 +423,13 @@ const Monitoring: React.FC = () => {
           {metricsLoading ? (
             <Box textAlign="center" py={10}>
               <Spinner size="lg" />
-              <Text mt={4}>加载历史数据中...</Text>
+              <Text mt={4}>{t.monitoring?.loading_history_data ?? '加载历史数据中...'}</Text>
             </Box>
           ) : metricsData && metricsData.data && Array.isArray(metricsData.data) && metricsData.data.length > 0 ? (
             <Tabs>
               <TabList>
-                <Tab>CPU 使用率</Tab>
-                <Tab>内存使用</Tab>
+                <Tab>{t.monitoring?.cpu_usage ?? 'CPU 使用率'}</Tab>
+                <Tab>{t.monitoring?.memory_usage ?? '内存使用'}</Tab>
               </TabList>
               <TabPanels>
                 <TabPanel>
@@ -455,8 +455,8 @@ const Monitoring: React.FC = () => {
                         />
                         <YAxis label={{ value: 'CPU (%)', angle: -90, position: 'insideLeft' }} />
                         <Tooltip
-                          formatter={(value: any) => [`${Number(value).toFixed(2)}%`, 'CPU 使用率']}
-                          labelFormatter={(label) => `时间: ${label}`}
+                          formatter={(value: any) => [`${Number(value).toFixed(2)}%`, t.monitoring?.cpu_usage ?? 'CPU 使用率']}
+                          labelFormatter={(label) => `${t.monitoring?.time_label ?? '时间'}: ${label}`}
                         />
                         <Legend />
                         <Line
@@ -465,7 +465,7 @@ const Monitoring: React.FC = () => {
                           stroke="#3182CE"
                           strokeWidth={2}
                           dot={{ r: 3 }}
-                          name="CPU 使用率"
+                          name={t.monitoring?.cpu_usage ?? 'CPU 使用率'}
                         />
                       </LineChart>
                     </ResponsiveContainer>
@@ -473,15 +473,15 @@ const Monitoring: React.FC = () => {
                   {metricsData.summary && (
                     <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4} mt={4}>
                       <Stat>
-                        <StatLabel>平均 CPU</StatLabel>
+                        <StatLabel>{t.monitoring?.avg_cpu ?? '平均 CPU'}</StatLabel>
                         <StatNumber fontSize="lg">{metricsData.summary.avg_cpu.toFixed(2)}%</StatNumber>
                       </Stat>
                       <Stat>
-                        <StatLabel>最大 CPU</StatLabel>
+                        <StatLabel>{t.monitoring?.max_cpu ?? '最大 CPU'}</StatLabel>
                         <StatNumber fontSize="lg">{metricsData.summary.max_cpu.toFixed(2)}%</StatNumber>
                       </Stat>
                       <Stat>
-                        <StatLabel>数据点数</StatLabel>
+                        <StatLabel>{t.monitoring?.data_points ?? '数据点数'}</StatLabel>
                         <StatNumber fontSize="lg">{metricsData.summary.total_samples}</StatNumber>
                       </Stat>
                     </SimpleGrid>
@@ -521,12 +521,12 @@ const Monitoring: React.FC = () => {
                         <Tooltip
                           formatter={(value: any, name: string) => {
                             if (name === '内存MB') {
-                              return [`${Number(value).toFixed(2)} MB`, '内存使用']
+                              return [`${Number(value).toFixed(2)} MB`, t.monitoring?.memory_usage ?? '内存使用']
                             } else {
-                              return [`${Number(value).toFixed(2)}%`, '内存百分比']
+                              return [`${Number(value).toFixed(2)}%`, t.monitoring?.memory_percent ?? '内存百分比']
                             }
                           }}
-                          labelFormatter={(label) => `时间: ${label}`}
+                          labelFormatter={(label) => `${t.monitoring?.time_label ?? '时间'}: ${label}`}
                         />
                         <Legend />
                         <Line
@@ -536,7 +536,7 @@ const Monitoring: React.FC = () => {
                           stroke="#38A169"
                           strokeWidth={2}
                           dot={{ r: 3 }}
-                          name="内存MB"
+                          name={t.monitoring?.memory_mb ?? '内存MB'}
                         />
                         <Line
                           yAxisId="right"
@@ -545,7 +545,7 @@ const Monitoring: React.FC = () => {
                           stroke="#805AD5"
                           strokeWidth={2}
                           dot={{ r: 3 }}
-                          name="内存百分比"
+                          name={t.monitoring?.memory_percent ?? '内存百分比'}
                         />
                       </LineChart>
                     </ResponsiveContainer>
@@ -553,15 +553,15 @@ const Monitoring: React.FC = () => {
                   {metricsData.summary && (
                     <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4} mt={4}>
                       <Stat>
-                        <StatLabel>平均内存</StatLabel>
+                        <StatLabel>{t.monitoring?.avg_memory ?? '平均内存'}</StatLabel>
                         <StatNumber fontSize="lg">{metricsData.summary.avg_memory_mb.toFixed(2)} MB</StatNumber>
                       </Stat>
                       <Stat>
-                        <StatLabel>最大内存</StatLabel>
+                        <StatLabel>{t.monitoring?.max_memory ?? '最大内存'}</StatLabel>
                         <StatNumber fontSize="lg">{metricsData.summary.max_memory_mb.toFixed(2)} MB</StatNumber>
                       </Stat>
                       <Stat>
-                        <StatLabel>数据点数</StatLabel>
+                        <StatLabel>{t.monitoring?.data_points ?? '数据点数'}</StatLabel>
                         <StatNumber fontSize="lg">{metricsData.summary.total_samples}</StatNumber>
                       </Stat>
                     </SimpleGrid>
@@ -571,9 +571,9 @@ const Monitoring: React.FC = () => {
             </Tabs>
           ) : (
             <Box textAlign="center" py={10}>
-              <Text color="gray.500">暂无历史数据</Text>
+              <Text color="gray.500">{t.monitoring?.no_history_data ?? '暂无历史数据'}</Text>
               <Text fontSize="sm" color="gray.400" mt={2}>
-                历史数据将在启用指标存储后开始收集
+                {t.monitoring?.history_data_will_collect ?? '历史数据将在启用指标存储后开始收集'}
               </Text>
             </Box>
           )}
@@ -588,7 +588,7 @@ const Monitoring: React.FC = () => {
         <CardBody>
           <VStack spacing={4} align="stretch">
             <FormControl>
-              <FormLabel>内存最大使用百分比 (%)</FormLabel>
+              <FormLabel>{t.monitoring?.memory_max_usage_percent ?? '内存最大使用百分比 (%)'}</FormLabel>
               <NumberInput
                 value={config.memory_max_usage_percent}
                 min={5}
@@ -605,7 +605,7 @@ const Monitoring: React.FC = () => {
               </NumberInput>
             </FormControl>
             <FormControl>
-              <FormLabel>内存释放冷却时间 (秒)</FormLabel>
+              <FormLabel>{t.monitoring?.memory_release_cooldown_sec ?? '内存释放冷却时间 (秒)'}</FormLabel>
               <NumberInput
                 value={config.memory_release_cooldown_sec}
                 min={60}
@@ -646,7 +646,7 @@ const Monitoring: React.FC = () => {
             {config.watchdog_enabled && (
               <>
                 <Divider />
-                <Heading size="sm">CPU 监控配置</Heading>
+                <Heading size="sm">{t.monitoring?.cpu_monitor_config ?? 'CPU 监控配置'}</Heading>
                 <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
                   <FormControl>
                     <FormLabel>
@@ -739,7 +739,7 @@ const Monitoring: React.FC = () => {
                 </SimpleGrid>
 
                 <Divider />
-                <Heading size="sm">内存监控配置</Heading>
+                <Heading size="sm">{t.monitoring?.memory_monitor_config ?? '内存监控配置'}</Heading>
                 <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
                   <FormControl>
                     <FormLabel>
@@ -762,7 +762,7 @@ const Monitoring: React.FC = () => {
                       </NumberInputStepper>
                     </NumberInput>
                     <Text fontSize="sm" color="gray.500" mt={1}>
-                      0 表示禁用
+                      {t.monitoring?.zero_disable ?? '0 表示禁用'}
                     </Text>
                   </FormControl>
                   <FormControl>
@@ -787,7 +787,7 @@ const Monitoring: React.FC = () => {
                       </NumberInputStepper>
                     </NumberInput>
                     <Text fontSize="sm" color="gray.500" mt={1}>
-                      0 表示禁用
+                      {t.monitoring?.zero_disable ?? '0 表示禁用'}
                     </Text>
                   </FormControl>
                   <FormControl>
@@ -836,7 +836,7 @@ const Monitoring: React.FC = () => {
                 </SimpleGrid>
 
                 <Divider />
-                <Heading size="sm">报警配置</Heading>
+                <Heading size="sm">{t.monitoring?.alert_config ?? '报警配置'}</Heading>
                 <FormControl>
                   <FormLabel>
                     {t.monitoring?.alert_cooldown || '报警冷却时间 (秒)'}
@@ -861,7 +861,7 @@ const Monitoring: React.FC = () => {
                 </FormControl>
 
                 <Divider />
-                <Heading size="sm">自动退出配置</Heading>
+                <Heading size="sm">{t.monitoring?.auto_exit_config ?? '自动退出配置'}</Heading>
                 {(config.watchdog_exit_on_memory_threshold ||
                   config.watchdog_exit_on_cpu_threshold) && (
                   <Alert status="warning">

@@ -305,7 +305,7 @@ const SecurityMTLS: React.FC = () => {
         <Alert status="warning" borderRadius="md">
           <AlertIcon />
           <Box>
-            <Text fontWeight="bold">实验性功能</Text>
+            <Text fontWeight="bold">{t.securityMTLS?.experimentalFeature ?? '实验性功能'}</Text>
             <Text fontSize="sm">{t.securityMTLS?.notReadyDesc ?? '零信任安全（mTLS）功能尚未完全实现，有待生产环境测试。请在测试环境中谨慎使用。'}</Text>
           </Box>
         </Alert>
@@ -318,7 +318,7 @@ const SecurityMTLS: React.FC = () => {
               {t.securityMTLS?.title ?? '零信任安全中心'}
             </Heading>
             <Text color="gray.500" mt={2}>
-              管理 mTLS、RBAC 和访问控制
+              {t.securityMTLS?.manageMTLSDesc ?? '管理 mTLS、RBAC 和访问控制'}
             </Text>
           </Box>
         </Box>
@@ -333,7 +333,7 @@ const SecurityMTLS: React.FC = () => {
                 </Box>
                 <Box>
                   <Text fontSize="sm" color="gray.500">
-                    已颁发证书
+                    {t.securityMTLS?.certsIssued ?? '已颁发证书'}
                   </Text>
                   <Text fontSize="2xl" fontWeight="bold">
                     {issuedCerts.length}
@@ -351,7 +351,7 @@ const SecurityMTLS: React.FC = () => {
                 </Box>
                 <Box>
                   <Text fontSize="sm" color="gray.500">
-                    角色数量
+                    {t.securityMTLS?.roleCount ?? '角色数量'}
                   </Text>
                   <Text fontSize="2xl" fontWeight="bold">
                     {roles.length}
@@ -369,7 +369,7 @@ const SecurityMTLS: React.FC = () => {
                 </Box>
                 <Box>
                   <Text fontSize="sm" color="gray.500">
-                    访问策略
+                    {t.securityMTLS?.accessPolicies ?? '访问策略'}
                   </Text>
                   <Text fontSize="2xl" fontWeight="bold">
                     {policies.length}
@@ -387,10 +387,10 @@ const SecurityMTLS: React.FC = () => {
                 </Box>
                 <Box>
                   <Text fontSize="sm" color="gray.500">
-                    mTLS 状态
+                    {t.securityMTLS?.mtlsStatus ?? 'mTLS 状态'}
                   </Text>
                   <Badge colorScheme={mtlsConfig?.enabled ? 'green' : 'gray'} fontSize="lg">
-                    {mtlsConfig?.enabled ? '已启用' : '已禁用'}
+                    {mtlsConfig?.enabled ? (t.securityMTLS?.enabled ?? '已启用') : (t.securityMTLS?.disabled ?? '已禁用')}
                   </Badge>
                 </Box>
               </HStack>
@@ -401,8 +401,8 @@ const SecurityMTLS: React.FC = () => {
         {/* Main Tabs */}
         <Tabs>
           <TabList>
-            <Tab>mTLS 配置</Tab>
-            <Tab>RBAC 管理</Tab>
+            <Tab>{t.securityMTLS?.mtlsConfig ?? 'mTLS 配置'}</Tab>
+            <Tab>{t.securityMTLS?.rbacManagement ?? 'RBAC 管理'}</Tab>
             <Tab>{t.securityMTLS?.auditLogs ?? '审计日志'}</Tab>
           </TabList>
 
@@ -412,7 +412,7 @@ const SecurityMTLS: React.FC = () => {
               <VStack spacing={6} align="stretch">
                 <Card>
                   <CardHeader display="flex" justifyContent="space-between">
-                    <Heading size="md">mTLS 设置</Heading>
+                    <Heading size="md">{t.securityMTLS?.mtlsSettings ?? 'mTLS 设置'}</Heading>
                     <HStack>
                       <Switch
                         isChecked={mtlsConfig?.enabled}
