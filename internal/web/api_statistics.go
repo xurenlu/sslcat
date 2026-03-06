@@ -232,6 +232,43 @@ func (s *Server) handleAPIPerformanceConfig(w http.ResponseWriter, r *http.Reque
 	}
 }
 
+// handleAPIPerformanceFailedSamples 获取 API 失败样本
+func (s *Server) handleAPIPerformanceFailedSamples(w http.ResponseWriter, r *http.Request) {
+	if s.apiPerformanceCollector == nil {
+		http.Error(w, "API performance collector not initialized", http.StatusServiceUnavailable)
+		return
+	}
+
+	// 获取查询参数
+	query := r.URL.Query()
+	method := query.Get("method")
+	path := query.Get("path")
+	limitStr := query.Get("limit")
+
+	if method == "" || path == "" {
+		s.sendJSON(w, map[string]interface{}{
+			"error": "method and path parameters are required",
+		})
+		return
+	}
+
+	limit := 10 // 默认返回最近10个失败样本
+	if limitStr != "" {
+		if n, err := strconv.Atoi(limitStr); err == nil && n > 0 && n <= 100 {
+			limit = n
+		}
+	}
+
+	samples := s.apiPerformanceCollector.GetFailedSamples(method, path, limit)
+
+	s.sendJSON(w, map[string]interface{}{
+		"samples": samples,
+		"count":   len(samples),
+		"method":  method,
+		"path":    path,
+	})
+}
+
 // sendJSON 发送 JSON 响应
 func (s *Server) sendJSON(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")

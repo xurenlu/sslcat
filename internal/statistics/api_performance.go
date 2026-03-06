@@ -56,6 +56,9 @@ type APIPerformanceEntry struct {
 	BusinessStatus       *BusinessStatus `json:"business_status,omitempty"` // 业务状态
 	IsProxiedAPI         bool            `json:"is_proxied_api"`          // 是否是代理的API
 	BackendAddress       string          `json:"backend_address,omitempty"` // 后端地址
+
+	// 响应内容（仅用于失败样本，前 200 字符）
+	ResponseBodySnippet string          `json:"response_body_snippet,omitempty"` // 响应 body 摘要（仅失败时记录）
 }
 
 // BusinessStatus 业务状态
@@ -64,6 +67,21 @@ type BusinessStatus struct {
 	Code      int    `json:"code"`       // 业务状态码
 	Message   string `json:"message"`    // 状态消息
 	Source    string `json:"source"`     // 来源字段（如 "status", "code" 等）
+}
+
+// FailedSample 失败样本
+type FailedSample struct {
+	Timestamp      time.Time       `json:"timestamp"`
+	Method         string          `json:"method"`
+	Path           string          `json:"path"`
+	Status         int             `json:"status"`
+	ResponseTime   time.Duration  `json:"response_time"`
+	BusinessStatus *BusinessStatus `json:"business_status,omitempty"`
+	RequestBody    string          `json:"request_body,omitempty"`    // 请求 body（可能很大，只记录摘要）
+	RequestHeaders  string          `json:"request_headers,omitempty"`  // 请求头（脱敏）
+	ResponseBody    string          `json:"response_body,omitempty"`   // 响应 body（只记录前 500 字符）
+	UserAgent      string          `json:"user_agent,omitempty"`
+	ClientIP       string          `json:"client_ip,omitempty"`
 }
 
 // APIPerformanceCollector API 性能收集器
@@ -80,8 +98,13 @@ type APIPerformanceCollector struct {
 	// key: "METHOD:PATH"
 	responseTimeSamples map[string][]time.Duration
 
+	// 失败样本存储（每个路径最多保留 20 个）
+	// key: "METHOD:PATH"
+	failedSamples map[string][]FailedSample
+
 	// 配置
 	maxSamplesPerPath int           // 每个路径保留的最大样本数（用于百分位数计算）
+	maxFailedSamples  int           // 每个路径保留的最大失败样本数
 	sampleWindow      time.Duration // 样本时间窗口
 	cleanupInterval   time.Duration
 	maxDataAge        time.Duration
@@ -119,7 +142,9 @@ func NewAPIPerformanceCollector() *APIPerformanceCollector {
 		log:                  logrus.WithFields(logrus.Fields{"component": "api_performance_collector"}),
 		performanceStats:     make(map[string]*APIPerformanceStats),
 		responseTimeSamples:  make(map[string][]time.Duration),
+		failedSamples:        make(map[string][]FailedSample),
 		maxSamplesPerPath:    1000,                    // 保留最近1000个样本
+		maxFailedSamples:     3,                       // 每个路径保留最近3个失败样本
 		sampleWindow:         5 * time.Minute,         // 5分钟窗口
 		cleanupInterval:      10 * time.Minute,        // 每10分钟清理一次
 		maxDataAge:           24 * time.Hour,          // 数据保留24小时
@@ -239,6 +264,27 @@ func (apc *APIPerformanceCollector) Record(entry APIPerformanceEntry) {
 
 	// 修复：不在持锁时更新百分位数（排序操作很慢）
 	// 百分位数将在下次读取时异步计算
+
+	// 记录失败样本（HTTP 错误或业务失败）
+	isFailure := (entry.Status >= 400) || (entry.BusinessStatus != nil && !entry.BusinessStatus.IsSuccess)
+	if isFailure {
+		sample := FailedSample{
+			Timestamp:      entry.Timestamp,
+			Method:         entry.Method,
+			Path:           entry.Path,
+			Status:         entry.Status,
+			ResponseTime:   entry.ResponseTime,
+			BusinessStatus: entry.BusinessStatus,
+			ResponseBody:   entry.ResponseBodySnippet, // 记录响应 body 摘要（前 200 字符）
+		}
+
+		// 限制失败样本数量
+		if len(apc.failedSamples[key]) >= apc.maxFailedSamples {
+			// 移除最旧的失败样本
+			apc.failedSamples[key] = apc.failedSamples[key][1:]
+		}
+		apc.failedSamples[key] = append(apc.failedSamples[key], sample)
+	}
 }
 
 // updatePercentiles 更新百分位数
@@ -524,6 +570,7 @@ func (apc *APIPerformanceCollector) cleanup() {
 		if stats.LastSeen.Before(cutoff) {
 			delete(apc.performanceStats, key)
 			delete(apc.responseTimeSamples, key)
+			delete(apc.failedSamples, key)
 			apc.log.Debugf("Cleaned up stale data for API: %s", key)
 		}
 	}
@@ -532,6 +579,32 @@ func (apc *APIPerformanceCollector) cleanup() {
 // Stop 停止收集器
 func (apc *APIPerformanceCollector) Stop() {
 	close(apc.stopChan)
+}
+
+// GetFailedSamples 获取指定路径的失败样本
+func (apc *APIPerformanceCollector) GetFailedSamples(method, path string, limit int) []FailedSample {
+	apc.mu.RLock()
+	defer apc.mu.RUnlock()
+
+	key := buildAPIKey(method, path)
+	samples, exists := apc.failedSamples[key]
+	if !exists || len(samples) == 0 {
+		return []FailedSample{}
+	}
+
+	// 返回最近的失败样本
+	if limit <= 0 || limit > len(samples) {
+		limit = len(samples)
+	}
+
+	// 从后往前取（最近的失败）
+	result := make([]FailedSample, limit)
+	start := len(samples) - limit
+	for i := 0; i < limit; i++ {
+		result[i] = samples[start+i]
+	}
+
+	return result
 }
 
 // buildAPIKey 构建统计键

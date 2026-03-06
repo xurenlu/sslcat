@@ -370,6 +370,8 @@ type responseWriter struct {
 	http.ResponseWriter
 	statusCode int
 	written    int64
+	bodyBuffer  []byte // 响应 body 缓冲（只记录前 200 字符）
+	captured    bool  // 是否已捕获响应内容
 }
 
 // Hijack 实现 http.Hijacker 接口，用于 WebSocket 升级
@@ -396,5 +398,29 @@ func (rw *responseWriter) WriteHeader(statusCode int) {
 func (rw *responseWriter) Write(b []byte) (int, error) {
 	n, err := rw.ResponseWriter.Write(b)
 	rw.written += int64(n)
+
+	// 捕获响应 body 的前 200 字符（仅记录失败请求）
+	if !rw.captured && rw.statusCode >= 400 {
+		if len(rw.bodyBuffer) < 200 {
+			remaining := 200 - len(rw.bodyBuffer)
+			if len(b) < remaining {
+				rw.bodyBuffer = append(rw.bodyBuffer, b...)
+			} else {
+				rw.bodyBuffer = append(rw.bodyBuffer, b[:remaining]...)
+				rw.captured = true
+			}
+		} else {
+			rw.captured = true
+		}
+	}
+
 	return n, err
+}
+
+// GetResponseBodySnippet 获取响应 body 摘要（前 200 字符）
+func (rw *responseWriter) GetResponseBodySnippet() string {
+	if len(rw.bodyBuffer) == 0 {
+		return ""
+	}
+	return string(rw.bodyBuffer)
 }
