@@ -311,7 +311,9 @@ const Security: React.FC = () => {
             duration: 3000,
             isClosable: true,
           })
-          refreshWAFData()
+          // 重新加载 WAF 数据和安全设置以确保同步
+          await refreshWAFData()
+          await loadSecuritySettings()
         }
       } else {
         throw new Error('更新 WAF 配置失败')
@@ -472,8 +474,9 @@ const Security: React.FC = () => {
             duration: 3000,
             isClosable: true,
           })
-          // 重新加载设置以确保同步
+          // 重新加载设置和 WAF 数据以确保同步
           await loadSecuritySettings()
+          await refreshWAFData()
         } else {
           throw new Error(result.message || '保存失败')
         }
