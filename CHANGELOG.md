@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2026-03-06
+
+### 🔧 改进
+
+- **安全报告页面国际化**：将 SecurityReports 页面所有硬编码中文替换为 i18n，补全 zh-CN、en-US、ja-JP、es-ES、fr-FR、de-DE、ru-RU 七种语言的 securityReports 翻译 key
+
 ## [1.7.0] - 2026-03-06
 
 ### 🚀 性能优化

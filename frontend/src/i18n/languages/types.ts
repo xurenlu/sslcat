@@ -2046,6 +2046,54 @@ export interface Translation {
     title: string
     createFirstDesc: string
     monthlyReportDesc: string
+    generateReport: string
+    reportType: string
+    dailyReport: string
+    weeklyReport: string
+    monthlyReport: string
+    custom: string
+    startDate: string
+    endDate: string
+    exportFormat: string
+    pdfDocument: string
+    htmlPage: string
+    jsonData: string
+    includeContent: string
+    chartsAndVisualization: string
+    attackDetailsList: string
+    optimizationRecommendations: string
+    generating: string
+    recentReports: string
+    noReports: string
+    created: string
+    statusCompleted: string
+    statusGenerating: string
+    statusFailed: string
+    statusPending: string
+    generateSuccess: string
+    autoDownload: string
+    queued: string
+    queuedDesc: string
+    generateFailed: string
+    generateError: string
+    reportTemplates: string
+    useCase: string
+    dailySummary: string
+    wafStats: string
+    trafficAnomaly: string
+    newThreatIPs: string
+    dailyUseCase: string
+    weeklyTrends: string
+    attackTypeDistribution: string
+    geoSourceStats: string
+    highRiskEvents: string
+    securitySuggestions: string
+    weeklyUseCase: string
+    monthlyFullAnalysis: string
+    monthlyTrends: string
+    threatEvolution: string
+    defenseEvaluation: string
+    improvementSuggestions: string
   }
 
   // 边缘计算

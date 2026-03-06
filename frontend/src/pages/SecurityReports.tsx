@@ -34,7 +34,7 @@ import {
   FiCheckCircle,
 } from 'react-icons/fi'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
-import { useTranslation } from '../hooks/useLanguage'
+import { useTranslation, useLanguage } from '../hooks/useLanguage'
 
 interface ReportConfig {
   reportType: 'daily' | 'weekly' | 'monthly' | 'custom'
@@ -59,6 +59,7 @@ interface ReportStatus {
 const SecurityReports: React.FC = () => {
   const { adminPrefix } = useConfig()
   const t = useTranslation()
+  const { currentLanguage } = useLanguage()
   const toast = useToast()
 
   const [config, setConfig] = useState<ReportConfig>({
@@ -126,8 +127,8 @@ const SecurityReports: React.FC = () => {
         if (data.download_url) {
           window.open(data.download_url, '_blank')
           toast({
-            title: '报告生成成功',
-            description: '报告已自动下载',
+            title: t.securityReports?.generateSuccess ?? '报告生成成功',
+            description: t.securityReports?.autoDownload ?? '报告已自动下载',
             status: 'success',
             duration: 3000,
             isClosable: true,
@@ -135,8 +136,8 @@ const SecurityReports: React.FC = () => {
         } else {
           // 异步生成
           toast({
-            title: '报告已加入队列',
-            description: '报告正在后台生成，请稍后在列表中查看',
+            title: t.securityReports?.queued ?? '报告已加入队列',
+            description: t.securityReports?.queuedDesc ?? '报告正在后台生成，请稍后在列表中查看',
             status: 'info',
             duration: 3000,
             isClosable: true,
@@ -145,13 +146,13 @@ const SecurityReports: React.FC = () => {
         }
       } else {
         const error = await response.json()
-        throw new Error(error.error || '生成失败')
+        throw new Error(error.error || (t.securityReports?.generateFailed ?? '生成失败'))
       }
     } catch (error) {
       console.error('Error generating report:', error)
       toast({
-        title: '生成失败',
-        description: error instanceof Error ? error.message : '生成报告时出错',
+        title: t.securityReports?.generateFailed ?? '生成失败',
+        description: error instanceof Error ? error.message : (t.securityReports?.generateError ?? '生成报告时出错'),
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -170,13 +171,13 @@ const SecurityReports: React.FC = () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
-        return <Badge colorScheme="green">已完成</Badge>
+        return <Badge colorScheme="green">{t.securityReports?.statusCompleted ?? '已完成'}</Badge>
       case 'generating':
-        return <Badge colorScheme="blue">生成中</Badge>
+        return <Badge colorScheme="blue">{t.securityReports?.statusGenerating ?? '生成中'}</Badge>
       case 'failed':
-        return <Badge colorScheme="red">失败</Badge>
+        return <Badge colorScheme="red">{t.securityReports?.statusFailed ?? '失败'}</Badge>
       default:
-        return <Badge colorScheme="gray">等待中</Badge>
+        return <Badge colorScheme="gray">{t.securityReports?.statusPending ?? '等待中'}</Badge>
     }
   }
 
@@ -194,24 +195,24 @@ const SecurityReports: React.FC = () => {
           <Card bg={bgColor} borderColor={borderColor} borderWidth="1px">
             <CardBody>
               <VStack spacing={4} align="stretch">
-                <Heading size="md">生成报告</Heading>
+                <Heading size="md">{t.securityReports?.generateReport ?? '生成报告'}</Heading>
 
                 <FormControl>
-                  <FormLabel>报告类型</FormLabel>
+                  <FormLabel>{t.securityReports?.reportType ?? '报告类型'}</FormLabel>
                   <Select
                     value={config.reportType}
                     onChange={(e) => setConfig({ ...config, reportType: e.target.value as any })}
                   >
-                    <option value="daily">每日报告</option>
-                    <option value="weekly">每周报告</option>
-                    <option value="monthly">每月报告</option>
-                    <option value="custom">自定义</option>
+                    <option value="daily">{t.securityReports?.dailyReport ?? '每日报告'}</option>
+                    <option value="weekly">{t.securityReports?.weeklyReport ?? '每周报告'}</option>
+                    <option value="monthly">{t.securityReports?.monthlyReport ?? '每月报告'}</option>
+                    <option value="custom">{t.securityReports?.custom ?? '自定义'}</option>
                   </Select>
                 </FormControl>
 
                 <HStack>
                   <FormControl>
-                    <FormLabel>开始日期</FormLabel>
+                    <FormLabel>{t.securityReports?.startDate ?? '开始日期'}</FormLabel>
                     <Input
                       type="date"
                       value={config.startDate}
@@ -220,7 +221,7 @@ const SecurityReports: React.FC = () => {
                   </FormControl>
 
                   <FormControl>
-                    <FormLabel>结束日期</FormLabel>
+                    <FormLabel>{t.securityReports?.endDate ?? '结束日期'}</FormLabel>
                     <Input
                       type="date"
                       value={config.endDate}
@@ -230,24 +231,24 @@ const SecurityReports: React.FC = () => {
                 </HStack>
 
                 <FormControl>
-                  <FormLabel>导出格式</FormLabel>
+                  <FormLabel>{t.securityReports?.exportFormat ?? '导出格式'}</FormLabel>
                   <Select
                     value={config.format}
                     onChange={(e) => setConfig({ ...config, format: e.target.value as any })}
                   >
-                    <option value="pdf">PDF 文档</option>
-                    <option value="html">HTML 网页</option>
-                    <option value="json">JSON 数据</option>
+                    <option value="pdf">{t.securityReports?.pdfDocument ?? 'PDF 文档'}</option>
+                    <option value="html">{t.securityReports?.htmlPage ?? 'HTML 网页'}</option>
+                    <option value="json">{t.securityReports?.jsonData ?? 'JSON 数据'}</option>
                   </Select>
                 </FormControl>
 
                 <Divider />
 
-                <Heading size="sm">包含内容</Heading>
+                <Heading size="sm">{t.securityReports?.includeContent ?? '包含内容'}</Heading>
 
                 <VStack align="start" spacing={2}>
                   <HStack justify="space-between" w="full">
-                    <Text>图表和可视化</Text>
+                    <Text>{t.securityReports?.chartsAndVisualization ?? '图表和可视化'}</Text>
                     <input
                       type="checkbox"
                       checked={config.includeCharts}
@@ -255,7 +256,7 @@ const SecurityReports: React.FC = () => {
                     />
                   </HStack>
                   <HStack justify="space-between" w="full">
-                    <Text>攻击详情列表</Text>
+                    <Text>{t.securityReports?.attackDetailsList ?? '攻击详情列表'}</Text>
                     <input
                       type="checkbox"
                       checked={config.includeAttackDetails}
@@ -263,7 +264,7 @@ const SecurityReports: React.FC = () => {
                     />
                   </HStack>
                   <HStack justify="space-between" w="full">
-                    <Text>优化建议</Text>
+                    <Text>{t.securityReports?.optimizationRecommendations ?? '优化建议'}</Text>
                     <input
                       type="checkbox"
                       checked={config.includeRecommendations}
@@ -277,10 +278,10 @@ const SecurityReports: React.FC = () => {
                   colorScheme="blue"
                   onClick={handleGenerate}
                   isLoading={generating}
-                  loadingText="生成中..."
+                  loadingText={t.securityReports?.generating ?? '生成中...'}
                   width="full"
                 >
-                  生成报告
+                  {t.securityReports?.generateReport ?? '生成报告'}
                 </Button>
               </VStack>
             </CardBody>
@@ -291,14 +292,14 @@ const SecurityReports: React.FC = () => {
             <CardBody>
               <VStack spacing={4} align="stretch">
                 <HStack justify="space-between">
-                  <Heading size="md">最近报告</Heading>
+                  <Heading size="md">{t.securityReports?.recentReports ?? '最近报告'}</Heading>
                   <Button
                     leftIcon={<Icon as={FiRefreshCw} />}
                     size="sm"
                     variant="outline"
                     onClick={loadRecentReports}
                   >
-                    刷新
+                    {t.common?.refresh ?? '刷新'}
                   </Button>
                 </HStack>
 
@@ -310,7 +311,7 @@ const SecurityReports: React.FC = () => {
                   <Alert status="info">
                     <AlertIcon />
                     <Box>
-                      <Text fontWeight="bold">暂无报告</Text>
+                      <Text fontWeight="bold">{t.securityReports?.noReports ?? '暂无报告'}</Text>
                       <Text fontSize="sm">{t.securityReports?.createFirstDesc ?? '生成第一份安全报告来查看系统安全状况'}</Text>
                     </Box>
                   </Alert>
@@ -327,7 +328,7 @@ const SecurityReports: React.FC = () => {
                                 {getStatusBadge(report.status)}
                               </HStack>
                               <Text fontSize="xs" color="gray.500">
-                                创建: {new Date(report.created).toLocaleString('zh-CN')}
+                                {t.securityReports?.created ?? '创建'}: {new Date(report.created).toLocaleString(currentLanguage)}
                               </Text>
                             </VStack>
 
@@ -338,7 +339,7 @@ const SecurityReports: React.FC = () => {
                                 colorScheme="green"
                                 onClick={() => handleDownload(report)}
                               >
-                                下载
+                                {t.common?.download ?? '下载'}
                               </Button>
                             )}
 
@@ -348,7 +349,7 @@ const SecurityReports: React.FC = () => {
 
                             {report.status === 'failed' && (
                               <Text fontSize="xs" color="red.500">
-                                {report.error || '生成失败'}
+                                {report.error || (t.securityReports?.generateFailed ?? '生成失败')}
                               </Text>
                             )}
                           </HStack>
@@ -366,31 +367,31 @@ const SecurityReports: React.FC = () => {
         <Card bg={bgColor} borderColor={borderColor} borderWidth="1px">
           <CardBody>
             <VStack spacing={4} align="stretch">
-              <Heading size="md">报告模板说明</Heading>
+              <Heading size="md">{t.securityReports?.reportTemplates ?? '报告模板说明'}</Heading>
 
               <Tabs>
                 <TabList>
-                  <Tab>每日报告</Tab>
-                  <Tab>每周报告</Tab>
-                  <Tab>每月报告</Tab>
+                  <Tab>{t.securityReports?.dailyReport ?? '每日报告'}</Tab>
+                  <Tab>{t.securityReports?.weeklyReport ?? '每周报告'}</Tab>
+                  <Tab>{t.securityReports?.monthlyReport ?? '每月报告'}</Tab>
                 </TabList>
 
                 <TabPanels>
                   <TabPanel>
                     <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
                       <Box>
-                        <Heading size="sm" mb={2}>包含内容</Heading>
+                        <Heading size="sm" mb={2}>{t.securityReports?.includeContent ?? '包含内容'}</Heading>
                         <VStack align="start" spacing={2}>
-                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>24小时安全事件汇总</Text></HStack>
-                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>WAF拦截统计</Text></HStack>
-                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>流量异常分析</Text></HStack>
-                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>新增威胁IP列表</Text></HStack>
+                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>{t.securityReports?.dailySummary ?? '24小时安全事件汇总'}</Text></HStack>
+                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>{t.securityReports?.wafStats ?? 'WAF拦截统计'}</Text></HStack>
+                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>{t.securityReports?.trafficAnomaly ?? '流量异常分析'}</Text></HStack>
+                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>{t.securityReports?.newThreatIPs ?? '新增威胁IP列表'}</Text></HStack>
                         </VStack>
                       </Box>
                       <Box>
-                        <Heading size="sm" mb={2}>适用场景</Heading>
+                        <Heading size="sm" mb={2}>{t.securityReports?.useCase ?? '适用场景'}</Heading>
                         <Text fontSize="sm" color="gray.600">
-                          日常安全监控，快速了解过去24小时的安全状况。适合每日晨会使用。
+                          {t.securityReports?.dailyUseCase ?? '日常安全监控，快速了解过去24小时的安全状况。适合每日晨会使用。'}
                         </Text>
                       </Box>
                     </SimpleGrid>
@@ -399,19 +400,19 @@ const SecurityReports: React.FC = () => {
                   <TabPanel>
                     <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
                       <Box>
-                        <Heading size="sm" mb={2}>包含内容</Heading>
+                        <Heading size="sm" mb={2}>{t.securityReports?.includeContent ?? '包含内容'}</Heading>
                         <VStack align="start" spacing={2}>
-                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>7天趋势分析</Text></HStack>
-                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>攻击类型分布</Text></HStack>
-                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>地理来源统计</Text></HStack>
-                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>高危事件详情</Text></HStack>
-                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>安全建议</Text></HStack>
+                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>{t.securityReports?.weeklyTrends ?? '7天趋势分析'}</Text></HStack>
+                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>{t.securityReports?.attackTypeDistribution ?? '攻击类型分布'}</Text></HStack>
+                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>{t.securityReports?.geoSourceStats ?? '地理来源统计'}</Text></HStack>
+                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>{t.securityReports?.highRiskEvents ?? '高危事件详情'}</Text></HStack>
+                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>{t.securityReports?.securitySuggestions ?? '安全建议'}</Text></HStack>
                         </VStack>
                       </Box>
                       <Box>
-                        <Heading size="sm" mb={2}>适用场景</Heading>
+                        <Heading size="sm" mb={2}>{t.securityReports?.useCase ?? '适用场景'}</Heading>
                         <Text fontSize="sm" color="gray.600">
-                          周度安全回顾，全面了解一周的安全态势。适合周报和安全团队讨论。
+                          {t.securityReports?.weeklyUseCase ?? '周度安全回顾，全面了解一周的安全态势。适合周报和安全团队讨论。'}
                         </Text>
                       </Box>
                     </SimpleGrid>
@@ -420,17 +421,17 @@ const SecurityReports: React.FC = () => {
                   <TabPanel>
                     <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
                       <Box>
-                        <Heading size="sm" mb={2}>包含内容</Heading>
+                        <Heading size="sm" mb={2}>{t.securityReports?.includeContent ?? '包含内容'}</Heading>
                         <VStack align="start" spacing={2}>
-                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>30天完整分析</Text></HStack>
-                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>月度趋势对比</Text></HStack>
-                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>威胁演变分析</Text></HStack>
-                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>防御效果评估</Text></HStack>
-                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>改进建议</Text></HStack>
+                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>{t.securityReports?.monthlyFullAnalysis ?? '30天完整分析'}</Text></HStack>
+                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>{t.securityReports?.monthlyTrends ?? '月度趋势对比'}</Text></HStack>
+                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>{t.securityReports?.threatEvolution ?? '威胁演变分析'}</Text></HStack>
+                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>{t.securityReports?.defenseEvaluation ?? '防御效果评估'}</Text></HStack>
+                          <HStack><Icon as={FiCheckCircle} color="green.500" /><Text>{t.securityReports?.improvementSuggestions ?? '改进建议'}</Text></HStack>
                         </VStack>
                       </Box>
                       <Box>
-                        <Heading size="sm" mb={2}>适用场景</Heading>
+                        <Heading size="sm" mb={2}>{t.securityReports?.useCase ?? '适用场景'}</Heading>
                         <Text fontSize="sm" color="gray.600">
                           {t.securityReports?.monthlyReportDesc ?? '月度安全报告，用于管理层汇报和长期安全策略规划。'}
                         </Text>
