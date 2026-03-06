@@ -286,7 +286,7 @@ const SlowRequests: React.FC = () => {
                     <Tr key={record.id}>
                       <Td><Text fontSize="sm">{new Date(record.timestamp).toLocaleString()}</Text></Td>
                       <Td><Badge colorScheme="blue" variant="outline">{record.method}</Badge></Td>
-                      <Td><Text fontSize="sm" maxW="300px" isTruncated>{record.url}</Text></Td>
+                      <Td><Tooltip label={record.url}><Text fontSize="sm" maxW="300px" isTruncated cursor="pointer">{record.url}</Text></Tooltip></Td>
                       <Td><Badge colorScheme={getStatusCodeColor(record.status_code)}>{record.status_code}</Badge></Td>
                       <Td><Text fontSize="sm" fontWeight="bold" color="red.500">{formatResponseTime(record.response_time)}</Text></Td>
                       <Td><Text fontSize="sm" maxW="150px" isTruncated>{record.backend_id || '-'}</Text></Td>
