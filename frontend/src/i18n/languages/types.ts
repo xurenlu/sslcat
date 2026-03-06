@@ -607,6 +607,7 @@ export interface Translation {
     memory_realtime_usage?: string
     update_time?: string
     last_refresh_time?: string
+    last12hours?: string
     today?: string
     last7days?: string
     last30days?: string
