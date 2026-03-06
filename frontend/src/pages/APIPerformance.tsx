@@ -37,6 +37,13 @@ import {
   Tooltip,
   Alert,
   AlertIcon,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalFooter,
+  ModalBody,
+  ModalCloseButton,
   useColorModeValue,
 } from '@chakra-ui/react'
 import {
@@ -51,6 +58,7 @@ import {
   FiZap,
   FiCheckCircle,
   FiXCircle,
+  FiList,
 } from 'react-icons/fi'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
 import { useTranslation } from '../hooks/useLanguage'
@@ -108,6 +116,12 @@ const APIPerformance: React.FC = () => {
   const [domains, setDomains] = useState<string[]>([])
   const [limit, setLimit] = useState(50)
 
+  // 失败样本弹窗状态
+  const [showFailedSamples, setShowFailedSamples] = useState(false)
+  const [selectedAPI, setSelectedAPI] = useState<{ method: string; path: string } | null>(null)
+  const [failedSamples, setFailedSamples] = useState<any[]>([])
+  const [loadingFailedSamples, setLoadingFailedSamples] = useState(false)
+
   const bgColor = useColorModeValue('white', 'gray.800')
   const borderColor = useColorModeValue('gray.200', 'gray.700')
 
@@ -160,8 +174,8 @@ const APIPerformance: React.FC = () => {
     } catch (error) {
       console.error('Error loading APIs:', error)
       toast({
-        title: '加载失败',
-        description: '无法加载 API 性能数据',
+        title: t.apiPerformance?.loadFailed ?? '加载失败',
+        description: t.apiPerformance?.loadFailedDesc ?? '无法加载 API 性能数据',
         status: 'error',
         duration: 3000,
         isClosable: true,
@@ -180,11 +194,47 @@ const APIPerformance: React.FC = () => {
     await loadData()
     setRefreshing(false)
     toast({
-      title: '刷新成功',
+      title: t.apiPerformance?.refreshSuccess ?? '刷新成功',
       status: 'success',
       duration: 2000,
       isClosable: true,
     })
+  }
+
+  // 加载失败样本
+  const loadFailedSamples = async (method: string, path: string) => {
+    setLoadingFailedSamples(true)
+    try {
+      const url = buildApiPath(adminPrefix, `/api/performance/failed-samples?method=${encodeURIComponent(method)}&path=${encodeURIComponent(path)}&limit=10`)
+      const response = await fetch(url, { credentials: 'include' })
+      if (response.ok) {
+        const data = await response.json()
+        setFailedSamples(data.samples || [])
+      } else {
+        toast({
+          title: t.apiPerformance?.loadFailed ?? '加载失败',
+          description: t.apiPerformance?.loadFailedSamplesDesc ?? '无法加载失败样本',
+          status: 'error',
+          duration: 3000,
+        })
+      }
+    } catch (error) {
+      console.error('Error loading failed samples:', error)
+      toast({
+        title: t.apiPerformance?.loadFailed ?? '加载失败',
+        description: t.apiPerformance?.networkError ?? '网络错误',
+        status: 'error',
+        duration: 3000,
+      })
+    }
+    setLoadingFailedSamples(false)
+  }
+
+  // 打开失败样本弹窗
+  const handleShowFailedSamples = (method: string, path: string) => {
+    setSelectedAPI({ method, path })
+    setShowFailedSamples(true)
+    loadFailedSamples(method, path)
   }
 
   useEffect(() => {
@@ -199,10 +249,10 @@ const APIPerformance: React.FC = () => {
   }
 
   const getResponseTimeLabel = (ms: number) => {
-    if (ms < 100) return '优秀'
-    if (ms < 200) return '良好'
-    if (ms < 500) return '一般'
-    return '较慢'
+    if (ms < 100) return t.apiPerformance?.excellentLabel ?? '优秀'
+    if (ms < 200) return t.apiPerformance?.goodLabel ?? '良好'
+    if (ms < 500) return t.apiPerformance?.normalLabel ?? '一般'
+    return t.apiPerformance?.slowLabel ?? '较慢'
   }
 
   const getMethodColor = (method: string) => {
@@ -252,7 +302,7 @@ const APIPerformance: React.FC = () => {
       <Box p={6} display="flex" justifyContent="center" alignItems="center" minH="400px">
         <VStack spacing={4}>
           <Spinner size="xl" thickness="4px" speed="0.65s" emptyColor="gray.200" color="blue.500" />
-          <Text>加载中...</Text>
+          <Text>{t.common.loading}</Text>
         </VStack>
       </Box>
     )
@@ -265,7 +315,7 @@ const APIPerformance: React.FC = () => {
         <HStack justify="space-between">
           <Heading size="lg" display="flex" alignItems="center">
             <Icon as={FiBarChart2} mr={3} />
-            API 性能排行榜
+            {t.apiPerformance?.title ?? 'API 性能排行榜'}
           </Heading>
           <Button
             leftIcon={<Icon as={FiRefreshCw} />}
@@ -273,7 +323,7 @@ const APIPerformance: React.FC = () => {
             onClick={handleRefresh}
             isLoading={refreshing}
           >
-            刷新
+            {t.apiPerformance?.refresh ?? '刷新'}
           </Button>
         </HStack>
 
@@ -285,10 +335,10 @@ const APIPerformance: React.FC = () => {
                 <Stat>
                   <StatLabel display="flex" alignItems="center">
                     <Icon as={FiActivity} mr={2} color="blue.500" />
-                    监控 API 数
+                    {t.apiPerformance?.monitoredApis ?? '监控 API 数'}
                   </StatLabel>
                   <StatNumber>{summary.total_apis}</StatNumber>
-                  <StatHelpText>总请求数: {summary.total_requests.toLocaleString()}</StatHelpText>
+                  <StatHelpText>{t.apiPerformance?.totalRequests ?? '总请求数'}: {summary.total_requests.toLocaleString()}</StatHelpText>
                 </Stat>
               </CardBody>
             </Card>
@@ -298,11 +348,11 @@ const APIPerformance: React.FC = () => {
                 <Stat>
                   <StatLabel display="flex" alignItems="center">
                     <Icon as={FiClock} mr={2} color="purple.500" />
-                    平均响应时间
+                    {t.apiPerformance?.avgResponseTime ?? '平均响应时间'}
                   </StatLabel>
                   <StatNumber>{formatDuration(summary.avg_response_time)}</StatNumber>
                   <StatHelpText>
-                    慢API: {summary.slow_apis_count} | 快API: {summary.fast_apis_count}
+                    {t.apiPerformance?.slowApis ?? '慢API'}: {summary.slow_apis_count} | {t.apiPerformance?.fastApis ?? '快API'}: {summary.fast_apis_count}
                   </StatHelpText>
                 </Stat>
               </CardBody>
@@ -313,11 +363,11 @@ const APIPerformance: React.FC = () => {
                 <Stat>
                   <StatLabel display="flex" alignItems="center">
                     <Icon as={FiAlertCircle} mr={2} color="orange.500" />
-                    HTTP 错误率
+                    {t.apiPerformance?.httpErrorRate ?? 'HTTP 错误率'}
                   </StatLabel>
                   <StatNumber>{summary.error_rate.toFixed(2)}%</StatNumber>
                   <StatHelpText>
-                    {summary.error_rate < 1 ? '健康' : '需要关注'}
+                    {summary.error_rate < 1 ? (t.apiPerformance?.healthy ?? '健康') : (t.apiPerformance?.needsAttention ?? '需要关注')}
                   </StatHelpText>
                 </Stat>
               </CardBody>
@@ -327,10 +377,10 @@ const APIPerformance: React.FC = () => {
               <Card bg={bgColor} borderColor={borderColor} borderWidth="1px">
                 <CardBody>
                   <Stat>
-                    <Tooltip label="JSON 内 code/status 等业务字段判定的成功率">
+                    <Tooltip label={t.apiPerformance?.businessSuccessRateTooltip ?? 'JSON 内 code/status 等业务字段判定的成功率'}>
                       <StatLabel display="flex" alignItems="center" cursor="help">
                         <Icon as={FiCheckCircle} mr={2} color="teal.500" />
-                        业务成功率
+                        {t.apiPerformance?.businessSuccessRate ?? '业务成功率'}
                       </StatLabel>
                     </Tooltip>
                     <StatNumber
@@ -345,7 +395,7 @@ const APIPerformance: React.FC = () => {
                       {(summary.business_success_rate ?? 0).toFixed(2)}%
                     </StatNumber>
                     <StatHelpText>
-                      {summary.business_requests?.toLocaleString()} 条业务判定
+                      {summary.business_requests?.toLocaleString()}{t.apiPerformance?.businessRecords ?? ' 条业务判定'}
                     </StatHelpText>
                   </Stat>
                 </CardBody>
@@ -357,12 +407,12 @@ const APIPerformance: React.FC = () => {
                 <Stat>
                   <StatLabel display="flex" alignItems="center">
                     <Icon as={FiZap} mr={2} color="green.500" />
-                    性能状态
+                    {t.apiPerformance?.performanceStatus ?? '性能状态'}
                   </StatLabel>
                   <StatNumber>
-                    {summary.avg_response_time < 200 && summary.error_rate < 1 ? '优秀' : '良好'}
+                    {summary.avg_response_time < 200 && summary.error_rate < 1 ? (t.apiPerformance?.excellent ?? '优秀') : (t.apiPerformance?.good ?? '良好')}
                   </StatNumber>
-                  <StatHelpText>基于响应时间和错误率</StatHelpText>
+                  <StatHelpText>{t.apiPerformance?.basedOnResponseAndError ?? '基于响应时间和错误率'}</StatHelpText>
                 </Stat>
               </CardBody>
             </Card>
@@ -376,16 +426,16 @@ const APIPerformance: React.FC = () => {
               <HStack spacing={4} width="full" wrap="wrap">
                 <Box flex="1" minW="200px">
                   <Text fontSize="sm" mb={2} fontWeight="medium">
-                    排序方式
+                    {t.apiPerformance?.sortBy ?? '排序方式'}
                   </Text>
                   <Select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value as any)}
                   >
-                    <option value="slow">最慢的 API</option>
-                    <option value="error">HTTP 错误率最高</option>
-                    <option value="business_error">业务失败率最高</option>
-                    <option value="active">请求量最大</option>
+                    <option value="slow">{t.apiPerformance?.sortSlowest ?? '最慢的 API'}</option>
+                    <option value="error">{t.apiPerformance?.sortHttpError ?? 'HTTP 错误率最高'}</option>
+                    <option value="business_error">{t.apiPerformance?.sortBusinessError ?? '业务失败率最高'}</option>
+                    <option value="active">{t.apiPerformance?.sortActive ?? '请求量最大'}</option>
                   </Select>
                 </Box>
 
@@ -408,13 +458,13 @@ const APIPerformance: React.FC = () => {
 
                 <Box flex="1" minW="150px">
                   <Text fontSize="sm" mb={2} fontWeight="medium">
-                    HTTP 方法
+                    {t.apiPerformance?.httpMethod ?? 'HTTP 方法'}
                   </Text>
                   <Select
                     value={methodFilter}
                     onChange={(e) => setMethodFilter(e.target.value)}
                   >
-                    <option value="">全部</option>
+                    <option value="">{t.apiPerformance?.all ?? '全部'}</option>
                     <option value="GET">GET</option>
                     <option value="POST">POST</option>
                     <option value="PUT">PUT</option>
@@ -425,7 +475,7 @@ const APIPerformance: React.FC = () => {
 
                 <Box flex="1" minW="200px">
                   <Text fontSize="sm" mb={2} fontWeight="medium">
-                    路径前缀
+                    {t.apiPerformance?.pathPrefix ?? '路径前缀'}
                   </Text>
                   <InputGroup>
                     <InputLeftElement pointerEvents="none">
@@ -444,7 +494,7 @@ const APIPerformance: React.FC = () => {
 
                 <Box flex="1" minW="150px">
                   <Text fontSize="sm" mb={2} fontWeight="medium">
-                    显示数量
+                    {t.apiPerformance?.displayCount ?? '显示数量'}
                   </Text>
                   <Select
                     value={limit.toString()}
@@ -465,14 +515,14 @@ const APIPerformance: React.FC = () => {
         <Card bg={bgColor} borderColor={borderColor} borderWidth="1px">
           <CardBody>
             <VStack spacing={4} align="stretch">
-              <Heading size="md">性能排行榜</Heading>
+              <Heading size="md">{t.apiPerformance?.performanceRanking ?? '性能排行榜'}</Heading>
 
               {apis.length === 0 ? (
                 <Alert status="info">
                   <AlertIcon />
                   <Box>
-                    <Text fontWeight="bold">暂无数据</Text>
-                    <Text fontSize="sm">API 性能数据收集中，请稍后再查看</Text>
+                    <Text fontWeight="bold">{t.apiPerformance?.noData ?? '暂无数据'}</Text>
+                    <Text fontSize="sm">{t.apiPerformance?.noDataDesc ?? 'API 性能数据收集中，请稍后再查看'}</Text>
                   </Box>
                 </Alert>
               ) : (
@@ -480,22 +530,22 @@ const APIPerformance: React.FC = () => {
                   <Table size="sm">
                     <Thead>
                       <Tr>
-                        <Th>API 端点</Th>
-                        <Th>请求数</Th>
-                        <Th>平均响应</Th>
+                        <Th>{t.apiPerformance?.apiEndpoint ?? 'API 端点'}</Th>
+                        <Th>{t.apiPerformance?.requests ?? '请求数'}</Th>
+                        <Th>{t.apiPerformance?.avgResponse ?? '平均响应'}</Th>
                         <Th>P95</Th>
                         <Th>P99</Th>
                         <Th>
-                          <Tooltip label="HTTP 4xx/5xx 占比">
-                            <Text as="span" cursor="help">HTTP 错误率</Text>
+                          <Tooltip label="HTTP 4xx/5xx">
+                            <Text as="span" cursor="help">{t.apiPerformance?.httpErrorRate ?? 'HTTP 错误率'}</Text>
                           </Tooltip>
                         </Th>
                         <Th>
-                          <Tooltip label="JSON 内 code/status 等业务字段判定的成功率">
-                            <Text as="span" cursor="help">业务成功率</Text>
+                          <Tooltip label={t.apiPerformance?.businessSuccessRateTooltip ?? 'JSON 内 code/status 等业务字段判定的成功率'}>
+                            <Text as="span" cursor="help">{t.apiPerformance?.businessSuccessRate ?? '业务成功率'}</Text>
                           </Tooltip>
                         </Th>
-                        <Th>性能评级</Th>
+                        <Th>{t.apiPerformance?.performanceRating ?? '性能评级'}</Th>
                       </Tr>
                     </Thead>
                     <Tbody>
@@ -514,7 +564,7 @@ const APIPerformance: React.FC = () => {
                                 </Tooltip>
                               </HStack>
                               <Text fontSize="xs" color="gray.500">
-                                首次: {new Date(api.first_seen).toLocaleString('zh-CN')}
+                                {t.apiPerformance?.firstSeen ?? '首次'}: {new Date(api.first_seen).toLocaleString()}
                               </Text>
                             </VStack>
                           </Td>
@@ -522,7 +572,7 @@ const APIPerformance: React.FC = () => {
                             <HStack>
                               <Text fontWeight="bold">{api.total_requests.toLocaleString()}</Text>
                               <Text fontSize="xs" color="green.500">
-                                ({api.success_requests.toLocaleString()} 成功)
+                                ({api.success_requests.toLocaleString()} {t.apiPerformance?.success ?? '成功'})
                               </Text>
                             </HStack>
                           </Td>
@@ -558,7 +608,7 @@ const APIPerformance: React.FC = () => {
                                 {calculateErrorRate(api)}%
                               </Text>
                               {api.error_requests > 0 && (
-                                <Tooltip label={`${api.error_requests} 个 HTTP 错误`}>
+                                <Tooltip label={(t.apiPerformance?.httpErrorsCount ?? '{n} 个 HTTP 错误').replace('{n}', String(api.error_requests))}>
                                   <Icon as={FiAlertCircle} color="orange.500" />
                                 </Tooltip>
                               )}
@@ -566,20 +616,40 @@ const APIPerformance: React.FC = () => {
                           </Td>
                           <Td>
                             {hasBusinessStats(api) ? (
-                              <Tooltip label={`来源: ${api.business_status_source || 'code/status'}`}>
-                                <Text
-                                  fontWeight="bold"
-                                  color={
-                                    parseFloat(calculateBusinessSuccessRate(api)!) >= 99
-                                      ? 'green.500'
-                                      : parseFloat(calculateBusinessSuccessRate(api)!) >= 95
-                                        ? 'yellow.500'
-                                        : 'red.500'
-                                  }
-                                >
-                                  {calculateBusinessSuccessRate(api)}%
-                                </Text>
-                              </Tooltip>
+                              <HStack>
+                                <Tooltip label={`${t.apiPerformance?.source ?? '来源'}: ${api.business_status_source || 'code/status'}${parseFloat(calculateBusinessSuccessRate(api)!) < 100 ? '\n' + (t.apiPerformance?.clickToViewFailedSamples ?? '点击查看失败样本') : ''}`}>
+                                  <Text
+                                    fontWeight="bold"
+                                    color={
+                                      parseFloat(calculateBusinessSuccessRate(api)!) >= 99
+                                        ? 'green.500'
+                                        : parseFloat(calculateBusinessSuccessRate(api)!) >= 95
+                                          ? 'yellow.500'
+                                          : 'red.500'
+                                    }
+                                    cursor={parseFloat(calculateBusinessSuccessRate(api)!) < 100 ? 'pointer' : 'default'}
+                                    onClick={() => {
+                                      if (parseFloat(calculateBusinessSuccessRate(api)!) < 100) {
+                                        handleShowFailedSamples(api.method, api.path)
+                                      }
+                                    }}
+                                  >
+                                    {calculateBusinessSuccessRate(api)}%
+                                  </Text>
+                                </Tooltip>
+                                {parseFloat(calculateBusinessSuccessRate(api)!) < 100 && (
+                                  <Tooltip label={t.apiPerformance?.viewFailedSamples ?? '查看失败样本'}>
+                                    <Button
+                                      size="xs"
+                                      variant="ghost"
+                                      colorScheme="red"
+                                      onClick={() => handleShowFailedSamples(api.method, api.path)}
+                                    >
+                                      <Icon as={FiList} boxSize={3} />
+                                    </Button>
+                                  </Tooltip>
+                                )}
+                              </HStack>
                             ) : (
                               <Text fontSize="sm" color="gray.500">—</Text>
                             )}
@@ -612,33 +682,116 @@ const APIPerformance: React.FC = () => {
         {/* Performance Tips */}
         <Card bg={bgColor} borderColor={borderColor} borderWidth="1px">
           <CardBody>
-            <Heading size="md" mb={4}>性能优化建议</Heading>
+            <Heading size="md" mb={4}>{t.apiPerformance?.optimizationTips ?? '性能优化建议'}</Heading>
             <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
               <Box p={4} borderRadius="md" bg="red.50" _dark={{ bg: 'red.900' }}>
                 <Icon as={FiAlertCircle} color="red.500" boxSize={6} mb={2} />
-                <Text fontWeight="bold" mb={1}>慢 API (&gt;500ms)</Text>
+                <Text fontWeight="bold" mb={1}>{t.apiPerformance?.slowApiTip ?? '慢 API (>500ms)'}</Text>
                 <Text fontSize="sm" color="gray.600" _dark={{ color: 'gray.400' }}>
-                  检查数据库查询、外部API调用或复杂计算逻辑
+                  {t.apiPerformance?.slowApiTipDesc ?? '检查数据库查询、外部API调用或复杂计算逻辑'}
                 </Text>
               </Box>
               <Box p={4} borderRadius="md" bg="yellow.50" _dark={{ bg: 'yellow.900' }}>
                 <Icon as={FiClock} color="yellow.500" boxSize={6} mb={2} />
-                <Text fontWeight="bold" mb={1}>一般 API (200-500ms)</Text>
+                <Text fontWeight="bold" mb={1}>{t.apiPerformance?.normalApiTip ?? '一般 API (200-500ms)'}</Text>
                 <Text fontSize="sm" color="gray.600" _dark={{ color: 'gray.400' }}>
-                  考虑添加缓存、优化算法或使用异步处理
+                  {t.apiPerformance?.normalApiTipDesc ?? '考虑添加缓存、优化算法或使用异步处理'}
                 </Text>
               </Box>
               <Box p={4} borderRadius="md" bg="green.50" _dark={{ bg: 'green.900' }}>
                 <Icon as={FiCheckCircle} color="green.500" boxSize={6} mb={2} />
-                <Text fontWeight="bold" mb={1}>优秀 API (&lt;200ms)</Text>
+                <Text fontWeight="bold" mb={1}>{t.apiPerformance?.excellentApiTip ?? '优秀 API (<200ms)'}</Text>
                 <Text fontSize="sm" color="gray.600" _dark={{ color: 'gray.400' }}>
-                  性能良好，继续保持！可考虑进一步优化用户体验
+                  {t.apiPerformance?.excellentApiTipDesc ?? '性能良好，继续保持！可考虑进一步优化用户体验'}
                 </Text>
               </Box>
             </SimpleGrid>
           </CardBody>
         </Card>
       </VStack>
+
+      {/* 失败样本弹窗 */}
+      <Modal isOpen={showFailedSamples} onClose={() => setShowFailedSamples(false)} size="xl">
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>
+            {t.apiPerformance?.failedSamplesTitle ?? '失败样本详情'}
+            {selectedAPI && (
+              <Text fontSize="sm" fontWeight="normal" mt={1}>
+                <Badge colorScheme={getMethodColor(selectedAPI.method)} mr={2}>{selectedAPI.method}</Badge>
+                <Text fontSize="xs">{selectedAPI.path}</Text>
+              </Text>
+            )}
+          </ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            {loadingFailedSamples ? (
+              <HStack justify="center" py={8}>
+                <Spinner />
+                <Text>{t.common.loading}</Text>
+              </HStack>
+            ) : failedSamples.length === 0 ? (
+              <Alert status="info">
+                <AlertIcon />
+                <Box>
+                  <Text fontWeight="bold">{t.apiPerformance?.noFailedSamples ?? '暂无失败样本'}</Text>
+                  <Text fontSize="sm">{t.apiPerformance?.noFailedSamplesDesc ?? '该 API 暂无记录到的失败请求'}</Text>
+                </Box>
+              </Alert>
+            ) : (
+              <VStack align="stretch" spacing={4}>
+                <Text fontSize="sm" color="gray.500">
+                  {(t.apiPerformance?.showingSamples ?? '显示最近 {n} 个失败样本').replace('{n}', String(failedSamples.length))}
+                </Text>
+                {failedSamples.map((sample, idx) => (
+                  <Card key={idx} size="sm" variant="outline">
+                    <CardBody>
+                      <VStack align="stretch" spacing={2}>
+                        <HStack justify="space-between">
+                          <HStack>
+                            <Badge colorScheme="red">HTTP {sample.status}</Badge>
+                            <Text fontSize="xs" color="gray.500">
+                              {new Date(sample.timestamp).toLocaleString('zh-CN')}
+                            </Text>
+                          </HStack>
+                          <Text fontSize="sm" color="gray.500">
+                            {t.apiPerformance?.responseTime ?? '响应时间'}: {sample.response_time ? `${sample.response_time}ms` : 'N/A'}
+                          </Text>
+                        </HStack>
+
+                        {sample.business_status && (
+                          <Box p={2} bg="orange.50" _dark={{ bg: 'orange.900' }} borderRadius="md">
+                            <Text fontSize="sm" fontWeight="bold" mb={1}>{t.apiPerformance?.businessStatus ?? '业务状态'}:</Text>
+                            <HStack>
+                              <Badge colorScheme={sample.business_status.is_success ? 'green' : 'red'}>
+                                {sample.business_status.code}
+                              </Badge>
+                              <Text fontSize="sm">{sample.business_status.message}</Text>
+                              <Text fontSize="xs" color="gray.500">
+                                {t.apiPerformance?.source ?? '来源'}: {sample.business_status.source}
+                              </Text>
+                            </HStack>
+                          </Box>
+                        )}
+
+                        {sample.user_agent && (
+                          <Text fontSize="xs" color="gray.500">
+                            UA: {sample.user_agent.substring(0, 100)}
+                            {sample.user_agent.length > 100 ? '...' : ''}
+                          </Text>
+                        )}
+                      </VStack>
+                    </CardBody>
+                  </Card>
+                ))}
+              </VStack>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button onClick={() => setShowFailedSamples(false)}>{t.apiPerformance?.close ?? t.common.close}</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </Box>
   )
 }

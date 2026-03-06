@@ -420,8 +420,70 @@ export interface Translation {
 
   // API 性能排行榜
   apiPerformance?: {
+    title: string
+    refresh: string
+    monitoredApis: string
+    totalRequests: string
+    avgResponseTime: string
+    slowApis: string
+    fastApis: string
+    httpErrorRate: string
+    healthy: string
+    needsAttention: string
+    businessSuccessRate: string
+    businessSuccessRateTooltip: string
+    performanceStatus: string
+    excellent: string
+    good: string
+    basedOnResponseAndError: string
+    sortBy: string
+    sortSlowest: string
+    sortHttpError: string
+    sortBusinessError: string
+    sortActive: string
+    httpMethod: string
+    all: string
+    pathPrefix: string
+    displayCount: string
+    performanceRanking: string
+    noData: string
+    noDataDesc: string
+    loadFailed: string
+    loadFailedDesc: string
+    refreshSuccess: string
+    loadFailedSamplesDesc: string
+    networkError: string
+    apiEndpoint: string
+    requests: string
+    avgResponse: string
+    performanceRating: string
+    firstSeen: string
+    success: string
+    excellentLabel: string
+    goodLabel: string
+    normalLabel: string
+    slowLabel: string
+    optimizationTips: string
+    slowApiTip: string
+    slowApiTipDesc: string
+    normalApiTip: string
+    normalApiTipDesc: string
+    excellentApiTip: string
+    excellentApiTipDesc: string
+    failedSamplesTitle: string
+    noFailedSamples: string
+    noFailedSamplesDesc: string
+    showingSamples: string
+    responseTime: string
+    businessStatus: string
+    source: string
+    close: string
     domainFilter: string
     domainFilterAll: string
+    businessRecords: string
+    httpErrorsCount: string
+    clickToViewFailedSamples: string
+    viewFailedSamples: string
   }
   
   // 监控页面

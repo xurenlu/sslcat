@@ -68,6 +68,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **整体预期：系统吞吐量提升 3-5 倍，响应延迟降低 80%+！**
 
+## [1.6.2-rc3] - 2026-03-06
+
+### 🌐 国际化
+
+- **API 性能页面翻译补全**：
+  - 扩展 `apiPerformance` 翻译键至 zh-CN、en-US、ja-JP、es-ES、fr-FR、de-DE、ru-RU
+  - 移除 APIPerformance 页面硬编码中文，全部改用 i18n
+
 ## [1.6.2-rc2] - 2026-03-05
 
 ### 🔧 改进
