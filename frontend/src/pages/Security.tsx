@@ -448,14 +448,18 @@ const Security: React.FC = () => {
   const saveSecuritySettings = async () => {
     try {
       const effectivePrefix = adminPrefix || '/sslcat-panel'
-      const response = await fetch(buildApiPath(effectivePrefix, '/api/settings'), {
+      const response = await fetch(buildApiPath(effectivePrefix, '/api/settings/update'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
         body: JSON.stringify({
-          maxRequestsPerMinute: settings.maxRequestsPerMinute,
+          security: {
+            enable_waf: settings.enableWAF,
+            enable_ddos: settings.enableDDoSProtection,
+            max_attempts_5min: parseInt(settings.maxRequestsPerMinute) || 1000,
+          },
         }),
       })
 

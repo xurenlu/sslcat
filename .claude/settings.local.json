@@ -9,7 +9,16 @@
       "Bash(find:*)",
       "Bash(npm run build:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git reset:*)",
+      "Bash(git tag:*)",
+      "Bash(git push:*)",
+      "Bash(dig:*)",
+      "Bash(/tmp/sslcat-test:*)",
+      "Bash(git status:*)",
+      "Bash(grep:*)",
+      "Bash(cat:*)",
+      "Bash(ab:*)"
     ],
     "deny": [],
     "ask": []
