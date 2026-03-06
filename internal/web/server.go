@@ -301,7 +301,7 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		SubnetBlockDuration: time.Duration(cfg.Security.WAFSubnetBlockDurationSec) * time.Second,
 	}
 
-	wafEngine := waf.NewAdvancedEngine(rateLimitConfig, multiDimConfig)
+	wafEngine := waf.NewAdvancedEngine(rateLimitConfig, multiDimConfig, cfg.Security.EnableWAF)
 
 	// 初始化翻译器（从嵌入读取）
 	translator := i18n.NewTranslator(i18n.LangZhCN, "")

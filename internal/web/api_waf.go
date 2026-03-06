@@ -718,7 +718,7 @@ func (s *Server) handleAPIWAFTestRule(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// 创建临时引擎进行单规则测试
-			tempEngine := waf.NewEngine(nil, nil)
+			tempEngine := waf.NewEngine(nil, nil, true)
 			tempEngine.AddRule(rule)
 
 			if _, isBlocked := tempEngine.CheckRequest(testReq); isBlocked {
@@ -743,7 +743,7 @@ func (s *Server) handleAPIWAFTestRule(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// 创建临时引擎进行测试
-		tempEngine := waf.NewEngine(nil, nil)
+		tempEngine := waf.NewEngine(nil, nil, true)
 		tempEngine.AddRule(testRule)
 
 		if _, isBlocked := tempEngine.CheckRequest(testReq); isBlocked {

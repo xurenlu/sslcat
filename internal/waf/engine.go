@@ -100,7 +100,7 @@ type WAFRateLimitConfig struct {
 }
 
 // NewEngine 创建WAF引擎
-func NewEngine(rateLimitConfig *WAFRateLimitConfig, multiDimConfig *MultiDimBlockConfig) *Engine {
+func NewEngine(rateLimitConfig *WAFRateLimitConfig, multiDimConfig *MultiDimBlockConfig, enabled bool) *Engine {
 	log := logrus.WithFields(logrus.Fields{
 		"component": "waf_engine",
 	})
@@ -130,7 +130,7 @@ func NewEngine(rateLimitConfig *WAFRateLimitConfig, multiDimConfig *MultiDimBloc
 
 	engine := &Engine{
 		rules:           make(map[string]*Rule),
-		enabled:         true,
+		enabled:         enabled,
 		events:          make([]AttackEvent, 0),
 		maxEvents:       10000, // 最多保存10000个事件
 		logLimiter:      newWAFLogRateLimiter(time.Minute), // 相同攻击每分钟最多记录一次日志

@@ -101,8 +101,8 @@ type EngineStats struct {
 }
 
 // NewAdvancedEngine 创建高级WAF引擎
-func NewAdvancedEngine(rateLimitConfig *WAFRateLimitConfig, multiDimConfig *MultiDimBlockConfig) *AdvancedEngine {
-	baseEngine := NewEngine(rateLimitConfig, multiDimConfig)
+func NewAdvancedEngine(rateLimitConfig *WAFRateLimitConfig, multiDimConfig *MultiDimBlockConfig, enabled bool) *AdvancedEngine {
+	baseEngine := NewEngine(rateLimitConfig, multiDimConfig, enabled)
 
 	engine := &AdvancedEngine{
 		Engine:          baseEngine,
