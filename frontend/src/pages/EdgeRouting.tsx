@@ -164,8 +164,8 @@ const EdgeRouting: React.FC = () => {
       }
     } catch (error) {
       toast({
-        title: '加载失败',
-        description: '无法加载边缘路由配置',
+        title: t.edgeRouting?.loadFailed ?? t.common.error,
+        description: t.edgeRouting?.loadConfigFailed ?? '无法加载边缘路由配置',
         status: 'error',
         duration: 3000,
       });
@@ -190,15 +190,15 @@ const EdgeRouting: React.FC = () => {
       // 直接使用服务器返回的最新配置
       setConfig(response.data);
       toast({
-        title: '成功',
-        description: `边缘路由已${!config?.enabled ? '启用' : '禁用'}`,
+        title: t.common.success,
+        description: !config?.enabled ? (t.edgeRouting?.enabledSuccess ?? '边缘路由已启用') : (t.edgeRouting?.disabledSuccess ?? '边缘路由已禁用'),
         status: 'success',
         duration: 3000,
       });
     } catch (error) {
       toast({
-        title: '操作失败',
-        description: '无法更新边缘路由配置',
+        title: t.common.operationFailed,
+        description: t.edgeRouting?.configUpdateFailed ?? '无法更新边缘路由配置',
         status: 'error',
         duration: 3000,
       });
@@ -210,15 +210,15 @@ const EdgeRouting: React.FC = () => {
       await axios.post(buildApiPath(adminPrefix, '/api/edge-routing/config'), newConfig);
       await fetchConfig();
       toast({
-        title: '成功',
-        description: '配置已更新',
+        title: t.common.success,
+        description: t.edgeRouting?.configUpdated ?? '配置已更新',
         status: 'success',
         duration: 3000,
       });
     } catch (error) {
       toast({
-        title: '操作失败',
-        description: '无法更新配置',
+        title: t.common.operationFailed,
+        description: t.edgeRouting?.configUpdateFailed ?? '无法更新配置',
         status: 'error',
         duration: 3000,
       });
@@ -233,15 +233,15 @@ const EdgeRouting: React.FC = () => {
       });
       await fetchConfig();
       toast({
-        title: '成功',
-        description: `边缘节点已${enabled ? '启用' : '禁用'}`,
+        title: t.common.success,
+        description: enabled ? (t.edgeRouting?.enabledSuccess ?? '边缘节点已启用') : (t.edgeRouting?.disabledSuccess ?? '边缘节点已禁用'),
         status: 'success',
         duration: 3000,
       });
     } catch (error) {
       toast({
-        title: '操作失败',
-        description: '无法更新边缘节点状态',
+        title: t.common.operationFailed,
+        description: t.edgeRouting?.nodeToggleFailed ?? '无法更新边缘节点状态',
         status: 'error',
         duration: 3000,
       });
@@ -252,15 +252,15 @@ const EdgeRouting: React.FC = () => {
     try {
       const response = await axios.post(buildApiPath(adminPrefix, '/api/edge-routing/select-best'), { client_ip: clientIP });
       toast({
-        title: '最佳边缘节点',
-        description: `推荐节点: ${response.data.location?.name || '无'}`,
+        title: t.edgeRouting?.bestNode ?? '最佳边缘节点',
+        description: `${t.edgeRouting?.recommendedNode ?? '推荐节点'}: ${response.data.location?.name || (t.edgeRouting?.none ?? '无')}`,
         status: 'success',
         duration: 5000,
       });
     } catch (error) {
       toast({
-        title: '测试失败',
-        description: '无法测试最佳边缘节点选择',
+        title: t.edgeRouting?.testFailed ?? '测试失败',
+        description: t.edgeRouting?.testFailedDesc ?? '无法测试最佳边缘节点选择',
         status: 'error',
         duration: 3000,
       });
@@ -301,8 +301,8 @@ const EdgeRouting: React.FC = () => {
     // 验证必填字段
     if (!locationForm.id || !locationForm.name || !locationForm.region || !locationForm.country || !locationForm.city) {
       toast({
-        title: '验证失败',
-        description: '请填写所有必填字段',
+        title: t.edgeRouting?.validationFailed ?? '验证失败',
+        description: t.edgeRouting?.fillRequiredFields ?? '请填写所有必填字段',
         status: 'error',
         duration: 3000,
       });
@@ -317,15 +317,15 @@ const EdgeRouting: React.FC = () => {
       await fetchConfig();
       handleCloseLocationModal();
       toast({
-        title: '成功',
-        description: '边缘节点已添加',
+        title: t.common.success,
+        description: t.edgeRouting?.nodeAdded ?? '边缘节点已添加',
         status: 'success',
         duration: 3000,
       });
     } catch (error) {
       toast({
-        title: '操作失败',
-        description: '无法添加边缘节点',
+        title: t.common.operationFailed,
+        description: t.edgeRouting?.nodeAddFailed ?? '无法添加边缘节点',
         status: 'error',
         duration: 3000,
       });
@@ -335,7 +335,7 @@ const EdgeRouting: React.FC = () => {
   if (loading) {
     return (
       <Container maxW="container.xl" py={8}>
-        <Text>加载中...</Text>
+        <Text>{t.common.loading}</Text>
       </Container>
     );
   }
@@ -392,9 +392,9 @@ const EdgeRouting: React.FC = () => {
               <Card>
                 <CardBody>
                   <Stat>
-                    <StatLabel>总请求数</StatLabel>
+                    <StatLabel>{t.edgeRouting?.totalRequests ?? '总请求数'}</StatLabel>
                     <StatNumber>{metrics?.total_requests.toLocaleString()}</StatNumber>
-                    <StatHelpText>边缘路由请求</StatHelpText>
+                    <StatHelpText>{t.edgeRouting?.edgeRoutingRequests ?? '边缘路由请求'}</StatHelpText>
                   </Stat>
                 </CardBody>
               </Card>
@@ -402,9 +402,9 @@ const EdgeRouting: React.FC = () => {
               <Card>
                 <CardBody>
                   <Stat>
-                    <StatLabel>失败请求</StatLabel>
+                    <StatLabel>{t.edgeRouting?.failedRequests ?? '失败请求'}</StatLabel>
                     <StatNumber color="red.500">{metrics?.failed_requests.toLocaleString()}</StatNumber>
-                    <StatHelpText>路由失败</StatHelpText>
+                    <StatHelpText>{t.edgeRouting?.routingFailed ?? '路由失败'}</StatHelpText>
                   </Stat>
                 </CardBody>
               </Card>
@@ -412,11 +412,11 @@ const EdgeRouting: React.FC = () => {
               <Card>
                 <CardBody>
                   <Stat>
-                    <StatLabel>活跃节点</StatLabel>
+                    <StatLabel>{t.edgeRouting?.activeNodes ?? '活跃节点'}</StatLabel>
                     <StatNumber>
                       {Object.values(locations).filter((l) => l.enabled && l.healthy).length}
                     </StatNumber>
-                    <StatHelpText>/ {Object.values(locations).length} 总节点</StatHelpText>
+                    <StatHelpText>/ {Object.values(locations).length} {t.edgeRouting?.totalNodes ?? '总节点'}</StatHelpText>
                   </Stat>
                 </CardBody>
               </Card>
@@ -424,9 +424,9 @@ const EdgeRouting: React.FC = () => {
               <Card>
                 <CardBody>
                   <Stat>
-                    <StatLabel>健康检查失败</StatLabel>
+                    <StatLabel>{t.edgeRouting?.healthCheckFailures ?? '健康检查失败'}</StatLabel>
                     <StatNumber color="orange.500">{metrics?.health_check_failures}</StatNumber>
-                    <StatHelpText>需要关注</StatHelpText>
+                    <StatHelpText>{t.edgeRouting?.needsAttention ?? '需要关注'}</StatHelpText>
                   </Stat>
                 </CardBody>
               </Card>
@@ -438,19 +438,19 @@ const EdgeRouting: React.FC = () => {
                 <Tab>
                   <Box display="flex" alignItems="center" gap={2}>
                     <FiMapPin />
-                    边缘节点
+                    {t.edgeRouting?.edgeNodes ?? '边缘节点'}
                   </Box>
                 </Tab>
                 <Tab>
                   <Box display="flex" alignItems="center" gap={2}>
                     <FiActivity />
-                    流量统计
+                    {t.edgeRouting?.trafficStats ?? '流量统计'}
                   </Box>
                 </Tab>
                 <Tab>
                   <Box display="flex" alignItems="center" gap={2}>
                     <FiTrendingUp />
-                    配置
+                    {t.edgeRouting?.config ?? '配置'}
                   </Box>
                 </Tab>
               </TabList>
@@ -460,23 +460,23 @@ const EdgeRouting: React.FC = () => {
                 <TabPanel>
                   <Card>
                     <CardHeader display="flex" justifyContent="space-between">
-                      <Heading size="md">边缘节点列表</Heading>
+                      <Heading size="md">{t.edgeRouting?.edgeNodeList ?? '边缘节点列表'}</Heading>
                       <Button leftIcon={<FiPlus />} size="sm" colorScheme="blue" onClick={handleOpenAddLocationModal}>
-                        添加节点
+                        {t.edgeRouting?.addNode ?? '添加节点'}
                       </Button>
                     </CardHeader>
                     <CardBody>
                       <Table variant="simple">
                         <Thead>
                           <Tr>
-                            <Th>节点名称</Th>
-                            <Th>位置</Th>
-                            <Th>区域</Th>
-                            <Th>优先级</Th>
-                            <Th>状态</Th>
-                            <Th>健康</Th>
-                            <Th>平均延迟</Th>
-                            <Th>操作</Th>
+                            <Th>{t.edgeRouting?.nodeName ?? '节点名称'}</Th>
+                            <Th>{t.edgeRouting?.location ?? '位置'}</Th>
+                            <Th>{t.edgeRouting?.region ?? '区域'}</Th>
+                            <Th>{t.edgeRouting?.priority ?? '优先级'}</Th>
+                            <Th>{t.cluster?.status ?? '状态'}</Th>
+                            <Th>{t.cluster?.healthy ?? '健康'}</Th>
+                            <Th>{t.edgeRouting?.avgLatency ?? '平均延迟'}</Th>
+                            <Th>{t.common.actions}</Th>
                           </Tr>
                         </Thead>
                         <Tbody>
@@ -508,22 +508,22 @@ const EdgeRouting: React.FC = () => {
                               </Td>
                               <Td>
                                 <Badge colorScheme={location.enabled ? 'green' : 'gray'}>
-                                  {location.enabled ? '启用' : '禁用'}
+                                  {location.enabled ? (t.pathPrefixRules?.enabled ?? t.common.enable) : (t.pathPrefixRules?.disabled ?? t.common.disable)}
                                 </Badge>
                               </Td>
                               <Td>
                                 {location.healthy ? (
                                   <Badge colorScheme="green">
                                     <Box display="flex" alignItems="center" gap={1}>
-                                      <FiCheck />
-                                      健康
+                                    <FiCheck />
+                                    {t.cluster?.healthy ?? '健康'}
                                     </Box>
                                   </Badge>
                                 ) : (
                                   <Badge colorScheme="red">
                                     <Box display="flex" alignItems="center" gap={1}>
-                                      <FiX />
-                                      不健康
+                                    <FiX />
+                                    {t.cluster?.unhealthy ?? '不健康'}
                                     </Box>
                                   </Badge>
                                 )}
@@ -541,7 +541,7 @@ const EdgeRouting: React.FC = () => {
                                     size="xs"
                                     onClick={() => handleToggleLocation(location.id, !location.enabled)}
                                   >
-                                    {location.enabled ? '禁用' : '启用'}
+                                    {location.enabled ? (t.pathPrefixRules?.disabled ?? t.common.disable) : (t.pathPrefixRules?.enabled ?? t.common.enable)}
                                   </Button>
                                 </HStack>
                               </Td>
@@ -558,7 +558,7 @@ const EdgeRouting: React.FC = () => {
                   <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={4}>
                     <Card>
                       <CardHeader>
-                        <Heading size="md">按区域统计</Heading>
+                        <Heading size="md">{t.edgeRouting?.byRegion ?? '按区域统计'}</Heading>
                       </CardHeader>
                       <CardBody>
                         <VStack spacing={3} align="stretch">
@@ -580,7 +580,7 @@ const EdgeRouting: React.FC = () => {
 
                     <Card>
                       <CardHeader>
-                        <Heading size="md">按集群统计</Heading>
+                        <Heading size="md">{t.edgeRouting?.byCluster ?? '按集群统计'}</Heading>
                       </CardHeader>
                       <CardBody>
                         <VStack spacing={3} align="stretch">
@@ -606,13 +606,13 @@ const EdgeRouting: React.FC = () => {
                 <TabPanel>
                   <Card>
                     <CardHeader>
-                      <Heading size="md">边缘路由配置</Heading>
+                      <Heading size="md">{t.edgeRouting?.edgeRoutingConfig ?? '边缘路由配置'}</Heading>
                     </CardHeader>
                     <CardBody>
                       <VStack spacing={4} align="stretch">
                         <HStack spacing={4}>
                           <FormControl>
-                            <FormLabel>回退策略</FormLabel>
+                            <FormLabel>{t.edgeRouting?.fallbackStrategy ?? '回退策略'}</FormLabel>
                             <Select
                               value={config.fallback_strategy}
                               onChange={(e) => {
@@ -621,14 +621,14 @@ const EdgeRouting: React.FC = () => {
                                 handleUpdateConfig(newConfig);
                               }}
                             >
-                              <option value="local">本地优先</option>
-                              <option value="any">任意节点</option>
-                              <option value="closest">最近节点</option>
+                              <option value="local">{t.edgeRouting?.localFirst ?? '本地优先'}</option>
+                              <option value="any">{t.edgeRouting?.anyNode ?? '任意节点'}</option>
+                              <option value="closest">{t.edgeRouting?.closestNode ?? '最近节点'}</option>
                             </Select>
                           </FormControl>
 
                           <FormControl>
-                            <FormLabel>最大重试次数</FormLabel>
+                            <FormLabel>{t.edgeRouting?.maxRetries ?? '最大重试次数'}</FormLabel>
                             <NumberInput
                               value={config.max_retries}
                               min={0}
@@ -648,7 +648,7 @@ const EdgeRouting: React.FC = () => {
                           </FormControl>
 
                           <FormControl>
-                            <FormLabel>重试延迟 (ms)</FormLabel>
+                            <FormLabel>{t.edgeRouting?.retryDelay ?? '重试延迟 (ms)'}</FormLabel>
                             <NumberInput
                               value={config.retry_delay_ms}
                               min={0}
@@ -671,7 +671,7 @@ const EdgeRouting: React.FC = () => {
 
                         <HStack spacing={4}>
                           <FormControl>
-                            <FormLabel>健康检查间隔 (ms)</FormLabel>
+                            <FormLabel>{t.edgeRouting?.healthCheckInterval ?? '健康检查间隔 (ms)'}</FormLabel>
                             <NumberInput
                               value={config.health_check_interval_ms}
                               min={5000}
@@ -692,7 +692,7 @@ const EdgeRouting: React.FC = () => {
                           </FormControl>
 
                           <FormControl>
-                            <FormLabel>健康检查超时 (ms)</FormLabel>
+                            <FormLabel>{t.edgeRouting?.healthCheckTimeout ?? '健康检查超时 (ms)'}</FormLabel>
                             <NumberInput
                               value={config.health_check_timeout_ms}
                               min={1000}
@@ -713,7 +713,7 @@ const EdgeRouting: React.FC = () => {
                           </FormControl>
 
                           <FormControl>
-                            <FormLabel>延迟阈值 (ms)</FormLabel>
+                            <FormLabel>{t.edgeRouting?.latencyThreshold ?? '延迟阈值 (ms)'}</FormLabel>
                             <NumberInput
                               value={config.latency_threshold_ms}
                               min={100}
@@ -736,19 +736,19 @@ const EdgeRouting: React.FC = () => {
 
                         <Card>
                           <CardHeader>
-                            <Heading size="sm">测试最佳节点选择</Heading>
+                            <Heading size="sm">{t.edgeRouting?.testBestNode ?? '测试最佳节点选择'}</Heading>
                           </CardHeader>
                           <CardBody>
                             <HStack spacing={2}>
                               <Input
-                                placeholder="输入客户端 IP 地址"
+                                placeholder={t.edgeRouting?.clientIPPlaceholder ?? '输入客户端 IP 地址'}
                                 defaultValue="127.0.0.1"
                               />
                               <Button
                                 colorScheme="blue"
                                 onClick={() => handleTestBestEdge("127.0.0.1")}
                               >
-                                测试
+                                {t.edgeRouting?.test ?? '测试'}
                               </Button>
                             </HStack>
                           </CardBody>
@@ -767,23 +767,23 @@ const EdgeRouting: React.FC = () => {
       <Modal isOpen={isLocationOpen} onClose={handleCloseLocationModal} size="lg">
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>添加边缘节点</ModalHeader>
+          <ModalHeader>{t.edgeRouting?.addEdgeNode ?? '添加边缘节点'}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             <VStack spacing={4}>
               <HStack spacing={4} width="100%">
                 <FormControl isRequired>
-                  <FormLabel>节点 ID</FormLabel>
+                  <FormLabel>{t.edgeRouting?.nodeId ?? '节点 ID'}</FormLabel>
                   <Input
-                    placeholder="例如: cn-north-1"
+                    placeholder={t.edgeRouting?.nodeIdPlaceholder ?? '例如: cn-north-1'}
                     value={locationForm.id}
                     onChange={(e) => setLocationForm({ ...locationForm, id: e.target.value })}
                   />
                 </FormControl>
                 <FormControl isRequired>
-                  <FormLabel>节点名称</FormLabel>
+                  <FormLabel>{t.edgeRouting?.nodeName ?? '节点名称'}</FormLabel>
                   <Input
-                    placeholder="例如: 北京节点"
+                    placeholder={t.edgeRouting?.nodeNamePlaceholder ?? '例如: 北京节点'}
                     value={locationForm.name}
                     onChange={(e) => setLocationForm({ ...locationForm, name: e.target.value })}
                   />
@@ -792,17 +792,17 @@ const EdgeRouting: React.FC = () => {
 
               <HStack spacing={4} width="100%">
                 <FormControl isRequired>
-                  <FormLabel>区域</FormLabel>
+                  <FormLabel>{t.edgeRouting?.region ?? '区域'}</FormLabel>
                   <Input
-                    placeholder="例如: cn-north"
+                    placeholder={t.edgeRouting?.regionPlaceholder ?? '例如: cn-north'}
                     value={locationForm.region}
                     onChange={(e) => setLocationForm({ ...locationForm, region: e.target.value })}
                   />
                 </FormControl>
                 <FormControl isRequired>
-                  <FormLabel>国家代码</FormLabel>
+                  <FormLabel>{t.edgeRouting?.countryCode ?? '国家代码'}</FormLabel>
                   <Input
-                    placeholder="例如: CN"
+                    placeholder={t.edgeRouting?.countryPlaceholder ?? '例如: CN'}
                     value={locationForm.country}
                     onChange={(e) => setLocationForm({ ...locationForm, country: e.target.value })}
                   />
@@ -810,9 +810,9 @@ const EdgeRouting: React.FC = () => {
               </HStack>
 
               <FormControl isRequired>
-                <FormLabel>城市</FormLabel>
+                <FormLabel>{t.edgeRouting?.city ?? '城市'}</FormLabel>
                 <Input
-                  placeholder="例如: 北京"
+                  placeholder={t.edgeRouting?.cityPlaceholder ?? '例如: 北京'}
                   value={locationForm.city}
                   onChange={(e) => setLocationForm({ ...locationForm, city: e.target.value })}
                 />
@@ -820,7 +820,7 @@ const EdgeRouting: React.FC = () => {
 
               <HStack spacing={4} width="100%">
                 <FormControl>
-                  <FormLabel>纬度</FormLabel>
+                  <FormLabel>{t.edgeRouting?.latitude ?? '纬度'}</FormLabel>
                   <NumberInput
                     value={locationForm.latitude}
                     onChange={(_, value) => setLocationForm({ ...locationForm, latitude: value })}
@@ -835,7 +835,7 @@ const EdgeRouting: React.FC = () => {
                   </NumberInput>
                 </FormControl>
                 <FormControl>
-                  <FormLabel>经度</FormLabel>
+                  <FormLabel>{t.edgeRouting?.longitude ?? '经度'}</FormLabel>
                   <NumberInput
                     value={locationForm.longitude}
                     onChange={(_, value) => setLocationForm({ ...locationForm, longitude: value })}
@@ -853,7 +853,7 @@ const EdgeRouting: React.FC = () => {
 
               <HStack spacing={4} width="100%">
                 <FormControl>
-                  <FormLabel>优先级</FormLabel>
+                  <FormLabel>{t.edgeRouting?.priority ?? '优先级'}</FormLabel>
                   <NumberInput
                     value={locationForm.priority}
                     onChange={(_, value) => setLocationForm({ ...locationForm, priority: value })}
@@ -868,9 +868,9 @@ const EdgeRouting: React.FC = () => {
                   </NumberInput>
                 </FormControl>
                 <FormControl>
-                  <FormLabel>健康检查 URL</FormLabel>
+                  <FormLabel>{t.edgeRouting?.healthCheckUrl ?? '健康检查 URL'}</FormLabel>
                   <Input
-                    placeholder="例如: http://example.com/health"
+                    placeholder={t.edgeRouting?.healthCheckUrlPlaceholder ?? '例如: http://example.com/health'}
                     value={locationForm.health_check}
                     onChange={(e) => setLocationForm({ ...locationForm, health_check: e.target.value })}
                   />
@@ -880,10 +880,10 @@ const EdgeRouting: React.FC = () => {
           </ModalBody>
           <ModalFooter>
             <Button variant="ghost" mr={3} onClick={handleCloseLocationModal}>
-              取消
+              {t.common.cancel}
             </Button>
             <Button colorScheme="blue" onClick={handleSubmitLocation}>
-              添加
+              {t.securityMTLS?.add ?? t.common.add}
             </Button>
           </ModalFooter>
         </ModalContent>

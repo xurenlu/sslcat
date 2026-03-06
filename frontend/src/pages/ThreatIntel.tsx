@@ -109,7 +109,7 @@ const ThreatIntel: React.FC = () => {
       setStats(response.data);
     } catch (error) {
       toast({
-        title: '加载失败',
+        title: t.threatIntel?.loadFailed ?? t.threatIntel?.loadStatsFailed ?? '加载失败',
         description: t.threatIntel?.loadStatsFailed ?? '无法加载威胁情报统计',
         status: 'error',
         duration: 3000,
@@ -141,7 +141,7 @@ const ThreatIntel: React.FC = () => {
   const handleSearch = async () => {
     if (!searchValue.trim()) {
       toast({
-        title: '请输入搜索内容',
+        title: t.threatIntel?.enterSearchContent ?? '请输入搜索内容',
         status: 'warning',
         duration: 3000,
       });
@@ -158,7 +158,7 @@ const ThreatIntel: React.FC = () => {
 
       if (!response.data.ioc) {
         toast({
-          title: '未找到威胁',
+          title: t.threatIntel?.indicatorNotFoundTitle ?? '未找到威胁',
           description: t.threatIntel?.indicatorNotFound ?? '该指标未在威胁情报库中找到',
           status: 'info',
           duration: 3000,
@@ -166,7 +166,7 @@ const ThreatIntel: React.FC = () => {
       }
     } catch (error) {
       toast({
-        title: '搜索失败',
+        title: t.threatIntel?.queryFailedTitle ?? '搜索失败',
         description: t.threatIntel?.queryFailed ?? '无法查询威胁情报',
         status: 'error',
         duration: 3000,
@@ -180,7 +180,7 @@ const ThreatIntel: React.FC = () => {
     try {
       await axios.post(buildApiPath(adminPrefix, `/api/threat-intel/sources/${sourceName}/update`));
       toast({
-        title: '成功',
+        title: t.common.success,
         description: (t.threatIntel?.sourceUpdateTriggered ?? '威胁情报源 {name} 更新已触发').replace('{name}', sourceName),
         status: 'success',
         duration: 3000,
@@ -189,7 +189,7 @@ const ThreatIntel: React.FC = () => {
       await fetchStats();
     } catch (error) {
       toast({
-        title: '更新失败',
+        title: t.threatIntel?.updateFailedTitle ?? '更新失败',
         description: t.threatIntel?.sourceUpdateFailed ?? '无法更新威胁情报源',
         status: 'error',
         duration: 3000,
@@ -204,14 +204,14 @@ const ThreatIntel: React.FC = () => {
       });
       await fetchSources();
       toast({
-        title: '成功',
-        description: (t.threatIntel?.sourceStatusUpdated ?? '威胁情报源 {name} 已{status}').replace('{name}', sourceName).replace('{status}', enabled ? '启用' : '禁用'),
+        title: t.common.success,
+        description: (t.threatIntel?.sourceStatusUpdated ?? '威胁情报源 {name} 已{status}').replace('{name}', sourceName).replace('{status}', enabled ? (t.pathPrefixRules?.enabled ?? '启用') : (t.pathPrefixRules?.disabled ?? '禁用')),
         status: 'success',
         duration: 3000,
       });
     } catch (error) {
       toast({
-        title: '操作失败',
+        title: t.threatIntel?.operationFailedTitle ?? t.common.operationFailed,
         description: t.threatIntel?.sourceUpdateFailed ?? '无法更新威胁情报源',
         status: 'error',
         duration: 3000,

@@ -128,8 +128,8 @@ const SecurityMTLS: React.FC = () => {
       setMtlsConfig(response.data);
     } catch (error) {
       toast({
-        title: '加载失败',
-        description: '无法加载 mTLS 配置',
+        title: t.securityMTLS?.loadFailed ?? t.common.error,
+        description: t.securityMTLS?.loadConfigFailed ?? '无法加载 mTLS 配置',
         status: 'error',
         duration: 3000,
       });
@@ -215,15 +215,15 @@ const SecurityMTLS: React.FC = () => {
       // 直接使用服务器返回的最新配置
       setMtlsConfig(response.data);
       toast({
-        title: '成功',
-        description: `mTLS 已${!mtlsConfig?.enabled ? '启用' : '禁用'}`,
+        title: t.common.success,
+        description: !mtlsConfig?.enabled ? (t.securityMTLS?.mtlsEnabled ?? 'mTLS 已启用') : (t.securityMTLS?.mtlsDisabled ?? 'mTLS 已禁用'),
         status: 'success',
         duration: 3000,
       });
     } catch (error) {
       toast({
-        title: '操作失败',
-        description: '无法更新 mTLS 配置',
+        title: t.common.operationFailed,
+        description: t.securityMTLS?.mtlsUpdateFailed ?? '无法更新 mTLS 配置',
         status: 'error',
         duration: 3000,
       });
@@ -235,15 +235,15 @@ const SecurityMTLS: React.FC = () => {
       await axios.post(buildApiPath(adminPrefix, '/api/mtls/whitelist'), { serial_number: serialNumber });
       await fetchWhitelist();
       toast({
-        title: '成功',
-        description: '证书已添加到白名单',
+        title: t.common.success,
+        description: t.securityMTLS?.certAddedToWhitelist ?? '证书已添加到白名单',
         status: 'success',
         duration: 3000,
       });
     } catch (error) {
       toast({
-        title: '操作失败',
-        description: '无法添加到白名单',
+        title: t.common.operationFailed,
+        description: t.securityMTLS?.certAddFailed ?? '无法添加到白名单',
         status: 'error',
         duration: 3000,
       });
@@ -255,15 +255,15 @@ const SecurityMTLS: React.FC = () => {
       await axios.delete(buildApiPath(adminPrefix, `/api/mtls/whitelist/${serialNumber}`));
       await fetchWhitelist();
       toast({
-        title: '成功',
-        description: '证书已从白名单移除',
+        title: t.common.success,
+        description: t.securityMTLS?.certRemovedFromWhitelist ?? '证书已从白名单移除',
         status: 'success',
         duration: 3000,
       });
     } catch (error) {
       toast({
-        title: '操作失败',
-        description: '无法从白名单移除',
+        title: t.common.operationFailed,
+        description: t.securityMTLS?.certRemoveFailed ?? '无法从白名单移除',
         status: 'error',
         duration: 3000,
       });
@@ -275,15 +275,15 @@ const SecurityMTLS: React.FC = () => {
       await axios.post(buildApiPath(adminPrefix, '/api/mtls/revoke'), { serial_number: serialNumber });
       await fetchIssuedCerts();
       toast({
-        title: '成功',
-        description: '证书已吊销',
+        title: t.common.success,
+        description: t.securityMTLS?.certRevoked ?? '证书已吊销',
         status: 'success',
         duration: 3000,
       });
     } catch (error) {
       toast({
-        title: '操作失败',
-        description: '无法吊销证书',
+        title: t.common.operationFailed,
+        description: t.securityMTLS?.certRevokeFailed ?? '无法吊销证书',
         status: 'error',
         duration: 3000,
       });
@@ -293,7 +293,7 @@ const SecurityMTLS: React.FC = () => {
   if (loading) {
     return (
       <Container maxW="container.xl" py={8}>
-        <Text>加载中...</Text>
+        <Text>{t.common.loading}</Text>
       </Container>
     );
   }
@@ -434,12 +434,12 @@ const SecurityMTLS: React.FC = () => {
                   <CardBody>
                     <VStack spacing={4} align="stretch">
                       <FormControl>
-                        <FormLabel>验证模式</FormLabel>
+                        <FormLabel>{t.securityMTLS?.verificationMode ?? '验证模式'}</FormLabel>
                         <Select value={mtlsConfig?.mode} isDisabled={!mtlsConfig?.enabled}>
-                          <option value="strict">严格模式 - 必须提供有效证书</option>
-                          <option value="optional">可选模式 - 证书可选</option>
+                          <option value="strict">{t.securityMTLS?.strictMode ?? '严格模式 - 必须提供有效证书'}</option>
+                          <option value="optional">{t.securityMTLS?.optionalMode ?? '可选模式 - 证书可选'}</option>
                           <option value="verify_client_if_given">
-                            验证模式 - 如果提供则验证
+                            {t.securityMTLS?.verifyIfGiven ?? '验证模式 - 如果提供则验证'}
                           </option>
                         </Select>
                       </FormControl>
@@ -451,7 +451,7 @@ const SecurityMTLS: React.FC = () => {
                             isDisabled={!mtlsConfig?.enabled}
                           />
                           <FormLabel mb="0" ml={3}>
-                            要求客户端证书
+                            {t.securityMTLS?.requireClientCert ?? '要求客户端证书'}
                           </FormLabel>
                         </FormControl>
 
@@ -461,7 +461,7 @@ const SecurityMTLS: React.FC = () => {
                             isDisabled={!mtlsConfig?.enabled}
                           />
                           <FormLabel mb="0" ml={3}>
-                            启用 CRL 检查
+                            {t.securityMTLS?.enableCrlCheck ?? '启用 CRL 检查'}
                           </FormLabel>
                         </FormControl>
 
@@ -471,7 +471,7 @@ const SecurityMTLS: React.FC = () => {
                             isDisabled={!mtlsConfig?.enabled}
                           />
                           <FormLabel mb="0" ml={3}>
-                            启用证书固定
+                            {t.securityMTLS?.enableCertPinning ?? '启用证书固定'}
                           </FormLabel>
                         </FormControl>
                       </HStack>
@@ -482,13 +482,13 @@ const SecurityMTLS: React.FC = () => {
                 <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={4}>
                   <Card>
                     <CardHeader display="flex" justifyContent="space-between">
-                      <Heading size="md">证书白名单</Heading>
+                      <Heading size="md">{t.securityMTLS?.certWhitelist ?? '证书白名单'}</Heading>
                       <Button
                         leftIcon={<FiPlus />}
                         size="sm"
                         onClick={onCertModalOpen}
                       >
-                        添加
+                        {t.securityMTLS?.add ?? t.common.add}
                       </Button>
                     </CardHeader>
                     <CardBody>
@@ -496,7 +496,7 @@ const SecurityMTLS: React.FC = () => {
                         {whitelist.length === 0 ? (
                           <Alert status="info">
                             <AlertIcon />
-                            白名单为空
+                            {t.securityMTLS?.whitelistEmpty ?? '白名单为空'}
                           </Alert>
                         ) : (
                           whitelist.map((serial) => (
@@ -523,16 +523,16 @@ const SecurityMTLS: React.FC = () => {
 
                   <Card>
                     <CardHeader>
-                      <Heading size="md">已颁发证书</Heading>
+                      <Heading size="md">{t.securityMTLS?.certsIssued ?? '已颁发证书'}</Heading>
                     </CardHeader>
                     <CardBody>
                       <Table variant="simple" size="sm">
                         <Thead>
                           <Tr>
-                            <Th>主题</Th>
-                            <Th>过期时间</Th>
-                            <Th>状态</Th>
-                            <Th>操作</Th>
+                            <Th>{t.securityMTLS?.subject ?? '主题'}</Th>
+                            <Th>{t.securityMTLS?.expiryTime ?? '过期时间'}</Th>
+                            <Th>{t.cluster?.status ?? '状态'}</Th>
+                            <Th>{t.common.actions}</Th>
                           </Tr>
                         </Thead>
                         <Tbody>
@@ -548,9 +548,9 @@ const SecurityMTLS: React.FC = () => {
                               </Td>
                               <Td>
                                 {cert.revoked ? (
-                                  <Badge colorScheme="red">已吊销</Badge>
+                                  <Badge colorScheme="red">{t.securityMTLS?.revoked ?? '已吊销'}</Badge>
                                 ) : (
-                                  <Badge colorScheme="green">有效</Badge>
+                                  <Badge colorScheme="green">{t.securityMTLS?.valid ?? '有效'}</Badge>
                                 )}
                               </Td>
                               <Td>
@@ -560,7 +560,7 @@ const SecurityMTLS: React.FC = () => {
                                     colorScheme="red"
                                     onClick={() => handleRevokeCert(cert.serial_number)}
                                   >
-                                    吊销
+                                    {t.securityMTLS?.revoke ?? '吊销'}
                                   </Button>
                                 )}
                               </Td>
@@ -579,9 +579,9 @@ const SecurityMTLS: React.FC = () => {
               <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
                 <Card>
                   <CardHeader display="flex" justifyContent="space-between">
-                    <Heading size="md">角色列表</Heading>
+                    <Heading size="md">{t.securityMTLS?.roleList ?? '角色列表'}</Heading>
                     <Button leftIcon={<FiPlus />} size="sm" colorScheme="blue">
-                      创建角色
+                      {t.securityMTLS?.createRole ?? '创建角色'}
                     </Button>
                   </CardHeader>
                   <CardBody>
@@ -596,7 +596,7 @@ const SecurityMTLS: React.FC = () => {
                         >
                           <HStack justify="space-between" mb={2}>
                             <Text fontWeight="bold">{role.name}</Text>
-                            <Badge>{role.user_count} 用户</Badge>
+                            <Badge>{role.user_count} {t.securityMTLS?.users ?? '用户'}</Badge>
                           </HStack>
                           <Text fontSize="sm" color="gray.600" mb={2}>
                             {role.description}
@@ -621,19 +621,19 @@ const SecurityMTLS: React.FC = () => {
 
                 <Card>
                   <CardHeader display="flex" justifyContent="space-between">
-                    <Heading size="md">访问策略</Heading>
+                    <Heading size="md">{t.securityMTLS?.accessPolicies ?? '访问策略'}</Heading>
                     <Button leftIcon={<FiPlus />} size="sm" colorScheme="green">
-                      添加策略
+                      {t.securityMTLS?.addPolicy ?? '添加策略'}
                     </Button>
                   </CardHeader>
                   <CardBody>
                     <Table variant="simple" size="sm">
                       <Thead>
                         <Tr>
-                          <Th>名称</Th>
-                          <Th>资源</Th>
-                          <Th>操作</Th>
-                          <Th>效果</Th>
+                          <Th>{t.securityMTLS?.name ?? '名称'}</Th>
+                          <Th>{t.securityMTLS?.resource ?? '资源'}</Th>
+                          <Th>{t.securityMTLS?.action ?? '操作'}</Th>
+                          <Th>{t.securityMTLS?.effect ?? '效果'}</Th>
                         </Tr>
                       </Thead>
                       <Tbody>
@@ -665,7 +665,7 @@ const SecurityMTLS: React.FC = () => {
                   <Heading size="md">{t.securityMTLS?.auditLogs ?? t.auditLogs?.title ?? '审计日志'}</Heading>
                   <HStack>
                     <Button leftIcon={<FiDownload />} size="sm" variant="outline">
-                      导出
+                      {t.common.export}
                     </Button>
                     <IconButton
                       aria-label="刷新"
@@ -678,12 +678,12 @@ const SecurityMTLS: React.FC = () => {
                   <Table variant="simple" size="sm">
                     <Thead>
                       <Tr>
-                        <Th>时间</Th>
-                        <Th>用户</Th>
-                        <Th>资源</Th>
-                        <Th>操作</Th>
-                        <Th>结果</Th>
-                        <Th>原因</Th>
+                        <Th>{t.securityMTLS?.time ?? t.common.time}</Th>
+                        <Th>{t.securityMTLS?.users ?? t.common.user}</Th>
+                        <Th>{t.securityMTLS?.resource ?? '资源'}</Th>
+                        <Th>{t.securityMTLS?.action ?? '操作'}</Th>
+                        <Th>{t.securityMTLS?.result ?? '结果'}</Th>
+                        <Th>{t.securityMTLS?.reason ?? '原因'}</Th>
                       </Tr>
                     </Thead>
                     <Tbody>
@@ -699,9 +699,9 @@ const SecurityMTLS: React.FC = () => {
                           <Td>{log.action}</Td>
                           <Td>
                             {log.allowed ? (
-                              <Badge colorScheme="green">允许</Badge>
+                              <Badge colorScheme="green">{t.securityMTLS?.allow ?? '允许'}</Badge>
                             ) : (
-                              <Badge colorScheme="red">拒绝</Badge>
+                              <Badge colorScheme="red">{t.securityMTLS?.deny ?? '拒绝'}</Badge>
                             )}
                           </Td>
                           <Td fontSize="xs">{log.reason}</Td>
@@ -720,18 +720,18 @@ const SecurityMTLS: React.FC = () => {
       <Modal isOpen={isCertModalOpen} onClose={onCertModalClose}>
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>添加证书到白名单</ModalHeader>
+          <ModalHeader>{t.securityMTLS?.addCertToWhitelist ?? '添加证书到白名单'}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             <FormControl>
-              <FormLabel>证书序列号</FormLabel>
-              <Input placeholder="输入证书序列号" />
+              <FormLabel>{t.securityMTLS?.certSerialNumber ?? '证书序列号'}</FormLabel>
+              <Input placeholder={t.securityMTLS?.certSerialPlaceholder ?? '输入证书序列号'} />
             </FormControl>
           </ModalBody>
           <ModalFooter>
-            <Button onClick={onCertModalClose}>取消</Button>
+            <Button onClick={onCertModalClose}>{t.common.cancel}</Button>
             <Button colorScheme="blue" ml={3}>
-              添加
+              {t.securityMTLS?.add ?? t.common.add}
             </Button>
           </ModalFooter>
         </ModalContent>

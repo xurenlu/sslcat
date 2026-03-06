@@ -160,6 +160,50 @@ export interface Translation {
     slaveNotice: string
     nodeConfig?: string
     experimentalFeature?: string
+    // Service Mesh
+    serviceMesh?: string
+    serviceMeshDesc?: string
+    serviceMeshManagement?: string
+    serviceMeshNotEnabled?: string
+    serviceMeshEnabled?: string
+    serviceMeshDisabled?: string
+    serviceMeshUpdateFailed?: string
+    servicesDiscovered?: string
+    servicesRegistered?: string
+    meshRequests?: string
+    viaServiceMesh?: string
+    directRequests?: string
+    bypassServiceMesh?: string
+    meshApiCalls?: string
+    serviceList?: string
+    circuitBreakerStatus?: string
+    refreshServices?: string
+    noServices?: string
+    serviceName?: string
+    namespace?: string
+    address?: string
+    port?: string
+    status?: string
+    lastCheck?: string
+    healthy?: string
+    unhealthy?: string
+    breakerOpenCount?: string
+    failureCount?: string
+    successCount?: string
+    lastStateChange?: string
+    breakerClosed?: string
+    breakerOpen?: string
+    breakerHalfOpen?: string
+    breakerReset?: string
+    breakerResetSuccess?: string
+    breakerResetFailed?: string
+    discoverTriggered?: string
+    discoverFailed?: string
+    healthCheckTriggered?: string
+    healthCheckFailed?: string
+    triggerHealthCheck?: string
+    noBreakers?: string
+    service?: string
   }
 
   // 集群状态
@@ -2090,6 +2134,12 @@ export interface Translation {
     sourceUpdateTriggered: string
     sourceUpdateFailed: string
     sourceStatusUpdated: string
+    loadFailed?: string
+    enterSearchContent?: string
+    indicatorNotFoundTitle?: string
+    queryFailedTitle?: string
+    updateFailedTitle?: string
+    operationFailedTitle?: string
     totalIOCs?: string
     totalThreatIndicators?: string
     criticalThreats?: string
@@ -2207,6 +2257,69 @@ export interface Translation {
     experimentalFeature?: string
     manageMultiRegionDesc?: string
     edgeRoutingNotEnabled?: string
+    loadFailed?: string
+    loadConfigFailed?: string
+    enabledSuccess?: string
+    disabledSuccess?: string
+    configUpdateFailed?: string
+    configUpdated?: string
+    nodeAdded?: string
+    nodeAddFailed?: string
+    nodeToggleFailed?: string
+    validationFailed?: string
+    fillRequiredFields?: string
+    totalRequests?: string
+    edgeRoutingRequests?: string
+    failedRequests?: string
+    routingFailed?: string
+    activeNodes?: string
+    totalNodes?: string
+    healthCheckFailures?: string
+    needsAttention?: string
+    edgeNodes?: string
+    trafficStats?: string
+    config?: string
+    edgeNodeList?: string
+    addNode?: string
+    nodeName?: string
+    location?: string
+    region?: string
+    priority?: string
+    avgLatency?: string
+    actions?: string
+    byRegion?: string
+    byCluster?: string
+    edgeRoutingConfig?: string
+    fallbackStrategy?: string
+    localFirst?: string
+    anyNode?: string
+    closestNode?: string
+    maxRetries?: string
+    retryDelay?: string
+    healthCheckInterval?: string
+    healthCheckTimeout?: string
+    latencyThreshold?: string
+    testBestNode?: string
+    clientIPPlaceholder?: string
+    test?: string
+    addEdgeNode?: string
+    nodeId?: string
+    nodeIdPlaceholder?: string
+    nodeNamePlaceholder?: string
+    countryCode?: string
+    city?: string
+    cityPlaceholder?: string
+    latitude?: string
+    longitude?: string
+    healthCheckUrl?: string
+    healthCheckUrlPlaceholder?: string
+    regionPlaceholder?: string
+    countryPlaceholder?: string
+    bestNode?: string
+    recommendedNode?: string
+    none?: string
+    testFailed?: string
+    testFailedDesc?: string
   }
 
   // 零信任安全
@@ -2225,6 +2338,49 @@ export interface Translation {
     mtlsConfig?: string
     rbacManagement?: string
     mtlsSettings?: string
+    loadFailed?: string
+    loadConfigFailed?: string
+    mtlsEnabled?: string
+    mtlsDisabled?: string
+    mtlsUpdateFailed?: string
+    certAddedToWhitelist?: string
+    certAddFailed?: string
+    certRemovedFromWhitelist?: string
+    certRemoveFailed?: string
+    certRevoked?: string
+    certRevokeFailed?: string
+    verificationMode?: string
+    strictMode?: string
+    optionalMode?: string
+    verifyIfGiven?: string
+    requireClientCert?: string
+    enableCrlCheck?: string
+    enableCertPinning?: string
+    certWhitelist?: string
+    add?: string
+    whitelistEmpty?: string
+    subject?: string
+    expiryTime?: string
+    revoke?: string
+    valid?: string
+    revoked?: string
+    roleList?: string
+    createRole?: string
+    users?: string
+    addPolicy?: string
+    name?: string
+    resource?: string
+    action?: string
+    effect?: string
+    time?: string
+    result?: string
+    reason?: string
+    allow?: string
+    deny?: string
+    addCertToWhitelist?: string
+    certSerialNumber?: string
+    certSerialPlaceholder?: string
+    remove?: string
   }
 
 }

@@ -201,14 +201,14 @@ const ClusterSettings: React.FC = () => {
       setMeshConfig(response.data)
       toast({
         title: t.common.success,
-        description: `Service Mesh 已${!meshConfig?.enabled ? '启用' : '禁用'}`,
+        description: !meshConfig?.enabled ? (t.cluster?.serviceMeshEnabled ?? 'Service Mesh 已启用') : (t.cluster?.serviceMeshDisabled ?? 'Service Mesh 已禁用'),
         status: 'success',
         duration: 3000,
       })
     } catch (error) {
       toast({
         title: t.common.error,
-        description: '无法更新 Service Mesh 配置',
+        description: t.cluster?.serviceMeshUpdateFailed ?? '无法更新 Service Mesh 配置',
         status: 'error',
         duration: 3000,
       })
@@ -221,14 +221,14 @@ const ClusterSettings: React.FC = () => {
       await fetchMeshConfig()
       toast({
         title: t.common.success,
-        description: `熔断器 ${service} 已重置`,
+        description: (t.cluster?.breakerResetSuccess ?? '熔断器 {service} 已重置').replace('{service}', service),
         status: 'success',
         duration: 3000,
       })
     } catch (error) {
       toast({
         title: t.common.error,
-        description: '无法重置熔断器',
+        description: t.cluster?.breakerResetFailed ?? '无法重置熔断器',
         status: 'error',
         duration: 3000,
       })
@@ -241,14 +241,14 @@ const ClusterSettings: React.FC = () => {
       await fetchMeshConfig()
       toast({
         title: t.common.success,
-        description: '服务发现已触发',
+        description: t.cluster?.discoverTriggered ?? '服务发现已触发',
         status: 'success',
         duration: 3000,
       })
     } catch (error) {
       toast({
         title: t.common.error,
-        description: '无法触发服务发现',
+        description: t.cluster?.discoverFailed ?? '无法触发服务发现',
         status: 'error',
         duration: 3000,
       })
@@ -261,14 +261,14 @@ const ClusterSettings: React.FC = () => {
       await fetchMeshConfig()
       toast({
         title: t.common.success,
-        description: '健康检查已触发',
+        description: t.cluster?.healthCheckTriggered ?? '健康检查已触发',
         status: 'success',
         duration: 3000,
       })
     } catch (error) {
       toast({
         title: t.common.error,
-        description: '无法触发健康检查',
+        description: t.cluster?.healthCheckFailed ?? '无法触发健康检查',
         status: 'error',
         duration: 3000,
       })
@@ -289,7 +289,7 @@ const ClusterSettings: React.FC = () => {
       <Tabs>
         <TabList>
           <Tab>{t.cluster?.nodeConfig ?? '节点配置'}</Tab>
-          <Tab>Service Mesh</Tab>
+          <Tab>{t.cluster?.serviceMesh ?? 'Service Mesh'}</Tab>
         </TabList>
 
         <TabPanels>
@@ -408,12 +408,12 @@ const ClusterSettings: React.FC = () => {
                 <AlertIcon />
                 <Box>
                   <Text fontWeight="bold">{t.cluster?.experimentalFeature ?? '实验性功能'}</Text>
-                  <Text fontSize="sm">Service Mesh 功能尚未完全实现，有待生产环境测试。请在测试环境中谨慎使用。</Text>
+                  <Text fontSize="sm">{t.cluster?.serviceMeshDesc ?? 'Service Mesh 功能尚未完全实现，有待生产环境测试。请在测试环境中谨慎使用。'}</Text>
                 </Box>
               </Alert>
 
               <Box display="flex" justifyContent="space-between" alignItems="center">
-                <Heading size="md">Service Mesh 管理</Heading>
+                <Heading size="md">{t.cluster?.serviceMeshManagement ?? 'Service Mesh 管理'}</Heading>
                 <HStack>
                   <Switch
                     isChecked={meshConfig?.enabled}
@@ -432,7 +432,7 @@ const ClusterSettings: React.FC = () => {
               {!meshConfig?.enabled && (
                 <Alert status="info" borderRadius="md">
                   <AlertIcon />
-                  Service Mesh 当前未启用
+                  {t.cluster?.serviceMeshNotEnabled ?? 'Service Mesh 当前未启用'}
                 </Alert>
               )}
 
@@ -443,9 +443,9 @@ const ClusterSettings: React.FC = () => {
                     <Card>
                       <CardBody>
                         <Stat>
-                          <StatLabel>已发现服务</StatLabel>
+                          <StatLabel>{t.cluster?.servicesDiscovered ?? '已发现服务'}</StatLabel>
                           <StatNumber>{meshConfig.stats.services_discovered.toLocaleString()}</StatNumber>
-                          <StatHelpText>已注册服务</StatHelpText>
+                          <StatHelpText>{t.cluster?.servicesRegistered ?? '已注册服务'}</StatHelpText>
                         </Stat>
                       </CardBody>
                     </Card>
@@ -453,9 +453,9 @@ const ClusterSettings: React.FC = () => {
                     <Card>
                       <CardBody>
                         <Stat>
-                          <StatLabel>Mesh 请求</StatLabel>
+                          <StatLabel>{t.cluster?.meshRequests ?? 'Mesh 请求'}</StatLabel>
                           <StatNumber>{meshConfig.stats.requests_via_mesh.toLocaleString()}</StatNumber>
-                          <StatHelpText>通过 Service Mesh</StatHelpText>
+                          <StatHelpText>{t.cluster?.viaServiceMesh ?? '通过 Service Mesh'}</StatHelpText>
                         </Stat>
                       </CardBody>
                     </Card>
@@ -463,9 +463,9 @@ const ClusterSettings: React.FC = () => {
                     <Card>
                       <CardBody>
                         <Stat>
-                          <StatLabel>直接请求</StatLabel>
+                          <StatLabel>{t.cluster?.directRequests ?? '直接请求'}</StatLabel>
                           <StatNumber>{meshConfig.stats.requests_direct.toLocaleString()}</StatNumber>
-                          <StatHelpText>绕过 Service Mesh</StatHelpText>
+                          <StatHelpText>{t.cluster?.bypassServiceMesh ?? '绕过 Service Mesh'}</StatHelpText>
                         </Stat>
                       </CardBody>
                     </Card>
@@ -473,7 +473,7 @@ const ClusterSettings: React.FC = () => {
                     <Card>
                       <CardBody>
                         <Stat>
-                          <StatLabel>API 调用</StatLabel>
+                          <StatLabel>{t.cluster?.meshApiCalls ?? 'API 调用'}</StatLabel>
                           <StatNumber>{meshConfig.stats.mesh_api_calls.toLocaleString()}</StatNumber>
                           <StatHelpText>Mesh API 请求</StatHelpText>
                         </Stat>
@@ -487,13 +487,13 @@ const ClusterSettings: React.FC = () => {
                       <Tab>
                         <Box display="flex" alignItems="center" gap={2}>
                           <FiServer />
-                          服务列表
+                          {t.cluster?.serviceList ?? '服务列表'}
                         </Box>
                       </Tab>
                       <Tab>
                         <Box display="flex" alignItems="center" gap={2}>
                           <FiActivity />
-                          熔断器状态
+                          {t.cluster?.circuitBreakerStatus ?? '熔断器状态'}
                         </Box>
                       </Tab>
                     </TabList>
@@ -503,31 +503,31 @@ const ClusterSettings: React.FC = () => {
                       <TabPanel>
                         <Card>
                           <CardHeader display="flex" justifyContent="space-between">
-                            <Heading size="md">服务列表</Heading>
+                            <Heading size="md">{t.cluster?.serviceList ?? '服务列表'}</Heading>
                             <Button
                               leftIcon={<FiRefreshCw />}
                               size="sm"
                               onClick={handleDiscoverServices}
                             >
-                              刷新服务
+                              {t.cluster?.refreshServices ?? '刷新服务'}
                             </Button>
                           </CardHeader>
                           <CardBody>
                             {!meshConfig.services || meshConfig.services.length === 0 ? (
                               <Alert status="info">
                                 <AlertIcon />
-                                暂无服务
+                                {t.cluster?.noServices ?? '暂无服务'}
                               </Alert>
                             ) : (
                               <Table variant="simple">
                                 <Thead>
                                   <Tr>
-                                    <Th>服务名</Th>
-                                    <Th>命名空间</Th>
-                                    <Th>地址</Th>
-                                    <Th>端口</Th>
-                                    <Th>状态</Th>
-                                    <Th>最后检查</Th>
+                                    <Th>{t.cluster?.serviceName ?? '服务名'}</Th>
+                                    <Th>{t.cluster?.namespace ?? '命名空间'}</Th>
+                                    <Th>{t.cluster?.address ?? '地址'}</Th>
+                                    <Th>{t.cluster?.port ?? '端口'}</Th>
+                                    <Th>{t.cluster?.status ?? '状态'}</Th>
+                                    <Th>{t.cluster?.lastCheck ?? '最后检查'}</Th>
                                   </Tr>
                                 </Thead>
                                 <Tbody>
@@ -554,14 +554,14 @@ const ClusterSettings: React.FC = () => {
                                           <Badge colorScheme="green">
                                             <Box display="flex" alignItems="center" gap={1}>
                                               <FiCheckCircle />
-                                              健康
+                                              {t.cluster?.healthy ?? '健康'}
                                             </Box>
                                           </Badge>
                                         ) : (
                                           <Badge colorScheme="red">
                                             <Box display="flex" alignItems="center" gap={1}>
                                               <FiXCircle />
-                                              不健康
+                                              {t.cluster?.unhealthy ?? '不健康'}
                                             </Box>
                                           </Badge>
                                         )}
@@ -582,32 +582,32 @@ const ClusterSettings: React.FC = () => {
                       <TabPanel>
                         <Card>
                           <CardHeader display="flex" justifyContent="space-between">
-                            <Heading size="md">熔断器状态</Heading>
+                            <Heading size="md">{t.cluster?.circuitBreakerStatus ?? '熔断器状态'}</Heading>
                             <Button
                               leftIcon={<FiActivity />}
                               size="sm"
                               onClick={handleHealthCheck}
                             >
-                              触发健康检查
+                              {t.cluster?.triggerHealthCheck ?? '触发健康检查'}
                             </Button>
                           </CardHeader>
                           <CardBody>
                             {!meshConfig.circuit_breakers || Object.keys(meshConfig.circuit_breakers).length === 0 ? (
                               <Alert status="info">
                                 <AlertIcon />
-                                暂无熔断器
+                                {t.cluster?.noBreakers ?? '暂无熔断器'}
                               </Alert>
                             ) : (
                               <Table variant="simple">
                                 <Thead>
                                   <Tr>
-                                    <Th>服务</Th>
-                                    <Th>状态</Th>
-                                    <Th>开启次数</Th>
-                                    <Th>失败数</Th>
-                                    <Th>成功数</Th>
-                                    <Th>最后状态变更</Th>
-                                    <Th>操作</Th>
+                                    <Th>{t.cluster?.service ?? '服务'}</Th>
+                                    <Th>{t.cluster?.status ?? '状态'}</Th>
+                                    <Th>{t.cluster?.breakerOpenCount ?? '开启次数'}</Th>
+                                    <Th>{t.cluster?.failureCount ?? '失败数'}</Th>
+                                    <Th>{t.cluster?.successCount ?? '成功数'}</Th>
+                                    <Th>{t.cluster?.lastStateChange ?? '最后状态变更'}</Th>
+                                    <Th>{t.common.actions}</Th>
                                   </Tr>
                                 </Thead>
                                 <Tbody>
@@ -616,11 +616,11 @@ const ClusterSettings: React.FC = () => {
                                       <Td>{breaker.service}</Td>
                                       <Td>
                                         {breaker.state === 'closed' ? (
-                                          <Badge colorScheme="green">关闭</Badge>
+                                          <Badge colorScheme="green">{t.cluster?.breakerClosed ?? '关闭'}</Badge>
                                         ) : breaker.state === 'open' ? (
-                                          <Badge colorScheme="red">开启</Badge>
+                                          <Badge colorScheme="red">{t.cluster?.breakerOpen ?? '开启'}</Badge>
                                         ) : (
-                                          <Badge colorScheme="yellow">半开</Badge>
+                                          <Badge colorScheme="yellow">{t.cluster?.breakerHalfOpen ?? '半开'}</Badge>
                                         )}
                                       </Td>
                                       <Td>{breaker.open_count}</Td>
@@ -636,7 +636,7 @@ const ClusterSettings: React.FC = () => {
                                             leftIcon={<FiRefreshCw />}
                                             onClick={() => handleResetBreaker(breaker.service)}
                                           >
-                                            重置
+                                            {t.cluster?.breakerReset ?? '重置'}
                                           </Button>
                                         )}
                                       </Td>
