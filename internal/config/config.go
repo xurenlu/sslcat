@@ -69,7 +69,8 @@ type ServerConfig struct {
 	EnableHTTPS bool   `json:"enable_https"` // 是否启用 HTTPS（默认 true）
 
 	// HTTP/2 配置
-	HTTP2Enabled bool `json:"http2_enabled"` // 是否启用 HTTP/2（默认 false）
+	HTTP2Enabled bool          `json:"http2_enabled"` // 是否启用 HTTP/2（默认 false）
+	HTTP2Config   *HTTP2Config  `json:"http2_config,omitempty"`
 
 	// HTTP/3 配置
 	HTTP3Enabled bool         `json:"http3_enabled"` // 是否启用 HTTP/3（默认 false）
@@ -142,6 +143,15 @@ type HTTP3Config struct {
 	MaxIdleTimeout        string `json:"max_idle_timeout"`         // 默认 "120s"
 	MaxIncomingStreams    int64  `json:"max_incoming_streams"`     // 默认 1000
 	MaxIncomingUniStreams int64  `json:"max_incoming_uni_streams"` // 默认 1000
+}
+
+// HTTP2Config HTTP/2 配置
+type HTTP2Config struct {
+	MaxConcurrentStreams         int64  `json:"max_concurrent_streams"`          // 最大并发流数（默认 250）
+	MaxReadFrameSize             int64  `json:"max_read_frame_size"`             // 最大帧大小（默认 1MB）
+	IdleTimeout                  int    `json:"idle_timeout"`                    // 空闲超时（秒，默认 120）
+	MaxUploadBufferPerConnection int64  `json:"max_upload_buffer_per_connection"` // 连接级上传缓冲（默认 1MB）
+	MaxUploadBufferPerStream     int64  `json:"max_upload_buffer_per_stream"`     // 流级上传缓冲（默认 256KB）
 }
 
 // DNSProvider DNS服务商配置
@@ -2483,6 +2493,18 @@ type AISecurityConfig struct {
 	// 通知配置
 	NotifyOnThreat bool   `json:"notify_on_threat"` // 检测到威胁时是否通知（默认 true）
 	MinThreatLevel string `json:"min_threat_level"` // 最低通知威胁等级（low/medium/high/critical）
+
+	// ML 推理引擎配置
+	MLInference MLInferenceConfig `json:"ml_inference"`
+}
+
+// MLInferenceConfig ML 推理引擎配置
+type MLInferenceConfig struct {
+	WorkerPoolSize     int           `json:"worker_pool_size"`     // Worker 数量（默认 50，推荐 10-200）
+	MaxQueueSize       int           `json:"max_queue_size"`       // 最大队列大小（默认 5000）
+	BatchTimeout       time.Duration `json:"batch_timeout"`        // 批处理超时（默认 100ms）
+	QueueFullStrategy  string        `json:"queue_full_strategy"`  // 队列满时的策略: "drop" | "wait" | "error"（默认 "drop"）
+	EnableQueueLogging bool          `json:"enable_queue_logging"` // 是否记录队列日志（默认 false）
 }
 
 // ImageOptimizationConfig 图片优化配置

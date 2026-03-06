@@ -168,6 +168,12 @@ type Server struct {
 	clusterLastCertSyncAt        time.Time
 	clusterMasterLastReachableAt time.Time
 	clusterLastSyncError         string
+
+	// HTTP/2 动态控制
+	http2Enabled     bool      // 当前 HTTP/2 状态
+	http2Mutex        sync.RWMutex
+	http2DisableUntil time.Time // HTTP/2 禁用到何时
+	http2DisableReason string   // 禁用原因
 }
 
 // NewServer 创建Web服务器
@@ -338,6 +344,7 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		log: logrus.WithFields(logrus.Fields{
 			"component": "web_server",
 		}),
+		http2Enabled: cfg.Server.HTTP2Enabled, // 初始化 HTTP/2 状态
 	}
 
 	// 初始化 TokenStore
@@ -701,6 +708,9 @@ func (s *Server) SetupConfigReload(configWatcher *config.ConfigWatcher, reloadMa
 	// 注册配置版本管理API路由
 	s.setupConfigVersionRoutes()
 
+	// 注册 HTTP/2 控制API路由
+	s.setupHTTP2ControlRoutes()
+
 	s.log.Info("Config hot reload functionality enabled")
 }
 
@@ -710,9 +720,40 @@ func (s *Server) setupMLSystem() {
 
 	// 创建 ML 组件
 	s.mlAPIHandler = NewMLAPIHandler()
-	s.mlInferenceEngine = ml.NewInferenceEngine()
 	s.mlFeatureExtractor = ml.NewFeatureExtractor()
 	s.mlThreatScorer = ml.NewThreatScorer()
+
+	// 从配置读取 ML 推理引擎参数
+	mlConfig := s.config.AISecurity.MLInference
+
+	// 设置默认值
+	workerSize := mlConfig.WorkerPoolSize
+	if workerSize <= 0 {
+		workerSize = 50 // 默认 worker 数量
+	}
+
+	maxQueueSize := mlConfig.MaxQueueSize
+	if maxQueueSize <= 0 {
+		maxQueueSize = 5000 // 默认队列大小
+	}
+
+	batchTimeout := mlConfig.BatchTimeout
+	if batchTimeout == 0 {
+		batchTimeout = 100 * time.Millisecond // 默认批处理超时
+	}
+
+	queueStrategy := mlConfig.QueueFullStrategy
+	if queueStrategy == "" {
+		queueStrategy = "drop" // 默认策略
+	}
+
+	// 使用配置创建推理引擎
+	s.mlInferenceEngine = ml.NewInferenceEngineWithConfig(
+		workerSize,
+		maxQueueSize,
+		batchTimeout,
+		queueStrategy,
+	)
 
 	// 启动推理引擎
 	s.mlInferenceEngine.Start()
@@ -733,7 +774,28 @@ func (s *Server) setupMLSystem() {
 	s.mux.HandleFunc(prefix+"/threat/score", s.handleMLThreatScore)
 	s.mux.HandleFunc(prefix+"/features/extract", s.handleMLExtractFeatures)
 
-	s.log.Info("ML/AI anomaly detection system initialized")
+	s.log.WithFields(logrus.Fields{
+		"worker_pool_size":   workerSize,
+		"max_queue_size":     maxQueueSize,
+		"batch_timeout":      batchTimeout.String(),
+		"queue_full_strategy": queueStrategy,
+	}).Info("ML/AI anomaly detection system initialized")
+}
+
+// setupHTTP2ControlRoutes 设置 HTTP/2 控制 API 路由
+func (s *Server) setupHTTP2ControlRoutes() {
+	prefix := s.config.AdminPrefix + "/api/http2"
+
+	// GET /api/http2/status - 获取 HTTP/2 状态
+	s.mux.HandleFunc(prefix+"/status", s.handleHTTP2Status)
+
+	// POST /api/http2/enable - 启用 HTTP/2
+	s.mux.HandleFunc(prefix+"/enable", s.handleHTTP2Enable)
+
+	// POST /api/http2/disable - 禁用 HTTP/2
+	s.mux.HandleFunc(prefix+"/disable", s.handleHTTP2Disable)
+
+	s.log.Info("HTTP/2 control API routes registered")
 }
 
 // StopMLSystem 停止 ML 系统
@@ -3161,4 +3223,161 @@ func (s *Server) Stop() {
 	s.StopMLSystem()
 
 	s.log.Info("Web server stopped")
+}
+
+// ============================================
+// HTTP/2 动态控制
+// ============================================
+
+// SetHTTP2Enabled 动态启用/禁用 HTTP/2
+func (s *Server) SetHTTP2Enabled(enabled bool, reason string) {
+	s.http2Mutex.Lock()
+	defer s.http2Mutex.Unlock()
+
+	// 检查是否需要自动恢复
+	if !enabled && s.http2DisableUntil.IsZero() {
+		// 禁用 HTTP/2，默认禁用 10 分钟
+		s.http2DisableUntil = time.Now().Add(10 * time.Minute)
+		s.http2Enabled = false
+		s.http2DisableReason = reason
+		s.log.WithFields(logrus.Fields{
+			"reason":            reason,
+			"auto_resume_at":     s.http2DisableUntil.Format(time.RFC3339),
+		}).Warn("HTTP/2 已被禁用，将在 10 分钟后自动恢复")
+	} else if enabled {
+		// 手动启用 HTTP/2
+		s.http2DisableUntil = time.Time{}
+		s.http2Enabled = true
+		s.http2DisableReason = ""
+		s.log.Info("HTTP/2 已被手动启用")
+	}
+}
+
+// SetHTTP2DisabledForDuration 在指定时间内禁用 HTTP/2
+func (s *Server) SetHTTP2DisabledForDuration(duration time.Duration, reason string) {
+	s.http2Mutex.Lock()
+	defer s.http2Mutex.Unlock()
+
+	s.http2Enabled = false
+	s.http2DisableUntil = time.Now().Add(duration)
+	s.http2DisableReason = reason
+
+	s.log.WithFields(logrus.Fields{
+		"duration":     duration.String(),
+		"reason":       reason,
+		"auto_resume_at": s.http2DisableUntil.Format(time.RFC3339),
+	}).Warn("HTTP/2 已被禁用")
+}
+
+// IsHTTP2Enabled 检查 HTTP/2 是否启用（考虑自动恢复）
+func (s *Server) IsHTTP2Enabled() bool {
+	s.http2Mutex.RLock()
+	defer s.http2Mutex.RUnlock()
+
+	// 检查是否需要自动恢复
+	if !s.http2Enabled && !s.http2DisableUntil.IsZero() && time.Now().After(s.http2DisableUntil) {
+		// 需要自动恢复，但需要写锁
+		s.http2Mutex.RUnlock()
+		s.http2Mutex.Lock()
+		// 双重检查
+		if !s.http2Enabled && time.Now().After(s.http2DisableUntil) {
+			s.http2Enabled = true
+			s.http2DisableUntil = time.Time{}
+			s.http2DisableReason = ""
+			s.log.Info("HTTP/2 已自动恢复启用")
+		}
+		s.http2Mutex.Unlock()
+		s.http2Mutex.RLock()
+	}
+
+	return s.http2Enabled
+}
+
+// GetHTTP2Status 获取 HTTP/2 状态信息
+func (s *Server) GetHTTP2Status() map[string]interface{} {
+	s.http2Mutex.RLock()
+	defer s.http2Mutex.RUnlock()
+
+	status := map[string]interface{}{
+		"enabled":    s.http2Enabled,
+		"config_enabled": s.config.Server.HTTP2Enabled,
+	}
+
+	if !s.http2Enabled && !s.http2DisableUntil.IsZero() {
+		remaining := time.Until(s.http2DisableUntil)
+		status["disabled_until"] = s.http2DisableUntil.Format(time.RFC3339)
+		status["remaining_seconds"] = int(remaining.Seconds())
+		status["reason"] = s.http2DisableReason
+	}
+
+	return status
+}
+
+// ============================================
+// HTTP/2 API 处理器
+// ============================================
+
+// handleHTTP2Status 处理获取 HTTP/2 状态请求
+func (s *Server) handleHTTP2Status(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"data":    s.GetHTTP2Status(),
+	})
+}
+
+// handleHTTP2Enable 处理启用 HTTP/2 请求
+func (s *Server) handleHTTP2Enable(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	s.SetHTTP2Enabled(true, "手动启用")
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "HTTP/2 已启用",
+		"data":    s.GetHTTP2Status(),
+	})
+}
+
+// handleHTTP2Disable 处理禁用 HTTP/2 请求
+func (s *Server) handleHTTP2Disable(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 解析请求参数
+	var req struct {
+		Duration int    `json:"duration"` // 禁用时长（秒），0 表示默认 10 分钟
+		Reason   string `json:"reason"`   // 禁用原因
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		// 使用默认值
+		req.Duration = 0
+		req.Reason = "手动禁用"
+	}
+
+	if req.Duration <= 0 {
+		// 使用默认 10 分钟
+		s.SetHTTP2Enabled(false, req.Reason)
+	} else {
+		s.SetHTTP2DisabledForDuration(time.Duration(req.Duration)*time.Second, req.Reason)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "HTTP/2 已禁用",
+		"data":    s.GetHTTP2Status(),
+	})
 }

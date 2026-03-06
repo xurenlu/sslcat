@@ -68,6 +68,12 @@ type InferenceEngine struct {
 	batchTicker        *time.Ticker
 	batchStopChan      chan bool
 
+	// Worker 池配置
+	workerPoolSize     int           // Worker 数量
+	maxQueueSize       int           // 最大队列大小
+	queueFullStrategy  string        // 队列满时的策略: "drop" | "wait" | "error"
+	droppedRequests    int64         // 丢弃的请求计数
+
 	// 统计
 	totalPredictions int64
 	anomalyCount     int64
@@ -88,13 +94,21 @@ type InferenceRequest struct {
 
 // NewInferenceEngine 创建推理引擎
 func NewInferenceEngine() *InferenceEngine {
+	return NewInferenceEngineWithConfig(100, 1000, 100*time.Millisecond, "drop")
+}
+
+// NewInferenceEngineWithConfig 使用自定义配置创建推理引擎
+func NewInferenceEngineWithConfig(workerSize, maxQueueSize int, batchTimeout time.Duration, queueStrategy string) *InferenceEngine {
 	return &InferenceEngine{
-		batchBuffer:    make([]*InferenceRequest, 0, 1000),
-		batchSize:      100,
-		batchTimeout:   100 * time.Millisecond,
-		cacheTTL:       5 * time.Minute,
-		predictionCache: make(map[string]*AnomalyPrediction),
-		batchStopChan:  make(chan bool),
+		batchBuffer:       make([]*InferenceRequest, 0, maxQueueSize),
+		batchSize:         workerSize,
+		batchTimeout:      batchTimeout,
+		cacheTTL:          5 * time.Minute,
+		predictionCache:   make(map[string]*AnomalyPrediction),
+		batchStopChan:     make(chan bool),
+		workerPoolSize:    workerSize,
+		maxQueueSize:      maxQueueSize,
+		queueFullStrategy: queueStrategy,
 		log: logrus.WithFields(logrus.Fields{
 			"component": "inference_engine",
 		}),
@@ -103,7 +117,12 @@ func NewInferenceEngine() *InferenceEngine {
 
 // Start 启动推理引擎
 func (ie *InferenceEngine) Start() {
-	ie.log.Info("启动推理引擎")
+	ie.log.WithFields(logrus.Fields{
+		"worker_pool_size":    ie.workerPoolSize,
+		"max_queue_size":      ie.maxQueueSize,
+		"batch_timeout":       ie.batchTimeout.String(),
+		"queue_full_strategy": ie.queueFullStrategy,
+	}).Info("启动推理引擎")
 
 	// 启动批处理协程
 	go ie.processBatchLoop()
@@ -167,21 +186,51 @@ func (ie *InferenceEngine) Predict(r *http.Request, statusCode int, responseTime
 // PredictAsync 异步预测
 func (ie *InferenceEngine) PredictAsync(r *http.Request, statusCode int, responseTime time.Duration, remoteAddr string, callback func(*AnomalyPrediction)) {
 	request := &InferenceRequest{
-		Request:     r,
-		StatusCode:  statusCode,
+		Request:      r,
+		StatusCode:   statusCode,
 		ResponseTime: responseTime,
-		RemoteAddr:  remoteAddr,
-		Callback:    callback,
-		Timestamp:   time.Now(),
-		RequestID:   generateRequestID(r, remoteAddr),
+		RemoteAddr:   remoteAddr,
+		Callback:     callback,
+		Timestamp:    time.Now(),
+		RequestID:    generateRequestID(r, remoteAddr),
 	}
 
 	// 加入批处理缓冲区
 	ie.batchMutex.Lock()
-	if len(ie.batchBuffer) < cap(ie.batchBuffer) {
+	defer ie.batchMutex.Unlock()
+
+	currentLen := len(ie.batchBuffer)
+	maxLen := cap(ie.batchBuffer)
+
+	if currentLen < maxLen {
+		// 队列未满，正常加入
 		ie.batchBuffer = append(ie.batchBuffer, request)
+	} else {
+		// 队列已满，根据策略处理
+		switch ie.queueFullStrategy {
+		case "drop":
+			// 静默丢弃，增加计数器
+			ie.droppedRequests++
+			ie.log.WithField("request_id", request.RequestID).Debug("ML 推理队列已满，丢弃请求")
+			return
+		case "error":
+			// 返回错误给回调
+			ie.droppedRequests++
+			ie.log.WithField("request_id", request.RequestID).Warn("ML 推理队列已满")
+			if callback != nil {
+				callback(nil)
+			}
+			return
+		case "wait":
+			// 阻塞等待（不推荐，可能导致请求堆积）
+			ie.batchBuffer = append(ie.batchBuffer, request)
+			ie.log.WithField("request_id", request.RequestID).Warn("ML 推理队列已满，阻塞等待")
+		default:
+			// 默认行为：丢弃
+			ie.droppedRequests++
+			return
+		}
 	}
-	ie.batchMutex.Unlock()
 }
 
 // processBatchLoop 批处理预测循环
@@ -575,11 +624,23 @@ func (ie *InferenceEngine) GetStats() map[string]interface{} {
 	ie.modelMutex.RLock()
 	defer ie.modelMutex.RUnlock()
 
+	ie.batchMutex.Lock()
+	currentQueueLen := len(ie.batchBuffer)
+	maxQueueSize := cap(ie.batchBuffer)
+	dropped := ie.droppedRequests
+	ie.batchMutex.Unlock()
+
 	stats := map[string]interface{}{
-		"total_predictions": ie.totalPredictions,
-		"anomaly_count":     ie.anomalyCount,
-		"model_loaded":      ie.forest != nil,
-		"cache_size":        len(ie.predictionCache),
+		"total_predictions":    ie.totalPredictions,
+		"anomaly_count":        ie.anomalyCount,
+		"model_loaded":         ie.forest != nil,
+		"cache_size":           len(ie.predictionCache),
+		"worker_pool_size":     ie.workerPoolSize,
+		"max_queue_size":       maxQueueSize,
+		"current_queue_len":    currentQueueLen,
+		"queue_full_strategy":  ie.queueFullStrategy,
+		"dropped_requests":     dropped,
+		"queue_utilization":    float64(currentQueueLen) / float64(maxQueueSize) * 100,
 	}
 
 	if ie.forest != nil {

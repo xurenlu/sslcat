@@ -140,8 +140,8 @@ const Monitoring: React.FC = () => {
   const [statsLoading, setStatsLoading] = useState(false)
   const [metricsLoading, setMetricsLoading] = useState(false)
   const [metricsData, setMetricsData] = useState<MetricsQueryResult | null>(null)
-  const [timeRange, setTimeRange] = useState<'today' | '7days' | '30days' | '90days'>('today')
-  const [granularity, setGranularity] = useState<'1min' | '5min' | '15min'>('1min')
+  const [timeRange, setTimeRange] = useState<'12hours' | 'today' | '7days' | '30days' | '90days'>('today')
+  const [granularity, setGranularity] = useState<'1min' | '5min' | '15min'>('5min')
 
   // 加载配置
   const loadConfig = async () => {
@@ -226,7 +226,7 @@ const Monitoring: React.FC = () => {
   }
 
   // 加载历史指标数据
-  const loadMetrics = async (range: 'today' | '7days' | '30days' | '90days', selectedGranularity?: '1min' | '5min' | '15min') => {
+  const loadMetrics = async (range: '12hours' | 'today' | '7days' | '30days' | '90days', selectedGranularity?: '1min' | '5min' | '15min') => {
     setMetricsLoading(true)
     try {
       const now = new Date()
@@ -234,6 +234,9 @@ const Monitoring: React.FC = () => {
       const useGranularity = selectedGranularity || granularity
 
       switch (range) {
+        case '12hours':
+          startTime = new Date(now.getTime() - 12 * 60 * 60 * 1000)
+          break
         case 'today':
           startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate())
           break
@@ -391,9 +394,17 @@ const Monitoring: React.FC = () => {
             <HStack>
               <Select
                 value={timeRange}
-                onChange={(e) => setTimeRange(e.target.value as any)}
+                onChange={(e) => {
+                  const newRange = e.target.value as any
+                  setTimeRange(newRange)
+                  // 如果选择不是 12 小时，自动切换到 5 分钟粒度
+                  if (newRange !== '12hours' && granularity === '1min') {
+                    setGranularity('5min')
+                  }
+                }}
                 width="150px"
               >
+                <option value="12hours">{t.monitoring?.last12hours ?? '最近12小时'}</option>
                 <option value="today">{t.monitoring?.today ?? '今天'}</option>
                 <option value="7days">{t.monitoring?.last7days ?? '最近7天'}</option>
                 <option value="30days">{t.monitoring?.last30days ?? '最近30天'}</option>
@@ -404,7 +415,7 @@ const Monitoring: React.FC = () => {
                 onChange={(e) => setGranularity(e.target.value as '1min' | '5min' | '15min')}
                 width="120px"
               >
-                <option value="1min">{t.monitoring?.one_min ?? '1分钟'}</option>
+                <option value="1min" disabled={timeRange !== '12hours'}>{t.monitoring?.one_min ?? '1分钟'}</option>
                 <option value="5min">{t.monitoring?.five_min ?? '5分钟'}</option>
                 <option value="15min">{t.monitoring?.fifteen_min ?? '15分钟'}</option>
               </Select>

@@ -489,6 +489,7 @@ export const enUS: Translation = {
     memory_realtime_usage: 'Realtime memory usage',
     update_time: 'Update Time',
     last_refresh_time: 'Last refresh time',
+    last12hours: 'Last 12 hours',
     today: 'Today',
     last7days: 'Last 7 days',
     last30days: 'Last 30 days',

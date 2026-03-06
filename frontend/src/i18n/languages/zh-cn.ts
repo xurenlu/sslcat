@@ -485,6 +485,7 @@ export const zhCN: Translation = {
     memory_realtime_usage: '实时内存占用',
     update_time: '更新时间',
     last_refresh_time: '最后刷新时间',
+    last12hours: '最近12小时',
     today: '今天',
     last7days: '最近7天',
     last30days: '最近30天',

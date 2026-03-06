@@ -737,17 +737,44 @@ func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *s
 		// 注意：即使全局关闭，站点级覆盖也可能启用 HTTP/2，所以总是配置 HTTP/2 服务器
 		// TLS 配置中的 NextProtos 会控制实际是否协商 HTTP/2
 		// 優化參數以避免 ERR_HTTP2_PROTOCOL_ERROR：
-		// - MaxConcurrentStreams: 降低到 250 以減少資源競爭，適合複雜 SPA 網站
-		// - MaxReadFrameSize: 保持 1MB，足夠處理大多數請求
-		// - IdleTimeout: 保持 120 秒，允許連接複用
+		// - MaxConcurrentStreams: 根据配置调整，默认 250
+		// - MaxReadFrameSize: 根据配置调整，默认 1MB
+		// - IdleTimeout: 根据配置调整，默认 120 秒
 		// - MaxUploadBufferPerConnection: 設置上傳緩衝區大小
 		// - MaxUploadBufferPerStream: 設置每個流的上傳緩衝區
+
+		// 从配置读取 HTTP/2 参数，使用默认值
+		http2Config := cfg.Server.HTTP2Config
+		maxConcurrentStreams := int64(250)
+		maxReadFrameSize := int64(1048576) // 1MB
+		idleTimeoutSec := 120
+		maxUploadBufferPerConn := int64(1 << 20) // 1MB
+		maxUploadBufferPerStream := int64(1 << 18) // 256KB
+
+		if http2Config != nil {
+			if http2Config.MaxConcurrentStreams > 0 {
+				maxConcurrentStreams = http2Config.MaxConcurrentStreams
+			}
+			if http2Config.MaxReadFrameSize > 0 {
+				maxReadFrameSize = http2Config.MaxReadFrameSize
+			}
+			if http2Config.IdleTimeout > 0 {
+				idleTimeoutSec = http2Config.IdleTimeout
+			}
+			if http2Config.MaxUploadBufferPerConnection > 0 {
+				maxUploadBufferPerConn = http2Config.MaxUploadBufferPerConnection
+			}
+			if http2Config.MaxUploadBufferPerStream > 0 {
+				maxUploadBufferPerStream = http2Config.MaxUploadBufferPerStream
+			}
+		}
+
 		http2.ConfigureServer(httpsServer, &http2.Server{
-			MaxConcurrentStreams:         250,               // 降低併發流數量，減少資源競爭
-			MaxReadFrameSize:             1048576,           // 1MB
-			IdleTimeout:                  120 * time.Second, // 空閒超時
-			MaxUploadBufferPerConnection: 1 << 20,           // 1MB 連接級別上傳緩衝
-			MaxUploadBufferPerStream:     1 << 18,           // 256KB 流級別上傳緩衝
+			MaxConcurrentStreams:         uint32(maxConcurrentStreams),
+			MaxReadFrameSize:             uint32(maxReadFrameSize),
+			IdleTimeout:                  time.Duration(idleTimeoutSec) * time.Second,
+			MaxUploadBufferPerConnection: int32(maxUploadBufferPerConn),
+			MaxUploadBufferPerStream:     int32(maxUploadBufferPerStream),
 		})
 
 		go func() {
