@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.3-rc1] - 2026-03-06
+
+### 🐛 Bug 修复
+
+- **版本号显示重复 v** - 修复 Release 构建（tag 为 v1.7.3）时版本号显示为 "SSLcat vv1.7.3" 的问题
+  - 后端 API 和 CLI 统一对版本号做 `TrimPrefix("v")` 处理，确保显示为 "SSLcat v1.7.3"
+
 ## [1.7.3] - 2026-03-06
 
 ### ✨ 新功能

@@ -137,7 +137,7 @@ func (s *Server) handleAPISettings(w http.ResponseWriter, r *http.Request) {
 		"totp_enabled":     s.config.Admin.EnableTOTP,
 		"webauthn_enabled": s.webauthnManager != nil, // WebAuthn 是否可用
 		"server_info": map[string]interface{}{
-			"version":    s.version,
+			"version":    strings.TrimPrefix(s.version, "v"),
 			"build_time": time.Now().Format("2006-01-02 15:04:05"),
 		},
 	}

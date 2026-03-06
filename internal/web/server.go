@@ -2636,13 +2636,15 @@ func (s *Server) getSystemStats() map[string]interface{} {
 		totalRequests = getInt64("cached_proxies", 0)
 	}
 
+	// 统一返回不含 v 前缀的版本号，避免前端显示 "SSLcat vv1.7.3"
+	ver := strings.TrimPrefix(s.version, "v")
 	return map[string]interface{}{
 		// 前端期望的字段名（小写开头）
 		"activeRules":   len(s.config.Proxy.Rules),
 		"cachedProxies": totalRequests,
 		"publicIP":      publicIP,
 		"goVersion":     runtime.Version(),
-		"version":       s.version, // 添加应用版本
+		"version":       ver, // 应用版本（不含 v 前缀）
 
 		// 保持向后兼容的大写字段
 		"ActiveRules":     len(s.config.Proxy.Rules),
@@ -2656,7 +2658,7 @@ func (s *Server) getSystemStats() map[string]interface{} {
 		"SSLCertificates": len(s.sslManager.GetCertificateList()),
 		"BlockedIPs":      len(s.securityManager.GetBlockedIPs()),
 		"PublicIP":        publicIP,
-		"Version":         s.version, // 向后兼容的大写版本
+		"Version":         ver, // 向后兼容的大写版本
 	}
 }
 

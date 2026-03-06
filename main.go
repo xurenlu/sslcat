@@ -39,7 +39,7 @@ import (
 )
 
 var (
-	version = "1.7.3"
+	version = "1.7.3-rc1"
 	build   = "dev"
 )
 
@@ -142,7 +142,8 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("SSLcat v%s (build: %s)\n", version, build)
+		ver := strings.TrimPrefix(version, "v")
+		fmt.Printf("SSLcat v%s (build: %s)\n", ver, build)
 		return
 	}
 
@@ -196,7 +197,7 @@ func main() {
 		"component": "main",
 	})
 
-	log.Infof("Starting SSLcat v%s (build: %s)", version, build)
+	log.Infof("Starting SSLcat v%s (build: %s)", strings.TrimPrefix(version, "v"), build)
 
 	// 配置 Go 运行时内存管理：优化 GC 以减少 CPU 占用
 	// 1. 设置 GC 触发阈值
@@ -1068,7 +1069,7 @@ func startMemoryMonitor(cdnCache *cache.CDNCache, proxyManager *proxy.Manager) {
 
 // showHelp 显示帮助信息，包括所有子命令和启动参数
 func showHelp() {
-	fmt.Printf("SSLcat v%s (build: %s)\n", version, build)
+	fmt.Printf("SSLcat v%s (build: %s)\n", strings.TrimPrefix(version, "v"), build)
 	fmt.Println()
 	fmt.Println("用法:")
 	fmt.Println("  sslcat [选项]                  # 启动服务器")

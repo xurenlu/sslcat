@@ -1,7 +1,7 @@
 {
   "name": "sslcat-frontend",
   "private": true,
-  "version": "1.7.2",
+  "version": "1.7.3-rc1",
   "type": "module",
   "scripts": {
     "dev": "vite",
