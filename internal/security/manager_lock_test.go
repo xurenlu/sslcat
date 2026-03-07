@@ -160,3 +160,28 @@ func TestCheckTOTPNoDeadlock(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+// TestLogAccessNoDeadlockOnBlock 验证 LogAccess 在触发封禁路径时不会自锁死锁
+func TestLogAccessNoDeadlockOnBlock(t *testing.T) {
+	m := newTestManager(t)
+	m.config.Security.MaxAttempts = 1
+	m.config.Security.MaxAttempts5Min = 100
+	m.Start()
+	defer m.Stop()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		m.LogAccess("203.0.113.10", "curl/8.0", "/login", false)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("LogAccess deadlocked when block threshold was reached")
+	}
+
+	if !m.IsBlocked("203.0.113.10") {
+		t.Fatal("expected IP to be blocked after hitting failure threshold")
+	}
+}

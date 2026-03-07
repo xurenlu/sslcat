@@ -263,8 +263,14 @@ func (m *RBACManager) CheckAccess(request AccessRequest) *AccessDecision {
 	}
 
 	// 1. 检查策略优先（显式策略优先于角色）
+	var policies []*Policy
 	m.mutex.RLock()
 	for _, policy := range m.policies {
+		policies = append(policies, policy)
+	}
+	m.mutex.RUnlock()
+
+	for _, policy := range policies {
 		if !policy.Enabled {
 			continue
 		}
@@ -277,7 +283,6 @@ func (m *RBACManager) CheckAccess(request AccessRequest) *AccessDecision {
 			break
 		}
 	}
-	m.mutex.RUnlock()
 
 	// 如果策略没有匹配，检查角色权限
 	if decision.MatchedBy == "" {
@@ -425,11 +430,7 @@ func (m *RBACManager) hasPermission(role *Role, resource, action string) bool {
 	return false
 }
 
-// getUserRoles 获取用户的所有角色
-func (m *RBACManager) getUserRoles(userID string) []string {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
+func (m *RBACManager) getUserRolesLocked(userID string) []string {
 	roles := make([]string, 0)
 
 	// 直接角色
@@ -449,6 +450,13 @@ func (m *RBACManager) getUserRoles(userID string) []string {
 	return roles
 }
 
+// getUserRoles 获取用户的所有角色
+func (m *RBACManager) getUserRoles(userID string) []string {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	return m.getUserRolesLocked(userID)
+}
+
 // sortRolesByPriority 按优先级排序角色
 func (m *RBACManager) sortRolesByPriority(roleIDs []string) []string {
 	m.mutex.RLock()
@@ -464,7 +472,7 @@ func (m *RBACManager) userHasRole(userID, roleName string) bool {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	roles := m.getUserRoles(userID)
+	roles := m.getUserRolesLocked(userID)
 	for _, roleID := range roles {
 		if role := m.roles[roleID]; role != nil && role.Name == roleName {
 			return true

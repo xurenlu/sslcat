@@ -294,70 +294,82 @@ func (m *Manager) LogAccess(ip, userAgent, path string, success bool) {
 		}
 	}
 
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	var blockedReason string
+	now := time.Now()
 
-	// 检查User-Agent是否合法
-	if m.config.Security.EnableUAFilter && !m.isValidUserAgent(userAgent) {
-		m.log.Warnf("Suspicious User-Agent: %s from %s", userAgent, ip)
-		now := time.Now()
-		// 记录1分钟/5分钟窗口内的无效UA
-		m.uaInvalid1Min[ip] = append(m.uaInvalid1Min[ip], now)
-		m.uaInvalid5Min[ip] = append(m.uaInvalid5Min[ip], now)
-		// 清理窗口外
-		cut1 := now.Add(-1 * time.Minute)
-		cut5 := now.Add(-5 * time.Minute)
-		pruned1 := m.uaInvalid1Min[ip][:0]
-		for _, t := range m.uaInvalid1Min[ip] {
-			if t.After(cut1) {
-				pruned1 = append(pruned1, t)
+	func() {
+		m.mutex.Lock()
+		defer m.mutex.Unlock()
+
+		// 检查User-Agent是否合法
+		if m.config.Security.EnableUAFilter && !m.isValidUserAgent(userAgent) {
+			m.log.Warnf("Suspicious User-Agent: %s from %s", userAgent, ip)
+			// 记录1分钟/5分钟窗口内的无效UA
+			m.uaInvalid1Min[ip] = append(m.uaInvalid1Min[ip], now)
+			m.uaInvalid5Min[ip] = append(m.uaInvalid5Min[ip], now)
+			// 清理窗口外
+			cut1 := now.Add(-1 * time.Minute)
+			cut5 := now.Add(-5 * time.Minute)
+			pruned1 := m.uaInvalid1Min[ip][:0]
+			for _, t := range m.uaInvalid1Min[ip] {
+				if t.After(cut1) {
+					pruned1 = append(pruned1, t)
+				}
 			}
-		}
-		m.uaInvalid1Min[ip] = pruned1
-		pruned5 := m.uaInvalid5Min[ip][:0]
-		for _, t := range m.uaInvalid5Min[ip] {
-			if t.After(cut5) {
-				pruned5 = append(pruned5, t)
+			m.uaInvalid1Min[ip] = pruned1
+			pruned5 := m.uaInvalid5Min[ip][:0]
+			for _, t := range m.uaInvalid5Min[ip] {
+				if t.After(cut5) {
+					pruned5 = append(pruned5, t)
+				}
 			}
+			m.uaInvalid5Min[ip] = pruned5
+
+			// 阈值（配置可调，未配置则使用默认）
+			max1 := m.config.Security.UAInvalidMax1Min
+			if max1 <= 0 {
+				max1 = 30
+			}
+			max5 := m.config.Security.UAInvalidMax5Min
+			if max5 <= 0 {
+				max5 = 100
+			}
+			if len(m.uaInvalid1Min[ip]) >= max1 || len(m.uaInvalid5Min[ip]) >= max5 {
+				reason := fmt.Sprintf("Too many invalid UA: %d in 1min, %d in 5min", len(m.uaInvalid1Min[ip]), len(m.uaInvalid5Min[ip]))
+				if m.blockIPLocked(ip, reason, now) {
+					blockedReason = reason
+				}
+				delete(m.uaInvalid1Min, ip)
+				delete(m.uaInvalid5Min, ip)
+			}
+			return
 		}
-		m.uaInvalid5Min[ip] = pruned5
 
-		// 阈值（配置可调，未配置则使用默认）
-		max1 := m.config.Security.UAInvalidMax1Min
-		if max1 <= 0 {
-			max1 = 30
+		// 记录访问日志
+		accessLog := AccessLog{
+			IP:        ip,
+			UserAgent: userAgent,
+			Path:      path,
+			Timestamp: now,
+			Success:   success,
 		}
-		max5 := m.config.Security.UAInvalidMax5Min
-		if max5 <= 0 {
-			max5 = 100
+
+		m.accessLogs[ip] = append(m.accessLogs[ip], accessLog)
+
+		// 限制日志数量（放宽）：只保留最近3000条
+		if len(m.accessLogs[ip]) > 3000 {
+			m.accessLogs[ip] = m.accessLogs[ip][len(m.accessLogs[ip])-3000:]
 		}
-		if len(m.uaInvalid1Min[ip]) >= max1 || len(m.uaInvalid5Min[ip]) >= max5 {
-			m.blockIP(ip, fmt.Sprintf("Too many invalid UA: %d in 1min, %d in 5min", len(m.uaInvalid1Min[ip]), len(m.uaInvalid5Min[ip])))
-			delete(m.uaInvalid1Min, ip)
-			delete(m.uaInvalid5Min, ip)
+
+		// 如果不是成功访问，检查是否需要封禁
+		if !success {
+			blockedReason = m.checkAndBlockLocked(ip, now)
 		}
-		return
-	}
+	}()
 
-	// 记录访问日志
-	accessLog := AccessLog{
-		IP:        ip,
-		UserAgent: userAgent,
-		Path:      path,
-		Timestamp: time.Now(),
-		Success:   success,
-	}
-
-	m.accessLogs[ip] = append(m.accessLogs[ip], accessLog)
-
-	// 限制日志数量（放宽）：只保留最近3000条
-	if len(m.accessLogs[ip]) > 3000 {
-		m.accessLogs[ip] = m.accessLogs[ip][len(m.accessLogs[ip])-3000:]
-	}
-
-	// 如果不是成功访问，检查是否需要封禁
-	if !success {
-		m.checkAndBlock(ip)
+	if blockedReason != "" {
+		go m.saveBlockedIPs()
+		m.log.Warnf("Blocked IP %s: %s", ip, blockedReason)
 	}
 }
 
@@ -504,9 +516,9 @@ func HashTLSRaw(raw string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// checkAndBlock 检查并封禁IP
-func (m *Manager) checkAndBlock(ip string) {
-	now := time.Now()
+// checkAndBlockLocked 检查失败窗口并在需要时直接更新封禁缓存
+// 调用方必须已经持有 m.mutex.Lock()
+func (m *Manager) checkAndBlockLocked(ip string, now time.Time) string {
 	// 更新失败次数
 	m.attemptCounts[ip]++
 	// 记录失败时间
@@ -531,34 +543,47 @@ func (m *Manager) checkAndBlock(ip string) {
 	// 封禁条件
 	if recentAttempts >= m.config.Security.MaxAttempts ||
 		fiveMinAttempts >= m.config.Security.MaxAttempts5Min {
-		m.blockIP(ip, fmt.Sprintf("Too many failed attempts: %d in 1min, %d in 5min",
-			recentAttempts, fiveMinAttempts))
+		reason := fmt.Sprintf("Too many failed attempts: %d in 1min, %d in 5min",
+			recentAttempts, fiveMinAttempts)
+		if m.blockIPLocked(ip, reason, now) {
+			return reason
+		}
 	}
+	return ""
 }
 
 // blockIP 封禁IP
 func (m *Manager) blockIP(ip, reason string) {
-	// 检查白名单，白名单中的IP不会被封禁
-	if m.IsWhitelisted(ip) {
-		m.log.Infof("Skipped blocking IP %s (in whitelist): %s", ip, reason)
+	now := time.Now()
+	var blocked bool
+	m.mutex.Lock()
+	blocked = m.blockIPLocked(ip, reason, now)
+	m.mutex.Unlock()
+	if !blocked {
 		return
 	}
-
-	blocked := BlockedIP{
-		IP:         ip,
-		Reason:     reason,
-		BlockTime:  time.Now(),
-		ExpireTime: time.Now().Add(m.config.Security.BlockDuration),
-	}
-
-	// 修复：快速更新内存，然后在锁外执行 I/O
-	m.mutex.Lock()
-	m.blockedIPs[ip] = blocked
-	m.mutex.Unlock()
 
 	// 异步保存到文件（避免持锁执行 I/O）
 	go m.saveBlockedIPs()
 	m.log.Warnf("Blocked IP %s: %s", ip, reason)
+}
+
+// blockIPLocked 在已持锁前提下更新封禁缓存
+func (m *Manager) blockIPLocked(ip, reason string, now time.Time) bool {
+	if m.isWhitelistedLocked(ip) {
+		m.log.Infof("Skipped blocking IP %s (in whitelist): %s", ip, reason)
+		return false
+	}
+	if now.IsZero() {
+		now = time.Now()
+	}
+	m.blockedIPs[ip] = BlockedIP{
+		IP:         ip,
+		Reason:     reason,
+		BlockTime:  now,
+		ExpireTime: now.Add(m.config.Security.BlockDuration),
+	}
+	return true
 }
 
 // BlockIP 手动封禁IP（公开方法）
@@ -1481,7 +1506,11 @@ func (m *Manager) parseCIDR(value string) (string, error) {
 func (m *Manager) IsWhitelisted(ip string) bool {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
+	return m.isWhitelistedLocked(ip)
+}
 
+// isWhitelistedLocked 在已持锁前提下检查白名单
+func (m *Manager) isWhitelistedLocked(ip string) bool {
 	if ip == "" {
 		return false
 	}

@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.5-rc1] - 2026-03-07
+
+### 🐛 Bug 修复
+
+- **修复 Security Manager 访问失败封禁路径死锁**：
+  - `LogAccess` 持锁状态下不再调用会重复加锁的 `blockIP`
+  - 新增无锁外溢的持锁 helper，在锁内只更新内存状态，锁外再异步落盘
+  - 修复无效 User-Agent 触发封禁时的同类自锁问题
+
+- **修复 RBAC 递归读锁死锁隐患**：
+  - `userHasRole` 改为复用不重复加锁的内部 helper，避免 `RLock` 套 `RLock`
+  - `CheckAccess` 对策略列表先做快照再解锁，避免持读锁进入角色匹配链路
+
+- **补充并发回归测试**：
+  - 新增 `TestLogAccessNoDeadlockOnBlock`
+  - 新增 `TestRBACEvaluateRolePolicyNoDeadlock`
+
 ## [1.7.3-rc1] - 2026-03-06
 
 ### 🐛 Bug 修复
