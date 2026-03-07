@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.5-rc2] - 2026-03-07
+
+### 🐛 Bug 修复
+
+- **修复多处历史构建问题**：
+  - 为 `ConfigWatcher` 补充循环代理检测兼容包装，恢复相关单元测试编译
+  - 为翻译器新增无格式化查表方法 `Text`，修复 `cli/ui` 与 `web/api_runners` 的 vet 报错
+  - 修复 `api_security_reports` 的 `fmt.Sprintf` 参数数量错误
+  - 修复 `git_server_html` 中百分号模板与参数数量不匹配的问题
+
+- **降低低置信度锁风险点**：
+  - `ReloadManager` 改为先快照组件列表，再在锁外执行 `Validate/Reload`
+  - `Plugin Manager` 改为先快照或移除插件，再在锁外调用插件 `Stop`
+  - `SessionManager` 不再在 manager 锁内调用 `storage`，并为 `MemorySessionStorage` 补充并发保护
+
+- **补充并发回归测试**：
+  - 新增 `TestReloadAllNoDeadlockWhenComponentReentersManager`
+  - 新增 `TestStopNoDeadlockWhenPluginReentersManager`
+  - 新增 `TestCreateSessionNoDeadlockWithReentrantStorage`
+
 ## [1.7.5-rc1] - 2026-03-07
 
 ### 🐛 Bug 修复

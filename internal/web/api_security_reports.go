@@ -321,7 +321,7 @@ func (s *Server) generateHTMLReport(req SecurityReportRequest, data map[string]i
 	</div>
 </body>
 </html>
-`, req.ReportType, req.StartDate, req.EndDate, time.Now().Format("2006-01-02 15:04:05"))
+`, req.ReportType, req.ReportType, req.StartDate, req.EndDate, time.Now().Format("2006-01-02 15:04:05"))
 }
 
 // generatePDFReport 生成 PDF 报告

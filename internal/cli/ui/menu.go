@@ -27,7 +27,7 @@ func NewMenuModel(translator *i18n.Translator) MenuModel {
 	// 使用翻译键，如果翻译不存在则使用中文原文本作为后备
 	getText := func(key, fallback string) string {
 		if translator != nil {
-			text := translator.T(key)
+			text := translator.Text(key)
 			if text != key {
 				return text
 			}
@@ -105,7 +105,7 @@ func (m MenuModel) View() string {
 	// 标题 - 使用翻译
 	getText := func(key, fallback string) string {
 		if m.translator != nil {
-			text := m.translator.T(key)
+			text := m.translator.Text(key)
 			if text != key {
 				return text
 			}

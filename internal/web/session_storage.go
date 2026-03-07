@@ -163,6 +163,7 @@ func (s *FileSessionStorage) cleanupExpiredSessions() {
 // MemorySessionStorage 内存会话存储（原有实现）
 type MemorySessionStorage struct {
 	sessions map[string]*Session
+	mutex    sync.RWMutex
 }
 
 // NewMemorySessionStorage 创建内存会话存储
@@ -173,11 +174,15 @@ func NewMemorySessionStorage() *MemorySessionStorage {
 }
 
 func (m *MemorySessionStorage) Set(key string, session *Session) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 	m.sessions[key] = session
 	return nil
 }
 
 func (m *MemorySessionStorage) Get(key string) (*Session, error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 	session, exists := m.sessions[key]
 	if !exists {
 		return nil, fmt.Errorf("会话不存在")
@@ -192,11 +197,15 @@ func (m *MemorySessionStorage) Get(key string) (*Session, error) {
 }
 
 func (m *MemorySessionStorage) Delete(key string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 	delete(m.sessions, key)
 	return nil
 }
 
 func (m *MemorySessionStorage) GetAll() (map[string]*Session, error) {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
 	result := make(map[string]*Session)
 	now := time.Now()
 

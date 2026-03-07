@@ -77,9 +77,7 @@ func (sm *SessionManager) CreateSession(username, role, ipAddress, userAgent str
 		LastAccess: time.Now(),
 	}
 
-	sm.mutex.Lock()
 	err := sm.storage.Set(sessionID, session)
-	sm.mutex.Unlock()
 
 	if err != nil {
 		return nil, fmt.Errorf("保存会话失败: %v", err)
@@ -91,9 +89,7 @@ func (sm *SessionManager) CreateSession(username, role, ipAddress, userAgent str
 
 // GetSession 获取会话
 func (sm *SessionManager) GetSession(sessionID string) (*Session, bool) {
-	sm.mutex.RLock()
 	session, err := sm.storage.Get(sessionID)
-	sm.mutex.RUnlock()
 
 	if err != nil {
 		return nil, false
@@ -104,9 +100,7 @@ func (sm *SessionManager) GetSession(sessionID string) (*Session, bool) {
 
 	// 异步更新会话
 	go func() {
-		sm.mutex.Lock()
-		sm.storage.Set(sessionID, session)
-		sm.mutex.Unlock()
+		_ = sm.storage.Set(sessionID, session)
 	}()
 
 	return session, true
@@ -114,15 +108,12 @@ func (sm *SessionManager) GetSession(sessionID string) (*Session, bool) {
 
 // DeleteSession 删除会话
 func (sm *SessionManager) DeleteSession(sessionID string) {
-	sm.mutex.Lock()
-	defer sm.mutex.Unlock()
-
 	// 先获取会话信息用于日志
 	if session, err := sm.storage.Get(sessionID); err == nil {
 		sm.log.Infof("会话删除: %s (用户: %s)", sessionID, session.Username)
 	}
 
-	sm.storage.Delete(sessionID)
+	_ = sm.storage.Delete(sessionID)
 }
 
 // SetSessionCookie 设置会话Cookie
@@ -163,9 +154,6 @@ func (sm *SessionManager) GetSessionFromRequest(r *http.Request) (*Session, bool
 
 // GetAllSessions 获取所有会话
 func (sm *SessionManager) GetAllSessions() []*Session {
-	sm.mutex.RLock()
-	defer sm.mutex.RUnlock()
-
 	sessionMap, err := sm.storage.GetAll()
 	if err != nil {
 		sm.log.Errorf("获取所有会话失败: %v", err)
@@ -182,9 +170,6 @@ func (sm *SessionManager) GetAllSessions() []*Session {
 
 // GetUserSessions 获取用户的所有会话
 func (sm *SessionManager) GetUserSessions(username string) []*Session {
-	sm.mutex.RLock()
-	defer sm.mutex.RUnlock()
-
 	sessionMap, err := sm.storage.GetAll()
 	if err != nil {
 		sm.log.Errorf("获取用户会话失败: %v", err)
@@ -203,9 +188,6 @@ func (sm *SessionManager) GetUserSessions(username string) []*Session {
 
 // DeleteUserSessions 删除用户的所有会话
 func (sm *SessionManager) DeleteUserSessions(username string) {
-	sm.mutex.Lock()
-	defer sm.mutex.Unlock()
-
 	sessionMap, err := sm.storage.GetAll()
 	if err != nil {
 		sm.log.Errorf("获取用户会话失败: %v", err)
@@ -215,16 +197,13 @@ func (sm *SessionManager) DeleteUserSessions(username string) {
 	for sessionID, session := range sessionMap {
 		if session.Username == username {
 			sm.log.Infof("删除用户会话: %s (用户: %s)", sessionID, username)
-			sm.storage.Delete(sessionID)
+			_ = sm.storage.Delete(sessionID)
 		}
 	}
 }
 
 // ExtendSession 延长会话过期时间
 func (sm *SessionManager) ExtendSession(sessionID string, duration time.Duration) bool {
-	sm.mutex.Lock()
-	defer sm.mutex.Unlock()
-
 	session, err := sm.storage.Get(sessionID)
 	if err != nil {
 		return false
@@ -243,11 +222,9 @@ func (sm *SessionManager) cleanupExpiredSessions() {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		sm.mutex.Lock()
 		sessionMap, err := sm.storage.GetAll()
 		if err != nil {
 			sm.log.Errorf("清理过期会话失败: %v", err)
-			sm.mutex.Unlock()
 			continue
 		}
 
@@ -256,7 +233,7 @@ func (sm *SessionManager) cleanupExpiredSessions() {
 
 		for sessionID, session := range sessionMap {
 			if now.After(session.ExpiresAt) {
-				sm.storage.Delete(sessionID)
+				_ = sm.storage.Delete(sessionID)
 				expiredCount++
 			}
 		}
@@ -264,7 +241,6 @@ func (sm *SessionManager) cleanupExpiredSessions() {
 		if expiredCount > 0 {
 			sm.log.Debugf("清理过期会话: %d 个", expiredCount)
 		}
-		sm.mutex.Unlock()
 	}
 }
 
@@ -277,9 +253,6 @@ func (sm *SessionManager) generateSessionID() string {
 
 // GetSessionStats 获取会话统计信息
 func (sm *SessionManager) GetSessionStats() map[string]interface{} {
-	sm.mutex.RLock()
-	defer sm.mutex.RUnlock()
-
 	sessionMap, err := sm.storage.GetAll()
 	if err != nil {
 		sm.log.Errorf("获取会话统计失败: %v", err)

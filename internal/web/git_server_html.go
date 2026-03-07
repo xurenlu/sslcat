@@ -601,8 +601,8 @@ func (s *Server) generateGitServerManagementHTML(data map[string]interface{}) st
                         '</div>' +
                         (app.deploy_status ? '<div class="mt-3"><h6>部署状态</h6><div class="card"><div class="card-body">' +
                             '<p><strong>状态:</strong> ' + getAppStatusBadge(app.deploy_status.status) + '</p>' +
-                            '<p><strong>进度:</strong> ' + (app.deploy_status.progress || 0) + '%</p>' +
-                            '<div class="progress" style="height: 20px;"><div class="progress-bar" role="progressbar" style="width: ' + (app.deploy_status.progress || 0) + '%">' + (app.deploy_status.progress || 0) + '%</div></div>' +
+                            '<p><strong>进度:</strong> ' + (app.deploy_status.progress || 0) + '%%</p>' +
+                            '<div class="progress" style="height: 20px;"><div class="progress-bar" role="progressbar" style="width: ' + (app.deploy_status.progress || 0) + '%%">' + (app.deploy_status.progress || 0) + '%%</div></div>' +
                             '<p class="mt-2"><strong>消息:</strong> ' + (app.deploy_status.message || '无') + '</p>' +
                             (app.deploy_status.error ? '<p class="text-danger"><strong>错误:</strong> ' + app.deploy_status.error + '</p>' : '') +
                         '</div></div></div>' : '') +
@@ -684,9 +684,9 @@ func (s *Server) generateGitServerManagementHTML(data map[string]interface{}) st
                                     '<div class="card">' +
                                         '<div class="card-body">' +
                                             '<p><strong>状态:</strong> ' + getAppStatusBadge(deployStatus.status || app.status) + '</p>' +
-                                            '<p><strong>进度:</strong> ' + (deployStatus.progress || 0) + '%</p>' +
+                                            '<p><strong>进度:</strong> ' + (deployStatus.progress || 0) + '%%</p>' +
                                             '<div class="progress mb-3" style="height: 25px;">' +
-                                                '<div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: ' + (deployStatus.progress || 0) + '%">' + (deployStatus.progress || 0) + '%</div>' +
+                                                '<div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: ' + (deployStatus.progress || 0) + '%%">' + (deployStatus.progress || 0) + '%%</div>' +
                                             '</div>' +
                                             '<p><strong>消息:</strong> ' + (deployStatus.message || '无') + '</p>' +
                                             (deployStatus.deploy_id ? '<p><strong>部署ID:</strong> <code>' + deployStatus.deploy_id + '</code></p>' : '') +
@@ -954,22 +954,12 @@ func (s *Server) generateGitServerManagementHTML(data map[string]interface{}) st
 </html>`,
 		data["Title"].(string),
 		s.generateSidebar(data["AdminPrefix"].(string), "git-server"),
+		data["Title"].(string),
 		map[bool]string{true: "bg-success", false: "bg-secondary"}[data["GitEnabled"].(bool)],
 		map[bool]string{true: "已启用", false: "已禁用"}[data["GitEnabled"].(bool)],
 		data["AdminPrefix"].(string),
 		data["AdminPrefix"].(string),
 		data["FunctionDescription"].(string),
 		data["Description"].(string),
-		data["AdminPrefix"].(string),
-		data["AdminPrefix"].(string),
-		data["AdminPrefix"].(string),
-		data["AdminPrefix"].(string),
-		data["AdminPrefix"].(string),
-		data["AdminPrefix"].(string),
-		data["AdminPrefix"].(string),
-		data["AdminPrefix"].(string),
-		data["AdminPrefix"].(string),
-		data["AdminPrefix"].(string),
-		data["AdminPrefix"].(string),
 		data["AdminPrefix"].(string))
 }

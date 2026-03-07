@@ -222,17 +222,29 @@ func (t *Translator) T(key string, args ...interface{}) string {
 	return t.TLang(t.currentLang, key, args...)
 }
 
+// Text 翻译指定 key，不做格式化替换。
+func (t *Translator) Text(key string) string {
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
+	return t.lookupTextLocked(t.currentLang, key)
+}
+
 // TLang 翻译指定语言的文本
 func (t *Translator) TLang(lang SupportedLanguage, key string, args ...interface{}) string {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
+	text := t.lookupTextLocked(lang, key)
+	if len(args) > 0 {
+		return fmt.Sprintf(text, args...)
+	}
+	return text
+}
+
+func (t *Translator) lookupTextLocked(lang SupportedLanguage, key string) string {
 	// 尝试当前语言
 	if translations, exists := t.translations[lang]; exists {
 		if text, found := translations[key]; found {
-			if len(args) > 0 {
-				return fmt.Sprintf(text, args...)
-			}
 			return text
 		}
 	}
@@ -241,9 +253,6 @@ func (t *Translator) TLang(lang SupportedLanguage, key string, args ...interface
 	if fallback, exists := t.fallbacks[lang]; exists {
 		if translations, exists := t.translations[fallback]; exists {
 			if text, found := translations[key]; found {
-				if len(args) > 0 {
-					return fmt.Sprintf(text, args...)
-				}
 				return text
 			}
 		}
@@ -253,18 +262,12 @@ func (t *Translator) TLang(lang SupportedLanguage, key string, args ...interface
 	if lang != t.defaultLang {
 		if translations, exists := t.translations[t.defaultLang]; exists {
 			if text, found := translations[key]; found {
-				if len(args) > 0 {
-					return fmt.Sprintf(text, args...)
-				}
 				return text
 			}
 		}
 	}
 
 	// 最后返回原始key
-	if len(args) > 0 {
-		return fmt.Sprintf(key, args...)
-	}
 	return key
 }
 

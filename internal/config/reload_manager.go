@@ -33,6 +33,15 @@ type ReloadManager struct {
 	errorCount     int64
 }
 
+func (rm *ReloadManager) snapshotComponents() []ReloadableComponent {
+	rm.mutex.RLock()
+	defer rm.mutex.RUnlock()
+
+	components := make([]ReloadableComponent, len(rm.components))
+	copy(components, rm.components)
+	return components
+}
+
 // NewReloadManager 创建重载管理器
 func NewReloadManager() *ReloadManager {
 	return &ReloadManager{
@@ -68,12 +77,13 @@ func (rm *ReloadManager) UnregisterComponent(componentName string) {
 
 // ReloadAll 重载所有组件（增强版：智能变更检测）
 func (rm *ReloadManager) ReloadAll(oldConfig, newConfig *Config) error {
-	rm.mutex.RLock()
-	defer rm.mutex.RUnlock()
-
 	startTime := time.Now()
+	components := rm.snapshotComponents()
+
+	rm.mutex.Lock()
 	rm.reloadCount++
 	rm.lastReloadTime = startTime
+	rm.mutex.Unlock()
 
 	// 第一阶段：检测配置变更级别
 	detector := NewChangeDetector()
@@ -96,16 +106,20 @@ func (rm *ReloadManager) ReloadAll(oldConfig, newConfig *Config) error {
 
 	// 第三阶段：验证配置
 	if errs := ValidateConfig(newConfig); len(errs) > 0 {
+		rm.mutex.Lock()
 		rm.errorCount++
+		rm.mutex.Unlock()
 		return fmt.Errorf("configuration validation failed: %v", errs)
 	}
 
-	rm.log.Infof("Starting reload of %d components (level: %s)", len(rm.components), maxLevel)
+	rm.log.Infof("Starting reload of %d components (level: %s)", len(components), maxLevel)
 
 	// 第四阶段：验证所有组件
-	for _, component := range rm.components {
+	for _, component := range components {
 		if err := component.Validate(newConfig); err != nil {
+			rm.mutex.Lock()
 			rm.errorCount++
+			rm.mutex.Unlock()
 			return fmt.Errorf("component %s validation failed: %w", component.GetName(), err)
 		}
 	}
@@ -114,7 +128,7 @@ func (rm *ReloadManager) ReloadAll(oldConfig, newConfig *Config) error {
 
 	// 第五阶段：重载所有组件
 	var failedComponents []string
-	for _, component := range rm.components {
+	for _, component := range components {
 		if err := component.Reload(newConfig); err != nil {
 			rm.log.Errorf("Failed to reload component %s: %v", component.GetName(), err)
 			failedComponents = append(failedComponents, component.GetName())
@@ -126,12 +140,16 @@ func (rm *ReloadManager) ReloadAll(oldConfig, newConfig *Config) error {
 	duration := time.Since(startTime)
 
 	if len(failedComponents) > 0 {
+		rm.mutex.Lock()
 		rm.errorCount++
+		rm.mutex.Unlock()
 		return fmt.Errorf("failed to reload components: %v", failedComponents)
 	}
 
+	rm.mutex.Lock()
 	rm.successCount++
-	rm.log.Infof("Successfully reloaded all %d components in %v", len(rm.components), duration)
+	rm.mutex.Unlock()
+	rm.log.Infof("Successfully reloaded all %d components in %v", len(components), duration)
 
 	return nil
 }
@@ -172,10 +190,7 @@ func (rm *ReloadManager) GetComponents() []ReloadableComponent {
 
 // ValidateAllComponents 验证所有组件是否支持新配置
 func (rm *ReloadManager) ValidateAllComponents(newConfig *Config) error {
-	rm.mutex.RLock()
-	defer rm.mutex.RUnlock()
-
-	for _, component := range rm.components {
+	for _, component := range rm.snapshotComponents() {
 		if err := component.Validate(newConfig); err != nil {
 			return fmt.Errorf("component %s validation failed: %w", component.GetName(), err)
 		}
@@ -186,10 +201,7 @@ func (rm *ReloadManager) ValidateAllComponents(newConfig *Config) error {
 
 // ReloadComponent 重载指定组件
 func (rm *ReloadManager) ReloadComponent(componentName string, newConfig *Config) error {
-	rm.mutex.RLock()
-	defer rm.mutex.RUnlock()
-
-	for _, component := range rm.components {
+	for _, component := range rm.snapshotComponents() {
 		if component.GetName() == componentName {
 			// 先验证
 			if err := component.Validate(newConfig); err != nil {

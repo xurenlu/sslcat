@@ -196,11 +196,15 @@ func (m *Manager) Stop(ctx context.Context) error {
 	// 停止健康检查
 	close(m.healthChecker.stopChan)
 
-	// 停止所有插件
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
+	// 先快照插件列表，再在锁外调用外部插件实现，避免重入死锁
+	m.mutex.RLock()
+	plugins := make(map[string]Plugin, len(m.plugins))
 	for id, plugin := range m.plugins {
+		plugins[id] = plugin
+	}
+	m.mutex.RUnlock()
+
+	for id, plugin := range plugins {
 		if err := plugin.Stop(ctx); err != nil {
 			m.log.Errorf("Failed to stop plugin %s: %v", id, err)
 		}
@@ -328,16 +332,10 @@ func (m *Manager) LoadPlugin(ctx context.Context, path string) error {
 // UnloadPlugin 卸载插件
 func (m *Manager) UnloadPlugin(ctx context.Context, pluginID string) error {
 	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	plugin, exists := m.plugins[pluginID]
 	if !exists {
+		m.mutex.Unlock()
 		return fmt.Errorf("plugin %s not found", pluginID)
-	}
-
-	// 停止插件
-	if err := plugin.Stop(ctx); err != nil {
-		m.log.Errorf("Error stopping plugin %s: %v", pluginID, err)
 	}
 
 	// 从分类中移除
@@ -346,6 +344,12 @@ func (m *Manager) UnloadPlugin(ctx context.Context, pluginID string) error {
 	// 从主映射中移除
 	delete(m.plugins, pluginID)
 	delete(m.pluginPaths, pluginID)
+	m.mutex.Unlock()
+
+	// 在锁外停止插件，避免插件内部回调 manager 时发生重入死锁
+	if err := plugin.Stop(ctx); err != nil {
+		m.log.Errorf("Error stopping plugin %s: %v", pluginID, err)
+	}
 
 	// 从加载器中移除
 	m.loader.mutex.Lock()

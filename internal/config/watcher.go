@@ -335,3 +335,20 @@ func (cw *ConfigWatcher) GetConfigFileInfo() (map[string]interface{}, error) {
 		"debounce_ms": cw.debounceInterval.Milliseconds(),
 	}, nil
 }
+
+// 以下兼容包装方法仅用于复用现有测试与旧调用方。
+func (cw *ConfigWatcher) detectProxyLoop(config *Config, rule *ProxyRule) error {
+	return detectProxyLoop(config, rule, getListeningPorts(config))
+}
+
+func (cw *ConfigWatcher) detectBackendLoop(config *Config, rule *ProxyRule, backend *ProxyBackend) error {
+	return detectBackendLoop(config, rule, backend, getListeningPorts(config))
+}
+
+func (cw *ConfigWatcher) isLocalhost(host string) bool {
+	return isLocalhost(host)
+}
+
+func (cw *ConfigWatcher) getListeningPorts(config *Config) []int {
+	return getListeningPorts(config)
+}

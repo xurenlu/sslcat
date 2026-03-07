@@ -883,7 +883,7 @@ func (api *RuntimeDetectorAPI) writeTranslatedError(w http.ResponseWriter, key s
 	translator := api.getTranslator()
 	message := key
 	if translator != nil {
-		message = translator.T(key)
+		message = translator.Text(key)
 		// 支持参数替换
 		if len(args) > 0 {
 			message = fmt.Sprintf(message, args...)
@@ -933,7 +933,7 @@ func (api *GitServerAPI) writeTranslatedError(w http.ResponseWriter, key string,
 	translator := api.getTranslator()
 	message := key
 	if translator != nil {
-		message = translator.T(key)
+		message = translator.Text(key)
 		// 支持参数替换
 		if len(args) > 0 {
 			message = fmt.Sprintf(message, args...)
