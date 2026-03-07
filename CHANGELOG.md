@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.6-rc1] - 2026-03-07
+
+### 🐛 Bug 修复
+
+- **修复 SSL 证书删除“假成功”问题**：
+  - 前端 SSL 管理页删除证书时，改为真实调用 `DELETE /api/ssl/delete`，不再只做本地状态移除
+  - 删除成功后立即刷新证书列表，确保页面状态与后端证书状态一致，避免刷新后“证书复活”错觉
+  - 新增前端单元测试覆盖删除行为，防止回归为仅本地删除
+
 ## [1.7.6] - 2026-03-07
 
 ### 🐛 Bug 修复

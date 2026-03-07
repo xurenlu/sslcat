@@ -142,8 +142,29 @@ const SSLManagement: React.FC = () => {
     }
 
     try {
-      // TODO: 实际的 API 调用
-      setCertificates(certificates.filter(cert => cert.domain !== domain))
+      const response = await fetch(
+        buildApiPath(adminPrefix, `/ssl/delete?domain=${encodeURIComponent(domain)}`),
+        {
+          method: 'DELETE',
+          credentials: 'include',
+        }
+      )
+
+      if (!response.ok) {
+        let errorMessage = `HTTP error! status: ${response.status}`
+        try {
+          const data = await response.json()
+          if (data?.error) {
+            errorMessage = data.error
+          }
+        } catch {
+          // 忽略解析错误，使用默认错误消息
+        }
+        throw new Error(errorMessage)
+      }
+
+      // 删除成功后刷新列表，确保前后端状态一致
+      await refreshCertificates()
       toast({
         title: '证书删除成功',
         description: `域名 ${domain} 的证书已删除`,
