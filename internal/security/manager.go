@@ -1383,7 +1383,17 @@ func (m *Manager) loadWhitelist() {
 }
 
 // saveWhitelist 保存IP白名单
+// 注意：此方法应该在锁外调用，传入白名单的副本
 func (m *Manager) saveWhitelist() {
+	// 获取当前时间快照，避免持锁执行 I/O
+	m.mutex.RLock()
+	// 创建白名单的副本，避免在 I/O 期间持有锁
+	entries := make(map[string]WhitelistEntry, len(m.whitelistEntries))
+	for k, v := range m.whitelistEntries {
+		entries[k] = v
+	}
+	m.mutex.RUnlock()
+
 	whitelistFile := m.getWhitelistFile()
 
 	// 确保目录存在
@@ -1400,7 +1410,7 @@ func (m *Manager) saveWhitelist() {
 	}
 	defer file.Close()
 
-	for _, entry := range m.whitelistEntries {
+	for _, entry := range entries {
 		data, err := json.Marshal(entry)
 		if err != nil {
 			m.log.Errorf("Failed to serialize whitelist record: %v", err)
@@ -1509,7 +1519,8 @@ func (m *Manager) AddWhitelistEntry(value, description string) error {
 	}
 
 	m.whitelistEntries[normalized] = entry
-	m.saveWhitelist()
+	// 异步保存到文件（避免持锁执行 I/O）
+	go m.saveWhitelist()
 	m.log.Infof("Added whitelist entry: %s", normalized)
 
 	return nil
@@ -1531,7 +1542,8 @@ func (m *Manager) RemoveWhitelistEntry(value string) error {
 	}
 
 	delete(m.whitelistEntries, normalized)
-	m.saveWhitelist()
+	// 异步保存到文件（避免持锁执行 I/O）
+	go m.saveWhitelist()
 	m.log.Infof("Removed whitelist entry: %s", normalized)
 
 	return nil
@@ -1575,7 +1587,8 @@ func (m *Manager) UpdateWhitelistEntry(oldValue, newValue, description string) e
 	entry.UpdatedAt = time.Now()
 	m.whitelistEntries[newNormalized] = entry
 
-	m.saveWhitelist()
+	// 异步保存到文件（避免持锁执行 I/O）
+	go m.saveWhitelist()
 	m.log.Infof("Updated whitelist entry: %s -> %s", oldNormalized, newNormalized)
 
 	return nil
