@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.6] - 2026-03-07
+
+### 🐛 Bug 修复
+
+- **修复并发与持久化一致性问题（正式发布）**：
+  - Security Manager 的封禁列表与白名单持久化改为队列化串行写入，避免并发落盘时旧快照覆盖新状态
+  - 写盘改为临时文件 + `fsync` + `rename` 的原子替换流程，降低异常中断导致文件损坏风险
+  - 补充封禁列表/白名单“内存状态与落盘状态一致”回归测试，覆盖竞争窗口场景
+
 ## [1.7.5-rc3] - 2026-03-07
 
 ### 🐛 Bug 修复
