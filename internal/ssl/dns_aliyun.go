@@ -538,7 +538,7 @@ func (p *AliyunProvider) makeRequest(ctx context.Context, action string, params 
 			errMsg += fmt.Sprintf(" (RequestId: %s)", requestID)
 		}
 		p.log.Errorf("Aliyun API error: %s, response: %s", errMsg, string(body))
-		return nil, fmt.Errorf(errMsg)
+		return nil, fmt.Errorf("%s", errMsg)
 	}
 
 	return result, nil

@@ -484,58 +484,46 @@ func (c *Collector) startCleanupTask() {
 
 // cleanup 清理过期数据
 func (c *Collector) cleanup() {
-	// 修复：先获取需要删除的键列表，然后在锁外执行删除操作
 	now := time.Now()
 
-	// 第一步：获取锁并收集需要删除的数据
 	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	// 清理漏斗条目
 	c.ipFunnel.CleanupOldEntries(c.ipEntries, c.maxDataAge, now)
 	c.uaFunnel.CleanupOldEntries(c.uaEntries, c.maxDataAge, now)
 	c.cityFunnel.CleanupOldEntries(c.cityEntries, c.maxDataAge, now)
-
-	// 收集需要删除的域名统计数据键
-	type deletionKey struct {
-		domain  string
-		dim     TimeDimension
-		timeKey string
-	}
-	var deletions []deletionKey
-	var domainDeletions []string
 
 	for domain, dimStats := range c.domainStats {
 		for dim, timeStats := range dimStats {
 			for timeKey := range timeStats {
 				if c.isTimeKeyExpired(timeKey, dim, now) {
-					deletions = append(deletions, deletionKey{domain, dim, timeKey})
+					delete(timeStats, timeKey)
+					if c.domainUniqueIPs[domain] != nil && c.domainUniqueIPs[domain][dim] != nil {
+						delete(c.domainUniqueIPs[domain][dim], timeKey)
+					}
+					if c.domainUniqueUAs[domain] != nil && c.domainUniqueUAs[domain][dim] != nil {
+						delete(c.domainUniqueUAs[domain][dim], timeKey)
+					}
 				}
 			}
 			if len(timeStats) == 0 {
-				domainDeletions = append(domainDeletions, domain)
+				delete(dimStats, dim)
+				if c.domainUniqueIPs[domain] != nil {
+					delete(c.domainUniqueIPs[domain], dim)
+				}
+				if c.domainUniqueUAs[domain] != nil {
+					delete(c.domainUniqueUAs[domain], dim)
+				}
 			}
 		}
+		if len(dimStats) == 0 {
+			delete(c.domainStats, domain)
+			delete(c.domainUniqueIPs, domain)
+			delete(c.domainUniqueUAs, domain)
+		}
 	}
 
-	// 限制数据增长
 	c.limitDataGrowth()
-
-	c.mu.Unlock()
-
-	// 第二步：在锁外执行删除操作（减少持锁时间）
-	c.mu.Lock()
-	for _, del := range deletions {
-		if c.domainStats[del.domain] != nil && c.domainStats[del.domain][del.dim] != nil {
-			delete(c.domainStats[del.domain][del.dim], del.timeKey)
-		}
-		if c.domainUniqueIPs[del.domain] != nil && c.domainUniqueIPs[del.domain][del.dim] != nil {
-			delete(c.domainUniqueIPs[del.domain][del.dim], del.timeKey)
-		}
-		if c.domainUniqueUAs[del.domain] != nil && c.domainUniqueUAs[del.domain][del.dim] != nil {
-			delete(c.domainUniqueUAs[del.domain][del.dim], del.timeKey)
-		}
-	}
-	c.mu.Unlock()
 
 	c.log.Debug("完成数据清理")
 }

@@ -249,22 +249,25 @@ func (m *Manager) AccessLogsSnapshot() map[string][]AccessLog {
 
 // IsBlocked 检查IP是否被封禁
 func (m *Manager) IsBlocked(ip string) bool {
-	// 先检查白名单，白名单中的IP永远不会被封禁
 	if m.IsWhitelisted(ip) {
 		return false
 	}
 
 	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
 	blocked, exists := m.blockedIPs[ip]
+	m.mutex.RUnlock()
+
 	if !exists {
 		return false
 	}
 
-	// 检查是否已过期
 	if time.Now().After(blocked.ExpireTime) {
-		delete(m.blockedIPs, ip)
+		// 过期条目用写锁清理（不能在 RLock 下 delete map）
+		m.mutex.Lock()
+		if b, ok := m.blockedIPs[ip]; ok && time.Now().After(b.ExpireTime) {
+			delete(m.blockedIPs, ip)
+		}
+		m.mutex.Unlock()
 		return false
 	}
 
@@ -1278,7 +1281,6 @@ func (m *Manager) UpdateGeoConfig(config config.GeoBlockingConfig) error {
 // CheckTOTPOnlyLoginSecurity 检查 TOTP-only 登录的安全性
 // 返回 (是否允许, 错误信息, 是否需要验证码)
 func (m *Manager) CheckTOTPOnlyLoginSecurity(ip string) (bool, string, bool) {
-	// 1. 检查 IP 是否被封禁 (在获取锁之前调用,避免死锁)
 	if blocked, reason := m.CheckIPAccess(ip); !blocked {
 		return false, reason, false
 	}
@@ -1286,14 +1288,13 @@ func (m *Manager) CheckTOTPOnlyLoginSecurity(ip string) (bool, string, bool) {
 		return false, "IP已被封禁", false
 	}
 
-	// 2. 获取锁并检查登录失败次数
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	// 在锁内完成计算，收集需要封禁的信息后释放锁，再执行 I/O
+	var shouldBlock bool
+	var blockReason string
 
-	// 3. 检查 TOTP-only 登录失败次数（更严格的限制）
+	m.mutex.Lock()
 	now := time.Now()
-	
-	// 清理过期的失败记录（15分钟前）
+
 	var validAttempts []time.Time
 	if attempts, exists := m.totpOnlyLastAttempts[ip]; exists {
 		for _, attempt := range attempts {
@@ -1304,10 +1305,8 @@ func (m *Manager) CheckTOTPOnlyLoginSecurity(ip string) (bool, string, bool) {
 		m.totpOnlyLastAttempts[ip] = validAttempts
 	}
 
-	// 检查最近15分钟内的失败次数
 	recentAttempts := len(validAttempts)
-	
-	// 检查最近1分钟内的失败次数
+
 	oneMinAttempts := 0
 	for _, attempt := range validAttempts {
 		if now.Sub(attempt) <= time.Minute {
@@ -1315,16 +1314,26 @@ func (m *Manager) CheckTOTPOnlyLoginSecurity(ip string) (bool, string, bool) {
 		}
 	}
 
-	// 4. 安全策略：
-	// - 1分钟内超过3次失败：需要验证码
-	// - 15分钟内超过5次失败：封禁IP 15分钟
 	if oneMinAttempts >= 3 {
-		return true, "", true // 需要验证码
+		m.mutex.Unlock()
+		return true, "", true
 	}
 	if recentAttempts >= 5 {
-		// 封禁IP 15分钟
-		m.blockIP(ip, fmt.Sprintf("TOTP-only登录失败次数过多: %d次/15分钟", recentAttempts))
-		return false, fmt.Sprintf("TOTP-only登录失败次数过多，IP已被临时封禁15分钟"), false
+		blockReason = fmt.Sprintf("TOTP-only登录失败次数过多: %d次/15分钟", recentAttempts)
+		shouldBlock = true
+		m.blockedIPs[ip] = BlockedIP{
+			IP:         ip,
+			Reason:     blockReason,
+			BlockTime:  now,
+			ExpireTime: now.Add(m.config.Security.BlockDuration),
+		}
+	}
+	m.mutex.Unlock()
+
+	if shouldBlock {
+		go m.saveBlockedIPs()
+		m.log.Warnf("Blocked IP %s: %s", ip, blockReason)
+		return false, "TOTP-only登录失败次数过多，IP已被临时封禁15分钟", false
 	}
 
 	return true, "", false
