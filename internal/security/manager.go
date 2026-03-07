@@ -53,20 +53,20 @@ type BlockedUserAgent struct {
 
 // WhitelistEntry IP白名单条目
 type WhitelistEntry struct {
-	Value       string    `json:"value"`        // IP或CIDR（如 "192.168.1.1" 或 "192.168.1.0/24"）
-	Description string    `json:"description"`  // 描述信息（可选）
-	CreatedAt   time.Time `json:"created_at"`   // 创建时间
-	UpdatedAt   time.Time `json:"updated_at"`   // 更新时间
+	Value       string    `json:"value"`       // IP或CIDR（如 "192.168.1.1" 或 "192.168.1.0/24"）
+	Description string    `json:"description"` // 描述信息（可选）
+	CreatedAt   time.Time `json:"created_at"`  // 创建时间
+	UpdatedAt   time.Time `json:"updated_at"`  // 更新时间
 }
 
 // Manager 安全管理器
 type Manager struct {
-	config        *config.Config
-	accessLogs    map[string][]AccessLog
-	blockedIPs    map[string]BlockedIP
+	config            *config.Config
+	accessLogs        map[string][]AccessLog
+	blockedIPs        map[string]BlockedIP
 	blockedUserAgents map[string]BlockedUserAgent // User-Agent封禁列表
-	attemptCounts map[string]int
-	lastAttempts  map[string][]time.Time
+	attemptCounts     map[string]int
+	lastAttempts      map[string][]time.Time
 	// UA 违规计数：按IP维度记录
 	uaInvalid1Min map[string][]time.Time
 	uaInvalid5Min map[string][]time.Time
@@ -79,8 +79,8 @@ type Manager struct {
 	log                   *logrus.Entry
 	stopChan              chan struct{}
 	// TLS 指纹持久化
-	tlsFPRotator *logger.Rotator
-	geoIPService *GeoIPService
+	tlsFPRotator   *logger.Rotator
+	geoIPService   *GeoIPService
 	corsMiddleware *CORSMiddleware
 
 	// IP白名单
@@ -90,13 +90,21 @@ type Manager struct {
 	threatIntelManager *threatintel.ThreatIntelManager
 
 	// 内存泄漏防护
-	maxAccessLogEntries int // 每个IP的访问日志最多保留多少条
-	maxBlockedIPs       int // 最多保留多少个被封禁的IP
-	maxAttemptCounts    int // 最多保留多少个IP的尝试计数
-	maxLastAttempts     int // 最多保留多少个IP的最后尝试时间
-	maxUAInvalidEntries int // 最多保留多少个IP的UA违规记录
-	maxTLSFPEntries     int // 最多保留多少个TLS指纹计数
+	maxAccessLogEntries int           // 每个IP的访问日志最多保留多少条
+	maxBlockedIPs       int           // 最多保留多少个被封禁的IP
+	maxAttemptCounts    int           // 最多保留多少个IP的尝试计数
+	maxLastAttempts     int           // 最多保留多少个IP的最后尝试时间
+	maxUAInvalidEntries int           // 最多保留多少个IP的UA违规记录
+	maxTLSFPEntries     int           // 最多保留多少个TLS指纹计数
 	cleanupInterval     time.Duration // 清理间隔
+
+	// 持久化队列：避免并发写盘导致旧快照覆盖新状态
+	blockedPersistCh   chan struct{}
+	whitelistPersistCh chan struct{}
+	persistWG          sync.WaitGroup
+	// 文件级串行保护，防止绕过队列时并发写同一文件
+	blockedPersistMu   sync.Mutex
+	whitelistPersistMu sync.Mutex
 }
 
 // NewManager 创建安全管理器
@@ -146,13 +154,15 @@ func NewManager(cfg *config.Config) *Manager {
 			"component": "security_manager",
 		}),
 		// 内存泄漏防护初始化
-		maxAccessLogEntries: cfg.Security.MaxAccessLogEntries, 
+		maxAccessLogEntries: cfg.Security.MaxAccessLogEntries,
 		maxBlockedIPs:       cfg.Security.MaxBlockedIPs,
 		maxAttemptCounts:    cfg.Security.MaxAttemptCounts,
 		maxLastAttempts:     cfg.Security.MaxLastAttempts,
 		maxUAInvalidEntries: cfg.Security.UAInvalidMaxTotal,
 		maxTLSFPEntries:     cfg.Security.TLSFingerprintMaxTotal,
 		cleanupInterval:     time.Duration(cfg.Security.CleanupIntervalMin) * time.Minute,
+		blockedPersistCh:    make(chan struct{}, 1),
+		whitelistPersistCh:  make(chan struct{}, 1),
 	}
 }
 
@@ -215,6 +225,7 @@ func (m *Manager) Start() {
 
 	// 启动清理任务
 	go m.cleanupTask()
+	m.startPersistWorkers()
 
 	// 初始化 TLS 指纹日志轮转器（10MB*10）
 	if rot, err := logger.NewRotator("./data/tls_fp.log", 10*1024*1024, 10); err == nil {
@@ -226,11 +237,82 @@ func (m *Manager) Start() {
 func (m *Manager) Stop() {
 	m.log.Info("Stopping security manager")
 	close(m.stopChan)
+	m.persistWG.Wait()
 	if m.tlsFPRotator != nil {
 		_ = m.tlsFPRotator.Close()
 	}
 	if m.geoIPService != nil {
 		_ = m.geoIPService.Close()
+	}
+}
+
+func (m *Manager) startPersistWorkers() {
+	m.persistWG.Add(2)
+	go m.persistWorker(m.blockedPersistCh, m.saveBlockedIPs)
+	go m.persistWorker(m.whitelistPersistCh, m.saveWhitelist)
+}
+
+func (m *Manager) persistWorker(ch <-chan struct{}, saveFn func()) {
+	defer m.persistWG.Done()
+	for {
+		select {
+		case <-ch:
+			// 合并短时间内高频触发，减少写盘抖动
+			timer := time.NewTimer(30 * time.Millisecond)
+			select {
+			case <-timer.C:
+			case <-m.stopChan:
+				if !timer.Stop() {
+					select {
+					case <-timer.C:
+					default:
+					}
+				}
+				saveFn()
+				return
+			}
+
+			for {
+				select {
+				case <-ch:
+					continue
+				default:
+					saveFn()
+					goto next
+				}
+			}
+		case <-m.stopChan:
+			// 停止前尽量冲刷一次队列里的最后状态
+			select {
+			case <-ch:
+				for {
+					select {
+					case <-ch:
+						continue
+					default:
+						saveFn()
+						return
+					}
+				}
+			default:
+				return
+			}
+		}
+	next:
+	}
+}
+
+func (m *Manager) queueBlockedPersist() {
+	select {
+	case m.blockedPersistCh <- struct{}{}:
+	default:
+	}
+}
+
+func (m *Manager) queueWhitelistPersist() {
+	select {
+	case m.whitelistPersistCh <- struct{}{}:
+	default:
 	}
 }
 
@@ -368,7 +450,7 @@ func (m *Manager) LogAccess(ip, userAgent, path string, success bool) {
 	}()
 
 	if blockedReason != "" {
-		go m.saveBlockedIPs()
+		m.queueBlockedPersist()
 		m.log.Warnf("Blocked IP %s: %s", ip, blockedReason)
 	}
 }
@@ -378,7 +460,7 @@ func (m *Manager) LogTLSFingerprint(fingerprint, ip string) {
 	if fingerprint == "" {
 		return
 	}
-	
+
 	// 先准备要写入的数据(在锁外面)
 	now := time.Now()
 	rec := map[string]any{
@@ -386,14 +468,14 @@ func (m *Manager) LogTLSFingerprint(fingerprint, ip string) {
 		"fp":   fingerprint,
 		"ip":   ip,
 	}
-	
+
 	// 锁内只做内存操作,不做文件I/O
 	var shouldWarn bool
 	var warnCount int
 	func() {
 		m.mutex.Lock()
 		defer m.mutex.Unlock()
-		
+
 		arr := append(m.tlsFPCounts[fingerprint], now)
 		// 清理窗口外
 		window := time.Duration(m.config.Security.TLSFingerprintWindowSec) * time.Second
@@ -408,7 +490,7 @@ func (m *Manager) LogTLSFingerprint(fingerprint, ip string) {
 			}
 		}
 		m.tlsFPCounts[fingerprint] = pruned
-		
+
 		// 阈值告警检查(只记录是否需要告警,不在锁内打日志)
 		maxPerMin := m.config.Security.TLSFingerprintMaxPerMin
 		if maxPerMin <= 0 {
@@ -419,7 +501,7 @@ func (m *Manager) LogTLSFingerprint(fingerprint, ip string) {
 			warnCount = len(pruned)
 		}
 	}()
-	
+
 	// 锁外执行告警日志
 	if shouldWarn {
 		m.log.Warnf("TLS fingerprint too active fp=%s count=%d ip=%s", fingerprint, warnCount, ip)
@@ -564,7 +646,7 @@ func (m *Manager) blockIP(ip, reason string) {
 	}
 
 	// 异步保存到文件（避免持锁执行 I/O）
-	go m.saveBlockedIPs()
+	m.queueBlockedPersist()
 	m.log.Warnf("Blocked IP %s: %s", ip, reason)
 }
 
@@ -610,7 +692,7 @@ func (m *Manager) BlockIP(ip string, duration time.Duration, reason string) {
 	m.mutex.Unlock()
 
 	// 异步保存到文件（避免持锁执行 I/O）
-	go m.saveBlockedIPs()
+	m.queueBlockedPersist()
 	m.log.Warnf("Manually blocked IP %s: %s (duration: %v)", ip, reason, duration)
 }
 
@@ -833,6 +915,9 @@ func (m *Manager) loadBlockedIPs() {
 // saveBlockedIPs 保存被封禁的IP列表
 // 注意：此方法应该在锁外调用，避免持锁执行 I/O
 func (m *Manager) saveBlockedIPs() {
+	m.blockedPersistMu.Lock()
+	defer m.blockedPersistMu.Unlock()
+
 	// 获取数据快照，避免持锁执行 I/O
 	m.mutex.RLock()
 	// 创建封禁列表的副本，避免在 I/O 期间持有锁
@@ -842,33 +927,68 @@ func (m *Manager) saveBlockedIPs() {
 	}
 	m.mutex.RUnlock()
 
-	blockFile := m.config.Security.BlockFile
-
-	// 确保目录存在
-	dir := filepath.Dir(blockFile)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		m.log.Errorf("Failed to create block file directory: %v", err)
-		return
-	}
-
-	file, err := os.Create(blockFile)
-	if err != nil {
-		m.log.Errorf("Failed to create block file: %v", err)
-		return
-	}
-	defer file.Close()
-
+	lines := make([][]byte, 0, len(blockedIPs))
 	for _, blocked := range blockedIPs {
 		data, err := json.Marshal(blocked)
 		if err != nil {
 			m.log.Errorf("Failed to serialize blocked record: %v", err)
 			continue
 		}
+		lines = append(lines, data)
+	}
+	if err := writeJSONLinesAtomically(m.config.Security.BlockFile, lines); err != nil {
+		m.log.Errorf("Failed to persist blocked IPs: %v", err)
+	}
+}
 
-		if _, err := file.Write(append(data, '\n')); err != nil {
-			m.log.Errorf("Failed to write blocked record: %v", err)
+func writeJSONLinesAtomically(targetPath string, lines [][]byte) error {
+	dir := filepath.Dir(targetPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("create directory failed: %w", err)
+	}
+
+	tmpFile, err := os.CreateTemp(dir, ".persist-*.tmp")
+	if err != nil {
+		return fmt.Errorf("create temp file failed: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	success := false
+	defer func() {
+		if !success {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+
+	for _, line := range lines {
+		if _, err := tmpFile.Write(line); err != nil {
+			_ = tmpFile.Close()
+			return fmt.Errorf("write temp file failed: %w", err)
+		}
+		if _, err := tmpFile.Write([]byte{'\n'}); err != nil {
+			_ = tmpFile.Close()
+			return fmt.Errorf("write temp newline failed: %w", err)
 		}
 	}
+
+	if err := tmpFile.Sync(); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("sync temp file failed: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("close temp file failed: %w", err)
+	}
+	if err := os.Rename(tmpPath, targetPath); err != nil {
+		return fmt.Errorf("rename temp file failed: %w", err)
+	}
+
+	// 最后同步目录元数据，尽量降低崩溃后丢文件窗口
+	if dirHandle, err := os.Open(dir); err == nil {
+		_ = dirHandle.Sync()
+		_ = dirHandle.Close()
+	}
+
+	success = true
+	return nil
 }
 
 // cleanupTask 清理任务
@@ -1196,7 +1316,7 @@ func (m *Manager) UnblockIP(ip string) {
 
 	if exists {
 		// 异步保存到文件（避免持锁执行 I/O）
-		go m.saveBlockedIPs()
+		m.queueBlockedPersist()
 		m.log.Infof("Manually unblocked IP: %s", ip)
 	}
 }
@@ -1356,7 +1476,7 @@ func (m *Manager) CheckTOTPOnlyLoginSecurity(ip string) (bool, string, bool) {
 	m.mutex.Unlock()
 
 	if shouldBlock {
-		go m.saveBlockedIPs()
+		m.queueBlockedPersist()
 		m.log.Warnf("Blocked IP %s: %s", ip, blockReason)
 		return false, "TOTP-only登录失败次数过多，IP已被临时封禁15分钟", false
 	}
@@ -1375,7 +1495,7 @@ func (m *Manager) RecordTOTPOnlyLoginFailure(ip string) {
 		m.totpOnlyLastAttempts[ip] = make([]time.Time, 0)
 	}
 	m.totpOnlyLastAttempts[ip] = append(m.totpOnlyLastAttempts[ip], now)
-	
+
 	m.log.Warnf("TOTP-only登录失败: IP=%s, 失败次数=%d", ip, m.totpOnlyAttemptCounts[ip])
 }
 
@@ -1435,6 +1555,9 @@ func (m *Manager) loadWhitelist() {
 // saveWhitelist 保存IP白名单
 // 注意：此方法应该在锁外调用，传入白名单的副本
 func (m *Manager) saveWhitelist() {
+	m.whitelistPersistMu.Lock()
+	defer m.whitelistPersistMu.Unlock()
+
 	// 获取当前时间快照，避免持锁执行 I/O
 	m.mutex.RLock()
 	// 创建白名单的副本，避免在 I/O 期间持有锁
@@ -1444,32 +1567,17 @@ func (m *Manager) saveWhitelist() {
 	}
 	m.mutex.RUnlock()
 
-	whitelistFile := m.getWhitelistFile()
-
-	// 确保目录存在
-	dir := filepath.Dir(whitelistFile)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		m.log.Errorf("Failed to create whitelist file directory: %v", err)
-		return
-	}
-
-	file, err := os.Create(whitelistFile)
-	if err != nil {
-		m.log.Errorf("Failed to create whitelist file: %v", err)
-		return
-	}
-	defer file.Close()
-
+	lines := make([][]byte, 0, len(entries))
 	for _, entry := range entries {
 		data, err := json.Marshal(entry)
 		if err != nil {
 			m.log.Errorf("Failed to serialize whitelist record: %v", err)
 			continue
 		}
-
-		if _, err := file.Write(append(data, '\n')); err != nil {
-			m.log.Errorf("Failed to write whitelist record: %v", err)
-		}
+		lines = append(lines, data)
+	}
+	if err := writeJSONLinesAtomically(m.getWhitelistFile(), lines); err != nil {
+		m.log.Errorf("Failed to persist whitelist: %v", err)
 	}
 }
 
@@ -1574,7 +1682,7 @@ func (m *Manager) AddWhitelistEntry(value, description string) error {
 
 	m.whitelistEntries[normalized] = entry
 	// 异步保存到文件（避免持锁执行 I/O）
-	go m.saveWhitelist()
+	m.queueWhitelistPersist()
 	m.log.Infof("Added whitelist entry: %s", normalized)
 
 	return nil
@@ -1597,7 +1705,7 @@ func (m *Manager) RemoveWhitelistEntry(value string) error {
 
 	delete(m.whitelistEntries, normalized)
 	// 异步保存到文件（避免持锁执行 I/O）
-	go m.saveWhitelist()
+	m.queueWhitelistPersist()
 	m.log.Infof("Removed whitelist entry: %s", normalized)
 
 	return nil
@@ -1642,7 +1750,7 @@ func (m *Manager) UpdateWhitelistEntry(oldValue, newValue, description string) e
 	m.whitelistEntries[newNormalized] = entry
 
 	// 异步保存到文件（避免持锁执行 I/O）
-	go m.saveWhitelist()
+	m.queueWhitelistPersist()
 	m.log.Infof("Updated whitelist entry: %s -> %s", oldNormalized, newNormalized)
 
 	return nil

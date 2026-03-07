@@ -1,7 +1,10 @@
 package security
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -184,4 +187,174 @@ func TestLogAccessNoDeadlockOnBlock(t *testing.T) {
 	if !m.IsBlocked("203.0.113.10") {
 		t.Fatal("expected IP to be blocked after hitting failure threshold")
 	}
+}
+
+func TestPersistBlockedIPsMatchesLatestMemoryState(t *testing.T) {
+	m := newTestManager(t)
+	m.Start()
+	defer m.Stop()
+
+	// 先制造一批状态变化
+	m.BlockIP("198.51.100.10", time.Minute, "test1")
+	m.BlockIP("198.51.100.11", time.Minute, "test2")
+	m.UnblockIP("198.51.100.10")
+
+	// 触发一次异步持久化（需要和业务代码一样走队列）
+	m.queueBlockedPersist()
+
+	ok := waitUntil(2*time.Second, 20*time.Millisecond, func() bool {
+		diskMap, err := readBlockedIPFileAsMap(m.config.Security.BlockFile)
+		if err != nil {
+			return false
+		}
+
+		memoryMap := m.blockedIPSnapshot()
+		return mapsEqualBlockedIP(memoryMap, diskMap)
+	})
+	if !ok {
+		memoryMap := m.blockedIPSnapshot()
+		diskMap, _ := readBlockedIPFileAsMap(m.config.Security.BlockFile)
+		t.Fatalf("blocked IP persistence mismatch, memory=%d disk=%d", len(memoryMap), len(diskMap))
+	}
+}
+
+func TestPersistWhitelistMatchesLatestMemoryState(t *testing.T) {
+	m := newTestManager(t)
+	m.Start()
+	defer m.Stop()
+
+	if err := m.AddWhitelistEntry("203.0.113.20", "keep"); err != nil {
+		t.Fatalf("add whitelist failed: %v", err)
+	}
+	if err := m.AddWhitelistEntry("203.0.113.21", "remove later"); err != nil {
+		t.Fatalf("add whitelist failed: %v", err)
+	}
+	if err := m.RemoveWhitelistEntry("203.0.113.21"); err != nil {
+		t.Fatalf("remove whitelist failed: %v", err)
+	}
+
+	m.queueWhitelistPersist()
+
+	ok := waitUntil(2*time.Second, 20*time.Millisecond, func() bool {
+		diskMap, err := readWhitelistFileAsMap(m.getWhitelistFile())
+		if err != nil {
+			return false
+		}
+		memoryMap := m.whitelistSnapshot()
+		return mapsEqualWhitelist(memoryMap, diskMap)
+	})
+	if !ok {
+		memoryMap := m.whitelistSnapshot()
+		diskMap, _ := readWhitelistFileAsMap(m.getWhitelistFile())
+		t.Fatalf("whitelist persistence mismatch, memory=%d disk=%d", len(memoryMap), len(diskMap))
+	}
+}
+
+func (m *Manager) blockedIPSnapshot() map[string]BlockedIP {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	out := make(map[string]BlockedIP, len(m.blockedIPs))
+	for k, v := range m.blockedIPs {
+		out[k] = v
+	}
+	return out
+}
+
+func (m *Manager) whitelistSnapshot() map[string]WhitelistEntry {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	out := make(map[string]WhitelistEntry, len(m.whitelistEntries))
+	for k, v := range m.whitelistEntries {
+		out[k] = v
+	}
+	return out
+}
+
+func waitUntil(timeout, step time.Duration, cond func() bool) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if cond() {
+			return true
+		}
+		time.Sleep(step)
+	}
+	return cond()
+}
+
+func readBlockedIPFileAsMap(path string) (map[string]BlockedIP, error) {
+	out := make(map[string]BlockedIP)
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+		var blocked BlockedIP
+		if err := json.Unmarshal(line, &blocked); err != nil {
+			return nil, err
+		}
+		out[blocked.IP] = blocked
+	}
+	return out, scanner.Err()
+}
+
+func readWhitelistFileAsMap(path string) (map[string]WhitelistEntry, error) {
+	out := make(map[string]WhitelistEntry)
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+		var entry WhitelistEntry
+		if err := json.Unmarshal(line, &entry); err != nil {
+			return nil, err
+		}
+		out[entry.Value] = entry
+	}
+	return out, scanner.Err()
+}
+
+func mapsEqualBlockedIP(a, b map[string]BlockedIP) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, av := range a {
+		bv, ok := b[k]
+		if !ok {
+			return false
+		}
+		if av.IP != bv.IP || av.Reason != bv.Reason || !av.BlockTime.Equal(bv.BlockTime) || !av.ExpireTime.Equal(bv.ExpireTime) {
+			return false
+		}
+	}
+	return true
+}
+
+func mapsEqualWhitelist(a, b map[string]WhitelistEntry) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, av := range a {
+		bv, ok := b[k]
+		if !ok {
+			return false
+		}
+		if av.Value != bv.Value || av.Description != bv.Description || !av.CreatedAt.Equal(bv.CreatedAt) || !av.UpdatedAt.Equal(bv.UpdatedAt) {
+			return false
+		}
+	}
+	return true
 }
