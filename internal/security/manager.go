@@ -547,8 +547,14 @@ func (m *Manager) blockIP(ip, reason string) {
 		BlockTime:  time.Now(),
 		ExpireTime: time.Now().Add(m.config.Security.BlockDuration),
 	}
+
+	// 修复：快速更新内存，然后在锁外执行 I/O
+	m.mutex.Lock()
 	m.blockedIPs[ip] = blocked
-	m.saveBlockedIPs()
+	m.mutex.Unlock()
+
+	// 异步保存到文件（避免持锁执行 I/O）
+	go m.saveBlockedIPs()
 	m.log.Warnf("Blocked IP %s: %s", ip, reason)
 }
 
@@ -797,7 +803,17 @@ func (m *Manager) loadBlockedIPs() {
 }
 
 // saveBlockedIPs 保存被封禁的IP列表
+// 注意：此方法应该在锁外调用，避免持锁执行 I/O
 func (m *Manager) saveBlockedIPs() {
+	// 获取数据快照，避免持锁执行 I/O
+	m.mutex.RLock()
+	// 创建封禁列表的副本，避免在 I/O 期间持有锁
+	blockedIPs := make(map[string]BlockedIP, len(m.blockedIPs))
+	for k, v := range m.blockedIPs {
+		blockedIPs[k] = v
+	}
+	m.mutex.RUnlock()
+
 	blockFile := m.config.Security.BlockFile
 
 	// 确保目录存在
@@ -814,7 +830,7 @@ func (m *Manager) saveBlockedIPs() {
 	}
 	defer file.Close()
 
-	for _, blocked := range m.blockedIPs {
+	for _, blocked := range blockedIPs {
 		data, err := json.Marshal(blocked)
 		if err != nil {
 			m.log.Errorf("Failed to serialize blocked record: %v", err)

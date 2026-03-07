@@ -490,17 +490,16 @@ func (tim *ThreatIntelManager) CheckHash(hash string) (*IOC, bool) {
 
 // AddIOC 添加IOC
 func (tim *ThreatIntelManager) AddIOC(ioc *IOC) {
-	tim.mutex.Lock()
-	defer tim.mutex.Unlock()
-
 	key := fmt.Sprintf("%s:%s", ioc.Type, strings.ToLower(ioc.Value))
+
+	// 快速更新内存
+	tim.mutex.Lock()
 	tim.iocs[key] = ioc
+	tim.mutex.Unlock()
 
-	// 保存到数据库
-	tim.SaveIOCToDB(ioc)
-
-	// 记录到日志
-	tim.logIOC(ioc)
+	// 异步保存到数据库和日志（避免持锁执行 I/O）
+	go tim.SaveIOCToDB(ioc)
+	go tim.logIOC(ioc)
 }
 
 // logIOC 记录IOC到日志
