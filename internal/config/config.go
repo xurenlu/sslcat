@@ -185,7 +185,7 @@ type ProxyConfig struct {
 	UnmatchedBehavior string `json:"unmatched_behavior"`
 	// 当 UnmatchedBehavior=="302" 时的跳转URL
 	UnmatchedRedirectURL string `json:"unmatched_redirect_url"`
-	// 全局默认：等待后端响应头超时（秒），单条规则未设置时使用，默认 3
+	// 全局默认：等待后端响应头超时（秒），单条规则未设置时使用，默认 10
 	DefaultResponseHeaderTimeoutSec int `json:"default_response_header_timeout_sec"`
 }
 
@@ -268,7 +268,7 @@ type ProxyRule struct {
 	IdleTimeoutSec           int `json:"idle_timeout_sec"`            // 空闲连接超时（秒），默认90
 	TLSHandshakeTimeoutSec   int `json:"tls_handshake_timeout_sec"`   // TLS握手超时（秒），默认10
 	ExpectContinueTimeoutSec int `json:"expect_continue_timeout_sec"` // Expect-Continue超时（秒），默认1
-	ResponseHeaderTimeoutSec int `json:"response_header_timeout_sec"` // 响应头超时（秒），默认3
+	ResponseHeaderTimeoutSec int `json:"response_header_timeout_sec"` // 响应头超时（秒），默认10
 	HealthCheckTimeoutSec    int `json:"health_check_timeout_sec"`    // 健康检查超时（秒），默认5
 
 	// WebSocket代理优化配置

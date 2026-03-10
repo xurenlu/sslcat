@@ -539,7 +539,7 @@ export const esES: Translation = {
     memoryReleaseCooldownSecDesc: 'Mínimo 60 segundos, para evitar liberaciones frecuentes de memoria que causen fluctuaciones de rendimiento.',
     proxyPerformanceSettings: 'Rendimiento del proxy',
     responseHeaderTimeoutSec: 'Timeout de cabeceras de respuesta (seg)',
-    responseHeaderTimeoutSecDesc: 'Tiempo máximo de espera de cabeceras del backend; fallo rápido si se supera. Por defecto 3 seg, rango 1–120.',
+    responseHeaderTimeoutSecDesc: 'Tiempo máximo de espera de cabeceras del backend; fallo rápido si se supera. Por defecto 10 seg, rango 1–120.',
     // SSL Staging 环境
     sslStaging: 'Usar Entorno Staging (Prueba)',
     sslStagingDesc: '⚠️ Los certificados emitidos por el entorno Staging no son confiables para los navegadores, solo para pruebas. Por favor desactive esta opción para uso en producción.',

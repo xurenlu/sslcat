@@ -1521,7 +1521,7 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 		responseHeaderTimeout = m.config.Proxy.DefaultResponseHeaderTimeoutSec
 	}
 	if responseHeaderTimeout <= 0 {
-		responseHeaderTimeout = 3 // 默认3秒，快速失败避免长时间等待
+		responseHeaderTimeout = 10 // 默认10秒，快速失败避免长时间等待
 	}
 
 	// 自定义传输配置

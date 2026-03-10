@@ -645,7 +645,7 @@ export const zhCN: Translation = {
     // 代理性能设置
     proxyPerformanceSettings: '代理性能设置',
     responseHeaderTimeoutSec: '响应头超时（秒）',
-    responseHeaderTimeoutSecDesc: '等待后端返回响应头的最大时间，超时则快速失败。默认 3 秒，范围 1–120。',
+    responseHeaderTimeoutSecDesc: '等待后端返回响应头的最大时间，超时则快速失败。默认 10 秒，范围 1–120。',
     // SSL Staging 环境
     sslStaging: '使用 Staging 环境（测试）',
     sslStagingDesc: '⚠️ Staging 环境签发的证书不被浏览器信任，仅用于测试。正式使用请关闭此选项。',

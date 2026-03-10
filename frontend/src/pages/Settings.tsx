@@ -94,7 +94,7 @@ const Settings: React.FC = () => {
     memoryReleaseCooldownSec: 300,
     
     // 代理超时设置
-    responseHeaderTimeoutSec: 3,
+    responseHeaderTimeoutSec: 10,
     
     // 压缩设置
     compressionEnabled: true,
@@ -611,7 +611,7 @@ const Settings: React.FC = () => {
               memoryReleaseCooldownSec: config.monitoring?.memory_release_cooldown_sec || 300,
               
               // 代理超时设置
-              responseHeaderTimeoutSec: config.proxy?.default_response_header_timeout_sec ?? 3,
+              responseHeaderTimeoutSec: config.proxy?.default_response_header_timeout_sec ?? 10,
             }))
           }
         }
@@ -944,7 +944,7 @@ const Settings: React.FC = () => {
       memoryMaxUsagePercent: 20,
       memoryReleaseCooldownSec: 300,
       // 代理超时设置
-      responseHeaderTimeoutSec: 3,
+      responseHeaderTimeoutSec: 10,
       // 压缩设置
       compressionEnabled: true,
       compressionAlgorithms: ['br', 'gzip'],
@@ -1673,7 +1673,7 @@ const Settings: React.FC = () => {
                 onChange={(e) =>
                   handleInputChange(
                     'responseHeaderTimeoutSec',
-                    parseInt(e.target.value) || 3
+                    parseInt(e.target.value) || 10
                   )
                 }
               />

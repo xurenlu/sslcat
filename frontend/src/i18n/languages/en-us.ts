@@ -649,7 +649,7 @@ export const enUS: Translation = {
     // Proxy performance
     proxyPerformanceSettings: 'Proxy Performance',
     responseHeaderTimeoutSec: 'Response Header Timeout (sec)',
-    responseHeaderTimeoutSecDesc: 'Max time to wait for backend response headers; request fails fast on timeout. Default 3 sec, range 1–120.',
+    responseHeaderTimeoutSecDesc: 'Max time to wait for backend response headers; request fails fast on timeout. Default 10 sec, range 1–120.',
     // SSL Staging 环境
     sslStaging: 'Use Staging Environment (Testing)',
     sslStagingDesc: '⚠️ Certificates issued by Staging environment are not trusted by browsers, for testing only. Please disable this option for production use.',

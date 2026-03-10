@@ -539,7 +539,7 @@ export const jaJP: Translation = {
     memoryReleaseCooldownSecDesc: '最小60秒、頻繁なメモリ解放によるパフォーマンスの変動を避けるため。',
     proxyPerformanceSettings: 'プロキシパフォーマンス',
     responseHeaderTimeoutSec: 'レスポンスヘッダータイムアウト（秒）',
-    responseHeaderTimeoutSecDesc: 'バックエンドのレスポンスヘッダー待ちの最大時間。超過で即失敗。デフォルト3秒、範囲1–120。',
+    responseHeaderTimeoutSecDesc: 'バックエンドのレスポンスヘッダー待ちの最大時間。超過で即失敗。デフォルト10秒、範囲1–120。',
     // SSL Staging 环境
     sslStaging: 'Staging環境を使用 (テスト)',
     sslStagingDesc: '⚠️ Staging環境で発行された証明書はブラウザーによって信頼されません。テスト専用です。本番使用ではこのオプションを無効にしてください。',
