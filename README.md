@@ -1,29 +1,26 @@
 # SSLcat 🚀
 
-[![Version](https://img.shields.io/badge/version-1.3.27--rc2-blue.svg)](https://github.com/xurenlu/sslcat/releases/tag/v1.3.27-rc2)
+[![Version](https://img.shields.io/badge/version-2.0.0--rc1-blue.svg)](https://github.com/xurenlu/sslcat/releases/tag/v2.0.0-rc1)
 [![Go Version](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://golang.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![CPU Optimized](https://img.shields.io/badge/CPU%20optimized-97%25%20reduction-brightgreen.svg)](#performance)
 
-> **Enterprise-grade SSL proxy server with automatic certificate management, intelligent domain forwarding, and modern web management interface.**
+> **Enterprise-grade Web Server and API Gateway with automatic SSL certificate management, intelligent load balancing, and modern web management interface.**
 
-> **企业级 SSL 代理服务器，具备自动证书管理、智能域名转发和现代化 Web 管理界面。**
+> **企业级 Web 服务器和 API 网关，具备自动 SSL 证书管理、智能负载均衡和现代化 Web 管理界面。**
 
 ---
 
 ## 🌟 What is SSLcat? / SSLcat 是什么？
 
-SSLcat is a powerful, high-performance SSL proxy server built with Go that simplifies SSL certificate management and provides intelligent domain forwarding capabilities. Think of it as **nginx + Caddy + Web UI + GitOps** all in one package.
+SSLcat is a powerful, high-performance web server and API gateway built with Go that simplifies SSL certificate management and provides intelligent proxy capabilities. Think of it as **nginx + Caddy + Web UI** all in one package.
 
-SSLcat 是一个功能强大的高性能 SSL 代理服务器，使用 Go 语言构建，简化 SSL 证书管理并提供智能域名转发功能。可以把它理解为 **nginx + Caddy + Web UI + GitOps** 的一体化解决方案。
+SSLcat 是一个功能强大的高性能 Web 服务器和 API 网关，使用 Go 语言构建，简化 SSL 证书管理并提供智能代理功能。可以把它理解为 **nginx + Caddy + Web UI** 的一体化解决方案。
 
 ### 🎯 Key Features / 核心特性
 
 - 🔒 **Auto SSL Management** - Let's Encrypt integration with automatic certificate renewal
-- 🔄 **Smart Load Balancing** - 6 algorithms with health checks and session persistence  
+- 🔄 **Smart Load Balancing** - 6 algorithms with health checks and session persistence
 - 🎨 **Modern Web UI** - React-based management dashboard with real-time monitoring
-- 🚀 **GitOps Deployment** - Git push to deploy (like Dokku/Heroku)
-- 🐳 **Docker Integration** - Built-in container management and deployment
 - 🛡️ **Advanced Security** - AI-powered threat detection and IP blocking
 - 📡 **Real-time Logs** - WebSocket-based live log streaming
 - 🌍 **Multi-language** - English, Chinese, Japanese support
@@ -36,8 +33,6 @@ SSLcat 是一个功能强大的高性能 SSL 代理服务器，使用 Go 语言�
 - 🔒 **自动 SSL 管理** - Let's Encrypt 集成，自动证书续期
 - 🔄 **智能负载均衡** - 6种算法，健康检查和会话保持
 - 🎨 **现代化 Web UI** - 基于 React 的管理面板，实时监控
-- 🚀 **GitOps 部署** - Git 推送即部署（类似 Dokku/Heroku）
-- 🐳 **Docker 集成** - 内置容器管理和部署
 - 🛡️ **高级安全** - AI 驱动的威胁检测和 IP 封禁
 - 📡 **实时日志** - 基于 WebSocket 的实时日志流
 - 🌍 **多语言支持** - 英语、中文、日语
@@ -57,7 +52,6 @@ SSLcat 是一个功能强大的高性能 SSL 代理服务器，使用 Go 语言�
 |----------------|--------|-------|------------------|
 | **🎨 Web Management UI** | ✅ | ❌ | No more config file editing / 无需编辑配置文件 |
 | **🔒 Auto SSL** | ✅ | ❌ | No manual certificate management / 无需手动管理证书 |
-| **🚀 GitOps** | ✅ | ❌ | Deploy with `git push` / 使用 `git push` 部署 |
 | **📊 Real-time Monitoring** | ✅ | ❌ | Built-in dashboard / 内置监控面板 |
 | **🤖 AI Security** | ✅ | ❌ | Intelligent threat detection / 智能威胁检测 |
 
@@ -67,7 +61,6 @@ SSLcat 是一个功能强大的高性能 SSL 代理服务器，使用 Go 语言�
 |----------------|--------|-------|------------------|
 | **🔄 Advanced Load Balancing** | ✅ 6 algorithms | ✅ Basic | More algorithms / 更多算法 |
 | **👥 Multi-user Management** | ✅ | ❌ | Team collaboration / 团队协作 |
-| **🐳 Container Support** | ✅ | ❌ | Docker registry and deployment / Docker 镜像管理和部署 |
 | **🔑 API Token System** | ✅ | ❌ | Granular permissions / 细粒度权限控制 |
 | **📡 Real-time Logs** | ✅ | ❌ | WebSocket streaming / WebSocket 日志流 |
 
@@ -112,20 +105,6 @@ docker compose up -d
 
 ---
 
-## 📊 Performance / 性能表现
-
-Recent optimizations achieved **97% CPU reduction** / 最近的优化实现了 **97% CPU 降低**:
-- 8 Runner apps: 400% CPU → 11% CPU
-- 1 Runner app: 55% CPU → 4% CPU  
-- Idle state: 50-100% CPU → <1% CPU
-
-最近的优化实现了 **97% CPU 降低**：
-- 8 个 Runner 应用：400% CPU → 11% CPU
-- 1 个 Runner 应用：55% CPU → 4% CPU
-- 空闲状态：50-100% CPU → < 1% CPU
-
----
-
 ## 🛠️ Core Capabilities / 核心功能
 
 ### 🔒 SSL Certificate Management / SSL 证书管理
@@ -164,14 +143,34 @@ Recent optimizations achieved **97% CPU reduction** / 最近的优化实现了 *
 }
 ```
 
-### 🚀 GitOps Deployment / GitOps 部署
+### 🌍 Static Site Hosting / 静态站点托管
 
-```bash
-# Add SSLcat as remote / 添加 SSLcat 作为远程仓库
-git remote add sslcat git@your-server:your-app.git
+```json
+{
+  "static_sites": [
+    {
+      "domain": "www.example.com",
+      "root": "/var/www/example",
+      "index": "index.html",
+      "try_files": true
+    }
+  ]
+}
+```
 
-# Deploy with git push / 使用 git push 部署
-git push sslcat main
+### 🐘 PHP Site Hosting / PHP 站点托管
+
+```json
+{
+  "php_sites": [
+    {
+      "domain": "blog.example.com",
+      "root": "/var/www/blog",
+      "fcgi_host": "localhost",
+      "fcgi_port": 9000
+    }
+  ]
+}
 ```
 
 ---
@@ -180,9 +179,9 @@ git push sslcat main
 
 - **Microservices Gateway** - Route traffic to multiple services / **微服务网关** - 将流量路由到多个服务
 - **Automated SSL Management** - Centralized certificate management / **自动化SSL管理** - 集中式证书管理
-- **Development Platform** - GitOps deployment for teams / **开发平台** - 团队的 GitOps 部署
-- **Container Orchestration** - Docker-based application hosting / **容器编排** - 基于 Docker 的应用托管
 - **API Gateway** - Load balancing and security for APIs / **API 网关** - API 的负载均衡和安全
+- **Static Site Hosting** - High-performance static file serving / **静态站点托管** - 高性能静态文件服务
+- **Reverse Proxy** - Intelligent request routing / **反向代理** - 智能请求路由
 
 ---
 
@@ -194,15 +193,18 @@ git push sslcat main
 - 🌍 **GeoIP Analysis** - Attack source visualization / **GeoIP 分析** - 攻击来源可视化
 - 📊 **Advanced Analytics** - Real-time metrics and reporting / **高级分析** - 实时指标和报告
 - 🛡️ **AI Security** - GPT-4 powered threat detection / **AI 安全** - GPT-4 驱动的威胁检测
+- 🌐 **CDN Caching** - Built-in CDN with upstream cache and image optimization / **CDN 缓存** - 内置 CDN，支持上游缓存和图片优化
+- 🔒 **WAF Protection** - Web Application Firewall with custom rules / **WAF 防护** - 支持自定义规则的 Web 应用防火墙
+- 🚫 **DDoS Protection** - Advanced rate limiting and IP blocking / **DDoS 防护** - 高级限流和 IP 封禁
+- 🌍 **Cluster Deployment** - Master-slave synchronization / **集群部署** - 主从同步
 
 ---
 
 ## 📈 Roadmap / 路线图
 
-- [ ] Kubernetes integration / Kubernetes 集成
-- [ ] Multi-cluster support / 多集群支持  
+- [ ] WebSocket proxy support / WebSocket 代理支持
+- [ ] gRPC proxy support / gRPC 代理支持
 - [ ] Advanced caching strategies / 高级缓存策略
-- [ ] Plugin system / 插件系统
 - [ ] GraphQL API / GraphQL API
 
 ---
@@ -244,7 +246,6 @@ For complete documentation, please visit / 完整文档请访问：
 - [🏗️ **Architecture Overview** / **架构概览**](docs/en/getting-started/architecture.md)
 - [🔧 **Configuration Reference** / **配置参考**](docs/zh/configuration/)
 - [🔒 **Security Features** / **安全功能**](docs/zh/security/)
-- [📊 **Performance Optimization** / **性能优化**](CPU_OPTIMIZATION_COMPLETE.md)
 - [📝 **Changelog** / **更新日志**](CHANGELOG.md) - 查看所有版本变更记录
 
 ---

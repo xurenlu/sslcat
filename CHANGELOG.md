@@ -5,6 +5,75 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc1] - 2026-03-14
+
+### 🔥 重大变更 - Git Server 功能移除
+
+本版本标志项目战略方向调整：**精简为专注的 Web Server / API 网关**
+
+- **移除内置 Git Server**：删除所有内置 Git 部署服务器相关功能
+- **移除 SSH 密钥管理**：删除包装安装时的 SSH 密钥设置功能
+- **移除 Git 推送部署**：删除通过 Git 推送部署软件的功能
+
+### 🗑️ 删除的功能
+
+#### 后端删除
+- **internal/runner/git_server.go**：Git 服务器核心实现
+- **internal/web/git_server_html.go**：Git 服务器 HTML 页面生成
+- **internal/web/api_runners.go**：Git 服务器 API 路由
+- **internal/web/api_service.go**：服务管理 API
+- **internal/web/api_credential.go**：凭证管理 API
+- **internal/web/api_domain.go**：域名管理 API
+- **internal/web/api_template_deploy.go**：模板部署 API
+
+#### 前端删除
+- **frontend/src/pages/GitServerManagement/**：Git 服务器管理页面
+- **frontend/src/pages/TemplateDeploy.tsx**：模板部署页面
+- **frontend/src/hooks/useSSHKeys.ts**：SSH 密钥管理钩子
+- **frontend/src/hooks/useGitApps.ts**：Git 应用管理钩子
+- **frontend/src/hooks/useGitServerConfig.ts**：Git 服务器配置钩子
+- **frontend/src/contexts/GitServerContext.tsx**：Git 服务器上下文
+- **frontend/src/components/GitCommandToast.tsx**：Git 命令提示组件
+- **frontend/src/components/SSHKeyBindings.tsx**：SSH 密钥绑定组件
+- **frontend/src/components/DeployHistory.tsx**：部署历史组件
+
+#### 配置删除
+- **RunnerConfig.Git**：Git 服务器配置结构
+- **GitServerConfig**：Git 服务器详细配置
+- **ProxyRule.ManagedByGitDeploy**：Git 部署标记
+- **ProxyRule.GitDeployAppName**：Git 应用名称
+- **ProxyRule.GitDeployAppID**：Git 应用 ID
+
+### ✅ 保留的功能
+
+以下核心功能完全保留，继续正常工作：
+
+- **反向代理**：多上游、负载均衡、健康检查
+- **SSL/TLS**：自动申请、续期、Let's Encrypt、DNS-01 挑战
+- **静态站点**：文件服务、Try Files、目录列表
+- **PHP 站点**：FastCGI、多版本支持
+- **安全防护**：WAF、DDoS、访问控制、机器人检测
+- **CDN 缓存**：上游缓存、图片优化、WebP 转换
+- **监控统计**：访问统计、慢请求、性能分析
+- **集群部署**：主从同步、配置同步、证书同步
+- **API 网关**：请求转发、响应修改、Header 管理
+
+### 📝 升级说明
+
+如果您使用了 Git Server 功能：
+
+1. **备份应用数据**：Git 仓库目录位于 `./data/runners/git/`
+2. **迁移应用**：将应用迁移到其他部署方案（Docker、Kubernetes 等）
+3. **更新配置**：删除配置文件中的 `runners.git` 字段
+4. **重启服务**：升级后重启 sslcat 服务
+
+### 🏗️ 架构调整
+
+- **定位调整**：从"全能应用平台"调整为"专注的 Web Server / API 网关"
+- **功能聚焦**：专注于反向代理、SSL 管理、安全防护、缓存加速
+- **代码精简**：移除约 10,000+ 行 Git Server 相关代码
+- **维护性提升**：减少功能复杂度，提升系统稳定性
+
 ## [1.7.6-rc1] - 2026-03-07
 
 ### 🐛 Bug 修复

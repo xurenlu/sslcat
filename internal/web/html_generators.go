@@ -2,7 +2,6 @@ package web
 
 import (
 	"fmt"
-	"net/http"
 	"strings"
 )
 
@@ -1171,54 +1170,7 @@ func (s *Server) getConfigSSLDisableSelfSigned(data map[string]interface{}) stri
 	return ""
 }
 
-// ==================== Git Deploy Server 页面处理 ====================
-
-// handleCreateApp 处理创建应用页面
-func (s *Server) handleCreateApp(w http.ResponseWriter, r *http.Request) {
-	if !s.checkAuth(w, r) {
-		return
-	}
-
-	data := map[string]interface{}{
-		"AdminPrefix":    s.config.AdminPrefix,
-		"GitEnabled":     s.config.Runners.Git.Enabled,
-		"CreateAppTitle": s.translator.T("git_deploy_server.create_app_title"),
-		"ReturnText":     s.translator.T("git_deploy_server.return"),
-	}
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	html := s.generateCreateAppHTML(data)
-	w.Write([]byte(html))
-}
-
-// handleServerConfig 处理服务器配置页面
-func (s *Server) handleServerConfig(w http.ResponseWriter, r *http.Request) {
-	if !s.checkAuth(w, r) {
-		return
-	}
-
-	// 获取服务器配置
-	serverConfig := s.gitServer.GetServerConfig()
-
-	data := map[string]interface{}{
-		"AdminPrefix":       s.config.AdminPrefix,
-		"GitEnabled":        s.config.Runners.Git.Enabled,
-		"ServerConfig":      serverConfig,
-		"DomainSuffix":      serverConfig.DomainSuffix,
-		"ServerConfigTitle": s.translator.T("git_deploy_server.server_config_title"),
-		"ReturnText":        s.translator.T("git_deploy_server.return"),
-		"PortRange":         serverConfig.PortRange,
-		"WelcomeMessage":    serverConfig.WelcomeMessage,
-		"AutoSSL":           serverConfig.AutoSSL,
-		"SSLEmail":          s.config.SSL.Email, // 使用系统配置中的SSL邮箱
-		"AutoDomain":        serverConfig.AutoDomain,
-		"DefaultStrategy":   serverConfig.DefaultStrategy,
-	}
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	html := s.generateServerConfigHTML(data)
-	w.Write([]byte(html))
-}
+// ==================== Git Deploy Server 页面处理（已移除）====================
 
 // generateCreateAppHTML 生成创建应用页面 HTML
 func (s *Server) generateCreateAppHTML(data map[string]interface{}) string {

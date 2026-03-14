@@ -37,7 +37,6 @@ import (
 	"github.com/xurenlu/sslcat/internal/notify"
 	"github.com/xurenlu/sslcat/internal/proxy"
 	"github.com/xurenlu/sslcat/internal/report"
-	"github.com/xurenlu/sslcat/internal/runner"
 	"github.com/xurenlu/sslcat/internal/security"
 	"github.com/xurenlu/sslcat/internal/slowrequest"
 	"github.com/xurenlu/sslcat/internal/ssl"
@@ -115,8 +114,6 @@ type Server struct {
 	sessionManager *SessionManager
 	// 通知集成器
 	notificationIntegrator *notification.NotificationIntegrator
-	// Runner 模块
-	gitServer *runner.GitServer
 	// 统计收集器和API
 	statisticsCollector        *statistics.Collector
 	statisticsAPI              *StatisticsAPI
@@ -177,7 +174,7 @@ type Server struct {
 }
 
 // NewServer 创建Web服务器
-func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Manager, sslMgr *ssl.Manager, gitServer *runner.GitServer, notificationIntegrator *notification.NotificationIntegrator, version string) *Server {
+func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Manager, sslMgr *ssl.Manager, notificationIntegrator *notification.NotificationIntegrator, version string) *Server {
 	// 初始化压缩器
 	compressor := compression.NewCompressor(compression.FromConfig(cfg))
 
@@ -331,7 +328,6 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		mux:                http.NewServeMux(),
 		startTime:          time.Now(),
 		version:            version,
-		gitServer:          gitServer,
 		compressor:         compressor,
 		compressionCache:   compressionCache,
 		prometheusMetrics:  prometheusMetrics,
@@ -1613,10 +1609,7 @@ func (s *Server) setupRoutes() {
 	// Runners 管理页面路由 - 页面路由已迁移到前端SPA
 	// s.mux.HandleFunc(s.config.AdminPrefix+"/runners", s.handleRunners) // 已迁移到前端SPA
 
-	// Git Deploy Server 管理页面路由 - 页面路由已迁移到前端SPA
-	// s.mux.HandleFunc(s.config.AdminPrefix+"/git-server", s.handleGitServer) // 已迁移到前端SPA
-	s.mux.HandleFunc(s.config.AdminPrefix+"/git-server/create-app", s.handleCreateApp)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/git-server/server-config", s.handleServerConfig)
+	// Git Deploy Server 功能已移除
 
 	// Favicon 处理（同时注册根路径和AdminPrefix路径）
 	s.mux.HandleFunc("/favicon.ico", s.handleFavicon)
@@ -1641,100 +1634,8 @@ func (s *Server) setupRoutes() {
 
 // registerRunnerRoutes 注册 Runner API 路由
 func (s *Server) registerRunnerRoutes() {
-	// 创建 API 处理器，传递 webServer 引用以支持 localhost 认证豁免
-	gitAPI := NewGitServerAPI(s.gitServer, s)
-	runtimeAPI := NewRuntimeDetectorAPI(s)
-	templateBase := s.config.AdminPrefix + "/api/git-server/templates"
-	templateAPI := NewTemplateAPI(s.gitServer.GetTemplateManager(), templateBase)
-
-	// Git 服务器 API 路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/apps", gitAPI.HandleApps) // GET: 列表, POST: 创建
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app", gitAPI.GetApp)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/create", gitAPI.CreateApp) // 保留兼容性
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/delete", gitAPI.DeleteApp)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/env", gitAPI.UpdateAppEnv)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/routing", gitAPI.UpdateAppRouting)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/redeploy", gitAPI.RedeployApp)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/reinstall-hooks", gitAPI.ReinstallHooks)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/apps/", gitAPI.HandleAppAction) // 支持 /apps/{name}/deploy 等
-
-	// 服务器配置 API 路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/config", gitAPI.HandleServerConfig)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/config/update", gitAPI.UpdateServerConfig)
-
-	// SSH 密钥管理 API 路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/ssh-keys", gitAPI.HandleSSHKeys)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/ssh-key/add", gitAPI.AddSSHKey)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/ssh-key/remove", gitAPI.RemoveSSHKey)
-
-	// 推送历史和密钥绑定 API 路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/push-history", gitAPI.GetPushHistory)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/bind-key", gitAPI.BindKeyToApp)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/unbind-key", gitAPI.UnbindKeyFromApp)
-
-	// 日志查看 API 路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/logs", gitAPI.GetAppLogs)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/log-files", gitAPI.GetAppLogFiles)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/logs/stream", gitAPI.GetAppLogsStream)      // SSE
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/logs/stream-ws", gitAPI.GetAppLogsStreamWS) // WebSocket
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/logs/history", gitAPI.GetAppLogsHistory)
-
-	// SSH 服务管理 API 路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/restart-sshd", gitAPI.RestartSSHD)
-
-	if templateAPI != nil {
-		s.mux.HandleFunc(templateBase, templateAPI.HandleTemplates)
-		s.mux.HandleFunc(templateBase+"/reload", templateAPI.HandleTemplateReload)
-		s.mux.HandleFunc(templateBase+"/", templateAPI.HandleTemplateDetail)
-	}
-
-	// 模板部署 API 路由
-	if s.gitServer != nil && s.gitServer.GetDeployOrchestrator() != nil {
-		templateDeployAPI := NewTemplateDeployAPI(s.gitServer, s.log.Logger)
-		s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/templates/deploy", templateDeployAPI.DeployFromTemplate)
-		s.log.Info("模板部署 API 路由已注册")
-	} else {
-		s.log.Warn("GitServer 或 DeployOrchestrator 未启用，模板部署 API 路由未注册")
-	}
-
-	// 域名管理 API 路由
-	if s.gitServer != nil {
-		domainAPI := NewDomainAPI(s.gitServer, s.log.Logger)
-		s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/domains/add", domainAPI.AddDomain)
-		s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/domains/remove", domainAPI.RemoveDomain)
-		s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/domains", domainAPI.GetDomains)
-		s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/domains/verify-dns", domainAPI.VerifyDNS)
-		s.log.Info("域名管理 API 路由已注册")
-	}
-
-	// 服务管理 API 路由
-	if s.gitServer != nil {
-		serviceAPI := NewServiceAPI(s.gitServer, s.log.Logger)
-		s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/services/status", serviceAPI.GetServiceStatus)
-		s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/services/restart", serviceAPI.RestartService)
-		s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/services/stop", serviceAPI.StopService)
-		s.log.Info("服务管理 API 路由已注册")
-	}
-
-	// 凭证管理 API 路由
-	if s.gitServer != nil {
-		credentialAPI := NewCredentialAPI(s.gitServer, s.log.Logger)
-		s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/credentials", credentialAPI.GetCredentials)
-		s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/credentials/regenerate", credentialAPI.RegenerateCredential)
-		s.log.Info("凭证管理 API 路由已注册")
-	}
-
-	// Docker Registry API 路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/docker/images", gitAPI.GetDockerImages)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/docker/config", gitAPI.GetDockerConfig)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/docker/config/update", gitAPI.UpdateDockerConfig)
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/docker/test", gitAPI.TestDockerConnection)
-
-	// 部署通知 API 路由（内部使用，由 Git hooks 调用）
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/internal/deploy-notification", gitAPI.HandleDeployNotification)
-
-	// 运行时检测 API 路由
-	s.mux.HandleFunc(s.config.AdminPrefix+"/api/runtime-detector/detect", runtimeAPI.DetectProject)
+	// Git Server 功能已移除
+	// 运行时检测 API 路由（已移除，不再需要）
 }
 
 // ServeHTTP 实现http.Handler接口

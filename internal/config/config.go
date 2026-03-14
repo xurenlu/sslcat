@@ -286,11 +286,6 @@ type ProxyRule struct {
 	UpstreamRequestHeaders map[string]string `json:"upstream_request_headers,omitempty"`
 	ResponseHeaders        map[string]string `json:"response_headers,omitempty"`
 
-	// Git部署服务标记
-	ManagedByGitDeploy bool   `json:"managed_by_git_deploy"` // 是否由Git部署服务管理
-	GitDeployAppName   string `json:"git_deploy_app_name"`   // 关联的Git应用名称
-	GitDeployAppID     string `json:"git_deploy_app_id"`     // 关联的Git应用ID
-
 	// 机器人检测配置
 	BotDetectionEnabled bool                `json:"bot_detection_enabled"`          // 是否启用机器人检测
 	BotDetectionConfig  *BotDetectionConfig `json:"bot_detection_config,omitempty"` // 机器人检测配置
@@ -934,25 +929,8 @@ type LogConfig struct {
 	MaxFiles int `json:"max_files"`
 }
 
-// RunnerConfig Runner 配置
+// RunnerConfig Runner 配置（Git Server 功能已移除）
 type RunnerConfig struct {
-	// Git 服务器配置
-	Git GitServerConfig `json:"git"`
-}
-
-// GitServerConfig Git 服务器配置
-type GitServerConfig struct {
-	Enabled bool `json:"enabled"`
-	// Git 仓库目录
-	ReposDir string `json:"repos_dir"`
-	// 最大并发克隆数
-	MaxConcurrent int `json:"max_concurrent"`
-	// 克隆超时时间（秒）
-	CloneTimeout int `json:"clone_timeout"`
-	// 自动清理仓库
-	AutoCleanup bool `json:"auto_cleanup"`
-	// 清理间隔（秒）
-	CleanupInterval int `json:"cleanup_interval"`
 }
 
 // Load 加载配置文件
@@ -1082,16 +1060,7 @@ func Load(configFile string) (*Config, error) {
 		},
 		StaticSites: []StaticSite{},
 		PHPSites:    []PHPSite{},
-		Runners: RunnerConfig{
-			Git: GitServerConfig{
-				Enabled:         false,
-				ReposDir:        "./data/runners/git",
-				MaxConcurrent:   3,
-				CloneTimeout:    300, // 5分钟
-				AutoCleanup:     true,
-				CleanupInterval: 7200, // 2小时
-			},
-		},
+		Runners: RunnerConfig{},
 		UpstreamCache: UpstreamCacheConfig{
 			Enabled:         false, // 默认禁用，减少内存占用
 			CacheDir:        "./data/upstream-cache",
@@ -1648,16 +1617,7 @@ func getDefaultConfig() *Config {
 		},
 		StaticSites: []StaticSite{},
 		PHPSites:    []PHPSite{},
-		Runners: RunnerConfig{
-			Git: GitServerConfig{
-				Enabled:         false,
-				ReposDir:        "./data/runners/git",
-				MaxConcurrent:   3,
-				CloneTimeout:    300,
-				AutoCleanup:     true,
-				CleanupInterval: 7200,
-			},
-		},
+		Runners:     RunnerConfig{},
 		UpstreamCache: UpstreamCacheConfig{
 			Enabled:         true,
 			CacheDir:        "./data/upstream-cache",

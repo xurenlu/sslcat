@@ -21,13 +21,11 @@ import (
 	"github.com/xurenlu/sslcat/internal/cache"
 	"github.com/xurenlu/sslcat/internal/cli"
 	"github.com/xurenlu/sslcat/internal/config"
-	"github.com/xurenlu/sslcat/internal/i18n"
 	"github.com/xurenlu/sslcat/internal/logger"
 	"github.com/xurenlu/sslcat/internal/monitor"
 	"github.com/xurenlu/sslcat/internal/notification"
 	"github.com/xurenlu/sslcat/internal/proxy"
 	"github.com/xurenlu/sslcat/internal/report"
-	"github.com/xurenlu/sslcat/internal/runner"
 	"github.com/xurenlu/sslcat/internal/security"
 	"github.com/xurenlu/sslcat/internal/ssl"
 	"github.com/xurenlu/sslcat/internal/threatintel"
@@ -39,7 +37,7 @@ import (
 )
 
 var (
-	version = "1.7.6-rc1"
+	version = "2.0.0-rc1"
 	build   = "dev"
 )
 
@@ -354,16 +352,7 @@ func main() {
 	cdnCache.StartCleaner()
 	proxyManager := proxy.NewManager(cfg, sslManager, securityManager, cdnCache, version)
 
-	// 初始化翻译器
-	translator := i18n.NewTranslator(i18n.LangZhCN, "i18n")
-
-	// 初始化 Runner 模块
-	gitServer := runner.NewGitServer(cfg, translator)
-
-	// 注入 SSL Manager 到 Git Server（用于自动申请证书）
-	gitServer.SetSSLManager(sslManager)
-
-	webServer := web.NewServer(cfg, proxyManager, securityManager, sslManager, gitServer, notificationIntegrator, version)
+	webServer := web.NewServer(cfg, proxyManager, securityManager, sslManager, notificationIntegrator, version)
 
 	// 将威胁情报管理器链接到 Web 服务器
 	webServer.SetThreatIntelManager(threatIntelManager)
@@ -456,11 +445,6 @@ func main() {
 
 	// 启动威胁情报管理器
 	threatIntelManager.Start()
-
-	// 启动 Runner 模块
-	if err := gitServer.Start(); err != nil {
-		log.Warnf("启动 Git 服务器失败: %v", err)
-	}
 
 	// 注册 TLS ClientHello 指纹回调
 	sslManager.SetOnClientHello(func(hello *tls.ClientHelloInfo) {
@@ -577,9 +561,6 @@ func main() {
 
 	// 停止威胁情报管理器
 	threatIntelManager.Stop()
-
-	// 停止 Runner 模块
-	gitServer.Stop()
 
 	// 停止报告调度器
 	if reportScheduler != nil {

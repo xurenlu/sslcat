@@ -18,7 +18,11 @@
       "Bash(git status:*)",
       "Bash(grep:*)",
       "Bash(cat:*)",
-      "Bash(ab:*)"
+      "Bash(ab:*)",
+      "Bash(go test:*)",
+      "Bash(curl:*)",
+      "Bash(lsof:*)",
+      "Bash(timeout:*)"
     ],
     "deny": [],
     "ask": []

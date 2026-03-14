@@ -156,7 +156,6 @@ const SidebarContent = () => {
       items: [
         { name: t.navigation.cdnCache, icon: FiHardDrive, path: buildPath(adminPrefix, '/cdn'), keywords: 'cache speed cdn 缓存 加速' },
         { name: t.navigation.imageOptimization, icon: FiImage, path: buildPath(adminPrefix, '/image-optimization'), keywords: 'webp compression resize 图片 压缩' },
-        { name: t.navigation.gitServer, icon: FiGitBranch, path: buildPath(adminPrefix, '/git-server'), keywords: 'deploy auto ci/cd 部署 自动化' },
         { name: t.sidebar.templateMarket, icon: FiPackage, path: buildPath(adminPrefix, '/templates'), keywords: 'market apps docker 模板 应用' },
       ]
     },

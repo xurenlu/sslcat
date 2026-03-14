@@ -20,7 +20,6 @@ import SitesManagement from './pages/SitesManagement'
 import StaticSiteEdit from './pages/StaticSiteEdit'
 import PHPSiteEdit from './pages/PHPSiteEdit'
 import DNSManagement from './pages/DNSManagement'
-import GitServerManagement from './pages/GitServerManagement'
 import UserManagement from './pages/UserManagement'
 import ChangePassword from './pages/ChangePassword'
 import CDNManagement from './pages/CDNManagement'
@@ -33,7 +32,6 @@ import ClusterSettings from './pages/ClusterSettings'
 import Monitoring from './pages/Monitoring'
 import ClusterStatus from './pages/ClusterStatus'
 import TemplateMarket from './pages/TemplateMarket'
-import TemplateDeploy from './pages/TemplateDeploy'
 import BlockManagement from './pages/BlockManagement'
 import ConfigHistory from './pages/ConfigHistory'
 import AIAnalytics from './pages/AIAnalytics'
@@ -193,24 +191,10 @@ const AppRoutes: React.FC = () => {
           </LayoutRoute>
         </AuthGuard>
       } />
-      <Route path={`${adminPrefix}/git-server`} element={
-        <AuthGuard>
-          <LayoutRoute>
-            <GitServerManagement />
-          </LayoutRoute>
-        </AuthGuard>
-      } />
       <Route path={`${adminPrefix}/templates`} element={
         <AuthGuard>
           <LayoutRoute>
             <TemplateMarket />
-          </LayoutRoute>
-        </AuthGuard>
-      } />
-      <Route path={`${adminPrefix}/templates/deploy/:templateId`} element={
-        <AuthGuard>
-          <LayoutRoute>
-            <TemplateDeploy />
           </LayoutRoute>
         </AuthGuard>
       } />
