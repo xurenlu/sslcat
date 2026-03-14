@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.6-rc2] - 2026-03-15
+
+### 🐛 Bug 修复
+
+- **修复 Git 应用部署"假成功"问题**：
+  - `startAppProcessWithLogging` 从桩实现改为真正的 Docker 容器启动逻辑
+  - 新增自动生成 Dockerfile 功能，支持 Ruby/Node.js/Python/Go 等多种应用类型
+  - 实现端口自动分配和蓝绿部署，确保新容器启动后再停止旧容器
+  - 添加容器健康检查，等待容器就绪后才标记部署成功
+  - 修复 `stopApp` 函数，正确停止并删除 Docker 容器并释放端口
+
 ## [1.7.6-rc1] - 2026-03-07
 
 ### 🐛 Bug 修复

@@ -349,6 +349,12 @@ type AppDeployConfig struct {
 	// 域名配置
 	Domains []string `json:"domains,omitempty"`
 
+	// Docker 容器配置
+	ContainerName string `json:"container_name,omitempty"`
+	ContainerID   string `json:"container_id,omitempty"`
+	Port          int    `json:"port,omitempty"`
+	ImageName     string `json:"image_name,omitempty"`
+
 	// SSL 配置
 	SSL SSLConfig `json:"ssl"`
 
@@ -1883,16 +1889,110 @@ func (gs *GitServer) startGoAppWithLogging(app *GitApp, deployLogger *DeployLogg
 
 // startAppProcessWithLogging 启动应用进程（带日志）
 func (gs *GitServer) startAppProcessWithLogging(app *GitApp, command string, deployLogger *DeployLogger) error {
-	// 这里应该实现完整的进程管理
-	// 当前简化实现：记录启动信息
+	deployLogger.WriteLog("info", "docker", "开始启动应用容器...")
 
+	// 为新容器分配一个临时端口
+	newPort, err := gs.allocatePort()
+	if err != nil {
+		return fmt.Errorf("无法分配新端口: %w", err)
+	}
+	deployLogger.WriteLog("info", "docker", fmt.Sprintf("分配端口: %d", newPort))
+
+	// 生成新容器名称（带时间戳）
+	timestamp := time.Now().Unix()
+	newContainerName := fmt.Sprintf("sslcat-%s-%d", app.Name, timestamp)
+	deployLogger.WriteLog("info", "docker", fmt.Sprintf("容器名称: %s", newContainerName))
+
+	// 构建镜像名称（如果还没有）
+	imageName := app.DockerImage
+	if imageName == "" {
+		imageName = fmt.Sprintf("sslcat-%s:latest", app.Name)
+		// 如果镜像不存在，需要先构建
+		deployLogger.WriteLog("info", "docker", "构建Docker镜像...")
+		if err := gs.buildDockerImageForApp(app, imageName, deployLogger); err != nil {
+			gs.releasePort(newPort)
+			return fmt.Errorf("构建Docker镜像失败: %w", err)
+		}
+		deployLogger.WriteLog("info", "docker", fmt.Sprintf("镜像构建完成: %s", imageName))
+	}
+
+	// 获取应用内部端口（默认为构建器的默认端口）
+	internalPort := 3000
+	if gs.builderRegistry != nil {
+		if builder, err := gs.builderRegistry.GetBuilder(app.AppType); err == nil {
+			internalPort = builder.GetDefaultPort()
+		}
+	}
+
+	// 启动新容器
+	deployLogger.WriteLog("info", "docker", fmt.Sprintf("启动容器: docker run -d --name %s -p %d:%d %s",
+		newContainerName, newPort, internalPort, imageName))
+
+	runCmd := exec.Command("docker", "run", "-d",
+		"--name", newContainerName,
+		"-p", fmt.Sprintf("%d:%d", newPort, internalPort),
+		"--restart", "unless-stopped",
+		imageName)
+	if output, err := runCmd.CombinedOutput(); err != nil {
+		gs.releasePort(newPort)
+		errMsg := fmt.Sprintf("启动新容器失败: %v, 输出: %s", err, string(output))
+		deployLogger.WriteLog("error", "docker", errMsg)
+		return fmt.Errorf("启动新容器失败: %w", err)
+	}
+
+	deployLogger.WriteLog("info", "docker", fmt.Sprintf("容器已启动: %s, 端口: %d", newContainerName, newPort))
+
+	// 获取容器ID
+	getIDCmd := exec.Command("docker", "inspect", "-f", "{{.Id}}", newContainerName)
+	containerIDBytes, err := getIDCmd.Output()
+	if err != nil {
+		deployLogger.WriteLog("error", "docker", fmt.Sprintf("获取容器ID失败: %v", err))
+		// 容器已启动但获取ID失败，尝试清理
+		gs.stopContainer(newContainerName)
+		gs.releasePort(newPort)
+		return fmt.Errorf("获取容器ID失败: %w", err)
+	}
+	newContainerID := strings.TrimSpace(string(containerIDBytes))
+	deployLogger.WriteLog("info", "docker", fmt.Sprintf("容器ID: %s", newContainerID))
+
+	// 健康检查：等待容器启动
+	deployLogger.WriteLog("info", "docker", "等待容器就绪...")
+	if err := gs.waitForContainerReady(newContainerID, 30*time.Second, deployLogger); err != nil {
+		deployLogger.WriteLog("warn", "docker", fmt.Sprintf("容器健康检查失败: %v", err))
+		// 健康检查失败不阻止部署，只记录警告
+	}
+
+	// 蓝绿部署：先停掉旧容器
+	oldContainerName := ""
+	if app.DeployConfig != nil && app.DeployConfig.ContainerName != "" {
+		oldContainerName = app.DeployConfig.ContainerName
+		deployLogger.WriteLog("info", "docker", fmt.Sprintf("停止旧容器: %s", oldContainerName))
+		if err := gs.stopContainer(oldContainerName); err != nil {
+			deployLogger.WriteLog("warn", "docker", fmt.Sprintf("停止旧容器失败: %v", err))
+		}
+		// 释放旧端口
+		if app.DeployConfig.Port > 0 {
+			gs.releasePort(app.DeployConfig.Port)
+		}
+	}
+
+	// 更新应用配置
 	gs.mutex.Lock()
+	if app.DeployConfig == nil {
+		app.DeployConfig = &AppDeployConfig{}
+	}
+	app.DeployConfig.ContainerName = newContainerName
+	app.DeployConfig.ContainerID = newContainerID
+	app.DeployConfig.Port = newPort
+	app.DeployConfig.ImageName = imageName
 	app.Status = "running"
 	app.StartCommand = command
+	app.Port = newPort
 	gs.mutex.Unlock()
 
-	deployLogger.WriteLog("info", "process", fmt.Sprintf("应用进程已启动: %s", command))
-	gs.logger.Infof("应用 %s 已启动，命令: %s", app.Name, command)
+	deployLogger.WriteLog("info", "process", fmt.Sprintf("应用进程已启动: %s (容器: %s, 端口: %d)", command, newContainerName, newPort))
+	deployLogger.WriteLog("success", "docker", "应用部署完成")
+	gs.logger.Infof("应用 %s 已启动，容器: %s, 端口: %d", app.Name, newContainerName, newPort)
 
 	return nil
 }
@@ -2049,21 +2149,40 @@ func (gs *GitServer) generateGitURL(appName string) string {
 
 // stopApp 停止应用
 func (gs *GitServer) stopApp(app *GitApp) error {
-	// 根据应用类型停止应用
-	switch app.AppType {
-	case "docker":
-		containerName := fmt.Sprintf("sslcat-%s", app.Name)
-		gs.runCommand("", "docker", "stop", containerName)
-		gs.runCommand("", "docker", "rm", containerName)
-	default:
-		// 其他类型的应用停止逻辑
-		gs.logger.Infof("停止应用: %s", app.Name)
+	gs.logger.Infof("停止应用: %s", app.Name)
+
+	// 停止并删除 Docker 容器
+	if app.DeployConfig != nil && app.DeployConfig.ContainerName != "" {
+		gs.logger.Infof("停止容器: %s", app.DeployConfig.ContainerName)
+		if err := gs.stopContainer(app.DeployConfig.ContainerName); err != nil {
+			gs.logger.Warnf("停止容器失败: %v", err)
+		}
+
+		// 释放端口
+		if app.DeployConfig.Port > 0 {
+			gs.releasePort(app.DeployConfig.Port)
+		}
+
+		// 清除容器信息
+		gs.mutex.Lock()
+		app.DeployConfig.ContainerName = ""
+		app.DeployConfig.ContainerID = ""
+		app.DeployConfig.Port = 0
+		gs.mutex.Unlock()
+	}
+
+	// 移除代理规则
+	if app.Domain != "" {
+		if err := gs.removeProxyRuleForApp(app); err != nil {
+			gs.logger.Warnf("移除应用 %s 的代理规则失败: %v", app.Name, err)
+		}
 	}
 
 	gs.mutex.Lock()
 	app.Status = "idle"
 	gs.mutex.Unlock()
 
+	gs.logger.Infof("应用 %s 已停止", app.Name)
 	return nil
 }
 
@@ -4113,19 +4232,31 @@ func (gs *GitServer) initGitRepo(app *GitApp) error {
 	}
 
 	// 设置 git 用户所有权（如果 git 用户存在）
-	if gs.uid > 0 && gs.gid > 0 {
-		gs.logger.Debugf("设置 Git 仓库所有者为 git 用户 (uid:%d, gid:%d)", gs.uid, gs.gid)
+	uid, gid := gs.uid, gs.gid
+	if uid <= 0 || gid <= 0 {
+		// 如果 uid/gid 未初始化，尝试查找 git 用户
+		if gitUser, err := user.Lookup(gs.sshUser); err == nil {
+			uid, _ = strconv.Atoi(gitUser.Uid)
+			gid, _ = strconv.Atoi(gitUser.Gid)
+			gs.logger.Debugf("动态查找 git 用户: uid=%d, gid=%d", uid, gid)
+		} else {
+			gs.logger.Warnf("无法查找 git 用户: %v，文件所有者将是 root", err)
+		}
+	}
+
+	if uid > 0 && gid > 0 {
+		gs.logger.Debugf("设置 Git 仓库所有者为 git 用户 (uid:%d, gid:%d)", uid, gid)
 
 		// 递归设置整个应用目录的所有者
 		// 使用 chown -R 命令会更高效
-		cmd = exec.Command("chown", "-R", fmt.Sprintf("%d:%d", gs.uid, gs.gid), filepath.Dir(app.GitPath))
+		cmd = exec.Command("chown", "-R", fmt.Sprintf("%d:%d", uid, gid), filepath.Dir(app.GitPath))
 		if output, err := cmd.CombinedOutput(); err != nil {
 			gs.logger.Warnf("设置 Git 仓库所有者失败: %v, output: %s", err, string(output))
 		} else {
 			gs.logger.Infof("✓ Git 仓库所有者已设置为 git 用户")
 		}
 	} else {
-		gs.logger.Warnf("未找到 git 用户，跳过所有者设置（文件所有者将是当前运行用户）")
+		gs.logger.Warn("未找到 git 用户，跳过所有者设置（文件所有者将是当前运行用户）")
 	}
 
 	return nil
@@ -4166,11 +4297,27 @@ func (gs *GitServer) createGitSymlink(app *GitApp) error {
 	}
 
 	// 设置符号链接的所有者为 git 用户
-	if gs.uid > 0 && gs.gid > 0 {
-		// Lchown 修改符号链接本身的所有者，而不是目标文件
-		if err := os.Lchown(symlinkPath, gs.uid, gs.gid); err != nil {
-			gs.logger.Warnf("设置符号链接所有者失败: %v", err)
+	uid, gid := gs.uid, gs.gid
+	if uid <= 0 || gid <= 0 {
+		// 如果 uid/gid 未初始化，尝试查找 git 用户
+		if gitUser, err := user.Lookup(gs.sshUser); err == nil {
+			uid, _ = strconv.Atoi(gitUser.Uid)
+			gid, _ = strconv.Atoi(gitUser.Gid)
+			gs.logger.Debugf("动态查找 git 用户: uid=%d, gid=%d", uid, gid)
+		} else {
+			gs.logger.Warnf("无法查找 git 用户: %v，符号链接所有者将是 root", err)
 		}
+	}
+
+	if uid > 0 && gid > 0 {
+		// Lchown 修改符号链接本身的所有者，而不是目标文件
+		if err := os.Lchown(symlinkPath, uid, gid); err != nil {
+			gs.logger.Warnf("设置符号链接所有者失败: %v", err)
+		} else {
+			gs.logger.Debugf("✓ 符号链接所有者已设置为 %d:%d", uid, gid)
+		}
+	} else {
+		gs.logger.Warn("未设置符号链接所有者，符号链接可能以 root 身份运行")
 	}
 
 	gs.logger.Infof("Git SSH 符号链接已创建: %s -> %s", symlinkPath, targetPath)
@@ -5023,6 +5170,197 @@ func (gs *GitServer) BlueGreenDeploy(app *GitApp, newContainerID string, newPort
 	}
 
 	return nil
+}
+
+// buildDockerImageForApp 为应用构建 Docker 镜像
+func (gs *GitServer) buildDockerImageForApp(app *GitApp, imageName string, deployLogger *DeployLogger) error {
+	// 生成 Dockerfile
+	dockerfile, err := gs.generateDockerfileForApp(app)
+	if err != nil {
+		return fmt.Errorf("生成 Dockerfile 失败: %w", err)
+	}
+
+	// 写入 Dockerfile
+	dockerfilePath := filepath.Join(app.GitPath, "Dockerfile")
+	if err := os.WriteFile(dockerfilePath, []byte(dockerfile), 0644); err != nil {
+		return fmt.Errorf("写入 Dockerfile 失败: %w", err)
+	}
+	deployLogger.WriteLog("info", "docker", "Dockerfile 已生成")
+
+	// 构建镜像
+	deployLogger.WriteLog("info", "docker", fmt.Sprintf("开始构建镜像: %s", imageName))
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "docker", "build", "-t", imageName, app.GitPath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("docker build 失败: %w, 输出: %s", err, string(output))
+	}
+
+	// 保存镜像名称
+	gs.mutex.Lock()
+	app.DockerImage = imageName
+	gs.mutex.Unlock()
+
+	deployLogger.WriteLog("info", "docker", fmt.Sprintf("镜像构建成功: %s", imageName))
+	return nil
+}
+
+// generateDockerfileForApp 为应用生成 Dockerfile
+func (gs *GitServer) generateDockerfileForApp(app *GitApp) (string, error) {
+	switch app.AppType {
+	case "ruby":
+		return gs.generateRubyDockerfile(app)
+	case "nodejs":
+		return gs.generateNodeJSDockerfile(app)
+	case "python":
+		return gs.generatePythonDockerfile(app)
+	case "go":
+		return gs.generateGoDockerfile(app)
+	default:
+		// 默认使用通用 Dockerfile
+		return fmt.Sprintf(`FROM alpine:latest
+WORKDIR /app
+COPY . .
+RUN apk add --no-cache ca-certificates
+EXPOSE 3000
+CMD ["sh", "-c", "%s"]
+`, app.StartCommand), nil
+	}
+}
+
+// generateRubyDockerfile 生成 Ruby 应用的 Dockerfile
+func (gs *GitServer) generateRubyDockerfile(app *GitApp) (string, error) {
+	dockerfile := `FROM ruby:3.2-alpine
+
+WORKDIR /app
+
+# 安装系统依赖
+RUN apk add --no-cache \
+    build-base \
+    postgresql-dev \
+    mysql-dev \
+    sqlite-dev \
+    nodejs \
+    yarn \
+    tzdata
+
+# 复制 Gemfile 并安装依赖
+COPY Gemfile* ./
+RUN bundle install --deployment --without development test
+
+# 复制应用代码
+COPY . .
+
+# 创建日志目录
+RUN mkdir -p log tmp
+
+# 暴露端口
+EXPOSE 3000
+
+# 启动应用
+CMD ["bundle", "exec", "ruby", "app.rb"]
+`
+	return dockerfile, nil
+}
+
+// generateNodeJSDockerfile 生成 Node.js 应用的 Dockerfile
+func (gs *GitServer) generateNodeJSDockerfile(app *GitApp) (string, error) {
+	dockerfile := `FROM node:18-alpine
+
+WORKDIR /app
+
+# 复制 package.json 并安装依赖
+COPY package*.json ./
+RUN npm ci --only=production
+
+# 复制应用代码
+COPY . .
+
+# 暴露端口
+EXPOSE 3000
+
+# 启动应用
+CMD ["npm", "start"]
+`
+	return dockerfile, nil
+}
+
+// generatePythonDockerfile 生成 Python 应用的 Dockerfile
+func (gs *GitServer) generatePythonDockerfile(app *GitApp) (string, error) {
+	dockerfile := `FROM python:3.11-slim
+
+WORKDIR /app
+
+# 安装系统依赖
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# 复制 requirements.txt 并安装依赖
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 复制应用代码
+COPY . .
+
+# 暴露端口
+EXPOSE 8000
+
+# 启动应用
+CMD ["python", "app.py"]
+`
+	return dockerfile, nil
+}
+
+// generateGoDockerfile 生成 Go 应用的 Dockerfile
+func (gs *GitServer) generateGoDockerfile(app *GitApp) (string, error) {
+	dockerfile := `FROM golang:1.21-alpine AS builder
+
+WORKDIR /app
+COPY . .
+RUN go build -o app .
+
+FROM alpine:latest
+WORKDIR /app
+COPY --from=builder /app/app .
+EXPOSE 8080
+CMD ["./app"]
+`
+	return dockerfile, nil
+}
+
+// waitForContainerReady 等待容器就绪
+func (gs *GitServer) waitForContainerReady(containerID string, timeout time.Duration, deployLogger *DeployLogger) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	// 先等待容器启动
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	startTime := time.Now()
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("等待容器就绪超时")
+		case <-ticker.C:
+			// 检查容器状态
+			cmd := exec.Command("docker", "inspect", "-f", "{{.State.Status}}", containerID)
+			output, err := cmd.Output()
+			if err != nil {
+				continue
+			}
+			status := strings.TrimSpace(string(output))
+			if status == "running" {
+				// 容器已运行，再做简单检查
+				deployLogger.WriteLog("info", "docker", fmt.Sprintf("容器已就绪 (耗时: %s)", time.Since(startTime).Round(time.Millisecond)))
+				return nil
+			}
+		}
+	}
 }
 
 // stopContainer 停止容器

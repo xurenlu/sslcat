@@ -93,10 +93,10 @@ REPOS_DIR="${DETECTED_REPOS_DIR:-/opt/sslcat/data/runners/git}"
 # 智能构建 API URL
 # 当端口为 443 时，使用 HTTP (80) 进行 API 调用，因为 443 是 HTTPS 端口
 if [[ "$SERVER_PORT" == "443" ]]; then
-    API_URL="http://localhost:80${ADMIN_PREFIX}"
+    API_URL="http://127.0.0.1:80${ADMIN_PREFIX}"
     echo "  ⚠️  检测到端口 443，使用 HTTP (80) 进行 API 调用"
 else
-    API_URL="http://localhost:${SERVER_PORT}${ADMIN_PREFIX}"
+    API_URL="http://127.0.0.1:${SERVER_PORT}${ADMIN_PREFIX}"
 fi
 
 echo "  检测到的配置："
@@ -156,14 +156,14 @@ echo ""
 echo "📝 配置说明："
 echo ""
 echo "可以通过以下环境变量自定义配置："
-echo "  SSLCAT_API_URL     - SSLcat API 地址（默认: http://localhost/sslcat-panel）"
+echo "  SSLCAT_API_URL     - SSLcat API 地址（默认: http://127.0.0.1/sslcat-panel）"
 echo "  SSLCAT_REPOS_DIR   - Git 仓库目录（默认: /opt/sslcat/data/runners/git）"
 echo ""
 echo "要设置环境变量，编辑 git 用户的配置："
 echo "  sudo -u git nano ~/.bashrc"
 echo ""
 echo "添加："
-echo "  export SSLCAT_API_URL='http://localhost/sslcat-panel'"
+echo "  export SSLCAT_API_URL='http://127.0.0.1/sslcat-panel'"
 echo "  export SSLCAT_REPOS_DIR='/opt/sslcat/data/runners/git'"
 echo ""
 
