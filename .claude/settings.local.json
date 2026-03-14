@@ -18,7 +18,12 @@
       "Bash(git status:*)",
       "Bash(grep:*)",
       "Bash(cat:*)",
-      "Bash(ab:*)"
+      "Bash(ab:*)",
+      "Bash(git branch:*)",
+      "Bash(git remote:*)",
+      "Bash(git config:*)",
+      "Bash(ssh-add:*)",
+      "Bash(GIT_SSH_COMMAND=\"ssh -o IdentitiesOnly=yes -i ~/.ssh/id_rsa\" git push:*)"
     ],
     "deny": [],
     "ask": []

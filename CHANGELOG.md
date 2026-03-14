@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.6-rc3] - 2026-03-15
+
+### 🐛 Bug 修复
+
+- **修复 IPv6 localhost 认证绕过检测失败问题**：
+  - `isLocalhostRequest` 函数未能正确处理 IPv6 地址 `[::1]`（带方括号）
+  - 导致 sslcat-git-hook 等 localhost 工具的 API 调用被错误要求认证
+  - 修复后正确去除 IPv6 地址的方括号，支持 `127.0.0.1`、`::1`、`localhost` 等多种格式
+
 ## [1.7.6-rc2] - 2026-03-15
 
 ### 🐛 Bug 修复

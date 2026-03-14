@@ -2555,14 +2555,22 @@ func (s *Server) isLocalhostRequest(r *http.Request) bool {
 	// 使用 RemoteAddr 获取真实的 TCP 连接来源
 	// 这个值无法通过 HTTP 头部伪造
 	remoteAddr := r.RemoteAddr
+
+	// 去除端口号
+	// IPv4: "127.0.0.1:8080" -> "127.0.0.1"
+	// IPv6: "[::1]:8080" -> "::1" 或 "[::1]" -> "::1"
 	if idx := strings.LastIndex(remoteAddr, ":"); idx != -1 {
 		remoteAddr = remoteAddr[:idx]
 	}
+
+	// 去除 IPv6 地址的方括号
+	remoteAddr = strings.Trim(remoteAddr, "[]")
 
 	// 检查是否是 localhost
 	// 支持 IPv4 的 127.0.0.1 和 IPv6 的 ::1
 	if remoteAddr == "127.0.0.1" ||
 		remoteAddr == "::1" ||
+		remoteAddr == "localhost" ||
 		strings.HasPrefix(remoteAddr, "127.") {
 		return true
 	}
