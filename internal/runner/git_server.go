@@ -921,6 +921,10 @@ func (gs *GitServer) CreateApp(appName string, autoSSL bool) (*GitApp, error) {
 	gs.logger.Infof("  ✓ %s", gs.translator.T("git_server.logs_dir_created"))
 
 	// 创建应用对象
+	// 初始化环境变量，设置默认 PORT=8080
+	envVars := make(map[string]string)
+	envVars["PORT"] = "8080"
+
 	app := &GitApp{
 		Name:        appName,
 		DisplayName: appName,
@@ -934,7 +938,7 @@ func (gs *GitServer) CreateApp(appName string, autoSSL bool) (*GitApp, error) {
 		Status:      "idle",
 		LogsDir:     logsDir,
 		CurrentLog:  filepath.Join(logsDir, fmt.Sprintf("deploy-%s.log", time.Now().Format("2006-01-02"))),
-		EnvVars:     make(map[string]string),
+		EnvVars:     envVars,
 		DeployConfig: &AppDeployConfig{
 			Strategy: gs.serverConfig.DefaultStrategy,
 			SSL: SSLConfig{
@@ -1918,27 +1922,35 @@ func (gs *GitServer) startAppProcessWithLogging(app *GitApp, command string, dep
 	}
 
 	// 获取应用内部端口
-	// 优先级: 1. 已配置的内部端口 > 2. 从 Dockerfile 检测 > 3. 构建器默认端口 > 4. 默认 3000
-	internalPort := 3000
+	// 优先级: 1. 应用环境变量 PORT > 2. 已配置的内部端口 > 3. 从 Dockerfile 检测 > 4. 构建器默认端口 > 5. 默认 8080
+	internalPort := 8080
 
-	// 1. 检查是否已配置内部端口
-	if app.DeployConfig != nil && app.DeployConfig.InternalPort > 0 {
+	// 1. 优先检查应用环境变量中的 PORT
+	if portStr, exists := app.EnvVars["PORT"]; exists {
+		if port, err := strconv.Atoi(portStr); err == nil && port > 0 {
+			internalPort = port
+			deployLogger.WriteLog("info", "docker", fmt.Sprintf("使用应用环境变量 PORT: %d", internalPort))
+		}
+	} else if app.DeployConfig != nil && app.DeployConfig.InternalPort > 0 {
+		// 2. 检查是否已配置内部端口
 		internalPort = app.DeployConfig.InternalPort
 		deployLogger.WriteLog("info", "docker", fmt.Sprintf("使用已配置的内部端口: %d", internalPort))
 	} else if app.AppType == "docker" || app.AppType == "docker-compose" {
-		// 2. 对于 Docker 应用，尝试从 Dockerfile 中检测 EXPOSE 端口
+		// 3. 对于 Docker 应用，尝试从 Dockerfile 中检测 EXPOSE 端口
 		if detectedPort := gs.detectDockerfileExposedPort(app); detectedPort > 0 {
 			internalPort = detectedPort
 			deployLogger.WriteLog("info", "docker", fmt.Sprintf("从 Dockerfile 检测到暴露端口: %d", internalPort))
 		} else {
-			deployLogger.WriteLog("info", "docker", "无法从 Dockerfile 检测端口，使用默认端口: 3000")
+			deployLogger.WriteLog("info", "docker", "无法从 Dockerfile 检测端口，使用默认端口: 8080")
 		}
 	} else if gs.builderRegistry != nil {
-		// 3. 使用构建器的默认端口
+		// 4. 使用构建器的默认端口
 		if builder, err := gs.builderRegistry.GetBuilder(app.AppType); err == nil {
 			internalPort = builder.GetDefaultPort()
 			deployLogger.WriteLog("info", "docker", fmt.Sprintf("使用构建器默认端口: %d", internalPort))
 		}
+	} else {
+		deployLogger.WriteLog("info", "docker", "使用默认端口: 8080")
 	}
 
 	// 启动新容器

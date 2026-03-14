@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.6-rc5] - 2026-03-15
+
+### ✨ 新功能
+
+- **Git Deploy 默认环境变量 PORT=8080**：
+  - 创建应用时自动添加默认环境变量 `PORT=8080`
+  - Docker 容器启动时使用应用配置的 PORT 环境变量
+  - 端口检测优先级：应用环境变量 PORT > 已配置的内部端口 > Dockerfile EXPOSE > 构建器默认端口 > 默认 8080
+
 ## [1.7.6-rc4] - 2026-03-15
 
 ### 🐛 Bug 修复
