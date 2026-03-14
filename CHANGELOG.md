@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.6-rc4] - 2026-03-15
+
+### 🐛 Bug 修复
+
+- **修复 Docker 容器端口映射和环境变量问题**：
+  - 容器启动时添加 `-e PORT` 环境变量，让应用知道监听哪个端口
+  - 新增 `InternalPort` 字段到 `AppDeployConfig`，记录容器内部端口
+  - 实现 `detectDockerfileExposedPort` 函数，从 Dockerfile 自动检测 EXPOSE 端口
+  - 端口检测优先级：已配置端口 > Dockerfile EXPOSE > 构建器默认端口 > 默认 3000
+  - 修复应用因端口不匹配导致启动失败的问题
+
 ## [1.7.6-rc3] - 2026-03-15
 
 ### 🐛 Bug 修复

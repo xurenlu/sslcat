@@ -352,7 +352,8 @@ type AppDeployConfig struct {
 	// Docker 容器配置
 	ContainerName string `json:"container_name,omitempty"`
 	ContainerID   string `json:"container_id,omitempty"`
-	Port          int    `json:"port,omitempty"`
+	Port          int    `json:"port,omitempty"`          // 外部端口
+	InternalPort  int    `json:"internal_port,omitempty"` // 容器内部端口
 	ImageName     string `json:"image_name,omitempty"`
 
 	// SSL 配置
@@ -1916,21 +1917,38 @@ func (gs *GitServer) startAppProcessWithLogging(app *GitApp, command string, dep
 		deployLogger.WriteLog("info", "docker", fmt.Sprintf("镜像构建完成: %s", imageName))
 	}
 
-	// 获取应用内部端口（默认为构建器的默认端口）
+	// 获取应用内部端口
+	// 优先级: 1. 已配置的内部端口 > 2. 从 Dockerfile 检测 > 3. 构建器默认端口 > 4. 默认 3000
 	internalPort := 3000
-	if gs.builderRegistry != nil {
+
+	// 1. 检查是否已配置内部端口
+	if app.DeployConfig != nil && app.DeployConfig.InternalPort > 0 {
+		internalPort = app.DeployConfig.InternalPort
+		deployLogger.WriteLog("info", "docker", fmt.Sprintf("使用已配置的内部端口: %d", internalPort))
+	} else if app.AppType == "docker" || app.AppType == "docker-compose" {
+		// 2. 对于 Docker 应用，尝试从 Dockerfile 中检测 EXPOSE 端口
+		if detectedPort := gs.detectDockerfileExposedPort(app); detectedPort > 0 {
+			internalPort = detectedPort
+			deployLogger.WriteLog("info", "docker", fmt.Sprintf("从 Dockerfile 检测到暴露端口: %d", internalPort))
+		} else {
+			deployLogger.WriteLog("info", "docker", "无法从 Dockerfile 检测端口，使用默认端口: 3000")
+		}
+	} else if gs.builderRegistry != nil {
+		// 3. 使用构建器的默认端口
 		if builder, err := gs.builderRegistry.GetBuilder(app.AppType); err == nil {
 			internalPort = builder.GetDefaultPort()
+			deployLogger.WriteLog("info", "docker", fmt.Sprintf("使用构建器默认端口: %d", internalPort))
 		}
 	}
 
 	// 启动新容器
-	deployLogger.WriteLog("info", "docker", fmt.Sprintf("启动容器: docker run -d --name %s -p %d:%d %s",
-		newContainerName, newPort, internalPort, imageName))
+	deployLogger.WriteLog("info", "docker", fmt.Sprintf("启动容器: docker run -d --name %s -p %d:%d -e PORT=%d %s",
+		newContainerName, newPort, internalPort, internalPort, imageName))
 
 	runCmd := exec.Command("docker", "run", "-d",
 		"--name", newContainerName,
 		"-p", fmt.Sprintf("%d:%d", newPort, internalPort),
+		"-e", fmt.Sprintf("PORT=%d", internalPort),
 		"--restart", "unless-stopped",
 		imageName)
 	if output, err := runCmd.CombinedOutput(); err != nil {
@@ -1984,6 +2002,7 @@ func (gs *GitServer) startAppProcessWithLogging(app *GitApp, command string, dep
 	app.DeployConfig.ContainerName = newContainerName
 	app.DeployConfig.ContainerID = newContainerID
 	app.DeployConfig.Port = newPort
+	app.DeployConfig.InternalPort = internalPort // 保存内部端口
 	app.DeployConfig.ImageName = imageName
 	app.Status = "running"
 	app.StartCommand = command
@@ -5205,6 +5224,42 @@ func (gs *GitServer) buildDockerImageForApp(app *GitApp, imageName string, deplo
 
 	deployLogger.WriteLog("info", "docker", fmt.Sprintf("镜像构建成功: %s", imageName))
 	return nil
+}
+
+// detectDockerfileExposedPort 从 Dockerfile 中检测 EXPOSE 端口
+func (gs *GitServer) detectDockerfileExposedPort(app *GitApp) int {
+	dockerfilePath := filepath.Join(app.GitPath, "Dockerfile")
+	if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) {
+		return 0
+	}
+
+	// 读取 Dockerfile 内容
+	content, err := os.ReadFile(dockerfilePath)
+	if err != nil {
+		gs.logger.Warnf("无法读取 Dockerfile: %v", err)
+		return 0
+	}
+
+	// 使用正则表达式查找 EXPOSE 指令
+	// 支持: EXPOSE 3000, EXPOSE 4567, EXPOSE 8080 等
+	lines := strings.Split(string(content), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "EXPOSE") {
+			// 提取端口号
+			parts := strings.Fields(line)
+			if len(parts) >= 2 {
+				// 尝试解析端口
+				var port int
+				if _, err := fmt.Sscanf(parts[1], "%d", &port); err == nil && port > 0 {
+					gs.logger.Infof("从 Dockerfile 检测到 EXPOSE 端口: %d", port)
+					return port
+				}
+			}
+		}
+	}
+
+	return 0
 }
 
 // generateDockerfileForApp 为应用生成 Dockerfile
