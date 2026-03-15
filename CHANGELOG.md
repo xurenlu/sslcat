@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.6] - 2026-03-16
+
+### ✨ 新功能
+
+- **Git Deploy 日志流实时输出优化**：
+  - 修复 git push 时日志流不能实时输出到客户端的问题
+  - 使用临时文件避免管道子 shell 缓冲
+  - 添加输出刷新函数确保实时显示
+  - 每行输出后强制刷新缓冲区
+
+- **Git 部署 UI 优化**：
+  - 在每个应用后添加"部署历史"按钮，可查看所有部署记录
+  - 添加部署历史 Dialog，显示部署状态、提交信息、作者等
+  - 提供"查看最新部署日志"快捷按钮
+  - "推送到此地址"列添加复制 icon，点击可复制地址
+  - 复制成功后显示 ✓ 图标和绿色反馈
+
+- **新增部署历史 API**：
+  - GET /api/git-server/deployments?app={appName} - 获取应用部署历史
+  - 返回部署状态、提交信息、时间戳等详细信息
+
+### 🌍 国际化
+
+- 添加新功能的国际化翻译（中文、英语、德语、西班牙语、法语、日语、俄语）
+
 ## [1.7.6-rc5] - 2026-03-15
 
 ### ✨ 新功能

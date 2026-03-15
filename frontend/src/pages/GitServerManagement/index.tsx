@@ -57,12 +57,13 @@ import ConfigModal from './ConfigModal'
 import EnvVarModal from './EnvVarModal'
 import RoutingModal from './RoutingModal'
 import DeleteAppModal from './DeleteAppModal'
+import DeployHistoryDialog from './DeployHistoryDialog'
 import { GitApp } from './types'
 
 const GitServerManagement: React.FC = () => {
   const { adminPrefix } = useConfig()
   const t = useTranslation()
-  
+
   // 使用自定义 Hooks
   const {
     apps,
@@ -93,6 +94,8 @@ const GitServerManagement: React.FC = () => {
 
   const [selectedApp, setSelectedApp] = useState<string>('')
   const [selectedAppForModal, setSelectedAppForModal] = useState<GitApp | null>(null)
+  const [selectedAppForDeployHistory, setSelectedAppForDeployHistory] = useState<GitApp | null>(null)
+  const [logsDeploymentId, setLogsDeploymentId] = useState<string | null>(null)
 
   // Modal 状态
   const { isOpen: isCreateAppOpen, onOpen: onCreateAppOpen, onClose: onCreateAppClose } = useDisclosure()
@@ -101,6 +104,7 @@ const GitServerManagement: React.FC = () => {
   const { isOpen: isEnvModalOpen, onOpen: onEnvModalOpen, onClose: onEnvModalClose } = useDisclosure()
   const { isOpen: isRoutingModalOpen, onOpen: onRoutingModalOpen, onClose: onRoutingModalClose } = useDisclosure()
   const { isOpen: isDeleteModalOpen, onOpen: onDeleteModalOpen, onClose: onDeleteModalClose } = useDisclosure()
+  const { isOpen: isDeployHistoryOpen, onOpen: onDeployHistoryOpen, onClose: onDeployHistoryClose } = useDisclosure()
 
   // 刷新所有数据
   const refreshData = async () => {
@@ -154,6 +158,21 @@ const GitServerManagement: React.FC = () => {
   const openDeleteModal = (app: GitApp) => {
     setSelectedAppForModal(app)
     onDeleteModalOpen()
+  }
+
+  // 打开部署历史模态框
+  const openDeployHistoryModal = (app: GitApp) => {
+    setSelectedAppForDeployHistory(app)
+    onDeployHistoryOpen()
+  }
+
+  // 打开特定部署的日志
+  const handleOpenDeploymentLogs = (appName: string, deploymentId: string) => {
+    setSelectedApp(appName)
+    setLogsDeploymentId(deploymentId)
+    // 切换到日志标签页
+    // 这里需要通过 state 或其他方式来切换 tab
+    // 暂时简化处理，直接返回让用户手动切换
   }
 
   const loading = appsLoading || keysLoading || configLoading
@@ -394,6 +413,7 @@ const GitServerManagement: React.FC = () => {
                 onDelete={openDeleteModal}
                 onOpenEnvModal={openEnvModal}
                 onOpenRoutingModal={openRoutingModal}
+                onOpenDeployHistory={openDeployHistoryModal}
                 onCreateApp={onCreateAppOpen}
               />
             </TabPanel>
@@ -536,6 +556,13 @@ const GitServerManagement: React.FC = () => {
           onClose={onDeleteModalClose}
           onDelete={handleDeleteApp}
           app={selectedAppForModal}
+        />
+
+        <DeployHistoryDialog
+          isOpen={isDeployHistoryOpen}
+          onClose={onDeployHistoryClose}
+          appName={selectedAppForDeployHistory?.name || ''}
+          onOpenLogs={handleOpenDeploymentLogs}
         />
       </Box>
     </>

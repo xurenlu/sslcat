@@ -26,6 +26,7 @@ export interface Translation {
     upload: string
     download: string
     copy: string
+    copied: string
     paste: string
     cut: string
     undo: string
@@ -1388,10 +1389,15 @@ export interface Translation {
     statusDeploying: string
     statusInactive: string
     statusError: string
+    statusSuccess: string
+    statusFailed: string
+    statusRunning: string
+    statusPending: string
     allStatuses: string
     searchPlaceholder: string
     noAppsFound: string
     noGitApps: string
+    noDeployments: string
     sortByName: string
     sortByStatus: string
     sortByLastDeploy: string
@@ -1460,6 +1466,7 @@ export interface Translation {
     redeployDescription: string
     deployFailed: string
     copyToClipboard: string
+    pushAddressCopied: string
     pushHistoryFailed: string
     networkError: string
     cannotGetPushHistory: string
@@ -1471,6 +1478,11 @@ export interface Translation {
     rollbackFailedDescription: string
     dockerImagesLoadFailed: string
     dockerImagesLoadError: string
+    latest: string
+    author: string
+    error: string
+    viewLogs: string
+    viewLatestLogs: string
   }
 
 

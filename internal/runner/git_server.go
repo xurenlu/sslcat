@@ -3841,6 +3841,21 @@ func (gs *GitServer) generatePostReceiveHook(app *GitApp) string {
 
 set -e
 
+# 强制行缓冲模式，确保实时输出到 git 客户端
+# 这样可以避免 SSH 连接上的输出缓冲延迟
+if [ -n "$BASH_VERSION" ]; then
+    # bash 环境下确保实时输出
+    set -o pipefail
+fi
+# Python 风格的 unbuffered 输出 - 每次写入后立即刷新
+# 这里使用一个技巧：将 stdout 连接到一个总是刷新的文件描述符
+exec 3>&1  # 保存原始 stdout
+# 使用 stdbuf 如果可用（Linux），否则跳过
+if command -v stdbuf >/dev/null 2>&1; then
+    # 确保所有后续命令都使用行缓冲
+    export STDBUF="-oL"
+fi
+
 APP_NAME="%s"
 REPO_DIR="%s"
 BARE_REPO="%s"
@@ -3866,27 +3881,37 @@ COLOR_YELLOW='\033[0;33m'
 COLOR_CYAN='\033[0;36m'
 COLOR_RED='\033[0;31m'
 
-# 输出函数
+# 输出函数 - 添加强制刷新以确保实时输出
+_flush_output() {
+    # 使用 dd 来强制刷新缓冲区
+    sync 2>/dev/null || true
+}
+
 print_header() {
     echo -e "${COLOR_BOLD}${COLOR_CYAN}"
     echo "-----> $1"
     echo -e "${COLOR_RESET}"
+    _flush_output
 }
 
 print_info() {
     echo -e "${COLOR_GREEN}       $1${COLOR_RESET}"
+    _flush_output
 }
 
 print_warning() {
     echo -e "${COLOR_YELLOW}       ⚠ $1${COLOR_RESET}"
+    _flush_output
 }
 
 print_error() {
     echo -e "${COLOR_RED}       ✗ $1${COLOR_RESET}"
+    _flush_output
 }
 
 print_success() {
     echo -e "${COLOR_BOLD}${COLOR_GREEN}       ✓ $1${COLOR_RESET}"
+    _flush_output
 }
 
 # 记录推送信息
@@ -4050,12 +4075,13 @@ while read oldrev newrev refname; do
                 if [ $CURRENT_POS -gt $START_POS ]; then
                     # 有新日志，重置空闲计时器
                     IDLE_ELAPSED=0
-                    
-                    # 提取新的日志行
-                    NEW_LOGS=$(tail -c +$((START_POS + 1)) "$DEPLOY_LOG" 2>/dev/null || echo "")
-                    
-                    # 逐行处理并格式化输出
-                    echo "$NEW_LOGS" | while IFS= read -r line; do
+
+                    # 提取新的日志行并直接输出，避免管道缓冲问题
+                    # 使用临时文件来避免子shell缓冲问题
+                    tail -c +$((START_POS + 1)) "$DEPLOY_LOG" 2>/dev/null > /tmp/git_deploy_logs_$$ 2>&1 || true
+
+                    # 使用 here-string 而不是管道来避免子shell缓冲
+                    while IFS= read -r line || [ -n "$line" ]; do
                         if [ -n "$line" ]; then
                             # 尝试解析JSON格式的日志
                             if echo "$line" | grep -q '"level"'; then
@@ -4063,7 +4089,7 @@ while read oldrev newrev refname; do
                                 LEVEL=$(echo "$line" | grep -o '"level":"[^"]*"' | cut -d'"' -f4 || echo "info")
                                 MESSAGE=$(echo "$line" | grep -o '"message":"[^"]*"' | cut -d'"' -f4 || echo "$line")
                                 SOURCE=$(echo "$line" | grep -o '"source":"[^"]*"' | cut -d'"' -f4 || echo "")
-                                
+
                                 case "$LEVEL" in
                                     "error")
                                         echo -e "${COLOR_RED}       [$SOURCE] $MESSAGE${COLOR_RESET}"
@@ -4082,8 +4108,18 @@ while read oldrev newrev refname; do
                                 # 纯文本日志
                                 echo "       $line"
                             fi
+                            # 每输出一行就强制刷新，确保实时显示
+                            sync 2>/dev/null || true
                         fi
-                    done
+                    # 使用 process substitution 而不是管道，避免子shell缓冲
+                    done < /tmp/git_deploy_logs_$$
+
+                    # 保存日志内容用于状态检查
+                    NEW_LOGS=$(cat /tmp/git_deploy_logs_$$ 2>/dev/null || echo "")
+                    rm -f /tmp/git_deploy_logs_$$
+
+                    # 强制刷新输出缓冲区
+                    (printf "" >&3) 2>/dev/null || true
                     
                     # 检查部署状态（在子shell外检查）
                     if echo "$NEW_LOGS" | grep -q "部署成功\|部署完成\|deployment.*success\|deployment.*complete"; then

@@ -21,6 +21,8 @@ import {
   InputGroup,
   InputLeftElement,
   Select,
+  Tooltip,
+  useToast,
 } from '@chakra-ui/react'
 import {
   FiGithub,
@@ -32,11 +34,12 @@ import {
   FiSearch,
   FiGitBranch,
   FiPlus,
+  FiClock,
+  FiCheck,
 } from 'react-icons/fi'
 import { useTranslation } from '../../hooks/useLanguage'
 import { GitApp } from './types'
 import { TOAST_DURATION } from '../../constants'
-import { useToast } from '@chakra-ui/react'
 
 interface AppListProps {
   apps: GitApp[]
@@ -46,6 +49,7 @@ interface AppListProps {
   onDelete: (app: GitApp) => void
   onOpenEnvModal: (app: GitApp) => void
   onOpenRoutingModal: (app: GitApp) => void
+  onOpenDeployHistory: (app: GitApp) => void
   onCreateApp: () => void
 }
 
@@ -57,6 +61,7 @@ const AppList: React.FC<AppListProps> = ({
   onDelete,
   onOpenEnvModal,
   onOpenRoutingModal,
+  onOpenDeployHistory,
   onCreateApp,
 }) => {
   const t = useTranslation()
@@ -65,6 +70,7 @@ const AppList: React.FC<AppListProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [sortField, setSortField] = useState<'name' | 'status' | 'lastDeploy'>('name')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [copiedAddress, setCopiedAddress] = useState<string | null>(null)
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -96,14 +102,19 @@ const AppList: React.FC<AppListProps> = ({
     }
   }
 
-  const copyToClipboard = (text: string) => {
+  const copyToClipboard = (text: string, type: 'address' | 'url') => {
     navigator.clipboard.writeText(text)
+    setCopiedAddress(text)
     toast({
-      title: t.gitServer.copyToClipboard,
+      title: type === 'address'
+        ? (t.gitServer.pushAddressCopied || '推送地址已复制')
+        : (t.gitServer.copyToClipboard || '已复制'),
       status: 'success',
       duration: TOAST_DURATION.SHORT,
       isClosable: true,
     })
+    // 2秒后重置复制状态
+    setTimeout(() => setCopiedAddress(null), 2000)
   }
 
   // 过滤和排序应用列表
@@ -269,10 +280,11 @@ const AppList: React.FC<AppListProps> = ({
                           </Code>
                           <IconButton
                             aria-label={t.frontend.copy_git_url}
-                            icon={<FiCopy />}
+                            icon={copiedAddress === app.git_url ? <Icon as={FiCheck} /> : <Icon as={FiCopy} />}
                             size="xs"
                             variant="ghost"
-                            onClick={() => copyToClipboard(app.git_url || '')}
+                            colorScheme={copiedAddress === app.git_url ? 'green' : 'gray'}
+                            onClick={() => copyToClipboard(app.git_url || '', 'url')}
                           />
                         </HStack>
                       )}
@@ -300,14 +312,24 @@ const AppList: React.FC<AppListProps> = ({
                   </Td>
                   <Td>
                     {app.git_url ? (
-                      <VStack align="start" spacing={1}>
-                        <Text fontSize="xs" color="gray.500">
-                          {t.gitServer.pushToAddress}
-                        </Text>
-                        <Code fontSize="xs" maxW="200px" isTruncated>
+                      <HStack spacing={2}>
+                        <Code fontSize="xs" maxW="180px" isTruncated>
                           {app.git_url}
                         </Code>
-                      </VStack>
+                        <Tooltip
+                          label={copiedAddress === app.git_url ? (t.common.copied || '已复制') : (t.common.copy || '复制')}
+                          placement="top"
+                        >
+                          <IconButton
+                            aria-label={t.common.copy || '复制'}
+                            icon={copiedAddress === app.git_url ? <Icon as={FiCheck} /> : <Icon as={FiCopy} />}
+                            size="xs"
+                            variant="ghost"
+                            colorScheme={copiedAddress === app.git_url ? 'green' : 'gray'}
+                            onClick={() => copyToClipboard(app.git_url || '', 'address')}
+                          />
+                        </Tooltip>
+                      </HStack>
                     ) : (
                       <Text fontSize="xs" color="gray.400">
                         {t.gitServer.waitingConfig}
@@ -322,23 +344,36 @@ const AppList: React.FC<AppListProps> = ({
                   <Td>{app.lastDeploy || t.gitServer.notDeployed}</Td>
                   <Td>
                     <HStack spacing={1}>
-                      <IconButton
-                        aria-label={t.frontend.redeploy}
-                        icon={<FiUpload />}
-                        size="sm"
-                        variant="ghost"
-                        colorScheme="green"
-                        onClick={() => onDeploy(app.name)}
-                        title={t.frontend.trigger_redeploy}
-                      />
-                      <IconButton
-                        aria-label={t.frontend.delete_app}
-                        icon={<FiTrash2 />}
-                        size="sm"
-                        variant="ghost"
-                        colorScheme="red"
-                        onClick={() => onDelete(app)}
-                      />
+                      <Tooltip label={t.gitServer.deployHistory || '部署历史'} placement="top">
+                        <IconButton
+                          aria-label={t.gitServer.deployHistory || '部署历史'}
+                          icon={<FiClock />}
+                          size="sm"
+                          variant="ghost"
+                          colorScheme="blue"
+                          onClick={() => onOpenDeployHistory(app)}
+                        />
+                      </Tooltip>
+                      <Tooltip label={t.frontend.redeploy || '重新部署'} placement="top">
+                        <IconButton
+                          aria-label={t.frontend.redeploy}
+                          icon={<FiUpload />}
+                          size="sm"
+                          variant="ghost"
+                          colorScheme="green"
+                          onClick={() => onDeploy(app.name)}
+                        />
+                      </Tooltip>
+                      <Tooltip label={t.frontend.delete_app || '删除'} placement="top">
+                        <IconButton
+                          aria-label={t.frontend.delete_app}
+                          icon={<FiTrash2 />}
+                          size="sm"
+                          variant="ghost"
+                          colorScheme="red"
+                          onClick={() => onDelete(app)}
+                        />
+                      </Tooltip>
                     </HStack>
                   </Td>
                 </Tr>
