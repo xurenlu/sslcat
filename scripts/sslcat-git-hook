@@ -130,8 +130,7 @@ create_app() {
             return 1
         fi
     elif echo "$response" | grep -q "app_exists"; then
-        # 应用已存在，这是正常情况
-        log "✓ 应用 '$app_name' 已存在，跳过创建"
+        # 应用已存在，这是正常情况，静默跳过
         return 0
     else
         log_error "创建应用失败"
@@ -198,10 +197,8 @@ main() {
             log_error "应用 '$APP_NAME' 不存在且不是 push 操作，无法自动创建"
             exit 1
         fi
-    else
-        log "应用 '$APP_NAME' 已存在"
     fi
-    
+
     # 3. 执行 Git 命令
     execute_git_command "$APP_NAME" "$GIT_CMD"
 }
