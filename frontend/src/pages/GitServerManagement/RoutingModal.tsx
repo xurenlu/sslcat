@@ -108,9 +108,15 @@ const RoutingModal: React.FC<RoutingModalProps> = ({
               <Alert status="error" variant="left-accent">
                 <AlertIcon />
                 <Box>
-                  <AlertTitle fontSize="sm">{t.common.warning || '警告'}</AlertTitle>
-                  <AlertDescription fontSize="sm">
-                    {t.gitServer.domainChangeWarning || '检测到域名变化！修改域名将：\n1. 备份当前应用数据\n2. 创建新域名的应用配置\n3. 复制 Git 仓库数据\n4. 更新代理规则并申请新证书\n\n旧应用数据将被保留作为备份。'}
+                  <AlertTitle fontSize="sm">{t.common?.warning || '警告'}</AlertTitle>
+                  <AlertDescription fontSize="sm" whiteSpace="pre-line">
+                    检测到域名变化！修改域名将：
+                    1. 备份当前应用数据
+                    2. 创建新域名的应用配置
+                    3. 复制 Git 仓库数据
+                    4. 更新代理规则并申请新证书
+
+                    旧应用数据将被保留作为备份。
                   </AlertDescription>
                 </Box>
               </Alert>
@@ -120,21 +126,25 @@ const RoutingModal: React.FC<RoutingModalProps> = ({
               <Alert status="warning" variant="left-accent">
                 <AlertIcon />
                 <Box>
-                  <AlertTitle fontSize="sm">{t.common.confirm || '确认'}</AlertTitle>
-                  <AlertDescription fontSize="sm">
-                    {t.gitServer.domainChangeConfirm || `即将修改域名：\n从：${app?.domain || '空'}\n到：${domain}\n\n此操作不可撤销，确定继续吗？`}
+                  <AlertTitle fontSize="sm">{t.common?.confirm || '确认'}</AlertTitle>
+                  <AlertDescription fontSize="sm" whiteSpace="pre-line">
+                    即将修改域名：
+                    从：{app?.domain || '空'}
+                    到：{domain}
+
+                    此操作不可撤销，确定继续吗？
                   </AlertDescription>
                 </Box>
               </Alert>
             )}
 
             <FormControl>
-              <FormLabel>{t.gitServer.customDomain}</FormLabel>
+              <FormLabel>{t.gitServer?.customDomain || '自定义域名'}</FormLabel>
               <Input
                 placeholder={
                   config.domainSuffix
                     ? `${app?.name || 'app'}.${config.domainSuffix}`
-                    : t.gitServer.domain
+                    : t.gitServer?.domain || '域名'
                 }
                 value={domain}
                 onChange={(e) => setDomain(e.target.value.trim())}
@@ -142,7 +152,7 @@ const RoutingModal: React.FC<RoutingModalProps> = ({
               />
               {domainChanged && (
                 <Text fontSize="xs" color="orange.500" mt={1} fontWeight="bold">
-                  {t.gitServer.domainWillChange || '⚠️ 域名将发生变化'}
+                  ⚠️ 域名将发生变化
                 </Text>
               )}
             </FormControl>
@@ -167,7 +177,7 @@ const RoutingModal: React.FC<RoutingModalProps> = ({
         </ModalBody>
         <ModalFooter>
           <Button onClick={handleClose} mr={3} variant="ghost" isDisabled={loading}>
-            {t.common.cancel}
+            {t.common?.cancel || '取消'}
           </Button>
           <Button
             colorScheme={domainChanged && !confirmDomainChange ? "red" : "blue"}
@@ -176,8 +186,8 @@ const RoutingModal: React.FC<RoutingModalProps> = ({
             isDisabled={!port || port <= 0 || !domain.trim()}
           >
             {domainChanged && !confirmDomainChange
-              ? (t.common.confirm || '确认修改域名')
-              : (t.common.save || '保存')}
+              ? '确认修改域名'
+              : (t.common?.save || '保存')}
           </Button>
         </ModalFooter>
       </ModalContent>
