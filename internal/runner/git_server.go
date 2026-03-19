@@ -1200,52 +1200,187 @@ func (gs *GitServer) UpdateAppRouting(appName string, port int, domain string) e
 		}
 	}
 
-	// 记录旧域名，用于后续证书申请
+	// 记录旧域名
 	oldDomain := app.Domain
 	domainChanged := (oldDomain != domain && domain != "")
 
-	// 更新应用信息
-	gs.releasePort(app.Port)
+	// 如果域名发生变化，执行迁移流程
+	if domainChanged {
+		gs.logger.Infof("检测到域名变化: %s -> %s，开始域名迁移流程", oldDomain, domain)
 
-	app.Port = port
-
-	if gs.domainManager != nil {
-		if domain != "" {
-			gs.domainManager.SetPrimaryDomain(app, domain)
+		// 1. 备份旧应用数据
+		backupDir := filepath.Join(gs.config.Runners.Git.ReposDir, appName+"_backup_"+time.Now().Format("20060102_150405"))
+		if err := gs.backupAppData(app, backupDir); err != nil {
+			gs.logger.Warnf("备份应用数据失败: %v", err)
+			// 继续执行，不阻塞迁移
 		} else {
-			app.Domain = ""
-			app.Domains = filterEmptyDomains(app.Domains)
+			gs.logger.Infof("✓ 应用数据已备份到: %s", backupDir)
 		}
+
+		// 2. 更新应用配置
+		app.Port = port
+
+		if gs.domainManager != nil {
+			if domain != "" {
+				gs.domainManager.SetPrimaryDomain(app, domain)
+			} else {
+				app.Domain = ""
+				app.Domains = filterEmptyDomains(app.Domains)
+			}
+		} else {
+			app.Domain = domain
+			if domain != "" {
+				current := filterEmptyDomains(app.Domains)
+				app.Domains = append([]string{domain}, current...)
+			} else {
+				app.Domains = filterEmptyDomains(app.Domains)
+			}
+		}
+
+		// 3. 保存应用配置
+		if err := gs.saveApps(); err != nil {
+			return fmt.Errorf("保存应用信息失败: %w", err)
+		}
+
+		// 4. 更新 Git 配置（如果需要）
+		if err := gs.updateGitRepoForDomainChange(app, oldDomain, domain); err != nil {
+			gs.logger.Warnf("更新 Git 仓库配置失败: %v", err)
+			// 继续执行，不阻塞迁移
+		}
+
+		// 5. 更新代理规则
+		if err := gs.addProxyRuleForApp(app); err != nil {
+			return fmt.Errorf("更新代理规则失败: %w", err)
+		}
+
+		// 6. 申请新的 SSL 证书
+		if gs.sslManager != nil {
+			gs.logger.Infof("申请新域名的 SSL 证书: %s", domain)
+			if err := gs.sslManager.EnsureDomainCert(domain); err != nil {
+				gs.logger.Warnf("申请新域名的 SSL 证书失败: %v", err)
+				// 不阻塞域名更新流程，只记录警告
+			} else {
+				gs.logger.Infof("✓ 成功为域名 %s 申请 SSL 证书", domain)
+			}
+		}
+
+		gs.logger.Infof("✓ 域名迁移完成: %s -> %s (备份: %s)", oldDomain, domain, backupDir)
 	} else {
-		app.Domain = domain
-		if domain != "" {
-			current := filterEmptyDomains(app.Domains)
-			app.Domains = append([]string{domain}, current...)
-		} else {
-			app.Domains = filterEmptyDomains(app.Domains)
+		// 域名未变化，只更新端口
+		gs.releasePort(app.Port)
+		app.Port = port
+
+		if err := gs.saveApps(); err != nil {
+			return fmt.Errorf("保存应用信息失败: %w", err)
 		}
-	}
 
-	if err := gs.saveApps(); err != nil {
-		return fmt.Errorf("保存应用信息失败: %w", err)
-	}
-
-	if err := gs.addProxyRuleForApp(app); err != nil {
-		return fmt.Errorf("更新代理规则失败: %w", err)
-	}
-
-	// 如果域名发生变化，申请新的 SSL 证书
-	if domainChanged && gs.sslManager != nil {
-		gs.logger.Infof("检测到域名变化: %s -> %s，开始申请新的 SSL 证书", oldDomain, domain)
-		if err := gs.sslManager.EnsureDomainCert(domain); err != nil {
-			gs.logger.Warnf("申请新域名的 SSL 证书失败: %v", err)
-			// 不阻塞域名更新流程，只记录警告
-		} else {
-			gs.logger.Infof("✓ 成功为域名 %s 申请 SSL 证书", domain)
+		if err := gs.addProxyRuleForApp(app); err != nil {
+			return fmt.Errorf("更新代理规则失败: %w", err)
 		}
 	}
 
 	gs.logger.Infof("应用 %s 的路由信息已更新，域名: %s, 端口: %d", appName, domain, port)
+	return nil
+}
+
+// backupAppData 备份应用数据
+func (gs *GitServer) backupAppData(app *GitApp, backupDir string) error {
+	// 创建备份目录
+	if err := os.MkdirAll(backupDir, 0755); err != nil {
+		return fmt.Errorf("创建备份目录失败: %w", err)
+	}
+
+	// 复制应用配置文件
+	appConfigFile := filepath.Join(gs.config.Runners.Git.ReposDir, app.Name, "app.json")
+	backupConfigFile := filepath.Join(backupDir, "app.json")
+	if _, err := os.Stat(appConfigFile); err == nil {
+		if err := copyFile(appConfigFile, backupConfigFile); err != nil {
+			return fmt.Errorf("复制配置文件失败: %w", err)
+		}
+	}
+
+	// 复制 Git 仓库（如果存在）
+	if app.GitPath != "" {
+		backupGitDir := filepath.Join(backupDir, "git")
+		if err := copyDirectory(app.GitPath, backupGitDir); err != nil {
+			return fmt.Errorf("复制 Git 仓库失败: %w", err)
+		}
+	}
+
+	// 复制日志文件（如果存在）
+	if app.LogsDir != "" {
+		backupLogsDir := filepath.Join(backupDir, "logs")
+		if err := copyDirectory(app.LogsDir, backupLogsDir); err != nil {
+			gs.logger.Warnf("复制日志文件失败: %v", err)
+			// 不阻塞备份流程
+		}
+	}
+
+	return nil
+}
+
+// updateGitRepoForDomainChange 更新 Git 仓库配置以适应域名变化
+func (gs *GitServer) updateGitRepoForDomainChange(app *GitApp, oldDomain, newDomain string) error {
+	// 更新 post-receive 钩子中的域名配置
+	postReceiveHook := filepath.Join(app.BareRepo, "hooks", "post-receive")
+	if _, err := os.Stat(postReceiveHook); err == nil {
+		// 重新生成钩子文件
+		hookContent := gs.generatePostReceiveHook(app)
+		if err := os.WriteFile(postReceiveHook, []byte(hookContent), 0755); err != nil {
+			return fmt.Errorf("更新 post-receive 钩子失败: %w", err)
+		}
+	}
+
+	// 更新 pre-receive 钩子
+	preReceiveHook := filepath.Join(app.BareRepo, "hooks", "pre-receive")
+	if _, err := os.Stat(preReceiveHook); err == nil {
+		hookContent := gs.generatePreReceiveHook(app)
+		if err := os.WriteFile(preReceiveHook, []byte(hookContent), 0755); err != nil {
+			return fmt.Errorf("更新 pre-receive 钩子失败: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// copyFile 复制文件
+func copyFile(src, dst string) error {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dst, data, 0644)
+}
+
+// copyDirectory 复制目录
+func copyDirectory(src, dst string) error {
+	// 创建目标目录
+	if err := os.MkdirAll(dst, 0755); err != nil {
+		return err
+	}
+
+	// 读取源目录
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+
+	// 复制每个文件/子目录
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+
+		if entry.IsDir() {
+			if err := copyDirectory(srcPath, dstPath); err != nil {
+				return err
+			}
+		} else {
+			if err := copyFile(srcPath, dstPath); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 

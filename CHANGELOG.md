@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.7-rc6] - 2026-03-19
+
+### ✨ 新功能
+
+- **安全的域名修改功能**：
+  - 允许修改应用域名，同时自动备份旧数据
+  - 修改域名时显示警告，需要二次确认
+  - 自动备份应用配置、Git 仓库和日志文件
+  - 备份目录命名为 `应用名_backup_时间戳`
+  - 更新 Git 钩子配置以适应新域名
+  - 自动申请新域名的 SSL 证书
+
+### 🔧 改进
+
+- **域名迁移流程优化**：
+  - 前端显示域名变化警告
+  - 二次确认机制防止误操作
+  - 后端自动备份所有相关数据
+  - 迁移失败不影响备份的数据
+  - 日志详细记录迁移过程
+
+### 📝 说明
+
+- **迁移场景**：从 .localhost 迁移到 .facev.app
+- **备份保留**：旧应用数据完整保留在备份目录
+- **零成本迁移**：无需删除重建，直接修改域名
+
 ## [1.7.7-rc5] - 2026-03-19
 
 ### ✨ 新功能
