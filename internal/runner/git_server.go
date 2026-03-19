@@ -1200,6 +1200,10 @@ func (gs *GitServer) UpdateAppRouting(appName string, port int, domain string) e
 		}
 	}
 
+	// 记录旧域名，用于后续证书申请
+	oldDomain := app.Domain
+	domainChanged := (oldDomain != domain && domain != "")
+
 	// 更新应用信息
 	gs.releasePort(app.Port)
 
@@ -1228,6 +1232,17 @@ func (gs *GitServer) UpdateAppRouting(appName string, port int, domain string) e
 
 	if err := gs.addProxyRuleForApp(app); err != nil {
 		return fmt.Errorf("更新代理规则失败: %w", err)
+	}
+
+	// 如果域名发生变化，申请新的 SSL 证书
+	if domainChanged && gs.sslManager != nil {
+		gs.logger.Infof("检测到域名变化: %s -> %s，开始申请新的 SSL 证书", oldDomain, domain)
+		if err := gs.sslManager.EnsureDomainCert(domain); err != nil {
+			gs.logger.Warnf("申请新域名的 SSL 证书失败: %v", err)
+			// 不阻塞域名更新流程，只记录警告
+		} else {
+			gs.logger.Infof("✓ 成功为域名 %s 申请 SSL 证书", domain)
+		}
 	}
 
 	gs.logger.Infof("应用 %s 的路由信息已更新，域名: %s, 端口: %d", appName, domain, port)

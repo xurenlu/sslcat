@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.7-rc5] - 2026-03-19
+
+### ✨ 新功能
+
+- **自动申请新域名的 SSL 证书**：
+  - 修改应用域名后，自动检测域名变化
+  - 自动申请新域名的 SSL 证书（ACME/Let's Encrypt）
+  - 证书申请失败不影响域名更新流程
+  - 日志显示证书申请状态
+
+### 🔧 改进
+
+- **域名管理体验优化**：
+  - 修改域名后无需手动申请证书
+  - 自动完成域名更新 + 证书申请 + 代理规则更新
+  - 支持从旧域名（如 .localhost）迁移到新域名（如 .facev.app）
+
 ## [1.7.7-rc4] - 2026-03-19
 
 ### 🐛 Bug 修复
