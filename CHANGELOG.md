@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.7-rc3] - 2026-03-19
+
+### 🐛 Bug 修复
+
+- **修复 Git Push 部署日志流缓冲问题**：
+  - 优化 post-receive 钩子的输出缓冲处理
+  - 改进 `_flush_output` 函数，使用多种方法强制刷新缓冲区
+  - 支持 Python/Perl/dd 等多种刷新方式，提高兼容性
+  - 解决 "Streaming deployment logs..." 后长时间无响应的问题
+  - 确保部署日志能实时输出到客户端
+
 ## [1.7.7-rc2] - 2026-03-19
 
 ### 🐛 Bug 修复

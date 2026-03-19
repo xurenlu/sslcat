@@ -3847,17 +3847,14 @@ set -e
 
 # 强制行缓冲模式，确保实时输出到 git 客户端
 # 这样可以避免 SSH 连接上的输出缓冲延迟
+
+# 设置 Python 无缓冲模式
+export PYTHONUNBUFFERED=1
+
+# 强制 Bash 行缓冲（如果有）
 if [ -n "$BASH_VERSION" ]; then
-    # bash 环境下确保实时输出
-    set -o pipefail
-fi
-# Python 风格的 unbuffered 输出 - 每次写入后立即刷新
-# 这里使用一个技巧：将 stdout 连接到一个总是刷新的文件描述符
-exec 3>&1  # 保存原始 stdout
-# 使用 stdbuf 如果可用（Linux），否则跳过
-if command -v stdbuf >/dev/null 2>&1; then
-    # 确保所有后续命令都使用行缓冲
-    export STDBUF="-oL"
+    # 禁用 job control，避免输出缓冲
+    set +m
 fi
 
 APP_NAME="%s"
@@ -3887,8 +3884,23 @@ COLOR_RED='\033[0;31m'
 
 # 输出函数 - 添加强制刷新以确保实时输出
 _flush_output() {
-    # 使用 dd 来强制刷新缓冲区
-    sync 2>/dev/null || true
+    # 强制刷新 stdout/stderr 缓冲区
+    # 使用多种方法确保刷新
+    {
+        # 方法1: 使用 python 刷新（如果可用）
+        if command -v python3 >/dev/null 2>&1; then
+            python3 -c "import sys; sys.stdout.flush(); sys.stderr.flush()" 2>/dev/null || true
+        fi
+
+        # 方法2: 使用 perl 刷新（如果可用）
+        if command -v perl >/dev/null 2>&1; then
+            perl -e "STDOUT->flush(); STDERR->flush();" 2>/dev/null || true
+        fi
+    } >/dev/null 2>&1
+
+    # 方法3: 使用 dd 强制刷新（适用于所有系统）
+    # 读取 0 字节会触发缓冲区刷新而不产生输出
+    dd bs=1 count=0 >/dev/null 2>&1 || true
 }
 
 print_header() {
