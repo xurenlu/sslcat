@@ -1203,6 +1203,7 @@ func (api *GitServerAPI) TriggerDeploy(w http.ResponseWriter, r *http.Request, a
 	}
 
 	// 触发部署 - 直接调用 ProcessGitPush
+	// 注意：ProcessGitPush 会启动 goroutine，所以这里不会阻塞
 	go func() {
 		api.logger.Infof("开始异步部署应用: %s", appName)
 		// 使用 ProcessGitPush 触发部署流程

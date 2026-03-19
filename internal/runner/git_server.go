@@ -89,6 +89,10 @@ type GitServer struct {
 	buildSemaphore      chan struct{}
 	maxConcurrentBuilds int
 
+	// 全局部署互斥锁（确保同时只有一个应用在部署）
+	deployMutex sync.Mutex
+	currentDeployingApp string // 当前正在部署的应用名称
+
 	// 日志清理配置
 	maxDeploymentLogs int           // 最多保留多少个部署日志文件
 	maxDeploymentAge  time.Duration // 最多保留多久的部署日志
@@ -4942,6 +4946,20 @@ func (gs *GitServer) recoverAppFromRepository(appName, bareRepoPath string) (*Gi
 
 // processGitPushWithRecord 处理推送并更新记录
 func (gs *GitServer) processGitPushWithRecord(app *GitApp, pushID string, pushRecord PushRecord) {
+	// 获取全局部署锁，确保同时只有一个应用在部署
+	gs.deployMutex.Lock()
+
+	// 记录当前正在部署的应用
+	gs.currentDeployingApp = app.Name
+	gs.logger.Infof("🔒 获取部署锁: %s (此前可能正在部署: %s)", app.Name, gs.currentDeployingApp)
+
+	defer func() {
+		// 释放部署锁
+		gs.currentDeployingApp = ""
+		gs.deployMutex.Unlock()
+		gs.logger.Infof("🔓 释放部署锁: %s", app.Name)
+	}()
+
 	// 使用现有的 processGitPush 逻辑
 	gs.processGitPush(app, nil)
 

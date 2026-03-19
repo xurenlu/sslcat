@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.7-rc1] - 2026-03-19
+
+### 🐛 Bug 修复
+
+- **添加全局部署互斥锁**：
+  - 确保同时只有一个应用在部署，避免资源竞争和死锁
+  - 解决 `GetApp` 可能被长时间阻塞的问题
+  - 添加部署锁的获取和释放日志（🔒/🔓）
+  - 防止多个部署同时修改 Docker、端口等资源
+
+### 🔧 改进
+
+- **部署并发控制**：
+  - 在 `processGitPushWithRecord` 中添加全局部署锁
+  - 记录当前正在部署的应用名称
+  - 部署完成后自动释放锁
+
 ## [1.7.6] - 2026-03-16
 
 ### ✨ 新功能
