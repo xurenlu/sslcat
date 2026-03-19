@@ -4318,14 +4318,25 @@ func (gs *GitServer) initGitRepo(app *GitApp) error {
 	if uid > 0 && gid > 0 {
 		gs.logger.Debugf("设置 Git 仓库所有者为 git 用户 (uid:%d, gid:%d)", uid, gid)
 
-		// 递归设置整个应用目录的所有者
-		// 使用 chown -R 命令会更高效
-		cmd = exec.Command("chown", "-R", fmt.Sprintf("%d:%d", uid, gid), filepath.Dir(app.GitPath))
-		if output, err := cmd.CombinedOutput(); err != nil {
-			gs.logger.Warnf("设置 Git 仓库所有者失败: %v, output: %s", err, string(output))
-		} else {
-			gs.logger.Infof("✓ Git 仓库所有者已设置为 git 用户")
+		// 只设置应用自己的目录，不要影响父目录
+		// chown 应用目录下的所有内容
+		pathsToChown := []string{
+			app.GitPath,      // /opt/sslcat/data/runners/git/cliptxt/git
+			app.RepoDir,      // /opt/sslcat/data/runners/git/cliptxt/git/repo
+			app.BareRepo,     // /opt/sslcat/data/runners/git/cliptxt/git/repo.git
+			app.LogsDir,      // /opt/sslcat/data/runners/git/cliptxt/logs
 		}
+
+		for _, path := range pathsToChown {
+			if _, err := os.Stat(path); err == nil {
+				cmd = exec.Command("chown", "-R", fmt.Sprintf("%d:%d", uid, gid), path)
+				if output, err := cmd.CombinedOutput(); err != nil {
+					gs.logger.Warnf("设置 %s 所有者失败: %v, output: %s", path, err, string(output))
+				}
+			}
+		}
+
+		gs.logger.Infof("✓ Git 仓库所有者已设置为 git 用户")
 	} else {
 		gs.logger.Warn("未找到 git 用户，跳过所有者设置（文件所有者将是当前运行用户）")
 	}
