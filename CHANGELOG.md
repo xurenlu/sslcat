@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.7-rc4] - 2026-03-19
+
+### 🐛 Bug 修复
+
+- **增强 Docker 容器状态检查和错误报告**：
+  - 容器启动后等待 2 秒，确保不会立即退出
+  - 检测容器退出状态（exited/dead/restarting）
+  - 自动获取并输出容器日志（最后 50 行）
+  - 显示容器退出码和错误信息
+  - 解决"部署成功但容器已退出"的问题
+
+### ✨ 新功能
+
+- **容器失败诊断**：
+  - 自动输出容器日志到部署日志
+  - 显示容器退出状态和退出码
+  - 显示容器错误信息（如果有）
+  - 帮助快速定位容器启动失败原因
+
 ## [1.7.7-rc3] - 2026-03-19
 
 ### 🐛 Bug 修复

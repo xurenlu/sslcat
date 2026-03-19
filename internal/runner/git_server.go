@@ -5486,25 +5486,112 @@ func (gs *GitServer) waitForContainerReady(containerID string, timeout time.Dura
 	defer ticker.Stop()
 
 	startTime := time.Now()
+	containerWasRunning := false
+
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("等待容器就绪超时")
+			// 超时后检查容器最终状态
+			return gs.checkContainerFinalState(containerID, deployLogger, startTime)
 		case <-ticker.C:
 			// 检查容器状态
 			cmd := exec.Command("docker", "inspect", "-f", "{{.State.Status}}", containerID)
 			output, err := cmd.Output()
 			if err != nil {
+				// 容器可能不存在，继续等待
 				continue
 			}
 			status := strings.TrimSpace(string(output))
+
 			if status == "running" {
-				// 容器已运行，再做简单检查
-				deployLogger.WriteLog("info", "docker", fmt.Sprintf("容器已就绪 (耗时: %s)", time.Since(startTime).Round(time.Millisecond)))
-				return nil
+				if !containerWasRunning {
+					// 第一次检测到容器运行
+					containerWasRunning = true
+					deployLogger.WriteLog("info", "docker", fmt.Sprintf("容器已启动 (耗时: %s)", time.Since(startTime).Round(time.Millisecond)))
+
+					// 等待一小段时间，确保容器不会立即退出
+					time.Sleep(2 * time.Second)
+				} else {
+					// 容器持续运行，认为部署成功
+					deployLogger.WriteLog("info", "docker", fmt.Sprintf("容器已就绪 (耗时: %s)", time.Since(startTime).Round(time.Millisecond)))
+					return nil
+				}
+			} else if status == "exited" || status == "dead" {
+				// 容器已退出，获取退出信息和日志
+				return gs.handleContainerExit(containerID, deployLogger, startTime)
+			} else if status == "restarting" {
+				// 容器正在重启，可能是启动失败
+				if containerWasRunning {
+					deployLogger.WriteLog("warn", "docker", "容器正在重启，可能启动失败")
+				}
 			}
 		}
 	}
+}
+
+// checkContainerFinalState 检查容器最终状态
+func (gs *GitServer) checkContainerFinalState(containerID string, deployLogger *DeployLogger, startTime time.Time) error {
+	// 检查容器当前状态
+	cmd := exec.Command("docker", "inspect", "-f", "{{.State.Status}}", containerID)
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("容器启动超时且无法获取状态: %w", err)
+	}
+
+	status := strings.TrimSpace(string(output))
+	if status == "running" {
+		deployLogger.WriteLog("info", "docker", fmt.Sprintf("容器已就绪 (耗时: %s)", time.Since(startTime).Round(time.Millisecond)))
+		return nil
+	}
+
+	// 容器未运行，获取详细信息
+	return gs.handleContainerExit(containerID, deployLogger, startTime)
+}
+
+// handleContainerExit 处理容器退出情况
+func (gs *GitServer) handleContainerExit(containerID string, deployLogger *DeployLogger, startTime time.Time) error {
+	// 获取容器退出码
+	cmd := exec.Command("docker", "inspect", "-f", "{{.State.ExitCode}}", containerID)
+	output, err := cmd.Output()
+	exitCode := -1
+	if err == nil {
+		fmt.Sscanf(strings.TrimSpace(string(output)), "%d", &exitCode)
+	}
+
+	// 获取容器退出状态
+	cmd = exec.Command("docker", "inspect", "-f", "{{.State.Status}}", containerID)
+	output, err = cmd.Output()
+	status := "unknown"
+	if err == nil {
+		status = strings.TrimSpace(string(output))
+	}
+
+	deployLogger.WriteLog("error", "docker", fmt.Sprintf("容器已退出 (状态: %s, 退出码: %d, 耗时: %s)", status, exitCode, time.Since(startTime).Round(time.Millisecond)))
+
+	// 获取容器日志
+	deployLogger.WriteLog("info", "docker", "正在获取容器日志...")
+	cmd = exec.Command("docker", "logs", "--tail", "50", containerID)
+	logOutput, err := cmd.CombinedOutput()
+	if err != nil {
+		deployLogger.WriteLog("warn", "docker", fmt.Sprintf("获取容器日志失败: %v", err))
+	} else {
+		deployLogger.WriteLog("info", "docker", "=== 容器日志 ===")
+		for _, line := range strings.Split(string(logOutput), "\n") {
+			if line != "" {
+				deployLogger.WriteLog("docker", "container", line)
+			}
+		}
+		deployLogger.WriteLog("info", "docker", "=== 日志结束 ===")
+	}
+
+	// 获取容器错误信息（如果有）
+	cmd = exec.Command("docker", "inspect", "-f", "{{.State.Error}}", containerID)
+	output, err = cmd.Output()
+	if err == nil && strings.TrimSpace(string(output)) != "" {
+		deployLogger.WriteLog("error", "docker", fmt.Sprintf("容器错误: %s", strings.TrimSpace(string(output))))
+	}
+
+	return fmt.Errorf("容器已退出 (状态: %s, 退出码: %d)", status, exitCode)
 }
 
 // stopContainer 停止容器
