@@ -1669,6 +1669,7 @@ func (s *Server) registerRunnerRoutes() {
 
 	// 推送历史和密钥绑定 API 路由
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/push-history", gitAPI.GetPushHistory)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/deploy/history", gitAPI.GetDeployHistory)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/bind-key", gitAPI.BindKeyToApp)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/git-server/app/unbind-key", gitAPI.UnbindKeyFromApp)
 

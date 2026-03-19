@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/xurenlu/sslcat/internal/i18n"
@@ -787,6 +788,69 @@ func (api *GitServerAPI) GetPushHistory(w http.ResponseWriter, r *http.Request) 
 		"success": true,
 		"data":    history,
 		"count":   len(history),
+	}
+
+	api.writeJSON(w, response)
+}
+
+// ==================== 部署历史 API ====================
+
+// GetDeployHistory 获取部署历史
+func (api *GitServerAPI) GetDeployHistory(w http.ResponseWriter, r *http.Request) {
+	appName := r.URL.Query().Get("app")
+	if appName == "" {
+		api.writeTranslatedError(w, "git_server.app_name_required", http.StatusBadRequest)
+		return
+	}
+
+	// 获取应用信息
+	app, err := api.server.GetApp(appName)
+	if err != nil {
+		api.writeTranslatedError(w, "git_server.app_not_exists", http.StatusNotFound, err.Error())
+		return
+	}
+
+	// 获取部署历史
+	deployHistory := app.DeployHistory
+	if deployHistory == nil {
+		deployHistory = []runner.DeployRecord{}
+	}
+
+	// 计算统计信息
+	stats := map[string]interface{}{
+		"total_deploys":      len(deployHistory),
+		"successful_deploys": 0,
+		"failed_deploys":     0,
+		"average_duration":   0,
+		"last_deploy_time":   "",
+		"success_rate":       0.0,
+	}
+
+	totalDuration := int64(0)
+	for _, record := range deployHistory {
+		if record.Status == "success" {
+			stats["successful_deploys"] = stats["successful_deploys"].(int) + 1
+		} else if record.Status == "failed" {
+			stats["failed_deploys"] = stats["failed_deploys"].(int) + 1
+		}
+		totalDuration += record.Duration
+	}
+
+	if len(deployHistory) > 0 {
+		stats["average_duration"] = totalDuration / int64(len(deployHistory))
+		stats["last_deploy_time"] = deployHistory[len(deployHistory)-1].Timestamp.Format(time.RFC3339)
+	}
+
+	if stats["total_deploys"].(int) > 0 {
+		successRate := float64(stats["successful_deploys"].(int)) / float64(stats["total_deploys"].(int)) * 100
+		stats["success_rate"] = successRate
+	}
+
+	response := map[string]interface{}{
+		"success": true,
+		"data":    deployHistory,
+		"stats":   stats,
+		"count":   len(deployHistory),
 	}
 
 	api.writeJSON(w, response)

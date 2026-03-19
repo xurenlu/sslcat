@@ -4,7 +4,7 @@ import { useToast } from '@chakra-ui/react'
 import { buildApiPath } from '../contexts/ConfigContext'
 import { useErrorHandler } from './useErrorHandler'
 import { useTranslation } from './useLanguage'
-import { GitApp } from '../pages/GitServerManagement/types'
+import { GitApp, transformBackendAppToGitApp } from '../pages/GitServerManagement/types'
 import { TOAST_DURATION } from '../constants'
 import { GitCommandToast } from '../components/GitCommandToast'
 
@@ -75,7 +75,10 @@ export const useGitApps = ({ adminPrefix }: UseGitAppsOptions) => {
           }
 
           const appsJson = await response.json()
-          const appsData = Array.isArray(appsJson?.data) ? appsJson.data : []
+          const appsDataRaw = Array.isArray(appsJson?.data) ? appsJson.data : []
+
+          // 转换后端状态为前端状态
+          const appsData = appsDataRaw.map(transformBackendAppToGitApp)
 
           // 更新缓存
           cache.set(cacheKey, {

@@ -1527,7 +1527,7 @@ func (gs *GitServer) processGitPush(app *GitApp, pushData []byte) {
 		// 更新部署失败状态
 		deployLogger.UpdateStatus("failed", 100, fmt.Sprintf("部署失败: %s", err.Error()))
 
-		gs.handleDeployError(app, err)
+		gs.handleDeployErrorWithDetails(app, err, commitSHA, message, deployLogger.GetDuration())
 		return
 	}
 
@@ -1537,7 +1537,7 @@ func (gs *GitServer) processGitPush(app *GitApp, pushData []byte) {
 	// 更新部署成功状态
 	deployLogger.UpdateStatus("success", 100, fmt.Sprintf("部署成功 - 耗时: %v", deployLogger.GetDuration()))
 
-	gs.handleDeploySuccess(app)
+	gs.handleDeploySuccessWithDetails(app, commitSHA, message, deployLogger.GetDuration(), deployer)
 }
 
 // detectAppType 检测应用类型（使用 Builder Registry）
@@ -2373,6 +2373,11 @@ func (gs *GitServer) stopApp(app *GitApp) error {
 
 // handleDeploySuccess 处理部署成功
 func (gs *GitServer) handleDeploySuccess(app *GitApp) {
+	gs.handleDeploySuccessWithDetails(app, "", "", 0, "")
+}
+
+// handleDeploySuccessWithDetails 处理部署成功（带详细信息）
+func (gs *GitServer) handleDeploySuccessWithDetails(app *GitApp, commitHash, commitMessage string, duration time.Duration, deployer string) {
 	gs.mutex.Lock()
 	app.Status = "running"
 	app.LastDeploy = time.Now()
@@ -2387,16 +2392,65 @@ func (gs *GitServer) handleDeploySuccess(app *GitApp) {
 		}
 	}
 
+	// 添加成功记录到部署历史
+	if commitHash != "" {
+		gs.addDeployRecord(app, "success", duration, commitHash, commitMessage, "")
+	}
+
 	gs.logger.Infof("应用 %s 部署成功", app.Name)
+}
+
+// addDeployRecord 添加部署记录到应用历史
+func (gs *GitServer) addDeployRecord(app *GitApp, status string, duration time.Duration, commitHash, commitMessage string, errorMsg string) {
+	gs.mutex.Lock()
+	defer gs.mutex.Unlock()
+
+	if app.DeployHistory == nil {
+		app.DeployHistory = make([]DeployRecord, 0)
+	}
+
+	record := DeployRecord{
+		ID:            fmt.Sprintf("%s-%d", app.Name, time.Now().UnixNano()),
+		Timestamp:     time.Now(),
+		Status:        status,
+		CommitHash:    commitHash,
+		CommitMessage: commitMessage,
+		Duration:      duration.Milliseconds(),
+	}
+
+	if errorMsg != "" {
+		record.Error = errorMsg
+	}
+
+	app.DeployHistory = append(app.DeployHistory, record)
+
+	// 限制历史记录数量（保留最近100条）
+	if len(app.DeployHistory) > 100 {
+		app.DeployHistory = app.DeployHistory[len(app.DeployHistory)-100:]
+	}
+
+	gs.logger.Infof("已添加部署记录: %s - %s (耗时: %v)", app.Name, status, duration)
 }
 
 // handleDeployError 处理部署错误
 func (gs *GitServer) handleDeployError(app *GitApp, err error) {
+	gs.handleDeployErrorWithDetails(app, err, "", "", 0)
+}
+
+// handleDeployErrorWithDetails 处理部署错误（带详细信息）
+func (gs *GitServer) handleDeployErrorWithDetails(app *GitApp, err error, commitHash, commitMessage string, duration time.Duration) {
 	gs.mutex.Lock()
 	app.Status = "failed"
 	gs.mutex.Unlock()
 
 	gs.logger.Errorf("应用 %s 部署失败: %v", app.Name, err)
+
+	// 添加失败记录到部署历史
+	if commitHash != "" {
+		gs.addDeployRecord(app, "failed", duration, commitHash, commitMessage, err.Error())
+	} else {
+		gs.addDeployRecord(app, "failed", 0, "", "", err.Error())
+	}
 }
 
 // ==================== 数据持久化 ====================
