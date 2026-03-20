@@ -858,7 +858,7 @@ EOF
 
 set_permissions() {
     log_info "$(msg setting_perms)"
-    
+
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
         chown -R root:root /opt/sslcat
         chown -R root:root /etc/sslcat
@@ -866,6 +866,12 @@ set_permissions() {
         chown -R git:git /var/www
         chown -R root:root /var/log/sslcat
         chmod +x /opt/sslcat/sslcat
+
+        # 设置 Git runners 目录权限（如果存在）
+        if [[ -d "/opt/sslcat/data/runners/git" ]]; then
+            chown -R git:git /opt/sslcat/data/runners/git
+            log_info "Set git:git permissions for /opt/sslcat/data/runners/git"
+        fi
     elif [[ "$OSTYPE" == "darwin"* ]]; then
         chown -R root:wheel /usr/local/bin/sslcat
         chown -R root:wheel /usr/local/etc/sslcat
@@ -873,8 +879,14 @@ set_permissions() {
         chown -R git:staff /usr/local/var/www
         chown -R root:wheel /usr/local/var/sslcat
         chmod +x /usr/local/bin/sslcat
+
+        # 设置 Git runners 目录权限（如果存在）
+        if [[ -d "/usr/local/var/sslcat/data/runners/git" ]]; then
+            chown -R git:staff /usr/local/var/sslcat/data/runners/git
+            log_info "Set git:staff permissions for /usr/local/var/sslcat/data/runners/git"
+        fi
     fi
-    
+
     log_success "$(msg perms_done2)"
 }
 

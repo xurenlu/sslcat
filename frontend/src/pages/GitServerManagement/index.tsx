@@ -2,54 +2,40 @@ import React, { useState, useEffect } from 'react'
 import {
   Box,
   Heading,
-  SimpleGrid,
-  Card,
-  CardBody,
   VStack,
   HStack,
   Button,
   Icon,
   Text,
   Flex,
-  Badge,
-  Stat,
-  StatLabel,
-  StatNumber,
-  StatHelpText,
   Alert,
   AlertIcon,
   AlertTitle,
   AlertDescription,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
   useDisclosure,
+  SimpleGrid,
+  Card,
+  CardBody,
+  Stat,
+  StatLabel,
+  StatNumber,
+  StatHelpText,
+  useColorModeValue,
 } from '@chakra-ui/react'
 import {
   FiGitBranch,
   FiRefreshCw,
-  FiPlus,
-  FiUpload,
   FiSettings,
-  FiKey,
   FiFolder,
-  FiTerminal,
-  FiPackage,
-  FiClock,
+  FiActivity,
+  FiServer,
+  FiShield,
 } from 'react-icons/fi'
-import { useConfig, buildApiPath } from '../../contexts/ConfigContext'
+import { useConfig } from '../../contexts/ConfigContext'
 import { useTranslation } from '../../hooks/useLanguage'
-import RealtimeLogs from '../../components/RealtimeLogs'
-import DockerImageManager from '../../components/DockerImageManager'
-import DeployHistory from '../../components/DeployHistory'
-import PushHistory from '../../components/PushHistory'
-import SSHKeyBindings from '../../components/SSHKeyBindings'
 import { useGitApps } from '../../hooks/useGitApps'
 import { useSSHKeys } from '../../hooks/useSSHKeys'
 import { useGitServerConfig } from '../../hooks/useGitServerConfig'
-import AppList from './AppList'
 import SSHKeyList from './SSHKeyList'
 import CreateAppModal from './CreateAppModal'
 import AddSSHKeyModal from './AddSSHKeyModal'
@@ -57,7 +43,7 @@ import ConfigModal from './ConfigModal'
 import EnvVarModal from './EnvVarModal'
 import RoutingModal from './RoutingModal'
 import DeleteAppModal from './DeleteAppModal'
-import DeployHistoryDialog from './DeployHistoryDialog'
+import AppCardGrid from './AppCardGrid'
 import { GitApp } from './types'
 
 const GitServerManagement: React.FC = () => {
@@ -92,10 +78,8 @@ const GitServerManagement: React.FC = () => {
     restartSSHD,
   } = useGitServerConfig({ adminPrefix })
 
-  const [selectedApp, setSelectedApp] = useState<string>('')
   const [selectedAppForModal, setSelectedAppForModal] = useState<GitApp | null>(null)
-  const [selectedAppForDeployHistory, setSelectedAppForDeployHistory] = useState<GitApp | null>(null)
-  const [logsDeploymentId, setLogsDeploymentId] = useState<string | null>(null)
+  const [showSSHKeys, setShowSSHKeys] = useState(false)
 
   // Modal 状态
   const { isOpen: isCreateAppOpen, onOpen: onCreateAppOpen, onClose: onCreateAppClose } = useDisclosure()
@@ -104,7 +88,6 @@ const GitServerManagement: React.FC = () => {
   const { isOpen: isEnvModalOpen, onOpen: onEnvModalOpen, onClose: onEnvModalClose } = useDisclosure()
   const { isOpen: isRoutingModalOpen, onOpen: onRoutingModalOpen, onClose: onRoutingModalClose } = useDisclosure()
   const { isOpen: isDeleteModalOpen, onOpen: onDeleteModalOpen, onClose: onDeleteModalClose } = useDisclosure()
-  const { isOpen: isDeployHistoryOpen, onOpen: onDeployHistoryOpen, onClose: onDeployHistoryClose } = useDisclosure()
 
   // 刷新所有数据
   const refreshData = async () => {
@@ -160,25 +143,18 @@ const GitServerManagement: React.FC = () => {
     onDeleteModalOpen()
   }
 
-  // 打开部署历史模态框
-  const openDeployHistoryModal = (app: GitApp) => {
-    setSelectedAppForDeployHistory(app)
-    onDeployHistoryOpen()
-  }
-
-  // 打开特定部署的日志
-  const handleOpenDeploymentLogs = (appName: string, deploymentId: string) => {
-    setSelectedApp(appName)
-    setLogsDeploymentId(deploymentId)
-    // 切换到日志标签页
-    // 这里需要通过 state 或其他方式来切换 tab
-    // 暂时简化处理，直接返回让用户手动切换
-  }
-
   const loading = appsLoading || keysLoading || configLoading
 
   // 获取需要重新部署的应用
   const pendingApps = apps.filter((app) => app.pending_restart === true)
+
+  // 统计数据
+  const activeAppsCount = apps.filter((app) => app.status === 'active').length
+  const deployingAppsCount = apps.filter((app) => app.status === 'deploying').length
+  const errorAppsCount = apps.filter((app) => app.status === 'error').length
+
+  const bg = useColorModeValue('gray.50', 'gray.900')
+  const cardBg = useColorModeValue('white', 'gray.800')
 
   return (
     <>
@@ -186,34 +162,35 @@ const GitServerManagement: React.FC = () => {
       {pendingApps.length > 0 && (
         <Box
           position="fixed"
-          top="60px"
+          top="80px"
           right="20px"
           zIndex={9999}
           bg="orange.500"
           color="white"
           p={4}
-          borderRadius="md"
+          borderRadius="12px"
           boxShadow="lg"
           maxW="400px"
+          backdropFilter="blur(10px)"
         >
-          <VStack align="stretch" spacing={2}>
+          <VStack align="stretch" spacing={3}>
             <HStack justify="space-between">
               <HStack>
-                <Icon as={FiUpload} boxSize={5} />
-                <Text fontWeight="bold">{t.gitServer.configUpdated}</Text>
+                <Icon as={FiActivity} boxSize={5} />
+                <Text fontWeight="bold">配置已更新</Text>
               </HStack>
             </HStack>
             <Text fontSize="sm">
-              {t.gitServer.needRedeploy}
+              以下应用需要重新部署以应用新配置：
             </Text>
-            <VStack align="stretch" spacing={1} maxH="200px" overflowY="auto">
+            <VStack align="stretch" spacing={2} maxH="200px" overflowY="auto">
               {pendingApps.map((app) => (
                 <HStack
                   key={app.name}
                   justify="space-between"
                   bg="orange.600"
                   p={2}
-                  borderRadius="sm"
+                  borderRadius="8px"
                 >
                   <Text fontSize="sm" fontWeight="medium">
                     {app.name}
@@ -221,10 +198,10 @@ const GitServerManagement: React.FC = () => {
                   <Button
                     size="xs"
                     colorScheme="whiteAlpha"
-                    leftIcon={<Icon as={FiUpload} />}
+                    leftIcon={<Icon as={FiRefreshCw} />}
                     onClick={() => deployApp(app.name)}
                   >
-                    {t.gitServer.redeploy}
+                    重新部署
                   </Button>
                 </HStack>
               ))}
@@ -233,341 +210,215 @@ const GitServerManagement: React.FC = () => {
         </Box>
       )}
 
-      <Box>
-        <Flex justify="space-between" align="center" mb={6}>
-          <HStack>
-            <Icon as={FiGitBranch} boxSize={6} />
-            <Heading size="lg">{t.gitServer.title}</Heading>
-          </HStack>
-          <HStack>
-            <Button
-              leftIcon={<Icon as={FiRefreshCw} />}
-              onClick={refreshData}
-              isLoading={loading}
-              variant="outline"
-            >
-              {t.common.refresh}
-            </Button>
-            <Button
-              leftIcon={<Icon as={FiSettings} />}
-              onClick={onConfigOpen}
-              variant="outline"
-            >
-              {t.gitServer.config}
-            </Button>
-            <Button leftIcon={<Icon as={FiPlus} />} colorScheme="blue" onClick={onCreateAppOpen}>
-              {t.gitServer.addApp}
-            </Button>
-          </HStack>
-        </Flex>
-
-        {/* 服务器状态 */}
-        <Alert status={config.enabled ? 'success' : 'warning'} mb={6}>
-          <AlertIcon />
-          <AlertTitle>{t.gitServer.serverStatus}</AlertTitle>
-          <AlertDescription>
-            {config.enabled
-              ? t.gitServer.serverRunning.replace('{port}', String(config.port))
-              : t.gitServer.serverDisabled}
-          </AlertDescription>
-        </Alert>
-
-        {/* SSH 服务重启提示 */}
-        {config.enabled && (
-          <Alert status="info" mb={6}>
-            <AlertIcon />
-            <Box flex="1">
-              <AlertTitle>{t.gitServer.needRestartSSH}</AlertTitle>
-              <AlertDescription>
-                {t.gitServer.restartSSHDescription}
-                <br />
-                <Text as="span" fontWeight="bold" color="blue.600">
-                  Linux: sudo systemctl restart sshd
+      <Box minH="100vh" bg={bg} py={8}>
+        <VStack spacing={8} maxW="1600px" mx="auto" px={6}>
+          {/* 页面头部 */}
+          <Flex justify="space-between" align="center">
+            <HStack spacing={4}>
+              <Box
+                p={3}
+                bg="blue.500"
+                borderRadius="12px"
+                boxShadow="0 4px 12px rgba(59, 130, 246, 0.3)"
+              >
+                <Icon as={FiGitBranch} boxSize={8} color="white" />
+              </Box>
+              <VStack align="start" spacing={1}>
+                <Heading size="lg" color="gray.800">
+                  Git Server
+                </Heading>
+                <Text fontSize="sm" color="gray.500">
+                  持续部署平台
                 </Text>
-                <br />
-                <Text as="span" fontWeight="bold" color="blue.600">
-                  macOS: sudo launchctl unload /System/Library/LaunchDaemons/ssh.plist && sudo
-                  launchctl load /System/Library/LaunchDaemons/ssh.plist
-                </Text>
-              </AlertDescription>
-            </Box>
-            <Button
-              colorScheme="blue"
-              size="sm"
-              onClick={restartSSHD}
-              isLoading={configLoading}
-            >
-              {t.gitServer.autoRestartSSH}
-            </Button>
-          </Alert>
-        )}
+              </VStack>
+            </HStack>
 
-        {/* 统计信息 */}
-        <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={6} mb={8}>
-          <Card>
-            <CardBody>
-              <Stat>
-                <StatLabel>{t.gitServer.gitApps}</StatLabel>
-                <StatNumber>{apps.length}</StatNumber>
-                <StatHelpText>
-                  {t.gitServer.runningApps}:{' '}
-                  {Array.isArray(apps)
-                    ? apps.filter((app) => app.status === 'active').length
-                    : 0}
-                </StatHelpText>
-              </Stat>
-            </CardBody>
-          </Card>
+            <HStack spacing={3}>
+              <Button
+                leftIcon={<Icon as={FiShield} />}
+                onClick={() => setShowSSHKeys(!showSSHKeys)}
+                variant={showSSHKeys ? 'solid' : 'outline'}
+                colorScheme="green"
+                borderRadius="8px"
+              >
+                SSH 密钥 ({sshKeys.length})
+              </Button>
+              <Button
+                leftIcon={<Icon as={FiSettings} />}
+                onClick={onConfigOpen}
+                variant="outline"
+                borderRadius="8px"
+              >
+                服务器配置
+              </Button>
+              <Button
+                leftIcon={<Icon as={FiRefreshCw} />}
+                onClick={refreshData}
+                isLoading={loading}
+                variant="outline"
+                borderRadius="8px"
+              >
+                刷新
+              </Button>
+            </HStack>
+          </Flex>
 
-          <Card>
-            <CardBody>
-              <Stat>
-                <StatLabel>{t.gitServer.sshKeys}</StatLabel>
-                <StatNumber>{sshKeys.length}</StatNumber>
-                <StatHelpText>{t.gitServer.configuredKeys}</StatHelpText>
-              </Stat>
-            </CardBody>
-          </Card>
+          {/* 统计卡片 */}
+          <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4}>
+            <Card bg={cardBg} borderRadius="12px" boxShadow="sm">
+              <CardBody>
+                <Stat>
+                  <StatLabel fontSize="sm" color="gray.500">总应用数</StatLabel>
+                  <StatNumber fontSize="3xl">{apps.length}</StatNumber>
+                  <StatHelpText fontSize="xs">已创建的应用</StatHelpText>
+                </Stat>
+              </CardBody>
+            </Card>
 
-          <Card>
-            <CardBody>
-              <Stat>
-                <StatLabel>{t.gitServer.totalCommits}</StatLabel>
-                <StatNumber>
-                  {Array.isArray(apps)
-                    ? apps.reduce((sum, app) => sum + (app.commits || 0), 0)
-                    : 0}
-                </StatNumber>
-                <StatHelpText>{t.gitServer.allAppsCommits}</StatHelpText>
-              </Stat>
-            </CardBody>
-          </Card>
+            <Card bg={cardBg} borderRadius="12px" boxShadow="sm">
+              <CardBody>
+                <Stat>
+                  <StatLabel fontSize="sm" color="gray.500">运行中</StatLabel>
+                  <StatNumber fontSize="3xl" color="green.500">{activeAppsCount}</StatNumber>
+                  <StatHelpText fontSize="xs">正常部署的应用</StatHelpText>
+                </Stat>
+              </CardBody>
+            </Card>
 
-          <Card>
-            <CardBody>
-              <Stat>
-                <StatLabel>{t.gitServer.autoSSL}</StatLabel>
-                <StatNumber>
-                  {Array.isArray(apps) ? apps.filter((app) => app.autoSSL).length : 0}
-                </StatNumber>
-                <StatHelpText>{t.gitServer.autoSSLApps}</StatHelpText>
-              </Stat>
-            </CardBody>
-          </Card>
-        </SimpleGrid>
+            <Card bg={cardBg} borderRadius="12px" boxShadow="sm">
+              <CardBody>
+                <Stat>
+                  <StatLabel fontSize="sm" color="gray.500">部署中</StatLabel>
+                  <StatNumber fontSize="3xl" color="blue.500">{deployingAppsCount}</StatNumber>
+                  <StatHelpText fontSize="xs">正在构建或部署</StatHelpText>
+                </Stat>
+              </CardBody>
+            </Card>
 
-        <Tabs variant="enclosed">
-          <TabList>
-            <Tab>
-              <HStack>
-                <Icon as={FiFolder} />
-                <Text>{t.gitServer.gitApps}</Text>
-                <Badge colorScheme="blue">{apps.length}</Badge>
-              </HStack>
-            </Tab>
-            <Tab>
-              <HStack>
-                <Icon as={FiKey} />
-                <Text>{t.gitServer.sshKeys}</Text>
-                <Badge colorScheme="green">{sshKeys.length}</Badge>
-              </HStack>
-            </Tab>
+            <Card bg={cardBg} borderRadius="12px" boxShadow="sm">
+              <CardBody>
+                <Stat>
+                  <StatLabel fontSize="sm" color="gray.500">错误</StatLabel>
+                  <StatNumber fontSize="3xl" color="red.500">{errorAppsCount}</StatNumber>
+                  <StatHelpText fontSize="xs">部署失败的应用</StatHelpText>
+                </Stat>
+              </CardBody>
+            </Card>
+          </SimpleGrid>
 
-            <Tab>
-              <HStack>
-                <Icon as={FiTerminal} />
-                <Text>{t.gitServer.realtimeLogs}</Text>
-              </HStack>
-            </Tab>
+          {/* 服务器状态 */}
+          {!config.enabled && (
+            <Alert status="warning" borderRadius="12px">
+              <AlertIcon />
+              <Box flex="1">
+                <AlertTitle>Git Server 未启用</AlertTitle>
+                <AlertDescription>
+                  请在服务器配置中启用 Git Server 功能。
+                </AlertDescription>
+              </Box>
+              <Button
+                colorScheme="orange"
+                size="sm"
+                onClick={onConfigOpen}
+              >
+                前往配置
+              </Button>
+            </Alert>
+          )}
 
-            <Tab>
-              <HStack>
-                <Icon as={FiPackage} />
-                <Text>{t.gitServer.dockerImages}</Text>
-              </HStack>
-            </Tab>
+          {/* SSH 密钥管理 */}
+          {showSSHKeys && (
+            <Card bg={cardBg} borderRadius="12px" boxShadow="sm">
+              <CardBody>
+                <VStack align="stretch" spacing={4}>
+                  <Flex justify="space-between" align="center">
+                    <HStack spacing={2}>
+                      <Icon as={FiShield} boxSize={5} color="green.500" />
+                      <Heading size="md">SSH 密钥</Heading>
+                      <Text fontSize="sm" color="gray.500">
+                    ({sshKeys.length} 个密钥)
+                  </Text>
+                    </HStack>
+                    <Button
+                      leftIcon={<Icon as={FiFolder} />}
+                      size="sm"
+                      colorScheme="green"
+                      onClick={onKeyOpen}
+                    >
+                      添加密钥
+                    </Button>
+                  </Flex>
 
-            <Tab>
-              <HStack>
-                <Icon as={FiClock} />
-                <Text>{t.gitServer.deployHistory}</Text>
-              </HStack>
-            </Tab>
-
-            <Tab>
-              <HStack>
-                <Icon as={FiGitBranch} />
-                <Text>{t.gitServer.pushHistory}</Text>
-              </HStack>
-            </Tab>
-          </TabList>
-
-          <TabPanels>
-            {/* Git应用 */}
-            <TabPanel>
-              <AppList
-                apps={apps}
-                selectedApp={selectedApp}
-                onSelectApp={setSelectedApp}
-                onDeploy={deployApp}
-                onDelete={openDeleteModal}
-                onOpenEnvModal={openEnvModal}
-                onOpenRoutingModal={openRoutingModal}
-                onOpenDeployHistory={openDeployHistoryModal}
-                onCreateApp={onCreateAppOpen}
-              />
-            </TabPanel>
-
-            {/* SSH密钥 */}
-            <TabPanel>
-              <SSHKeyList
-                sshKeys={sshKeys}
-                onAdd={onKeyOpen}
-                onDelete={deleteSSHKey}
-              />
-            </TabPanel>
-
-            {/* 实时日志 */}
-            <TabPanel>
-              <VStack spacing={4} align="stretch">
-                {selectedApp ? (
-                  <RealtimeLogs
-                    appName={selectedApp}
-                    autoScroll={true}
-                    maxLines={500}
-                    showControls={true}
+                  <SSHKeyList
+                    sshKeys={sshKeys}
+                    onAdd={onKeyOpen}
+                    onDelete={deleteSSHKey}
                   />
-                ) : (
-                  <Alert status="info">
-                    <AlertIcon />
-                    {t.gitServer.selectAppFirst.replace('{feature}', t.gitServer.realtimeLogs)}
-                  </Alert>
-                )}
-              </VStack>
-            </TabPanel>
+                </VStack>
+              </CardBody>
+            </Card>
+          )}
 
-            {/* Docker镜像 */}
-            <TabPanel>
-              <VStack spacing={4} align="stretch">
-                {selectedApp ? (
-                  <DockerImageManager appName={selectedApp} />
-                ) : (
-                  <Alert status="info">
-                    <AlertIcon />
-                    {t.gitServer.selectAppFirst.replace('{feature}', t.gitServer.manageDockerImages)}
-                  </Alert>
-                )}
-              </VStack>
-            </TabPanel>
-
-            {/* 部署历史 */}
-            <TabPanel>
-              <VStack spacing={4} align="stretch">
-                {selectedApp ? (
-                  <DeployHistory appName={selectedApp} />
-                ) : (
-                  <Alert status="info">
-                    <AlertIcon />
-                    {t.gitServer.selectAppFirst.replace('{feature}', t.gitServer.viewDeployHistory)}
-                  </Alert>
-                )}
-              </VStack>
-            </TabPanel>
-
-            {/* 推送记录 */}
-            <TabPanel>
-              <VStack spacing={4} align="stretch">
-                {selectedApp ? (
-                  <>
-                    <Card>
-                      <CardBody>
-                        <VStack align="stretch" spacing={4}>
-                          <Heading size="md">{t.gitServer.pushHistory}</Heading>
-                          <PushHistory appName={selectedApp} limit={50} />
-                        </VStack>
-                      </CardBody>
-                    </Card>
-
-                    <Card>
-                      <CardBody>
-                        <VStack align="stretch" spacing={4}>
-                          <Heading size="md">{t.gitServer.sshKeys}</Heading>
-                          <SSHKeyBindings
-                            appName={selectedApp}
-                            allowedKeys={
-                              apps.find((a) => a.name === selectedApp)?.allowed_keys || []
-                            }
-                            onUpdate={refreshData}
-                          />
-                        </VStack>
-                      </CardBody>
-                    </Card>
-                  </>
-                ) : (
-                  <Alert status="info">
-                    <AlertIcon />
-                    {t.gitServer.viewPushHistory}
-                  </Alert>
-                )}
-              </VStack>
-            </TabPanel>
-          </TabPanels>
-        </Tabs>
-
-        {/* 模态框 */}
-        <CreateAppModal
-          isOpen={isCreateAppOpen}
-          onClose={onCreateAppClose}
-          onCreate={handleCreateApp}
-          config={config}
-        />
-
-        <AddSSHKeyModal
-          isOpen={isKeyOpen}
-          onClose={onKeyClose}
-          onAdd={handleAddSSHKey}
-        />
-
-        <ConfigModal
-          isOpen={isConfigOpen}
-          onClose={onConfigClose}
-          onSave={updateConfig}
-          config={config}
-          loading={configLoading}
-        />
-
-        <EnvVarModal
-          isOpen={isEnvModalOpen}
-          onClose={onEnvModalClose}
-          onSave={handleSaveEnvVars}
-          app={selectedAppForModal}
-        />
-
-        <RoutingModal
-          isOpen={isRoutingModalOpen}
-          onClose={onRoutingModalClose}
-          onSave={handleSaveRouting}
-          app={selectedAppForModal}
-          config={config}
-        />
-
-        <DeleteAppModal
-          isOpen={isDeleteModalOpen}
-          onClose={onDeleteModalClose}
-          onDelete={handleDeleteApp}
-          app={selectedAppForModal}
-        />
-
-        <DeployHistoryDialog
-          isOpen={isDeployHistoryOpen}
-          onClose={onDeployHistoryClose}
-          appName={selectedAppForDeployHistory?.name || ''}
-          onOpenLogs={handleOpenDeploymentLogs}
-        />
+          {/* 应用卡片网格 */}
+          <AppCardGrid
+            apps={apps}
+            loading={loading}
+            onRefresh={loadApps}
+            onDeploy={deployApp}
+            onDelete={openDeleteModal}
+            onOpenEnvModal={openEnvModal}
+            onOpenRoutingModal={openRoutingModal}
+            onCreateApp={onCreateAppOpen}
+          />
+        </VStack>
       </Box>
+
+      {/* Modal 组件 */}
+      <CreateAppModal
+        isOpen={isCreateAppOpen}
+        onClose={onCreateAppClose}
+        onCreate={handleCreateApp}
+        config={config}
+      />
+
+      <AddSSHKeyModal
+        isOpen={isKeyOpen}
+        onClose={onKeyClose}
+        onAdd={handleAddSSHKey}
+      />
+
+      <ConfigModal
+        isOpen={isConfigOpen}
+        onClose={onConfigClose}
+        config={config}
+        onSave={updateConfig}
+      />
+
+      {selectedAppForModal && (
+        <>
+          <EnvVarModal
+            isOpen={isEnvModalOpen}
+            onClose={onEnvModalClose}
+            app={selectedAppForModal}
+            onSave={handleSaveEnvVars}
+          />
+          <RoutingModal
+            isOpen={isRoutingModalOpen}
+            onClose={onRoutingModalClose}
+            app={selectedAppForModal}
+            config={config}
+            onSave={handleSaveRouting}
+          />
+          <DeleteAppModal
+            isOpen={isDeleteModalOpen}
+            onClose={onDeleteModalClose}
+            app={selectedAppForModal}
+            onDelete={handleDeleteApp}
+          />
+        </>
+      )}
     </>
   )
 }
 
 export default GitServerManagement
-
