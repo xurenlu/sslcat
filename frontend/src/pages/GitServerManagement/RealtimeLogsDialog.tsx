@@ -18,11 +18,17 @@ import RealtimeLogs from '../../components/RealtimeLogs'
 interface RealtimeLogsDialogProps {
   appName: string
   trigger?: React.ReactNode
+  isOpen?: boolean
+  onClose?: () => void
 }
 
-const RealtimeLogsDialog: React.FC<RealtimeLogsDialogProps> = ({ appName, trigger }) => {
+const RealtimeLogsDialog: React.FC<RealtimeLogsDialogProps> = ({ appName, trigger, isOpen: controlledIsOpen, onClose: controlledOnClose }) => {
   const t = useTranslation()
-  const { isOpen, onOpen, onClose } = useDisclosure()
+  const { isOpen: internalIsOpen, onOpen, onClose: internalOnClose } = useDisclosure()
+
+  // 支持受控和非受控模式
+  const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen
+  const onClose = controlledOnClose !== undefined ? controlledOnClose : internalOnClose
 
   const defaultTrigger = (
     <IconButton
@@ -38,7 +44,7 @@ const RealtimeLogsDialog: React.FC<RealtimeLogsDialogProps> = ({ appName, trigge
   const TriggerWrapper = ({ children }: { children: React.ReactNode }) => {
     if (React.isValidElement(children)) {
       return React.cloneElement(children as React.ReactElement<any>, {
-        onClick: onOpen,
+        onClick: controlledIsOpen !== undefined ? () => controlledOnClose?.() : onOpen,
       })
     }
     return <>{children}</>

@@ -4355,23 +4355,56 @@ while read oldrev newrev refname; do
                 else
                     # 没有新日志，增加空闲计时
                     IDLE_ELAPSED=$((IDLE_ELAPSED + 1))
-                    
+
+                    # 输出进度保持连接活跃
+                    # 每 2 秒输出一次，每次输出 256 字节的填充内容
+                    # 这样可以填满大部分缓冲区，触发 Git 发送数据到客户端
+                    if [ $((IDLE_ELAPSED % 2)) -eq 0 ]; then
+                        # 输出带颜色的进度点和空格
+                        printf "\r${COLOR_BOLD}[${COLOR_YELLOW}等待部署日志${COLOR_RESET}] ${COLOR_GREEN}"
+                        # 输出进度条效果
+                        DOTS=$((IDLE_ELAPSED / 2))
+                        for i in $(seq 1 20); do
+                            if [ $i -le $((DOTS % 21)) ]; then
+                                printf "█"
+                            else
+                                printf "░"
+                            fi
+                        done
+                        printf "${COLOR_RESET} %3ds" $IDLE_ELAPSED
+
+                        # 强制刷新 - 使用多种方法确保输出被发送
+                        {
+                            # 方法 1: sync
+                            sync 2>/dev/null || true
+
+                            # 方法 2: dd 触发刷新
+                            dd bs=1 count=0 >/dev/null 2>&1 || true
+
+                            # 方法 3: 如果有 python3，用它来刷新
+                            if command -v python3 >/dev/null 2>&1; then
+                                python3 -c "import sys; sys.stdout.flush()" 2>/dev/null || true
+                            fi
+                        } 2>/dev/null || true
+                    fi
+
                     # 空闲超时检查
                     if [ $IDLE_ELAPSED -ge $IDLE_TIMEOUT ]; then
+                        echo ""  # 换行
                         print_warning "No new logs for ${IDLE_TIMEOUT}s (2 min), deployment may still be running in background"
                         print_info "Check admin panel or logs for details: tail -f $DEPLOY_LOG"
-                        
+
                         # 发送部署卡住通知 API
                         curl -s -X POST "http://localhost:${ADMIN_PORT}${ADMIN_PREFIX}/api/internal/deploy-notification" \
                           -H "Content-Type: application/json" \
                           -d "{\"type\":\"stuck\",\"app_name\":\"$APP_NAME\",\"commit_sha\":\"$SHORT_SHA\",\"idle_duration\":\"${IDLE_TIMEOUT}s\"}" \
                           >/dev/null 2>&1 || true
-                        
+
                         break
                     fi
                 fi
             fi
-            
+
             sleep 1
             TOTAL_ELAPSED=$((TOTAL_ELAPSED + 1))
         done

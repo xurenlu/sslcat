@@ -3,7 +3,6 @@ package runner
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -25,7 +24,7 @@ type DeploymentLogger struct {
 	Message        string
 	LogFile        string
 	DB             *DeploymentDatabase
-	FileWriter     io.Writer
+	FileWriter     *os.File
 	logger         *logrus.Entry
 	startTime      time.Time
 	statusCallback func(status string, progress int, message string)
@@ -142,6 +141,14 @@ func (dl *DeploymentLogger) writeToFile(entry *LogEntry) {
 	_, err = dl.FileWriter.Write(append(jsonData, '\n'))
 	if err != nil {
 		dl.logger.Errorf("写入日志文件失败: %v", err)
+		return
+	}
+
+	// 立即同步到磁盘，确保 Git hook 能实时读取到日志
+	// 这对于 git push 时的实时日志输出至关重要
+	if err := dl.FileWriter.Sync(); err != nil {
+		dl.logger.Warnf("同步日志文件失败: %v", err)
+		// 同步失败不视为致命错误，继续执行
 	}
 }
 
@@ -303,8 +310,8 @@ func (dl *DeploymentLogger) Close() error {
 	dl.logger.Infof("关闭发布日志记录器: %s", dl.UUID)
 
 	// 关闭文件
-	if file, ok := dl.FileWriter.(*os.File); ok {
-		if err := file.Close(); err != nil {
+	if dl.FileWriter != nil {
+		if err := dl.FileWriter.Close(); err != nil {
 			dl.logger.Errorf("关闭日志文件失败: %v", err)
 		}
 	}
