@@ -1,4 +1,4 @@
-import{r as s,R as ce}from"./chakra-vendor-CZA_t-07.js";/**
+import{r as s,R as ce}from"./chakra-vendor-BktPxkNK.js";/**
  * @remix-run/router v1.23.2
  *
  * Copyright (c) Remix Software Inc.

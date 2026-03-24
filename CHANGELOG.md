@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc5] - 2026-03-24
+
+### 🐛 Bug 修复
+
+- **修复前端资源加载问题**：
+  - 修复嵌入的前端资源未同步导致的页面加载失败
+  - 更新前端构建产物到 Go 嵌入目录
+  - 修复 Git Server 管理页面无法加载的问题
+
+### 🔧 改进
+
+- **前端构建流程优化**：
+  - 确保 Vite 构建产物正确嵌入到 Go 二进制文件
+  - 清理过期的前端资源文件
+
 ## [1.7.7-rc6] - 2026-03-19
 
 ### ✨ 新功能
