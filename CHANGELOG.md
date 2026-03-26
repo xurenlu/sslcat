@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.7.7-rc7] - 2026-03-27
+## [2.0.0-rc6] - 2026-03-27
 
 ### 🐛 Bug 修复
 
@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 已登录的管理员用户不再受 WAF 检查影响
   - 保留对普通未认证用户的 WAF 保护
   - IP 白名单机制依然有效
+- **版本 semver**：纠正误打在 2.x 主线上的 `v1.7.7-rc7` 标签，本发布统一为 `v2.0.0-rc6`（`main.go` 与前端 `package.json` 同步）
 
 ## [2.0.0-rc5] - 2026-03-24
 
