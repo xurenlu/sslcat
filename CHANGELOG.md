@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 已登录的管理员用户不再受 WAF 检查影响
   - 保留对普通未认证用户的 WAF 保护
   - IP 白名单机制依然有效
+  - **优化命令注入检测范围**：`command_injection` 规则不再检查请求头（Headers），只检查用户可控输入（Query String 和 POST Body）
+    - 避免因 Referer、Cookie 等请求头中包含合法的命令展示内容（如 Git 推送命令）而误判
+    - 命令注入攻击只能通过用户输入参数执行，检查请求头没有实际安全意义
 - **版本 semver**：纠正误打在 2.x 主线上的 `v1.7.7-rc7` 标签，本发布统一为 `v2.0.0-rc6`（`main.go` 与前端 `package.json` 同步）
 
 ## [2.0.0-rc5] - 2026-03-24

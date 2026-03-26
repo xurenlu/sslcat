@@ -634,12 +634,14 @@ func (e *Engine) checkURLParams(r *http.Request, clientIP, userAgent, url, metho
 	return nil
 }
 
-// checkHeaders 检查请求头
+// checkHeaders 检查请求头（注意：不检查 command_injection 类型规则，因为请求头中可能包含合法的命令展示内容）
 func (e *Engine) checkHeaders(r *http.Request, clientIP, userAgent, url, method string) *AttackEvent {
 	for key, values := range r.Header {
 		for _, value := range values {
 			payload := key + ": " + value
-			if event := e.matchRules(payload, clientIP, userAgent, url, method); event != nil {
+			// 跳过 command_injection 类型的规则检查，避免误判
+			// 命令注入应该只检查用户可控的输入（Query String 和 Body）
+			if event := e.matchRulesExceptCommandInjection(payload, clientIP, userAgent, url, method); event != nil {
 				return event
 			}
 		}
@@ -950,6 +952,50 @@ func (e *Engine) SetWhitelistChecker(checker func(ip string) bool) {
 	if e.multiDimBlocker != nil {
 		e.multiDimBlocker.SetWhitelistChecker(checker)
 	}
+}
+
+// matchRulesExceptCommandInjection 匹配规则（排除命令注入类型）
+// 用于检查请求头等不应该触发命令注入检测的地方
+func (e *Engine) matchRulesExceptCommandInjection(payload, clientIP, userAgent, url, method string) *AttackEvent {
+	// 对所有启用的规则进行匹配
+	for _, rule := range e.rules {
+		if !rule.Enabled {
+			continue
+		}
+
+		// 跳过命令注入类型规则
+		if rule.Type == RuleTypeCommandInjection {
+			continue
+		}
+
+		if rule.Regex.MatchString(payload) {
+			event := &AttackEvent{
+				ID:        e.generateEventID(),
+				ClientIP:  clientIP,
+				UserAgent: userAgent,
+				URL:       url,
+				Method:    method,
+				RuleID:    rule.ID,
+				RuleName:  rule.Name,
+				RuleType:  rule.Type,
+				Action:    rule.Action,
+				Payload:   payload,
+				Timestamp: time.Now(),
+				Blocked:   rule.Action == ActionBlock,
+			}
+
+			// 使用日志限流器：相同攻击每分钟最多记录一次日志
+			logKey := fmt.Sprintf("%s:%s:%s:%s", rule.Type, clientIP, rule.ID, payload[:min(len(payload), 100)])
+			if shouldLog, _ := e.logLimiter.shouldLog(logKey); shouldLog {
+				e.log.Warnf("WAF检测到攻击: %s from %s, 规则: %s, 动作: %s",
+					rule.Type, clientIP, rule.Name, rule.Action)
+			}
+
+			return event
+		}
+	}
+
+	return nil
 }
 
 // min 辅助函数
