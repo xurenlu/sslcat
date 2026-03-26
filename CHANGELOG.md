@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.7-rc7] - 2026-03-27
+
+### 🐛 Bug 修复
+
+- **修复 WAF 误判拦截已登录管理员的问题**：
+  - 添加已登录管理员白名单机制，跳过 WAF 检查
+  - 修复访问 Git Server 管理页面时因前端代码包含 `git push` 等命令导致的误判
+  - 误判场景：前端展示 Git 推送命令时，请求中包含 `curl`、`git push` 等关键词触发 `command_injection` 规则
+
+### 🔧 改进
+
+- **WAF 中间件优化**：
+  - 已登录的管理员用户不再受 WAF 检查影响
+  - 保留对普通未认证用户的 WAF 保护
+  - IP 白名单机制依然有效
+
 ## [2.0.0-rc5] - 2026-03-24
 
 ### 🐛 Bug 修复

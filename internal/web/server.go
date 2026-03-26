@@ -1927,8 +1927,22 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// WAF 检测（开启时才生效，支持按域名配置）
 	// 先检查白名单，白名单中的IP跳过WAF检查
 	clientIP := s.getClientIP(r)
+
+	// 检查是否为已登录的管理员用户
+	isAuthenticatedAdmin := false
+	if s.sessionManager != nil {
+		if session, exists := s.sessionManager.GetSessionFromRequest(r); exists {
+			// 已登录的管理员用户，跳过 WAF 检查
+			isAuthenticatedAdmin = true
+			s.log.Debugf("已认证管理员用户 %s 跳过 WAF 检查", session.Username)
+		}
+	}
+
 	if s.securityManager != nil && s.securityManager.IsWhitelisted(clientIP) {
 		// 白名单IP跳过WAF检查，继续处理请求
+	} else if isAuthenticatedAdmin {
+		// 已登录的管理员跳过 WAF 检查，避免误判（如前端代码中包含的 git push 等命令）
+		// 直接继续处理请求
 	} else {
 		wafEnabled := s.config.Security.EnableWAF
 		// 检查是否有域名级别的 WAF 配置
