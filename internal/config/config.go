@@ -115,7 +115,7 @@ type SSLConfig struct {
 	Domains           []string `json:"domains"`
 	CertDir           string   `json:"cert_dir"`
 	KeyDir            string   `json:"key_dir"`
-	AutoRenew         bool     `json:"auto_renew"`
+	AutoRenew         *bool    `json:"auto_renew,omitempty"` // nil 表示未写该字段，语义为默认开启（与 JSON 省略 bool 时被误解析为 false 的问题区分）
 	DisableSelfSigned bool     `json:"disable_self_signed"`
 
 	// DNS验证配置
@@ -125,6 +125,20 @@ type SSLConfig struct {
 
 	// TLS Session Resumption 配置
 	SessionResumption *SessionResumptionConfig `json:"session_resumption,omitempty"`
+}
+
+// BoolPtr 返回布尔指针，用于 JSON 中可选布尔字段（如 ssl.auto_renew）。
+func BoolPtr(b bool) *bool { return &b }
+
+// IsAutoRenewEnabled 是否启用证书自动续期。配置中省略 auto_renew 时默认为 true。
+func (c *SSLConfig) IsAutoRenewEnabled() bool {
+	if c == nil {
+		return true
+	}
+	if c.AutoRenew == nil {
+		return true
+	}
+	return *c.AutoRenew
 }
 
 // SessionResumptionConfig TLS Session Resumption 配置
@@ -992,7 +1006,7 @@ func Load(configFile string) (*Config, error) {
 			Staging:            false,
 			CertDir:            "./data/certs",
 			KeyDir:             "./data/keys",
-			AutoRenew:          true,
+			AutoRenew:          BoolPtr(true),
 			DisableSelfSigned:  true,
 			DNSProviders:       []DNSProvider{},
 			DefaultDNSProvider: "",
@@ -1559,7 +1573,7 @@ func getDefaultConfig() *Config {
 			Staging:            false,
 			CertDir:            "./data/certs",
 			KeyDir:             "./data/keys",
-			AutoRenew:          true,
+			AutoRenew:          BoolPtr(true),
 			DisableSelfSigned:  true,
 			DNSProviders:       []DNSProvider{},
 			DefaultDNSProvider: "",

@@ -133,9 +133,9 @@ func (cd *ChangeDetector) detectSSLChanges(old, new *SSLConfig) {
 		cd.addChange("SSL.Email", old.Email, new.Email, SoftReload, "SSL邮箱变更")
 	}
 
-	// 自动续期变更 - 软重载
-	if old.AutoRenew != new.AutoRenew {
-		cd.addChange("SSL.AutoRenew", old.AutoRenew, new.AutoRenew, SoftReload, "SSL自动续期设置变更")
+	// 自动续期变更 - 软重载（比较生效值：省略字段默认为 true）
+	if old.IsAutoRenewEnabled() != new.IsAutoRenewEnabled() {
+		cd.addChange("SSL.AutoRenew", old.IsAutoRenewEnabled(), new.IsAutoRenewEnabled(), SoftReload, "SSL自动续期设置变更")
 	}
 
 	// DNS提供商变更 - 软重载

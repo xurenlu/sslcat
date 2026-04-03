@@ -127,7 +127,7 @@ func (s *Server) handleAPISettings(w http.ResponseWriter, r *http.Request) {
 		"ssl": map[string]interface{}{
 			"email":               s.config.SSL.Email,
 			"disable_self_signed": s.config.SSL.DisableSelfSigned,
-			"auto_renew":          s.config.SSL.AutoRenew,
+			"auto_renew":          s.config.SSL.IsAutoRenewEnabled(),
 		},
 		"monitoring": map[string]interface{}{
 			"enabled":                     s.config.Monitoring.Enabled,

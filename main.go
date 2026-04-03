@@ -39,7 +39,7 @@ import (
 )
 
 var (
-	version = "2.0.0-rc7"
+	version = "2.0.0-rc8"
 	build   = "dev"
 )
 
@@ -306,7 +306,7 @@ func main() {
 		"access_log.max_files":    cfg.Server.AccessLogMaxFiles,
 		"ssl.email":               cfg.SSL.Email,
 		"ssl.staging":             cfg.SSL.Staging,
-		"ssl.auto_renew":          cfg.SSL.AutoRenew,
+		"ssl.auto_renew":          cfg.SSL.IsAutoRenewEnabled(),
 		"ssl.disable_self_signed": cfg.SSL.DisableSelfSigned,
 		"ssl.cert_dir":            cfg.SSL.CertDir,
 		"ssl.key_dir":             cfg.SSL.KeyDir,

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc8] - 2026-04-04
+
+### 🐛 Bug 修复
+
+- **SSL `auto_renew` 默认值**：将 `ssl.auto_renew` 改为可选 `*bool`（JSON 省略该字段时视为 `true`）。修复当配置中存在 `ssl` 块但未写 `auto_renew` 时，被 `json.Unmarshal` 误解析为 `false`、从而默认关闭自动续期的问题。
+
 ## [2.0.0-rc7] - 2026-04-04
 
 ### 🐛 Bug 修复

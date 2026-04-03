@@ -588,7 +588,7 @@ func (s *Server) handleFirstTimeSetup(w http.ResponseWriter, r *http.Request) {
 
 	// 更新邮箱和自动续期配置
 	s.config.SSL.Email = adminEmail
-	s.config.SSL.AutoRenew = autoRenew
+	s.config.SSL.AutoRenew = config.BoolPtr(autoRenew)
 
 	// 添加代理规则（如果提供了）
 	if domain != "" && target != "" {

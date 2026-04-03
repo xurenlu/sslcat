@@ -247,7 +247,7 @@ func (m *Manager) Start() error {
 	m.log.Info("Starting SSL manager")
 
 	// 启动证书自动续期
-	if m.config.SSL.AutoRenew {
+	if m.config.SSL.IsAutoRenewEnabled() {
 		go m.autoRenewCerts()
 	}
 	// 周期性证书到期提醒

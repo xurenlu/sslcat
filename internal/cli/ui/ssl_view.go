@@ -149,7 +149,7 @@ func (m sslModel) View() string {
 			fmt.Sprintf("密钥目录: %s", m.config.SSL.KeyDir),
 			fmt.Sprintf("邮箱: %s", m.config.SSL.Email),
 			fmt.Sprintf("测试环境: %v", m.config.SSL.Staging),
-			fmt.Sprintf("自动续期: %v", m.config.SSL.AutoRenew),
+			fmt.Sprintf("自动续期: %v", m.config.SSL.IsAutoRenewEnabled()),
 		}
 
 		configBox := renderBox("SSL 配置", strings.Join(configInfo, "\n"), m.width)
