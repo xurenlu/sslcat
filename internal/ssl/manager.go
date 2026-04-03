@@ -1825,6 +1825,24 @@ func (m *Manager) getServerIPs() ([]net.IP, error) {
 	return ips, nil
 }
 
+// ruleDomainMatchesHost 判断配置中的域名 d 是否与证书/主机名 host 匹配。
+// 支持：d 为 *.example.com 且 host 为子域；host 为 *.example.com（通配符证书身份）且 d 为任一被覆盖的子域。
+func ruleDomainMatchesHost(host, d string) bool {
+	if d == "" {
+		return false
+	}
+	if host == d {
+		return true
+	}
+	if matchDomain(host, d) {
+		return true
+	}
+	if matchDomain(d, host) {
+		return true
+	}
+	return false
+}
+
 // isAllowedDomain 仅允许配置中的域名（代理规则或 ssl.domains）
 func (m *Manager) isAllowedDomain(host string) bool {
 	host = strings.ToLower(host)
@@ -1843,20 +1861,14 @@ func (m *Manager) isAllowedDomain(host string) bool {
 	// 显式配置的 ssl.domains
 	for _, d := range m.config.SSL.Domains {
 		d = strings.ToLower(strings.TrimSpace(d))
-		if d == "" {
-			continue
-		}
-		if host == d || matchDomain(host, d) {
+		if ruleDomainMatchesHost(host, d) {
 			return true
 		}
 	}
 	// 代理规则中的域名（无论是否启用，只要存在就允许申请证书）
 	for _, r := range m.config.Proxy.Rules {
 		d := strings.ToLower(strings.TrimSpace(r.Domain))
-		if d == "" {
-			continue
-		}
-		if host == d || matchDomain(host, d) {
+		if ruleDomainMatchesHost(host, d) {
 			return true
 		}
 	}
@@ -1866,10 +1878,7 @@ func (m *Manager) isAllowedDomain(host string) bool {
 			continue
 		}
 		d := strings.ToLower(strings.TrimSpace(s.Domain))
-		if d == "" {
-			continue
-		}
-		if host == d || matchDomain(host, d) {
+		if ruleDomainMatchesHost(host, d) {
 			return true
 		}
 	}
@@ -1879,10 +1888,7 @@ func (m *Manager) isAllowedDomain(host string) bool {
 			continue
 		}
 		d := strings.ToLower(strings.TrimSpace(p.Domain))
-		if d == "" {
-			continue
-		}
-		if host == d || matchDomain(host, d) {
+		if ruleDomainMatchesHost(host, d) {
 			return true
 		}
 	}

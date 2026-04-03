@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc12] - 2026-04-04
+
+### 🐛 Bug 修复
+
+- **通配符证书与 isAllowedDomain**：证书身份为 `*.example.com` 时，除原有「配置通配符匹配 host」外，增加「配置中的具体子域（如 `a.example.com`）匹配通配符证书名」的判断。修复 `*.facev.app` 等泛域名在**自动续期**（`renewExpiringCerts`）中因 `isAllowedDomain` 为 false 而被跳过、无法续期的问题。
+
 ## [2.0.0-rc11] - 2026-04-04
 
 ### 🐛 Bug 修复
