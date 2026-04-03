@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc9] - 2026-04-04
+
+### ✨ 新功能
+
+- **CLI 证书操作**：`sslcat ssl renew` / `request` / `delete` / `list` / `show` 接入真实 SSL 管理器：`renew` 会预加载已有证书再调用 ACME 续期；`request` 适合新域名首次签发；`delete` 删除磁盘证书与 ACME 缓存。需配置 `ssl.email`（或 `SSLCAT_SSL_EMAIL` / `request` 的 `-email`）。通配符域名请在 shell 中加引号，如 `-domain '*.example.com'`。
+
 ## [2.0.0-rc8] - 2026-04-04
 
 ### 🐛 Bug 修复

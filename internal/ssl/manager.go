@@ -159,6 +159,11 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 	return manager, nil
 }
 
+// ACMEEnabled 是否已初始化 ACME（Let's Encrypt）客户端，即配置了 ssl.email 等。
+func (m *Manager) ACMEEnabled() bool {
+	return m != nil && m.acmeMgr != nil
+}
+
 // SetNotificationIntegrator 设置通知集成器
 func (m *Manager) SetNotificationIntegrator(integrator *notification.NotificationIntegrator) {
 	m.notificationIntegrator = integrator
@@ -2023,7 +2028,6 @@ func (m *Manager) AllowDomainTemporary(domain string, ttl time.Duration) {
 func (m *Manager) ListCertificatesFromDisk() []CertificateInfo {
 	certDir := m.config.SSL.CertDir
 
-
 	entries, err := os.ReadDir(certDir)
 	if err != nil {
 		m.log.Warnf("Failed to read certificate directory %s: %v", certDir, err)
@@ -2044,7 +2048,6 @@ func (m *Manager) ListCertificatesFromDisk() []CertificateInfo {
 		domain := strings.TrimSuffix(name, ".crt")
 		certPath := filepath.Join(certDir, name)
 
-
 		pemBytes, err := os.ReadFile(certPath)
 		if err != nil {
 			continue
@@ -2057,7 +2060,6 @@ func (m *Manager) ListCertificatesFromDisk() []CertificateInfo {
 		if err != nil {
 			continue
 		}
-
 
 		status := "有效"
 		if time.Now().After(x509Cert.NotAfter) {
@@ -2093,7 +2095,6 @@ func (m *Manager) ListCertificatesFromDisk() []CertificateInfo {
 			Issuer:     issuer,
 		})
 	}
-
 
 	// 合并内存缓存中的证书（如 ACME 刚获取）
 	m.certMutex.RLock()
@@ -2151,14 +2152,12 @@ func (m *Manager) ListCertificatesFromDisk() []CertificateInfo {
 	}
 	m.certMutex.RUnlock()
 
-
 	return certs
 }
 
 // SyncACMECertsToDisk 扫描 acme-cache，将有效证书与私钥写入 certs/keys 目录
 func (m *Manager) SyncACMECertsToDisk() (int, error) {
 	acmeCacheDir := filepath.Join(filepath.Dir(m.config.SSL.CertDir), "acme-cache")
-
 
 	entries, err := os.ReadDir(acmeCacheDir)
 	if err != nil {
@@ -2218,7 +2217,6 @@ func (m *Manager) SyncACMECertsToDisk() (int, error) {
 		}
 		domain = strings.ToLower(strings.TrimSpace(domain))
 
-
 		if domain == "" {
 			continue
 		}
@@ -2248,7 +2246,6 @@ func (m *Manager) SyncACMECertsToDisk() (int, error) {
 			}
 		}
 
-
 		if err := os.WriteFile(certPath, certPEM, 0644); err != nil {
 			m.log.Warnf("Failed to write certificate %s: %v", certPath, err)
 			continue
@@ -2262,7 +2259,6 @@ func (m *Manager) SyncACMECertsToDisk() (int, error) {
 		}
 		synced++
 	}
-
 
 	return synced, nil
 }

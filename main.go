@@ -39,7 +39,7 @@ import (
 )
 
 var (
-	version = "2.0.0-rc8"
+	version = "2.0.0-rc9"
 	build   = "dev"
 )
 
@@ -1144,6 +1144,7 @@ func showHelp() {
 	fmt.Println("  sslcat config show            显示完整配置")
 	fmt.Println("  sslcat proxy list              列出所有代理规则")
 	fmt.Println("  sslcat ssl list               列出所有 SSL 证书")
+	fmt.Println("  sslcat ssl renew -domain a.com -config /etc/sslcat/sslcat.conf  CLI 续期证书（需 ACME）")
 	fmt.Println("  sslcat -config ./sslcat.conf  使用自定义配置文件启动")
 	fmt.Println()
 }

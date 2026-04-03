@@ -472,147 +472,93 @@ func (m *Manager) listCertificates(args []string) error {
 	if m.config == nil {
 		return fmt.Errorf("no configuration loaded")
 	}
-
-	fmt.Println("SSL Certificates:")
-	fmt.Println("=================")
-
-	// 这里需要实现证书列表功能
-	// 由于需要访问 SSL 管理器，暂时显示占位信息
-	fmt.Println("Note: SSL certificate listing requires SSL manager integration")
-	fmt.Println("Available domains from config:")
-
-	for _, rule := range m.config.Proxy.Rules {
-		if rule.Enabled {
-			fmt.Printf("  - %s\n", rule.Domain)
-		}
+	if len(args) > 0 {
+		return fmt.Errorf("ssl list 不接受额外参数")
 	}
-
-	return nil
+	return sslListCerts(m.config)
 }
 
 // showCertificate 显示证书详情
 func (m *Manager) showCertificate(args []string) error {
-	if len(args) < 1 {
+	if m.config == nil {
+		return fmt.Errorf("no configuration loaded")
+	}
+	var domain string
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "-domain", "-d":
+			if i+1 >= len(args) {
+				return fmt.Errorf("-domain 需要参数")
+			}
+			domain = args[i+1]
+			i++
+		default:
+			return fmt.Errorf("usage: sslcat ssl show -domain <domain>")
+		}
+	}
+	if domain == "" {
 		return fmt.Errorf("usage: sslcat ssl show -domain <domain>")
 	}
-
-	var domain string
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "-domain":
-			if i+1 >= len(args) {
-				return fmt.Errorf("domain value required")
-			}
-			domain = args[i+1]
-			i++
-		}
-	}
-
-	if domain == "" {
-		return fmt.Errorf("domain is required")
-	}
-
-	fmt.Printf("Certificate details for %s:\n", domain)
-	fmt.Println("Note: SSL certificate details require SSL manager integration")
-
-	return nil
+	return sslShowCert(m.config, domain)
 }
 
-// requestCertificate 申请证书
+// requestCertificate 申请证书（与续期共用 ACME 流程；不预加载磁盘证书，适合新域名首次签发）
 func (m *Manager) requestCertificate(args []string) error {
-	if len(args) < 1 {
-		return fmt.Errorf("usage: sslcat ssl request -domain <domain> [-email <email>]")
+	if m.config == nil {
+		return fmt.Errorf("no configuration loaded")
 	}
-
-	var domain, email string
+	var email string
+	parsed := make([]string, 0, len(args))
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
-		case "-domain":
-			if i+1 >= len(args) {
-				return fmt.Errorf("domain value required")
-			}
-			domain = args[i+1]
-			i++
 		case "-email":
 			if i+1 >= len(args) {
-				return fmt.Errorf("email value required")
+				return fmt.Errorf("-email 需要参数")
 			}
-			email = args[i+1]
+			email = strings.TrimSpace(args[i+1])
 			i++
+		default:
+			parsed = append(parsed, args[i])
 		}
 	}
-
-	if domain == "" {
-		return fmt.Errorf("domain is required")
+	if email != "" {
+		m.config.SSL.Email = email
 	}
-
-	if email == "" {
-		email = m.config.SSL.Email
-		if email == "" {
-			return fmt.Errorf("email is required (use -email flag or set ssl.email in config)")
-		}
+	domains, err := parseSSLDomainFlags(parsed)
+	if err != nil {
+		return fmt.Errorf("usage: sslcat ssl request -domain <domain> [-domain <domain> ...] [-email <email>]\n%v", err)
 	}
-
-	fmt.Printf("Requesting SSL certificate for %s (email: %s)\n", domain, email)
-	fmt.Println("Note: SSL certificate request requires SSL manager integration")
-
-	return nil
+	if strings.TrimSpace(m.config.SSL.Email) == "" {
+		return fmt.Errorf("需要 ACME 邮箱：请在配置中设置 ssl.email，或使用 -email，或环境变量 SSLCAT_SSL_EMAIL")
+	}
+	return sslRenewOrRequest(m.config, domains, false)
 }
 
-// renewCertificate 续期证书
+// renewCertificate 续期证书（若磁盘已有证书会先加载再申请，以便清理 ACME 缓存并强制续期）
 func (m *Manager) renewCertificate(args []string) error {
-	if len(args) < 1 {
-		return fmt.Errorf("usage: sslcat ssl renew -domain <domain>")
+	if m.config == nil {
+		return fmt.Errorf("no configuration loaded")
 	}
-
-	var domain string
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "-domain":
-			if i+1 >= len(args) {
-				return fmt.Errorf("domain value required")
-			}
-			domain = args[i+1]
-			i++
-		}
+	domains, err := parseSSLDomainFlags(args)
+	if err != nil {
+		return fmt.Errorf("usage: sslcat ssl renew -domain <domain> [-domain <domain> ...]\n%v", err)
 	}
-
-	if domain == "" {
-		return fmt.Errorf("domain is required")
+	if strings.TrimSpace(m.config.SSL.Email) == "" {
+		return fmt.Errorf("需要 ACME 邮箱：请在配置中设置 ssl.email，或环境变量 SSLCAT_SSL_EMAIL")
 	}
-
-	fmt.Printf("Renewing SSL certificate for %s\n", domain)
-	fmt.Println("Note: SSL certificate renewal requires SSL manager integration")
-
-	return nil
+	return sslRenewOrRequest(m.config, domains, true)
 }
 
-// deleteCertificate 删除证书
+// deleteCertificate 删除证书（磁盘证书、密钥及 ACME 缓存项）
 func (m *Manager) deleteCertificate(args []string) error {
-	if len(args) < 1 {
-		return fmt.Errorf("usage: sslcat ssl delete -domain <domain>")
+	if m.config == nil {
+		return fmt.Errorf("no configuration loaded")
 	}
-
-	var domain string
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "-domain":
-			if i+1 >= len(args) {
-				return fmt.Errorf("domain value required")
-			}
-			domain = args[i+1]
-			i++
-		}
+	domains, err := parseSSLDomainFlags(args)
+	if err != nil {
+		return fmt.Errorf("usage: sslcat ssl delete -domain <domain> [-domain <domain> ...]\n%v", err)
 	}
-
-	if domain == "" {
-		return fmt.Errorf("domain is required")
-	}
-
-	fmt.Printf("Deleting SSL certificate for %s\n", domain)
-	fmt.Println("Note: SSL certificate deletion requires SSL manager integration")
-
-	return nil
+	return sslDeleteCerts(m.config, domains)
 }
 
 // RegisterHelpCommand 注册帮助命令
