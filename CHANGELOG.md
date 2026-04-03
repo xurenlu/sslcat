@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc10] - 2026-04-04
+
+### ✨ 新功能
+
+- **CLI 批量续期**：新增 `sslcat renew`（精简命令，无子命令），以及 `sslcat ssl renew --all` / `ssl renew-all`，自动扫描证书目录，对**已过期**或**剩余有效期 ≤3 天**的非自签名证书调用 ACME 续期；若无待续期证书则提示并退出 0。
+
 ## [2.0.0-rc9] - 2026-04-04
 
 ### ✨ 新功能

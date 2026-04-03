@@ -445,7 +445,7 @@ func (m *Manager) RegisterSSLCommands() {
 		Description: "SSL certificate management",
 		Handler: func(args []string) error {
 			if len(args) == 0 {
-				return fmt.Errorf("ssl subcommand required (list|show|request|renew|delete)")
+				return fmt.Errorf("ssl subcommand required (list|show|request|renew|renew-all|delete)")
 			}
 
 			subcmd := args[0]
@@ -458,6 +458,8 @@ func (m *Manager) RegisterSSLCommands() {
 				return m.requestCertificate(args[1:])
 			case "renew":
 				return m.renewCertificate(args[1:])
+			case "renew-all":
+				return m.renewAllDue(args[1:])
 			case "delete":
 				return m.deleteCertificate(args[1:])
 			default:
@@ -539,14 +541,46 @@ func (m *Manager) renewCertificate(args []string) error {
 	if m.config == nil {
 		return fmt.Errorf("no configuration loaded")
 	}
-	domains, err := parseSSLDomainFlags(args)
+	var allDue bool
+	var rest []string
+	for _, a := range args {
+		if a == "--all" || a == "-a" {
+			allDue = true
+			continue
+		}
+		rest = append(rest, a)
+	}
+	if allDue {
+		if len(rest) > 0 {
+			return fmt.Errorf("ssl renew --all 不能与 -domain 等参数同时使用；批量续期请仅使用: sslcat ssl renew --all")
+		}
+		if strings.TrimSpace(m.config.SSL.Email) == "" {
+			return fmt.Errorf("需要 ACME 邮箱：请在配置中设置 ssl.email，或环境变量 SSLCAT_SSL_EMAIL")
+		}
+		return sslRenewDue(m.config)
+	}
+	domains, err := parseSSLDomainFlags(rest)
 	if err != nil {
-		return fmt.Errorf("usage: sslcat ssl renew -domain <domain> [-domain <domain> ...]\n%v", err)
+		return fmt.Errorf("usage: sslcat ssl renew -domain <domain> ... | sslcat ssl renew --all\n%v", err)
 	}
 	if strings.TrimSpace(m.config.SSL.Email) == "" {
 		return fmt.Errorf("需要 ACME 邮箱：请在配置中设置 ssl.email，或环境变量 SSLCAT_SSL_EMAIL")
 	}
 	return sslRenewOrRequest(m.config, domains, true)
+}
+
+// renewAllDue 与 ssl renew --all 相同：续期已过期或 3 天内过期的证书
+func (m *Manager) renewAllDue(args []string) error {
+	if m.config == nil {
+		return fmt.Errorf("no configuration loaded")
+	}
+	if len(args) > 0 {
+		return fmt.Errorf("usage: sslcat ssl renew-all（无额外参数）")
+	}
+	if strings.TrimSpace(m.config.SSL.Email) == "" {
+		return fmt.Errorf("需要 ACME 邮箱：请在配置中设置 ssl.email，或环境变量 SSLCAT_SSL_EMAIL")
+	}
+	return sslRenewDue(m.config)
 }
 
 // deleteCertificate 删除证书（磁盘证书、密钥及 ACME 缓存项）
@@ -559,6 +593,26 @@ func (m *Manager) deleteCertificate(args []string) error {
 		return fmt.Errorf("usage: sslcat ssl delete -domain <domain> [-domain <domain> ...]\n%v", err)
 	}
 	return sslDeleteCerts(m.config, domains)
+}
+
+// RegisterRenewDueCommand 注册精简命令：sslcat renew（批量续期即将过期/已过期证书）
+func (m *Manager) RegisterRenewDueCommand() {
+	m.RegisterCommand(&Command{
+		Name:        "renew",
+		Description: "Renew all certs expired or expiring within 3 days (same as ssl renew --all)",
+		Handler: func(args []string) error {
+			if m.config == nil {
+				return fmt.Errorf("no configuration loaded")
+			}
+			if len(args) > 0 {
+				return fmt.Errorf("renew 不接受参数；指定域名请用: sslcat ssl renew -domain <域名> -config <path>")
+			}
+			if strings.TrimSpace(m.config.SSL.Email) == "" {
+				return fmt.Errorf("需要 ACME 邮箱：请在配置中设置 ssl.email，或环境变量 SSLCAT_SSL_EMAIL")
+			}
+			return sslRenewDue(m.config)
+		},
+	})
 }
 
 // RegisterHelpCommand 注册帮助命令

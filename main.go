@@ -39,7 +39,7 @@ import (
 )
 
 var (
-	version = "2.0.0-rc9"
+	version = "2.0.0-rc10"
 	build   = "dev"
 )
 
@@ -89,6 +89,7 @@ func main() {
 		cliManager.RegisterBlockCommands()
 		cliManager.RegisterHelpCommand()
 		cliManager.RegisterConsoleCommand()
+		cliManager.RegisterRenewDueCommand()
 
 		// 解析配置文件路径
 		configFile := "sslcat.conf"
@@ -503,8 +504,8 @@ func main() {
 	// 启用 mutex 和 block profiling（在 pprof 启用时）
 	// 这可以帮助诊断锁竞争和阻塞问题
 	if cfg.Server.EnablePprof {
-		runtime.SetMutexProfileFraction(10)  // 采样 10% 的 mutex 争用
-		runtime.SetBlockProfileRate(1)         // 记录所有阻塞操作
+		runtime.SetMutexProfileFraction(10) // 采样 10% 的 mutex 争用
+		runtime.SetBlockProfileRate(1)      // 记录所有阻塞操作
 		logrus.Info("Mutex 和 Block profiling 已启用")
 	}
 
@@ -748,7 +749,7 @@ func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *s
 		maxConcurrentStreams := int64(250)
 		maxReadFrameSize := int64(1048576) // 1MB
 		idleTimeoutSec := 120
-		maxUploadBufferPerConn := int64(1 << 20) // 1MB
+		maxUploadBufferPerConn := int64(1 << 20)   // 1MB
 		maxUploadBufferPerStream := int64(1 << 18) // 256KB
 
 		if http2Config != nil {
@@ -1144,7 +1145,9 @@ func showHelp() {
 	fmt.Println("  sslcat config show            显示完整配置")
 	fmt.Println("  sslcat proxy list              列出所有代理规则")
 	fmt.Println("  sslcat ssl list               列出所有 SSL 证书")
-	fmt.Println("  sslcat ssl renew -domain a.com -config /etc/sslcat/sslcat.conf  CLI 续期证书（需 ACME）")
+	fmt.Println("  sslcat renew -config /etc/sslcat/sslcat.conf   批量续期已过期或 3 天内过期的证书")
+	fmt.Println("  sslcat ssl renew --all -config /etc/sslcat/sslcat.conf  同上（ssl 子命令）")
+	fmt.Println("  sslcat ssl renew -domain a.com -config /etc/sslcat/sslcat.conf  续期单个域名")
 	fmt.Println("  sslcat -config ./sslcat.conf  使用自定义配置文件启动")
 	fmt.Println()
 }

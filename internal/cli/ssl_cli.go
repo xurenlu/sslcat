@@ -3,11 +3,58 @@ package cli
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/xurenlu/sslcat/internal/config"
 	"github.com/xurenlu/sslcat/internal/ssl"
 )
+
+// renewDueWithin 已过期或剩余有效期不超过此时长的证书需要续期（与面板/自动续期策略接近的 CLI 批量行为）。
+const renewDueWithin = 3 * 24 * time.Hour
+
+func certNeedsRenewDue(c ssl.CertificateInfo, now time.Time) bool {
+	if c.SelfSigned {
+		return false
+	}
+	if now.After(c.ExpiresAt) {
+		return true
+	}
+	return c.ExpiresAt.Sub(now) <= renewDueWithin
+}
+
+// sslRenewDue 扫描磁盘证书，对已过期或 renewDueWithin 内过期的非自签名证书执行续期。
+func sslRenewDue(cfg *config.Config) error {
+	mgr, err := ssl.NewManager(cfg)
+	if err != nil {
+		return fmt.Errorf("初始化 SSL 管理器失败: %w", err)
+	}
+	if !mgr.ACMEEnabled() {
+		return fmt.Errorf("ACME 未启用：请在配置中设置 ssl.email（或环境变量 SSLCAT_SSL_EMAIL）")
+	}
+	list := mgr.ListCertificatesFromDisk()
+	now := time.Now()
+	var due []ssl.CertificateInfo
+	for _, c := range list {
+		if certNeedsRenewDue(c, now) {
+			due = append(due, c)
+		}
+	}
+	if len(due) == 0 {
+		fmt.Println("没有需要续期的证书（仅处理已过期或 3 天内过期的非自签名证书）")
+		return nil
+	}
+	sort.Slice(due, func(i, j int) bool {
+		return due[i].ExpiresAt.Before(due[j].ExpiresAt)
+	})
+	domains := make([]string, len(due))
+	for i, c := range due {
+		domains[i] = c.Domain
+	}
+	fmt.Fprintf(os.Stdout, "将续期 %d 个域名: %s\n", len(domains), strings.Join(domains, ", "))
+	return sslRenewOrRequestWithManager(mgr, domains, true)
+}
 
 // parseSSLDomainFlags 解析 -domain / -d，可重复。
 func parseSSLDomainFlags(args []string) ([]string, error) {
@@ -39,10 +86,13 @@ func sslRenewOrRequest(cfg *config.Config, domains []string, preloadExisting boo
 	if err != nil {
 		return fmt.Errorf("初始化 SSL 管理器失败: %w", err)
 	}
+	return sslRenewOrRequestWithManager(mgr, domains, preloadExisting)
+}
+
+func sslRenewOrRequestWithManager(mgr *ssl.Manager, domains []string, preloadExisting bool) error {
 	if !mgr.ACMEEnabled() {
 		return fmt.Errorf("ACME 未启用：请在配置中设置 ssl.email（或环境变量 SSLCAT_SSL_EMAIL），并确保使用 ACME/Let's Encrypt（非纯自签名模式）")
 	}
-
 	var fail int
 	for _, d := range domains {
 		domain := strings.ToLower(strings.TrimSpace(d))
