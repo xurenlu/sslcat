@@ -39,7 +39,7 @@ import (
 )
 
 var (
-	version = "2.0.0-rc10"
+	version = "2.0.0-rc11"
 	build   = "dev"
 )
 
@@ -91,12 +91,20 @@ func main() {
 		cliManager.RegisterConsoleCommand()
 		cliManager.RegisterRenewDueCommand()
 
-		// 解析配置文件路径
+		// 解析配置文件路径：未指定 -config 时，若存在系统安装配置则优先使用（与 systemd 服务一致）
 		configFile := "sslcat.conf"
+		configExplicit := false
 		for i, arg := range os.Args {
 			if arg == "-config" && i+1 < len(os.Args) {
 				configFile = os.Args[i+1]
+				configExplicit = true
 				break
+			}
+		}
+		if !configExplicit {
+			const systemConfig = "/etc/sslcat/sslcat.conf"
+			if _, err := os.Stat(systemConfig); err == nil {
+				configFile = systemConfig
 			}
 		}
 
@@ -1145,6 +1153,7 @@ func showHelp() {
 	fmt.Println("  sslcat config show            显示完整配置")
 	fmt.Println("  sslcat proxy list              列出所有代理规则")
 	fmt.Println("  sslcat ssl list               列出所有 SSL 证书")
+	fmt.Println("  sslcat renew   同上；未写 -config 时若存在 /etc/sslcat/sslcat.conf 会自动使用")
 	fmt.Println("  sslcat renew -config /etc/sslcat/sslcat.conf   批量续期已过期或 3 天内过期的证书")
 	fmt.Println("  sslcat ssl renew --all -config /etc/sslcat/sslcat.conf  同上（ssl 子命令）")
 	fmt.Println("  sslcat ssl renew -domain a.com -config /etc/sslcat/sslcat.conf  续期单个域名")

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc11] - 2026-04-04
+
+### 🐛 Bug 修复
+
+- **CLI 默认配置文件**：在未指定 `-config` 时，若存在 `/etc/sslcat/sslcat.conf` 则自动使用该路径，与 systemd 安装的 sslcat 服务一致，避免在 `/opt/sslcat` 下执行子命令时误加载当前目录的 `sslcat.conf` 而导致缺少 `ssl.email` 等问题。
+
 ## [2.0.0-rc10] - 2026-04-04
 
 ### ✨ 新功能
