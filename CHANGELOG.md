@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc7] - 2026-04-04
+
+### 🐛 Bug 修复
+
+- **SSL 自动续期**：`autoRenewCerts` 在启动后立即执行一次 `renewExpiringCerts`，不再仅依赖 24 小时 ticker 的首轮触发，避免证书已过期或临近过期时长时间得不到续期。
+
 ## [2.0.0-rc6] - 2026-03-27
 
 ### 🐛 Bug 修复
@@ -23,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **优化命令注入检测范围**：`command_injection` 规则不再检查请求头（Headers），只检查用户可控输入（Query String 和 POST Body）
     - 避免因 Referer、Cookie 等请求头中包含合法的命令展示内容（如 Git 推送命令）而误判
     - 命令注入攻击只能通过用户输入参数执行，检查请求头没有实际安全意义
+  - **新增 API 路径白名单机制**：为日志上报等数据内容不可预测的接口添加路径白名单
+    - `/api/v1/logs/*` 路径下的接口（如 `/api/v1/logs/ingest-batch`）跳过 WAF 检查
+    - 日志数据可能包含任意文本内容（包括 `curl`、`wget` 等命令关键词），不应被 WAF 拦截
 - **版本 semver**：纠正误打在 2.x 主线上的 `v1.7.7-rc7` 标签，本发布统一为 `v2.0.0-rc6`（`main.go` 与前端 `package.json` 同步）
 
 ## [2.0.0-rc5] - 2026-03-24

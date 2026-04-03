@@ -600,6 +600,9 @@ func (m *Manager) generateSelfSignedCert(domain string) (*tls.Certificate, error
 
 // autoRenewCerts 自动续期证书
 func (m *Manager) autoRenewCerts() {
+	// 启动后立即检查一次，避免仅靠 24h ticker 导致过期后首日无法续期
+	m.renewExpiringCerts()
+
 	ticker := time.NewTicker(24 * time.Hour) // 每天检查一次
 	defer ticker.Stop()
 
