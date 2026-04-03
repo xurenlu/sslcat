@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc13] - 2026-04-04
+
+### ✨ 新功能
+
+- **TLS 证书热加载**：续期或外部更新写入 `certs/*.crt` 后，无需 `systemctl restart sslcat`。主进程记录各证书文件 ModTime，在 TLS 握手前若检测到磁盘文件变新则重载；并每约 45 秒扫描证书目录作为兜底（例如独立 CLI 续期后尚无新连接时）。
+
 ## [2.0.0-rc12] - 2026-04-04
 
 ### 🐛 Bug 修复

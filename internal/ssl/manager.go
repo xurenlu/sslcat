@@ -70,6 +70,8 @@ type Manager struct {
 	// ACME 账户密钥缓存：复用账户密钥避免重复创建
 	acmeAccountKey      *ecdsa.PrivateKey
 	acmeAccountKeyMutex sync.Mutex
+	// certDiskModTime 记录各域名证书文件上次加载时的 ModTime，用于热加载（CLI/外部更新磁盘后不重启）
+	certDiskModTime map[string]time.Time
 }
 
 // CertProgressEvent 证书申请进度事件
@@ -102,6 +104,7 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 		failedDomainCache:  make(map[string]time.Time),
 		certMetadataCache:  make(map[string]*certMetadata),
 		progressChannels:   make(map[string]chan CertProgressEvent),
+		certDiskModTime:    make(map[string]time.Time),
 	}
 
 	// 初始化一个默认自签证书（用于未允许域名回退，避免写盘）
@@ -192,6 +195,7 @@ func (m *Manager) DeleteCertificate(domain string) error {
 	// 阶段1: 快速清除内存缓存（写锁范围最小化，避免阻塞 TLS 握手）
 	m.certMutex.Lock()
 	delete(m.certCache, domain)
+	delete(m.certDiskModTime, domain)
 	m.certMutex.Unlock()
 
 	m.metadataMutex.Lock()
@@ -273,6 +277,9 @@ func (m *Manager) Start() error {
 			}
 		}
 	}()
+
+	// 磁盘证书热加载：外部进程（如 sslcat ssl renew CLI）写入新证书后，无需重启即可加载到内存
+	go m.periodicReloadCertsFromDiskIfChanged()
 
 	return nil
 }
@@ -466,23 +473,40 @@ func (m *Manager) GetCertificate(domain string) (*tls.Certificate, error) {
 	}
 
 	// 首先检查是否有包含此域名的多域名证书
+	var matchedKey string
 	m.certMutex.RLock()
 	for cachedDomain, cert := range m.certCache {
 		if m.domainMatchesCert(domain, cert) {
-			m.certMutex.RUnlock()
-			m.log.Debugf("Domain %s matches cached certificate %s", domain, cachedDomain)
-			return cert, nil
+			matchedKey = cachedDomain
+			break
 		}
 	}
 	m.certMutex.RUnlock()
 
+	if matchedKey != "" {
+		m.maybeReloadCertIfStale(matchedKey)
+		m.certMutex.RLock()
+		cert := m.certCache[matchedKey]
+		m.certMutex.RUnlock()
+		if cert != nil && m.domainMatchesCert(domain, cert) {
+			m.log.Debugf("Domain %s matches cached certificate %s", domain, matchedKey)
+			return cert, nil
+		}
+	}
+
 	// 检查单域名证书
 	m.certMutex.RLock()
-	if cert, exists := m.certCache[domain]; exists {
-		m.certMutex.RUnlock()
-		return cert, nil
-	}
+	_, directHit := m.certCache[domain]
 	m.certMutex.RUnlock()
+	if directHit {
+		m.maybeReloadCertIfStale(domain)
+		m.certMutex.RLock()
+		cert := m.certCache[domain]
+		m.certMutex.RUnlock()
+		if cert != nil {
+			return cert, nil
+		}
+	}
 
 	// 尝试查找通配符证书（例如 *.facev.app 匹配 f.facev.app）
 	if wildcardCert := m.findWildcardCert(domain); wildcardCert != nil {
@@ -506,14 +530,9 @@ func (m *Manager) GetCertificate(domain string) (*tls.Certificate, error) {
 		return nil, fmt.Errorf("no certificate for %s", domain)
 	}
 
-	// 证书文件存在，从磁盘加载
-	certPath := filepath.Join(m.config.SSL.CertDir, domain+".crt")
-	keyPath := filepath.Join(m.config.SSL.KeyDir, domain+".key")
-
-	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
-	if err != nil {
+	// 证书文件存在，从磁盘加载（与 CLI 续期等路径统一，并记录 cert mtime 供热加载）
+	if err := m.LoadCertificateFromDisk(domain); err != nil {
 		m.log.Errorf("Failed to load certificate %s: %v", domain, err)
-		// 加载失败，更新元数据缓存标记为不存在
 		m.metadataMutex.Lock()
 		m.certMetadataCache[domain] = &certMetadata{
 			exists:      false,
@@ -523,18 +542,18 @@ func (m *Manager) GetCertificate(domain string) (*tls.Certificate, error) {
 		return nil, err
 	}
 
-	// 加载成功，更新证书缓存和元数据缓存
-	m.certMutex.Lock()
-	m.certCache[domain] = &cert
-	m.certMutex.Unlock()
-	m.updateCertMetadata(domain, &cert)
+	m.certMutex.RLock()
+	cert := m.certCache[domain]
+	m.certMutex.RUnlock()
+	if cert == nil {
+		return nil, fmt.Errorf("no certificate for %s", domain)
+	}
 
-	// 清除失败缓存（如果存在）
 	m.failedCacheMutex.Lock()
 	delete(m.failedDomainCache, domain)
 	m.failedCacheMutex.Unlock()
 
-	return &cert, nil
+	return cert, nil
 }
 
 // generateSelfSignedCert 生成自签名证书
@@ -763,18 +782,28 @@ func (m *Manager) findWildcardCert(domain string) *tls.Certificate {
 		return nil
 	}
 
-	// 尝试匹配 *.domain.com 格式的通配符证书
 	wildcardDomain := "*." + strings.Join(parts[1:], ".")
 
+	var matchedKey string
 	m.certMutex.RLock()
-	defer m.certMutex.RUnlock()
-
 	for cachedDomain, cert := range m.certCache {
 		if cachedDomain == wildcardDomain || strings.Contains(cachedDomain, "*") {
 			if m.domainMatchesCert(domain, cert) {
-				m.log.Debugf("Domain %s matches wildcard certificate %s", domain, cachedDomain)
-				return cert
+				matchedKey = cachedDomain
+				break
 			}
+		}
+	}
+	m.certMutex.RUnlock()
+
+	if matchedKey != "" {
+		m.maybeReloadCertIfStale(matchedKey)
+		m.certMutex.RLock()
+		cert := m.certCache[matchedKey]
+		m.certMutex.RUnlock()
+		if cert != nil && m.domainMatchesCert(domain, cert) {
+			m.log.Debugf("Domain %s matches wildcard certificate %s", domain, matchedKey)
+			return cert
 		}
 	}
 
@@ -814,9 +843,12 @@ func (m *Manager) loadWildcardCertFromDisk(domain string) *tls.Certificate {
 		return nil
 	}
 
-	// 加载成功，更新证书缓存
+	// 加载成功，更新证书缓存与磁盘 mtime（供热加载）
 	m.certMutex.Lock()
 	m.certCache[wildcardDomain] = &cert
+	if st, err := os.Stat(certPath); err == nil {
+		m.certDiskModTime[wildcardDomain] = st.ModTime()
+	}
 	m.certMutex.Unlock()
 	m.updateCertMetadata(wildcardDomain, &cert)
 
@@ -1978,7 +2010,8 @@ func (m *Manager) LoadCertificateFromDisk(domain string) error {
 	certPath := filepath.Join(m.config.SSL.CertDir, domain+".crt")
 	keyPath := filepath.Join(m.config.SSL.KeyDir, domain+".key")
 
-	if _, err := os.Stat(certPath); err != nil {
+	certStat, err := os.Stat(certPath)
+	if err != nil {
 		return fmt.Errorf("certificate file not found: %s", certPath)
 	}
 	if _, err := os.Stat(keyPath); err != nil {
@@ -1992,10 +2025,84 @@ func (m *Manager) LoadCertificateFromDisk(domain string) error {
 
 	m.certMutex.Lock()
 	m.certCache[domain] = &cert
+	m.certDiskModTime[domain] = certStat.ModTime()
 	m.certMutex.Unlock()
 	m.updateCertMetadata(domain, &cert) // 更新元数据缓存
-	m.log.Infof("Loaded certificate from disk into cache: %s", domain)
+	m.log.Debugf("Loaded certificate from disk into cache: %s", domain)
 	return nil
+}
+
+// maybeReloadCertIfStale 若磁盘 .crt 的 ModTime 新于上次加载记录，则重新加载（TLS 握手路径，免重启换证）
+func (m *Manager) maybeReloadCertIfStale(certKey string) {
+	certPath := filepath.Join(m.config.SSL.CertDir, certKey+".crt")
+	st, err := os.Stat(certPath)
+	if err != nil {
+		return
+	}
+	m.certMutex.RLock()
+	last, ok := m.certDiskModTime[certKey]
+	m.certMutex.RUnlock()
+	if ok && !st.ModTime().After(last) {
+		return
+	}
+	if err := m.LoadCertificateFromDisk(certKey); err != nil {
+		m.log.Debugf("TLS certificate hot-reload skipped for %s: %v", certKey, err)
+		return
+	}
+	m.log.Infof("TLS certificate hot-reloaded from disk: %s", certKey)
+}
+
+func (m *Manager) periodicReloadCertsFromDiskIfChanged() {
+	ticker := time.NewTicker(45 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			m.reloadAllCachedCertsIfCertFilesStale()
+		case <-m.stopChan:
+			return
+		}
+	}
+}
+
+// reloadAllCachedCertsIfCertFilesStale 扫描证书目录：缓存中已有条目且 .crt mtime 变新则重载（兜底：独立 CLI 续期后主进程尚未握手时）
+func (m *Manager) reloadAllCachedCertsIfCertFilesStale() {
+	certDir := m.config.SSL.CertDir
+	entries, err := os.ReadDir(certDir)
+	if err != nil {
+		m.log.Debugf("hot reload scan skipped: %v", err)
+		return
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if !strings.HasSuffix(strings.ToLower(name), ".crt") {
+			continue
+		}
+		domain := strings.TrimSuffix(name, ".crt")
+		certPath := filepath.Join(certDir, name)
+		st, err := os.Stat(certPath)
+		if err != nil {
+			continue
+		}
+		m.certMutex.RLock()
+		_, inCache := m.certCache[domain]
+		last, hasLast := m.certDiskModTime[domain]
+		m.certMutex.RUnlock()
+		if !inCache {
+			continue
+		}
+		if hasLast && !st.ModTime().After(last) {
+			continue
+		}
+		if err := m.LoadCertificateFromDisk(domain); err != nil {
+			m.log.Debugf("TLS hot-reload (periodic) failed for %s: %v", domain, err)
+			continue
+		}
+		m.log.Infof("TLS certificate hot-reloaded from disk (periodic scan): %s", domain)
+	}
 }
 
 // cleanExpiredTempDomains 清理过期的临时域名（在锁保护下执行）
