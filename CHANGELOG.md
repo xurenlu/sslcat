@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc15] - 2026-04-21
+
+### 🐛 Bug 修复
+
+- **CI 前端构建**：將 `frontend/yarn.lock` 的 Yarn 鎖檔元數據升級至 v9，與 GitHub Actions 使用的 Yarn 4.14（`yarn@stable`）一致，修復 `YN0028: The lockfile would have been modified by this install` 導致 `yarn install` 在不可變模式下失敗的問題。
+
 ## [2.0.0-rc14] - 2026-04-20
 
 ### 🐛 Bug 修复
