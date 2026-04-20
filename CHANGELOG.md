@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc14] - 2026-04-20
+
+### 🐛 Bug 修复
+
+- **通配符 LE 域名与 DNS 检测**：`refreshLEPreferredHost` 对 `GetFirstValidLEDomain()` 返回的 `*.example.com` 直接调用 `net.LookupIP`，通配符不是合法 DNS 主机名，导致周期性告警 `lookup *.example.com: no such host`。现改为解析根域 `example.com`；若将来启用 IP→HTTPS 跳转，`leRedirectHost` 亦使用可解析的具体主机名。
+- **systemd 示例**：`ReadWritePaths` 增加 `/var/log`，以便在 `ProtectSystem=strict` 下写入站点 `access_log_path`（如 `/var/log/umi.log`）。
+
 ## [2.0.0-rc13] - 2026-04-04
 
 ### ✨ 新功能

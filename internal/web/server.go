@@ -2802,6 +2802,15 @@ func (s *Server) refreshLEPreferredHostLoop() {
 	}
 }
 
+// dnsLookupNameForCertDomain 返回可用于 net.LookupIP 的主机名。
+// 通配符证书在存储/文件名中常为 "*.example.com"，该字符串不是合法 DNS 主机名，应解析其根域 example.com。
+func dnsLookupNameForCertDomain(domain string) string {
+	if strings.HasPrefix(domain, "*.") {
+		return domain[2:]
+	}
+	return domain
+}
+
 func (s *Server) refreshLEPreferredHost() {
 	if s.sslManager == nil {
 		s.leRedirectHost = ""
@@ -2812,6 +2821,12 @@ func (s *Server) refreshLEPreferredHost() {
 		s.leRedirectHost = ""
 		return
 	}
+	lookupName := dnsLookupNameForCertDomain(domain)
+	// 若将来启用 IP→HTTPS 跳转，主机名须为具体域名，不能是 "*.example.com"
+	redirectHost := domain
+	if strings.HasPrefix(domain, "*.") {
+		redirectHost = lookupName
+	}
 	// 查询公网IP
 	publicIP := s.fetchPublicIPv4()
 	if publicIP == "" {
@@ -2819,7 +2834,7 @@ func (s *Server) refreshLEPreferredHost() {
 		s.leRedirectHost = ""
 		return
 	}
-	// DNS 解析 domain 并检查是否包含本机公网IP
+	// DNS 解析 lookupName 并检查是否包含本机公网IP
 	// 使用带超时的 DNS 解析，避免 CGO 异常
 	ips, err := func() ([]net.IP, error) {
 		type result struct {
@@ -2834,7 +2849,7 @@ func (s *Server) refreshLEPreferredHost() {
 					ch <- result{nil, fmt.Errorf("DNS 解析异常: %v", r)}
 				}
 			}()
-			ips, err := net.LookupIP(domain)
+			ips, err := net.LookupIP(lookupName)
 			ch <- result{ips, err}
 		}()
 
@@ -2853,7 +2868,7 @@ func (s *Server) refreshLEPreferredHost() {
 	}
 	for _, ip := range ips {
 		if ip.To4() != nil && ip.String() == publicIP {
-			s.leRedirectHost = domain
+			s.leRedirectHost = redirectHost
 			return
 		}
 	}

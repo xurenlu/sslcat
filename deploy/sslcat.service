@@ -32,7 +32,8 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=false
-ReadWritePaths=/opt/sslcat /etc/sslcat /home/git /var/lib/sslcat
+# /var/log：站点 access_log_path 等可能写至此目录（ProtectSystem=strict 下需显式放行）
+ReadWritePaths=/opt/sslcat /etc/sslcat /home/git /var/lib/sslcat /var/log
 
 [Install]
 WantedBy=multi-user.target

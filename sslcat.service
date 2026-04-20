@@ -25,7 +25,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=false
-ReadWritePaths=/opt/sslcat /etc/sslcat /home/git /var/lib/sslcat
+ReadWritePaths=/opt/sslcat /etc/sslcat /home/git /var/lib/sslcat /var/log
 
 [Install]
 WantedBy=multi-user.target
