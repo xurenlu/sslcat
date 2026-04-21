@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc16] - 2026-04-21
+
+### 🐛 Bug 修复
+
+- **DNS-01 申請證書與 ACME 帳戶**：Let's Encrypt（RFC 8555）在帳戶密鑰已註冊時回傳 HTTP 200，`golang.org/x/crypto/acme` 會回傳 `ErrAccountAlreadyExists`，而非 HTTP 409。先前僅判斷 409，導致誤報 `failed to register ACME account: acme: account already exists` 並中斷申請。現一併將 `ErrAccountAlreadyExists` 視為可繼續（客戶端已緩存 KID）。
+
 ## [2.0.0-rc15] - 2026-04-21
 
 ### 🐛 Bug 修复

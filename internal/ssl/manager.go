@@ -2607,16 +2607,19 @@ func (m *Manager) performDNSChallenge(domain, providerName string) error {
 	}
 
 	ctx := context.Background()
-	// 尝试注册账户，如果账户已存在则忽略错误
+	// 尝试注册账户，如果账户已存在则忽略错误。
+	// RFC 8555：同一账户密钥再次 newAccount 时 CA 常返回 200，Go acme 返回 ErrAccountAlreadyExists（非 409）。
 	account, regErr := client.Register(ctx, account, acme.AcceptTOS)
 	if regErr != nil {
-		// 检查是否是账户已存在的错误
-		if ae, ok := regErr.(*acme.Error); ok && ae.StatusCode == 409 {
+		if errors.Is(regErr, acme.ErrAccountAlreadyExists) {
+			m.log.Infof("ACME 账户已存在，复用现有账户（KID 已由客户端缓存）")
+		} else if ae, ok := regErr.(*acme.Error); ok && ae.StatusCode == 409 {
 			m.log.Infof("ACME 账户已存在，复用现有账户")
 		} else {
 			return fmt.Errorf("failed to register ACME account: %w", regErr)
 		}
 	}
+	_ = account // Register 在「已存在」时可能返回 nil account，后续订单不依赖此返回值
 
 	m.sendProgressEvent(domain, CertProgressEvent{
 		Status:  "dns_order",
