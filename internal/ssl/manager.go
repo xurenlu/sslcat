@@ -1768,8 +1768,22 @@ func (m *Manager) supportsHTTPChallenge() bool {
 	return len(m.config.SSL.ChallengeMethods) == 0
 }
 
+// dnsLookupHostForResolution 返回可用于 net.LookupIP 的主机名。
+// 「*.example.com」不是合法 DNS 查询名（无 such host），泛域名预检应对根域 example.com 解析。
+func dnsLookupHostForResolution(domain string) (lookupHost string, wildcard bool) {
+	if strings.HasPrefix(domain, "*.") {
+		return domain[2:], true
+	}
+	return domain, false
+}
+
 // checkDomainResolution 检查域名解析状态
 func (m *Manager) checkDomainResolution(domain string) (bool, string, error) {
+	lookupHost, isWildcard := dnsLookupHostForResolution(domain)
+	if isWildcard {
+		m.log.Debugf("Wildcard cert domain %s: DNS preflight uses apex %s", domain, lookupHost)
+	}
+
 	// 使用带超时和 panic 恢复的 DNS 解析
 	ips, err := func() ([]net.IP, error) {
 		type result struct {
@@ -1784,7 +1798,7 @@ func (m *Manager) checkDomainResolution(domain string) (bool, string, error) {
 					ch <- result{nil, fmt.Errorf("DNS 解析异常: %v", r)}
 				}
 			}()
-			ips, err := net.LookupIP(domain)
+			ips, err := net.LookupIP(lookupHost)
 			ch <- result{ips, err}
 		}()
 
@@ -1797,10 +1811,16 @@ func (m *Manager) checkDomainResolution(domain string) (bool, string, error) {
 	}()
 
 	if err != nil {
+		if isWildcard {
+			return false, "", fmt.Errorf("domain resolution failed (apex %s for wildcard %s): %w", lookupHost, domain, err)
+		}
 		return false, "", fmt.Errorf("domain resolution failed: %w", err)
 	}
 
 	if len(ips) == 0 {
+		if isWildcard {
+			return false, "", fmt.Errorf("no IP addresses found for apex %s (wildcard %s)", lookupHost, domain)
+		}
 		return false, "", fmt.Errorf("no IP addresses found for domain")
 	}
 
@@ -1808,6 +1828,9 @@ func (m *Manager) checkDomainResolution(domain string) (bool, string, error) {
 	serverIPs, err := m.getServerIPs()
 	if err != nil {
 		m.log.Warnf("Failed to get server IPs: %v", err)
+		if isWildcard {
+			return true, fmt.Sprintf("Wildcard %s: apex %s resolves to %v", domain, lookupHost, ips), nil
+		}
 		return true, fmt.Sprintf("Domain resolves to: %v", ips), nil // 仍然返回成功，但记录警告
 	}
 
@@ -1815,11 +1838,17 @@ func (m *Manager) checkDomainResolution(domain string) (bool, string, error) {
 	for _, domainIP := range ips {
 		for _, serverIP := range serverIPs {
 			if domainIP.Equal(serverIP) {
+				if isWildcard {
+					return true, fmt.Sprintf("Wildcard %s: apex %s resolves to server IP %s", domain, lookupHost, domainIP.String()), nil
+				}
 				return true, fmt.Sprintf("Domain correctly resolves to server IP: %s", domainIP.String()), nil
 			}
 		}
 	}
 
+	if isWildcard {
+		return false, fmt.Sprintf("Wildcard %s: apex %s resolves to %v, but server IPs are: %v", domain, lookupHost, ips, serverIPs), nil
+	}
 	return false, fmt.Sprintf("Domain resolves to: %v, but server IPs are: %v", ips, serverIPs), nil
 }
 

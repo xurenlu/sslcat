@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc17] - 2026-04-21
+
+### 🐛 Bug 修复
+
+- **泛域名證書 DNS 預檢**：`*.example.com` 不是可解析的 DNS 主機名（`lookup *.example.com` 會失敗）。證書申請與預檢 API 對泛域名改為解析根域（apex）`example.com`，與 `refreshLEPreferredHost` 行為一致。
+
 ## [2.0.0-rc16] - 2026-04-21
 
 ### 🐛 Bug 修复
