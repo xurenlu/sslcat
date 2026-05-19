@@ -1,11 +1,14 @@
 package cache
 
 import (
+	"bytes"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -261,6 +264,127 @@ func TestUpstreamCache_StoreAndRetrieve(t *testing.T) {
 	hits := stats["hits"].(int64)
 	if hits < 1 {
 		t.Errorf("Expected at least 1 hit, got %v", hits)
+	}
+}
+
+func TestUpstreamCache_HotHitDoesNotRewriteMetadata(t *testing.T) {
+	tempDir := t.TempDir()
+	cfg := &config.Config{
+		UpstreamCache: config.UpstreamCacheConfig{
+			Enabled:     true,
+			CacheDir:    tempDir,
+			MinFileSize: 1,
+			MaxFileSize: 1024 * 1024,
+			DefaultTTL:  time.Hour,
+			CacheableTypes: []string{
+				"text/css",
+			},
+		},
+	}
+	uc := NewUpstreamCache(cfg)
+
+	req := httptest.NewRequest("GET", "/hot.css", nil)
+	resp := &http.Response{
+		StatusCode:    http.StatusOK,
+		ContentLength: int64(len("body { color: blue; }")),
+		Header:        make(http.Header),
+		Body:          ioutil.NopCloser(strings.NewReader("body { color: blue; }")),
+	}
+	resp.Header.Set("Content-Type", "text/css")
+	resp.Header.Set("Cache-Control", "max-age=3600")
+
+	if err := uc.Store(req, resp); err != nil {
+		t.Fatalf("store cache: %v", err)
+	}
+
+	metaPath := uc.getMetaPath(uc.generateCacheKey(req))
+	before, err := os.Stat(metaPath)
+	if err != nil {
+		t.Fatalf("stat metadata before get: %v", err)
+	}
+
+	if _, _, err := uc.Get(req); err != nil {
+		t.Fatalf("get cache: %v", err)
+	}
+
+	after, err := os.Stat(metaPath)
+	if err != nil {
+		t.Fatalf("stat metadata after get: %v", err)
+	}
+	if !after.ModTime().Equal(before.ModTime()) {
+		t.Fatalf("hot cache hit should not rewrite metadata, before %v after %v", before.ModTime(), after.ModTime())
+	}
+}
+
+func TestUpstreamCache_ConcurrentSameKeyStoreAndGet(t *testing.T) {
+	tempDir := t.TempDir()
+	cfg := &config.Config{
+		UpstreamCache: config.UpstreamCacheConfig{
+			Enabled:     true,
+			CacheDir:    tempDir,
+			MinFileSize: 1,
+			MaxFileSize: 1024 * 1024,
+			DefaultTTL:  time.Hour,
+		},
+	}
+	uc := NewUpstreamCache(cfg)
+	req := httptest.NewRequest("GET", "/asset.js", nil)
+	body := bytes.Repeat([]byte("x"), 2048)
+
+	newResp := func() *http.Response {
+		resp := &http.Response{
+			StatusCode:    http.StatusOK,
+			ContentLength: int64(len(body)),
+			Header:        make(http.Header),
+			Body:          ioutil.NopCloser(bytes.NewReader(body)),
+		}
+		resp.Header.Set("Content-Type", "application/javascript")
+		resp.Header.Set("Cache-Control", "max-age=3600")
+		return resp
+	}
+
+	if err := uc.Store(req, newResp()); err != nil {
+		t.Fatalf("initial store: %v", err)
+	}
+
+	var wg sync.WaitGroup
+	errCh := make(chan error, 64)
+	for i := 0; i < 16; i++ {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			if err := uc.Store(req, newResp()); err != nil {
+				errCh <- err
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			_, data, err := uc.Get(req)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			if len(data) != len(body) {
+				errCh <- os.ErrInvalid
+			}
+		}()
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		t.Fatalf("concurrent cache operation failed: %v", err)
+	}
+
+	metaGlob, err := filepath.Glob(filepath.Join(tempDir, "meta", "*", "*.tmp"))
+	if err != nil {
+		t.Fatalf("glob temp metadata: %v", err)
+	}
+	dataGlob, err := filepath.Glob(filepath.Join(tempDir, "data", "*", "*.tmp"))
+	if err != nil {
+		t.Fatalf("glob temp data: %v", err)
+	}
+	if len(metaGlob)+len(dataGlob) != 0 {
+		t.Fatalf("temporary cache files should be cleaned up, got meta=%v data=%v", metaGlob, dataGlob)
 	}
 }
 

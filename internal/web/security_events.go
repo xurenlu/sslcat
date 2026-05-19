@@ -11,19 +11,19 @@ import (
 
 // SecurityEventMessage 安全事件消息
 type SecurityEventMessage struct {
-	Type      string           `json:"type"`       // "attack", "scan", "block"
+	Type      string           `json:"type"` // "attack", "scan", "block"
 	Event     *waf.AttackEvent `json:"event"`
 	Timestamp time.Time        `json:"timestamp"`
 }
 
 // SecurityEventHub 安全事件分发中心
 type SecurityEventHub struct {
-	clients map[*SecurityEventClient]bool
-	register chan *SecurityEventClient
+	clients    map[*SecurityEventClient]bool
+	register   chan *SecurityEventClient
 	unregister chan *SecurityEventClient
-	broadcast chan *SecurityEventMessage
-	log      *logrus.Entry
-	mu       sync.RWMutex
+	broadcast  chan *SecurityEventMessage
+	log        *logrus.Entry
+	mu         sync.RWMutex
 }
 
 // SecurityEventClient WebSocket客户端
@@ -54,20 +54,23 @@ func (h *SecurityEventHub) run() {
 		case client := <-h.register:
 			h.mu.Lock()
 			h.clients[client] = true
+			total := len(h.clients)
 			h.mu.Unlock()
-			h.log.Infof("Client connected: %s (total: %d)", client.id, len(h.clients))
+			h.log.Infof("Client connected: %s (total: %d)", client.id, total)
 
 		case client := <-h.unregister:
 			h.mu.Lock()
+			total := len(h.clients)
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
 				close(client.send)
+				total = len(h.clients)
 			}
 			h.mu.Unlock()
-			h.log.Infof("Client disconnected: %s (total: %d)", client.id, len(h.clients)-1)
+			h.log.Infof("Client disconnected: %s (total: %d)", client.id, total)
 
 		case message := <-h.broadcast:
-			h.mu.RLock()
+			h.mu.Lock()
 			for client := range h.clients {
 				select {
 				case client.send <- message:
@@ -77,7 +80,7 @@ func (h *SecurityEventHub) run() {
 					close(client.send)
 				}
 			}
-			h.mu.RUnlock()
+			h.mu.Unlock()
 		}
 	}
 }

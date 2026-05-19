@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc24] - 2026-05-19
+
+### 🐛 Bug 修复
+
+- **上游缓存高并发可靠性**：同一缓存 key 的读写增加互斥保护，缓存数据和元数据写入改为 fsync 后原子替换，避免并发读写读到半写文件。
+- **热点缓存命中减负**：上游缓存命中不再每次都重写 metadata，热点资源每分钟最多刷新一次访问元数据，降低高流量下的磁盘写放大。
+- **WebSocket 事件分发并发安全**：安全事件 WebSocket hub 广播慢客户端清理改为写锁保护，并修正连接数日志的无锁读取，降低广播风暴下的数据竞争风险。
+- **WebSocket 代理退出路径**：优化 WebSocket 代理错误上报为非阻塞，避免连接风暴下错误通道反向卡住 goroutine 退出。
+
 ## [2.0.0-rc23] - 2026-05-19
 
 ### 🐛 Bug 修复

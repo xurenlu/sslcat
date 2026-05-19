@@ -54,6 +54,9 @@ type UpstreamCache struct {
 	cleanerOnce    sync.Once
 	cleanerStarted bool
 	cleanerMutex   sync.Mutex
+
+	keyLocks   map[string]*cacheKeyLock
+	keyLocksMu sync.Mutex
 }
 
 // UpstreamCacheConfig 上游缓存配置
@@ -147,6 +150,7 @@ func NewUpstreamCache(cfg *config.Config) *UpstreamCache {
 		respectUpstream: respectUpstream,
 		minFileSize:     minFileSize,
 		maxFileSize:     maxFileSize,
+		keyLocks:        make(map[string]*cacheKeyLock),
 	}
 }
 
@@ -195,6 +199,7 @@ func NewUpstreamCacheWithConfig(cfg *config.Config, cacheConfig *UpstreamCacheCo
 		respectUpstream: cacheConfig.RespectUpstream,
 		minFileSize:     minSize,
 		maxFileSize:     maxSize,
+		keyLocks:        make(map[string]*cacheKeyLock),
 	}
 }
 
@@ -250,6 +255,9 @@ func (uc *UpstreamCache) Get(req *http.Request) (*UpstreamCacheEntry, []byte, er
 	}
 
 	key := uc.generateCacheKey(req)
+	unlock := uc.lockCacheKey(key)
+	defer unlock()
+
 	metaPath := uc.getMetaPath(key)
 	dataPath := uc.getDataPath(key)
 
@@ -289,12 +297,15 @@ func (uc *UpstreamCache) Get(req *http.Request) (*UpstreamCacheEntry, []byte, er
 	}
 
 	// 更新访问统计
+	previousAccessedAt := entry.AccessedAt
 	entry.AccessedAt = time.Now()
 	entry.AccessCount++
 
-	// 保存更新的元数据
-	updatedMeta, _ := json.Marshal(entry)
-	os.WriteFile(metaPath, updatedMeta, 0644)
+	// 命中路径避免每次请求都写盘；高并发热点资源每分钟最多刷新一次元数据。
+	if time.Since(previousAccessedAt) > time.Minute {
+		updatedMeta, _ := json.Marshal(entry)
+		_ = writeCacheFileAtomically(metaPath, updatedMeta, 0644)
+	}
 
 	uc.hits.Add(1)
 	uc.log.Debugf("Cache hit for %s", req.URL.String())
@@ -310,26 +321,15 @@ func (uc *UpstreamCache) Store(req *http.Request, resp *http.Response) error {
 
 	// 修復：使用流式處理 + 大小限制，避免大檔案占用過多記憶體
 	key := uc.generateCacheKey(req)
+	unlock := uc.lockCacheKey(key)
+	defer unlock()
+
 	metaPath := uc.getMetaPath(key)
 	dataPath := uc.getDataPath(key)
 
 	// 确保目录存在
 	os.MkdirAll(filepath.Dir(metaPath), 0755)
 	os.MkdirAll(filepath.Dir(dataPath), 0755)
-
-	// 创建临时文件
-	tempFile, err := os.CreateTemp(filepath.Dir(dataPath), ".upstream-tmp-*")
-	if err != nil {
-		return fmt.Errorf("failed to create temp file: %w", err)
-	}
-	tempPath := tempFile.Name()
-	defer func() {
-		tempFile.Close()
-		// 如果失敗，清理暫存檔
-		if _, err := os.Stat(tempPath); err == nil {
-			os.Remove(tempPath)
-		}
-	}()
 
 	// 使用 LimitedReader 限制单对象大小，避免代理响应路径读入过多内存。
 	maxSize := int64(10 * 1024 * 1024)
@@ -345,13 +345,11 @@ func (uc *UpstreamCache) Store(req *http.Request, resp *http.Response) error {
 	}
 	limitedReader := &io.LimitedReader{R: resp.Body, N: maxSize + 1}
 
-	// 流式寫入暫存檔，同時保存到緩衝區用於重置響應體
 	var buf bytes.Buffer
-	teeReader := io.TeeReader(limitedReader, &buf)
 
-	written, err := io.Copy(tempFile, teeReader)
+	written, err := io.Copy(&buf, limitedReader)
 	if err != nil {
-		return fmt.Errorf("failed to write temp file: %w", err)
+		return fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	// 检查是否超过限制
@@ -402,16 +400,10 @@ func (uc *UpstreamCache) Store(req *http.Request, resp *http.Response) error {
 		dataToStore = body
 	}
 
-	// 关闭临时文件
-	tempFile.Close()
-
 	// 写入数据（如果需要压缩，则写入压缩后的数据）
-	if err := os.WriteFile(dataPath, dataToStore, 0644); err != nil {
+	if err := writeCacheFileAtomically(dataPath, dataToStore, 0644); err != nil {
 		return fmt.Errorf("failed to write data file: %w", err)
 	}
-
-	// 删除临时文件（已经写入正式文件）
-	os.Remove(tempPath)
 
 	// 保存元数据文件
 	metaData, err := json.Marshal(entry)
@@ -419,7 +411,7 @@ func (uc *UpstreamCache) Store(req *http.Request, resp *http.Response) error {
 		return fmt.Errorf("failed to marshal metadata: %w", err)
 	}
 
-	if err := os.WriteFile(metaPath, metaData, 0644); err != nil {
+	if err := writeCacheFileAtomically(metaPath, metaData, 0644); err != nil {
 		return fmt.Errorf("failed to write metadata file: %w", err)
 	}
 
