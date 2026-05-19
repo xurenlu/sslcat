@@ -113,6 +113,8 @@ type Server struct {
 	userManager *UserManager
 	// 会话管理器
 	sessionManager *SessionManager
+	// 管理员恢复码
+	recoveryMu sync.Mutex
 	// 通知集成器
 	notificationIntegrator *notification.NotificationIntegrator
 	// Runner 模块
@@ -375,6 +377,12 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	// 从配置读取5分钟阈值并设置到 DDoS 防护器
 	if server.config.Security.MaxAttempts5Min > 0 {
 		server.ddosProtector.SetCustomRequestsPer5Minutes(server.config.Security.MaxAttempts5Min)
+	}
+
+	if err := server.ensureAdminRecoveryCode(); err != nil {
+		server.log.Warnf("Failed to ensure admin recovery code: %v", err)
+	} else {
+		server.log.Infof("Admin recovery code file is available at %s", server.recoveryCodePlaintextFile())
 	}
 
 	// 过老浏览器 UA 检测开关
@@ -1353,6 +1361,7 @@ func (s *Server) setupRoutes() {
 	// 认证相关 API
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/auth/login", s.handleAPIAuthLogin)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/auth/totp-login", s.handleAPIAuthTOTPLogin) // 仅TOTP登录（忘记密码时使用）
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/auth/recover-password", s.handleAPIRecoverPassword)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/auth/logout", s.handleAPIAuthLogout)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/auth/me", s.handleAPIAuthMe)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/auth/change-password", s.handleAPIChangePassword)

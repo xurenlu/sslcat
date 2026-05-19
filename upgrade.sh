@@ -118,14 +118,26 @@ detect_system() {
 
 # 获取最新版本号
 get_latest_version() {
-    log_info "$MSG_CHECKING"
-
     # 使用 GitHub API 获取最新 release
     local latest_url
-    latest_url=$(curl -s https://api.github.com/repos/xurenlu/sslcat/releases/latest | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1')
+    local api_output
+
+    api_output=$(curl -s https://api.github.com/repos/xurenlu/sslcat/releases/latest) || {
+        return 1
+    }
+
+    if [[ -z "$api_output" ]]; then
+        return 1
+    fi
+
+    # 尝试使用 jq 解析，如果不可用则用 grep+sed
+    if command -v jq &> /dev/null; then
+        latest_url=$(echo "$api_output" | jq -r '.tag_name // empty')
+    else
+        latest_url=$(echo "$api_output" | grep '"tag_name"' | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+    fi
 
     if [[ -z "$latest_url" ]]; then
-        log_error "$MSG_NO_RELEASE"
         return 1
     fi
 
@@ -178,11 +190,26 @@ extract_and_install() {
     log_success "$MSG_EXTRACTING"
 
     # 进入解压后的目录
-    cd "$extract_dir"
+    cd "$extract_dir" || return 1
+
+    # 列出解压后的内容（调试用）
+    log_info "解压内容:"
+    ls -la
 
     # 检查是否存在 install-sslcat.sh
-    if [[ ! -f "install-sslcat.sh" ]]; then
+    if [[ -f "install-sslcat.sh" ]]; then
+        # 直接在当前目录
+        :
+    elif [[ -f "sslcat/install-sslcat.sh" ]]; then
+        # 在子目录中
+        cd sslcat || return 1
+    elif [[ -f "sslcat-*/install-sslcat.sh" ]]; then
+        # 使用通配符找到子目录
+        cd sslcat-* || return 1
+    else
         log_error "install-sslcat.sh 未找到"
+        log_error "查找失败，当前目录内容:"
+        ls -laR
         return 1
     fi
 
@@ -224,6 +251,8 @@ main() {
     local latest_version
 
     current_version=$(get_current_version)
+
+    log_info "$MSG_CHECKING"
     latest_version=$(get_latest_version)
 
     if [[ -z "$latest_version" ]]; then
@@ -300,7 +329,15 @@ done
 # 如果只是检查版本
 if [[ "$VERSION_ONLY" == true ]]; then
     current_version=$(get_current_version)
+
+    log_info "$MSG_CHECKING"
     latest_version=$(get_latest_version)
+
+    if [[ -z "$latest_version" ]]; then
+        log_error "无法获取最新版本信息"
+        exit 1
+    fi
+
     log_info "$(printf "$MSG_CURRENT" "$current_version")"
     log_info "$(printf "$MSG_LATEST" "$latest_version")"
 

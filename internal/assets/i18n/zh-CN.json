@@ -33,6 +33,11 @@
   "recover.step4": "系统会强制进入“修改密码”页面，设置新密码后恢复正常",
   "recover.paths": "常见路径：配置文件 /etc/sslcat/sslcat.conf，密码文件 ./data/admin.pass",
   "recover.commands": "参考命令：systemctl restart sslcat 或直接重启进程",
+  "recover.code_file": "恢复码文件：%s",
+  "recover.code_label": "恢复码",
+  "recover.new_password": "新管理员密码",
+  "recover.confirm_password": "确认新管理员密码",
+  "recover.reset_submit": "使用恢复码重置密码",
   "recover.back_to_login": "返回登录页",
   
   "dashboard.welcome": "欢迎使用 SSLcat",

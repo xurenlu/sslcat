@@ -264,6 +264,72 @@ func TestPersistWhitelistMatchesLatestMemoryState(t *testing.T) {
 	}
 }
 
+func TestLoadBlockedIPsDeletionClearsMemoryState(t *testing.T) {
+	m := newTestManager(t)
+	blocked := BlockedIP{
+		IP:         "198.51.100.30",
+		Reason:     "reload test",
+		BlockTime:  time.Now(),
+		ExpireTime: time.Now().Add(time.Hour),
+	}
+	data, err := json.Marshal(blocked)
+	if err != nil {
+		t.Fatalf("marshal blocked IP failed: %v", err)
+	}
+	if err := os.WriteFile(m.getBlockFile(), append(data, '\n'), 0600); err != nil {
+		t.Fatalf("write block file failed: %v", err)
+	}
+
+	m.loadBlockedIPs()
+	if !m.IsBlocked(blocked.IP) {
+		t.Fatal("expected loaded IP to be blocked")
+	}
+
+	if err := os.Remove(m.getBlockFile()); err != nil {
+		t.Fatalf("remove block file failed: %v", err)
+	}
+	m.loadBlockedIPs()
+
+	if m.IsBlocked(blocked.IP) {
+		t.Fatal("expected deleting block file to clear in-memory block state after reload")
+	}
+	if got := len(m.GetBlockedIPs()); got != 0 {
+		t.Fatalf("expected no blocked IPs after deletion reload, got %d", got)
+	}
+}
+
+func TestLoadWhitelistDeletionClearsMemoryState(t *testing.T) {
+	m := newTestManager(t)
+	entry := WhitelistEntry{
+		Value:       "203.0.113.40",
+		Description: "reload test",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+	data, err := json.Marshal(entry)
+	if err != nil {
+		t.Fatalf("marshal whitelist entry failed: %v", err)
+	}
+	whitelistFile := m.getWhitelistFile()
+	if err := os.WriteFile(whitelistFile, append(data, '\n'), 0600); err != nil {
+		t.Fatalf("write whitelist file failed: %v", err)
+	}
+
+	m.loadWhitelist()
+	if !m.IsWhitelisted(entry.Value) {
+		t.Fatal("expected loaded whitelist entry to be active")
+	}
+
+	if err := os.Remove(whitelistFile); err != nil {
+		t.Fatalf("remove whitelist file failed: %v", err)
+	}
+	m.loadWhitelist()
+
+	if m.IsWhitelisted(entry.Value) {
+		t.Fatal("expected deleting whitelist file to clear in-memory whitelist state after reload")
+	}
+}
+
 func (m *Manager) blockedIPSnapshot() map[string]BlockedIP {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()

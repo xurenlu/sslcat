@@ -2165,13 +2165,19 @@ func (m *Manager) startOptimizedWebSocketProxy(clientConn, upstreamConn net.Conn
 		m.log.Warnf("Timeout waiting for WebSocket goroutines to exit for %s (this may indicate a goroutine leak)", rule.Target)
 	}
 
-	// 现在可以安全关闭通道，因为所有 goroutine 都已退出
-	close(clientToUpstream)
-	close(upstreamToClient)
-	// errChan 也应该关闭
-	close(errChan)
-
 	m.log.Debugf("WebSocket proxy connection closed for %s", rule.Target)
+}
+
+func (m *Manager) reportWebSocketError(ctx context.Context, errChan chan<- error, err error) {
+	if err == nil {
+		return
+	}
+	select {
+	case errChan <- err:
+	case <-ctx.Done():
+	default:
+		m.log.Debugf("WebSocket error channel full, dropping error: %v", err)
+	}
 }
 
 // readWebSocketData 读取WebSocket数据
@@ -2221,7 +2227,7 @@ func (m *Manager) readWebSocketData(ctx context.Context, conn net.Conn, dataChan
 					continue
 				}
 				m.log.Debugf("WebSocket read error (%s): %v", connType, err)
-				errChan <- err
+				m.reportWebSocketError(ctx, errChan, err)
 			}
 			return
 		}
@@ -2243,7 +2249,7 @@ func (m *Manager) readWebSocketData(ctx context.Context, conn net.Conn, dataChan
 				sendTimeoutCancel()
 				// 发送超时，可能对端已关闭
 				m.log.Warnf("WebSocket data send timeout (%s)", connType)
-				errChan <- fmt.Errorf("data send timeout")
+				m.reportWebSocketError(ctx, errChan, fmt.Errorf("data send timeout"))
 				return
 			case <-ctx.Done():
 				sendTimeoutCancel()
@@ -2297,7 +2303,7 @@ func (m *Manager) writeWebSocketData(ctx context.Context, conn net.Conn, dataCha
 			if err != nil {
 				if atomic.LoadInt32(closed) == 0 {
 					m.log.Debugf("WebSocket write error (%s): %v", connType, err)
-					errChan <- err
+					m.reportWebSocketError(ctx, errChan, err)
 				}
 				return
 			}
@@ -2309,7 +2315,7 @@ func (m *Manager) writeWebSocketData(ctx context.Context, conn net.Conn, dataCha
 				}
 				// 超时，关闭连接
 				m.log.Debugf("WebSocket write idle timeout (%s)", connType)
-				errChan <- fmt.Errorf("write idle timeout")
+				m.reportWebSocketError(ctx, errChan, fmt.Errorf("write idle timeout"))
 				return
 			}
 			// 如果时间未到（可能是 ticker 重置导致的误触发），继续等待
@@ -2337,7 +2343,7 @@ func (m *Manager) monitorWebSocketConnections(ctx context.Context, clientConn, u
 		case <-ticker.C:
 			// 定期检查连接状态
 			if atomic.LoadInt32(clientClosed) != 0 || atomic.LoadInt32(upstreamClosed) != 0 {
-				errChan <- fmt.Errorf("connection closed")
+				m.reportWebSocketError(ctx, errChan, fmt.Errorf("connection closed"))
 				return
 			}
 
@@ -3071,6 +3077,7 @@ type errorLogRateLimiter struct {
 	maxPerWindow  int                       // 窗口内最多允许的日志条数
 	cleanupTicker *time.Ticker
 	stopChan      chan struct{}
+	stopOnce      sync.Once
 	totalErrors   int64 // 总错误数（原子操作）
 	skippedErrors int64 // 跳过的错误数（原子操作）
 }
@@ -3214,7 +3221,9 @@ func (m *Manager) SetAPIPerformanceTracker(tracker func(*http.Request, *http.Res
 
 // Stop 停止错误日志限流器
 func (rl *errorLogRateLimiter) Stop() {
-	close(rl.stopChan)
+	rl.stopOnce.Do(func() {
+		close(rl.stopChan)
+	})
 }
 
 // getStats 获取统计信息

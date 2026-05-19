@@ -15,14 +15,15 @@ type simpleCacheItem struct {
 
 // SimpleCacheBackend 简单的 map-based 缓存实现（轻量级，按需分配）
 type SimpleCacheBackend struct {
-	items      map[string]*simpleCacheItem
-	mu         sync.RWMutex
-	maxEntries int
-	maxSize    int64
+	items       map[string]*simpleCacheItem
+	mu          sync.RWMutex
+	maxEntries  int
+	maxSize     int64
 	currentSize int64
-	ttl        time.Duration
-	log        *logrus.Entry
-	stopChan   chan struct{}
+	ttl         time.Duration
+	log         *logrus.Entry
+	stopChan    chan struct{}
+	stopOnce    sync.Once
 }
 
 // NewSimpleCacheBackend 创建简单的缓存后端
@@ -32,11 +33,11 @@ func NewSimpleCacheBackend(config *MemoryCacheConfig) (CacheBackend, error) {
 	}
 
 	sc := &SimpleCacheBackend{
-		items:      make(map[string]*simpleCacheItem),
-		maxEntries: config.MaxEntries,
-		maxSize:    config.MaxSizeBytes,
+		items:       make(map[string]*simpleCacheItem),
+		maxEntries:  config.MaxEntries,
+		maxSize:     config.MaxSizeBytes,
 		currentSize: 0,
-		ttl:        config.DefaultTTL,
+		ttl:         config.DefaultTTL,
 		log: logrus.WithFields(logrus.Fields{
 			"component": "simple_cache",
 			"name":      config.Name,
@@ -96,7 +97,7 @@ func (sc *SimpleCacheBackend) Set(key string, value []byte) error {
 	if sc.currentSize+valueSize > sc.maxSize {
 		// 尝试清理过期项
 		sc.cleanupExpiredLocked()
-		
+
 		// 如果仍然超限，删除最旧的项（简单的 FIFO）
 		if sc.currentSize+valueSize > sc.maxSize {
 			sc.evictOldestLocked()
@@ -159,7 +160,9 @@ func (sc *SimpleCacheBackend) Reset() error {
 
 // Close 关闭缓存
 func (sc *SimpleCacheBackend) Close() error {
-	close(sc.stopChan)
+	sc.stopOnce.Do(func() {
+		close(sc.stopChan)
+	})
 	sc.Reset()
 	return nil
 }
@@ -209,7 +212,7 @@ func (sc *SimpleCacheBackend) evictOldestLocked() {
 
 // 错误定义
 var (
-	ErrNotFound    = &CacheError{Message: "key not found"}
+	ErrNotFound     = &CacheError{Message: "key not found"}
 	ErrItemTooLarge = &CacheError{Message: "item too large"}
 )
 
@@ -221,4 +224,3 @@ type CacheError struct {
 func (e *CacheError) Error() string {
 	return e.Message
 }
-

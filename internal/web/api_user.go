@@ -4,10 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 // handleAPIUsers 用户管理API
@@ -323,19 +320,9 @@ func (s *Server) handleAPIChangePassword(w http.ResponseWriter, r *http.Request)
 
 // updateAdminPassword 更新管理员密码（写入文件）
 func (s *Server) updateAdminPassword(newPassword string) error {
-	// 生成bcrypt哈希
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
-	if err != nil {
-		return fmt.Errorf("密码加密失败: %v", err)
+	if err := s.writeAdminPassword(newPassword); err != nil {
+		return err
 	}
-
-	// 写入密码文件
-	if err := os.WriteFile(s.config.Admin.PasswordFile, append(hashedPassword, '\n'), 0600); err != nil {
-		return fmt.Errorf("写入密码文件失败: %v", err)
-	}
-
-	// 更新内存中的配置（避免明文存储）
-	s.config.Admin.Password = ""
 
 	// 保存配置文件
 	if err := s.config.Save(s.config.ConfigFile); err != nil {

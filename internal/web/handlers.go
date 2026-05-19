@@ -167,7 +167,7 @@ func (s *Server) verifyAdminPassword(input string) bool {
 		// 迁移为 bcrypt
 		if passFile != "" {
 			if hash, err := bcrypt.GenerateFromPassword([]byte(input), bcrypt.DefaultCost); err == nil {
-				_ = os.WriteFile(passFile, append(hash, '\n'), 0600)
+				_ = writeSensitiveFileAtomically(passFile, append(hash, '\n'), 0600)
 				s.log.Debug("Password migrated to bcrypt successfully")
 			} else {
 				s.log.Debugf("Failed to migrate password to bcrypt: %v", err)
@@ -323,31 +323,7 @@ func (s *Server) needFirstTimeSetup() bool {
 // 忘记密码紧急修复页面
 func (s *Server) handleRecoverHelp(w http.ResponseWriter, r *http.Request) {
 	// 无需登录，允许直接访问
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	// 多语言内容使用 translator
-	title := s.translator.T("recover.title")
-	intro := s.translator.T("recover.intro")
-	s1 := s.translator.T("recover.step1")
-	s2 := s.translator.T("recover.step2")
-	s3 := s.translator.T("recover.step3")
-	s4 := s.translator.T("recover.step4")
-	paths := s.translator.T("recover.paths")
-	cmds := s.translator.T("recover.commands")
-	back := s.translator.T("recover.back_to_login")
-	fmt.Fprintf(w, `<!DOCTYPE html><html><head><meta charset="utf-8"><title>%s</title>
-    <link href="https://cdnproxy.some.im/cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"></head><body>
-    <div class="container mt-4">
-      <h3>%s</h3>
-      <p class="text-muted">%s</p>
-      <ol>
-        <li>%s</li>
-        <li>%s</li>
-        <li>%s</li>
-        <li>%s</li>
-      </ol>
-      <div class="alert alert-secondary"><strong>Info</strong><br>%s<br>%s</div>
-      <a class="btn btn-primary" href="%s/login">%s</a>
-    </div></body></html>`, title, title, intro, s1, s2, s3, s4, paths, cmds, s.config.AdminPrefix, back)
+	s.renderRecoverHelp(w)
 }
 
 // 系统设置
@@ -391,10 +367,9 @@ func (s *Server) handleSettingsSave(w http.ResponseWriter, r *http.Request) {
 
 		if newPassword := r.FormValue("admin_password"); newPassword != "" {
 			// 存储 bcrypt 哈希
-			if hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost); err == nil {
-				_ = os.WriteFile(s.config.Admin.PasswordFile, append(hash, '\n'), 0600)
-				// 避免明文落入配置
-				s.config.Admin.Password = ""
+			if err := s.writeAdminPassword(newPassword); err != nil {
+				http.Error(w, "failed to write password file: "+err.Error(), http.StatusInternalServerError)
+				return
 			}
 		}
 
@@ -566,16 +541,9 @@ func (s *Server) handleFirstTimeSetup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 更新内存与持久化密码文件（bcrypt）
-	s.config.Admin.Password = "" // 避免将明文写入 sslcat.conf
-	if hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost); err == nil {
-		if err := os.WriteFile(s.config.Admin.PasswordFile, append(hash, '\n'), 0600); err != nil {
-			s.recordFirstSetupMetric("failure", "password_file")
-			http.Error(w, "failed to write password file: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-	} else {
-		s.recordFirstSetupMetric("failure", "password_hash")
-		http.Error(w, "failed to hash password", http.StatusInternalServerError)
+	if err := s.writeAdminPassword(newPassword); err != nil {
+		s.recordFirstSetupMetric("failure", "password_file")
+		http.Error(w, "failed to write password file: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -658,14 +626,8 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// 更新内存与持久化密码文件（bcrypt）
-		s.config.Admin.Password = "" // 避免将明文写入 sslcat.conf
-		if hash, err := bcrypt.GenerateFromPassword([]byte(newp), bcrypt.DefaultCost); err == nil {
-			if err := os.WriteFile(s.config.Admin.PasswordFile, append(hash, '\n'), 0600); err != nil {
-				http.Error(w, "failed to write password file: "+err.Error(), http.StatusInternalServerError)
-				return
-			}
-		} else {
-			http.Error(w, "failed to hash password", http.StatusInternalServerError)
+		if err := s.writeAdminPassword(newp); err != nil {
+			http.Error(w, "failed to write password file: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		// 保存配置（不包含密码）

@@ -59,6 +59,15 @@ type WhitelistEntry struct {
 	UpdatedAt   time.Time `json:"updated_at"`  // 更新时间
 }
 
+type watchedSecurityFileState struct {
+	path    string
+	exists  bool
+	size    int64
+	modTime time.Time
+}
+
+const securityFileWatchInterval = 5 * time.Second
+
 // Manager 安全管理器
 type Manager struct {
 	config            *config.Config
@@ -78,6 +87,7 @@ type Manager struct {
 	mutex                 sync.RWMutex
 	log                   *logrus.Entry
 	stopChan              chan struct{}
+	stopOnce              sync.Once
 	// TLS 指纹持久化
 	tlsFPRotator   *logger.Rotator
 	geoIPService   *GeoIPService
@@ -225,6 +235,7 @@ func (m *Manager) Start() {
 
 	// 启动清理任务
 	go m.cleanupTask()
+	go m.securityFilesWatchTask()
 	m.startPersistWorkers()
 
 	// 初始化 TLS 指纹日志轮转器（10MB*10）
@@ -236,7 +247,9 @@ func (m *Manager) Start() {
 // Stop 停止安全管理器
 func (m *Manager) Stop() {
 	m.log.Info("Stopping security manager")
-	close(m.stopChan)
+	m.stopOnce.Do(func() {
+		close(m.stopChan)
+	})
 	m.persistWG.Wait()
 	if m.tlsFPRotator != nil {
 		_ = m.tlsFPRotator.Close()
@@ -314,6 +327,49 @@ func (m *Manager) queueWhitelistPersist() {
 	case m.whitelistPersistCh <- struct{}{}:
 	default:
 	}
+}
+
+func (m *Manager) securityFilesWatchTask() {
+	blockState := securityFileState(m.getBlockFile())
+	whitelistState := securityFileState(m.getWhitelistFile())
+	ticker := time.NewTicker(securityFileWatchInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			nextBlockState := securityFileState(m.getBlockFile())
+			if nextBlockState != blockState {
+				m.loadBlockedIPs()
+				blockState = nextBlockState
+			}
+
+			nextWhitelistState := securityFileState(m.getWhitelistFile())
+			if nextWhitelistState != whitelistState {
+				m.loadWhitelist()
+				whitelistState = nextWhitelistState
+			}
+		case <-m.stopChan:
+			return
+		}
+	}
+}
+
+func securityFileState(path string) watchedSecurityFileState {
+	state := watchedSecurityFileState{path: path}
+	if path == "" {
+		return state
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		return state
+	}
+
+	state.exists = true
+	state.size = info.Size()
+	state.modTime = info.ModTime()
+	return state
 }
 
 // AccessLogsSnapshot 返回当前访问日志的只读快照（深拷贝切片，避免并发问题）
@@ -900,19 +956,35 @@ func (m *Manager) UpdateCORSConfig(config config.CORSConfig) {
 
 // loadBlockedIPs 加载被封禁的IP列表
 func (m *Manager) loadBlockedIPs() {
-	blockFile := m.config.Security.BlockFile
+	blockFile := m.getBlockFile()
+	loaded := m.readBlockedIPs(blockFile)
+
+	m.mutex.Lock()
+	m.blockedIPs = loaded
+	m.mutex.Unlock()
+
+	m.log.Infof("Loaded %d blocked IP records", len(loaded))
+}
+
+func (m *Manager) readBlockedIPs(blockFile string) map[string]BlockedIP {
+	loaded := make(map[string]BlockedIP)
+	if blockFile == "" {
+		return loaded
+	}
+
 	if _, err := os.Stat(blockFile); os.IsNotExist(err) {
-		return
+		return loaded
 	}
 
 	file, err := os.Open(blockFile)
 	if err != nil {
 		m.log.Errorf("Failed to open block file: %v", err)
-		return
+		return loaded
 	}
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
+	now := time.Now()
 	for scanner.Scan() {
 		var blocked BlockedIP
 		if err := json.Unmarshal(scanner.Bytes(), &blocked); err != nil {
@@ -921,12 +993,15 @@ func (m *Manager) loadBlockedIPs() {
 		}
 
 		// 只加载未过期的封禁记录
-		if time.Now().Before(blocked.ExpireTime) {
-			m.blockedIPs[blocked.IP] = blocked
+		if now.Before(blocked.ExpireTime) {
+			loaded[blocked.IP] = blocked
 		}
 	}
+	if err := scanner.Err(); err != nil {
+		m.log.Errorf("Failed to read block file: %v", err)
+	}
 
-	m.log.Infof("Loaded %d blocked IP records", len(m.blockedIPs))
+	return loaded
 }
 
 // saveBlockedIPs 保存被封禁的IP列表
@@ -953,7 +1028,7 @@ func (m *Manager) saveBlockedIPs() {
 		}
 		lines = append(lines, data)
 	}
-	if err := writeJSONLinesAtomically(m.config.Security.BlockFile, lines); err != nil {
+	if err := writeJSONLinesAtomically(m.getBlockFile(), lines); err != nil {
 		m.log.Errorf("Failed to persist blocked IPs: %v", err)
 	}
 }
@@ -1525,25 +1600,55 @@ func (m *Manager) ClearTOTPOnlyLoginAttempts(ip string) {
 	delete(m.totpOnlyLastAttempts, ip)
 }
 
+func (m *Manager) getBlockFile() string {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	if m.config == nil {
+		return ""
+	}
+	return m.config.Security.BlockFile
+}
+
+func whitelistFileFromBlockFile(blockFile string) string {
+	if blockFile == "" {
+		return ""
+	}
+	dir := filepath.Dir(blockFile)
+	return filepath.Join(dir, "whitelist.json")
+}
+
 // getWhitelistFile 获取白名单文件路径
 func (m *Manager) getWhitelistFile() string {
 	// 使用与BlockFile相同的目录，文件名改为whitelist.json
-	blockFile := m.config.Security.BlockFile
-	dir := filepath.Dir(blockFile)
-	return filepath.Join(dir, "whitelist.json")
+	return whitelistFileFromBlockFile(m.getBlockFile())
 }
 
 // loadWhitelist 加载IP白名单
 func (m *Manager) loadWhitelist() {
 	whitelistFile := m.getWhitelistFile()
+	loaded := m.readWhitelist(whitelistFile)
+
+	m.mutex.Lock()
+	m.whitelistEntries = loaded
+	m.mutex.Unlock()
+
+	m.log.Infof("Loaded %d whitelist entries", len(loaded))
+}
+
+func (m *Manager) readWhitelist(whitelistFile string) map[string]WhitelistEntry {
+	loaded := make(map[string]WhitelistEntry)
+	if whitelistFile == "" {
+		return loaded
+	}
+
 	if _, err := os.Stat(whitelistFile); os.IsNotExist(err) {
-		return
+		return loaded
 	}
 
 	file, err := os.Open(whitelistFile)
 	if err != nil {
 		m.log.Errorf("Failed to open whitelist file: %v", err)
-		return
+		return loaded
 	}
 	defer file.Close()
 
@@ -1563,10 +1668,13 @@ func (m *Manager) loadWhitelist() {
 		}
 
 		entry.Value = normalized
-		m.whitelistEntries[normalized] = entry
+		loaded[normalized] = entry
+	}
+	if err := scanner.Err(); err != nil {
+		m.log.Errorf("Failed to read whitelist file: %v", err)
 	}
 
-	m.log.Infof("Loaded %d whitelist entries", len(m.whitelistEntries))
+	return loaded
 }
 
 // saveWhitelist 保存IP白名单

@@ -28,6 +28,7 @@ type AdvancedRateLimiter struct {
 	mutex    sync.RWMutex
 	log      *logrus.Entry
 	stopChan chan struct{} // 停止清理任务
+	stopOnce sync.Once
 }
 
 // RateLimitConfig 限流配置
@@ -126,7 +127,9 @@ func (arl *AdvancedRateLimiter) startCleanupTask() {
 // Stop 停止清理任务
 func (arl *AdvancedRateLimiter) Stop() {
 	if arl.stopChan != nil {
-		close(arl.stopChan)
+		arl.stopOnce.Do(func() {
+			close(arl.stopChan)
+		})
 	}
 }
 

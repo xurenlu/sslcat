@@ -43,6 +43,7 @@ type Manager struct {
 	certCache     map[string]*tls.Certificate
 	certMutex     sync.RWMutex
 	stopChan      chan struct{}
+	stopOnce      sync.Once
 	log           *logrus.Entry
 	notifier      *notify.Notifier
 	lastNotify    map[string]string
@@ -65,6 +66,8 @@ type Manager struct {
 	// 证书申请进度事件通道：用于实时推送申请进度
 	progressChannels map[string]chan CertProgressEvent
 	progressMutex    sync.RWMutex
+	certRequestLocks map[string]*certRequestLock
+	certRequestMu    sync.Mutex
 	// TLS Session Resumption 相關
 	sessionCache tls.ClientSessionCache // Session ID 緩存（Session Ticket 由 Go 運行時自動管理）
 	// ACME 账户密钥缓存：复用账户密钥避免重复创建
@@ -104,6 +107,7 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 		failedDomainCache:  make(map[string]time.Time),
 		certMetadataCache:  make(map[string]*certMetadata),
 		progressChannels:   make(map[string]chan CertProgressEvent),
+		certRequestLocks:   make(map[string]*certRequestLock),
 		certDiskModTime:    make(map[string]time.Time),
 	}
 
@@ -287,7 +291,9 @@ func (m *Manager) Start() error {
 // Stop 停止SSL管理器
 func (m *Manager) Stop() {
 	m.log.Info("Stopping SSL manager")
-	close(m.stopChan)
+	m.stopOnce.Do(func() {
+		close(m.stopChan)
+	})
 }
 
 // cleanFailedCache 定期清理过期的失败缓存条目
@@ -598,11 +604,11 @@ func (m *Manager) generateSelfSignedCert(domain string) (*tls.Certificate, error
 	certPath := filepath.Join(m.config.SSL.CertDir, domain+".crt")
 	keyPath := filepath.Join(m.config.SSL.KeyDir, domain+".key")
 
-	if err := os.WriteFile(certPath, certPEM, 0644); err != nil {
+	if err := writeFileAtomically(certPath, certPEM, 0644); err != nil {
 		m.log.Errorf("Failed to save certificate: %v", err)
 	}
 
-	if err := os.WriteFile(keyPath, keyPEM, 0600); err != nil {
+	if err := writeFileAtomically(keyPath, keyPEM, 0600); err != nil {
 		m.log.Errorf("Failed to save private key: %v", err)
 	}
 
@@ -1254,6 +1260,8 @@ func (m *Manager) EnsureDomainCert(domain string) error {
 	if domain == "" {
 		return fmt.Errorf("empty domain")
 	}
+	unlock := m.lockCertRequest(domain)
+	defer unlock()
 
 	// 记录证书续期/申请请求的详细信息
 	m.log.Infof("Certificate request initiated for domain: %s", domain)
@@ -1474,6 +1482,9 @@ func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error
 		acmeStart := time.Now()
 		cert, err := m.acmeMgr.GetCertificate(&tls.ClientHelloInfo{ServerName: domain})
 		acmeDuration := time.Since(acmeStart)
+		if err == nil && cert == nil {
+			err = fmt.Errorf("acme returned nil certificate")
+		}
 
 		if err == nil && cert != nil {
 			// 申请成功，立即将证书保存到缓存和磁盘
@@ -2005,11 +2016,11 @@ func (m *Manager) GenerateMultiDomainCert(domains []string) (*tls.Certificate, e
 	certPath := filepath.Join(m.config.SSL.CertDir, primaryDomain+".crt")
 	keyPath := filepath.Join(m.config.SSL.KeyDir, primaryDomain+".key")
 
-	if err := os.WriteFile(certPath, certPEM, 0644); err != nil {
+	if err := writeFileAtomically(certPath, certPEM, 0644); err != nil {
 		m.log.Errorf("Failed to save certificate: %v", err)
 	}
 
-	if err := os.WriteFile(keyPath, keyPEM, 0600); err != nil {
+	if err := writeFileAtomically(keyPath, keyPEM, 0600); err != nil {
 		m.log.Errorf("Failed to save private key: %v", err)
 	}
 
@@ -2388,11 +2399,11 @@ func (m *Manager) SyncACMECertsToDisk() (int, error) {
 			}
 		}
 
-		if err := os.WriteFile(certPath, certPEM, 0644); err != nil {
+		if err := writeFileAtomically(certPath, certPEM, 0644); err != nil {
 			m.log.Warnf("Failed to write certificate %s: %v", certPath, err)
 			continue
 		}
-		if err := os.WriteFile(keyPath, keyPEM, 0600); err != nil {
+		if err := writeFileAtomically(keyPath, keyPEM, 0600); err != nil {
 			m.log.Warnf("Failed to write private key %s: %v", keyPath, err)
 			continue
 		}
@@ -2881,11 +2892,11 @@ func (m *Manager) saveCertificate(domain string, certDER [][]byte, privateKey *r
 	certPath := filepath.Join(m.config.SSL.CertDir, domain+".crt")
 	keyPath := filepath.Join(m.config.SSL.KeyDir, domain+".key")
 
-	if err := os.WriteFile(certPath, certPEM, 0644); err != nil {
+	if err := writeFileAtomically(certPath, certPEM, 0644); err != nil {
 		return fmt.Errorf("failed to save certificate file: %w", err)
 	}
 
-	if err := os.WriteFile(keyPath, keyPEM, 0600); err != nil {
+	if err := writeFileAtomically(keyPath, keyPEM, 0600); err != nil {
 		return fmt.Errorf("failed to save private key file: %w", err)
 	}
 
@@ -2956,11 +2967,11 @@ func (m *Manager) saveCertificateToDisk(domain string, cert *tls.Certificate) er
 	certPath := filepath.Join(m.config.SSL.CertDir, domain+".crt")
 	keyPath := filepath.Join(m.config.SSL.KeyDir, domain+".key")
 
-	if err := os.WriteFile(certPath, certPEM, 0644); err != nil {
+	if err := writeFileAtomically(certPath, certPEM, 0644); err != nil {
 		return fmt.Errorf("failed to write certificate file: %w", err)
 	}
 
-	if err := os.WriteFile(keyPath, keyPEM, 0600); err != nil {
+	if err := writeFileAtomically(keyPath, keyPEM, 0600); err != nil {
 		return fmt.Errorf("failed to write key file: %w", err)
 	}
 
@@ -3032,51 +3043,6 @@ func (m *Manager) RegisterDNSProvider(name string, provider DNSProviderInterface
 func (m *Manager) UnregisterDNSProvider(name string) {
 	m.dnsManager.UnregisterProvider(name)
 	m.log.Infof("Unregistered DNS provider: %s", name)
-}
-
-// CreateProgressChannel 为域名创建进度通道
-func (m *Manager) CreateProgressChannel(domain string) chan CertProgressEvent {
-	m.progressMutex.Lock()
-	defer m.progressMutex.Unlock()
-
-	ch := make(chan CertProgressEvent, 10) // 缓冲10个事件
-	m.progressChannels[domain] = ch
-	return ch
-}
-
-// GetProgressChannel 获取域名的进度通道
-func (m *Manager) GetProgressChannel(domain string) (chan CertProgressEvent, bool) {
-	m.progressMutex.RLock()
-	defer m.progressMutex.RUnlock()
-
-	ch, ok := m.progressChannels[domain]
-	return ch, ok
-}
-
-// CloseProgressChannel 关闭并删除进度通道
-func (m *Manager) CloseProgressChannel(domain string) {
-	m.progressMutex.Lock()
-	defer m.progressMutex.Unlock()
-
-	if ch, ok := m.progressChannels[domain]; ok {
-		close(ch)
-		delete(m.progressChannels, domain)
-	}
-}
-
-// sendProgressEvent 发送进度事件（非阻塞）
-func (m *Manager) sendProgressEvent(domain string, event CertProgressEvent) {
-	m.progressMutex.RLock()
-	ch, ok := m.progressChannels[domain]
-	m.progressMutex.RUnlock()
-
-	if ok {
-		select {
-		case ch <- event:
-		default:
-			// 通道已满，跳过（避免阻塞）
-		}
-	}
 }
 
 // getCertificateFromCache 从缓存中获取证书（线程安全）

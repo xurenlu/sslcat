@@ -30,6 +30,16 @@ const cdnMetaTouchMinInterval = time.Minute
 type processingEntry struct {
 	ch        chan struct{}
 	createdAt time.Time
+	closeOnce sync.Once
+}
+
+func (e *processingEntry) close() {
+	if e == nil || e.ch == nil {
+		return
+	}
+	e.closeOnce.Do(func() {
+		close(e.ch)
+	})
 }
 
 // CDNCache 本地静态文件缓存管理器
@@ -766,15 +776,7 @@ func (c *CDNCache) cleanupProcessing(req *http.Request) {
 			// 支持两种格式：新的 *processingEntry 和旧的 chan struct{}
 			switch v := value.(type) {
 			case *processingEntry:
-				if v != nil && v.ch != nil {
-					// 安全关闭 channel
-					select {
-					case <-v.ch:
-						// 已经关闭
-					default:
-						close(v.ch)
-					}
-				}
+				v.close()
 			case chan struct{}:
 				// 旧格式，直接关闭
 				select {
@@ -1159,16 +1161,10 @@ func (c *CDNCache) cleanupStaleProcessingEntries() {
 			c.log.Warnf("清理超时的 processing 条目: %v (创建于 %v, 已存在 %v)",
 				key, entry.createdAt, now.Sub(entry.createdAt))
 
-			// 安全关闭 channel
-			select {
-			case <-entry.ch:
-				// 已经关闭
-			default:
-				close(entry.ch)
+			if c.processing.CompareAndDelete(key, value) {
+				entry.close()
+				cleaned++
 			}
-
-			c.processing.Delete(key)
-			cleaned++
 		}
 
 		return true

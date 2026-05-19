@@ -13,6 +13,30 @@ import (
 	"github.com/xurenlu/sslcat/internal/ssl"
 )
 
+func (s *Server) prepareSSEResponse(w http.ResponseWriter, r *http.Request) (http.Flusher, bool) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache, no-transform")
+	if r.ProtoMajor < 2 {
+		w.Header().Set("Connection", "keep-alive")
+	}
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	rc := http.NewResponseController(w)
+	_ = rc.SetWriteDeadline(time.Time{})
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		return nil, false
+	}
+	select {
+	case <-r.Context().Done():
+		return flusher, true
+	default:
+	}
+	return flusher, true
+}
+
 // handleAPISSLGenerate 申请SSL证书
 func (s *Server) handleAPISSLGenerate(w http.ResponseWriter, r *http.Request) {
 	// 处理 OPTIONS 预检请求
@@ -55,6 +79,14 @@ func (s *Server) handleAPISSLGenerate(w http.ResponseWriter, r *http.Request) {
 	for _, domain := range req.Domains {
 		domain = strings.TrimSpace(domain)
 		if domain == "" {
+			continue
+		}
+		if !isValidDomain(domain) {
+			results[domain] = map[string]interface{}{
+				"success": false,
+				"error":   "invalid domain",
+			}
+			failureCount++
 			continue
 		}
 
@@ -130,26 +162,32 @@ func (s *Server) handleAPISSLGenerateStream(w http.ResponseWriter, r *http.Reque
 		json.NewEncoder(w).Encode(map[string]string{"error": "domain is required"})
 		return
 	}
+	if !isValidDomain(domain) {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid domain"})
+		return
+	}
 
 	// 设置 SSE 响应头
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-
-	flusher, ok := w.(http.Flusher)
+	flusher, ok := s.prepareSSEResponse(w, r)
 	if !ok {
 		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
 		return
 	}
 
 	// 创建进度通道
-	progressCh := s.sslManager.CreateProgressChannel(domain)
-	
+	progressCh, created := s.sslManager.TryCreateProgressChannel(domain)
+	if !created {
+		w.WriteHeader(http.StatusConflict)
+		fmt.Fprintf(w, "data: {\"status\":\"failed\",\"error\":\"certificate request already in progress\"}\n\n")
+		flusher.Flush()
+		return
+	}
+
 	// 使用 done 通道来协调 goroutine 和主循环
 	done := make(chan struct{})
 	var closeOnce sync.Once
-	
+
 	// 在 goroutine 中执行证书申请
 	go func() {
 		defer func() {
@@ -162,7 +200,7 @@ func (s *Server) handleAPISSLGenerateStream(w http.ResponseWriter, r *http.Reque
 			// 延迟关闭进度通道，确保所有事件都已发送
 			time.Sleep(200 * time.Millisecond)
 			closeOnce.Do(func() {
-				s.sslManager.CloseProgressChannel(domain)
+				s.sslManager.CloseProgressChannelIfMatch(domain, progressCh)
 			})
 		}()
 
@@ -176,12 +214,12 @@ func (s *Server) handleAPISSLGenerateStream(w http.ResponseWriter, r *http.Reque
 				}()
 				select {
 				case progressCh <- ssl.CertProgressEvent{
-					Domain:      domain,
-					Status:      "failed",
-					Message:     fmt.Sprintf("证书申请失败: %v", err),
-					Progress:    100,
-					Error:       err.Error(),
-					Timestamp:   time.Now(),
+					Domain:    domain,
+					Status:    "failed",
+					Message:   fmt.Sprintf("证书申请失败: %v", err),
+					Progress:  100,
+					Error:     err.Error(),
+					Timestamp: time.Now(),
 				}:
 				case <-time.After(100 * time.Millisecond):
 					// 超时，通道可能已关闭，忽略
@@ -195,9 +233,11 @@ func (s *Server) handleAPISSLGenerateStream(w http.ResponseWriter, r *http.Reque
 	defer func() {
 		// 确保通道被关闭
 		closeOnce.Do(func() {
-			s.sslManager.CloseProgressChannel(domain)
+			s.sslManager.CloseProgressChannelIfMatch(domain, progressCh)
 		})
 	}()
+	heartbeat := time.NewTicker(15 * time.Second)
+	defer heartbeat.Stop()
 
 	for {
 		select {
@@ -230,7 +270,11 @@ func (s *Server) handleAPISSLGenerateStream(w http.ResponseWriter, r *http.Reque
 			case <-time.After(1 * time.Second):
 			}
 			return
-			
+
+		case <-heartbeat.C:
+			fmt.Fprint(w, ": ping\n\n")
+			flusher.Flush()
+
 		case <-done:
 			// goroutine 已完成，等待最后的事件
 			select {
@@ -315,6 +359,11 @@ func (s *Server) handleAPISSLRetry(w http.ResponseWriter, r *http.Request) {
 	}
 
 	domain := strings.TrimSpace(req.Domain)
+	if !isValidDomain(domain) {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid domain"})
+		return
+	}
 	s.log.Infof("Manual retry requested for domain: %s", domain)
 
 	// 执行重试
@@ -374,28 +423,34 @@ func (s *Server) handleAPISSLRetryStream(w http.ResponseWriter, r *http.Request)
 		json.NewEncoder(w).Encode(map[string]string{"error": "domain is required"})
 		return
 	}
+	if !isValidDomain(domain) {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid domain"})
+		return
+	}
 
 	s.log.Infof("Manual retry (SSE) requested for domain: %s", domain)
 
 	// 设置 SSE 响应头
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-
-	flusher, ok := w.(http.Flusher)
+	flusher, ok := s.prepareSSEResponse(w, r)
 	if !ok {
 		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
 		return
 	}
 
 	// 创建进度通道
-	progressCh := s.sslManager.CreateProgressChannel(domain)
-	
+	progressCh, created := s.sslManager.TryCreateProgressChannel(domain)
+	if !created {
+		w.WriteHeader(http.StatusConflict)
+		fmt.Fprintf(w, "data: {\"status\":\"failed\",\"error\":\"certificate request already in progress\"}\n\n")
+		flusher.Flush()
+		return
+	}
+
 	// 使用 done 通道来协调 goroutine 和主循环
 	done := make(chan struct{})
 	var closeOnce sync.Once
-	
+
 	// 在 goroutine 中执行证书续期
 	go func() {
 		defer func() {
@@ -408,7 +463,7 @@ func (s *Server) handleAPISSLRetryStream(w http.ResponseWriter, r *http.Request)
 			// 延迟关闭进度通道，确保所有事件都已发送
 			time.Sleep(200 * time.Millisecond)
 			closeOnce.Do(func() {
-				s.sslManager.CloseProgressChannel(domain)
+				s.sslManager.CloseProgressChannelIfMatch(domain, progressCh)
 			})
 		}()
 
@@ -422,12 +477,12 @@ func (s *Server) handleAPISSLRetryStream(w http.ResponseWriter, r *http.Request)
 				}()
 				select {
 				case progressCh <- ssl.CertProgressEvent{
-					Domain:      domain,
-					Status:      "failed",
-					Message:     fmt.Sprintf("证书续期失败: %v", err),
-					Progress:    100,
-					Error:       err.Error(),
-					Timestamp:   time.Now(),
+					Domain:    domain,
+					Status:    "failed",
+					Message:   fmt.Sprintf("证书续期失败: %v", err),
+					Progress:  100,
+					Error:     err.Error(),
+					Timestamp: time.Now(),
 				}:
 				case <-time.After(100 * time.Millisecond):
 					// 超时，通道可能已关闭，忽略
@@ -441,9 +496,11 @@ func (s *Server) handleAPISSLRetryStream(w http.ResponseWriter, r *http.Request)
 	defer func() {
 		// 确保通道被关闭
 		closeOnce.Do(func() {
-			s.sslManager.CloseProgressChannel(domain)
+			s.sslManager.CloseProgressChannelIfMatch(domain, progressCh)
 		})
 	}()
+	heartbeat := time.NewTicker(15 * time.Second)
+	defer heartbeat.Stop()
 
 	for {
 		select {
@@ -476,7 +533,11 @@ func (s *Server) handleAPISSLRetryStream(w http.ResponseWriter, r *http.Request)
 			case <-time.After(1 * time.Second):
 			}
 			return
-			
+
+		case <-heartbeat.C:
+			fmt.Fprint(w, ": ping\n\n")
+			flusher.Flush()
+
 		case <-done:
 			// goroutine 已完成，等待最后的事件
 			select {
@@ -509,6 +570,11 @@ func (s *Server) handleAPISSLDelete(w http.ResponseWriter, r *http.Request) {
 	if domain == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": "domain parameter is required"})
+		return
+	}
+	if !isValidDomain(domain) {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid domain"})
 		return
 	}
 
@@ -553,6 +619,11 @@ func (s *Server) handleAPISSLPreflight(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"error": "domain parameter is required"})
 		return
 	}
+	if !isValidDomain(domain) {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid domain"})
+		return
+	}
 
 	if s.sslManager == nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -562,10 +633,10 @@ func (s *Server) handleAPISSLPreflight(w http.ResponseWriter, r *http.Request) {
 
 	// 查找DNS Provider
 	dnsProvider := s.sslManager.FindDNSProviderForDomain(domain)
-	
+
 	// 检查域名解析
 	resolved, resolutionInfo, resolutionErr := s.sslManager.CheckDomainResolution(domain)
-	
+
 	// 提取IP地址信息
 	var pointsToServer bool
 	if resolutionErr == nil {
@@ -607,7 +678,7 @@ func (s *Server) handleAPISSLPreflight(w http.ResponseWriter, r *http.Request) {
 			"resolved":         resolved,
 			"points_to_server": pointsToServer,
 			"info":             resolutionInfo,
-			"error":            func() string {
+			"error": func() string {
 				if resolutionErr != nil {
 					return resolutionErr.Error()
 				}
@@ -649,6 +720,12 @@ func (s *Server) handleAPISSLUpload(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"error": "domain, certificate and private_key are required"})
 		return
 	}
+	req.Domain = strings.TrimSpace(req.Domain)
+	if !isValidDomain(req.Domain) {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid domain"})
+		return
+	}
 
 	// 确保证书和密钥目录存在
 	if err := os.MkdirAll(s.config.SSL.CertDir, 0755); err != nil {
@@ -668,14 +745,14 @@ func (s *Server) handleAPISSLUpload(w http.ResponseWriter, r *http.Request) {
 	certPath := filepath.Join(s.config.SSL.CertDir, req.Domain+".crt")
 	keyPath := filepath.Join(s.config.SSL.KeyDir, req.Domain+".key")
 
-	if err := os.WriteFile(certPath, []byte(req.Certificate), 0644); err != nil {
+	if err := writeSensitiveFileAtomically(certPath, []byte(req.Certificate), 0644); err != nil {
 		s.log.Errorf("Failed to save certificate to %s: %v", certPath, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "failed to save certificate"})
 		return
 	}
 
-	if err := os.WriteFile(keyPath, []byte(req.PrivateKey), 0600); err != nil {
+	if err := writeSensitiveFileAtomically(keyPath, []byte(req.PrivateKey), 0600); err != nil {
 		s.log.Errorf("Failed to save private key to %s: %v", keyPath, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "failed to save private key"})
