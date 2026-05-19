@@ -29,6 +29,14 @@ const (
 	RuleTypeCustom           RuleType = "custom"
 )
 
+// wafPathWhitelist WAF 路径白名单
+// 这些路径的数据内容不可预测（如日志上报、用户输入等），应跳过 WAF 检查
+var wafPathWhitelist = []string{
+	"/api/v1/logs/ingest-batch", // 日志批量上报接口，日志内容可能包含任何文本
+	"/api/v1/logs/ingest",       // 日志单条上报接口
+	"/api/v1/logs/",             // 其他日志相关 API
+}
+
 // Action WAF动作
 type Action string
 
@@ -80,22 +88,22 @@ type Engine struct {
 	maxEvents    int
 	mutex        sync.RWMutex
 	log          *logrus.Entry
-	
+
 	// 日志限流器：防止大量重复日志导致 CPU 高占用
-	logLimiter   *wafLogRateLimiter
+	logLimiter *wafLogRateLimiter
 	// 事件清理定时器
 	cleanupTicker *time.Ticker
 	stopChan      chan struct{}
-	
+
 	// 多维度封禁器（替代原有的 rateLimiter）
 	multiDimBlocker *wafMultiDimBlocker
 }
 
 // WAFRateLimitConfig WAF 频率限制配置（保留向后兼容）
 type WAFRateLimitConfig struct {
-	Enabled       bool
-	WindowSec     int
-	MaxHits       int
+	Enabled          bool
+	WindowSec        int
+	MaxHits          int
 	BlockDurationSec int
 }
 
@@ -132,9 +140,9 @@ func NewEngine(rateLimitConfig *WAFRateLimitConfig, multiDimConfig *MultiDimBloc
 		rules:           make(map[string]*Rule),
 		enabled:         enabled,
 		events:          make([]AttackEvent, 0),
-		maxEvents:       10000, // 最多保存10000个事件
+		maxEvents:       10000,                             // 最多保存10000个事件
 		logLimiter:      newWAFLogRateLimiter(time.Minute), // 相同攻击每分钟最多记录一次日志
-		cleanupTicker:   time.NewTicker(10 * time.Minute), // 每10分钟清理一次过期事件
+		cleanupTicker:   time.NewTicker(10 * time.Minute),  // 每10分钟清理一次过期事件
 		stopChan:        make(chan struct{}),
 		log:             log,
 		multiDimBlocker: multiDimBlocker,
@@ -486,10 +494,15 @@ func (e *Engine) CheckRequestWithTLS(r *http.Request, tlsFingerprint string) (*A
 		}
 	}
 
+	// 路径白名单检查：某些 API 路径的数据内容不可预测（如日志上报），应跳过 WAF 检查
+	if e.isPathWhitelisted(r.URL.Path) {
+		return nil, false
+	}
+
 	// 使用读锁进行检测
 	e.mutex.RLock()
 	var event *AttackEvent
-	
+
 	// 1. 检查URL路径（敏感文件检测）
 	if event = e.checkURLPath(r, clientIP, userAgent, url, method); event == nil {
 		// 2. 检查User-Agent（扫描工具检测）
@@ -509,12 +522,12 @@ func (e *Engine) CheckRequestWithTLS(r *http.Request, tlsFingerprint string) (*A
 	// 如果检测到攻击，在释放读锁后添加事件
 	if event != nil {
 		e.addEvent(event)
-		
+
 		// 记录到多维度封禁器
 		if e.multiDimBlocker != nil {
 			e.multiDimBlocker.RecordHit(clientIP, tlsFingerprint)
 		}
-		
+
 		return event, event.Blocked
 	}
 
@@ -732,7 +745,7 @@ func (e *Engine) matchRules(payload, clientIP, userAgent, url, method string) *A
 func (e *Engine) addEvent(event *AttackEvent) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
-	
+
 	e.events = append(e.events, *event)
 
 	// 保持事件数量限制
@@ -744,6 +757,16 @@ func (e *Engine) addEvent(event *AttackEvent) {
 // generateEventID 生成事件ID
 func (e *Engine) generateEventID() string {
 	return fmt.Sprintf("waf_%d", time.Now().UnixNano())
+}
+
+// isPathWhitelisted 检查路径是否在白名单中
+func (e *Engine) isPathWhitelisted(path string) bool {
+	for _, whitelistPath := range wafPathWhitelist {
+		if strings.HasPrefix(path, whitelistPath) {
+			return true
+		}
+	}
+	return false
 }
 
 // getClientIP 获取客户端IP
@@ -880,7 +903,7 @@ func (e *Engine) GetRateLimitBlockedIPs() map[string]time.Time {
 	if e.multiDimBlocker == nil {
 		return make(map[string]time.Time)
 	}
-	
+
 	result := make(map[string]time.Time)
 	for _, record := range e.multiDimBlocker.GetBlockedList(DimensionIP) {
 		result[record.Value] = record.ExpireTime
@@ -903,9 +926,13 @@ func (e *Engine) UpdateRateLimitConfig(config *WAFRateLimitConfig) {
 		e.multiDimBlocker.config.IPWindow = time.Duration(config.WindowSec) * time.Second
 		e.multiDimBlocker.config.IPMaxHits = config.MaxHits
 		e.multiDimBlocker.config.IPBlockDuration = time.Duration(config.BlockDurationSec) * time.Second
-		
+		normalizeMultiDimBlockConfig(e.multiDimBlocker.config)
+
 		e.log.Infof("WAF 频率限制配置已更新: enabled=%v, window=%ds, max_hits=%d, block=%ds",
-			config.Enabled, config.WindowSec, config.MaxHits, config.BlockDurationSec)
+			e.multiDimBlocker.config.IPEnabled,
+			int(e.multiDimBlocker.config.IPWindow.Seconds()),
+			e.multiDimBlocker.config.IPMaxHits,
+			int(e.multiDimBlocker.config.IPBlockDuration.Seconds()))
 	}
 }
 

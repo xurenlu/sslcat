@@ -94,9 +94,40 @@ type UpstreamCacheEntry struct {
 
 // NewUpstreamCache 创建上游缓存管理器
 func NewUpstreamCache(cfg *config.Config) *UpstreamCache {
-	cacheDir := "./data/upstream-cache"
-	if cfg.CDNCache.CacheDir != "" {
-		cacheDir = filepath.Join(cfg.CDNCache.CacheDir, "upstream")
+	cacheConfig := cfg.UpstreamCache
+	emptyConfig := cacheConfig.CacheDir == "" &&
+		cacheConfig.MaxSizeBytes == 0 &&
+		cacheConfig.DefaultTTL == 0 &&
+		!cacheConfig.RespectUpstream &&
+		cacheConfig.MinFileSize == 0 &&
+		cacheConfig.MaxFileSize == 0 &&
+		len(cacheConfig.CacheableTypes) == 0
+	cacheDir := cacheConfig.CacheDir
+	if cacheDir == "" {
+		cacheDir = "./data/upstream-cache"
+	}
+
+	maxSizeBytes := cacheConfig.MaxSizeBytes
+	if maxSizeBytes <= 0 {
+		maxSizeBytes = 50 * 1024 * 1024
+	}
+	defaultTTL := cacheConfig.DefaultTTL
+	if defaultTTL <= 0 {
+		defaultTTL = time.Hour
+	}
+	minFileSize := cacheConfig.MinFileSize
+	if minFileSize <= 0 {
+		minFileSize = 1024
+	}
+	maxFileSize := cacheConfig.MaxFileSize
+	if maxFileSize <= 0 {
+		maxFileSize = 10 * 1024 * 1024
+	}
+	enabled := cacheConfig.Enabled
+	respectUpstream := cacheConfig.RespectUpstream
+	if emptyConfig {
+		enabled = true
+		respectUpstream = true
 	}
 
 	// 创建缓存目录和子目录
@@ -110,12 +141,12 @@ func NewUpstreamCache(cfg *config.Config) *UpstreamCache {
 		compressor:      compression.NewCompressor(compression.FromConfig(cfg)),
 		mimeDetector:    NewMIMEDetector(),
 		cacheDir:        cacheDir,
-		enabled:         true,               // 默认启用
-		maxSizeBytes:    1024 * 1024 * 1024, // 默认1GB
-		defaultTTL:      1 * time.Hour,      // 默认1小时
-		respectUpstream: true,               // 默认遵循上游Cache-Control
-		minFileSize:     1024,               // 默认1KB
-		maxFileSize:     100 * 1024 * 1024,  // 默认100MB
+		enabled:         enabled,
+		maxSizeBytes:    maxSizeBytes,
+		defaultTTL:      defaultTTL,
+		respectUpstream: respectUpstream,
+		minFileSize:     minFileSize,
+		maxFileSize:     maxFileSize,
 	}
 }
 
@@ -139,7 +170,7 @@ func NewUpstreamCacheWithConfig(cfg *config.Config, cacheConfig *UpstreamCacheCo
 
 	maxSize := cacheConfig.MaxSize
 	if maxSize <= 0 {
-		maxSize = 100 * 1024 * 1024 // 默认100MB
+		maxSize = 10 * 1024 * 1024 // 默认10MB
 	}
 
 	maxSizeBytes := cacheConfig.MaxSizeBytes
@@ -300,10 +331,10 @@ func (uc *UpstreamCache) Store(req *http.Request, resp *http.Response) error {
 		}
 	}()
 
-	// 使用 LimitedReader 限制讀取大小（最大 100MB）
-	maxSize := int64(100 * 1024 * 1024)
-	if uc.maxSizeBytes > 0 && uc.maxSizeBytes < maxSize {
-		maxSize = uc.maxSizeBytes
+	// 使用 LimitedReader 限制单对象大小，避免代理响应路径读入过多内存。
+	maxSize := int64(10 * 1024 * 1024)
+	if uc.maxFileSize > 0 {
+		maxSize = uc.maxFileSize
 	}
 	// 若 Content-Length 不可用或超出限制，直接跳過快取以避免讀取 resp.Body
 	if resp.ContentLength <= 0 {

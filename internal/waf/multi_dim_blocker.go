@@ -45,8 +45,8 @@ type MultiDimBlockConfig struct {
 
 	// IP 段维度配置
 	SubnetEnabled       bool
-	SubnetMask          int           // 默认 24 (/24)
-	SubnetThreshold     int           // 同段被封IP数量阈值，默认 3
+	SubnetMask          int // 默认 24 (/24)
+	SubnetThreshold     int // 同段被封IP数量阈值，默认 10
 	SubnetBlockDuration time.Duration
 }
 
@@ -83,18 +83,19 @@ func newWAFMultiDimBlocker(config *MultiDimBlockConfig, log *logrus.Entry) *wafM
 		config = &MultiDimBlockConfig{
 			IPEnabled:           false,
 			IPWindow:            60 * time.Second,
-			IPMaxHits:           10,
-			IPBlockDuration:     3600 * time.Second,
+			IPMaxHits:           60,
+			IPBlockDuration:     600 * time.Second,
 			TLSEnabled:          false,
 			TLSWindow:           60 * time.Second,
-			TLSMaxHits:          10,
-			TLSBlockDuration:    3600 * time.Second,
+			TLSMaxHits:          120,
+			TLSBlockDuration:    600 * time.Second,
 			SubnetEnabled:       false,
 			SubnetMask:          24,
-			SubnetThreshold:     3,
-			SubnetBlockDuration: 7200 * time.Second,
+			SubnetThreshold:     10,
+			SubnetBlockDuration: 1800 * time.Second,
 		}
 	}
+	normalizeMultiDimBlockConfig(config)
 
 	blocker := &wafMultiDimBlocker{
 		ipBlocked:     make(map[string]*BlockRecord),
@@ -114,6 +115,36 @@ func newWAFMultiDimBlocker(config *MultiDimBlockConfig, log *logrus.Entry) *wafM
 	go blocker.cleanup()
 
 	return blocker
+}
+
+func normalizeMultiDimBlockConfig(config *MultiDimBlockConfig) {
+	if config.IPWindow <= 0 {
+		config.IPWindow = 60 * time.Second
+	}
+	if config.IPMaxHits <= 0 {
+		config.IPMaxHits = 60
+	}
+	if config.IPBlockDuration <= 0 {
+		config.IPBlockDuration = 600 * time.Second
+	}
+	if config.TLSWindow <= 0 {
+		config.TLSWindow = 60 * time.Second
+	}
+	if config.TLSMaxHits <= 0 {
+		config.TLSMaxHits = 120
+	}
+	if config.TLSBlockDuration <= 0 {
+		config.TLSBlockDuration = 600 * time.Second
+	}
+	if config.SubnetMask <= 0 {
+		config.SubnetMask = 24
+	}
+	if config.SubnetThreshold <= 0 {
+		config.SubnetThreshold = 10
+	}
+	if config.SubnetBlockDuration <= 0 {
+		config.SubnetBlockDuration = 1800 * time.Second
+	}
 }
 
 // RecordHit 记录触发事件
@@ -595,4 +626,3 @@ func isIPInSubnet(ip string, cidr string) bool {
 
 	return subnet.Contains(parsed)
 }
-

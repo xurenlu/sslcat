@@ -94,6 +94,8 @@ type Protector struct {
 	mutex           sync.RWMutex
 	cleanupInterval time.Duration
 	stopChan        chan struct{}
+	stopOnce        sync.Once
+	attackQueue     chan attackRecord
 
 	// 配置参数
 	maxRequestsPerMinute int
@@ -120,13 +122,13 @@ type Protector struct {
 	geoIPService *security.GeoIPService
 
 	// 全局攻击感知
-	lastAttackCheckTime time.Time
-	attackCheckInterval time.Duration
+	lastAttackCheckTime  time.Time
+	attackCheckInterval  time.Duration
 	lastNotificationTime time.Time
 	notificationCooldown time.Duration
 	// 自动应对措施
 	autoEscalateEnabled bool
-	autoBlockEnabled bool
+	autoBlockEnabled    bool
 	// Security Manager 引用（用于统一封禁管理）
 	securityManager *security.Manager
 }
@@ -156,14 +158,15 @@ func NewProtectorWithThreatIntel(notificationIntegrator *notification.Notificati
 		attacks:                make([]Attack, 0),
 		cleanupInterval:        5 * time.Minute,
 		stopChan:               make(chan struct{}),
+		attackQueue:            make(chan attackRecord, 4096),
 		blockDuration:          1 * time.Hour,
 		maxClients:             10000,
 		maxAttacks:             1000,
 		notificationIntegrator: notificationIntegrator,
-		attackCheckInterval:    1 * time.Minute,  // 每分钟检查一次全局攻击
-		notificationCooldown:   5 * time.Minute,  // 通知冷却时间5分钟
-		autoEscalateEnabled:    true,             // 默认启用自动升级
-		autoBlockEnabled:       true,             // 默认启用自动封禁
+		attackCheckInterval:    1 * time.Minute, // 每分钟检查一次全局攻击
+		notificationCooldown:   5 * time.Minute, // 通知冷却时间5分钟
+		autoEscalateEnabled:    true,            // 默认启用自动升级
+		autoBlockEnabled:       true,            // 默认启用自动封禁
 		log: logrus.WithFields(logrus.Fields{
 			"component": "ddos_protector",
 		}),
@@ -177,6 +180,7 @@ func NewProtectorWithThreatIntel(notificationIntegrator *notification.Notificati
 
 	// 启动全局攻击检测协程
 	go p.globalAttackDetectionRoutine()
+	go p.attackRecorderRoutine()
 
 	// 初始化轮转器（10MB*10）
 	if rot, err := logger.NewRotator("./data/ddos_attacks.log", 10*1024*1024, 10); err == nil {
@@ -275,7 +279,16 @@ type attackRecord struct {
 
 // CheckRequest 检查请求
 func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
-	if !p.enabled || p.level == LevelOff {
+	p.mutex.RLock()
+	enabled := p.enabled
+	level := p.level
+	threshold := p.thresholds[level]
+	customRequestsPer5Minutes := p.customRequestsPer5Minutes
+	outdatedBrowserEnabled := p.outdatedBrowserEnabled
+	threatDetector := p.threatDetector
+	p.mutex.RUnlock()
+
+	if !enabled || level == LevelOff {
 		return false, ""
 	}
 
@@ -289,13 +302,9 @@ func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
 	userAgent := r.Header.Get("User-Agent")
 	now := time.Now()
 
-	// 修复：缩小锁范围，只在访问共享数据时持锁
-	// 获取当前阈值配置（不需要锁，只读）
-	threshold := p.thresholds[p.level]
-
 	// 如果设置了自定义5分钟阈值，使用自定义值
-	if p.customRequestsPer5Minutes > 0 {
-		threshold.RequestsPer5Minutes = p.customRequestsPer5Minutes
+	if customRequestsPer5Minutes > 0 {
+		threshold.RequestsPer5Minutes = customRequestsPer5Minutes
 	}
 
 	// 对静态资源路径放宽限制（提高阈值）
@@ -311,7 +320,7 @@ func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
 
 	// 修复：预先检查不需要锁的条件
 	// 极老浏览器 UA：直接拦截（多为爬虫）
-	if p.outdatedBrowserEnabled && userAgent != "" && security.IsVeryOutdatedBrowser(userAgent) {
+	if outdatedBrowserEnabled && userAgent != "" && security.IsVeryOutdatedBrowser(userAgent) {
 		// 需要锁来更新客户端状态
 		p.blockClientAndUpdate(clientIP, userAgent, r.URL.String(), r.Method,
 			"outdated_browser", "high", "极老浏览器 UA", true, threshold.BlockDuration, now)
@@ -329,8 +338,7 @@ func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
 
 	// 检查是否已被封禁（不需要锁）
 	if now.Before(blockedUntil) {
-		// 异步记录攻击，避免持锁
-		go p.recordAttackAsync(clientIP, userAgent, r.URL.String(), r.Method,
+		p.enqueueAttackRecord(clientIP, userAgent, r.URL.String(), r.Method,
 			"rate_limit", "high", "IP仍在封禁期内", true)
 		return true, "IP已被封禁"
 	}
@@ -374,14 +382,15 @@ func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
 
 	// 复制需要的数据用于后续检查
 	clientCopy := *client
+	clientCopy.RequestTimestamps = append([]time.Time(nil), client.RequestTimestamps...)
 
 	p.mutex.Unlock()
 
 	// 修复：所有耗时操作和 I/O 操作都在锁外执行
 
 	// 使用威胁情报检测（如果可用）
-	if p.threatDetector != nil {
-		threatResult := p.threatDetector.CheckRequest(r)
+	if threatDetector != nil {
+		threatResult := threatDetector.CheckRequest(r)
 		if threatResult.IsThreat {
 			shouldBlock := threatResult.ThreatLevel >= threatintel.ThreatLevelHigh
 			severity := threatResult.ThreatLevel.String()
@@ -392,8 +401,7 @@ func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
 					fmt.Sprintf("威胁情报检测: %s (置信度: %.2f)", threatResult.Description, threatResult.Confidence),
 					shouldBlock, threshold.BlockDuration, now)
 			} else {
-				// 异步记录，不阻塞请求
-				go p.recordAttackAsync(clientIP, userAgent, r.URL.String(), r.Method,
+				p.enqueueAttackRecord(clientIP, userAgent, r.URL.String(), r.Method,
 					"threat_intel", severity,
 					fmt.Sprintf("威胁情报检测: %s (置信度: %.2f)", threatResult.Description, threatResult.Confidence),
 					false)
@@ -407,9 +415,8 @@ func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
 
 	// 较老浏览器 UA：标记 + 使用更严格的速率限制
 	rateLimitThreshold := threshold
-	if p.outdatedBrowserEnabled && userAgent != "" && security.IsOutdatedBrowser(userAgent) {
-		// 异步记录，避免持锁
-		go p.recordAttackAsync(clientIP, userAgent, r.URL.String(), r.Method,
+	if outdatedBrowserEnabled && userAgent != "" && security.IsOutdatedBrowser(userAgent) {
+		p.enqueueAttackRecord(clientIP, userAgent, r.URL.String(), r.Method,
 			"outdated_browser", "medium", "较老浏览器 UA", false)
 
 		// 更新客户端可疑状态（需要锁）
@@ -433,8 +440,7 @@ func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
 
 	// 检查可疑User-Agent（非过老浏览器的其他可疑 UA）
 	if threshold.SuspiciousUA && p.isSuspiciousUserAgent(userAgent) {
-		// 异步记录
-		go p.recordAttackAsync(clientIP, userAgent, r.URL.String(), r.Method,
+		p.enqueueAttackRecord(clientIP, userAgent, r.URL.String(), r.Method,
 			"suspicious_ua", "medium", "可疑的User-Agent", false)
 
 		// 更新状态（快速加锁）
@@ -447,8 +453,7 @@ func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
 
 	// 检查请求模式
 	if p.isSuspiciousPattern(r, &clientCopy) {
-		// 异步记录
-		go p.recordAttackAsync(clientIP, userAgent, r.URL.String(), r.Method,
+		p.enqueueAttackRecord(clientIP, userAgent, r.URL.String(), r.Method,
 			"suspicious_pattern", "medium", "可疑的请求模式", false)
 
 		// 更新状态（快速加锁）
@@ -717,12 +722,61 @@ func (p *Protector) blockClientAndUpdate(clientIP, userAgent, url, method, attac
 	}
 	p.mutex.Unlock()
 
-	// 异步记录攻击，包含所有 I/O 操作
-	go p.recordAttackAsync(clientIP, userAgent, url, method, attackType, severity, reason, blocked)
+	p.enqueueAttackRecord(clientIP, userAgent, url, method, attackType, severity, reason, blocked)
+}
+
+func (p *Protector) enqueueAttackRecord(clientIP, userAgent, url, method, attackType, severity, reason string, blocked bool) {
+	record := attackRecord{
+		clientIP:   clientIP,
+		userAgent:  userAgent,
+		url:        url,
+		method:     method,
+		attackType: attackType,
+		severity:   severity,
+		reason:     reason,
+		blocked:    blocked,
+		timestamp:  time.Now(),
+	}
+
+	select {
+	case p.attackQueue <- record:
+	default:
+		p.log.Warnf("DDoS攻击记录队列已满，跳过一条攻击日志: ip=%s type=%s", clientIP, attackType)
+	}
+}
+
+func (p *Protector) attackRecorderRoutine() {
+	for {
+		select {
+		case record := <-p.attackQueue:
+			p.recordAttackAsync(record.clientIP, record.userAgent, record.url, record.method, record.attackType, record.severity, record.reason, record.blocked)
+		case <-p.stopChan:
+			p.drainAttackQueue()
+			return
+		}
+	}
+}
+
+func (p *Protector) drainAttackQueue() {
+	for {
+		select {
+		case record := <-p.attackQueue:
+			p.recordAttackAsync(record.clientIP, record.userAgent, record.url, record.method, record.attackType, record.severity, record.reason, record.blocked)
+		default:
+			return
+		}
+	}
 }
 
 // recordAttackAsync 异步记录攻击（避免在持锁时调用）
 func (p *Protector) recordAttackAsync(clientIP, userAgent, url, method, attackType, severity, reason string, blocked bool) {
+	p.mutex.RLock()
+	geoIPService := p.geoIPService
+	securityManager := p.securityManager
+	notificationIntegrator := p.notificationIntegrator
+	threshold := p.thresholds[p.level]
+	p.mutex.RUnlock()
+
 	attack := Attack{
 		ID:         p.generateAttackID(),
 		ClientIP:   clientIP,
@@ -737,8 +791,8 @@ func (p *Protector) recordAttackAsync(clientIP, userAgent, url, method, attackTy
 	}
 
 	// 查询 GeoIP 信息（可能在锁外进行网络请求）
-	if p.geoIPService != nil {
-		if geoLoc, err := p.geoIPService.GetLocation(clientIP); err == nil && geoLoc != nil {
+	if geoIPService != nil {
+		if geoLoc, err := geoIPService.GetLocation(clientIP); err == nil && geoLoc != nil {
 			attack.Country = geoLoc.Country
 			attack.CountryCode = geoLoc.CountryCode
 			attack.ISP = geoLoc.ISP
@@ -791,7 +845,7 @@ func (p *Protector) recordAttackAsync(clientIP, userAgent, url, method, attackTy
 	}
 
 	// 只对实际被阻止的攻击发送通知（可能在锁外进行网络请求）
-	if p.notificationIntegrator != nil && blocked {
+	if notificationIntegrator != nil && blocked {
 		attackInfo := &notification.AttackInfo{
 			ClientIP:  clientIP,
 			UserAgent: userAgent,
@@ -800,16 +854,12 @@ func (p *Protector) recordAttackAsync(clientIP, userAgent, url, method, attackTy
 			Severity:  severity,
 			Blocked:   blocked,
 		}
-		p.notificationIntegrator.SendDDoSAttackNotification(attackInfo)
+		notificationIntegrator.SendDDoSAttackNotification(attackInfo)
 	}
 
 	// 如果被封禁，同时添加到统一封禁管理系统（可能涉及 I/O）
-	if blocked && p.securityManager != nil {
-		// 获取封禁时长（使用当前防护级别的封禁时长）
-		p.mutex.RLock()
-		threshold := p.thresholds[p.level]
-		p.mutex.RUnlock()
-		p.securityManager.BlockIP(clientIP, threshold.BlockDuration, fmt.Sprintf("DDoS攻击: %s", reason))
+	if blocked && securityManager != nil {
+		securityManager.BlockIP(clientIP, threshold.BlockDuration, fmt.Sprintf("DDoS攻击: %s", reason))
 	}
 
 	if blocked {
@@ -950,14 +1000,14 @@ func (p *Protector) isPrivateIP(ip string) bool {
 
 	// 检查是否为内网IP段
 	privateBlocks := []string{
-		"10.0.0.0/8",       // A类私有地址
-		"172.16.0.0/12",    // B类私有地址
-		"192.168.0.0/16",   // C类私有地址
-		"127.0.0.0/8",      // 本地回环地址
-		"169.254.0.0/16",   // 链路本地地址
-		"::1/128",          // IPv6 本地回环
-		"fc00::/7",         // IPv6 私有地址
-		"fe80::/10",        // IPv6 链路本地地址
+		"10.0.0.0/8",     // A类私有地址
+		"172.16.0.0/12",  // B类私有地址
+		"192.168.0.0/16", // C类私有地址
+		"127.0.0.0/8",    // 本地回环地址
+		"169.254.0.0/16", // 链路本地地址
+		"::1/128",        // IPv6 本地回环
+		"fc00::/7",       // IPv6 私有地址
+		"fe80::/10",      // IPv6 链路本地地址
 	}
 
 	for _, block := range privateBlocks {
@@ -1252,7 +1302,6 @@ func (p *Protector) UnblockIP(ip string) bool {
 // BlockIP 手动封禁IP
 func (p *Protector) BlockIP(ip string, duration time.Duration, reason string) {
 	p.mutex.Lock()
-	defer p.mutex.Unlock()
 
 	now := time.Now()
 	client, exists := p.clients[ip]
@@ -1266,15 +1315,18 @@ func (p *Protector) BlockIP(ip string, duration time.Duration, reason string) {
 
 	client.BlockedUntil = now.Add(duration)
 	client.BlockCount++
+	p.mutex.Unlock()
 
-	p.recordAttack(ip, "", "", "", "manual", "high", reason, true)
+	p.enqueueAttackRecord(ip, "", "", "", "manual", "high", reason, true)
 	p.log.Warnf("手动封禁IP: %s，持续时间: %v，原因: %s", ip, duration, reason)
 }
 
 // Stop 停止防护器
 func (p *Protector) Stop() {
 	p.log.Info("停止DDoS防护器")
-	close(p.stopChan)
+	p.stopOnce.Do(func() {
+		close(p.stopChan)
+	})
 }
 
 // globalAttackDetectionRoutine 全局攻击检测协程
@@ -1298,16 +1350,16 @@ func (p *Protector) detectGlobalAttack() {
 	defer p.mutex.Unlock()
 
 	now := time.Now()
-	
+
 	// 检查最近1分钟内的攻击情况
 	recentWindow := 1 * time.Minute
 	cutoffTime := now.Add(-recentWindow)
-	
+
 	// 统计最近1分钟内的攻击
 	recentAttacks := 0
 	recentBlockedAttacks := 0
 	recentBlockedIPs := make(map[string]bool)
-	
+
 	for _, attack := range p.attacks {
 		if attack.Timestamp.After(cutoffTime) {
 			recentAttacks++
@@ -1317,7 +1369,7 @@ func (p *Protector) detectGlobalAttack() {
 			}
 		}
 	}
-	
+
 	// 统计当前被封禁的客户端数量
 	currentBlockedCount := 0
 	for _, client := range p.clients {
@@ -1325,7 +1377,7 @@ func (p *Protector) detectGlobalAttack() {
 			currentBlockedCount++
 		}
 	}
-	
+
 	// 检测大规模攻击的指标
 	// 主要关注被封禁的攻击，这才是真正的DDoS攻击
 	// 1. 最近1分钟内超过500次被封禁的攻击（提高阈值，避免误报）
@@ -1333,7 +1385,7 @@ func (p *Protector) detectGlobalAttack() {
 	// 3. 当前被封禁的IP超过100个
 	isLargeScaleAttack := false
 	attackSeverity := "medium"
-	
+
 	// 优先使用被封禁的攻击数和被封禁的IP数作为判断标准
 	if recentBlockedAttacks >= 500 || len(recentBlockedIPs) >= 20 || currentBlockedCount >= 100 {
 		isLargeScaleAttack = true
@@ -1343,31 +1395,31 @@ func (p *Protector) detectGlobalAttack() {
 			attackSeverity = "high"
 		}
 	}
-	
+
 	if isLargeScaleAttack {
 		// 检查是否需要发送通知（避免频繁通知）
 		shouldNotify := now.Sub(p.lastNotificationTime) >= p.notificationCooldown
-		
+
 		if shouldNotify {
 			p.lastNotificationTime = now
-			
+
 			// 发送大规模攻击通知
 			if p.notificationIntegrator != nil {
 				attackInfo := &notification.AttackInfo{
 					ClientIP:  "multiple",
 					UserAgent: "DDoS Attack",
 					URL:       "global",
-					Reason:    fmt.Sprintf("检测到大规模DDoS攻击: 最近1分钟%d次攻击被拦截, %d个IP被封禁, 当前%d个IP被封禁", 
+					Reason: fmt.Sprintf("检测到大规模DDoS攻击: 最近1分钟%d次攻击被拦截, %d个IP被封禁, 当前%d个IP被封禁",
 						recentBlockedAttacks, len(recentBlockedIPs), currentBlockedCount),
-					Severity:  attackSeverity,
-					Blocked:   true,
+					Severity: attackSeverity,
+					Blocked:  true,
 				}
 				p.notificationIntegrator.SendDDoSAttackNotification(attackInfo)
 			}
-			
+
 			p.log.Warnf("🚨 检测到大规模DDoS攻击！最近1分钟: %d次攻击被拦截, %d个IP被封禁, 当前%d个IP被封禁, 严重程度: %s",
 				recentBlockedAttacks, len(recentBlockedIPs), currentBlockedCount, attackSeverity)
-			
+
 			// 自动应对措施
 			if p.autoEscalateEnabled {
 				p.autoEscalateProtection(attackSeverity)
@@ -1379,27 +1431,27 @@ func (p *Protector) detectGlobalAttack() {
 // autoEscalateProtection 自动升级防护级别
 func (p *Protector) autoEscalateProtection(severity string) {
 	currentLevel := p.level
-	
+
 	switch severity {
 	case "critical":
 		// 严重攻击：升级到最高级别
 		if currentLevel < LevelExtreme {
 			p.level = LevelExtreme
-			p.log.Warnf("⚠️ 自动升级防护级别: %s -> %s (检测到严重DDoS攻击)", 
+			p.log.Warnf("⚠️ 自动升级防护级别: %s -> %s (检测到严重DDoS攻击)",
 				currentLevel.String(), p.level.String())
 		}
 	case "high":
 		// 高级攻击：升级到高级别
 		if currentLevel < LevelHigh {
 			p.level = LevelHigh
-			p.log.Warnf("⚠️ 自动升级防护级别: %s -> %s (检测到高级DDoS攻击)", 
+			p.log.Warnf("⚠️ 自动升级防护级别: %s -> %s (检测到高级DDoS攻击)",
 				currentLevel.String(), p.level.String())
 		}
 	case "medium":
 		// 中级攻击：升级到中高级别
 		if currentLevel < LevelMedium {
 			p.level = LevelMedium
-			p.log.Warnf("⚠️ 自动升级防护级别: %s -> %s (检测到中级DDoS攻击)", 
+			p.log.Warnf("⚠️ 自动升级防护级别: %s -> %s (检测到中级DDoS攻击)",
 				currentLevel.String(), p.level.String())
 		}
 	}
@@ -1413,12 +1465,12 @@ func (p *Protector) GetGlobalAttackStats() map[string]interface{} {
 	now := time.Now()
 	recentWindow := 1 * time.Minute
 	cutoffTime := now.Add(-recentWindow)
-	
+
 	recentAttacks := 0
 	recentBlockedAttacks := 0
 	recentBlockedIPs := make(map[string]bool)
 	currentBlockedCount := 0
-	
+
 	for _, attack := range p.attacks {
 		if attack.Timestamp.After(cutoffTime) {
 			recentAttacks++
@@ -1428,21 +1480,21 @@ func (p *Protector) GetGlobalAttackStats() map[string]interface{} {
 			}
 		}
 	}
-	
+
 	for _, client := range p.clients {
 		if now.Before(client.BlockedUntil) {
 			currentBlockedCount++
 		}
 	}
-	
+
 	return map[string]interface{}{
 		"recent_attacks_1min":      recentAttacks,
-		"recent_blocked_attacks":  recentBlockedAttacks,
-		"recent_blocked_ips":      len(recentBlockedIPs),
-		"current_blocked_ips":     currentBlockedCount,
-		"is_large_scale_attack":   recentAttacks >= 50 || len(recentBlockedIPs) >= 20 || currentBlockedCount >= 100,
-		"auto_escalate_enabled":   p.autoEscalateEnabled,
-		"auto_block_enabled":      p.autoBlockEnabled,
+		"recent_blocked_attacks":   recentBlockedAttacks,
+		"recent_blocked_ips":       len(recentBlockedIPs),
+		"current_blocked_ips":      currentBlockedCount,
+		"is_large_scale_attack":    recentAttacks >= 50 || len(recentBlockedIPs) >= 20 || currentBlockedCount >= 100,
+		"auto_escalate_enabled":    p.autoEscalateEnabled,
+		"auto_block_enabled":       p.autoBlockEnabled,
 		"current_protection_level": p.level.String(),
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/sirupsen/logrus"
 	"github.com/xurenlu/sslcat/internal/config"
@@ -100,21 +101,12 @@ func (s *HTTP3Server) runWithRetry() {
 		// 创建 HTTP/3 服务器
 		s.restartMu.Lock()
 		s.server = &http3.Server{
-			Addr:      fmt.Sprintf("%s:443", s.config.Server.Host),
-			Handler:   s.handler,
-			TLSConfig: tlsConfig,
+			Addr:       fmt.Sprintf("%s:443", s.config.Server.Host),
+			Handler:    s.handler,
+			TLSConfig:  tlsConfig,
+			QUICConfig: s.getQUICConfigForHTTP3(),
 		}
 		s.restartMu.Unlock()
-
-		// 配置 QUIC 参数（如果配置了）
-		if s.config.Server.HTTP3Config != nil {
-			cfg := s.config.Server.HTTP3Config
-			if cfg.MaxIdleTimeout != "" {
-				if timeout, err := time.ParseDuration(cfg.MaxIdleTimeout); err == nil {
-					s.log.Debugf("HTTP/3 MaxIdleTimeout configured: %v", timeout)
-				}
-			}
-		}
 
 		if s.retryCount == 0 {
 			s.log.Infof("HTTP/3 server starting on %s:443", s.config.Server.Host)
@@ -211,4 +203,36 @@ func (s *HTTP3Server) getTLSConfigForHTTP3() *tls.Config {
 	}
 
 	return tlsConfig
+}
+
+func (s *HTTP3Server) getQUICConfigForHTTP3() *quic.Config {
+	maxIdleTimeout := 120 * time.Second
+	maxIncomingStreams := int64(1000)
+	maxIncomingUniStreams := int64(1000)
+
+	if cfg := s.config.Server.HTTP3Config; cfg != nil {
+		if cfg.MaxIdleTimeout != "" {
+			if timeout, err := time.ParseDuration(cfg.MaxIdleTimeout); err == nil && timeout > 0 {
+				maxIdleTimeout = timeout
+			} else if err != nil {
+				s.log.Warnf("Invalid HTTP/3 max_idle_timeout %q, using %s: %v", cfg.MaxIdleTimeout, maxIdleTimeout, err)
+			}
+		}
+		if cfg.MaxIncomingStreams > 0 {
+			maxIncomingStreams = cfg.MaxIncomingStreams
+		}
+		if cfg.MaxIncomingUniStreams > 0 {
+			maxIncomingUniStreams = cfg.MaxIncomingUniStreams
+		}
+	}
+
+	return &quic.Config{
+		HandshakeIdleTimeout:       10 * time.Second,
+		MaxIdleTimeout:             maxIdleTimeout,
+		MaxIncomingStreams:         maxIncomingStreams,
+		MaxIncomingUniStreams:      maxIncomingUniStreams,
+		KeepAlivePeriod:            maxIdleTimeout / 2,
+		MaxStreamReceiveWindow:     8 << 20,
+		MaxConnectionReceiveWindow: 32 << 20,
+	}
 }

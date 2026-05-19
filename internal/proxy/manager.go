@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -493,7 +494,7 @@ func (m *Manager) handleLoadBalancedRequest(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	m.log.Infof("Selected backend %s (%s:%d) for request to %s",
+	m.log.Debugf("Selected backend %s (%s:%d) for request to %s",
 		backend.ID, backend.Host, backend.Port, rule.Domain)
 
 	// 创建临时的ProxyRule用于传统代理逻辑
@@ -1033,7 +1034,7 @@ func (m *Manager) GetCDNCache() interface{ Stats() map[string]any } {
 func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *config.ProxyRule) {
 	// 检查是否为WebSocket升级请求
 	if m.isWebSocketUpgrade(r) {
-		m.log.Infof("Detected WebSocket upgrade request for %s", r.Host)
+		m.log.Debugf("Detected WebSocket upgrade request for %s", r.Host)
 		m.HandleWebSocketOptimized(w, r, rule)
 		return
 	}
@@ -1163,11 +1164,11 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 	} else {
 		// CDN模式或云服务模式：最小化头部，避免干扰
 		if cdnEnabled && isCloudStorage {
-			m.log.Infof("云服务 + CDN mode enabled for %s, skipping proxy headers", r.Host)
+			m.log.Debugf("云服务 + CDN mode enabled for %s, skipping proxy headers", r.Host)
 		} else if isCloudStorage {
-			m.log.Infof("云服务模式 enabled for %s, skipping proxy headers", r.Host)
+			m.log.Debugf("云服务模式 enabled for %s, skipping proxy headers", r.Host)
 		} else if cdnEnabled {
-			m.log.Infof("CDN mode enabled for %s, skipping proxy headers", r.Host)
+			m.log.Debugf("CDN mode enabled for %s, skipping proxy headers", r.Host)
 		}
 	}
 
@@ -1317,16 +1318,12 @@ func (m *Manager) ProxyRequest(w http.ResponseWriter, r *http.Request, rule *con
 
 // getOrCreateProxy 获取或创建反向代理
 func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProxy {
-	// 生成缓存key，对于完整URL使用URL本身，对于IP+端口使用传统格式
-	var key string
-	targetURL := rule.Target
-	if strings.HasPrefix(strings.ToLower(targetURL), "http://") || strings.HasPrefix(strings.ToLower(targetURL), "https://") {
-		// 完整URL，使用URL本身作为key
-		key = targetURL
-	} else {
-		// IP或域名，使用传统格式
-		key = fmt.Sprintf("%s:%d", rule.Target, rule.Port)
+	targetURL, err := m.normalizeProxyTargetURL(rule)
+	if err != nil {
+		m.log.Errorf("Failed to parse target URL: %v", err)
+		return nil
 	}
+	key := m.buildProxyCacheKey(rule, targetURL)
 
 	m.cacheMutex.RLock()
 	if proxy, exists := m.proxyCache[key]; exists {
@@ -1334,38 +1331,6 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 		return proxy
 	}
 	m.cacheMutex.RUnlock()
-
-	// 创建新的反向代理
-	// 允许在配置中直接写入完整URL（包含协议与端口）或仅写主机名/IP
-	if !strings.HasPrefix(strings.ToLower(targetURL), "http://") && !strings.HasPrefix(strings.ToLower(targetURL), "https://") {
-		// 只有当target不包含协议时才添加协议和端口
-		if rule.Port > 0 {
-			targetURL = "http://" + net.JoinHostPort(rule.Target, strconv.Itoa(rule.Port))
-		} else {
-			targetURL = "http://" + rule.Target
-		}
-	} else {
-		// target已经包含完整URL，完全忽略port字段
-		// 解析URL以提取协议、主机和端口
-		parsedURL, err := url.Parse(targetURL)
-		if err != nil {
-			m.log.Errorf("Failed to parse target URL: %v", err)
-			return nil
-		}
-
-		// 如果URL中没有端口，根据协议使用默认端口
-		if parsedURL.Port() == "" {
-			if parsedURL.Scheme == "https" {
-				// HTTPS默认端口443
-				parsedURL.Host = net.JoinHostPort(parsedURL.Hostname(), "443")
-			} else if parsedURL.Scheme == "http" {
-				// HTTP默认端口80
-				parsedURL.Host = net.JoinHostPort(parsedURL.Hostname(), "80")
-			}
-			targetURL = parsedURL.String()
-		}
-		// 如果URL中已有端口，直接使用，完全忽略rule.Port字段
-	}
 
 	target, err := url.Parse(targetURL)
 	if err != nil {
@@ -1401,34 +1366,34 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 			// 后端是域名，根据配置决定Host头部处理方式
 			if rule.OptimizeHostHeader {
 				// 启用Host头部优化：使用后端配置的域名作为Host
-				m.log.Infof("开始Host头部优化: target=%s, port=%d", rule.Target, rule.Port)
+				m.log.Debugf("开始Host头部优化: target=%s, port=%d", rule.Target, rule.Port)
 				backendHost := m.extractHostFromTarget(rule.Target, rule.Port)
-				m.log.Infof("extractHostFromTarget返回: %s", backendHost)
+				m.log.Debugf("extractHostFromTarget返回: %s", backendHost)
 
 				// 如果是云存储服务，根据配置决定Host头部
 				if m.isCloudStorageService(rule.Target) {
-					m.log.Infof("检测到云存储服务: %s", rule.Target)
+					m.log.Debugf("检测到云存储服务: %s", rule.Target)
 					// 对于云存储，优先使用配置的端点，否则使用检测到的端点
 					if rule.CloudStorageEndpoint != "" {
 						backendHost = rule.CloudStorageEndpoint
-						m.log.Infof("使用配置的云存储端点: %s", backendHost)
+						m.log.Debugf("使用配置的云存储端点: %s", backendHost)
 					} else if cloudInfo := m.detectCloudStorageInfo(rule.Target); cloudInfo != nil {
 						backendHost = cloudInfo.Endpoint
-						m.log.Infof("使用检测到的云存储端点: %s", backendHost)
+						m.log.Debugf("使用检测到的云存储端点: %s", backendHost)
 					}
-					m.log.Infof("云存储模式: 使用端点 %s (配置: %s)", backendHost, rule.CloudStorageEndpoint)
+					m.log.Debugf("云存储模式: 使用端点 %s (配置: %s)", backendHost, rule.CloudStorageEndpoint)
 				}
 
 				// 关键修复：同时设置 req.Host 和 Header，覆盖原始Director的设置
 				req.Host = backendHost
 				req.Header.Set("Host", backendHost)
 
-				m.log.Infof("Host头部优化已启用: 设置Host为 %s (原: %s)", backendHost, originalHost)
+				m.log.Debugf("Host头部优化已启用: 设置Host为 %s (原: %s)", backendHost, originalHost)
 			} else {
 				// 禁用Host头部优化：保持原始的Host头，实现透明代理
 				req.Host = originalHost
 				req.Header.Set("Host", originalHost)
-				m.log.Infof("Host头部优化已禁用: 保持原始Host %s", originalHost)
+				m.log.Debugf("Host头部优化已禁用: 保持原始Host %s", originalHost)
 			}
 		}
 
@@ -1480,11 +1445,11 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 			}
 
 			if isCloudStorage && cdnEnabled {
-				m.log.Infof("云服务 + CDN mode: removed all proxy headers for target: %s", rule.Target)
+				m.log.Debugf("云服务 + CDN mode: removed all proxy headers for target: %s", rule.Target)
 			} else if isCloudStorage {
-				m.log.Infof("云服务模式: 已移除防盗链和代理头部 for target: %s", rule.Target)
+				m.log.Debugf("云服务模式: 已移除防盗链和代理头部 for target: %s", rule.Target)
 			} else if cdnEnabled {
-				m.log.Infof("CDN mode: removed proxy headers for target: %s", rule.Target)
+				m.log.Debugf("CDN mode: removed proxy headers for target: %s", rule.Target)
 			}
 		}
 
@@ -1531,16 +1496,17 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 			Timeout:   time.Duration(connectTimeout) * time.Second,
 			KeepAlive: time.Duration(keepAliveTimeout) * time.Second,
 		}).DialContext,
-		ForceAttemptHTTP2:      true,
-		MaxIdleConns:           100,
-		MaxIdleConnsPerHost:    10, // 每个主机保持 10 个空闲连接，提高连接复用
+		ForceAttemptHTTP2:      rule.UpstreamHTTP2Enabled,
+		MaxIdleConns:           1024,
+		MaxIdleConnsPerHost:    128,
+		MaxConnsPerHost:        0,
 		IdleConnTimeout:        time.Duration(idleTimeout) * time.Second,
 		TLSHandshakeTimeout:    time.Duration(tlsHandshakeTimeout) * time.Second,
 		ExpectContinueTimeout:  time.Duration(expectContinueTimeout) * time.Second,
 		ResponseHeaderTimeout:  time.Duration(responseHeaderTimeout) * time.Second, // 响应头超时，防止连接泄漏
-		MaxResponseHeaderBytes: 1 << 20,          // 限制响应头最大 1MB，防止内存攻击
-		ReadBufferSize:         32 * 1024,        // 32KB 读缓冲，减少小缓冲区频繁分配
-		WriteBufferSize:        32 * 1024,        // 32KB 写缓冲，减少小缓冲区频繁分配
+		MaxResponseHeaderBytes: 1 << 20,                                            // 限制响应头最大 1MB，防止内存攻击
+		ReadBufferSize:         32 * 1024,                                          // 32KB 读缓冲，减少小缓冲区频繁分配
+		WriteBufferSize:        32 * 1024,                                          // 32KB 写缓冲，减少小缓冲区频繁分配
 		// 不验证后端证书，允许自签名证书
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
@@ -1625,10 +1591,82 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 	// 修改响应
 	// 缓存代理
 	m.cacheMutex.Lock()
+	if cachedProxy, exists := m.proxyCache[key]; exists {
+		m.cacheMutex.Unlock()
+		return cachedProxy
+	}
 	m.proxyCache[key] = proxy
 	m.cacheMutex.Unlock()
 
 	return proxy
+}
+
+func (m *Manager) normalizeProxyTargetURL(rule *config.ProxyRule) (string, error) {
+	targetURL := rule.Target
+	if !strings.HasPrefix(strings.ToLower(targetURL), "http://") && !strings.HasPrefix(strings.ToLower(targetURL), "https://") {
+		if rule.Port > 0 {
+			return "http://" + net.JoinHostPort(rule.Target, strconv.Itoa(rule.Port)), nil
+		}
+		return "http://" + rule.Target, nil
+	}
+
+	parsedURL, err := url.Parse(targetURL)
+	if err != nil {
+		return "", err
+	}
+
+	if parsedURL.Port() == "" {
+		switch parsedURL.Scheme {
+		case "https":
+			parsedURL.Host = net.JoinHostPort(parsedURL.Hostname(), "443")
+		case "http":
+			parsedURL.Host = net.JoinHostPort(parsedURL.Hostname(), "80")
+		}
+	}
+
+	return parsedURL.String(), nil
+}
+
+func (m *Manager) buildProxyCacheKey(rule *config.ProxyRule, targetURL string) string {
+	h := sha1.New()
+	write := func(format string, args ...interface{}) {
+		fmt.Fprintf(h, format, args...)
+		h.Write([]byte{'\n'})
+	}
+
+	write("domain=%s", rule.Domain)
+	write("target=%s", targetURL)
+	write("connect_timeout=%d", rule.ConnectTimeoutSec)
+	write("keep_alive_timeout=%d", rule.KeepAliveTimeoutSec)
+	write("idle_timeout=%d", rule.IdleTimeoutSec)
+	write("tls_handshake_timeout=%d", rule.TLSHandshakeTimeoutSec)
+	write("expect_continue_timeout=%d", rule.ExpectContinueTimeoutSec)
+	write("response_header_timeout=%d", rule.ResponseHeaderTimeoutSec)
+	write("default_response_header_timeout=%d", m.config.Proxy.DefaultResponseHeaderTimeoutSec)
+	write("upstream_http2=%t", rule.UpstreamHTTP2Enabled)
+	write("optimize_host_header=%t", rule.OptimizeHostHeader)
+	write("cloud_storage_endpoint=%s", rule.CloudStorageEndpoint)
+	write("cdn_enabled=%t", rule.CDNEnabled)
+	writeStringMapHash(h, "upstream_headers", rule.UpstreamRequestHeaders)
+	writeStringMapHash(h, "response_headers", rule.ResponseHeaders)
+
+	return fmt.Sprintf("%s|%x", targetURL, h.Sum(nil))
+}
+
+func writeStringMapHash(h io.Writer, prefix string, values map[string]string) {
+	if len(values) == 0 {
+		fmt.Fprintf(h, "%s=<empty>\n", prefix)
+		return
+	}
+
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		fmt.Fprintf(h, "%s:%s=%s\n", prefix, key, values[key])
+	}
 }
 
 // getClientIP 获取客户端真实IP
@@ -1879,7 +1917,7 @@ func (m *Manager) HandleWebSocket(w http.ResponseWriter, r *http.Request, rule *
 		return
 	}
 
-	m.log.Infof("WebSocket handshake successful for %s (simple mode)", r.Host)
+	m.log.Debugf("WebSocket handshake successful for %s (simple mode)", r.Host)
 
 	// 检查后端缓冲区是否还有数据（WebSocket 帧）
 	if backendReader.Buffered() > 0 {
@@ -1998,7 +2036,7 @@ func (m *Manager) HandleWebSocketOptimized(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	m.log.Infof("WebSocket handshake successful for %s (optimized mode)", r.Host)
+	m.log.Debugf("WebSocket handshake successful for %s (optimized mode)", r.Host)
 
 	// 检查上游缓冲区是否还有数据（WebSocket 帧）
 	// 这非常重要！bufio.Reader 可能已经读取了一些 WebSocket 数据帧到缓冲区
@@ -2133,7 +2171,7 @@ func (m *Manager) startOptimizedWebSocketProxy(clientConn, upstreamConn net.Conn
 	// errChan 也应该关闭
 	close(errChan)
 
-	m.log.Infof("WebSocket proxy connection closed for %s", rule.Target)
+	m.log.Debugf("WebSocket proxy connection closed for %s", rule.Target)
 }
 
 // readWebSocketData 读取WebSocket数据
@@ -2413,24 +2451,21 @@ func (m *Manager) Reload(newConfig *config.Config) error {
 
 	// 清理不再需要的代理缓存
 	m.cacheMutex.Lock()
-	newDomains := make(map[string]bool)
-	for _, rule := range newConfig.Proxy.Rules {
-		newDomains[rule.Domain] = true
+	expectedKeys := make(map[string]bool, len(newConfig.Proxy.Rules))
+	for i := range newConfig.Proxy.Rules {
+		rule := &newConfig.Proxy.Rules[i]
+		if rule.LoadBalancerEnabled {
+			continue
+		}
+		targetURL, err := m.normalizeProxyTargetURL(rule)
+		if err != nil {
+			continue
+		}
+		expectedKeys[m.buildProxyCacheKey(rule, targetURL)] = true
 	}
-
 	// 清理不再使用的代理缓存
 	for key := range m.proxyCache {
-		found := false
-		for _, rule := range newConfig.Proxy.Rules {
-			if !rule.LoadBalancerEnabled {
-				expectedKey := fmt.Sprintf("%s:%d", rule.Target, rule.Port)
-				if key == expectedKey {
-					found = true
-					break
-				}
-			}
-		}
-		if !found {
+		if !expectedKeys[key] {
 			delete(m.proxyCache, key)
 		}
 	}
@@ -2526,16 +2561,7 @@ func (m *Manager) logRequestDetails(r *http.Request, requestType string, rule *c
 	headers := make(map[string]string)
 	for _, header := range importantHeaders {
 		if value := r.Header.Get(header); value != "" {
-			// 对敏感信息进行脱敏处理
-			if header == "Authorization" || header == "Cookie" {
-				if len(value) > 20 {
-					headers[header] = value[:20] + "..."
-				} else {
-					headers[header] = "***"
-				}
-			} else {
-				headers[header] = value
-			}
+			headers[header] = redactHeaderValue(header, value)
 		}
 	}
 
@@ -2549,16 +2575,28 @@ func (m *Manager) logRequestDetails(r *http.Request, requestType string, rule *c
 	// 记录请求体（仅对POST/PUT等有body的请求，且限制大小）
 	if r.Method == "POST" || r.Method == "PUT" || r.Method == "PATCH" {
 		if r.ContentLength > 0 && r.ContentLength < 1024 { // 只记录小于1KB的请求体
-			body, err := io.ReadAll(io.LimitReader(r.Body, 1024))
-			if err == nil && len(body) > 0 {
-				// 重新设置请求体，因为ReadAll会消耗掉原始body
-				r.Body = io.NopCloser(strings.NewReader(string(body)))
-				m.log.WithFields(logrus.Fields{
-					"type": requestType,
-					"body": string(body),
-				}).Debug("请求体内容")
-			}
+			m.log.WithFields(logrus.Fields{
+				"type":           requestType,
+				"content_length": r.ContentLength,
+				"body":           "[redacted]",
+			}).Debug("请求体内容已脱敏")
 		}
+	}
+}
+
+func redactHeaderValue(name, value string) string {
+	if isSensitiveHeader(name) {
+		return "***"
+	}
+	return value
+}
+
+func isSensitiveHeader(name string) bool {
+	switch strings.ToLower(name) {
+	case "authorization", "cookie", "set-cookie", "x-api-key", "x-auth-token", "x-csrf-token", "proxy-authorization":
+		return true
+	default:
+		return strings.Contains(strings.ToLower(name), "token") || strings.Contains(strings.ToLower(name), "secret")
 	}
 }
 
@@ -2644,21 +2682,21 @@ func (m *Manager) buildTargetInfo(rule *config.ProxyRule) string {
 
 // extractHostFromTarget 从目标配置中提取Host头信息
 func (m *Manager) extractHostFromTarget(target string, port int) string {
-	m.log.Infof("extractHostFromTarget调用: target=%s, port=%d", target, port)
+	m.log.Debugf("extractHostFromTarget调用: target=%s, port=%d", target, port)
 
 	// 如果target包含完整URL，解析出域名和端口
 	if strings.HasPrefix(strings.ToLower(target), "http://") || strings.HasPrefix(strings.ToLower(target), "https://") {
-		m.log.Infof("target包含协议，开始解析URL")
+		m.log.Debugf("target包含协议，开始解析URL")
 		parsedURL, err := url.Parse(target)
 		if err == nil {
 			// 检查是否为OSS或其他云服务，对于这些服务，Host头部不应包含标准端口号
 			hostname := parsedURL.Hostname()
-			m.log.Infof("解析URL成功: hostname=%s, port=%s", hostname, parsedURL.Port())
+			m.log.Debugf("解析URL成功: hostname=%s, port=%s", hostname, parsedURL.Port())
 			isCloudService := strings.Contains(strings.ToLower(hostname), "aliyuncs.com") ||
 				strings.Contains(strings.ToLower(hostname), "amazonaws.com") ||
 				strings.Contains(strings.ToLower(hostname), "qcloud.com") ||
 				strings.Contains(strings.ToLower(hostname), "myqcloud.com")
-			m.log.Infof("云服务检测结果: %v", isCloudService)
+			m.log.Debugf("云服务检测结果: %v", isCloudService)
 
 			// 如果URL中已经有端口
 			if parsedURL.Port() != "" {
@@ -2666,18 +2704,18 @@ func (m *Manager) extractHostFromTarget(target string, port int) string {
 
 				// 对于云服务，如果是标准端口（80/443），则不包含端口号
 				if isCloudService && (urlPort == 80 || urlPort == 443) {
-					m.log.Infof("云服务标准端口，返回hostname: %s", hostname)
+					m.log.Debugf("云服务标准端口，返回hostname: %s", hostname)
 					return hostname
 				}
 
 				// 对于云服务，即使是非标准端口，也不包含端口号（云服务通常只支持标准端口）
 				if isCloudService {
-					m.log.Infof("云服务非标准端口，仍返回hostname: %s", hostname)
+					m.log.Debugf("云服务非标准端口，仍返回hostname: %s", hostname)
 					return hostname
 				}
 
 				// 对于非云服务，保留端口号
-				m.log.Infof("非云服务，返回完整Host: %s", parsedURL.Host)
+				m.log.Debugf("非云服务，返回完整Host: %s", parsedURL.Host)
 				return parsedURL.Host
 			}
 
@@ -2685,14 +2723,14 @@ func (m *Manager) extractHostFromTarget(target string, port int) string {
 			if port > 0 && port != 80 && port != 443 {
 				// 对于云服务，即使配置了非标准端口，也不包含端口号（云服务通常只支持标准端口）
 				if isCloudService {
-					m.log.Infof("云服务，配置了非标准端口，仍返回hostname: %s", hostname)
+					m.log.Debugf("云服务，配置了非标准端口，仍返回hostname: %s", hostname)
 					return hostname
 				}
 				result := net.JoinHostPort(hostname, strconv.Itoa(port))
-				m.log.Infof("非云服务，添加配置端口，返回: %s", result)
+				m.log.Debugf("非云服务，添加配置端口，返回: %s", result)
 				return result
 			}
-			m.log.Infof("无需添加端口，返回hostname: %s", hostname)
+			m.log.Debugf("无需添加端口，返回hostname: %s", hostname)
 			return hostname
 		}
 	}
@@ -2729,7 +2767,6 @@ func (lt *loggingTransport) RoundTrip(req *http.Request) (*http.Response, error)
 			"user_agent":     req.Header.Get("User-Agent"),
 			"content_type":   req.Header.Get("Content-Type"),
 			"content_length": req.ContentLength,
-			"all_headers":    req.Header,
 			"curl_command":   curlCmd,
 		}).Debug("实际发送给上游的HTTP请求")
 
@@ -2766,16 +2803,7 @@ func (lt *loggingTransport) RoundTrip(req *http.Request) (*http.Response, error)
 		headers := make(map[string]string)
 		for _, header := range importantHeaders {
 			if value := req.Header.Get(header); value != "" {
-				// 对敏感信息进行脱敏处理
-				if header == "Authorization" || header == "Cookie" {
-					if len(value) > 20 {
-						headers[header] = value[:20] + "..."
-					} else {
-						headers[header] = "***"
-					}
-				} else {
-					headers[header] = value
-				}
+				headers[header] = redactHeaderValue(header, value)
 			}
 		}
 
@@ -2820,6 +2848,7 @@ func (lt *loggingTransport) buildCurlCommand(req *http.Request) string {
 	// 添加所有请求头
 	for name, values := range req.Header {
 		for _, value := range values {
+			value = redactHeaderValue(name, value)
 			// 对特殊字符进行转义
 			escapedValue := strings.ReplaceAll(value, "'", "'\\''")
 			parts = append(parts, "-H", fmt.Sprintf("'%s: %s'", name, escapedValue))

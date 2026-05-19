@@ -39,7 +39,7 @@ import (
 )
 
 var (
-	version = "2.0.0-rc17"
+	version = "2.0.0-rc19"
 	build   = "dev"
 )
 
@@ -757,8 +757,8 @@ func startStandardMode(cfg *config.Config, webServer http.Handler, sslManager *s
 		maxConcurrentStreams := int64(250)
 		maxReadFrameSize := int64(1048576) // 1MB
 		idleTimeoutSec := 120
-		maxUploadBufferPerConn := int64(1 << 20)   // 1MB
-		maxUploadBufferPerStream := int64(1 << 18) // 256KB
+		maxUploadBufferPerConn := int64(8 << 20)   // 8MB
+		maxUploadBufferPerStream := int64(1 << 20) // 1MB
 
 		if http2Config != nil {
 			if http2Config.MaxConcurrentStreams > 0 {

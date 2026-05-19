@@ -69,8 +69,8 @@ type ServerConfig struct {
 	EnableHTTPS bool   `json:"enable_https"` // 是否启用 HTTPS（默认 true）
 
 	// HTTP/2 配置
-	HTTP2Enabled bool          `json:"http2_enabled"` // 是否启用 HTTP/2（默认 false）
-	HTTP2Config   *HTTP2Config  `json:"http2_config,omitempty"`
+	HTTP2Enabled bool         `json:"http2_enabled"` // 是否启用 HTTP/2（默认 false）
+	HTTP2Config  *HTTP2Config `json:"http2_config,omitempty"`
 
 	// HTTP/3 配置
 	HTTP3Enabled bool         `json:"http3_enabled"` // 是否启用 HTTP/3（默认 false）
@@ -161,11 +161,11 @@ type HTTP3Config struct {
 
 // HTTP2Config HTTP/2 配置
 type HTTP2Config struct {
-	MaxConcurrentStreams         int64  `json:"max_concurrent_streams"`          // 最大并发流数（默认 250）
-	MaxReadFrameSize             int64  `json:"max_read_frame_size"`             // 最大帧大小（默认 1MB）
-	IdleTimeout                  int    `json:"idle_timeout"`                    // 空闲超时（秒，默认 120）
-	MaxUploadBufferPerConnection int64  `json:"max_upload_buffer_per_connection"` // 连接级上传缓冲（默认 1MB）
-	MaxUploadBufferPerStream     int64  `json:"max_upload_buffer_per_stream"`     // 流级上传缓冲（默认 256KB）
+	MaxConcurrentStreams         int64 `json:"max_concurrent_streams"`           // 最大并发流数（默认 250）
+	MaxReadFrameSize             int64 `json:"max_read_frame_size"`              // 最大帧大小（默认 1MB）
+	IdleTimeout                  int   `json:"idle_timeout"`                     // 空闲超时（秒，默认 120）
+	MaxUploadBufferPerConnection int64 `json:"max_upload_buffer_per_connection"` // 连接级上传缓冲（默认 8MB）
+	MaxUploadBufferPerStream     int64 `json:"max_upload_buffer_per_stream"`     // 流级上传缓冲（默认 1MB）
 }
 
 // DNSProvider DNS服务商配置
@@ -277,13 +277,14 @@ type ProxyRule struct {
 	AuthCookieDomain   string          `json:"auth_cookie_domain"`   // Cookie作用域，默认为代理域名
 
 	// 代理超时配置
-	ConnectTimeoutSec        int `json:"connect_timeout_sec"`         // 连接超时（秒），默认30
-	KeepAliveTimeoutSec      int `json:"keep_alive_timeout_sec"`      // 连接保持超时（秒），默认30
-	IdleTimeoutSec           int `json:"idle_timeout_sec"`            // 空闲连接超时（秒），默认90
-	TLSHandshakeTimeoutSec   int `json:"tls_handshake_timeout_sec"`   // TLS握手超时（秒），默认10
-	ExpectContinueTimeoutSec int `json:"expect_continue_timeout_sec"` // Expect-Continue超时（秒），默认1
-	ResponseHeaderTimeoutSec int `json:"response_header_timeout_sec"` // 响应头超时（秒），默认10
-	HealthCheckTimeoutSec    int `json:"health_check_timeout_sec"`    // 健康检查超时（秒），默认5
+	ConnectTimeoutSec        int  `json:"connect_timeout_sec"`         // 连接超时（秒），默认30
+	KeepAliveTimeoutSec      int  `json:"keep_alive_timeout_sec"`      // 连接保持超时（秒），默认30
+	IdleTimeoutSec           int  `json:"idle_timeout_sec"`            // 空闲连接超时（秒），默认90
+	TLSHandshakeTimeoutSec   int  `json:"tls_handshake_timeout_sec"`   // TLS握手超时（秒），默认10
+	ExpectContinueTimeoutSec int  `json:"expect_continue_timeout_sec"` // Expect-Continue超时（秒），默认1
+	ResponseHeaderTimeoutSec int  `json:"response_header_timeout_sec"` // 响应头超时（秒），默认10
+	HealthCheckTimeoutSec    int  `json:"health_check_timeout_sec"`    // 健康检查超时（秒），默认5
+	UpstreamHTTP2Enabled     bool `json:"upstream_http2_enabled"`      // 是否启用到上游的 HTTP/2，默认 false，避免高并发时上游单连接流控拖慢整体
 
 	// WebSocket代理优化配置
 	WebSocketOptimized bool `json:"websocket_optimized"` // 是否启用WebSocket优化，默认true
@@ -445,20 +446,20 @@ type SecurityConfig struct {
 	// WAF 频率限制配置
 	WAFRateLimitEnabled  bool `json:"waf_rate_limit_enabled"`   // 是否启用 WAF 频率限制
 	WAFRateLimitWindow   int  `json:"waf_rate_limit_window"`    // 时间窗口（秒），默认 60
-	WAFRateLimitMaxHits  int  `json:"waf_rate_limit_max_hits"`  // 时间窗口内最大触发次数，默认 10
-	WAFRateLimitBlockSec int  `json:"waf_rate_limit_block_sec"` // 封禁时长（秒），默认 3600
+	WAFRateLimitMaxHits  int  `json:"waf_rate_limit_max_hits"`  // 时间窗口内最大触发次数，默认 60
+	WAFRateLimitBlockSec int  `json:"waf_rate_limit_block_sec"` // 封禁时长（秒），默认 600
 
 	// TLS 指纹封禁配置
 	WAFTLSBlockEnabled     bool `json:"waf_tls_block_enabled"`      // 是否启用 TLS 指纹封禁
 	WAFTLSBlockWindow      int  `json:"waf_tls_block_window"`       // 时间窗口（秒），默认 60
-	WAFTLSBlockMaxHits     int  `json:"waf_tls_block_max_hits"`     // 时间窗口内最大触发次数，默认 10
-	WAFTLSBlockDurationSec int  `json:"waf_tls_block_duration_sec"` // 封禁时长（秒），默认 3600
+	WAFTLSBlockMaxHits     int  `json:"waf_tls_block_max_hits"`     // 时间窗口内最大触发次数，默认 120
+	WAFTLSBlockDurationSec int  `json:"waf_tls_block_duration_sec"` // 封禁时长（秒），默认 600
 
 	// IP 段封禁配置
 	WAFSubnetBlockEnabled     bool `json:"waf_subnet_block_enabled"`      // 是否启用 IP 段封禁
 	WAFSubnetMask             int  `json:"waf_subnet_mask"`               // 网段掩码，默认 24 (/24)
-	WAFSubnetThreshold        int  `json:"waf_subnet_threshold"`          // 同段被封IP数量阈值，默认 3
-	WAFSubnetBlockDurationSec int  `json:"waf_subnet_block_duration_sec"` // 封禁时长（秒），默认 7200
+	WAFSubnetThreshold        int  `json:"waf_subnet_threshold"`          // 同段被封IP数量阈值，默认 10
+	WAFSubnetBlockDurationSec int  `json:"waf_subnet_block_duration_sec"` // 封禁时长（秒），默认 1800
 
 	// 人机验证配置
 	EnableCaptcha bool `json:"enable_captcha"`
@@ -1046,16 +1047,25 @@ func Load(configFile string) (*Config, error) {
 				"Safari/",
 				"Edge/",
 			},
-			UAInvalidMax1Min:        30,
-			UAInvalidMax5Min:        100,
-			TLSFingerprintWindowSec: 60,
-			TLSFingerprintMaxPerMin: 60000,
-			TLSFingerprintTopN:      20,
-			EnableUAFilter:          false,
-			EnableWAF:               false,
-			EnableDDOS:              true,
-			EnableCaptcha:           false,
-			MinFormMs:               800,
+			UAInvalidMax1Min:          30,
+			UAInvalidMax5Min:          100,
+			TLSFingerprintWindowSec:   60,
+			TLSFingerprintMaxPerMin:   60000,
+			TLSFingerprintTopN:        20,
+			EnableUAFilter:            false,
+			EnableWAF:                 false,
+			EnableDDOS:                true,
+			WAFRateLimitWindow:        60,
+			WAFRateLimitMaxHits:       60,
+			WAFRateLimitBlockSec:      600,
+			WAFTLSBlockWindow:         60,
+			WAFTLSBlockMaxHits:        120,
+			WAFTLSBlockDurationSec:    600,
+			WAFSubnetMask:             24,
+			WAFSubnetThreshold:        10,
+			WAFSubnetBlockDurationSec: 1800,
+			EnableCaptcha:             false,
+			MinFormMs:                 800,
 			OutdatedBrowser: OutdatedBrowserConfig{
 				Enabled:           true,
 				BlockVeryOutdated: true,
@@ -1198,6 +1208,7 @@ func Load(configFile string) (*Config, error) {
 
 	// 配置迁移：处理旧的端口配置
 	migratePortConfig(config)
+	normalizeSecurityDefaults(&config.Security)
 
 	// 解析时间字符串
 	if config.Security.BlockDurationStr != "" {
@@ -1270,6 +1281,45 @@ func Load(configFile string) (*Config, error) {
 	}
 
 	return config, nil
+}
+
+func normalizeSecurityDefaults(security *SecurityConfig) {
+	if security.MaxAttempts <= 0 {
+		security.MaxAttempts = 900
+	}
+	if security.MaxAttempts5Min <= 0 {
+		security.MaxAttempts5Min = 3000
+	}
+	if security.BlockDurationStr == "" {
+		security.BlockDurationStr = "5s"
+	}
+	if security.WAFRateLimitWindow <= 0 {
+		security.WAFRateLimitWindow = 60
+	}
+	if security.WAFRateLimitMaxHits <= 0 {
+		security.WAFRateLimitMaxHits = 60
+	}
+	if security.WAFRateLimitBlockSec <= 0 {
+		security.WAFRateLimitBlockSec = 600
+	}
+	if security.WAFTLSBlockWindow <= 0 {
+		security.WAFTLSBlockWindow = 60
+	}
+	if security.WAFTLSBlockMaxHits <= 0 {
+		security.WAFTLSBlockMaxHits = 120
+	}
+	if security.WAFTLSBlockDurationSec <= 0 {
+		security.WAFTLSBlockDurationSec = 600
+	}
+	if security.WAFSubnetMask <= 0 {
+		security.WAFSubnetMask = 24
+	}
+	if security.WAFSubnetThreshold <= 0 {
+		security.WAFSubnetThreshold = 10
+	}
+	if security.WAFSubnetBlockDurationSec <= 0 {
+		security.WAFSubnetBlockDurationSec = 1800
+	}
 }
 
 // generateNodeID 生成节点ID
@@ -1613,27 +1663,36 @@ func getDefaultConfig() *Config {
 				"Safari/",
 				"Edge/",
 			},
-			UAInvalidMax1Min:        30,
-			UAInvalidMax5Min:        100,
-			TLSFingerprintWindowSec: 60,
-			TLSFingerprintMaxPerMin: 60000,
-			TLSFingerprintTopN:      20,
-			EnableUAFilter:          false,
-			EnableWAF:               false,
-			EnableDDOS:              true,
-			EnableCaptcha:           false,
-			MinFormMs:               800,
+			UAInvalidMax1Min:          30,
+			UAInvalidMax5Min:          100,
+			TLSFingerprintWindowSec:   60,
+			TLSFingerprintMaxPerMin:   60000,
+			TLSFingerprintTopN:        20,
+			EnableUAFilter:            false,
+			EnableWAF:                 false,
+			EnableDDOS:                true,
+			WAFRateLimitWindow:        60,
+			WAFRateLimitMaxHits:       60,
+			WAFRateLimitBlockSec:      600,
+			WAFTLSBlockWindow:         60,
+			WAFTLSBlockMaxHits:        120,
+			WAFTLSBlockDurationSec:    600,
+			WAFSubnetMask:             24,
+			WAFSubnetThreshold:        10,
+			WAFSubnetBlockDurationSec: 1800,
+			EnableCaptcha:             false,
+			MinFormMs:                 800,
 			OutdatedBrowser: OutdatedBrowserConfig{
 				Enabled:           true,
 				BlockVeryOutdated: true,
 			},
-			MaxAccessLogEntries:     3000,
-			MaxBlockedIPs:           1000,
-			MaxAttemptCounts:        1000,
-			MaxLastAttempts:         100,
-			UAInvalidMaxTotal:       500,
-			TLSFingerprintMaxTotal:  500,
-			CleanupIntervalMin:      5,
+			MaxAccessLogEntries:    3000,
+			MaxBlockedIPs:          1000,
+			MaxAttemptCounts:       1000,
+			MaxLastAttempts:        100,
+			UAInvalidMaxTotal:      500,
+			TLSFingerprintMaxTotal: 500,
+			CleanupIntervalMin:     5,
 		},
 		AdminPrefix:  "/sslcat-panel",
 		BotAPIPrefix: generateBotAPIPrefix(),

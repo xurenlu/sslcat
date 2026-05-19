@@ -127,15 +127,15 @@ func (s *Server) verifyAdminPassword(input string) bool {
 	stored := strings.TrimSpace(s.config.Admin.Password)
 
 	s.log.Debugf("=== Password Verification Debug ===")
-	s.log.Debugf("Password file: %s", passFile)
-	s.log.Debugf("Config password: '%s'", stored)
-	s.log.Debugf("Input password: '%s' (len=%d)", input, len(input))
+	s.log.Debugf("Password file configured: %v", passFile != "")
+	s.log.Debugf("Config password present: %v", stored != "")
+	s.log.Debugf("Input password length: %d", len(input))
 
 	// 优先从文件读取
 	if passFile != "" {
 		if b, err := os.ReadFile(passFile); err == nil {
 			stored = strings.TrimSpace(string(b))
-			s.log.Debugf("Read from password file: '%s' (len=%d)", stored, len(stored))
+			s.log.Debugf("Read password from file: present=%v, len=%d", stored != "", len(stored))
 		} else {
 			s.log.Debugf("Failed to read password file %s: %v", passFile, err)
 		}
@@ -148,7 +148,7 @@ func (s *Server) verifyAdminPassword(input string) bool {
 
 	// 检查是否为bcrypt格式
 	isBcrypt := strings.HasPrefix(stored, "$2a$") || strings.HasPrefix(stored, "$2b$") || strings.HasPrefix(stored, "$2y$")
-	s.log.Debugf("Password format: bcrypt=%v, stored_prefix='%s'", isBcrypt, stored[:min(10, len(stored))])
+	s.log.Debugf("Password format: bcrypt=%v", isBcrypt)
 
 	if isBcrypt {
 		err := bcrypt.CompareHashAndPassword([]byte(stored), []byte(input))
@@ -156,12 +156,12 @@ func (s *Server) verifyAdminPassword(input string) bool {
 			s.log.Debug("✅ bcrypt password verification SUCCESSFUL")
 			return true
 		}
-		s.log.Debugf("❌ bcrypt password verification FAILED: %v", err)
+		s.log.Debug("❌ bcrypt password verification FAILED")
 		return false
 	}
 
 	// 明文比较（常量时间）
-	s.log.Debugf("Comparing plaintext: stored='%s' vs input='%s'", stored, input)
+	s.log.Debug("Comparing plaintext password")
 	if subtle.ConstantTimeCompare([]byte(stored), []byte(input)) == 1 {
 		s.log.Debug("✅ Plain password matched, migrating to bcrypt")
 		// 迁移为 bcrypt
@@ -178,13 +178,6 @@ func (s *Server) verifyAdminPassword(input string) bool {
 
 	s.log.Debug("❌ Password verification FAILED - no match")
 	return false
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 // handleMobile, handleCharts, handleDefault 已移除，使用 React SPA

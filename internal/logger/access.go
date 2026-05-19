@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -21,6 +23,8 @@ const (
 	FormatNginx  LogFormat = "nginx"
 	FormatApache LogFormat = "apache"
 	FormatJSON   LogFormat = "json"
+
+	accessLogQueueSize = 8192
 )
 
 // AccessLog 访问日志记录
@@ -43,19 +47,26 @@ type AccessLog struct {
 
 // AccessLogger 访问日志记录器
 type AccessLogger struct {
-	format       LogFormat
-	writer       io.Writer
-	file         *os.File
-	mutex        sync.Mutex
-	enabled      bool
-	logPath      string          // 原始日志路径模板（可能包含占位符）
-	logPathRaw   string          // 原始日志路径（未解析占位符）
-	currentDate  string          // 当前日志文件对应的日期
-	maxSize      int64           // 最大文件大小 (字节)
-	maxFiles     int             // 最大文件数量
-	currentSize  int64
-	log          *logrus.Entry
-	hasDatePattern bool          // 路径中是否包含日期占位符
+	format         LogFormat
+	writer         io.Writer
+	file           *os.File
+	mutex          sync.Mutex
+	enabled        bool
+	closing        bool
+	closed         bool
+	logPath        string // 原始日志路径模板（可能包含占位符）
+	logPathRaw     string // 原始日志路径（未解析占位符）
+	currentDate    string // 当前日志文件对应的日期
+	maxSize        int64  // 最大文件大小 (字节)
+	maxFiles       int    // 最大文件数量
+	currentSize    int64
+	log            *logrus.Entry
+	hasDatePattern bool // 路径中是否包含日期占位符
+	logQueue       chan string
+	stopCh         chan struct{}
+	stopOnce       sync.Once
+	workerWG       sync.WaitGroup
+	droppedLogs    uint64
 }
 
 // NewAccessLogger 创建访问日志记录器
@@ -63,11 +74,13 @@ func NewAccessLogger(format LogFormat, logPath string, enabled bool) (*AccessLog
 	now := time.Now()
 
 	logger := &AccessLogger{
-		format:   format,
-		enabled:  enabled,
+		format:     format,
+		enabled:    enabled,
 		logPathRaw: logPath,
-		maxSize:  100 * 1024 * 1024, // 100MB
-		maxFiles: 10,
+		maxSize:    100 * 1024 * 1024, // 100MB
+		maxFiles:   10,
+		logQueue:   make(chan string, accessLogQueueSize),
+		stopCh:     make(chan struct{}),
 		log: logrus.WithFields(logrus.Fields{
 			"component": "access_logger",
 		}),
@@ -88,7 +101,35 @@ func NewAccessLogger(format LogFormat, logPath string, enabled bool) (*AccessLog
 		logger.writer = os.Stdout
 	}
 
+	logger.startWorker()
 	return logger, nil
+}
+
+func (a *AccessLogger) startWorker() {
+	a.workerWG.Add(1)
+	go func() {
+		defer a.workerWG.Done()
+		for {
+			select {
+			case line := <-a.logQueue:
+				a.writeLine(line)
+			case <-a.stopCh:
+				a.drainQueue()
+				return
+			}
+		}
+	}()
+}
+
+func (a *AccessLogger) drainQueue() {
+	for {
+		select {
+		case line := <-a.logQueue:
+			a.writeLine(line)
+		default:
+			return
+		}
+	}
 }
 
 // openLogFile 打开日志文件
@@ -125,8 +166,14 @@ func (a *AccessLogger) rotateLogFile() error {
 	a.file.Close()
 
 	// 重命名当前文件
-	timestamp := time.Now().Format("20060102-150405")
+	timestamp := time.Now().Format("20060102-150405.000000000")
 	rotatedPath := fmt.Sprintf("%s.%s", a.logPath, timestamp)
+	for i := 1; ; i++ {
+		if _, err := os.Stat(rotatedPath); os.IsNotExist(err) {
+			break
+		}
+		rotatedPath = fmt.Sprintf("%s.%s.%d", a.logPath, timestamp, i)
+	}
 	if err := os.Rename(a.logPath, rotatedPath); err != nil {
 		a.log.Errorf("重命名日志文件失败: %v", err)
 	}
@@ -158,6 +205,14 @@ func (a *AccessLogger) cleanOldFiles() {
 
 	// 按修改时间排序并删除多余的文件
 	if len(logFiles) > a.maxFiles {
+		sort.Slice(logFiles, func(i, j int) bool {
+			infoI, errI := os.Stat(logFiles[i])
+			infoJ, errJ := os.Stat(logFiles[j])
+			if errI != nil || errJ != nil {
+				return logFiles[i] < logFiles[j]
+			}
+			return infoI.ModTime().Before(infoJ.ModTime())
+		})
 		for i := 0; i < len(logFiles)-a.maxFiles; i++ {
 			os.Remove(logFiles[i])
 		}
@@ -166,16 +221,10 @@ func (a *AccessLogger) cleanOldFiles() {
 
 // Log 记录访问日志
 func (a *AccessLogger) Log(accessLog *AccessLog) {
-	if !a.enabled {
-		return
-	}
-
 	a.mutex.Lock()
-	defer a.mutex.Unlock()
-
-	// 检查日期变化（如果有日期占位符）
-	if err := a.checkDateRotation(); err != nil {
-		a.log.Errorf("日期轮转检查失败: %v", err)
+	if !a.enabled || a.closing || a.closed {
+		a.mutex.Unlock()
+		return
 	}
 
 	var logLine string
@@ -189,8 +238,28 @@ func (a *AccessLogger) Log(accessLog *AccessLog) {
 	default:
 		logLine = a.formatNginx(accessLog)
 	}
+	a.mutex.Unlock()
 
-	// 写入日志
+	select {
+	case a.logQueue <- logLine:
+	default:
+		atomic.AddUint64(&a.droppedLogs, 1)
+	}
+}
+
+func (a *AccessLogger) writeLine(logLine string) {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
+	if a.closed {
+		return
+	}
+
+	// 检查日期变化（如果有日期占位符）
+	if err := a.checkDateRotation(); err != nil {
+		a.log.Errorf("日期轮转检查失败: %v", err)
+	}
+
 	if _, err := fmt.Fprintln(a.writer, logLine); err != nil {
 		a.log.Errorf("写入访问日志失败: %v", err)
 		return
@@ -308,10 +377,27 @@ func (a *AccessLogger) getClientIP(r *http.Request) string {
 // Close 关闭日志记录器
 func (a *AccessLogger) Close() error {
 	a.mutex.Lock()
+	if a.closed || a.closing {
+		a.mutex.Unlock()
+		return nil
+	}
+	a.closing = true
+	a.enabled = false
+	a.mutex.Unlock()
+
+	a.stopOnce.Do(func() {
+		close(a.stopCh)
+	})
+	a.workerWG.Wait()
+
+	a.mutex.Lock()
 	defer a.mutex.Unlock()
+	a.closed = true
 
 	if a.file != nil {
-		return a.file.Close()
+		err := a.file.Close()
+		a.file = nil
+		return err
 	}
 	return nil
 }
@@ -328,6 +414,9 @@ func (a *AccessLogger) SetFormat(format LogFormat) {
 func (a *AccessLogger) SetEnabled(enabled bool) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
+	if a.closed || a.closing {
+		return
+	}
 	a.enabled = enabled
 	a.log.Infof("访问日志记录已%s", map[bool]string{true: "启用", false: "禁用"}[enabled])
 }
@@ -344,6 +433,9 @@ func (a *AccessLogger) GetStats() map[string]interface{} {
 		"current_size": a.currentSize,
 		"max_size":     a.maxSize,
 		"max_files":    a.maxFiles,
+		"queue_len":    len(a.logQueue),
+		"queue_cap":    cap(a.logQueue),
+		"dropped_logs": atomic.LoadUint64(&a.droppedLogs),
 	}
 
 	if a.file != nil {
@@ -376,29 +468,29 @@ func (a *AccessLogger) SetMaxFiles(n int) {
 // 日期占位符常量
 const (
 	// strftime 风格占位符（兼容 nginx 语法）
-	datePatternYear     = "%Y"  // 4位年份：2025
-	datePatternMonth    = "%m"  // 2位月份：02
-	datePatternDay      = "%d"  // 2位日期：28
-	datePatternHour     = "%H"  // 2位小时：15
-	datePatternMinute   = "%M"  // 2位分钟：04
-	datePatternSecond   = "%S"  // 2位秒数：05
-	datePatternTime     = "%s"  // Unix时间戳
+	datePatternYear   = "%Y" // 4位年份：2025
+	datePatternMonth  = "%m" // 2位月份：02
+	datePatternDay    = "%d" // 2位日期：28
+	datePatternHour   = "%H" // 2位小时：15
+	datePatternMinute = "%M" // 2位分钟：04
+	datePatternSecond = "%S" // 2位秒数：05
+	datePatternTime   = "%s" // Unix时间戳
 
 	// Go 风格占位符（简化版）
-	goDatePatternYear     = "{yyyy}"  // 4位年份：2025
-	goDatePatternYear2    = "{yy}"    // 2位年份：25
-	goDatePatternMonth    = "{mm}"    // 2位月份：02
-	goDatePatternMonthN   = "{m}"     // 月份（无前导零）：2
-	goDatePatternDay      = "{dd}"    // 2位日期：28
-	goDatePatternDayN     = "{d}"     // 日期（无前导零）：8
-	goDatePatternHour     = "{HH}"    // 2位小时：15
-	goDatePatternHourN    = "{H}"     // 小时（无前导零）：5
-	goDatePatternMinute   = "{MM}"    // 2位分钟：04
-	goDatePatternMinuteN  = "{M}"     // 分钟（无前导零）：4
-	goDatePatternSecond   = "{SS}"    // 2位秒数：05
-	goDatePatternSecondN  = "{S}"     // 秒数（无前导零）：5
-	goDatePatternDate     = "{date}"  // 完整日期：2006-01-02
-	goDatePatternTime     = "{time}"  // 完整时间：15:04:05
+	goDatePatternYear     = "{yyyy}"     // 4位年份：2025
+	goDatePatternYear2    = "{yy}"       // 2位年份：25
+	goDatePatternMonth    = "{mm}"       // 2位月份：02
+	goDatePatternMonthN   = "{m}"        // 月份（无前导零）：2
+	goDatePatternDay      = "{dd}"       // 2位日期：28
+	goDatePatternDayN     = "{d}"        // 日期（无前导零）：8
+	goDatePatternHour     = "{HH}"       // 2位小时：15
+	goDatePatternHourN    = "{H}"        // 小时（无前导零）：5
+	goDatePatternMinute   = "{MM}"       // 2位分钟：04
+	goDatePatternMinuteN  = "{M}"        // 分钟（无前导零）：4
+	goDatePatternSecond   = "{SS}"       // 2位秒数：05
+	goDatePatternSecondN  = "{S}"        // 秒数（无前导零）：5
+	goDatePatternDate     = "{date}"     // 完整日期：2006-01-02
+	goDatePatternTime     = "{time}"     // 完整时间：15:04:05
 	goDatePatternDateTime = "{datetime}" // 日期时间：2006-01-02_15-04-05
 )
 

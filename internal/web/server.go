@@ -24,9 +24,9 @@ import (
 	"github.com/xurenlu/sslcat/internal/bot"
 	"github.com/xurenlu/sslcat/internal/cache"
 	"github.com/xurenlu/sslcat/internal/compression"
-	"github.com/xurenlu/sslcat/internal/httputil"
 	"github.com/xurenlu/sslcat/internal/config"
 	"github.com/xurenlu/sslcat/internal/ddos"
+	"github.com/xurenlu/sslcat/internal/httputil"
 	"github.com/xurenlu/sslcat/internal/i18n"
 	"github.com/xurenlu/sslcat/internal/imageopt"
 	"github.com/xurenlu/sslcat/internal/logger"
@@ -74,10 +74,10 @@ type Server struct {
 	sharedCache *cache.MemoryCache
 
 	// 配置热重载
-	configWatcher         *config.ConfigWatcher
-	reloadManager         *config.ReloadManager
-	configReloadAPI       *ConfigReloadAPI
-	configVersionManager  *config.VersionManager
+	configWatcher        *config.ConfigWatcher
+	reloadManager        *config.ReloadManager
+	configReloadAPI      *ConfigReloadAPI
+	configVersionManager *config.VersionManager
 
 	// Prometheus指标
 	prometheusMetrics *metrics.PrometheusMetrics
@@ -118,10 +118,10 @@ type Server struct {
 	// Runner 模块
 	gitServer *runner.GitServer
 	// 统计收集器和API
-	statisticsCollector        *statistics.Collector
-	statisticsAPI              *StatisticsAPI
-	apiPerformanceCollector    *statistics.APIPerformanceCollector
-	responseAnalyzer           *statistics.ResponseAnalyzer
+	statisticsCollector     *statistics.Collector
+	statisticsAPI           *StatisticsAPI
+	apiPerformanceCollector *statistics.APIPerformanceCollector
+	responseAnalyzer        *statistics.ResponseAnalyzer
 	// 静态文件处理器
 	staticHandler *StaticFileHandler
 	// AI 安全分析器
@@ -160,8 +160,8 @@ type Server struct {
 	mlForest           *ml.IsolationForest
 
 	// Zero Trust Networking (Phase 5)
-	mtlsManager  *ssl.MTLSManager
-	rbacManager  *security.RBACManager
+	mtlsManager *ssl.MTLSManager
+	rbacManager *security.RBACManager
 
 	// Cluster runtime status
 	clusterLastConfigSyncAt      time.Time
@@ -170,10 +170,10 @@ type Server struct {
 	clusterLastSyncError         string
 
 	// HTTP/2 动态控制
-	http2Enabled     bool      // 当前 HTTP/2 状态
-	http2Mutex        sync.RWMutex
-	http2DisableUntil time.Time // HTTP/2 禁用到何时
-	http2DisableReason string   // 禁用原因
+	http2Enabled       bool // 当前 HTTP/2 状态
+	http2Mutex         sync.RWMutex
+	http2DisableUntil  time.Time // HTTP/2 禁用到何时
+	http2DisableReason string    // 禁用原因
 }
 
 // NewServer 创建Web服务器
@@ -775,9 +775,9 @@ func (s *Server) setupMLSystem() {
 	s.mux.HandleFunc(prefix+"/features/extract", s.handleMLExtractFeatures)
 
 	s.log.WithFields(logrus.Fields{
-		"worker_pool_size":   workerSize,
-		"max_queue_size":     maxQueueSize,
-		"batch_timeout":      batchTimeout.String(),
+		"worker_pool_size":    workerSize,
+		"max_queue_size":      maxQueueSize,
+		"batch_timeout":       batchTimeout.String(),
 		"queue_full_strategy": queueStrategy,
 	}).Info("ML/AI anomaly detection system initialized")
 }
@@ -1742,6 +1742,8 @@ func (s *Server) registerRunnerRoutes() {
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// 记录请求开始时间（用于计算请求耗时）
 	startTime := time.Now()
+	w.Header().Set("X-App-Version", strings.TrimPrefix(s.version, "v"))
+	w.Header().Set("X-Server-Version", strings.TrimPrefix(s.version, "v"))
 
 	// 添加 Alt-Svc 响应头，让浏览器知道服务器支持 HTTP/3
 	// 只在 HTTPS 连接上添加，且仅当 HTTP/3 已启用时。
@@ -1858,11 +1860,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				}
 
 				entry := statistics.APIPerformanceEntry{
-					Path:               apiPath,
-					Method:             r.Method,
-					Status:             wrappedWriter.statusCode,
-					ResponseTime:       duration,
-					Timestamp:          time.Now(),
+					Path:                apiPath,
+					Method:              r.Method,
+					Status:              wrappedWriter.statusCode,
+					ResponseTime:        duration,
+					Timestamp:           time.Now(),
 					ResponseBodySnippet: bodySnippet,
 				}
 				s.apiPerformanceCollector.Record(entry)
@@ -2423,18 +2425,18 @@ func (s *Server) proxyMiddleware(w http.ResponseWriter, r *http.Request) bool {
 // proxyRecordingWriter 包装 ResponseWriter，在代理响应时记录访问统计
 type proxyRecordingWriter struct {
 	http.ResponseWriter
-	req      *http.Request
-	collector *statistics.Collector
-	recorded bool
+	req        *http.Request
+	collector  *statistics.Collector
+	recorded   bool
 	statusCode int
 }
 
 func newProxyRecordingWriter(w http.ResponseWriter, r *http.Request, c *statistics.Collector) *proxyRecordingWriter {
 	return &proxyRecordingWriter{
 		ResponseWriter: w,
-		req:           r,
-		collector:     c,
-		statusCode:    200,
+		req:            r,
+		collector:      c,
+		statusCode:     200,
 	}
 }
 
@@ -2470,6 +2472,36 @@ func (p *proxyRecordingWriter) Flush() {
 	if f, ok := p.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
 	}
+}
+
+func (p *proxyRecordingWriter) Unwrap() http.ResponseWriter {
+	return p.ResponseWriter
+}
+
+func (p *proxyRecordingWriter) ReadFrom(r io.Reader) (int64, error) {
+	if !p.recorded {
+		p.recorded = true
+		p.collector.RecordAccessFromHTTP(p.req, p.statusCode)
+	}
+	if readerFrom, ok := p.ResponseWriter.(io.ReaderFrom); ok {
+		return readerFrom.ReadFrom(r)
+	}
+	return io.Copy(p.ResponseWriter, r)
+}
+
+func (p *proxyRecordingWriter) Push(target string, opts *http.PushOptions) error {
+	if pusher, ok := p.ResponseWriter.(http.Pusher); ok {
+		return pusher.Push(target, opts)
+	}
+	return http.ErrNotSupported
+}
+
+func (p *proxyRecordingWriter) CloseNotify() <-chan bool {
+	if notifier, ok := p.ResponseWriter.(http.CloseNotifier); ok {
+		return notifier.CloseNotify()
+	}
+	ch := make(chan bool)
+	return ch
 }
 
 // 工具函数
@@ -3279,8 +3311,8 @@ func (s *Server) SetHTTP2Enabled(enabled bool, reason string) {
 		s.http2Enabled = false
 		s.http2DisableReason = reason
 		s.log.WithFields(logrus.Fields{
-			"reason":            reason,
-			"auto_resume_at":     s.http2DisableUntil.Format(time.RFC3339),
+			"reason":         reason,
+			"auto_resume_at": s.http2DisableUntil.Format(time.RFC3339),
 		}).Warn("HTTP/2 已被禁用，将在 10 分钟后自动恢复")
 	} else if enabled {
 		// 手动启用 HTTP/2
@@ -3301,8 +3333,8 @@ func (s *Server) SetHTTP2DisabledForDuration(duration time.Duration, reason stri
 	s.http2DisableReason = reason
 
 	s.log.WithFields(logrus.Fields{
-		"duration":     duration.String(),
-		"reason":       reason,
+		"duration":       duration.String(),
+		"reason":         reason,
 		"auto_resume_at": s.http2DisableUntil.Format(time.RFC3339),
 	}).Warn("HTTP/2 已被禁用")
 }
@@ -3337,7 +3369,7 @@ func (s *Server) GetHTTP2Status() map[string]interface{} {
 	defer s.http2Mutex.RUnlock()
 
 	status := map[string]interface{}{
-		"enabled":    s.http2Enabled,
+		"enabled":        s.http2Enabled,
 		"config_enabled": s.config.Server.HTTP2Enabled,
 	}
 

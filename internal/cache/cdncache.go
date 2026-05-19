@@ -24,6 +24,8 @@ import (
 	"github.com/xurenlu/sslcat/internal/config"
 )
 
+const cdnMetaTouchMinInterval = time.Minute
+
 // processingEntry 处理中的请求条目（用于超时检测）
 type processingEntry struct {
 	ch        chan struct{}
@@ -44,9 +46,11 @@ type CDNCache struct {
 	processing sync.Map // key: request_key, value: *processingEntry
 
 	// 清理器控制
-	stopProcessingCleaner chan struct{}
-	cleanerStarted        bool
-	cleanerMutex          sync.Mutex
+	stopProcessingCleaner  chan struct{}
+	stopCleaner            chan struct{}
+	cleanerStarted         bool
+	periodicCleanerStarted bool
+	cleanerMutex           sync.Mutex
 }
 
 type objectMeta struct {
@@ -76,6 +80,7 @@ func NewCDNCache(cfg *config.Config) *CDNCache {
 		compressor:            compressor,
 		mimeDetector:          mimeDetector,
 		stopProcessingCleaner: make(chan struct{}),
+		stopCleaner:           make(chan struct{}),
 	}
 
 	// 启动 processing map 清理器，防止内存泄漏
@@ -91,21 +96,20 @@ func (c *CDNCache) ServeIfFresh(w http.ResponseWriter, r *http.Request) bool {
 
 // ServeIfFreshWithConfig 带自定义启用状态的缓存服务
 func (c *CDNCache) ServeIfFreshWithConfig(w http.ResponseWriter, r *http.Request, forceEnabled bool) bool {
-	c.log.Infof("CDN缓存查询: url=%s, isEnabled=%v, forceEnabled=%v", r.URL.Path, c.isEnabled(), forceEnabled)
-
 	if c == nil || (!c.isEnabled() && !forceEnabled) {
 		// 统计未命中（未启用）
 		if c != nil {
 			c.misses.Add(1)
-			c.log.Infof("CDN缓存未启用: url=%s", r.URL.Path)
+			c.log.Debugf("CDN缓存未启用: url=%s", r.URL.Path)
 		}
 		return false
 	}
+	c.log.Debugf("CDN缓存查询: url=%s, isEnabled=%v, forceEnabled=%v", r.URL.Path, c.isEnabled(), forceEnabled)
 
 	// 如果强制启用，但基本配置不可用，仍然返回false
 	if forceEnabled && (c.cfg == nil || c.cfg.CDNCache.CacheDir == "") {
 		c.misses.Add(1)
-		c.log.Infof("CDN缓存配置不可用: url=%s", r.URL.Path)
+		c.log.Debugf("CDN缓存配置不可用: url=%s", r.URL.Path)
 		return false
 	}
 	// 仅缓存 GET/HEAD
@@ -114,13 +118,13 @@ func (c *CDNCache) ServeIfFreshWithConfig(w http.ResponseWriter, r *http.Request
 	}
 
 	filePath, metaPath := c.cachePaths(r)
-	c.log.Infof("CDN缓存路径: filePath=%s, metaPath=%s", filePath, metaPath)
+	c.log.Debugf("CDN缓存路径: filePath=%s, metaPath=%s", filePath, metaPath)
 
 	meta, err := c.readMeta(metaPath)
 	if err != nil || meta == nil {
 		// 统计未命中（无元数据）
 		c.misses.Add(1)
-		c.log.Infof("CDN缓存未命中(无元数据): url=%s, err=%v", r.URL.Path, err)
+		c.log.Debugf("CDN缓存未命中(无元数据): url=%s, err=%v", r.URL.Path, err)
 
 		// 检查是否有相同请求正在处理，避免并发穿透
 		requestKey := c.getRequestKey(r)
@@ -133,7 +137,7 @@ func (c *CDNCache) ServeIfFreshWithConfig(w http.ResponseWriter, r *http.Request
 
 		if existingValue, loaded := c.processing.LoadOrStore(requestKey, newEntry); loaded {
 			// 有相同请求正在处理，等待其完成
-			c.log.Infof("CDN缓存等待相同请求完成: url=%s", r.URL.Path)
+			c.log.Debugf("CDN缓存等待相同请求完成: url=%s", r.URL.Path)
 
 			// 获取已存在的 entry
 			existingEntry, ok := existingValue.(*processingEntry)
@@ -154,7 +158,7 @@ func (c *CDNCache) ServeIfFreshWithConfig(w http.ResponseWriter, r *http.Request
 			}
 			// 重新尝试读取缓存
 			if meta, err := c.readMeta(metaPath); err == nil && meta != nil {
-				c.log.Infof("CDN缓存等待后命中: url=%s", r.URL.Path)
+				c.log.Debugf("CDN缓存等待后命中: url=%s", r.URL.Path)
 				// 检查过期
 				if meta.ExpiresAtUnix > 0 && time.Now().Unix() >= meta.ExpiresAtUnix {
 					_ = os.Remove(filePath)
@@ -256,12 +260,12 @@ func (c *CDNCache) MaybeStore(resp *http.Response) {
 // MaybeStoreWithConfig 带自定义启用状态的缓存存储
 func (c *CDNCache) MaybeStoreWithConfig(resp *http.Response, forceEnabled bool) {
 	if resp != nil && resp.Request != nil {
-		c.log.Infof("CDN缓存存储: url=%s, isEnabled=%v, forceEnabled=%v", resp.Request.URL.Path, c.isEnabled(), forceEnabled)
+		c.log.Debugf("CDN缓存存储: url=%s, isEnabled=%v, forceEnabled=%v", resp.Request.URL.Path, c.isEnabled(), forceEnabled)
 	}
 
 	if c == nil || (!c.isEnabled() && !forceEnabled) || resp == nil || resp.Request == nil {
 		if resp != nil && resp.Request != nil {
-			c.log.Infof("CDN缓存存储跳过: url=%s", resp.Request.URL.Path)
+			c.log.Debugf("CDN缓存存储跳过: url=%s", resp.Request.URL.Path)
 			c.cleanupProcessing(resp.Request)
 		}
 		return
@@ -269,7 +273,7 @@ func (c *CDNCache) MaybeStoreWithConfig(resp *http.Response, forceEnabled bool) 
 
 	// 如果强制启用，但基本配置不可用，仍然返回
 	if forceEnabled && (c.cfg == nil || c.cfg.CDNCache.CacheDir == "") {
-		c.log.Infof("CDN缓存配置不可用，无法存储: url=%s", resp.Request.URL.Path)
+		c.log.Debugf("CDN缓存配置不可用，无法存储: url=%s", resp.Request.URL.Path)
 		c.cleanupProcessing(resp.Request)
 		return
 	}
@@ -282,7 +286,7 @@ func (c *CDNCache) MaybeStoreWithConfig(resp *http.Response, forceEnabled bool) 
 	// 304 Not Modified 等其他状态码不缓存
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
 		if resp.StatusCode == http.StatusNotModified {
-			c.log.Infof("CDN缓存跳过存储(304响应): url=%s", req.URL.Path)
+			c.log.Debugf("CDN缓存跳过存储(304响应): url=%s", req.URL.Path)
 		}
 		c.cleanupProcessing(req)
 		return
@@ -399,7 +403,7 @@ func (c *CDNCache) MaybeStoreWithConfig(resp *http.Response, forceEnabled bool) 
 		return
 	}
 
-	c.log.Infof("CDN缓存写入成功: url=%s, filePath=%s, size=%d bytes", req.URL.Path, filePath, len(data))
+	c.log.Debugf("CDN缓存写入成功: url=%s, filePath=%s, size=%d bytes", req.URL.Path, filePath, len(data))
 
 	// 修复：生成预压缩文件，避免每次请求都压缩
 	// 只对可压缩的文件类型生成预压缩版本
@@ -544,6 +548,19 @@ func (c *CDNCache) StartCleaner() {
 	if !c.isEnabled() {
 		return
 	}
+	c.cleanerMutex.Lock()
+	if c.periodicCleanerStarted {
+		c.cleanerMutex.Unlock()
+		return
+	}
+	select {
+	case <-c.stopCleaner:
+		c.stopCleaner = make(chan struct{})
+	default:
+	}
+	c.periodicCleanerStarted = true
+	c.cleanerMutex.Unlock()
+
 	interval := time.Duration(c.cfg.CDNCache.CleanIntervalSec)
 	if interval <= 0 {
 		interval = 60
@@ -555,8 +572,14 @@ func (c *CDNCache) StartCleaner() {
 	go func() {
 		ticker := time.NewTicker(interval * time.Second)
 		defer ticker.Stop()
-		for range ticker.C {
-			c.CleanOnce()
+		for {
+			select {
+			case <-ticker.C:
+				c.CleanOnce()
+			case <-c.stopCleaner:
+				c.log.Info("CDN Cache 定时清理器已停止")
+				return
+			}
 		}
 	}()
 }
@@ -674,7 +697,7 @@ func (c *CDNCache) readMeta(metaPath string) (*objectMeta, error) {
 
 func (c *CDNCache) writeMeta(metaPath string, m *objectMeta) error {
 	m.LastAccess = time.Now()
-	b, err := json.MarshalIndent(m, "", "  ")
+	b, err := json.Marshal(m)
 	if err != nil {
 		return err
 	}
@@ -683,6 +706,9 @@ func (c *CDNCache) writeMeta(metaPath string, m *objectMeta) error {
 
 func (c *CDNCache) touch(metaPath string, m *objectMeta) {
 	if m == nil {
+		return
+	}
+	if !m.LastAccess.IsZero() && time.Since(m.LastAccess) < cdnMetaTouchMinInterval {
 		return
 	}
 	m.LastAccess = time.Now()
@@ -1163,20 +1189,25 @@ func (c *CDNCache) StopCleaner() {
 	c.cleanerMutex.Lock()
 	defer c.cleanerMutex.Unlock()
 
-	if !c.cleanerStarted {
-		return
-	}
-
-	if c.stopProcessingCleaner != nil {
+	if c.cleanerStarted && c.stopProcessingCleaner != nil {
 		select {
 		case <-c.stopProcessingCleaner:
 			// 已经关闭
 		default:
 			close(c.stopProcessingCleaner)
 		}
+		c.cleanerStarted = false
 	}
 
-	c.cleanerStarted = false
+	if c.periodicCleanerStarted && c.stopCleaner != nil {
+		select {
+		case <-c.stopCleaner:
+			// 已经关闭
+		default:
+			close(c.stopCleaner)
+		}
+		c.periodicCleanerStarted = false
+	}
 	c.log.Info("CDN Cache 清理器已停止")
 }
 

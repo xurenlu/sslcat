@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"strconv"
@@ -370,8 +371,8 @@ type responseWriter struct {
 	http.ResponseWriter
 	statusCode int
 	written    int64
-	bodyBuffer  []byte // 响应 body 缓冲（只记录前 200 字符）
-	captured    bool  // 是否已捕获响应内容
+	bodyBuffer []byte // 响应 body 缓冲（只记录前 200 字符）
+	captured   bool   // 是否已捕获响应内容
 }
 
 // Hijack 实现 http.Hijacker 接口，用于 WebSocket 升级
@@ -388,6 +389,36 @@ func (rw *responseWriter) Flush() {
 	if flusher, ok := rw.ResponseWriter.(http.Flusher); ok {
 		flusher.Flush()
 	}
+}
+
+func (rw *responseWriter) Unwrap() http.ResponseWriter {
+	return rw.ResponseWriter
+}
+
+func (rw *responseWriter) ReadFrom(r io.Reader) (int64, error) {
+	if readerFrom, ok := rw.ResponseWriter.(io.ReaderFrom); ok {
+		n, err := readerFrom.ReadFrom(r)
+		rw.written += n
+		return n, err
+	}
+	n, err := io.Copy(rw.ResponseWriter, r)
+	rw.written += n
+	return n, err
+}
+
+func (rw *responseWriter) Push(target string, opts *http.PushOptions) error {
+	if pusher, ok := rw.ResponseWriter.(http.Pusher); ok {
+		return pusher.Push(target, opts)
+	}
+	return http.ErrNotSupported
+}
+
+func (rw *responseWriter) CloseNotify() <-chan bool {
+	if notifier, ok := rw.ResponseWriter.(http.CloseNotifier); ok {
+		return notifier.CloseNotify()
+	}
+	ch := make(chan bool)
+	return ch
 }
 
 func (rw *responseWriter) WriteHeader(statusCode int) {

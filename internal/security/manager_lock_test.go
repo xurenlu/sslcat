@@ -123,6 +123,20 @@ func TestIsBlockedNoDataRace(t *testing.T) {
 	wg.Wait()
 }
 
+func TestZeroLoginThresholdsUseSafeDefaults(t *testing.T) {
+	m := newTestManager(t)
+	m.config.Security.MaxAttempts = 0
+	m.config.Security.MaxAttempts5Min = 0
+	m.Start()
+	defer m.Stop()
+
+	m.LogAccess("203.0.113.20", "Mozilla/5.0", "/sslcat-panel/login", false)
+
+	if m.IsBlocked("203.0.113.20") {
+		t.Fatal("single failed login should not block when thresholds are unset")
+	}
+}
+
 // TestCheckTOTPNoDeadlock 验证 CheckTOTPOnlyLoginSecurity 不会因为嵌套锁死锁
 func TestCheckTOTPNoDeadlock(t *testing.T) {
 	m := newTestManager(t)

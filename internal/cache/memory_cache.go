@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -54,10 +55,10 @@ func DefaultMemoryCacheConfig(name string) *MemoryCacheConfig {
 
 // MemoryCache 统一的内存缓存管理器（支持多种后端实现）
 type MemoryCache struct {
-	backend    CacheBackend // 缓存后端（可插拔）
-	log        *logrus.Entry
-	name       string
-	maxItemSize int64        // 单个项最大大小（用于验证）
+	backend     CacheBackend // 缓存后端（可插拔）
+	log         *logrus.Entry
+	name        string
+	maxItemSize int64         // 单个项最大大小（用于验证）
 	defaultTTL  time.Duration // 默认 TTL
 
 	// 统计信息（手动维护）
@@ -105,14 +106,14 @@ func NewMemoryCache(config *MemoryCacheConfig) *MemoryCache {
 func (mc *MemoryCache) Get(key string) (*MemoryCacheItem, bool) {
 	data, err := mc.backend.Get(key)
 	if err != nil {
-		mc.misses++
+		atomic.AddUint64(&mc.misses, 1)
 		return nil, false
 	}
 
 	// 反序列化缓存项
 	item, err := unmarshalCacheItem(data)
 	if err != nil {
-		mc.misses++
+		atomic.AddUint64(&mc.misses, 1)
 		mc.log.Errorf("Failed to unmarshal cache item: %v", err)
 		return nil, false
 	}
@@ -120,8 +121,8 @@ func (mc *MemoryCache) Get(key string) (*MemoryCacheItem, bool) {
 	// 检查是否过期
 	if item.IsExpired() {
 		mc.backend.Delete(key)
-		mc.misses++
-		mc.expired++
+		atomic.AddUint64(&mc.misses, 1)
+		atomic.AddUint64(&mc.expired, 1)
 		return nil, false
 	}
 
@@ -136,7 +137,7 @@ func (mc *MemoryCache) Get(key string) (*MemoryCacheItem, bool) {
 		mc.log.Errorf("Failed to re-marshal cache item: %v", err)
 	}
 
-	mc.hits++
+	atomic.AddUint64(&mc.hits, 1)
 	return item, true
 }
 
@@ -198,18 +199,22 @@ func (mc *MemoryCache) Clear() {
 // Stats 获取统计信息
 func (mc *MemoryCache) Stats() map[string]interface{} {
 	stats := mc.backend.Len()
-	totalRequests := mc.hits + mc.misses
+	hits := atomic.LoadUint64(&mc.hits)
+	misses := atomic.LoadUint64(&mc.misses)
+	evictions := atomic.LoadUint64(&mc.evictions)
+	expired := atomic.LoadUint64(&mc.expired)
+	totalRequests := hits + misses
 	hitRate := 0.0
 	if totalRequests > 0 {
-		hitRate = float64(mc.hits) / float64(totalRequests) * 100
+		hitRate = float64(hits) / float64(totalRequests) * 100
 	}
 
 	return map[string]interface{}{
 		"entries":          stats,
-		"hits":             mc.hits,
-		"misses":           mc.misses,
-		"evictions":        mc.evictions,
-		"expired":          mc.expired,
+		"hits":             hits,
+		"misses":           misses,
+		"evictions":        evictions,
+		"expired":          expired,
 		"hit_rate":         hitRate,
 		"cache_size_bytes": int64(stats) * 1024, // 估算
 	}

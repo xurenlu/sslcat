@@ -380,7 +380,13 @@ func (m *Manager) LogAccess(ip, userAgent, path string, success bool) {
 	now := time.Now()
 
 	func() {
-		m.mutex.Lock()
+		if success && !m.config.Security.EnableUAFilter {
+			if !m.mutex.TryLock() {
+				return
+			}
+		} else {
+			m.mutex.Lock()
+		}
 		defer m.mutex.Unlock()
 
 		// 检查User-Agent是否合法
@@ -438,9 +444,12 @@ func (m *Manager) LogAccess(ip, userAgent, path string, success bool) {
 
 		m.accessLogs[ip] = append(m.accessLogs[ip], accessLog)
 
-		// 限制日志数量（放宽）：只保留最近3000条
-		if len(m.accessLogs[ip]) > 3000 {
-			m.accessLogs[ip] = m.accessLogs[ip][len(m.accessLogs[ip])-3000:]
+		maxAccessLogs := m.maxAccessLogEntries
+		if maxAccessLogs <= 0 {
+			maxAccessLogs = 3000
+		}
+		if len(m.accessLogs[ip]) > maxAccessLogs {
+			m.accessLogs[ip] = m.accessLogs[ip][len(m.accessLogs[ip])-maxAccessLogs:]
 		}
 
 		// 如果不是成功访问，检查是否需要封禁
@@ -623,8 +632,16 @@ func (m *Manager) checkAndBlockLocked(ip string, now time.Time) string {
 	// 检查5分钟内失败次数
 	fiveMinAttempts := len(m.lastAttempts[ip])
 	// 封禁条件
-	if recentAttempts >= m.config.Security.MaxAttempts ||
-		fiveMinAttempts >= m.config.Security.MaxAttempts5Min {
+	maxAttempts := m.config.Security.MaxAttempts
+	if maxAttempts <= 0 {
+		maxAttempts = 900
+	}
+	maxAttempts5Min := m.config.Security.MaxAttempts5Min
+	if maxAttempts5Min <= 0 {
+		maxAttempts5Min = 3000
+	}
+	if recentAttempts >= maxAttempts ||
+		fiveMinAttempts >= maxAttempts5Min {
 		reason := fmt.Sprintf("Too many failed attempts: %d in 1min, %d in 5min",
 			recentAttempts, fiveMinAttempts)
 		if m.blockIPLocked(ip, reason, now) {

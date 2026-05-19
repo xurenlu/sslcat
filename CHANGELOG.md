@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc19] - 2026-05-19
+
+### 🐛 Bug 修复
+
+- **长时间高流量稳定性**：访问日志改为非阻塞队列写入，避免磁盘 I/O、日志轮转或 stdout 阻塞把业务请求串行拖慢；响应写包装器补齐 `Unwrap` / `ReadFrom` / `Push` / `CloseNotify` 透传，保留底层 HTTP 能力和大响应优化路径。
+- **代理配置热更新**：反向代理缓存键纳入域名、超时、上游 HTTP/2、Host 策略和自定义头配置，避免同一上游地址的不同规则或热更新继续复用旧 `Transport`。
+- **DDoS 记录抗压**：攻击记录从“每次攻击启动一个 goroutine”改为有界队列后台消费，避免攻击流量触发 goroutine 风暴。
+- **上游缓存请求路径减负**：上游缓存按 `upstream_cache.enabled` 正确启停，并使用单对象大小限制控制代理响应路径的内存读取，避免大响应缓存拖慢下游返回。
+- **内存缓存并发安全**：缓存命中、未命中、过期等统计改为原子计数，修复高并发读缓存时 race detector 报出的数据竞争。
+- **CDN 长跑稳定性**：CDN 热点命中日志降为 Debug，限制命中时元数据访问时间的写盘频率，并补齐定时清理器停止通道，避免缓存命中反而持续制造磁盘写、日志风暴或后台 goroutine 泄漏。
+- **代理热路径日志降噪**：反向代理选后端、Host 头优化、云存储/CDN 头部处理和 WebSocket 握手等逐请求日志降为 Debug，避免高流量下 Info 日志挤占 I/O。
+- **生产调试安全**：移除证书 API 中写死到本机路径的调试日志；代理 debug 日志不再输出请求体原文、完整 header 或带凭据的 curl 命令。
+
+## [2.0.0-rc18] - 2026-05-19
+
+### 🐛 Bug 修复
+
+- **登录与 WAF 封禁阈值**：放宽刚初始化场景下的默认封禁阈值，并为缺失或为 0 的旧配置增加安全兜底，避免输错密码或 WAF 初次触发就把 IP 封掉。
+- **敏感日志**：移除管理员密码校验过程中的明文密码、输入密码和哈希前缀调试日志，仅保留是否存在与长度等非敏感信息。
+- **高并发代理稳定性**：成功访问安全日志在锁竞争时改为非阻塞跳过，避免全局安全日志锁拖慢所有请求；反代上游 HTTP/2 默认关闭并可按规则开启，降低上游单连接流控导致的整体变慢风险；HTTP/3 服务器开始真正应用 QUIC 并发与空闲超时配置。
+- **版本可观测性**：统一后端、前端和 `VERSION` 文件到 `2.0.0-rc18`，并在服务端响应头暴露 `X-App-Version` / `X-Server-Version`。
+
 ## [2.0.0-rc17] - 2026-04-21
 
 ### 🐛 Bug 修复
