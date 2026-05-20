@@ -577,7 +577,7 @@ func (s *Server) handleFirstTimeSetup(w http.ResponseWriter, r *http.Request) {
 
 	// 创建首次设置完成标记文件
 	setupCompleteFile := filepath.Join("./data", ".first-setup-complete")
-	if err := os.WriteFile(setupCompleteFile, []byte(fmt.Sprintf("首次设置完成时间: %s\n管理员邮箱: %s\n自动续期: %t\n代理规则: %s",
+	if err := writeSensitiveFileAtomically(setupCompleteFile, []byte(fmt.Sprintf("首次设置完成时间: %s\n管理员邮箱: %s\n自动续期: %t\n代理规则: %s",
 		time.Now().Format("2006-01-02 15:04:05"),
 		adminEmail,
 		autoRenew,

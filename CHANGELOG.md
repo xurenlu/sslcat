@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc28] - 2026-05-20
+
+### 🐛 Bug 修复
+
+- **管理日志 API 内存保护**：审计日志和 DDoS 攻击日志接口改为读取尾部有界 JSONL，不再把整个日志文件读入内存，降低大日志文件下管理接口拖慢或内存抖动风险。
+- **启动状态文件可靠性**：自动生成的 Bot Challenge SecretKey 与首次设置完成标记改为原子写入，降低启动或初始化中断导致状态文件半写入的风险。
+
 ## [2.0.0-rc27] - 2026-05-20
 
 ### 🐛 Bug 修复

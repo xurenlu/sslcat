@@ -24,6 +24,8 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
+const maxAdminLogTailBytes int64 = 8 << 20
+
 // API处理器
 
 func (s *Server) authorizeAPI(w http.ResponseWriter, r *http.Request, readOnly bool) bool {
@@ -163,24 +165,20 @@ func (s *Server) handleAPIAudit(w http.ResponseWriter, r *http.Request) {
 	if !s.authorizeAPI(w, r, true) {
 		return
 	}
-	data, err := os.ReadFile("./data/audit.log")
+	limit := 1000
+	if r.URL.Query().Get("download") == "1" {
+		limit = 10000
+	}
+	if q := strings.TrimSpace(r.URL.Query().Get("limit")); q != "" {
+		if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 10000 {
+			limit = v
+		}
+	}
+	out, err := readRecentJSONLines("./data/audit.log", limit, maxAdminLogTailBytes)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte("{\"logs\":[]}"))
 		return
-	}
-	lines := strings.Split(string(data), "\n")
-	type item map[string]any
-	var out []item
-	for _, ln := range lines {
-		ln = strings.TrimSpace(ln)
-		if ln == "" {
-			continue
-		}
-		var it item
-		if err := json.Unmarshal([]byte(ln), &it); err == nil {
-			out = append(out, it)
-		}
 	}
 	// 下载模式
 	if r.URL.Query().Get("download") == "1" {
@@ -244,35 +242,96 @@ func (s *Server) handleAPISecurityAttacks(w http.ResponseWriter, r *http.Request
 		}
 	}
 	path := "./data/ddos_attacks.log"
-	f, err := os.Open(path)
+	rows, err := readRecentJSONLines(path, limit, maxAdminLogTailBytes)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte("{\"attacks\":[]}"))
 		return
 	}
-	defer f.Close()
-	// 读取全部行（文件通常较小，已做轮转）
-	data, _ := io.ReadAll(f)
-	lines := strings.Split(string(data), "\n")
-	// 取末尾 limit 行
-	start := 0
-	if len(lines) > limit {
-		start = len(lines) - limit
-	}
 	type attack map[string]any
-	var out []attack
-	for i := start; i < len(lines); i++ {
-		ln := strings.TrimSpace(lines[i])
-		if ln == "" {
-			continue
-		}
-		var rec attack
-		if err := json.Unmarshal([]byte(ln), &rec); err == nil {
-			out = append(out, rec)
-		}
+	out := make([]attack, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, attack(row))
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"attacks": out})
+}
+
+func readRecentJSONLines(path string, limit int, maxBytes int64) ([]map[string]any, error) {
+	if limit <= 0 {
+		limit = 1000
+	}
+	lines, err := readTailLines(path, limit, maxBytes)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]map[string]any, 0, len(lines))
+	for _, ln := range lines {
+		ln = strings.TrimSpace(ln)
+		if ln == "" {
+			continue
+		}
+		var item map[string]any
+		if err := json.Unmarshal([]byte(ln), &item); err == nil {
+			out = append(out, item)
+		}
+	}
+	return out, nil
+}
+
+func readTailLines(path string, limit int, maxBytes int64) ([]string, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+	if maxBytes <= 0 {
+		maxBytes = maxAdminLogTailBytes
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	info, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+
+	var data []byte
+	offset := info.Size()
+	newlines := 0
+	const chunkSize int64 = 64 << 10
+	for offset > 0 && int64(len(data)) < maxBytes && newlines <= limit {
+		n := chunkSize
+		if offset < n {
+			n = offset
+		}
+		remaining := maxBytes - int64(len(data))
+		if remaining < n {
+			n = remaining
+		}
+		offset -= n
+		chunk := make([]byte, n)
+		if _, err := f.ReadAt(chunk, offset); err != nil && err != io.EOF {
+			return nil, err
+		}
+		for _, b := range chunk {
+			if b == '\n' {
+				newlines++
+			}
+		}
+		data = append(chunk, data...)
+	}
+
+	lines := strings.Split(string(data), "\n")
+	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
+		lines = lines[:len(lines)-1]
+	}
+	if len(lines) > limit {
+		lines = lines[len(lines)-limit:]
+	}
+	return lines, nil
 }
 
 // handleAPICaptcha 处理验证码API请求

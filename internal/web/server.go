@@ -415,7 +415,7 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 			tokenSecret = hex.EncodeToString(secretBytes)
 
 			// 保存到文件以便重启后复用
-			if err := os.WriteFile(secretKeyFile, []byte(tokenSecret), 0600); err != nil {
+			if err := writeSensitiveFileAtomically(secretKeyFile, []byte(tokenSecret+"\n"), 0600); err != nil {
 				logrus.Warnf("无法保存 SecretKey 到文件 %s: %v", secretKeyFile, err)
 			} else {
 				logrus.Infof("已生成并保存 SecretKey 到: %s", secretKeyFile)
