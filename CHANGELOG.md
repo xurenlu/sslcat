@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc33] - 2026-05-20
+
+### 🐛 Bug 修复
+
+- **监控组件关闭可靠性**：Goroutine、内存、性能、看门狗和指标存储监控器的 Stop 改为幂等关闭，避免重复 Stop 或后台 goroutine 读取 stop channel 时被置空导致的竞态和关闭路径不稳定。
+
 ## [2.0.0-rc32] - 2026-05-20
 
 ### 🐛 Bug 修复

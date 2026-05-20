@@ -58,6 +58,7 @@ type ProcessStatsRecord struct {
 type WatchdogMonitor struct {
 	log             *logrus.Entry
 	stopChan        chan struct{}
+	stopOnce        sync.Once
 	options         WatchdogMonitorOptions
 	notificationMgr *notification.NotificationManager
 	history         []ProcessStatsRecord
@@ -109,11 +110,10 @@ func (wm *WatchdogMonitor) Start() {
 
 // Stop 停止监控
 func (wm *WatchdogMonitor) Stop() {
-	if wm.stopChan != nil {
+	wm.stopOnce.Do(func() {
 		close(wm.stopChan)
-		wm.stopChan = nil
-	}
-	wm.log.Info("看门狗监控器已停止")
+		wm.log.Info("看门狗监控器已停止")
+	})
 }
 
 // monitorLoop 监控循环

@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -17,15 +18,16 @@ import (
 
 // MetricsStorage 指标存储管理器
 type MetricsStorage struct {
-	db              *sql.DB
-	dbPath          string
-	log             *logrus.Entry
-	enabled         bool
-	samplingInterval time.Duration
-	retentionDays    int
+	db                  *sql.DB
+	dbPath              string
+	log                 *logrus.Entry
+	enabled             bool
+	samplingInterval    time.Duration
+	retentionDays       int
 	detailRetentionDays int
-	maxRows          int
-	stopChan        chan struct{}
+	maxRows             int
+	stopChan            chan struct{}
+	stopOnce            sync.Once
 }
 
 // ProcessMetric 进程指标数据
@@ -42,8 +44,8 @@ type ProcessMetric struct {
 
 // MetricsQueryResult 查询结果
 type MetricsQueryResult struct {
-	Data    []ProcessMetric          `json:"data"`
-	Summary MetricsQuerySummary      `json:"summary"`
+	Data    []ProcessMetric     `json:"data"`
+	Summary MetricsQuerySummary `json:"summary"`
 }
 
 // MetricsQuerySummary 查询摘要
@@ -57,12 +59,12 @@ type MetricsQuerySummary struct {
 
 // MetricsStorageOptions 存储配置选项
 type MetricsStorageOptions struct {
-	Enabled            bool
-	DataDir            string
-	SamplingInterval   time.Duration
-	RetentionDays      int
+	Enabled             bool
+	DataDir             string
+	SamplingInterval    time.Duration
+	RetentionDays       int
 	DetailRetentionDays int
-	MaxRows            int
+	MaxRows             int
 }
 
 // NewMetricsStorage 创建指标存储管理器
@@ -96,15 +98,15 @@ func NewMetricsStorage(opts MetricsStorageOptions) (*MetricsStorage, error) {
 	db.SetConnMaxLifetime(5 * time.Minute)
 
 	storage := &MetricsStorage{
-		db:                db,
-		dbPath:            dbPath,
-		log:               logrus.WithFields(logrus.Fields{"component": "metrics_storage"}),
-		enabled:           true,
-		samplingInterval:  opts.SamplingInterval,
-		retentionDays:     opts.RetentionDays,
+		db:                  db,
+		dbPath:              dbPath,
+		log:                 logrus.WithFields(logrus.Fields{"component": "metrics_storage"}),
+		enabled:             true,
+		samplingInterval:    opts.SamplingInterval,
+		retentionDays:       opts.RetentionDays,
 		detailRetentionDays: opts.DetailRetentionDays,
-		maxRows:           opts.MaxRows,
-		stopChan:          make(chan struct{}),
+		maxRows:             opts.MaxRows,
+		stopChan:            make(chan struct{}),
 	}
 
 	// 初始化数据库表
@@ -178,16 +180,13 @@ func (ms *MetricsStorage) Stop() {
 
 	ms.log.Info("停止指标存储管理器...")
 
-	if ms.stopChan != nil {
+	ms.stopOnce.Do(func() {
 		close(ms.stopChan)
-		ms.stopChan = nil
-	}
-
-	if ms.db != nil {
-		ms.db.Close()
-	}
-
-	ms.log.Info("指标存储管理器已停止")
+		if ms.db != nil {
+			ms.db.Close()
+		}
+		ms.log.Info("指标存储管理器已停止")
+	})
 }
 
 // IsEnabled 返回指标存储是否已启用
@@ -804,4 +803,3 @@ func (ms *MetricsStorage) aggregateMetrics(rawMetrics []ProcessMetric, targetGra
 
 	return result
 }
-

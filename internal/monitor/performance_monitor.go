@@ -11,6 +11,7 @@ import (
 type PerformanceMonitor struct {
 	log           *logrus.Entry
 	stopChan      chan struct{}
+	stopOnce      sync.Once
 	checkInterval time.Duration
 
 	// 性能指标
@@ -85,11 +86,10 @@ func (pm *PerformanceMonitor) Start() {
 
 // Stop 停止监控
 func (pm *PerformanceMonitor) Stop() {
-	if pm.stopChan != nil {
+	pm.stopOnce.Do(func() {
 		close(pm.stopChan)
-		pm.stopChan = nil
-	}
-	pm.log.Info("性能基线监控器已停止")
+		pm.log.Info("性能基线监控器已停止")
+	})
 }
 
 // monitorLoop 监控循环

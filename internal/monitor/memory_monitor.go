@@ -54,6 +54,7 @@ func (o MemoryMonitorOptions) normalize() MemoryMonitorOptions {
 type MemoryMonitor struct {
 	log               *logrus.Entry
 	stopChan          chan struct{}
+	stopOnce          sync.Once
 	checkInterval     time.Duration
 	baselineAlloc     uint64 // 基线内存分配（字节）
 	warningThreshold  uint64 // 警告阈值（字节）
@@ -138,11 +139,10 @@ func (mm *MemoryMonitor) Start() {
 
 // Stop 停止监控
 func (mm *MemoryMonitor) Stop() {
-	if mm.stopChan != nil {
+	mm.stopOnce.Do(func() {
 		close(mm.stopChan)
-		mm.stopChan = nil
-	}
-	mm.log.Info("内存监控器已停止")
+		mm.log.Info("内存监控器已停止")
+	})
 }
 
 // monitorLoop 监控循环

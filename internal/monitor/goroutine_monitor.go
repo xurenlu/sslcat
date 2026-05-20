@@ -12,6 +12,7 @@ import (
 type GoroutineMonitor struct {
 	log               *logrus.Entry
 	stopChan          chan struct{}
+	stopOnce          sync.Once
 	checkInterval     time.Duration
 	baselineCount     int
 	warningThreshold  int // 超过基线多少时发出警告
@@ -62,11 +63,10 @@ func (gm *GoroutineMonitor) Start() {
 
 // Stop 停止监控
 func (gm *GoroutineMonitor) Stop() {
-	if gm.stopChan != nil {
+	gm.stopOnce.Do(func() {
 		close(gm.stopChan)
-		gm.stopChan = nil
-	}
-	gm.log.Info("Goroutine监控器已停止")
+		gm.log.Info("Goroutine监控器已停止")
+	})
 }
 
 // monitorLoop 监控循环
