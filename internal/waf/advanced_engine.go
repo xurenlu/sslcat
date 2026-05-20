@@ -1,10 +1,8 @@
 package waf
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"regexp"
 	"sort"
@@ -192,8 +190,8 @@ func (e *AdvancedEngine) initAdvancedRules() {
 		Priority: 200,
 		Conditions: []RuleCondition{
 			{
-				Variable:  "ARGS",
-				Operator:  "regex",
+				Variable: "ARGS",
+				Operator: "regex",
 				// 修复: 使用更精确的模式，避免 \w+ 后面跟量词导致的 ReDoS
 				Value:     `(?i)<script[^>]*>|javascript:|on[a-z]+\s*=|<(iframe|object|embed)`,
 				Transform: []string{"urldecode", "htmldecode"},
@@ -519,10 +517,8 @@ func (e *AdvancedEngine) extractVariables(r *http.Request) map[string]string {
 
 	// 请求体 - 重要：读取后需要恢复，否则下游处理器无法读取
 	if r.Body != nil {
-		if bodyBytes, err := io.ReadAll(r.Body); err == nil {
+		if bodyBytes, err := readRequestBodyPrefix(r, maxWAFBodyScanBytes); err == nil {
 			variables["REQUEST_BODY"] = string(bodyBytes)
-			// 恢复请求体供下游处理器使用
-			r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 		}
 	}
 

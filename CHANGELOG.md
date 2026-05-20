@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc30] - 2026-05-20
+
+### 🐛 Bug 修复
+
+- **WAF 请求体扫描限流**：WAF 基础引擎与高级规则变量提取改为只扫描请求体前 1MB，并在扫描后恢复完整请求体给下游转发，降低大流量/大 body 场景下代理主路径的内存和 GC 压力。
+
 ## [2.0.0-rc29] - 2026-05-20
 
 ### 🐛 Bug 修复

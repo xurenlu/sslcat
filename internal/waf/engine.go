@@ -1,9 +1,7 @@
 package waf
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"net/http"
 	neturl "net/url"
 	"regexp"
@@ -669,14 +667,11 @@ func (e *Engine) checkBody(r *http.Request, clientIP, userAgent, url, method str
 		return nil
 	}
 
-	// 读取请求体
-	body, err := io.ReadAll(r.Body)
+	// 只扫描请求体前缀，避免大请求体在 WAF 主路径上被完整读入内存。
+	body, err := readRequestBodyPrefix(r, maxWAFBodyScanBytes)
 	if err != nil {
 		return nil
 	}
-
-	// 恢复请求体
-	r.Body = io.NopCloser(bytes.NewBuffer(body))
 
 	// 检查请求体内容
 	if len(body) > 0 {
