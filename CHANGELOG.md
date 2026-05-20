@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc41] - 2026-05-21
+
+### 🐛 Bug 修复
+
+- **GitHub Actions Yarn 初始化**：移除 `actions/setup-node` 的 Yarn 缓存配置，避免该 action 在 `corepack enable` 前调用全局 Yarn 1，导致 `packageManager: yarn@4.15.0` 校验失败。
+
 ## [2.0.0-rc40] - 2026-05-20
 
 ### 🐛 Bug 修复
