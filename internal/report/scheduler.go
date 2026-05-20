@@ -2,6 +2,7 @@ package report
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -14,6 +15,7 @@ type ReportScheduler struct {
 	config    *config.ReportConfig
 	log       *logrus.Entry
 	stopChan  chan struct{}
+	stopOnce  sync.Once
 }
 
 // NewReportScheduler 创建报告调度器
@@ -56,7 +58,9 @@ func (rs *ReportScheduler) Start() {
 // Stop 停止调度器
 func (rs *ReportScheduler) Stop() {
 	rs.log.Info("停止报告调度器")
-	close(rs.stopChan)
+	rs.stopOnce.Do(func() {
+		close(rs.stopChan)
+	})
 }
 
 // scheduleDailyReport 调度日报
@@ -78,7 +82,9 @@ func (rs *ReportScheduler) scheduleDailyReport() {
 	// 等待到第一次执行时间
 	waitDuration := time.Until(nextRun)
 	rs.log.Infof("日报将在 %s 后首次执行（%s）", waitDuration, nextRun.Format("2006-01-02 15:04:05"))
-	time.Sleep(waitDuration)
+	if !rs.waitForFirstRun(waitDuration, "日报") {
+		return
+	}
 
 	// 立即执行一次
 	rs.generateDailyReport()
@@ -129,7 +135,9 @@ func (rs *ReportScheduler) scheduleWeeklyReport() {
 	// 等待到第一次执行时间
 	waitDuration := time.Until(nextRun)
 	rs.log.Infof("周报将在 %s 后首次执行（%s）", waitDuration, nextRun.Format("2006-01-02 15:04:05"))
-	time.Sleep(waitDuration)
+	if !rs.waitForFirstRun(waitDuration, "周报") {
+		return
+	}
 
 	// 立即执行一次
 	rs.generateWeeklyReport()
@@ -180,7 +188,9 @@ func (rs *ReportScheduler) scheduleMonthlyReport() {
 	// 等待到第一次执行时间
 	waitDuration := time.Until(nextRun)
 	rs.log.Infof("月报将在 %s 后首次执行（%s）", waitDuration, nextRun.Format("2006-01-02 15:04:05"))
-	time.Sleep(waitDuration)
+	if !rs.waitForFirstRun(waitDuration, "月报") {
+		return
+	}
 
 	// 立即执行一次
 	rs.generateMonthlyReport()
@@ -204,6 +214,23 @@ func (rs *ReportScheduler) scheduleMonthlyReport() {
 			rs.log.Info("月报调度已停止")
 			return
 		}
+	}
+}
+
+func (rs *ReportScheduler) waitForFirstRun(waitDuration time.Duration, reportName string) bool {
+	if waitDuration <= 0 {
+		return true
+	}
+
+	timer := time.NewTimer(waitDuration)
+	defer timer.Stop()
+
+	select {
+	case <-timer.C:
+		return true
+	case <-rs.stopChan:
+		rs.log.Infof("%s调度已停止", reportName)
+		return false
 	}
 }
 
@@ -288,4 +315,3 @@ func (rs *ReportScheduler) parseWeekday(dayStr string) time.Weekday {
 		return time.Monday // 默认周一
 	}
 }
-

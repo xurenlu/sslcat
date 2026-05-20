@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc34] - 2026-05-20
+
+### 🐛 Bug 修复
+
+- **报告调度器关闭可靠性**：日报、周报和月报首次执行前的等待改为可被 Stop 中断，并将调度器 Stop 改为幂等，避免服务停止或热重载时报告 goroutine 长时间滞留或重复关闭 panic。
+
 ## [2.0.0-rc33] - 2026-05-20
 
 ### 🐛 Bug 修复
