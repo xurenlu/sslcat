@@ -72,6 +72,7 @@ type wafMultiDimBlocker struct {
 	log           *logrus.Entry
 	cleanupTicker *time.Ticker
 	stopChan      chan struct{}
+	stopOnce      sync.Once
 
 	// 白名单检查函数（可选）
 	whitelistChecker func(ip string) bool
@@ -584,12 +585,14 @@ func (b *wafMultiDimBlocker) doCleanup() {
 
 // Stop 停止封禁器
 func (b *wafMultiDimBlocker) Stop() {
-	if b.stopChan != nil {
-		close(b.stopChan)
-	}
-	if b.cleanupTicker != nil {
-		b.cleanupTicker.Stop()
-	}
+	b.stopOnce.Do(func() {
+		if b.stopChan != nil {
+			close(b.stopChan)
+		}
+		if b.cleanupTicker != nil {
+			b.cleanupTicker.Stop()
+		}
+	})
 }
 
 // getIPSubnet 获取 IP 所属的网段

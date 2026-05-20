@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc32] - 2026-05-20
+
+### 🐛 Bug 修复
+
+- **WAF 关闭路径可靠性**：WAF 引擎、日志限流器、旧版频率限制器和多维封禁器的 Stop 改为幂等，并在引擎停止时同步停止多维封禁器清理 goroutine，降低热重载或重复关闭时 panic 与 goroutine 泄漏风险。
+
 ## [2.0.0-rc31] - 2026-05-20
 
 ### 🐛 Bug 修复

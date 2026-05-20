@@ -92,6 +92,7 @@ type Engine struct {
 	// 事件清理定时器
 	cleanupTicker *time.Ticker
 	stopChan      chan struct{}
+	stopOnce      sync.Once
 
 	// 多维度封禁器（替代原有的 rateLimiter）
 	multiDimBlocker *wafMultiDimBlocker
@@ -210,12 +211,17 @@ func (e *Engine) cleanupOldEvents() {
 
 // Stop 停止WAF引擎（用于优雅关闭）
 func (e *Engine) Stop() {
-	if e.stopChan != nil {
-		close(e.stopChan)
-	}
-	if e.logLimiter != nil {
-		e.logLimiter.Stop()
-	}
+	e.stopOnce.Do(func() {
+		if e.stopChan != nil {
+			close(e.stopChan)
+		}
+		if e.logLimiter != nil {
+			e.logLimiter.Stop()
+		}
+		if e.multiDimBlocker != nil {
+			e.multiDimBlocker.Stop()
+		}
+	})
 }
 
 // initDefaultRules 初始化默认规则
@@ -1047,6 +1053,7 @@ type wafLogRateLimiter struct {
 	window        time.Duration        // 时间窗口
 	cleanupTicker *time.Ticker
 	stopChan      chan struct{}
+	stopOnce      sync.Once
 	totalLogs     int64 // 总日志数（原子操作）
 	skippedLogs   int64 // 跳过的日志数（原子操作）
 }
@@ -1122,9 +1129,11 @@ func (rl *wafLogRateLimiter) cleanup() {
 
 // Stop 停止日志限流器
 func (rl *wafLogRateLimiter) Stop() {
-	if rl.stopChan != nil {
-		close(rl.stopChan)
-	}
+	rl.stopOnce.Do(func() {
+		if rl.stopChan != nil {
+			close(rl.stopChan)
+		}
+	})
 }
 
 // wafRateLimiter WAF 频率限制器
@@ -1138,6 +1147,7 @@ type wafRateLimiter struct {
 	blockDuration time.Duration // 封禁时长
 	cleanupTicker *time.Ticker
 	stopChan      chan struct{}
+	stopOnce      sync.Once
 	log           *logrus.Entry
 }
 
@@ -1330,10 +1340,12 @@ func (rl *wafRateLimiter) doCleanup() {
 
 // Stop 停止频率限制器
 func (rl *wafRateLimiter) Stop() {
-	if rl.stopChan != nil {
-		close(rl.stopChan)
-	}
-	if rl.cleanupTicker != nil {
-		rl.cleanupTicker.Stop()
-	}
+	rl.stopOnce.Do(func() {
+		if rl.stopChan != nil {
+			close(rl.stopChan)
+		}
+		if rl.cleanupTicker != nil {
+			rl.cleanupTicker.Stop()
+		}
+	})
 }
