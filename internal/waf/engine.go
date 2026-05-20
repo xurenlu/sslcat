@@ -402,28 +402,29 @@ func (e *Engine) AddRule(rule *Rule) error {
 		return fmt.Errorf("编译正则表达式失败: %w", err)
 	}
 
-	rule.Regex = regex
+	ruleCopy := *rule
+	ruleCopy.Regex = regex
 
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
-	e.rules[rule.ID] = rule
+	e.rules[ruleCopy.ID] = &ruleCopy
 
 	// 按类型分类
-	switch rule.Type {
+	switch ruleCopy.Type {
 	case RuleTypeSQLInjection:
-		e.sqlPatterns = append(e.sqlPatterns, rule)
+		e.sqlPatterns = append(e.sqlPatterns, &ruleCopy)
 	case RuleTypeXSS:
-		e.xssPatterns = append(e.xssPatterns, rule)
+		e.xssPatterns = append(e.xssPatterns, &ruleCopy)
 	case RuleTypePathTraversal:
-		e.pathPatterns = append(e.pathPatterns, rule)
+		e.pathPatterns = append(e.pathPatterns, &ruleCopy)
 	case RuleTypeCommandInjection:
-		e.cmdPatterns = append(e.cmdPatterns, rule)
+		e.cmdPatterns = append(e.cmdPatterns, &ruleCopy)
 	case RuleTypeSensitiveFile, RuleTypeScannerDetection:
 		// 敏感文件和扫描工具检测规则使用自定义规则存储
-		e.customRules = append(e.customRules, rule)
+		e.customRules = append(e.customRules, &ruleCopy)
 	case RuleTypeCustom:
-		e.customRules = append(e.customRules, rule)
+		e.customRules = append(e.customRules, &ruleCopy)
 	}
 
 	return nil
@@ -461,7 +462,8 @@ func (e *Engine) CheckRequest(r *http.Request) (*AttackEvent, bool) {
 
 // CheckRequestWithTLS 检查请求（带 TLS 指纹）
 func (e *Engine) CheckRequestWithTLS(r *http.Request, tlsFingerprint string) (*AttackEvent, bool) {
-	if !e.enabled {
+	enabled, rules := e.snapshotRules()
+	if !enabled {
 		return nil, false
 	}
 
@@ -497,25 +499,22 @@ func (e *Engine) CheckRequestWithTLS(r *http.Request, tlsFingerprint string) (*A
 		return nil, false
 	}
 
-	// 使用读锁进行检测
-	e.mutex.RLock()
 	var event *AttackEvent
 
 	// 1. 检查URL路径（敏感文件检测）
-	if event = e.checkURLPath(r, clientIP, userAgent, url, method); event == nil {
+	if event = e.checkURLPath(rules, r, clientIP, userAgent, url, method); event == nil {
 		// 2. 检查User-Agent（扫描工具检测）
-		if event = e.checkUserAgent(r, clientIP, userAgent, url, method); event == nil {
+		if event = e.checkUserAgent(rules, r, clientIP, userAgent, url, method); event == nil {
 			// 3. 检查URL参数
-			if event = e.checkURLParams(r, clientIP, userAgent, url, method); event == nil {
+			if event = e.checkURLParams(rules, r, clientIP, userAgent, url, method); event == nil {
 				// 4. 检查请求头
-				if event = e.checkHeaders(r, clientIP, userAgent, url, method); event == nil {
+				if event = e.checkHeaders(rules, r, clientIP, userAgent, url, method); event == nil {
 					// 5. 检查请求体
-					event = e.checkBody(r, clientIP, userAgent, url, method)
+					event = e.checkBody(rules, r, clientIP, userAgent, url, method)
 				}
 			}
 		}
 	}
-	e.mutex.RUnlock()
 
 	// 如果检测到攻击，在释放读锁后添加事件
 	if event != nil {
@@ -532,15 +531,28 @@ func (e *Engine) CheckRequestWithTLS(r *http.Request, tlsFingerprint string) (*A
 	return nil, false
 }
 
+func (e *Engine) snapshotRules() (bool, []*Rule) {
+	e.mutex.RLock()
+	defer e.mutex.RUnlock()
+
+	rules := make([]*Rule, 0, len(e.rules))
+	for _, rule := range e.rules {
+		ruleCopy := *rule
+		rules = append(rules, &ruleCopy)
+	}
+
+	return e.enabled, rules
+}
+
 // checkURLPath 检查URL路径
-func (e *Engine) checkURLPath(r *http.Request, clientIP, userAgent, url, method string) *AttackEvent {
+func (e *Engine) checkURLPath(rules []*Rule, r *http.Request, clientIP, userAgent, url, method string) *AttackEvent {
 	path := r.URL.Path
 	if path == "" {
 		path = "/"
 	}
 
 	// 检查敏感文件路径规则
-	for _, rule := range e.rules {
+	for _, rule := range rules {
 		if !rule.Enabled {
 			continue
 		}
@@ -584,13 +596,13 @@ func (e *Engine) checkURLPath(r *http.Request, clientIP, userAgent, url, method 
 }
 
 // checkUserAgent 检查User-Agent
-func (e *Engine) checkUserAgent(r *http.Request, clientIP, userAgent, url, method string) *AttackEvent {
+func (e *Engine) checkUserAgent(rules []*Rule, r *http.Request, clientIP, userAgent, url, method string) *AttackEvent {
 	if userAgent == "" {
 		return nil
 	}
 
 	// 检查扫描工具User-Agent规则
-	for _, rule := range e.rules {
+	for _, rule := range rules {
 		if !rule.Enabled {
 			continue
 		}
@@ -630,13 +642,13 @@ func (e *Engine) checkUserAgent(r *http.Request, clientIP, userAgent, url, metho
 }
 
 // checkURLParams 检查URL参数
-func (e *Engine) checkURLParams(r *http.Request, clientIP, userAgent, url, method string) *AttackEvent {
+func (e *Engine) checkURLParams(rules []*Rule, r *http.Request, clientIP, userAgent, url, method string) *AttackEvent {
 	params := r.URL.Query()
 
 	for key, values := range params {
 		for _, value := range values {
 			payload := key + "=" + value
-			if event := e.matchRules(payload, clientIP, userAgent, url, method); event != nil {
+			if event := e.matchRules(rules, payload, clientIP, userAgent, url, method); event != nil {
 				return event
 			}
 		}
@@ -646,13 +658,13 @@ func (e *Engine) checkURLParams(r *http.Request, clientIP, userAgent, url, metho
 }
 
 // checkHeaders 检查请求头（注意：不检查 command_injection 类型规则，因为请求头中可能包含合法的命令展示内容）
-func (e *Engine) checkHeaders(r *http.Request, clientIP, userAgent, url, method string) *AttackEvent {
+func (e *Engine) checkHeaders(rules []*Rule, r *http.Request, clientIP, userAgent, url, method string) *AttackEvent {
 	for key, values := range r.Header {
 		for _, value := range values {
 			payload := key + ": " + value
 			// 跳过 command_injection 类型的规则检查，避免误判
 			// 命令注入应该只检查用户可控的输入（Query String 和 Body）
-			if event := e.matchRulesExceptCommandInjection(payload, clientIP, userAgent, url, method); event != nil {
+			if event := e.matchRulesExceptCommandInjection(rules, payload, clientIP, userAgent, url, method); event != nil {
 				return event
 			}
 		}
@@ -662,7 +674,7 @@ func (e *Engine) checkHeaders(r *http.Request, clientIP, userAgent, url, method 
 }
 
 // checkBody 检查请求体
-func (e *Engine) checkBody(r *http.Request, clientIP, userAgent, url, method string) *AttackEvent {
+func (e *Engine) checkBody(rules []*Rule, r *http.Request, clientIP, userAgent, url, method string) *AttackEvent {
 	if r.Body == nil {
 		return nil
 	}
@@ -676,7 +688,7 @@ func (e *Engine) checkBody(r *http.Request, clientIP, userAgent, url, method str
 	// 检查请求体内容
 	if len(body) > 0 {
 		payload := string(body)
-		if event := e.matchRules(payload, clientIP, userAgent, url, method); event != nil {
+		if event := e.matchRules(rules, payload, clientIP, userAgent, url, method); event != nil {
 			return event
 		}
 
@@ -686,7 +698,7 @@ func (e *Engine) checkBody(r *http.Request, clientIP, userAgent, url, method str
 				for key, vals := range values {
 					for _, val := range vals {
 						formPayload := key + "=" + val
-						if event := e.matchRules(formPayload, clientIP, userAgent, url, method); event != nil {
+						if event := e.matchRules(rules, formPayload, clientIP, userAgent, url, method); event != nil {
 							return event
 						}
 					}
@@ -699,9 +711,9 @@ func (e *Engine) checkBody(r *http.Request, clientIP, userAgent, url, method str
 }
 
 // matchRules 匹配规则
-func (e *Engine) matchRules(payload, clientIP, userAgent, url, method string) *AttackEvent {
+func (e *Engine) matchRules(rules []*Rule, payload, clientIP, userAgent, url, method string) *AttackEvent {
 	// 对所有启用的规则进行匹配
-	for _, rule := range e.rules {
+	for _, rule := range rules {
 		if !rule.Enabled {
 			continue
 		}
@@ -978,9 +990,9 @@ func (e *Engine) SetWhitelistChecker(checker func(ip string) bool) {
 
 // matchRulesExceptCommandInjection 匹配规则（排除命令注入类型）
 // 用于检查请求头等不应该触发命令注入检测的地方
-func (e *Engine) matchRulesExceptCommandInjection(payload, clientIP, userAgent, url, method string) *AttackEvent {
+func (e *Engine) matchRulesExceptCommandInjection(rules []*Rule, payload, clientIP, userAgent, url, method string) *AttackEvent {
 	// 对所有启用的规则进行匹配
-	for _, rule := range e.rules {
+	for _, rule := range rules {
 		if !rule.Enabled {
 			continue
 		}

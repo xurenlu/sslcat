@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc31] - 2026-05-20
+
+### 🐛 Bug 修复
+
+- **WAF 锁粒度优化**：WAF 请求检测改为先复制规则快照再释放规则锁，避免慢请求体读取期间持有读锁，降低规则更新、事件清理和后续请求在高并发下排队变慢的风险。
+
 ## [2.0.0-rc30] - 2026-05-20
 
 ### 🐛 Bug 修复
