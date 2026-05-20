@@ -74,13 +74,23 @@ func (ts *TokenStore) load() error {
 
 func (ts *TokenStore) save() error {
 	ts.mu.RLock()
-	defer ts.mu.RUnlock()
+	arr := ts.snapshotLocked()
+	ts.mu.RUnlock()
+
+	return ts.saveSnapshot(arr)
+}
+
+func (ts *TokenStore) snapshotLocked() []APIToken {
 	// stable order
 	arr := make([]APIToken, 0, len(ts.tokens))
 	for _, t := range ts.tokens {
 		arr = append(arr, t)
 	}
 	sort.Slice(arr, func(i, j int) bool { return arr[i].CreatedAt.Before(arr[j].CreatedAt) })
+	return arr
+}
+
+func (ts *TokenStore) saveSnapshot(arr []APIToken) error {
 	b, err := json.MarshalIndent(arr, "", "  ")
 	if err != nil {
 		return err
@@ -88,7 +98,7 @@ func (ts *TokenStore) save() error {
 	if err := os.MkdirAll(filepath.Dir(ts.filePath), 0755); err != nil {
 		return err
 	}
-	return os.WriteFile(ts.filePath, b, 0600)
+	return writeFileAtomically(ts.filePath, b, 0600)
 }
 
 func (ts *TokenStore) Generate(role TokenRole, note string) (APIToken, error) {
@@ -104,8 +114,9 @@ func (ts *TokenStore) Generate(role TokenRole, note string) (APIToken, error) {
 	at := APIToken{Token: token, Role: role, CreatedAt: time.Now(), Note: strings.TrimSpace(note)}
 	ts.mu.Lock()
 	ts.tokens[token] = at
+	snapshot := ts.snapshotLocked()
 	ts.mu.Unlock()
-	if err := ts.save(); err != nil {
+	if err := ts.saveSnapshot(snapshot); err != nil {
 		return APIToken{}, err
 	}
 	return at, nil
@@ -124,12 +135,14 @@ func (ts *TokenStore) List() []APIToken {
 
 func (ts *TokenStore) Delete(token string) bool {
 	ts.mu.Lock()
-	defer ts.mu.Unlock()
 	if _, ok := ts.tokens[token]; ok {
 		delete(ts.tokens, token)
-		_ = ts.save()
+		snapshot := ts.snapshotLocked()
+		ts.mu.Unlock()
+		_ = ts.saveSnapshot(snapshot)
 		return true
 	}
+	ts.mu.Unlock()
 	return false
 }
 

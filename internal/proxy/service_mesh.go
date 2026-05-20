@@ -21,17 +21,17 @@ import (
 type ServiceMeshType string
 
 const (
-	ServiceMeshNone    ServiceMeshType = "none"     // 无 Service Mesh
-	ServiceMeshIstio   ServiceMeshType = "istio"    // Istio
-	ServiceMeshLinkerd ServiceMeshType = "linkerd"  // Linkerd
-	ServiceMeshConsul  ServiceMeshType = "consul"   // Consul Connect
-	ServiceMeshCustom  ServiceMeshType = "custom"   // 自定义
+	ServiceMeshNone    ServiceMeshType = "none"    // 无 Service Mesh
+	ServiceMeshIstio   ServiceMeshType = "istio"   // Istio
+	ServiceMeshLinkerd ServiceMeshType = "linkerd" // Linkerd
+	ServiceMeshConsul  ServiceMeshType = "consul"  // Consul Connect
+	ServiceMeshCustom  ServiceMeshType = "custom"  // 自定义
 )
 
 // ServiceMeshConfig Service Mesh 配置
 type ServiceMeshConfig struct {
-	Enabled bool             `json:"enabled"`
-	Type    ServiceMeshType  `json:"type"`
+	Enabled bool            `json:"enabled"`
+	Type    ServiceMeshType `json:"type"`
 	// Istio 配置
 	Istio *IstioConfig `json:"istio,omitempty"`
 	// Linkerd 配置
@@ -39,11 +39,11 @@ type ServiceMeshConfig struct {
 	// Consul 配置
 	Consul *ConsulConfig `json:"consul,omitempty"`
 	// 通用配置
- ControlPlaneURL string        `json:"control_plane_url"`
+	ControlPlaneURL string        `json:"control_plane_url"`
 	DiscoveryURL    string        `json:"discovery_url"`
 	SidecarMode     bool          `json:"sidecar_mode"`
-	SidecarPort     int           `json:"sidecar_port"`     // sidecar 代理端口，默认 15001
-	EnablemTLS      bool          `json:"enable_mtls"`      // 启用 mesh mTLS
+	SidecarPort     int           `json:"sidecar_port"` // sidecar 代理端口，默认 15001
+	EnablemTLS      bool          `json:"enable_mtls"`  // 启用 mesh mTLS
 	ConnectTimeout  time.Duration `json:"connect_timeout"`
 	RequestTimeout  time.Duration `json:"request_timeout"`
 	// 服务发现配置
@@ -67,142 +67,143 @@ type IstioConfig struct {
 // LinkerdConfig Linkerd 特定配置
 type LinkerdConfig struct {
 	ControlPlaneURL string `json:"control_plane_url"` // linkerd.istio-system:8088
-	ProxyAPIURL     string `json:"proxy_api_url"`    // linkerd-proxy:4191
-	EnableIdentity  bool   `json:"enable_identity"`  // 启用 SPIFFE 身份
+	ProxyAPIURL     string `json:"proxy_api_url"`     // linkerd-proxy:4191
+	EnableIdentity  bool   `json:"enable_identity"`   // 启用 SPIFFE 身份
 }
 
 // ConsulConfig Consul Connect 特定配置
 type ConsulConfig struct {
-	Address      string `json:"address"`       // consul.default.svc:8500
-	Token        string `json:"token"`        // ACL token
-	Datacenter   string `json:"datacenter"`   // 数据中心名称
-	Namespace    string `json:"namespace"`    // 命名空间
-	ConnectCA    string `json:"connect_ca"`   // CA 路径
-	EnableTLS    bool   `json:"enable_tls"`
-	TLSSkipVerify bool  `json:"tls_skip_verify"`
+	Address       string `json:"address"`    // consul.default.svc:8500
+	Token         string `json:"token"`      // ACL token
+	Datacenter    string `json:"datacenter"` // 数据中心名称
+	Namespace     string `json:"namespace"`  // 命名空间
+	ConnectCA     string `json:"connect_ca"` // CA 路径
+	EnableTLS     bool   `json:"enable_tls"`
+	TLSSkipVerify bool   `json:"tls_skip_verify"`
 }
 
 // ServiceDiscoveryConfig 服务发现配置
 type ServiceDiscoveryConfig struct {
-	Enabled          bool          `json:"enabled"`
-	Type             string        `json:"type"`              // dns, consul, kubernetes, etcd
-	RefreshInterval  time.Duration `json:"refresh_interval"`  // 刷新间隔
-	HealthCheck      bool          `json:"health_check"`      // 启用健康检查
-	HealthCheckPath  string        `json:"health_check_path"` // 健康检查路径
+	Enabled             bool          `json:"enabled"`
+	Type                string        `json:"type"`              // dns, consul, kubernetes, etcd
+	RefreshInterval     time.Duration `json:"refresh_interval"`  // 刷新间隔
+	HealthCheck         bool          `json:"health_check"`      // 启用健康检查
+	HealthCheckPath     string        `json:"health_check_path"` // 健康检查路径
 	HealthCheckInterval time.Duration `json:"health_check_interval"`
 	// 本地后端优先配置
-	LocalBackendFirst   bool `json:"local_backend_first"`   // 优先使用本地后端
+	LocalBackendFirst    bool `json:"local_backend_first"`     // 优先使用本地后端
 	AllowCrossNodeAccess bool `json:"allow_cross_node_access"` // 允许跨节点访问
 }
 
 // TrafficManagementConfig 流量管理配置
 type TrafficManagementConfig struct {
 	CircuitBreaking *CircuitBreakingConfig `json:"circuit_breaking,omitempty"`
-	Retry          *RetryConfig            `json:"retry,omitempty"`
-	Timeout        *TimeoutConfig          `json:"timeout,omitempty"`
-	RateLimiting   *RateLimitConfig        `json:"rate_limiting,omitempty"`
+	Retry           *RetryConfig           `json:"retry,omitempty"`
+	Timeout         *TimeoutConfig         `json:"timeout,omitempty"`
+	RateLimiting    *RateLimitConfig       `json:"rate_limiting,omitempty"`
 }
 
 // CircuitBreakingConfig 熔断配置
 type CircuitBreakingConfig struct {
-	Enabled                bool          `json:"enabled"`
-	MaxConnections         int           `json:"max_connections"`
-	MaxPendingRequests     int           `json:"max_pending_requests"`
-	MaxRequests            int           `json:"max_requests"`
-	MaxRetries             int           `json:"max_retries"`
-	ConsecutiveErrors      int           `json:"consecutive_errors"`      // 连续错误阈值
-	Interval               time.Duration `json:"interval"`                // 统计间隔
-	Timeout                time.Duration `json:"timeout"`                 // 熔断超时
-	SleepWindow            time.Duration `json:"sleep_window"`            // 恢复睡眠窗口
+	Enabled            bool          `json:"enabled"`
+	MaxConnections     int           `json:"max_connections"`
+	MaxPendingRequests int           `json:"max_pending_requests"`
+	MaxRequests        int           `json:"max_requests"`
+	MaxRetries         int           `json:"max_retries"`
+	ConsecutiveErrors  int           `json:"consecutive_errors"` // 连续错误阈值
+	Interval           time.Duration `json:"interval"`           // 统计间隔
+	Timeout            time.Duration `json:"timeout"`            // 熔断超时
+	SleepWindow        time.Duration `json:"sleep_window"`       // 恢复睡眠窗口
 }
 
 // RetryConfig 重试配置
 type RetryConfig struct {
-	Enabled         bool          `json:"enabled"`
-	MaxRetries      int           `json:"max_retries"`       // 最大重试次数
-	PerTryTimeout   time.Duration `json:"per_try_timeout"`   // 每次尝试超时
-	RetryOn         []string      `json:"retry_on"`          // 重试的 HTTP 状态码
-	RetryBackoff    time.Duration `json:"retry_backoff"`     // 重试退避时间
+	Enabled       bool          `json:"enabled"`
+	MaxRetries    int           `json:"max_retries"`     // 最大重试次数
+	PerTryTimeout time.Duration `json:"per_try_timeout"` // 每次尝试超时
+	RetryOn       []string      `json:"retry_on"`        // 重试的 HTTP 状态码
+	RetryBackoff  time.Duration `json:"retry_backoff"`   // 重试退避时间
 }
 
 // TimeoutConfig 超时配置
 type TimeoutConfig struct {
-	RequestTimeout  time.Duration `json:"request_timeout"`
-	IdleTimeout     time.Duration `json:"idle_timeout"`
+	RequestTimeout time.Duration `json:"request_timeout"`
+	IdleTimeout    time.Duration `json:"idle_timeout"`
 }
 
 // RateLimitConfig 限流配置
 type RateLimitConfig struct {
-	Enabled     bool          `json:"enabled"`
-	RequestsPerUnit int       `json:"requests_per_unit"`
-	Unit        time.Duration `json:"unit"`        // second, minute, hour
-	Burst       int           `json:"burst"`
+	Enabled         bool          `json:"enabled"`
+	RequestsPerUnit int           `json:"requests_per_unit"`
+	Unit            time.Duration `json:"unit"` // second, minute, hour
+	Burst           int           `json:"burst"`
 }
 
 // ServiceInfo 服务信息
 type ServiceInfo struct {
-	Name       string            `json:"name"`
-	Namespace  string            `json:"namespace"`
-	Address    string            `json:"address"`
-	Port       int               `json:"port"`
-	Protocol   string            `json:"protocol"`    // http, https, grpc
-	Metadata   map[string]string `json:"metadata"`
-	Labels     map[string]string `json:"labels"`
-	Healthy    bool              `json:"healthy"`
-	LastCheck  time.Time         `json:"last_check"`
-	Version    string            `json:"version"`
-	Cluster    string            `json:"cluster"`
+	Name      string            `json:"name"`
+	Namespace string            `json:"namespace"`
+	Address   string            `json:"address"`
+	Port      int               `json:"port"`
+	Protocol  string            `json:"protocol"` // http, https, grpc
+	Metadata  map[string]string `json:"metadata"`
+	Labels    map[string]string `json:"labels"`
+	Healthy   bool              `json:"healthy"`
+	LastCheck time.Time         `json:"last_check"`
+	Version   string            `json:"version"`
+	Cluster   string            `json:"cluster"`
 }
 
 // ServiceMeshManager Service Mesh 管理器
 type ServiceMeshManager struct {
-	config         *ServiceMeshConfig
-	log            *logrus.Entry
-	proxyManager   *Manager
-	configManager  *config.Config
+	config        *ServiceMeshConfig
+	log           *logrus.Entry
+	proxyManager  *Manager
+	configManager *config.Config
 
 	// 服务发现
-	serviceCache    map[string][]*ServiceInfo
-	serviceMutex    sync.RWMutex
+	serviceCache map[string][]*ServiceInfo
+	serviceMutex sync.RWMutex
 
 	// Circuit Breaker 状态
-	breakerStates   map[string]*CircuitBreakerState
-	breakerMutex    sync.RWMutex
+	breakerStates map[string]*CircuitBreakerState
+	breakerMutex  sync.RWMutex
 
 	// 统计信息
-	stats           ServiceMeshStats
-	statsMutex      sync.RWMutex
+	stats      ServiceMeshStats
+	statsMutex sync.RWMutex
 
 	// HTTP 客户端（用于调用 mesh API）
-	httpClient      *http.Client
-	transport       *http.Transport
+	httpClient *http.Client
+	transport  *http.Transport
 
 	// 健康检查
 	stopHealthCheck chan struct{}
+	stopOnce        sync.Once
 }
 
 // CircuitBreakerState 熔断器状态
 type CircuitBreakerState struct {
-	Name            string        `json:"name"`
-	State           string        `json:"state"`           // closed, open, half-open
-	ConsecutiveErrors int         `json:"consecutive_errors"`
-	LastStateChange  time.Time    `json:"last_state_change"`
-	LastErrorTime    time.Time    `json:"last_error_time"`
-	LastError        string       `json:"last_error"`
-	RequestsTotal    int64        `json:"requests_total"`
-	RequestsFailed   int64        `json:"requests_failed"`
+	Name              string    `json:"name"`
+	State             string    `json:"state"` // closed, open, half-open
+	ConsecutiveErrors int       `json:"consecutive_errors"`
+	LastStateChange   time.Time `json:"last_state_change"`
+	LastErrorTime     time.Time `json:"last_error_time"`
+	LastError         string    `json:"last_error"`
+	RequestsTotal     int64     `json:"requests_total"`
+	RequestsFailed    int64     `json:"requests_failed"`
 }
 
 // ServiceMeshStats Service Mesh 统计
 type ServiceMeshStats struct {
-	ServicesDiscovered int       `json:"services_discovered"`
-	RequestsViaMesh    int64     `json:"requests_via_mesh"`
-	RequestsDirect     int64     `json:"requests_direct"`
-	RetriesAttempted   int64     `json:"retries_attempted"`
-	CircuitBreakerTrips int64    `json:"circuit_breaker_trips"`
-	LastDiscoveryTime  time.Time `json:"last_discovery_time"`
-	MeshAPICalls       int64     `json:"mesh_api_calls"`
-	MeshAPIErrors      int64     `json:"mesh_api_errors"`
+	ServicesDiscovered  int       `json:"services_discovered"`
+	RequestsViaMesh     int64     `json:"requests_via_mesh"`
+	RequestsDirect      int64     `json:"requests_direct"`
+	RetriesAttempted    int64     `json:"retries_attempted"`
+	CircuitBreakerTrips int64     `json:"circuit_breaker_trips"`
+	LastDiscoveryTime   time.Time `json:"last_discovery_time"`
+	MeshAPICalls        int64     `json:"mesh_api_calls"`
+	MeshAPIErrors       int64     `json:"mesh_api_errors"`
 }
 
 // NewServiceMeshManager 创建 Service Mesh 管理器
@@ -228,7 +229,7 @@ func NewServiceMeshManager(cfg *ServiceMeshConfig, proxyMgr *Manager, configMgr 
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 		// 支持 HTTP/2
-		ForceAttemptHTTP2:     true,
+		ForceAttemptHTTP2: true,
 	}
 
 	// 配置 HTTP/2
@@ -237,12 +238,12 @@ func NewServiceMeshManager(cfg *ServiceMeshConfig, proxyMgr *Manager, configMgr 
 	}
 
 	mgr := &ServiceMeshManager{
-		config:          cfg,
-		log:             log,
-		proxyManager:    proxyMgr,
-		configManager:   configMgr,
-		serviceCache:    make(map[string][]*ServiceInfo),
-		breakerStates:   make(map[string]*CircuitBreakerState),
+		config:        cfg,
+		log:           log,
+		proxyManager:  proxyMgr,
+		configManager: configMgr,
+		serviceCache:  make(map[string][]*ServiceInfo),
+		breakerStates: make(map[string]*CircuitBreakerState),
 		httpClient: &http.Client{
 			Transport: transport,
 			Timeout:   cfg.RequestTimeout,
@@ -406,15 +407,15 @@ func (m *ServiceMeshManager) getConsulServiceHealth(serviceName string) ([]*Serv
 	defer resp.Body.Close()
 
 	var healthChecks []struct {
-		Node    struct {
+		Node struct {
 			Address string `json:"Address"`
 		} `json:"Node"`
 		Service struct {
-			ID      string `json:"ID"`
-			Service string `json:"Service"`
+			ID      string   `json:"ID"`
+			Service string   `json:"Service"`
 			Tags    []string `json:"Tags"`
-			Address string `json:"Address"`
-			Port    int    `json:"Port"`
+			Address string   `json:"Address"`
+			Port    int      `json:"Port"`
 		} `json:"Service"`
 		Checks []struct {
 			Status string `json:"Status"`
@@ -717,8 +718,8 @@ func (m *ServiceMeshManager) ProxyViaMesh(req *http.Request) (*http.Response, er
 // checkCircuitBreaker 检查熔断器
 func (m *ServiceMeshManager) checkCircuitBreaker(service string) error {
 	if m.config.TrafficManagement == nil ||
-	   m.config.TrafficManagement.CircuitBreaking == nil ||
-	   !m.config.TrafficManagement.CircuitBreaking.Enabled {
+		m.config.TrafficManagement.CircuitBreaking == nil ||
+		!m.config.TrafficManagement.CircuitBreaking.Enabled {
 		return nil
 	}
 
@@ -728,9 +729,9 @@ func (m *ServiceMeshManager) checkCircuitBreaker(service string) error {
 	state, exists := m.breakerStates[service]
 	if !exists {
 		state = &CircuitBreakerState{
-			Name:             service,
-			State:            "closed",
-			LastStateChange:  time.Now(),
+			Name:            service,
+			State:           "closed",
+			LastStateChange: time.Now(),
 		}
 		m.breakerStates[service] = state
 	}
@@ -755,8 +756,8 @@ func (m *ServiceMeshManager) checkCircuitBreaker(service string) error {
 // recordRequestResult 记录请求结果（用于熔断器）
 func (m *ServiceMeshManager) recordRequestResult(service string, success bool) {
 	if m.config.TrafficManagement == nil ||
-	   m.config.TrafficManagement.CircuitBreaking == nil ||
-	   !m.config.TrafficManagement.CircuitBreaking.Enabled {
+		m.config.TrafficManagement.CircuitBreaking == nil ||
+		!m.config.TrafficManagement.CircuitBreaking.Enabled {
 		return
 	}
 
@@ -920,8 +921,8 @@ func (m *ServiceMeshManager) proxyViaSidecar(req *http.Request) (*http.Response,
 // shouldRetry 判断是否应该重试
 func (m *ServiceMeshManager) shouldRetry(resp *http.Response) bool {
 	if m.config.TrafficManagement == nil ||
-	   m.config.TrafficManagement.Retry == nil ||
-	   !m.config.TrafficManagement.Retry.Enabled {
+		m.config.TrafficManagement.Retry == nil ||
+		!m.config.TrafficManagement.Retry.Enabled {
 		return false
 	}
 
@@ -1022,7 +1023,9 @@ func (m *ServiceMeshManager) Stop() {
 		return
 	}
 
-	close(m.stopHealthCheck)
+	m.stopOnce.Do(func() {
+		close(m.stopHealthCheck)
+	})
 	m.log.Info("Service Mesh manager stopped")
 }
 

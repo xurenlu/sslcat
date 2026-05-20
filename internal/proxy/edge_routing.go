@@ -15,17 +15,17 @@ import (
 
 // EdgeLocation 边缘节点位置
 type EdgeLocation struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Region      string  `json:"region"`       // us-east, us-west, eu-central, ap-southeast, etc.
-	Country     string  `json:"country"`
-	City        string  `json:"city"`
-	Latitude    float64 `json:"latitude"`
-	Longitude   float64 `json:"longitude"`
-	Priority    int     `json:"priority"`     // 路由优先级，数字越小优先级越高
-	Enabled     bool    `json:"enabled"`
-	HealthCheck string  `json:"health_check"` // 健康检查URL
-	Healthy     bool    `json:"healthy"`      // 当前健康状态
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Region      string    `json:"region"` // us-east, us-west, eu-central, ap-southeast, etc.
+	Country     string    `json:"country"`
+	City        string    `json:"city"`
+	Latitude    float64   `json:"latitude"`
+	Longitude   float64   `json:"longitude"`
+	Priority    int       `json:"priority"` // 路由优先级，数字越小优先级越高
+	Enabled     bool      `json:"enabled"`
+	HealthCheck string    `json:"health_check"` // 健康检查URL
+	Healthy     bool      `json:"healthy"`      // 当前健康状态
 	LastCheck   time.Time `json:"last_check"`
 }
 
@@ -40,24 +40,24 @@ type EdgeCluster struct {
 
 // EdgeRoutingConfig 边缘路由配置
 type EdgeRoutingConfig struct {
-	Enabled           bool          `json:"enabled"`
-	DefaultClusterID  string        `json:"default_cluster_id"`
-	FallbackStrategy  string        `json:"fallback_strategy"`  // local, any, closest
+	Enabled             bool          `json:"enabled"`
+	DefaultClusterID    string        `json:"default_cluster_id"`
+	FallbackStrategy    string        `json:"fallback_strategy"` // local, any, closest
 	HealthCheckInterval time.Duration `json:"health_check_interval"`
 	HealthCheckTimeout  time.Duration `json:"health_check_timeout"`
-	MaxRetries        int           `json:"max_retries"`
-	RetryDelay        time.Duration `json:"retry_delay"`
-	LatencyThreshold  time.Duration `json:"latency_threshold"` // 延迟阈值，超过则认为节点不健康
+	MaxRetries          int           `json:"max_retries"`
+	RetryDelay          time.Duration `json:"retry_delay"`
+	LatencyThreshold    time.Duration `json:"latency_threshold"` // 延迟阈值，超过则认为节点不健康
 }
 
 // EdgeRoutingMetrics 边缘路由指标
 type EdgeRoutingMetrics struct {
-	TotalRequests     int64         `json:"total_requests"`
-	RequestsByRegion  map[string]int64 `json:"requests_by_region"`
-	RequestsByCluster map[string]int64 `json:"requests_by_cluster"`
-	AvgLatency        map[string]time.Duration `json:"avg_latency"`
-	FailedRequests    int64         `json:"failed_requests"`
-	HealthCheckFailures int64       `json:"health_check_failures"`
+	TotalRequests       int64                    `json:"total_requests"`
+	RequestsByRegion    map[string]int64         `json:"requests_by_region"`
+	RequestsByCluster   map[string]int64         `json:"requests_by_cluster"`
+	AvgLatency          map[string]time.Duration `json:"avg_latency"`
+	FailedRequests      int64                    `json:"failed_requests"`
+	HealthCheckFailures int64                    `json:"health_check_failures"`
 }
 
 // ClientLocation 客户端位置信息
@@ -74,29 +74,30 @@ type ClientLocation struct {
 
 // EdgeRoutingManager 边缘路由管理器
 type EdgeRoutingManager struct {
-	config      *EdgeRoutingConfig
-	clusters    map[string]*EdgeCluster
-	locations   map[string]*EdgeLocation
-	metrics     *EdgeRoutingMetrics
-	geoIPCache  map[string]*ClientLocation
-	client      *http.Client
-	log         *logrus.Entry
-	mutex       sync.RWMutex
-	stopChan    chan struct{}
-	manager     *Manager // 代理管理器引用
+	config     *EdgeRoutingConfig
+	clusters   map[string]*EdgeCluster
+	locations  map[string]*EdgeLocation
+	metrics    *EdgeRoutingMetrics
+	geoIPCache map[string]*ClientLocation
+	client     *http.Client
+	log        *logrus.Entry
+	mutex      sync.RWMutex
+	stopChan   chan struct{}
+	stopOnce   sync.Once
+	manager    *Manager // 代理管理器引用
 }
 
 // NewEdgeRoutingManager 创建边缘路由管理器
 func NewEdgeRoutingManager(config *EdgeRoutingConfig, manager *Manager) *EdgeRoutingManager {
 	if config == nil {
 		config = &EdgeRoutingConfig{
-			Enabled:            true,
-			FallbackStrategy:   "closest",
+			Enabled:             true,
+			FallbackStrategy:    "closest",
 			HealthCheckInterval: 30 * time.Second,
 			HealthCheckTimeout:  5 * time.Second,
-			MaxRetries:         3,
-			RetryDelay:         100 * time.Millisecond,
-			LatencyThreshold:   500 * time.Millisecond,
+			MaxRetries:          3,
+			RetryDelay:          100 * time.Millisecond,
+			LatencyThreshold:    500 * time.Millisecond,
 		}
 	}
 
@@ -145,18 +146,20 @@ func (m *EdgeRoutingManager) Start() error {
 // Stop 停止边缘路由管理器
 func (m *EdgeRoutingManager) Stop() {
 	m.log.Info("Stopping edge routing manager")
-	close(m.stopChan)
+	m.stopOnce.Do(func() {
+		close(m.stopChan)
+	})
 }
 
 // initDefaultEdges 初始化默认边缘节点
 func (m *EdgeRoutingManager) initDefaultEdges() {
 	// 创建默认集群
 	defaultCluster := &EdgeCluster{
-		ID:        "default",
-		Name:      "Default Edge Cluster",
-		Locations: []*EdgeLocation{},
+		ID:          "default",
+		Name:        "Default Edge Cluster",
+		Locations:   []*EdgeLocation{},
 		LoadBalance: "geo_proximity",
-		CreatedAt: time.Now(),
+		CreatedAt:   time.Now(),
 	}
 
 	// 添加默认边缘位置
@@ -194,7 +197,7 @@ func (m *EdgeRoutingManager) initDefaultEdges() {
 			Country:   "DE",
 			City:      "Frankfurt",
 			Latitude:  50.1109,
-			Longitude:  8.6821,
+			Longitude: 8.6821,
 			Priority:  3,
 			Enabled:   true,
 			Healthy:   true,
@@ -207,7 +210,7 @@ func (m *EdgeRoutingManager) initDefaultEdges() {
 			Country:   "SG",
 			City:      "Singapore",
 			Latitude:  1.3521,
-			Longitude:  103.8198,
+			Longitude: 103.8198,
 			Priority:  4,
 			Enabled:   true,
 			Healthy:   true,
@@ -220,7 +223,7 @@ func (m *EdgeRoutingManager) initDefaultEdges() {
 			Country:   "JP",
 			City:      "Tokyo",
 			Latitude:  35.6762,
-			Longitude:  139.6503,
+			Longitude: 139.6503,
 			Priority:  5,
 			Enabled:   true,
 			Healthy:   true,

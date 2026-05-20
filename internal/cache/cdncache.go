@@ -61,6 +61,7 @@ type CDNCache struct {
 	cleanerStarted         bool
 	periodicCleanerStarted bool
 	cleanerMutex           sync.Mutex
+	precompressSem         chan struct{}
 }
 
 type objectMeta struct {
@@ -91,6 +92,7 @@ func NewCDNCache(cfg *config.Config) *CDNCache {
 		mimeDetector:          mimeDetector,
 		stopProcessingCleaner: make(chan struct{}),
 		stopCleaner:           make(chan struct{}),
+		precompressSem:        make(chan struct{}, 2),
 	}
 
 	// 启动 processing map 清理器，防止内存泄漏
@@ -358,36 +360,17 @@ func (c *CDNCache) MaybeStoreWithConfig(resp *http.Response, forceEnabled bool) 
 		return
 	}
 
-	// 修復：使用流式處理 + 大小限制，避免大檔案占用過多記憶體
+	// 修復：使用大小限制，避免大檔案占用過多記憶體
 	filePath, metaPath := c.cachePaths(req)
 	_ = os.MkdirAll(filepath.Dir(filePath), 0755)
-
-	// 创建临时文件
-	tempFile, err := os.CreateTemp(filepath.Dir(filePath), ".cdn-tmp-*")
-	if err != nil {
-		c.log.Debugf("create temp file failed: %v", err)
-		c.cleanupProcessing(req)
-		return
-	}
-	tempPath := tempFile.Name()
-	defer func() {
-		tempFile.Close()
-		// 如果失败，清理临时文件
-		if _, err := os.Stat(tempPath); err == nil {
-			os.Remove(tempPath)
-		}
-	}()
 
 	// 使用 LimitedReader 限制读取大小，防止超大文件
 	limitedReader := &io.LimitedReader{R: resp.Body, N: maxObj + 1}
 
-	// 流式写入临时文件，同时保存到缓冲区用于重置响应体
 	var buf bytes.Buffer
-	teeReader := io.TeeReader(limitedReader, &buf)
-
-	written, err := io.Copy(tempFile, teeReader)
+	written, err := io.Copy(&buf, limitedReader)
 	if err != nil {
-		c.log.Debugf("write temp file failed: %v", err)
+		c.log.Debugf("read response body failed: %v", err)
 		c.cleanupProcessing(req)
 		return
 	}
@@ -403,12 +386,8 @@ func (c *CDNCache) MaybeStoreWithConfig(resp *http.Response, forceEnabled bool) 
 	data := buf.Bytes()
 	resp.Body = io.NopCloser(bytes.NewReader(data))
 
-	// 关闭临时文件，准备重命名
-	tempFile.Close()
-
-	// 重命名为正式缓存文件
-	if err := os.Rename(tempPath, filePath); err != nil {
-		c.log.Debugf("rename cache file failed: %v", err)
+	if err := writeCacheFileAtomically(filePath, data, 0644); err != nil {
+		c.log.Debugf("write cache file failed: %v", err)
 		c.cleanupProcessing(req)
 		return
 	}
@@ -711,7 +690,7 @@ func (c *CDNCache) writeMeta(metaPath string, m *objectMeta) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(metaPath, b, 0644)
+	return writeCacheFileAtomically(metaPath, b, 0644)
 }
 
 func (c *CDNCache) touch(metaPath string, m *objectMeta) {
@@ -1038,12 +1017,23 @@ func (c *CDNCache) serveWithAdvancedCompression(w http.ResponseWriter, r *http.R
 // generatePrecompressedFiles 生成预压缩文件（gzip 和 brotli）
 // 修复：在存储时生成，避免每次请求都压缩
 func (c *CDNCache) generatePrecompressedFiles(filePath string, data []byte) {
+	select {
+	case c.precompressSem <- struct{}{}:
+	default:
+		c.log.Debugf("CDN precompression busy, skipping: %s", filePath)
+		return
+	}
+
 	// 异步生成，不阻塞主流程
 	go func() {
+		defer func() {
+			<-c.precompressSem
+		}()
+
 		// 生成 gzip 版本
 		gzPath := filePath + ".gz"
 		if result, err := c.compressor.Compress(data, "gzip"); err == nil && result.Algorithm == compression.Gzip {
-			if err := os.WriteFile(gzPath, result.Data, 0644); err == nil {
+			if err := writeCacheFileAtomically(gzPath, result.Data, 0644); err == nil {
 				c.log.Debugf("Generated precompressed gzip: %s (%d -> %d bytes, %.1f%% reduction)",
 					gzPath, result.OriginalSize, result.CompressedSize, result.Ratio*100)
 			}
@@ -1052,7 +1042,7 @@ func (c *CDNCache) generatePrecompressedFiles(filePath string, data []byte) {
 		// 生成 brotli 版本
 		brPath := filePath + ".br"
 		if result, err := c.compressor.Compress(data, "br"); err == nil && result.Algorithm == compression.Brotli {
-			if err := os.WriteFile(brPath, result.Data, 0644); err == nil {
+			if err := writeCacheFileAtomically(brPath, result.Data, 0644); err == nil {
 				c.log.Debugf("Generated precompressed brotli: %s (%d -> %d bytes, %.1f%% reduction)",
 					brPath, result.OriginalSize, result.CompressedSize, result.Ratio*100)
 			}

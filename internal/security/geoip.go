@@ -35,6 +35,7 @@ type GeoIPService struct {
 	updateInterval    time.Duration // 更新间隔（默认7天）
 	updateURL         string        // 更新URL
 	stopUpdateChan    chan struct{} // 停止更新任务
+	stopUpdateOnce    sync.Once
 }
 
 // GeoLocation 地理位置信息
@@ -83,7 +84,7 @@ func NewGeoIPService(config config.GeoBlockingConfig) (*GeoIPService, error) {
 		} else {
 			// 启动自动更新任务
 			if service.autoUpdateEnabled {
-				go service.startAutoUpdateTask()
+				go service.startAutoUpdateTask(service.stopUpdateChan)
 			}
 		}
 	} else if config.Enabled && config.DatabasePath == "" {
@@ -323,7 +324,7 @@ func (g *GeoIPService) GetLocation(ipStr string) (*GeoLocation, error) {
 }
 
 // startAutoUpdateTask 启动自动更新任务
-func (g *GeoIPService) startAutoUpdateTask() {
+func (g *GeoIPService) startAutoUpdateTask(stopCh <-chan struct{}) {
 	ticker := time.NewTicker(g.updateInterval)
 	defer ticker.Stop()
 
@@ -338,7 +339,7 @@ func (g *GeoIPService) startAutoUpdateTask() {
 			} else {
 				g.log.Info("GeoIP数据库自动更新成功")
 			}
-		case <-g.stopUpdateChan:
+		case <-stopCh:
 			g.log.Info("GeoIP自动更新任务已停止")
 			return
 		}
@@ -347,10 +348,9 @@ func (g *GeoIPService) startAutoUpdateTask() {
 
 // StopAutoUpdate 停止自动更新任务
 func (g *GeoIPService) StopAutoUpdate() {
-	if g.stopUpdateChan != nil {
+	g.stopUpdateOnce.Do(func() {
 		close(g.stopUpdateChan)
-		g.stopUpdateChan = nil
-	}
+	})
 }
 
 // UpdateDatabase 更新GeoIP数据库（增强版：重试机制）

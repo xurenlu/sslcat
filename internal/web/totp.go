@@ -91,7 +91,7 @@ func (s *Server) handleTOTPSetup(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == "POST" {
 		action := r.FormValue("action")
-		
+
 		if action == "disable" {
 			// 禁用 TOTP
 			s.config.Admin.EnableTOTP = false
@@ -109,7 +109,7 @@ func (s *Server) handleTOTPSetup(w http.ResponseWriter, r *http.Request) {
 			// 启用 TOTP
 			secret := r.FormValue("secret")
 			code := r.FormValue("code")
-			
+
 			if secret == "" || code == "" {
 				http.Error(w, "Missing secret or code", http.StatusBadRequest)
 				return
@@ -123,17 +123,17 @@ func (s *Server) handleTOTPSetup(w http.ResponseWriter, r *http.Request) {
 
 			// 保存TOTP密钥到文件
 			if s.config.Admin.TOTPSecretFile != "" {
-				if err := os.WriteFile(s.config.Admin.TOTPSecretFile, []byte(secret+"\n"), 0600); err != nil {
+				if err := writeSensitiveFileAtomically(s.config.Admin.TOTPSecretFile, []byte(secret+"\n"), 0600); err != nil {
 					http.Error(w, "Failed to save TOTP secret: "+err.Error(), http.StatusInternalServerError)
 					return
 				}
 			}
-			
+
 			// 保存配置
 			s.config.Admin.EnableTOTP = true
 			s.config.Admin.TOTPSecret = secret
 			_ = s.config.Save(s.config.ConfigFile)
-			
+
 			http.Redirect(w, r, s.config.AdminPrefix+"/settings", http.StatusFound)
 			return
 		}
@@ -147,13 +147,13 @@ func (s *Server) verifyTOTP(code string) bool {
 	if !s.config.Admin.EnableTOTP {
 		return true // TOTP 未启用时直接通过
 	}
-	
+
 	// 获取有效的TOTP密钥
 	secret := s.getEffectiveTOTPSecret()
 	if secret == "" {
 		return true // 无密钥时直接通过
 	}
-	
+
 	return totp.Validate(code, secret)
 }
 
@@ -240,11 +240,11 @@ func (s *Server) handleAPITOTPGenerate(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":  true,
-		"secret":   key.Secret(),
-		"qr_code":  qrDataURL,
-		"issuer":   "SSLcat",
-		"account":  s.config.Admin.Username,
+		"success": true,
+		"secret":  key.Secret(),
+		"qr_code": qrDataURL,
+		"issuer":  "SSLcat",
+		"account": s.config.Admin.Username,
 	})
 }
 
@@ -294,7 +294,7 @@ func (s *Server) handleAPITOTPEnable(w http.ResponseWriter, r *http.Request) {
 
 	// 保存TOTP密钥到文件
 	if s.config.Admin.TOTPSecretFile != "" {
-		if err := os.WriteFile(s.config.Admin.TOTPSecretFile, []byte(req.Secret+"\n"), 0600); err != nil {
+		if err := writeSensitiveFileAtomically(s.config.Admin.TOTPSecretFile, []byte(req.Secret+"\n"), 0600); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"success": false,

@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc27] - 2026-05-20
+
+### 🐛 Bug 修复
+
+- **CDN 缓存落盘可靠性**：CDN 缓存数据、元数据和预压缩副本统一改为 fsync 后原子替换，降低进程崩溃或磁盘抖动导致半写缓存文件的风险。
+- **CDN 预压缩限流**：预压缩生成增加小型并发闸门，避免大量缓存写入时无限启动压缩 goroutine 抢占 CPU/内存。
+- **配置保存可靠性**：配置保存改为唯一临时文件、fsync、原子替换和目录同步，避免并发保存共用固定 `.tmp` 文件互相覆盖。
+
+## [2.0.0-rc26] - 2026-05-20
+
+### 🐛 Bug 修复
+
+- **API Token 删除死锁修复**：修复 `TokenStore.Delete` 在写锁内再次进入持久化读锁导致自锁死的问题，并将 token 文件写入改为原子替换。
+- **文件会话存储长期运行可靠性**：文件会话清理 goroutine 增加可关闭生命周期，`Close` 支持幂等等待退出，过期会话删除不再额外启动 goroutine。
+- **敏感状态文件落盘**：文件会话与 TOTP 密钥改为原子写入，session 文件权限收紧为 `0600`，并校验 session key 防止异常路径。
+
+## [2.0.0-rc25] - 2026-05-19
+
+### 🐛 Bug 修复
+
+- **后台组件生命周期可靠性**：Edge Routing、Service Mesh 与 GeoIP 自动更新停止路径增加幂等保护，避免热重载、重复 Stop/Close 或守护进程重复清理时触发 `close of closed channel` panic。
+- **长期运行稳定性测试**：补充 Edge Routing、Service Mesh 与 GeoIP 生命周期回归测试，覆盖重复停止场景。
+
 ## [2.0.0-rc24] - 2026-05-19
 
 ### 🐛 Bug 修复

@@ -2105,26 +2105,52 @@ func (c *Config) saveToPath(configPath string, data []byte) error {
 		return fmt.Errorf("创建配置目录失败 (%s): %w", configDir, err)
 	}
 
-	// 创建临时文件，然后原子性重命名
-	tempFile := configPath + ".tmp"
-	if err := os.WriteFile(tempFile, data, 0644); err != nil {
-		return fmt.Errorf("写入临时配置文件失败 (%s): %w", tempFile, err)
+	tmpFile, err := os.CreateTemp(configDir, ".config-*.tmp")
+	if err != nil {
+		return fmt.Errorf("创建临时配置文件失败 (%s): %w", configDir, err)
+	}
+	tmpPath := tmpFile.Name()
+	success := false
+	defer func() {
+		if !success {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+
+	if err := tmpFile.Chmod(0644); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("设置临时配置文件权限失败 (%s): %w", tmpPath, err)
+	}
+	if _, err := tmpFile.Write(data); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("写入临时配置文件失败 (%s): %w", tmpPath, err)
+	}
+	if err := tmpFile.Sync(); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("同步临时配置文件失败 (%s): %w", tmpPath, err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("关闭临时配置文件失败 (%s): %w", tmpPath, err)
 	}
 
 	// 原子性重命名
-	if err := os.Rename(tempFile, configPath); err != nil {
-		os.Remove(tempFile) // 清理临时文件
+	if err := os.Rename(tmpPath, configPath); err != nil {
 
 		// 提供更详细的错误信息和建议
 		if os.IsNotExist(err) {
-			return fmt.Errorf("重命名配置文件失败: 目标目录不存在 (%s -> %s)。请检查目录权限或使用备用路径", tempFile, configPath)
+			return fmt.Errorf("重命名配置文件失败: 目标目录不存在 (%s -> %s)。请检查目录权限或使用备用路径", tmpPath, configPath)
 		} else if os.IsPermission(err) {
-			return fmt.Errorf("重命名配置文件失败: 权限不足 (%s -> %s)。请检查文件权限或使用 sudo 运行", tempFile, configPath)
+			return fmt.Errorf("重命名配置文件失败: 权限不足 (%s -> %s)。请检查文件权限或使用 sudo 运行", tmpPath, configPath)
 		} else {
-			return fmt.Errorf("重命名配置文件失败 (%s -> %s): %w。建议检查文件系统权限或使用备用配置路径", tempFile, configPath, err)
+			return fmt.Errorf("重命名配置文件失败 (%s -> %s): %w。建议检查文件系统权限或使用备用配置路径", tmpPath, configPath, err)
 		}
 	}
 
+	if dirFile, err := os.Open(configDir); err == nil {
+		_ = dirFile.Sync()
+		_ = dirFile.Close()
+	}
+	success = true
 	return nil
 }
 

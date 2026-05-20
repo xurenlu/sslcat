@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -20,8 +21,11 @@ type SessionStorage interface {
 
 // FileSessionStorage 文件会话存储实现
 type FileSessionStorage struct {
-	dataDir string
-	mutex   sync.RWMutex
+	dataDir  string
+	mutex    sync.RWMutex
+	stopChan chan struct{}
+	stopOnce sync.Once
+	wg       sync.WaitGroup
 }
 
 // NewFileSessionStorage 创建文件会话存储
@@ -31,11 +35,16 @@ func NewFileSessionStorage(dataDir string) (*FileSessionStorage, error) {
 	}
 
 	storage := &FileSessionStorage{
-		dataDir: dataDir,
+		dataDir:  dataDir,
+		stopChan: make(chan struct{}),
 	}
 
 	// 启动过期清理goroutine
-	go storage.cleanupExpiredSessions()
+	storage.wg.Add(1)
+	go func() {
+		defer storage.wg.Done()
+		storage.cleanupExpiredSessions()
+	}()
 
 	return storage, nil
 }
@@ -50,17 +59,23 @@ func (s *FileSessionStorage) Set(key string, session *Session) error {
 		return fmt.Errorf("序列化会话失败: %v", err)
 	}
 
-	filePath := filepath.Join(s.dataDir, key+".json")
-	return os.WriteFile(filePath, data, 0644)
+	filePath, err := s.sessionPath(key)
+	if err != nil {
+		return err
+	}
+	return writeSensitiveFileAtomically(filePath, data, 0600)
 }
 
 // Get 获取会话
 func (s *FileSessionStorage) Get(key string) (*Session, error) {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
+	filePath, err := s.sessionPath(key)
+	if err != nil {
+		return nil, err
+	}
 
-	filePath := filepath.Join(s.dataDir, key+".json")
+	s.mutex.RLock()
 	data, err := os.ReadFile(filePath)
+	s.mutex.RUnlock()
 	if err != nil {
 		return nil, fmt.Errorf("读取会话文件失败: %v", err)
 	}
@@ -72,8 +87,7 @@ func (s *FileSessionStorage) Get(key string) (*Session, error) {
 
 	// 检查是否过期
 	if time.Now().After(session.ExpiresAt) {
-		// 异步删除过期会话
-		go s.Delete(key)
+		_ = s.Delete(key)
 		return nil, fmt.Errorf("会话已过期")
 	}
 
@@ -85,7 +99,10 @@ func (s *FileSessionStorage) Delete(key string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	filePath := filepath.Join(s.dataDir, key+".json")
+	filePath, err := s.sessionPath(key)
+	if err != nil {
+		return err
+	}
 	return os.Remove(filePath)
 }
 
@@ -126,7 +143,11 @@ func (s *FileSessionStorage) GetAll() (map[string]*Session, error) {
 
 // Close 关闭存储
 func (s *FileSessionStorage) Close() error {
-	return nil // 文件存储无需特殊关闭操作
+	s.stopOnce.Do(func() {
+		close(s.stopChan)
+	})
+	s.wg.Wait()
+	return nil
 }
 
 // cleanupExpiredSessions 清理过期会话
@@ -134,30 +155,42 @@ func (s *FileSessionStorage) cleanupExpiredSessions() {
 	ticker := time.NewTicker(13 * time.Minute) // 使用质数间隔避免与其他定时器同时触发
 	defer ticker.Stop()
 
-	for range ticker.C {
-		s.mutex.Lock()
-		files, err := filepath.Glob(filepath.Join(s.dataDir, "*.json"))
-		if err == nil {
-			now := time.Now()
-			for _, file := range files {
-				data, err := os.ReadFile(file)
-				if err != nil {
-					continue
-				}
+	for {
+		select {
+		case <-ticker.C:
+			s.mutex.Lock()
+			files, err := filepath.Glob(filepath.Join(s.dataDir, "*.json"))
+			if err == nil {
+				now := time.Now()
+				for _, file := range files {
+					data, err := os.ReadFile(file)
+					if err != nil {
+						continue
+					}
 
-				session := &Session{}
-				if err := json.Unmarshal(data, session); err != nil {
-					continue
-				}
+					session := &Session{}
+					if err := json.Unmarshal(data, session); err != nil {
+						continue
+					}
 
-				// 删除过期会话文件
-				if now.After(session.ExpiresAt) {
-					os.Remove(file)
+					// 删除过期会话文件
+					if now.After(session.ExpiresAt) {
+						os.Remove(file)
+					}
 				}
 			}
+			s.mutex.Unlock()
+		case <-s.stopChan:
+			return
 		}
-		s.mutex.Unlock()
 	}
+}
+
+func (s *FileSessionStorage) sessionPath(key string) (string, error) {
+	if key == "" || filepath.Base(key) != key || strings.Contains(key, `\`) || strings.Contains(key, "..") {
+		return "", fmt.Errorf("无效会话键")
+	}
+	return filepath.Join(s.dataDir, key+".json"), nil
 }
 
 // MemorySessionStorage 内存会话存储（原有实现）
