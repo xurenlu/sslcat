@@ -1108,7 +1108,7 @@ func Load(configFile string) (*Config, error) {
 		PHPSites:    []PHPSite{},
 		Runners: RunnerConfig{
 			Git: GitServerConfig{
-				Enabled:         false,
+				Enabled:         true,
 				ReposDir:        "./data/runners/git",
 				MaxConcurrent:   3,
 				CloneTimeout:    300, // 5分钟
@@ -1723,7 +1723,7 @@ func getDefaultConfig() *Config {
 		PHPSites:    []PHPSite{},
 		Runners: RunnerConfig{
 			Git: GitServerConfig{
-				Enabled:         false,
+				Enabled:         true,
 				ReposDir:        "./data/runners/git",
 				MaxConcurrent:   3,
 				CloneTimeout:    300,

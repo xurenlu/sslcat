@@ -1483,6 +1483,25 @@ export interface Translation {
     error: string
     viewLogs: string
     viewLatestLogs: string
+    runnerSource: string
+    runnerSourceGit: string
+    runnerSourceDirectory: string
+    runnerSourceBinary: string
+    runnerSourceDockerImage: string
+    uploadDirectory: string
+    uploadBinary: string
+    selectedFiles: string
+    dockerImageName: string
+    dockerImagePlaceholder: string
+    startCommand: string
+    startCommandPlaceholder: string
+    workDir: string
+    workDirPlaceholder: string
+    internalPort: string
+    envVarsPlaceholder: string
+    runtimeUpdateFailed: string
+    artifactUploadFailed: string
+    runnerConfigSaved: string
   }
 
 

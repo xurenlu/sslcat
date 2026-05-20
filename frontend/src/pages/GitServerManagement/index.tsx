@@ -44,7 +44,7 @@ import EnvVarModal from './EnvVarModal'
 import RoutingModal from './RoutingModal'
 import DeleteAppModal from './DeleteAppModal'
 import AppCardGrid from './AppCardGrid'
-import { GitApp } from './types'
+import { CreateAppRuntimeOptions, GitApp } from './types'
 
 const GitServerManagement: React.FC = () => {
   const { adminPrefix } = useConfig()
@@ -101,8 +101,8 @@ const GitServerManagement: React.FC = () => {
   }, [])
 
   // 处理创建应用
-  const handleCreateApp = async (name: string, autoSSL: boolean) => {
-    await createApp(name, autoSSL)
+  const handleCreateApp = async (name: string, autoSSL: boolean, options?: CreateAppRuntimeOptions) => {
+    await createApp(name, autoSSL, options)
   }
 
   // 处理删除应用

@@ -61,11 +61,11 @@ type GitServer struct {
 	builderRegistry *BuilderRegistry
 
 	// 模板与部署助手
-	templateManager   *TemplateManager
-	composeGenerator  *ComposeGenerator
-	credentialManager *CredentialManager
-	domainManager     *DomainManager
-	dnsVerifier       *DNSVerifier
+	templateManager    *TemplateManager
+	composeGenerator   *ComposeGenerator
+	credentialManager  *CredentialManager
+	domainManager      *DomainManager
+	dnsVerifier        *DNSVerifier
 	deployOrchestrator *DeployOrchestrator
 
 	// 部署数据库
@@ -90,7 +90,7 @@ type GitServer struct {
 	maxConcurrentBuilds int
 
 	// 全局部署互斥锁（确保同时只有一个应用在部署）
-	deployMutex sync.Mutex
+	deployMutex         sync.Mutex
 	currentDeployingApp string // 当前正在部署的应用名称
 
 	// 日志清理配置
@@ -239,19 +239,23 @@ type GitApp struct {
 	// 应用类型（自动检测）
 	AppType string `json:"app_type"` // "nodejs" | "python" | "go" | "php" | "static" | "docker"
 
+	// Runner 来源与运行规格
+	SourceType RunnerSourceType `json:"source_type,omitempty"`
+	Runtime    RunnerSpec       `json:"runtime,omitempty"`
+
 	// 分配的域名
 	Domain string `json:"domain"`
 	// 域名列表（包含主域名与别名）
 	Domains []string `json:"domains,omitempty"`
 
 	// 模板相关
-	TemplateID         string                          `json:"template_id,omitempty"`
-	TemplateType       string                          `json:"template_type,omitempty"`
-	TemplateParams     map[string]string               `json:"template_params,omitempty"`
-	Services           []AppServiceInfo                `json:"services,omitempty"`
-	ServiceCredentials map[string]AppServiceCredential `json:"service_credentials,omitempty"` // 存储完整凭证（JSON 序列化时会保存）
-	ServiceCredentialsRaw map[string]map[string]string `json:"service_credentials_raw,omitempty"` // 原始凭证（用于完整显示）
-	ComposeFile        string                          `json:"compose_file,omitempty"`
+	TemplateID            string                          `json:"template_id,omitempty"`
+	TemplateType          string                          `json:"template_type,omitempty"`
+	TemplateParams        map[string]string               `json:"template_params,omitempty"`
+	Services              []AppServiceInfo                `json:"services,omitempty"`
+	ServiceCredentials    map[string]AppServiceCredential `json:"service_credentials,omitempty"`     // 存储完整凭证（JSON 序列化时会保存）
+	ServiceCredentialsRaw map[string]map[string]string    `json:"service_credentials_raw,omitempty"` // 原始凭证（用于完整显示）
+	ComposeFile           string                          `json:"compose_file,omitempty"`
 
 	// 分配的端口
 	Port int `json:"port"`
@@ -354,11 +358,14 @@ type AppDeployConfig struct {
 	Domains []string `json:"domains,omitempty"`
 
 	// Docker 容器配置
-	ContainerName string `json:"container_name,omitempty"`
-	ContainerID   string `json:"container_id,omitempty"`
-	Port          int    `json:"port,omitempty"`          // 外部端口
-	InternalPort  int    `json:"internal_port,omitempty"` // 容器内部端口
-	ImageName     string `json:"image_name,omitempty"`
+	ContainerName string                `json:"container_name,omitempty"`
+	ContainerID   string                `json:"container_id,omitempty"`
+	Port          int                   `json:"port,omitempty"`          // 外部端口
+	InternalPort  int                   `json:"internal_port,omitempty"` // 容器内部端口
+	ImageName     string                `json:"image_name,omitempty"`
+	DockerImage   *DockerImageRunConfig `json:"docker_image,omitempty"`
+	Artifact      *ArtifactRunConfig    `json:"artifact,omitempty"`
+	Runtime       *RunnerSpec           `json:"runtime,omitempty"`
 
 	// SSL 配置
 	SSL SSLConfig `json:"ssl"`
@@ -767,6 +774,9 @@ func (gs *GitServer) Start() error {
 	// 加载现有应用
 	if err := gs.loadApps(); err != nil {
 		gs.logger.Warnf(gs.translator.T("git_server.load_app_failed")+": %v", err)
+	}
+	if err := gs.reconcileRunnerContainers(); err != nil {
+		gs.logger.Warnf("Runner 容器对账失败: %v", err)
 	}
 
 	// 启动清理协程
@@ -2111,12 +2121,9 @@ func (gs *GitServer) startAppProcessWithLogging(app *GitApp, command string, dep
 	deployLogger.WriteLog("info", "docker", fmt.Sprintf("启动容器: docker run -d --name %s -p %d:%d -e PORT=%d %s",
 		newContainerName, newPort, internalPort, internalPort, imageName))
 
-	runCmd := exec.Command("docker", "run", "-d",
-		"--name", newContainerName,
-		"-p", fmt.Sprintf("%d:%d", newPort, internalPort),
-		"-e", fmt.Sprintf("PORT=%d", internalPort),
-		"--restart", "unless-stopped",
-		imageName)
+	runtimeSpec := appRuntimeSpec(app, internalPort)
+	runArgs := runtimeSpec.DockerRunArgs(newContainerName, newPort, imageName, internalPort)
+	runCmd := exec.Command("docker", runArgs...)
 	if output, err := runCmd.CombinedOutput(); err != nil {
 		gs.releasePort(newPort)
 		errMsg := fmt.Sprintf("启动新容器失败: %v, 输出: %s", err, string(output))
@@ -4359,19 +4366,19 @@ while read oldrev newrev refname; do
                     # 输出进度保持连接活跃
                     # 每 2 秒输出一次，每次输出 256 字节的填充内容
                     # 这样可以填满大部分缓冲区，触发 Git 发送数据到客户端
-                    if [ $((IDLE_ELAPSED % 2)) -eq 0 ]; then
+                    if [ $((IDLE_ELAPSED %% 2)) -eq 0 ]; then
                         # 输出带颜色的进度点和空格
                         printf "\r${COLOR_BOLD}[${COLOR_YELLOW}等待部署日志${COLOR_RESET}] ${COLOR_GREEN}"
                         # 输出进度条效果
                         DOTS=$((IDLE_ELAPSED / 2))
                         for i in $(seq 1 20); do
-                            if [ $i -le $((DOTS % 21)) ]; then
+                            if [ $i -le $((DOTS %% 21)) ]; then
                                 printf "█"
                             else
                                 printf "░"
                             fi
                         done
-                        printf "${COLOR_RESET} %3ds" $IDLE_ELAPSED
+                        printf "${COLOR_RESET} %%3ds" $IDLE_ELAPSED
 
                         # 强制刷新 - 使用多种方法确保输出被发送
                         {
@@ -4570,10 +4577,10 @@ func (gs *GitServer) initGitRepo(app *GitApp) error {
 		// 只设置应用自己的目录，不要影响父目录
 		// chown 应用目录下的所有内容
 		pathsToChown := []string{
-			app.GitPath,      // /opt/sslcat/data/runners/git/cliptxt/git
-			app.RepoDir,      // /opt/sslcat/data/runners/git/cliptxt/git/repo
-			app.BareRepo,     // /opt/sslcat/data/runners/git/cliptxt/git/repo.git
-			app.LogsDir,      // /opt/sslcat/data/runners/git/cliptxt/logs
+			app.GitPath,  // /opt/sslcat/data/runners/git/cliptxt/git
+			app.RepoDir,  // /opt/sslcat/data/runners/git/cliptxt/git/repo
+			app.BareRepo, // /opt/sslcat/data/runners/git/cliptxt/git/repo.git
+			app.LogsDir,  // /opt/sslcat/data/runners/git/cliptxt/logs
 		}
 
 		for _, path := range pathsToChown {
@@ -4986,6 +4993,13 @@ func (gs *GitServer) CheckPushPermission(appName, keyFingerprint string) bool {
 	app, exists := gs.apps[appName]
 	if !exists {
 		return false
+	}
+
+	// Internal deployment triggers run after an authenticated admin action or
+	// after git-receive-pack has already accepted the push on localhost.
+	switch keyFingerprint {
+	case "system", "web-trigger", "git-hook":
+		return true
 	}
 
 	// 如果应用没有设置密钥限制，则允许所有已添加的密钥推送

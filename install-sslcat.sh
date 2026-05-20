@@ -753,7 +753,7 @@ create_default_config() {
   },
   "runners": {
     "git": {
-      "enabled": false,
+      "enabled": true,
       "repos_dir": "./data/runners/git"
     }
   }

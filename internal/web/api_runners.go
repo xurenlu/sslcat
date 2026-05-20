@@ -3,7 +3,11 @@ package web
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -346,6 +350,142 @@ func (api *GitServerAPI) UpdateAppEnv(w http.ResponseWriter, r *http.Request) {
 	}
 
 	api.writeJSON(w, response)
+}
+
+// UpdateAppRuntime 更新应用统一运行规格。
+func (api *GitServerAPI) UpdateAppRuntime(w http.ResponseWriter, r *http.Request, appName string) {
+	if !api.checkAuthWithLocalhostBypass(w, r) {
+		return
+	}
+
+	if r.Method != "PUT" && r.Method != "POST" {
+		api.writeTranslatedError(w, "git_server.method_not_allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if appName == "" {
+		api.writeTranslatedError(w, "git_server.app_name_required", http.StatusBadRequest)
+		return
+	}
+
+	var spec runner.RunnerSpec
+	if err := json.NewDecoder(r.Body).Decode(&spec); err != nil {
+		api.writeTranslatedError(w, "git_server.parse_request_failed", http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if err := api.server.UpdateAppRuntime(appName, spec); err != nil {
+		api.writeTranslatedError(w, "git_server.update_config_failed", http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response := map[string]interface{}{
+		"success":         true,
+		"message":         "Runner 运行规格已更新，请重新部署应用以应用更改",
+		"pending_restart": true,
+	}
+
+	api.writeJSON(w, response)
+}
+
+// UploadAppArtifact 上传目录或二进制产物，并保存对应 Runner 运行规格。
+func (api *GitServerAPI) UploadAppArtifact(w http.ResponseWriter, r *http.Request, appName string) {
+	if !api.checkAuthWithLocalhostBypass(w, r) {
+		return
+	}
+
+	if r.Method != "POST" {
+		api.writeTranslatedError(w, "git_server.method_not_allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	app, err := api.server.GetApp(appName)
+	if err != nil {
+		api.writeTranslatedError(w, "git_server.app_not_exists", http.StatusNotFound, err.Error())
+		return
+	}
+
+	maxUpload := int64(1 << 30)
+	if api.webServer != nil && api.webServer.config.Server.MaxUploadBytes > 0 {
+		maxUpload = api.webServer.config.Server.MaxUploadBytes
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxUpload)
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		api.writeTranslatedError(w, "git_server.parse_request_failed", http.StatusBadRequest, err.Error())
+		return
+	}
+
+	sourceType := runner.RunnerSourceType(r.FormValue("source_type"))
+	if sourceType == "" {
+		sourceType = runner.RunnerSourceArtifact
+	}
+	startCommand := strings.TrimSpace(r.FormValue("start_command"))
+	workDir := strings.TrimSpace(r.FormValue("work_dir"))
+	internalPort, _ := strconv.Atoi(r.FormValue("internal_port"))
+	envVars := parseRuntimeEnvJSON(r.FormValue("env_vars"))
+
+	appRoot := filepath.Dir(app.GitPath)
+	artifactDir := filepath.Join(appRoot, "artifacts", "current")
+	if err := os.RemoveAll(artifactDir); err != nil {
+		api.writeTranslatedError(w, "git_server.update_config_failed", http.StatusInternalServerError, err.Error())
+		return
+	}
+	if err := os.MkdirAll(artifactDir, 0755); err != nil {
+		api.writeTranslatedError(w, "git_server.update_config_failed", http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	files := r.MultipartForm.File["files"]
+	paths := r.MultipartForm.Value["paths"]
+	for index, header := range files {
+		relativePath := header.Filename
+		if index < len(paths) && strings.TrimSpace(paths[index]) != "" {
+			relativePath = paths[index]
+		}
+		safePath, ok := safeArtifactRelativePath(relativePath)
+		if !ok {
+			api.writeTranslatedError(w, "git_server.parse_request_failed", http.StatusBadRequest, relativePath)
+			return
+		}
+		targetPath := filepath.Join(artifactDir, safePath)
+		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+			api.writeTranslatedError(w, "git_server.update_config_failed", http.StatusInternalServerError, err.Error())
+			return
+		}
+		if err := saveUploadedFile(header, targetPath); err != nil {
+			api.writeTranslatedError(w, "git_server.update_config_failed", http.StatusInternalServerError, err.Error())
+			return
+		}
+	}
+
+	spec := runner.RunnerSpec{
+		SourceType:   sourceType,
+		RuntimeType:  runner.RunnerRuntimeDockerImage,
+		EnvVars:      envVars,
+		StartCommand: startCommand,
+		WorkDir:      workDir,
+		InternalPort: internalPort,
+		Artifact: &runner.ArtifactRunConfig{
+			Kind:         sourceType,
+			Path:         artifactDir,
+			WorkDir:      workDir,
+			StartCommand: startCommand,
+			InternalPort: internalPort,
+			EnvVars:      envVars,
+		},
+	}
+	if err := api.server.UpdateAppRuntime(appName, spec); err != nil {
+		api.writeTranslatedError(w, "git_server.update_config_failed", http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	api.writeJSON(w, map[string]interface{}{
+		"success":         true,
+		"message":         "Artifact uploaded",
+		"files":           len(files),
+		"path":            artifactDir,
+		"pending_restart": true,
+	})
 }
 
 // RedeployApp 手动触发应用重新部署
@@ -1006,6 +1146,45 @@ func (api *GitServerAPI) writeTranslatedError(w http.ResponseWriter, key string,
 	api.writeError(w, message, statusCode)
 }
 
+func parseRuntimeEnvJSON(raw string) map[string]string {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	var envVars map[string]string
+	if err := json.Unmarshal([]byte(raw), &envVars); err != nil {
+		return nil
+	}
+	return envVars
+}
+
+func safeArtifactRelativePath(path string) (string, bool) {
+	normalized := filepath.Clean(strings.ReplaceAll(path, "\\", "/"))
+	normalized = strings.TrimPrefix(normalized, "/")
+	if normalized == "." || normalized == "" || normalized == ".." || strings.HasPrefix(normalized, "../") {
+		return "", false
+	}
+	return normalized, true
+}
+
+func saveUploadedFile(header *multipart.FileHeader, targetPath string) error {
+	src, err := header.Open()
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	dst, err := os.OpenFile(targetPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+	defer dst.Close()
+
+	if _, err := io.Copy(dst, src); err != nil {
+		return err
+	}
+	return dst.Sync()
+}
+
 func (api *RuntimeDetectorAPI) writeJSON(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(data)
@@ -1224,6 +1403,10 @@ func (api *GitServerAPI) HandleAppAction(w http.ResponseWriter, r *http.Request)
 	switch action {
 	case "deploy":
 		api.TriggerDeploy(w, r, appName)
+	case "runtime":
+		api.UpdateAppRuntime(w, r, appName)
+	case "artifact":
+		api.UploadAppArtifact(w, r, appName)
 	default:
 		api.writeTranslatedError(w, "git_server.unknown_action", http.StatusNotFound, action)
 	}

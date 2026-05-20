@@ -4,7 +4,7 @@ import { useToast } from '@chakra-ui/react'
 import { buildApiPath } from '../contexts/ConfigContext'
 import { useErrorHandler } from './useErrorHandler'
 import { useTranslation } from './useLanguage'
-import { GitApp, transformBackendAppToGitApp } from '../pages/GitServerManagement/types'
+import { CreateAppRuntimeOptions, GitApp, RunnerSpec, transformBackendAppToGitApp } from '../pages/GitServerManagement/types'
 import { TOAST_DURATION } from '../constants'
 import { GitCommandToast } from '../components/GitCommandToast'
 
@@ -117,8 +117,58 @@ export const useGitApps = ({ adminPrefix }: UseGitAppsOptions) => {
     }
   }, [])
 
+  const updateAppRuntime = useCallback(
+    async (appName: string, runtime: RunnerSpec) => {
+      const response = await fetch(
+        buildApiPath(adminPrefix, `/git-server/apps/${encodeURIComponent(appName)}/runtime`),
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(runtime),
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || t.gitServer.runtimeUpdateFailed)
+      }
+    },
+    [adminPrefix, t]
+  )
+
+  const uploadAppArtifact = useCallback(
+    async (appName: string, options: NonNullable<CreateAppRuntimeOptions['artifact']>, sourceType: CreateAppRuntimeOptions['sourceType']) => {
+      const formData = new FormData()
+      formData.append('source_type', sourceType)
+      formData.append('start_command', options.startCommand || '')
+      formData.append('work_dir', options.workDir || '')
+      formData.append('internal_port', options.internalPort ? String(options.internalPort) : '')
+      formData.append('env_vars', JSON.stringify(options.envVars || {}))
+      options.files.forEach((file, index) => {
+        formData.append('files', file)
+        formData.append('paths', options.paths[index] || file.name)
+      })
+
+      const response = await fetch(
+        buildApiPath(adminPrefix, `/git-server/apps/${encodeURIComponent(appName)}/artifact`),
+        {
+          method: 'POST',
+          body: formData,
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || t.gitServer.artifactUploadFailed)
+      }
+    },
+    [adminPrefix, t]
+  )
+
   const createApp = useCallback(
-    async (name: string, autoSSL: boolean) => {
+    async (name: string, autoSSL: boolean, options?: CreateAppRuntimeOptions) => {
       try {
         const response = await fetch(buildApiPath(adminPrefix, '/git-server/apps'), {
           method: 'POST',
@@ -139,9 +189,18 @@ export const useGitApps = ({ adminPrefix }: UseGitAppsOptions) => {
         const result = await response.json()
         const appData = result.data
 
+        if (options?.sourceType === 'docker_image' && options.runtime) {
+          await updateAppRuntime(name, options.runtime)
+        }
+        if ((options?.sourceType === 'directory' || options?.sourceType === 'binary') && options.artifact) {
+          await uploadAppArtifact(name, options.artifact, options.sourceType)
+        }
+
         toast({
           title: t.gitServer.appCreatedSuccess,
-          description: t.gitServer.gitAddressFormat.replace('{hostname}', window.location.hostname).replace('{name}', name),
+          description: options?.sourceType && options.sourceType !== 'git'
+            ? t.gitServer.runnerConfigSaved
+            : t.gitServer.gitAddressFormat.replace('{hostname}', window.location.hostname).replace('{name}', name),
           status: 'success',
           duration: TOAST_DURATION.LONG,
           isClosable: true,
@@ -151,19 +210,20 @@ export const useGitApps = ({ adminPrefix }: UseGitAppsOptions) => {
         cache.delete(`apps-${adminPrefix}`)
         await loadApps(true)
 
-        // 显示Git推送指令提示
-        setTimeout(() => {
-          const gitCommands = `git remote add sslcat git@${window.location.hostname}:${name}.git
+        if (!options?.sourceType || options.sourceType === 'git') {
+          setTimeout(() => {
+            const gitCommands = `git remote add sslcat git@${window.location.hostname}:${name}.git
 git push sslcat main`
 
-          toast({
-            title: t.gitServer.pushCodeToApp,
-            description: React.createElement(GitCommandToast, { gitCommands }),
-            status: 'info',
-            duration: TOAST_DURATION.LONG * 2,
-            isClosable: true,
-          })
-        }, 1000)
+            toast({
+              title: t.gitServer.pushCodeToApp,
+              description: React.createElement(GitCommandToast, { gitCommands }),
+              status: 'info',
+              duration: TOAST_DURATION.LONG * 2,
+              isClosable: true,
+            })
+          }, 1000)
+        }
 
         return appData
       } catch (error) {
@@ -171,7 +231,7 @@ git push sslcat main`
         throw error
       }
     },
-    [adminPrefix, handleError, toast, loadApps, t]
+    [adminPrefix, handleError, toast, loadApps, t, updateAppRuntime, uploadAppArtifact]
   )
 
   const deleteApp = useCallback(
@@ -332,6 +392,7 @@ git push sslcat main`
     deployApp,
     updateEnvVars,
     updateRouting,
+    updateAppRuntime,
+    uploadAppArtifact,
   }
 }
-

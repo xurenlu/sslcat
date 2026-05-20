@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc39] - 2026-05-20
+
+### 🐛 Bug 修复
+
+- **Runner 容器启动对账**：sslcat 启动时会只读核对已记录的 Docker Runner 容器状态，容器仍在运行时恢复应用运行态、端口和代理规则；容器缺失或退出时标记为异常但不主动重启、停止或删除业务容器。
+
+## [2.0.0-rc38] - 2026-05-20
+
+### Added
+
+- **多来源 Runner 创建入口**：Git Deploy 创建应用弹窗支持选择 Git push、上传目录、上传二进制和直接 Docker 镜像，并可填写环境变量、启动命令、工作目录和实际监听端口。
+- **目录/二进制产物上传 API**：新增应用级 artifact 上传接口，支持保留目录相对路径保存上传文件，并同步写入统一 Runner Runtime Spec。
+- **Runner i18n 文案**：新增多语言 Runner 创建文案，避免 React 页面新增硬编码 UI 文案。
+
+## [2.0.0-rc37] - 2026-05-20
+
+### 🐛 Bug 修复
+
+- **Runner 运行规格骨架**：新增统一 Runner Spec，开始把 Git push、上传产物、直接 Docker 镜像和模板部署归一到同一套来源、运行时、环境变量、端口、挂载与启动命令模型。
+- **Docker 镜像运行参数可测试化**：将 `docker run` 参数生成改为不经 shell 拼接的规格化参数，并补充覆盖环境变量、挂载、入口命令、启动参数和内部端口的回归测试。
+- **Runner 配置入口**：新增应用级 Runtime Spec 更新入口，用于先保存直接镜像、上传目录/二进制等运行配置，后续接入上传 API 与前端拖拽界面。
+
+## [2.0.0-rc36] - 2026-05-20
+
+### 🐛 Bug 修复
+
+- **Git 自动化部署闭环修复**：允许 `system`、`web-trigger`、`git-hook` 等内部部署触发源绕过应用级 SSH key 绑定检查，避免 Git push 已进入 post-receive 后部署 API 被误拦截。
+- **Git Hook 回归测试**：新增 Git hook 生成测试，覆盖 pre-receive、update、post-receive、receive-pack 的 Bash 语法检查，以及 post-receive 中 shell 百分号和部署 API URL 的渲染结果。
+
+## [2.0.0-rc35] - 2026-05-20
+
+### 🐛 Bug 修复
+
+- **Git Deploy 默认可用性恢复**：重新默认启用内置 Git Deploy Server，确保新安装和 Docker 示例配置会启动 `runners.git`，用于替代外部部署平台故障时的自托管发布通道。
+- **Git Hook 脚本生成修复**：修复 post-receive hook 模板中 shell 百分号未转义导致 `internal/runner` 无法编译的问题。
+
 ## [2.0.0-rc34] - 2026-05-20
 
 ### 🐛 Bug 修复
