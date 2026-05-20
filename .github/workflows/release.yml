@@ -50,12 +50,12 @@ jobs:
           cache-dependency-path: 'frontend/yarn.lock'
 
       - name: Enable Corepack (Yarn 4)
-        run: corepack enable && corepack prepare yarn@stable --activate
+        run: corepack enable && corepack prepare yarn@4.15.0 --activate
 
       - name: Build frontend
         run: |
           cd frontend
-          yarn install
+          yarn install --immutable
           yarn run build
           mkdir -p ../internal/assets/frontend
           cp -r dist/* ../internal/assets/frontend/
@@ -184,12 +184,12 @@ jobs:
           cache-dependency-path: 'frontend/yarn.lock'
 
       - name: Enable Corepack (Yarn 4)
-        run: corepack enable && corepack prepare yarn@stable --activate
+        run: corepack enable && corepack prepare yarn@4.15.0 --activate
 
       - name: Build frontend
         run: |
           cd frontend
-          yarn install
+          yarn install --immutable
           yarn run build
           mkdir -p ../internal/assets/frontend
           cp -r dist/* ../internal/assets/frontend/

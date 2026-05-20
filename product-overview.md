@@ -31,6 +31,7 @@ SSLcat 是一个集成 SSL 证书管理、反向代理、WAF、安全审计、�
 
 ## 版本记录
 
+- `2.0.0-rc40`：固定 GitHub Actions 前端构建使用 Yarn 4.15.0，并让锁文件元数据与 CI 使用的 Yarn 版本一致，避免不可变安装阶段因 lockfile 迁移失败。
 - `2.0.0-rc39`：新增 Runner Docker 容器启动对账，sslcat 重启后只读同步容器状态并恢复代理规则，不主动重启、停止或删除已运行容器。
 - `2.0.0-rc38`：Git Deploy 创建应用入口支持 Git push、上传目录、上传二进制和直接 Docker 镜像，并新增 artifact 上传 API 保留目录结构写入 Runner 运行规格。
 - `2.0.0-rc37`：新增统一 Runner 运行规格骨架，为上传目录/二进制、直接 Docker 镜像、Git push 构建镜像和模板部署共用同一套环境变量、端口、挂载与启动命令模型打基础。

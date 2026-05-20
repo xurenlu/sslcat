@@ -1,7 +1,8 @@
 {
   "name": "sslcat-frontend",
   "private": true,
-  "version": "2.0.0-rc39",
+  "version": "2.0.0-rc40",
+  "packageManager": "yarn@4.15.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
