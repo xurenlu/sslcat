@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc29] - 2026-05-20
+
+### 🐛 Bug 修复
+
+- **管理 API 请求体保护**：WAF 规则导入与 WebAuthn 完成注册/登录接口增加请求体大小限制，避免异常大 JSON 请求占用过多内存。
+- **WebAuthn 敏感日志收敛**：移除 WebAuthn 响应体调试日志，避免认证响应内容进入日志。
+- **配置版本文件可靠性**：配置版本创建、回滚、导出和导入备份统一使用 fsync 后原子替换，降低版本文件半写入与配置回滚损坏风险。
+
 ## [2.0.0-rc28] - 2026-05-20
 
 ### 🐛 Bug 修复

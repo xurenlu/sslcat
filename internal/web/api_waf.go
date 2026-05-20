@@ -202,10 +202,10 @@ func (s *Server) handleAPIWAFConfig(w http.ResponseWriter, r *http.Request) {
 	// 更新WAF启用状态
 	if req.Enabled != nil {
 		s.wafEngine.Engine.SetEnabled(*req.Enabled)
-		
+
 		// 同时更新配置文件中的设置
 		s.config.Security.EnableWAF = *req.Enabled
-		
+
 		// 保存配置（使用当前配置文件路径）
 		if err := s.config.Save(s.config.ConfigFile); err != nil {
 			s.log.WithFields(logrus.Fields{
@@ -254,7 +254,7 @@ func (s *Server) handleAPIWAFBlockedList(w http.ResponseWriter, r *http.Request)
 
 	// 获取维度参数
 	dimension := r.URL.Query().Get("dimension")
-	
+
 	var records interface{}
 	switch dimension {
 	case "ip":
@@ -390,49 +390,49 @@ func (s *Server) handleAPIWAFTLSStats(w http.ResponseWriter, r *http.Request) {
 
 // WAFRuleCreateRequest 创建WAF规则请求
 type WAFRuleCreateRequest struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Type        string   `json:"type"`
-	Pattern     string   `json:"pattern"`
-	Action      string   `json:"action"`
-	Enabled     bool     `json:"enabled"`
-	Description string   `json:"description"`
-	Priority    int      `json:"priority"`
+	ID          string                   `json:"id"`
+	Name        string                   `json:"name"`
+	Type        string                   `json:"type"`
+	Pattern     string                   `json:"pattern"`
+	Action      string                   `json:"action"`
+	Enabled     bool                     `json:"enabled"`
+	Description string                   `json:"description"`
+	Priority    int                      `json:"priority"`
 	Conditions  []map[string]interface{} `json:"conditions,omitempty"`
 	Actions     []map[string]interface{} `json:"actions,omitempty"`
-	Tags        []string `json:"tags,omitempty"`
-	Severity    string   `json:"severity,omitempty"`
-	Category    string   `json:"category,omitempty"`
+	Tags        []string                 `json:"tags,omitempty"`
+	Severity    string                   `json:"severity,omitempty"`
+	Category    string                   `json:"category,omitempty"`
 }
 
 // WAFRuleUpdateRequest 更新WAF规则请求
 type WAFRuleUpdateRequest struct {
-	Pattern     string   `json:"pattern,omitempty"`
-	Action      string   `json:"action,omitempty"`
-	Enabled     *bool    `json:"enabled,omitempty"`
-	Description string   `json:"description,omitempty"`
-	Priority    int      `json:"priority,omitempty"`
+	Pattern     string `json:"pattern,omitempty"`
+	Action      string `json:"action,omitempty"`
+	Enabled     *bool  `json:"enabled,omitempty"`
+	Description string `json:"description,omitempty"`
+	Priority    int    `json:"priority,omitempty"`
 }
 
 // WAFRuleTestRequest 测试WAF规则请求
 type WAFRuleTestRequest struct {
-	RuleID      string `json:"rule_id,omitempty"`
+	RuleID      string               `json:"rule_id,omitempty"`
 	Rule        WAFRuleCreateRequest `json:"rule,omitempty"`
-	TestURL     string            `json:"test_url"`
-	TestMethod  string            `json:"test_method"`
-	TestHeaders map[string]string `json:"test_headers,omitempty"`
-	TestBody    string            `json:"test_body,omitempty"`
+	TestURL     string               `json:"test_url"`
+	TestMethod  string               `json:"test_method"`
+	TestHeaders map[string]string    `json:"test_headers,omitempty"`
+	TestBody    string               `json:"test_body,omitempty"`
 }
 
 // WAFRuleTestResponse 测试WAF规则响应
 type WAFRuleTestResponse struct {
-	Success      bool        `json:"success"`
-	Message      string      `json:"message,omitempty"`
-	Matched      bool        `json:"matched"`
-	Blocked      bool        `json:"blocked"`
-	Action       string      `json:"action,omitempty"`
-	RuleName     string      `json:"rule_name,omitempty"`
-	MatchDetails  string      `json:"match_details,omitempty"`
+	Success      bool   `json:"success"`
+	Message      string `json:"message,omitempty"`
+	Matched      bool   `json:"matched"`
+	Blocked      bool   `json:"blocked"`
+	Action       string `json:"action,omitempty"`
+	RuleName     string `json:"rule_name,omitempty"`
+	MatchDetails string `json:"match_details,omitempty"`
 }
 
 // handleAPIWAFCreateRule 创建WAF规则
@@ -500,7 +500,7 @@ func (s *Server) handleAPIWAFCreateRule(w http.ResponseWriter, r *http.Request) 
 	}
 
 	s.log.WithFields(logrus.Fields{
-		"rule_id": req.ID,
+		"rule_id":   req.ID,
 		"rule_name": req.Name,
 	}).Info("WAF rule created")
 
@@ -756,9 +756,9 @@ func (s *Server) handleAPIWAFTestRule(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := WAFRuleTestResponse{
-		Success:     true,
-		Matched:     matchedRule != nil,
-		Blocked:     blocked,
+		Success:      true,
+		Matched:      matchedRule != nil,
+		Blocked:      blocked,
 		MatchDetails: fmt.Sprintf("Rule: %s, Action: %s", matchedRule.Name, matchedRule.Action),
 	}
 
@@ -804,8 +804,8 @@ func (s *Server) handleAPIWAFExportRules(w http.ResponseWriter, r *http.Request)
 		w.Header().Set("Content-Disposition", "attachment; filename=waf_rules.json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"version":     "1.0",
-			"exported_at":  time.Now().Format(time.RFC3339),
-			"total_rules":  len(rules),
+			"exported_at": time.Now().Format(time.RFC3339),
+			"total_rules": len(rules),
 			"rules":       rules,
 		})
 
@@ -858,7 +858,7 @@ func (s *Server) handleAPIWAFImportRules(w http.ResponseWriter, r *http.Request)
 	}
 
 	// 读取请求体
-	body, err := io.ReadAll(r.Body)
+	body, err := s.readLimitedRequestBody(w, r, defaultJSONBodyLimit)
 	if err != nil {
 		s.writeErrorResponse(w, http.StatusBadRequest, "Failed to read request body")
 		return
@@ -906,9 +906,9 @@ func (s *Server) handleAPIWAFImportRules(w http.ResponseWriter, r *http.Request)
 
 			if err := s.wafEngine.Engine.AddRule(rule); err != nil {
 				failedRules = append(failedRules, map[string]interface{}{
-					"id":      rule.ID,
-					"name":    rule.Name,
-					"error":   err.Error(),
+					"id":    rule.ID,
+					"name":  rule.Name,
+					"error": err.Error(),
 				})
 			} else {
 				importedRules = append(importedRules, rule)
@@ -998,4 +998,3 @@ func (s *Server) handleAPIWAFImportRules(w http.ResponseWriter, r *http.Request)
 		s.log.WithError(err).Error("Failed to encode WAF import rules response")
 	}
 }
-

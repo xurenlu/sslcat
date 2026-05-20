@@ -16,32 +16,32 @@ import (
 
 // ConfigVersion 配置版本信息
 type ConfigVersion struct {
-	ID          string    `json:"id"`           // 版本唯一ID
-	Version     int       `json:"version"`      // 版本号
-	Timestamp   time.Time `json:"timestamp"`    // 创建时间
-	Hash        string    `json:"hash"`         // 配置文件MD5哈希
-	FilePath    string    `json:"file_path"`    // 备份文件路径
-	Size        int64     `json:"size"`         // 文件大小
-	Author      string    `json:"author"`       // 作者（谁创建的备份）
-	Description string    `json:"description"`  // 版本描述/注释
-	IsAuto      bool      `json:"is_auto"`      // 是否为自动备份
-	IsDaily     bool      `json:"is_daily"`     // 是否为按天备份
+	ID          string    `json:"id"`             // 版本唯一ID
+	Version     int       `json:"version"`        // 版本号
+	Timestamp   time.Time `json:"timestamp"`      // 创建时间
+	Hash        string    `json:"hash"`           // 配置文件MD5哈希
+	FilePath    string    `json:"file_path"`      // 备份文件路径
+	Size        int64     `json:"size"`           // 文件大小
+	Author      string    `json:"author"`         // 作者（谁创建的备份）
+	Description string    `json:"description"`    // 版本描述/注释
+	IsAuto      bool      `json:"is_auto"`        // 是否为自动备份
+	IsDaily     bool      `json:"is_daily"`       // 是否为按天备份
 	Date        string    `json:"date,omitempty"` // 日期（用于按天备份，格式：2006-01-02）
 }
 
 // VersionManager 版本管理器
 type VersionManager struct {
-	configFile  string
-	configDir   string
-	configBase  string
-	versions    []*ConfigVersion
-	versionMap  map[string]*ConfigVersion // id -> version
-	mutex       sync.RWMutex
-	log         *logrus.Entry
+	configFile string
+	configDir  string
+	configBase string
+	versions   []*ConfigVersion
+	versionMap map[string]*ConfigVersion // id -> version
+	mutex      sync.RWMutex
+	log        *logrus.Entry
 
 	// 配置
-	maxVersions     int // 最多保留的版本数
-	maxDailyBackups int // 最多保留的按天备份数
+	maxVersions     int  // 最多保留的版本数
+	maxDailyBackups int  // 最多保留的按天备份数
 	autoBackup      bool // 是否自动备份
 }
 
@@ -119,14 +119,14 @@ func (vm *VersionManager) loadVersionBackups() error {
 		}
 
 		cv := &ConfigVersion{
-			ID:         vm.generateID("v", version),
-			Version:    version,
-			Timestamp:  info.ModTime(),
-			Hash:       hash,
-			FilePath:   file,
-			Size:       info.Size(),
-			IsAuto:     true,
-			IsDaily:    false,
+			ID:        vm.generateID("v", version),
+			Version:   version,
+			Timestamp: info.ModTime(),
+			Hash:      hash,
+			FilePath:  file,
+			Size:      info.Size(),
+			IsAuto:    true,
+			IsDaily:   false,
 		}
 
 		vm.versions = append(vm.versions, cv)
@@ -170,15 +170,15 @@ func (vm *VersionManager) loadDailyBackups() error {
 		}
 
 		cv := &ConfigVersion{
-			ID:         fmt.Sprintf("daily-%s", dateStr),
-			Version:    -1, // 按天备份没有版本号
-			Timestamp:  info.ModTime(),
-			Hash:       hash,
-			FilePath:   file,
-			Size:       info.Size(),
-			IsAuto:     true,
-			IsDaily:    true,
-			Date:       dateStr,
+			ID:        fmt.Sprintf("daily-%s", dateStr),
+			Version:   -1, // 按天备份没有版本号
+			Timestamp: info.ModTime(),
+			Hash:      hash,
+			FilePath:  file,
+			Size:      info.Size(),
+			IsAuto:    true,
+			IsDaily:   true,
+			Date:      dateStr,
 		}
 
 		vm.versions = append(vm.versions, cv)
@@ -271,7 +271,7 @@ func (vm *VersionManager) CreateVersion(author, description string) (*ConfigVers
 	backupFile := filepath.Join(vm.configDir, fmt.Sprintf("%s.backup.v%d", vm.configBase, newVersion))
 
 	// 写入备份文件
-	if err := os.WriteFile(backupFile, data, 0644); err != nil {
+	if err := writeFileAtomically(backupFile, data, 0644); err != nil {
 		return nil, fmt.Errorf("failed to write backup file: %w", err)
 	}
 
@@ -321,7 +321,7 @@ func (vm *VersionManager) RollbackToVersion(id string) error {
 	}
 
 	// 写入到配置文件
-	if err := os.WriteFile(vm.configFile, data, 0644); err != nil {
+	if err := writeFileAtomically(vm.configFile, data, 0644); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
@@ -452,7 +452,7 @@ func (vm *VersionManager) backupCurrentConfig(author, description string) error 
 	versionID := vm.generateID("v", newVersion)
 	backupFile := filepath.Join(vm.configDir, fmt.Sprintf("%s.backup.v%d", vm.configBase, newVersion))
 
-	if err := os.WriteFile(backupFile, data, 0644); err != nil {
+	if err := writeFileAtomically(backupFile, data, 0644); err != nil {
 		return err
 	}
 
@@ -634,7 +634,7 @@ func (vm *VersionManager) ExportVersion(id, exportPath string) error {
 	}
 
 	// 写入到导出路径
-	if err := os.WriteFile(exportPath, data, 0644); err != nil {
+	if err := writeFileAtomically(exportPath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write export file: %w", err)
 	}
 
@@ -673,7 +673,7 @@ func (vm *VersionManager) ImportVersion(importPath, author, description string) 
 	backupFile := filepath.Join(vm.configDir, fmt.Sprintf("%s.backup.v%d", vm.configBase, newVersion))
 
 	// 写入备份文件
-	if err := os.WriteFile(backupFile, data, 0644); err != nil {
+	if err := writeFileAtomically(backupFile, data, 0644); err != nil {
 		return nil, fmt.Errorf("failed to write backup file: %w", err)
 	}
 

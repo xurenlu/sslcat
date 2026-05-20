@@ -25,7 +25,7 @@ func saveWebAuthnSession(key string, sessionData *webauthn.SessionData) {
 	webauthnSessionStore.Lock()
 	defer webauthnSessionStore.Unlock()
 	webauthnSessionStore.data[key] = sessionData
-	
+
 	// 5分钟后自动清理
 	go func() {
 		time.Sleep(5 * time.Minute)
@@ -142,7 +142,7 @@ func (s *Server) handleAPIWebAuthnBeginRegistration(w http.ResponseWriter, r *ht
 	// CredentialCreation 结构：{ Response: { PublicKey: {...} } }
 	// 序列化后可能是 { Response: { PublicKey: {...} } } 或 { publicKey: {...} }
 	var publicKeyOptions map[string]interface{}
-	
+
 	// 先检查 Response.PublicKey
 	if response, ok := optionsMap["Response"].(map[string]interface{}); ok {
 		s.log.Infof("找到 Response 字段")
@@ -169,10 +169,10 @@ func (s *Server) handleAPIWebAuthnBeginRegistration(w http.ResponseWriter, r *ht
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":      true,
-		"options":      publicKeyOptions, // 直接返回 publicKeyOptions，不再包装
-		"session_key":  sessionKey,
-		"device_name":  req.DeviceName,
+		"success":     true,
+		"options":     publicKeyOptions, // 直接返回 publicKeyOptions，不再包装
+		"session_key": sessionKey,
+		"device_name": req.DeviceName,
 	})
 }
 
@@ -188,7 +188,7 @@ func (s *Server) handleAPIWebAuthnFinishRegistration(w http.ResponseWriter, r *h
 	}
 
 	// 读取请求体
-	bodyBytes, err := io.ReadAll(r.Body)
+	bodyBytes, err := s.readLimitedRequestBody(w, r, defaultJSONBodyLimit)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": "读取请求体失败"})
@@ -242,14 +242,6 @@ func (s *Server) handleAPIWebAuthnFinishRegistration(w http.ResponseWriter, r *h
 		return
 	}
 
-	// 调试：打印响应内容（前500字符）
-	responseStr := string(responseBytes)
-	if len(responseStr) > 500 {
-		s.log.Infof("WebAuthn 注册响应 (前500字符): %s...", responseStr[:500])
-	} else {
-		s.log.Infof("WebAuthn 注册响应: %s", responseStr)
-	}
-
 	// 创建新的请求体供 webauthn 库使用
 	r.Body = io.NopCloser(bytes.NewBuffer(responseBytes))
 
@@ -257,7 +249,6 @@ func (s *Server) handleAPIWebAuthnFinishRegistration(w http.ResponseWriter, r *h
 	credential, err := s.webauthnManager.webauthn.FinishRegistration(user, *sessionData, r)
 	if err != nil {
 		s.log.Errorf("完成 WebAuthn 注册失败: %v", err)
-		s.log.Errorf("请求体内容: %s", string(responseBytes))
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": "注册失败: " + err.Error()})
 		return
@@ -409,7 +400,7 @@ func (s *Server) handleAPIWebAuthnFinishLogin(w http.ResponseWriter, r *http.Req
 	}
 
 	// 读取请求体
-	bodyBytes, err := io.ReadAll(r.Body)
+	bodyBytes, err := s.readLimitedRequestBody(w, r, defaultJSONBodyLimit)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": "读取请求体失败"})
@@ -477,7 +468,7 @@ func (s *Server) handleAPIWebAuthnFinishLogin(w http.ResponseWriter, r *http.Req
 	// 创建会话
 	clientIP := s.getClientIP(r)
 	userAgent := r.Header.Get("User-Agent")
-	
+
 	// 确定用户角色（这里简化处理，实际应该从数据库获取）
 	userRole := RoleSuperAdmin // 默认超级管理员
 	if req.Username != s.config.Admin.Username {
@@ -594,4 +585,3 @@ func (s *Server) handleAPIWebAuthnDeleteCredential(w http.ResponseWriter, r *htt
 		"message": "凭证已删除",
 	})
 }
-
