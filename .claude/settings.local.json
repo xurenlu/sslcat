@@ -43,7 +43,11 @@
       "Bash(do:*)",
       "Bash(gh release delete:*)",
       "Bash(while IFS=$'\\t' read sha ref)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(awk 'NR>=1177 && /^func \\\\\\(s \\\\*Server\\\\\\) [a-zA-Z]+/{print NR\": \"$0}' /Users/rocky/Sites/sslcat/internal/web/server.go)",
+      "Bash(go vet *)",
+      "Bash(yarn tsc *)",
+      "Bash(go test *)"
     ],
     "deny": [],
     "ask": []

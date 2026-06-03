@@ -53,6 +53,8 @@ type Config struct {
 	CacheWarmup CacheWarmupConfig `json:"cache_warmup"`
 	// 报告生成配置
 	Report ReportConfig `json:"report"`
+	// MCP（Model Context Protocol）服务配置
+	MCP MCPConfig `json:"mcp"`
 }
 
 // ServerConfig 服务器配置
@@ -1191,6 +1193,15 @@ func Load(configFile string) (*Config, error) {
 			StripMetadata: false,           // 不移除元数据
 			MinSizeBytes:  60 * 1024,       // 最小文件大小 60KB
 			MaxSizeBytes:  5 * 1024 * 1024, // 最大文件大小 5MB
+		},
+		MCP: MCPConfig{
+			Enabled:    false, // 默认关闭 MCP 服务，需用户显式开启
+			PathPrefix: "/mcp",
+			Tokens:     []MCPToken{},
+			Audit: MCPAuditConfig{
+				Enabled: true,
+				File:    "./data/mcp_audit.log",
+			},
 		},
 	}
 

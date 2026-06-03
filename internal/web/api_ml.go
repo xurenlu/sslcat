@@ -14,11 +14,15 @@ import (
 
 // MLAPIHandler ML API 处理器
 type MLAPIHandler struct {
-	inferenceEngine *ml.InferenceEngine
-	forest          *ml.IsolationForest
+	inferenceEngine  *ml.InferenceEngine
+	forest           *ml.IsolationForest
 	featureExtractor *ml.FeatureExtractor
-	threatScorer    *ml.ThreatScorer
-	log             *logrus.Entry
+	threatScorer     *ml.ThreatScorer
+	sampler          *ml.RequestSampler
+	historyStore     *ml.TrainingHistoryStore
+	modelPath        string
+	onForestUpdate   func(*ml.IsolationForest)
+	log              *logrus.Entry
 }
 
 // NewMLAPIHandler 创建 ML API 处理器
@@ -38,12 +42,25 @@ func (h *MLAPIHandler) SetEngine(ie *ml.InferenceEngine, forest *ml.IsolationFor
 	h.threatScorer = scorer
 }
 
+// SetPersistence 注入样本采集器、训练历史存储、模型持久化路径，以及森林更新回调
+// 回调用于把训练后的新 forest 同步给 Server，便于 ServeHTTP 中间件读取
+func (h *MLAPIHandler) SetPersistence(sampler *ml.RequestSampler, history *ml.TrainingHistoryStore, modelPath string, onForestUpdate func(*ml.IsolationForest)) {
+	h.sampler = sampler
+	h.historyStore = history
+	h.modelPath = modelPath
+	h.onForestUpdate = onForestUpdate
+}
+
 // TrainRequest 训练请求
+// 当 AutoSample 为 true 时（前端默认），后端直接从内置 RequestSampler 取最近 N 条真实请求样本训练
+// 否则使用前端传入的 Samples
 type TrainRequest struct {
 	Samples       [][]float64 `json:"samples"`
 	NTrees        int         `json:"n_trees"`
 	MaxSamples    int         `json:"max_samples"`
 	Contamination float64     `json:"contamination"`
+	AutoSample    bool        `json:"auto_sample"`
+	Triggered     string      `json:"triggered,omitempty"` // "ui" | "api" | "scheduler"
 }
 
 // PredictRequest 预测请求
@@ -62,17 +79,20 @@ type FeedbackRequest struct {
 
 // StatsResponse 统计响应
 type StatsResponse struct {
-	ModelLoaded    bool                   `json:"model_loaded"`
-	TotalSamples   int                    `json:"total_samples"`
-	FeatureDim     int                    `json:"feature_dim"`
-	NTrees         int                    `json:"n_trees"`
-	Contamination  float64                `json:"contamination"`
-	TotalPredictions int64                `json:"total_predictions"`
-	AnomalyCount   int64                  `json:"anomaly_count"`
-	Threshold      float64                `json:"threshold"`
-	AvgTreeDepth   float64                `json:"avg_tree_depth"`
-	LastTraining   string                 `json:"last_training"`
-	RecentPredictions []ml.AnomalyPrediction `json:"recent_predictions,omitempty"`
+	ModelLoaded          bool                   `json:"model_loaded"`
+	TotalSamples         int                    `json:"total_samples"`
+	FeatureDim           int                    `json:"feature_dim"`
+	NTrees               int                    `json:"n_trees"`
+	Contamination        float64                `json:"contamination"`
+	TotalPredictions     int64                  `json:"total_predictions"`
+	AnomalyCount         int64                  `json:"anomaly_count"`
+	Threshold            float64                `json:"threshold"`
+	AvgTreeDepth         float64                `json:"avg_tree_depth"`
+	LastTraining         string                 `json:"last_training,omitempty"`
+	TrainingHistoryCount int                    `json:"training_history_count"`
+	CollectedSamples     int                    `json:"collected_samples"`
+	TotalObserved        int64                  `json:"total_observed"`
+	RecentPredictions    []ml.AnomalyPrediction `json:"recent_predictions,omitempty"`
 }
 
 // RegisterRoutes 注册路由
@@ -110,42 +130,64 @@ func (h *MLAPIHandler) handleTrain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 验证请求
-	if len(req.Samples) == 0 {
-		h.sendError(w, "No samples provided", fmt.Errorf("empty samples"))
-		return
+	// 确定样本来源
+	var samples [][]float64
+	sampleSource := "manual"
+	switch {
+	case req.AutoSample:
+		if h.sampler == nil {
+			h.sendError(w, "Sampler not initialized", fmt.Errorf("sampler is nil"))
+			return
+		}
+		samples = h.sampler.Vectors()
+		sampleSource = "auto"
+		if len(samples) == 0 {
+			h.sendError(w, "No samples collected yet; let some traffic flow first or send samples manually",
+				fmt.Errorf("sampler empty"))
+			return
+		}
+	case len(req.Samples) > 0:
+		samples = req.Samples
+	default:
+		// 兼容旧用法：没传 samples 也没开 auto_sample，尝试自动采样
+		if h.sampler != nil {
+			samples = h.sampler.Vectors()
+			sampleSource = "auto"
+		}
+		if len(samples) == 0 {
+			h.sendError(w, "No samples provided", fmt.Errorf("empty samples"))
+			return
+		}
 	}
 
 	// 计算特征维度
-	featureDim := len(req.Samples[0])
+	featureDim := len(samples[0])
 	if featureDim == 0 {
 		h.sendError(w, "Invalid feature dimension", fmt.Errorf("feature dimension is 0"))
 		return
 	}
 
 	// 创建或更新森林配置
-	config := &ml.ForestConfig{
+	cfg := &ml.ForestConfig{
 		NTrees:        req.NTrees,
 		MaxSamples:    req.MaxSamples,
 		Contamination: req.Contamination,
 	}
-
-	if config.NTrees == 0 {
-		config.NTrees = 100
+	if cfg.NTrees == 0 {
+		cfg.NTrees = 100
 	}
-	if config.MaxSamples == 0 {
-		config.MaxSamples = 256
+	if cfg.MaxSamples == 0 {
+		cfg.MaxSamples = 256
 	}
-	if config.Contamination == 0 {
-		config.Contamination = 0.1
+	if cfg.Contamination == 0 {
+		cfg.Contamination = 0.1
 	}
 
-	// 创建新的森林
-	newForest := ml.NewIsolationForest(featureDim, config)
-
-	// 训练
-	h.log.Infof("开始训练 ML 模型: %d 树, %d 特征, %d 样本", config.NTrees, featureDim, len(req.Samples))
-	if err := newForest.Fit(req.Samples); err != nil {
+	// 创建并训练森林
+	newForest := ml.NewIsolationForest(featureDim, cfg)
+	h.log.Infof("开始训练 ML 模型: %d 树, %d 特征, %d 样本 (来源=%s)",
+		cfg.NTrees, featureDim, len(samples), sampleSource)
+	if err := newForest.Fit(samples); err != nil {
 		h.sendError(w, "Training failed", err)
 		return
 	}
@@ -155,17 +197,57 @@ func (h *MLAPIHandler) handleTrain(w http.ResponseWriter, r *http.Request) {
 	if h.inferenceEngine != nil && h.featureExtractor != nil {
 		h.inferenceEngine.SetModel(h.forest, h.featureExtractor)
 	}
+	if h.onForestUpdate != nil {
+		h.onForestUpdate(newForest)
+	}
 
 	duration := time.Since(startTime)
+	stats := newForest.GetStats()
+
+	// 持久化模型 + 写训练历史（失败也不阻断）
+	if h.modelPath != "" {
+		if err := ml.SaveModelJSON(newForest, h.modelPath); err != nil {
+			h.log.WithError(err).Warn("Failed to persist ML model")
+		}
+	}
+
+	triggered := req.Triggered
+	if triggered == "" {
+		triggered = "api"
+	}
+	if h.historyStore != nil {
+		entry := ml.TrainingHistoryEntry{
+			ID:            fmt.Sprintf("train_%d", time.Now().UnixNano()),
+			Timestamp:     time.Now(),
+			NTrees:        cfg.NTrees,
+			MaxSamples:    cfg.MaxSamples,
+			Contamination: cfg.Contamination,
+			FeatureDim:    featureDim,
+			SampleCount:   len(samples),
+			SampleSource:  sampleSource,
+			DurationMS:    duration.Milliseconds(),
+			Triggered:     triggered,
+		}
+		if v, ok := stats["threshold"].(float64); ok {
+			entry.Threshold = v
+		}
+		if v, ok := stats["avg_tree_depth"].(float64); ok {
+			entry.AvgTreeDepth = v
+		}
+		if err := h.historyStore.Append(entry); err != nil {
+			h.log.WithError(err).Warn("Failed to append training history")
+		}
+	}
 
 	h.sendJSON(w, map[string]interface{}{
 		"success":       true,
 		"message":       "Model trained successfully",
-		"n_trees":       config.NTrees,
-		"max_samples":   config.MaxSamples,
-		"contamination": config.Contamination,
+		"n_trees":       cfg.NTrees,
+		"max_samples":   cfg.MaxSamples,
+		"contamination": cfg.Contamination,
 		"feature_dim":   featureDim,
-		"total_samples": len(req.Samples),
+		"total_samples": len(samples),
+		"sample_source": sampleSource,
 		"duration_ms":   duration.Milliseconds(),
 		"timestamp":     time.Now().Format(time.RFC3339),
 	})
@@ -173,25 +255,30 @@ func (h *MLAPIHandler) handleTrain(w http.ResponseWriter, r *http.Request) {
 
 // handleStats 获取模型统计
 func (h *MLAPIHandler) handleStats(w http.ResponseWriter, r *http.Request) {
-	if h.forest == nil {
-		h.sendJSON(w, StatsResponse{
-			ModelLoaded: false,
-		})
-		return
-	}
+	// 即使没有 forest，也返回采样器和训练历史信息（前端友好显示）
+	response := StatsResponse{}
 
-	// 获取森林统计
-	forestStats := h.forest.GetStats()
-
-	response := StatsResponse{
-		ModelLoaded:      true,
-		TotalSamples:     forestStats["total_samples"].(int),
-		FeatureDim:       forestStats["feature_dim"].(int),
-		NTrees:           forestStats["n_trees"].(int),
-		Contamination:    forestStats["contamination"].(float64),
-		Threshold:        forestStats["threshold"].(float64),
-		AvgTreeDepth:     forestStats["avg_tree_depth"].(float64),
-		LastTraining:     time.Now().Format(time.RFC3339),
+	if h.forest != nil {
+		forestStats := h.forest.GetStats()
+		response.ModelLoaded = true
+		if v, ok := forestStats["total_samples"].(int); ok {
+			response.TotalSamples = v
+		}
+		if v, ok := forestStats["feature_dim"].(int); ok {
+			response.FeatureDim = v
+		}
+		if v, ok := forestStats["n_trees"].(int); ok {
+			response.NTrees = v
+		}
+		if v, ok := forestStats["contamination"].(float64); ok {
+			response.Contamination = v
+		}
+		if v, ok := forestStats["threshold"].(float64); ok {
+			response.Threshold = v
+		}
+		if v, ok := forestStats["avg_tree_depth"].(float64); ok {
+			response.AvgTreeDepth = v
+		}
 	}
 
 	// 获取推理引擎统计
@@ -203,6 +290,20 @@ func (h *MLAPIHandler) handleStats(w http.ResponseWriter, r *http.Request) {
 		if anomalyCount, ok := engineStats["anomaly_count"].(int64); ok {
 			response.AnomalyCount = anomalyCount
 		}
+	}
+
+	// 真实的最近训练时间（来自 history store）
+	if h.historyStore != nil {
+		if last := h.historyStore.Last(); last != nil {
+			response.LastTraining = last.Timestamp.Format(time.RFC3339)
+			response.TrainingHistoryCount = len(h.historyStore.List(0))
+		}
+	}
+
+	// 采样器统计（用于前端"已收集样本"展示）
+	if h.sampler != nil {
+		response.CollectedSamples = h.sampler.Size()
+		response.TotalObserved = h.sampler.TotalObserved()
 	}
 
 	h.sendJSON(w, response)

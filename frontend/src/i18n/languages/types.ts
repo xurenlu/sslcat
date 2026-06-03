@@ -424,6 +424,27 @@ export interface Translation {
     threatLevelMedium?: string
     threatLevelLow?: string
     threatLevelNormal?: string
+    collectedSamples?: string
+    collectedSamplesHint?: string
+    totalObserved?: string
+    trainingHistory?: string
+    noTrainingHistory?: string
+    historyTime?: string
+    historyTrigger?: string
+    historySource?: string
+    historySamples?: string
+    historyDuration?: string
+    historyNTrees?: string
+    historyContamination?: string
+    autoSampleHint?: string
+    trainSuccess?: string
+    trainFailed?: string
+    needMoreSamples?: string
+    sourceAuto?: string
+    sourceManual?: string
+    triggerUI?: string
+    triggerAPI?: string
+    triggerScheduler?: string
   }
   
   // 访问统计

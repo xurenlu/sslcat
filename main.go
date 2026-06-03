@@ -39,7 +39,7 @@ import (
 )
 
 var (
-	version = "2.0.0-rc41"
+	version = "2.1.0-rc3"
 	build   = "dev"
 )
 
@@ -90,6 +90,7 @@ func main() {
 		cliManager.RegisterHelpCommand()
 		cliManager.RegisterConsoleCommand()
 		cliManager.RegisterRenewDueCommand()
+		cliManager.RegisterMCPCommands()
 
 		// 解析配置文件路径：未指定 -config 时，若存在系统安装配置则优先使用（与 systemd 服务一致）
 		configFile := "sslcat.conf"

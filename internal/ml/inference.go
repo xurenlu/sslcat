@@ -4,6 +4,7 @@ import (
 	"math"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -74,9 +75,12 @@ type InferenceEngine struct {
 	queueFullStrategy  string        // 队列满时的策略: "drop" | "wait" | "error"
 	droppedRequests    int64         // 丢弃的请求计数
 
-	// 统计
+	// 统计（使用 atomic 操作）
 	totalPredictions int64
 	anomalyCount     int64
+
+	// 最近预测缓冲区（环形）
+	recentPredictions *PredictionBuffer
 
 	log *logrus.Entry
 }
@@ -109,10 +113,19 @@ func NewInferenceEngineWithConfig(workerSize, maxQueueSize int, batchTimeout tim
 		workerPoolSize:    workerSize,
 		maxQueueSize:      maxQueueSize,
 		queueFullStrategy: queueStrategy,
+		recentPredictions: NewPredictionBuffer(200),
 		log: logrus.WithFields(logrus.Fields{
 			"component": "inference_engine",
 		}),
 	}
+}
+
+// RecentPredictions 返回最近 N 条预测结果（最新在前）
+func (ie *InferenceEngine) RecentPredictions(limit int) []AnomalyPrediction {
+	if ie.recentPredictions == nil {
+		return nil
+	}
+	return ie.recentPredictions.Recent(limit)
 }
 
 // Start 启动推理引擎
@@ -284,10 +297,22 @@ func (ie *InferenceEngine) processBatch() {
 	wg.Wait()
 }
 
-// updateStats 更新统计
+// updateStats 更新统计计数 + 写入最近预测缓冲区
 func (ie *InferenceEngine) updateStats(pred *AnomalyPrediction) {
-	// 原子操作更新计数器
-	// 注意：实际使用 sync/atomic 或其他原子操作
+	if pred == nil {
+		return
+	}
+	atomic.AddInt64(&ie.totalPredictions, 1)
+	if pred.IsAnomaly {
+		atomic.AddInt64(&ie.anomalyCount, 1)
+	}
+	if ie.recentPredictions != nil {
+		// 入 buffer 时去掉重的字段（FeatureVector / Features 这俩内存大且对前端无用）
+		light := *pred
+		light.FeatureVector = nil
+		light.Features = nil
+		ie.recentPredictions.Push(light)
+	}
 }
 
 // generateReason 生成异常原因
@@ -631,16 +656,16 @@ func (ie *InferenceEngine) GetStats() map[string]interface{} {
 	ie.batchMutex.Unlock()
 
 	stats := map[string]interface{}{
-		"total_predictions":    ie.totalPredictions,
-		"anomaly_count":        ie.anomalyCount,
-		"model_loaded":         ie.forest != nil,
-		"cache_size":           len(ie.predictionCache),
-		"worker_pool_size":     ie.workerPoolSize,
-		"max_queue_size":       maxQueueSize,
-		"current_queue_len":    currentQueueLen,
-		"queue_full_strategy":  ie.queueFullStrategy,
-		"dropped_requests":     dropped,
-		"queue_utilization":    float64(currentQueueLen) / float64(maxQueueSize) * 100,
+		"total_predictions":   atomic.LoadInt64(&ie.totalPredictions),
+		"anomaly_count":       atomic.LoadInt64(&ie.anomalyCount),
+		"model_loaded":        ie.forest != nil,
+		"cache_size":          len(ie.predictionCache),
+		"worker_pool_size":    ie.workerPoolSize,
+		"max_queue_size":      maxQueueSize,
+		"current_queue_len":   currentQueueLen,
+		"queue_full_strategy": ie.queueFullStrategy,
+		"dropped_requests":    dropped,
+		"queue_utilization":   float64(currentQueueLen) / float64(maxQueueSize) * 100,
 	}
 
 	if ie.forest != nil {

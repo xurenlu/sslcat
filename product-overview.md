@@ -2,7 +2,7 @@
 
 ## 当前定位
 
-SSLcat 是一个集成 SSL 证书管理、反向代理、WAF、安全审计、站点托管和 Git 部署能力的自托管网关管理工具。当前 2.0.0 rc 主线重点是提升管理面板、证书自动化、代理稳定性和安全防护的可用性。
+SSLcat 是一个集成 SSL 证书管理、反向代理、WAF、安全审计、站点托管和 Git 部署能力的自托管网关管理工具。2.0.x rc 主线侧重稳定性，2.1.x 起新增 **MCP 内置接入**，让 AI 客户端可以直接担任运维助理。
 
 ## 主要功能
 
@@ -11,6 +11,7 @@ SSLcat 是一个集成 SSL 证书管理、反向代理、WAF、安全审计、�
 - 管理面板、多用户、会话、审计日志和配置版本管理。
 - WAF、DDoS、防爆破、IP/UA/TLS 指纹封禁和白名单管理。
 - 运行监控、慢请求分析、缓存、压缩和图片优化。
+- **MCP（Model Context Protocol）内置服务**：sslcat 自身即是 MCP server，可被 Claude / Cursor / Cherry Studio 等 AI 客户端直接调用，AI 通过 tool 调用即可完成站点、证书、转发的查询与管理。默认关闭；启用时需通过 `sslcat mcp token create` 颁发独立 token，支持 scope、IP 白名单、速率限制与审计日志。
 
 ## 当前设计取向
 
@@ -31,6 +32,8 @@ SSLcat 是一个集成 SSL 证书管理、反向代理、WAF、安全审计、�
 
 ## 版本记录
 
+- `2.1.0-rc3`：AI 异常检测真实化。修复前端"训练模型"按钮空转、"最近检测"硬编码假数据、`total_predictions` 永远为 0 的问题。新增内置 `RequestSampler` 真实流量采样、模型 JSON 持久化（`${data_dir}/ml/isolation_forest.json`）、训练历史 JSON 存储、`InferenceEngine` 真实统计与最近预测环形缓冲、新接口 `predictions/recent` 与 `training/history`、`ServeHTTP` defer 异步采样+推理接入主流量。
+- `2.1.0-rc1`：MCP 内置接入 P1。新增 `internal/mcp` 协议骨架、Streamable HTTP transport、独立 Token + Scope/RBAC 鉴权、审计日志，以及 4 个只读工具 `version_info / site_list / cert_list / proxy_route_list`。新增 CLI 子命令 `sslcat mcp [enable|disable|token|doctor]`。默认关闭。
 - `2.0.0-rc41`：移除 GitHub Actions 中 setup-node 的 Yarn 缓存预探测，避免其在 Corepack 启用前调用全局 Yarn 1 导致 release 构建失败。
 - `2.0.0-rc40`：固定 GitHub Actions 前端构建使用 Yarn 4.15.0，并让锁文件元数据与 CI 使用的 Yarn 版本一致，避免不可变安装阶段因 lockfile 迁移失败。
 - `2.0.0-rc39`：新增 Runner Docker 容器启动对账，sslcat 重启后只读同步容器状态并恢复代理规则，不主动重启、停止或删除已运行容器。

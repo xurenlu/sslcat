@@ -5,6 +5,70 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0-rc3] - 2026-06-03
+
+### ✨ 新功能（AI 异常检测真实化）
+
+修复了 AI 异常检测面板"训练好几次却一切归零"的问题：之前前端的"训练模型"按钮只是 `setTimeout(3000)` 假装训练、并没有真正调用后端 API；"最近检测"列表里的内容是硬编码的假数据；后端推理引擎也没有接入到任何真实流量，因此 `total_predictions` 永远是 0、训练历史无处可查。
+
+- **真实训练流水线**：
+  - 新增 `internal/ml/sampler.go` 中的 `RequestSampler`，对每个进入 sslcat 的真实请求做特征提取并写入 5000 容量的环形缓冲区，作为训练样本来源；
+  - `POST /api/ml/train` 支持 `auto_sample: true` 模式，直接从样本环上抓取特征向量训练，不再依赖前端上传 `samples`；
+  - 训练完成后将森林模型 JSON 序列化持久化到 `${data_dir}/ml/isolation_forest.json`，进程下次启动时自动加载，老板再也不用每次重启都重新训练。
+- **训练历史**：
+  - 新增 `internal/ml/persistence.go` 中的 `TrainingHistoryStore`，把每次训练事件（时间、触发方、样本来源、样本数、参数、耗时、阈值、平均树深）落地到 `${data_dir}/ml/training_history.json`，最多保留 50 条；
+  - 新增接口 `GET ${admin_prefix}/api/ml/training/history?limit=20`；
+  - 前端 `AIAnalytics` 页面新增"训练历史"卡片完整展示每次训练记录。
+- **最近预测真实化**：
+  - `InferenceEngine` 新增 `PredictionBuffer`（200 条环形缓冲），所有推理结果实时入队；
+  - 新增接口 `GET ${admin_prefix}/api/ml/predictions/recent?limit=50`；
+  - 前端"最近检测"改为从此接口读取真实数据，不再展示硬编码假记录。
+- **推理接入主流量**：
+  - `Server.ServeHTTP` 的 defer 阶段新增 `feedMLAsync`，对所有非管理面板/非健康检查请求异步执行采样 + 推理；
+  - 修复 `InferenceEngine.updateStats` —— 之前是空函数，导致 `total_predictions` / `anomaly_count` 永远为 0；现在使用 `sync/atomic` 真实累加并写入预测缓冲区。
+- **统计面板真实化**：
+  - `GET /api/ml/stats` 新增 `collected_samples`、`total_observed`、`training_history_count` 字段；
+  - `last_training` 从 history store 取真实时间，而不是每次请求都现编 `time.Now()`；
+  - 即使模型未加载，stats 接口也会返回样本采集进度，便于前端引导用户"先攒样本再训练"。
+
+### 🔧 行为变更
+
+- 新增数据目录 `${data_dir}/ml/`（默认 `./data/ml/`），用于持久化模型与训练历史。
+- 推理只在森林模型已加载时执行；未训练前 sampler 仍持续累积训练样本，不影响主流量。
+- 管理后台路径（`AdminPrefix` 前缀）、`/metrics`、`/healthz`、`/favicon.ico`、`/.well-known/*` 等噪音路径不参与 ML 采样与推理。
+
+### 🌐 国际化
+
+- 新增 `aiAnalytics` 下的 `collectedSamples` / `trainingHistory` / `historyTime` / `historyTrigger` / `historySource` 等词条（zh-CN、en-US 已落地，其他语言走英文兜底）。
+
+## [2.1.0-rc1] - 2026-06-03
+
+### ✨ 新功能（P1：MCP 内置接入 - 协议骨架与只读能力）
+
+- **内置 MCP 服务**：sslcat 现在自身就是一个 MCP（Model Context Protocol）服务端。把连接串交给 Claude / Cursor / Cherry Studio 等 AI 客户端后，AI 可直接调用 sslcat 的工具来运维（首批为只读）。
+- **Streamable HTTP transport**：复用 admin server 端口，挂载在 `${admin_prefix}/mcp/stream`（默认 `/sslcat-panel/mcp/stream`）。健康检查在 `${admin_prefix}/mcp/health`。
+- **独立 Token + Scope 鉴权**：新增 `mcp.tokens` 配置段，token 以 argon2id 哈希存储，明文仅创建时返回一次。支持 scope（`read` / `site:write` / `cert:write` / `proxy:write` / `security:write` / `ops:write` / `admin`）、IP 白名单、过期时间、速率限制。
+- **审计日志**：每次 tool 调用记录 token、IP、tool 名、参数（脱敏）、状态、耗时，按日切片到 `./data/mcp_audit.YYYYMMDD.log`。
+- **首批 4 个只读工具**：
+  - `version_info` —— 返回 sslcat 版本、构建、协议版本、节点角色与代理统计；
+  - `site_list` —— 列出反向代理站点（支持 keyword 子串与启用过滤）；
+  - `cert_list` —— 列出全部证书（支持按到期天数筛选）；
+  - `proxy_route_list` —— 路由完整详情（含路径前缀规则、健康检查、会话保持、超时等）。
+- **新增 CLI 子命令**：
+  - `sslcat mcp enable` / `disable` —— 切换 MCP 服务总开关；
+  - `sslcat mcp token create --name xxx --scopes read,site:write` —— 颁发 token（明文仅打印一次）；
+  - `sslcat mcp token list` / `revoke --name xxx` —— 查看/吊销 token；
+  - `sslcat mcp doctor` —— 自检：配置、token、过期、健康检查端点。
+
+### 🔧 默认值
+
+- `config.mcp.enabled` 默认为 **false**，需用户显式开启。
+- 启用且未配置任何 token 时，服务启动会在日志中告警，并拒绝所有请求。
+
+### 📦 依赖
+
+- 无新增第三方依赖（argon2 复用项目已有的 `golang.org/x/crypto`）。
+
 ## [2.0.0-rc41] - 2026-05-21
 
 ### 🐛 Bug 修复

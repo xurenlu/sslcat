@@ -160,6 +160,11 @@ type Server struct {
 	mlFeatureExtractor *ml.FeatureExtractor
 	mlThreatScorer     *ml.ThreatScorer
 	mlForest           *ml.IsolationForest
+	mlSampler          *ml.RequestSampler
+	mlHistoryStore     *ml.TrainingHistoryStore
+	mlModelPath        string
+	mlLastTrainingMu   sync.RWMutex
+	mlLastTrainingAt   time.Time
 
 	// Zero Trust Networking (Phase 5)
 	mtlsManager *ssl.MTLSManager
@@ -731,6 +736,36 @@ func (s *Server) setupMLSystem() {
 	s.mlFeatureExtractor = ml.NewFeatureExtractor()
 	s.mlThreatScorer = ml.NewThreatScorer()
 
+	// 训练样本环形缓冲区（最近 5000 条真实请求）
+	s.mlSampler = ml.NewRequestSampler(s.mlFeatureExtractor, 5000)
+
+	// 训练历史 & 模型持久化路径
+	dataDir := s.config.Server.DataDir
+	if dataDir == "" {
+		dataDir = "./data"
+	}
+	mlDir := filepath.Join(dataDir, "ml")
+	s.mlModelPath = filepath.Join(mlDir, "isolation_forest.json")
+	s.mlHistoryStore = ml.NewTrainingHistoryStore(filepath.Join(mlDir, "training_history.json"), 50)
+
+	// 尝试加载之前持久化的模型
+	if loaded, err := ml.LoadModelJSON(s.mlModelPath); err == nil && loaded != nil {
+		s.mlForest = loaded
+		s.log.WithFields(logrus.Fields{
+			"path":          s.mlModelPath,
+			"n_trees":       loaded.NTrees,
+			"feature_dim":   loaded.FeatureDim,
+			"total_samples": loaded.TotalSamples,
+		}).Info("Loaded persisted ML model")
+		if last := s.mlHistoryStore.Last(); last != nil {
+			s.mlLastTrainingMu.Lock()
+			s.mlLastTrainingAt = last.Timestamp
+			s.mlLastTrainingMu.Unlock()
+		}
+	} else if err != nil && !os.IsNotExist(err) {
+		s.log.WithError(err).Warn("Failed to load persisted ML model")
+	}
+
 	// 从配置读取 ML 推理引擎参数
 	mlConfig := s.config.AISecurity.MLInference
 
@@ -766,8 +801,19 @@ func (s *Server) setupMLSystem() {
 	// 启动推理引擎
 	s.mlInferenceEngine.Start()
 
+	// 如果从磁盘加载到模型，把它注入推理引擎
+	if s.mlForest != nil {
+		s.mlInferenceEngine.SetModel(s.mlForest, s.mlFeatureExtractor)
+	}
+
 	// 设置 API 处理器的引擎
 	s.mlAPIHandler.SetEngine(s.mlInferenceEngine, s.mlForest, s.mlFeatureExtractor, s.mlThreatScorer)
+	s.mlAPIHandler.SetPersistence(s.mlSampler, s.mlHistoryStore, s.mlModelPath, func(f *ml.IsolationForest) {
+		s.mlForest = f
+		s.mlLastTrainingMu.Lock()
+		s.mlLastTrainingAt = time.Now()
+		s.mlLastTrainingMu.Unlock()
+	})
 
 	// 注册 ML API 路由 - 直接使用 s.mux 而不是 gorilla/mux
 	// 注意: RegisterRoutes 需要一个 gorilla/mux.Router，但这里我们使用标准库的 http.ServeMux
@@ -781,6 +827,8 @@ func (s *Server) setupMLSystem() {
 	s.mux.HandleFunc(prefix+"/feedback", s.handleMLFeedback)
 	s.mux.HandleFunc(prefix+"/threat/score", s.handleMLThreatScore)
 	s.mux.HandleFunc(prefix+"/features/extract", s.handleMLExtractFeatures)
+	s.mux.HandleFunc(prefix+"/predictions/recent", s.handleMLRecentPredictions)
+	s.mux.HandleFunc(prefix+"/training/history", s.handleMLTrainingHistory)
 
 	s.log.WithFields(logrus.Fields{
 		"worker_pool_size":    workerSize,
@@ -1641,6 +1689,9 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/cluster/status", s.handleAPIClusterStatus)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/cluster/test-master", s.handleAPIClusterTestMaster)
 
+	// MCP 服务（默认关闭，启用时挂在 admin_prefix + path_prefix 下）
+	s.setupMCPRoutes()
+
 	// 前端 SPA 路由 - 必须放在最后，作为 fallback
 	s.setupFrontendRoutes()
 
@@ -1854,6 +1905,15 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			perfMonitor := s.monitorManager.GetPerformanceMonitor()
 			isError := wrappedWriter.statusCode >= 400
 			perfMonitor.RecordRequest(duration, isError)
+		}
+
+		// ML 异常检测：采样 + 推理（异步，不阻塞主请求）
+		// 排除管理面板、静态资源、健康检查等噪音路径
+		if s.shouldFeedML(r) {
+			snapshot := r // 已经走完，直接复用
+			statusCode := wrappedWriter.statusCode
+			remoteAddr := s.getClientIP(r)
+			s.feedMLAsync(snapshot, statusCode, duration, remoteAddr)
 		}
 
 		// 记录 API 性能数据（仅针对 API 路径）
@@ -3223,77 +3283,6 @@ func (s *Server) GetMonitorManager() *monitor.Manager {
 	return s.monitorManager
 }
 
-// GetMLEngine 获取ML推理引擎
-func (s *Server) GetMLEngine() *ml.InferenceEngine {
-	return s.mlInferenceEngine
-}
-
-// GetMLFeatureExtractor 获取ML特征提取器
-func (s *Server) GetMLFeatureExtractor() *ml.FeatureExtractor {
-	return s.mlFeatureExtractor
-}
-
-// GetMLThreatScorer 获取ML威胁评分器
-func (s *Server) GetMLThreatScorer() *ml.ThreatScorer {
-	return s.mlThreatScorer
-}
-
-// ML API 处理函数
-
-// handleMLTrain 处理模型训练请求
-func (s *Server) handleMLTrain(w http.ResponseWriter, r *http.Request) {
-	if s.mlAPIHandler == nil {
-		http.Error(w, "ML system not initialized", http.StatusServiceUnavailable)
-		return
-	}
-	s.mlAPIHandler.handleTrain(w, r)
-}
-
-// handleMLStats 处理获取模型统计请求
-func (s *Server) handleMLStats(w http.ResponseWriter, r *http.Request) {
-	if s.mlAPIHandler == nil {
-		http.Error(w, "ML system not initialized", http.StatusServiceUnavailable)
-		return
-	}
-	s.mlAPIHandler.handleStats(w, r)
-}
-
-// handleMLPredict 处理预测请求
-func (s *Server) handleMLPredict(w http.ResponseWriter, r *http.Request) {
-	if s.mlAPIHandler == nil {
-		http.Error(w, "ML system not initialized", http.StatusServiceUnavailable)
-		return
-	}
-	s.mlAPIHandler.handlePredict(w, r)
-}
-
-// handleMLFeedback 处理反馈请求
-func (s *Server) handleMLFeedback(w http.ResponseWriter, r *http.Request) {
-	if s.mlAPIHandler == nil {
-		http.Error(w, "ML system not initialized", http.StatusServiceUnavailable)
-		return
-	}
-	s.mlAPIHandler.handleFeedback(w, r)
-}
-
-// handleMLThreatScore 处理威胁评分请求
-func (s *Server) handleMLThreatScore(w http.ResponseWriter, r *http.Request) {
-	if s.mlAPIHandler == nil {
-		http.Error(w, "ML system not initialized", http.StatusServiceUnavailable)
-		return
-	}
-	s.mlAPIHandler.handleThreatScore(w, r)
-}
-
-// handleMLExtractFeatures 处理特征提取请求
-func (s *Server) handleMLExtractFeatures(w http.ResponseWriter, r *http.Request) {
-	if s.mlAPIHandler == nil {
-		http.Error(w, "ML system not initialized", http.StatusServiceUnavailable)
-		return
-	}
-	s.mlAPIHandler.handleExtractFeatures(w, r)
-}
-
 // Stop 停止 Web 服务器及其管理的资源
 func (s *Server) Stop() {
 	s.log.Info("Stopping web server")
@@ -3304,159 +3293,4 @@ func (s *Server) Stop() {
 	s.log.Info("Web server stopped")
 }
 
-// ============================================
-// HTTP/2 动态控制
-// ============================================
-
-// SetHTTP2Enabled 动态启用/禁用 HTTP/2
-func (s *Server) SetHTTP2Enabled(enabled bool, reason string) {
-	s.http2Mutex.Lock()
-	defer s.http2Mutex.Unlock()
-
-	// 检查是否需要自动恢复
-	if !enabled && s.http2DisableUntil.IsZero() {
-		// 禁用 HTTP/2，默认禁用 10 分钟
-		s.http2DisableUntil = time.Now().Add(10 * time.Minute)
-		s.http2Enabled = false
-		s.http2DisableReason = reason
-		s.log.WithFields(logrus.Fields{
-			"reason":         reason,
-			"auto_resume_at": s.http2DisableUntil.Format(time.RFC3339),
-		}).Warn("HTTP/2 已被禁用，将在 10 分钟后自动恢复")
-	} else if enabled {
-		// 手动启用 HTTP/2
-		s.http2DisableUntil = time.Time{}
-		s.http2Enabled = true
-		s.http2DisableReason = ""
-		s.log.Info("HTTP/2 已被手动启用")
-	}
-}
-
-// SetHTTP2DisabledForDuration 在指定时间内禁用 HTTP/2
-func (s *Server) SetHTTP2DisabledForDuration(duration time.Duration, reason string) {
-	s.http2Mutex.Lock()
-	defer s.http2Mutex.Unlock()
-
-	s.http2Enabled = false
-	s.http2DisableUntil = time.Now().Add(duration)
-	s.http2DisableReason = reason
-
-	s.log.WithFields(logrus.Fields{
-		"duration":       duration.String(),
-		"reason":         reason,
-		"auto_resume_at": s.http2DisableUntil.Format(time.RFC3339),
-	}).Warn("HTTP/2 已被禁用")
-}
-
-// IsHTTP2Enabled 检查 HTTP/2 是否启用（考虑自动恢复）
-func (s *Server) IsHTTP2Enabled() bool {
-	s.http2Mutex.RLock()
-	defer s.http2Mutex.RUnlock()
-
-	// 检查是否需要自动恢复
-	if !s.http2Enabled && !s.http2DisableUntil.IsZero() && time.Now().After(s.http2DisableUntil) {
-		// 需要自动恢复，但需要写锁
-		s.http2Mutex.RUnlock()
-		s.http2Mutex.Lock()
-		// 双重检查
-		if !s.http2Enabled && time.Now().After(s.http2DisableUntil) {
-			s.http2Enabled = true
-			s.http2DisableUntil = time.Time{}
-			s.http2DisableReason = ""
-			s.log.Info("HTTP/2 已自动恢复启用")
-		}
-		s.http2Mutex.Unlock()
-		s.http2Mutex.RLock()
-	}
-
-	return s.http2Enabled
-}
-
-// GetHTTP2Status 获取 HTTP/2 状态信息
-func (s *Server) GetHTTP2Status() map[string]interface{} {
-	s.http2Mutex.RLock()
-	defer s.http2Mutex.RUnlock()
-
-	status := map[string]interface{}{
-		"enabled":        s.http2Enabled,
-		"config_enabled": s.config.Server.HTTP2Enabled,
-	}
-
-	if !s.http2Enabled && !s.http2DisableUntil.IsZero() {
-		remaining := time.Until(s.http2DisableUntil)
-		status["disabled_until"] = s.http2DisableUntil.Format(time.RFC3339)
-		status["remaining_seconds"] = int(remaining.Seconds())
-		status["reason"] = s.http2DisableReason
-	}
-
-	return status
-}
-
-// ============================================
-// HTTP/2 API 处理器
-// ============================================
-
-// handleHTTP2Status 处理获取 HTTP/2 状态请求
-func (s *Server) handleHTTP2Status(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"data":    s.GetHTTP2Status(),
-	})
-}
-
-// handleHTTP2Enable 处理启用 HTTP/2 请求
-func (s *Server) handleHTTP2Enable(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	s.SetHTTP2Enabled(true, "手动启用")
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"message": "HTTP/2 已启用",
-		"data":    s.GetHTTP2Status(),
-	})
-}
-
-// handleHTTP2Disable 处理禁用 HTTP/2 请求
-func (s *Server) handleHTTP2Disable(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// 解析请求参数
-	var req struct {
-		Duration int    `json:"duration"` // 禁用时长（秒），0 表示默认 10 分钟
-		Reason   string `json:"reason"`   // 禁用原因
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		// 使用默认值
-		req.Duration = 0
-		req.Reason = "手动禁用"
-	}
-
-	if req.Duration <= 0 {
-		// 使用默认 10 分钟
-		s.SetHTTP2Enabled(false, req.Reason)
-	} else {
-		s.SetHTTP2DisabledForDuration(time.Duration(req.Duration)*time.Second, req.Reason)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"message": "HTTP/2 已禁用",
-		"data":    s.GetHTTP2Status(),
-	})
-}
+// HTTP/2 动态控制与对应 API 处理器已迁移至 server_http2.go

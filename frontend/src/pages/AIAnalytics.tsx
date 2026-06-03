@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   Box,
   Heading,
@@ -22,11 +22,6 @@ import {
   AlertIcon,
   Badge,
   Divider,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
   Table,
   Thead,
   Tbody,
@@ -36,13 +31,11 @@ import {
   Spinner,
   FormControl,
   FormLabel,
-  Input,
   NumberInput,
   NumberInputField,
   NumberInputStepper,
   NumberIncrementStepper,
   NumberDecrementStepper,
-  Switch,
   Modal,
   ModalOverlay,
   ModalContent,
@@ -63,6 +56,7 @@ import {
   FiAlertTriangle,
   FiCheckCircle,
   FiTarget,
+  FiClock,
 } from 'react-icons/fi'
 import { FaBrain } from 'react-icons/fa'
 import { useConfig, buildApiPath } from '../contexts/ConfigContext'
@@ -79,28 +73,33 @@ interface MLStats {
   threshold: number
   avg_tree_depth: number
   last_training?: string
+  training_history_count?: number
+  collected_samples?: number
+  total_observed?: number
 }
 
 interface AnomalyPrediction {
   score: number
   level: string
   is_anomaly: boolean
-  confidence: number
+  confidence?: number
   timestamp: string
-  reason: string
+  reason?: string
 }
 
-interface ThreatScore {
-  overall_score: number
-  overall_level: string
-  components: {
-    [key: string]: {
-      score: number
-      weight: number
-      reason: string
-    }
-  }
-  predictions: AnomalyPrediction[]
+interface TrainingHistoryEntry {
+  id: string
+  timestamp: string
+  n_trees: number
+  max_samples: number
+  contamination: number
+  feature_dim: number
+  sample_count: number
+  sample_source: string
+  duration_ms: number
+  threshold: number
+  avg_tree_depth: number
+  triggered: string
 }
 
 const AIAnalytics: React.FC = () => {
@@ -110,7 +109,7 @@ const AIAnalytics: React.FC = () => {
 
   const [stats, setStats] = useState<MLStats | null>(null)
   const [predictions, setPredictions] = useState<AnomalyPrediction[]>([])
-  const [threatScore, setThreatScore] = useState<ThreatScore | null>(null)
+  const [history, setHistory] = useState<TrainingHistoryEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [training, setTraining] = useState(false)
 
@@ -121,7 +120,7 @@ const AIAnalytics: React.FC = () => {
 
   const { isOpen: isTrainModalOpen, onOpen: onTrainModalOpen, onClose: onTrainModalClose } = useDisclosure()
 
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       const response = await fetch(buildApiPath(adminPrefix, '/api/ml/stats'), {
         credentials: 'include',
@@ -133,74 +132,91 @@ const AIAnalytics: React.FC = () => {
     } catch (error) {
       console.error('Error loading ML stats:', error)
     }
-  }
+  }, [adminPrefix])
 
-  const loadPredictions = async () => {
-    // TODO: 实现获取最近预测的 API
-    // 暂时使用模拟数据
-    setPredictions([
-      {
-        score: 0.15,
-        level: 'normal',
-        is_anomaly: false,
-        confidence: 0.7,
-        timestamp: new Date(Date.now() - 60000).toISOString(),
-        reason: '正常访问模式',
-      },
-      {
-        score: 0.85,
-        level: 'high',
-        is_anomaly: true,
-        confidence: 0.95,
-        timestamp: new Date(Date.now() - 120000).toISOString(),
-        reason: '检测到SQL注入特征',
-      },
-    ])
-  }
+  const loadPredictions = useCallback(async () => {
+    try {
+      const response = await fetch(buildApiPath(adminPrefix, '/api/ml/predictions/recent?limit=50'), {
+        credentials: 'include',
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setPredictions(Array.isArray(data?.predictions) ? data.predictions : [])
+      }
+    } catch (error) {
+      console.error('Error loading ML predictions:', error)
+    }
+  }, [adminPrefix])
+
+  const loadHistory = useCallback(async () => {
+    try {
+      const response = await fetch(buildApiPath(adminPrefix, '/api/ml/training/history?limit=20'), {
+        credentials: 'include',
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setHistory(Array.isArray(data?.entries) ? data.entries : [])
+      }
+    } catch (error) {
+      console.error('Error loading ML training history:', error)
+    }
+  }, [adminPrefix])
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true)
-      await Promise.all([loadStats(), loadPredictions()])
+      await Promise.all([loadStats(), loadPredictions(), loadHistory()])
       setLoading(false)
     }
     loadData()
-  }, [adminPrefix])
+  }, [loadStats, loadPredictions, loadHistory])
 
   const handleTrain = async () => {
     setTraining(true)
     try {
-      // TODO: 实现真实的训练 API 调用
-      // const response = await fetch(buildApiPath(adminPrefix, '/api/ml/train'), {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   credentials: 'include',
-      //   body: JSON.stringify({
-      //     samples: [],
-      //     n_trees: nTrees,
-      //     max_samples: maxSamples,
-      //     contamination,
-      //   }),
-      // })
+      const response = await fetch(buildApiPath(adminPrefix, '/api/ml/train'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          n_trees: nTrees,
+          max_samples: maxSamples,
+          contamination,
+          auto_sample: true,
+          triggered: 'ui',
+        }),
+      })
 
-      // 模拟训练延迟
-      await new Promise(resolve => setTimeout(resolve, 3000))
+      if (!response.ok) {
+        const errBody = await response.json().catch(() => ({}))
+        const description = errBody?.error || errBody?.message ||
+          (t.aiAnalytics?.needMoreSamples ?? 'Too few samples collected.')
+        toast({
+          title: t.aiAnalytics?.trainFailed ?? 'Training failed',
+          description,
+          status: 'error',
+          duration: 6000,
+          isClosable: true,
+        })
+        return
+      }
 
+      const result = await response.json()
       toast({
-        title: '训练完成',
-        description: 'ML 模型已成功训练',
+        title: t.aiAnalytics?.trainSuccess ?? 'Training complete',
+        description: `${result.total_samples} samples · ${result.n_trees} trees · ${result.duration_ms}ms`,
         status: 'success',
-        duration: 3000,
+        duration: 4000,
         isClosable: true,
       })
 
-      await loadStats()
+      await Promise.all([loadStats(), loadHistory(), loadPredictions()])
       onTrainModalClose()
     } catch (error) {
       console.error('Error training model:', error)
       toast({
-        title: '训练失败',
-        description: error instanceof Error ? error.message : '训练模型时出错',
+        title: t.aiAnalytics?.trainFailed ?? 'Training failed',
+        description: error instanceof Error ? error.message : '',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -228,16 +244,34 @@ const AIAnalytics: React.FC = () => {
   const getThreatLevelLabel = (level: string) => {
     switch (level) {
       case 'critical':
-        return t.aiAnalytics?.threatLevelCritical ?? '严重'
+        return t.aiAnalytics?.threatLevelCritical ?? 'Critical'
       case 'high':
-        return t.aiAnalytics?.threatLevelHigh ?? '高'
+        return t.aiAnalytics?.threatLevelHigh ?? 'High'
       case 'medium':
-        return t.aiAnalytics?.threatLevelMedium ?? '中'
+        return t.aiAnalytics?.threatLevelMedium ?? 'Medium'
       case 'low':
-        return t.aiAnalytics?.threatLevelLow ?? '低'
+        return t.aiAnalytics?.threatLevelLow ?? 'Low'
       default:
-        return t.aiAnalytics?.threatLevelNormal ?? '正常'
+        return t.aiAnalytics?.threatLevelNormal ?? 'Normal'
     }
+  }
+
+  const getSourceLabel = (src: string) => {
+    if (src === 'auto') return t.aiAnalytics?.sourceAuto ?? 'Auto'
+    if (src === 'manual') return t.aiAnalytics?.sourceManual ?? 'Manual'
+    return src
+  }
+
+  const getTriggerLabel = (trg: string) => {
+    if (trg === 'ui') return t.aiAnalytics?.triggerUI ?? 'UI'
+    if (trg === 'api') return t.aiAnalytics?.triggerAPI ?? 'API'
+    if (trg === 'scheduler') return t.aiAnalytics?.triggerScheduler ?? 'Scheduler'
+    return trg
+  }
+
+  const formatDuration = (ms: number) => {
+    if (ms < 1000) return `${ms}ms`
+    return `${(ms / 1000).toFixed(2)}s`
   }
 
   if (loading) {
@@ -245,7 +279,7 @@ const AIAnalytics: React.FC = () => {
       <Box p={6} display="flex" justifyContent="center" alignItems="center" minH="400px">
         <VStack spacing={4}>
           <Spinner size="xl" thickness="4px" speed="0.65s" emptyColor="gray.200" color="blue.500" />
-          <Text>加载中...</Text>
+          <Text>{t.common.loading ?? 'Loading...'}</Text>
         </VStack>
       </Box>
     )
@@ -255,6 +289,9 @@ const AIAnalytics: React.FC = () => {
     ? ((stats.anomaly_count / stats.total_predictions) * 100).toFixed(2)
     : '0.00'
 
+  const collected = stats?.collected_samples ?? 0
+  const observed = stats?.total_observed ?? 0
+
   return (
     <Box p={6}>
       <VStack spacing={6} align="stretch">
@@ -262,13 +299,13 @@ const AIAnalytics: React.FC = () => {
         <HStack justify="space-between">
           <Heading size="lg" display="flex" alignItems="center">
             <Icon as={FaBrain} mr={3} />
-            {t.aiAnalytics?.title ?? t.aiSecurity?.title ?? 'AI 安全分析'}
+            {t.aiAnalytics?.title ?? t.aiSecurity?.title ?? 'AI Anomaly Detection'}
           </Heading>
           <HStack>
             <Button
               leftIcon={<Icon as={FiRefreshCw} />}
               variant="outline"
-              onClick={() => Promise.all([loadStats(), loadPredictions()])}
+              onClick={() => Promise.all([loadStats(), loadPredictions(), loadHistory()])}
             >
               {t.common.refresh}
             </Button>
@@ -277,7 +314,7 @@ const AIAnalytics: React.FC = () => {
               colorScheme="blue"
               onClick={onTrainModalOpen}
             >
-              {t.aiAnalytics?.trainModel ?? '训练模型'}
+              {t.aiAnalytics?.trainModel ?? 'Train Model'}
             </Button>
           </HStack>
         </HStack>
@@ -287,11 +324,11 @@ const AIAnalytics: React.FC = () => {
           <Alert status="warning" variant="left-accent">
             <AlertIcon />
             <Box flex="1">
-              <Text fontWeight="bold">{t.aiAnalytics?.modelNotLoaded ?? '模型未加载'}</Text>
-              <Text fontSize="sm">{t.aiAnalytics?.trainModelFirst ?? '请先训练模型以启用 AI 异常检测功能'}</Text>
+              <Text fontWeight="bold">{t.aiAnalytics?.modelNotLoaded ?? 'Model not loaded'}</Text>
+              <Text fontSize="sm">{t.aiAnalytics?.trainModelFirst ?? 'Please train the model first'}</Text>
             </Box>
             <Button size="sm" colorScheme="blue" onClick={onTrainModalOpen}>
-              {t.aiAnalytics?.trainNow ?? '立即训练'}
+              {t.aiAnalytics?.trainNow ?? 'Train now'}
             </Button>
           </Alert>
         )}
@@ -304,10 +341,10 @@ const AIAnalytics: React.FC = () => {
                 <Stat>
                   <StatLabel display="flex" alignItems="center">
                     <Icon as={FiDatabase} mr={2} />
-                    {t.aiAnalytics?.trainingSamples ?? '训练样本'}
+                    {t.aiAnalytics?.trainingSamples ?? 'Training samples'}
                   </StatLabel>
                   <StatNumber>{stats?.total_samples?.toLocaleString() || 0}</StatNumber>
-                  <StatHelpText>{t.aiAnalytics?.totalSamples ?? '总样本数'}</StatHelpText>
+                  <StatHelpText>{t.aiAnalytics?.totalSamples ?? 'Total samples'}</StatHelpText>
                 </Stat>
               </StatGroup>
             </CardBody>
@@ -319,10 +356,12 @@ const AIAnalytics: React.FC = () => {
                 <Stat>
                   <StatLabel display="flex" alignItems="center">
                     <Icon as={FiTarget} mr={2} />
-                    {t.aiAnalytics?.featureDimension ?? '特征维度'}
+                    {t.aiAnalytics?.collectedSamples ?? 'Collected samples'}
                   </StatLabel>
-                  <StatNumber>{stats?.feature_dim || 0}</StatNumber>
-                  <StatHelpText>{t.aiAnalytics?.dimensions ?? '维度'}</StatHelpText>
+                  <StatNumber>{collected.toLocaleString()}</StatNumber>
+                  <StatHelpText>
+                    {(t.aiAnalytics?.totalObserved ?? 'Observed')}: {observed.toLocaleString()}
+                  </StatHelpText>
                 </Stat>
               </StatGroup>
             </CardBody>
@@ -334,10 +373,10 @@ const AIAnalytics: React.FC = () => {
                 <Stat>
                   <StatLabel display="flex" alignItems="center">
                     <Icon as={FiCpu} mr={2} />
-                    {t.aiAnalytics?.forestSize ?? '森林规模'}
+                    {t.aiAnalytics?.forestSize ?? 'Forest size'}
                   </StatLabel>
                   <StatNumber>{stats?.n_trees?.toLocaleString() || 0}</StatNumber>
-                  <StatHelpText>{t.aiAnalytics?.trees ?? '棵树'}</StatHelpText>
+                  <StatHelpText>{t.aiAnalytics?.trees ?? 'trees'}</StatHelpText>
                 </Stat>
               </StatGroup>
             </CardBody>
@@ -349,12 +388,12 @@ const AIAnalytics: React.FC = () => {
                 <Stat>
                   <StatLabel display="flex" alignItems="center">
                     <Icon as={FiActivity} mr={2} />
-                    {t.aiAnalytics?.totalPredictions ?? '总预测次数'}
+                    {t.aiAnalytics?.totalPredictions ?? 'Total predictions'}
                   </StatLabel>
                   <StatNumber>{stats?.total_predictions?.toLocaleString() || 0}</StatNumber>
                   <StatHelpText>
                     <StatArrow type="increase" />
-                    {t.aiAnalytics?.continuouslyGrowing ?? '持续增长'}
+                    {t.aiAnalytics?.continuouslyGrowing ?? 'Growing'}
                   </StatHelpText>
                 </Stat>
               </StatGroup>
@@ -370,13 +409,13 @@ const AIAnalytics: React.FC = () => {
               <VStack spacing={4} align="stretch">
                 <Heading size="md" display="flex" alignItems="center">
                   <Icon as={FiShield} mr={2} />
-                  {t.aiAnalytics?.modelConfig ?? '模型配置'}
+                  {t.aiAnalytics?.modelConfig ?? 'Model configuration'}
                 </Heading>
 
                 <SimpleGrid columns={2} spacing={4}>
                   <Box>
                     <Text fontSize="sm" color="gray.500" mb={1}>
-                      {t.aiAnalytics?.contaminationThreshold ?? '污染率阈值'}
+                      {t.aiAnalytics?.contaminationThreshold ?? 'Contamination'}
                     </Text>
                     <Text fontSize="xl" fontWeight="bold">
                       {stats?.contamination || 0}
@@ -385,7 +424,7 @@ const AIAnalytics: React.FC = () => {
 
                   <Box>
                     <Text fontSize="sm" color="gray.500" mb={1}>
-                      {t.aiAnalytics?.anomalyThreshold ?? '异常阈值'}
+                      {t.aiAnalytics?.anomalyThreshold ?? 'Anomaly threshold'}
                     </Text>
                     <Text fontSize="xl" fontWeight="bold">
                       {stats?.threshold?.toFixed(4) || 0}
@@ -394,7 +433,7 @@ const AIAnalytics: React.FC = () => {
 
                   <Box>
                     <Text fontSize="sm" color="gray.500" mb={1}>
-                      {t.aiAnalytics?.avgTreeDepth ?? '平均树深度'}
+                      {t.aiAnalytics?.avgTreeDepth ?? 'Avg tree depth'}
                     </Text>
                     <Text fontSize="xl" fontWeight="bold">
                       {stats?.avg_tree_depth?.toFixed(2) || 0}
@@ -403,7 +442,7 @@ const AIAnalytics: React.FC = () => {
 
                   <Box>
                     <Text fontSize="sm" color="gray.500" mb={1}>
-                      {t.aiAnalytics?.anomalyDetectionRate ?? '异常检测率'}
+                      {t.aiAnalytics?.anomalyDetectionRate ?? 'Anomaly rate'}
                     </Text>
                     <HStack>
                       <Text fontSize="xl" fontWeight="bold" color={parseFloat(anomalyRate) > 5 ? 'red.500' : 'green.500'}>
@@ -418,7 +457,7 @@ const AIAnalytics: React.FC = () => {
 
                 <Box>
                   <Text fontSize="sm" color="gray.500" mb={2}>
-                    {t.aiAnalytics?.anomalyCountTotalPrediction ?? '异常计数 / 总预测'}
+                    {t.aiAnalytics?.anomalyCountTotalPrediction ?? 'Anomalies / Predictions'}
                   </Text>
                   <Progress
                     value={parseFloat(anomalyRate)}
@@ -428,10 +467,10 @@ const AIAnalytics: React.FC = () => {
                   />
                   <HStack justify="space-between" mt={2}>
                     <Text fontSize="xs" color="gray.500">
-                      {t.aiAnalytics?.anomaly ?? '异常'}: {stats?.anomaly_count || 0}
+                      {t.aiAnalytics?.anomaly ?? 'Anomaly'}: {stats?.anomaly_count || 0}
                     </Text>
                     <Text fontSize="xs" color="gray.500">
-                      {t.aiAnalytics?.total ?? '总计'}: {stats?.total_predictions || 0}
+                      {t.aiAnalytics?.total ?? 'Total'}: {stats?.total_predictions || 0}
                     </Text>
                   </HStack>
                 </Box>
@@ -439,7 +478,7 @@ const AIAnalytics: React.FC = () => {
                 {stats?.last_training && (
                   <Box>
                     <Text fontSize="sm" color="gray.500">
-                      {t.aiAnalytics?.lastTrainingTime ?? '最后训练时间'}: {new Date(stats.last_training).toLocaleString()}
+                      {t.aiAnalytics?.lastTrainingTime ?? 'Last training'}: {new Date(stats.last_training).toLocaleString()}
                     </Text>
                   </Box>
                 )}
@@ -453,24 +492,24 @@ const AIAnalytics: React.FC = () => {
               <VStack spacing={4} align="stretch">
                 <Heading size="md" display="flex" alignItems="center">
                   <Icon as={FiTrendingUp} mr={2} />
-                  {t.aiAnalytics?.recentDetection ?? '最近检测'}
+                  {t.aiAnalytics?.recentDetection ?? 'Recent detections'}
                 </Heading>
 
-                <Box overflowX="auto" maxH="300px" overflowY="auto">
+                <Box overflowX="auto" maxH="320px" overflowY="auto">
                   <Table size="sm">
                     <Thead position="sticky" top={0} bg="white" zIndex={1}>
                       <Tr>
-                        <Th>{t.aiAnalytics?.time ?? '时间'}</Th>
-                        <Th>{t.aiAnalytics?.level ?? '等级'}</Th>
-                        <Th>{t.aiAnalytics?.score ?? '分数'}</Th>
-                        <Th>{t.aiAnalytics?.reason ?? '原因'}</Th>
+                        <Th>{t.aiAnalytics?.time ?? 'Time'}</Th>
+                        <Th>{t.aiAnalytics?.level ?? 'Level'}</Th>
+                        <Th>{t.aiAnalytics?.score ?? 'Score'}</Th>
+                        <Th>{t.aiAnalytics?.reason ?? 'Reason'}</Th>
                       </Tr>
                     </Thead>
                     <Tbody>
                       {predictions.length === 0 ? (
                         <Tr>
                           <Td colSpan={4} textAlign="center" py={8}>
-                            <Text color="gray.500">{t.aiAnalytics?.noPredictions ?? '暂无预测记录'}</Text>
+                            <Text color="gray.500">{t.aiAnalytics?.noPredictions ?? 'No predictions yet'}</Text>
                           </Td>
                         </Tr>
                       ) : (
@@ -491,7 +530,7 @@ const AIAnalytics: React.FC = () => {
                                 {!pred.is_anomaly && <Icon as={FiCheckCircle} color="green.500" />}
                               </HStack>
                             </Td>
-                            <Td whiteSpace="nowrap">{pred.reason}</Td>
+                            <Td whiteSpace="nowrap">{pred.reason || '-'}</Td>
                           </Tr>
                         ))
                       )}
@@ -503,6 +542,65 @@ const AIAnalytics: React.FC = () => {
           </Card>
         </SimpleGrid>
 
+        {/* Training History */}
+        <Card>
+          <CardBody>
+            <VStack spacing={4} align="stretch">
+              <Heading size="md" display="flex" alignItems="center">
+                <Icon as={FiClock} mr={2} />
+                {t.aiAnalytics?.trainingHistory ?? 'Training history'}
+              </Heading>
+
+              <Box overflowX="auto" maxH="320px" overflowY="auto">
+                <Table size="sm">
+                  <Thead position="sticky" top={0} bg="white" zIndex={1}>
+                    <Tr>
+                      <Th>{t.aiAnalytics?.historyTime ?? 'Time'}</Th>
+                      <Th>{t.aiAnalytics?.historyTrigger ?? 'Trigger'}</Th>
+                      <Th>{t.aiAnalytics?.historySource ?? 'Source'}</Th>
+                      <Th isNumeric>{t.aiAnalytics?.historyNTrees ?? 'Trees'}</Th>
+                      <Th isNumeric>{t.aiAnalytics?.historySamples ?? 'Samples'}</Th>
+                      <Th isNumeric>{t.aiAnalytics?.historyContamination ?? 'Contamination'}</Th>
+                      <Th isNumeric>{t.aiAnalytics?.historyDuration ?? 'Duration'}</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {history.length === 0 ? (
+                      <Tr>
+                        <Td colSpan={7} textAlign="center" py={8}>
+                          <Text color="gray.500">
+                            {t.aiAnalytics?.noTrainingHistory ?? 'No training records yet'}
+                          </Text>
+                        </Td>
+                      </Tr>
+                    ) : (
+                      history.map((entry) => (
+                        <Tr key={entry.id}>
+                          <Td whiteSpace="nowrap">{new Date(entry.timestamp).toLocaleString()}</Td>
+                          <Td>
+                            <Badge colorScheme="blue" variant="subtle">
+                              {getTriggerLabel(entry.triggered)}
+                            </Badge>
+                          </Td>
+                          <Td>
+                            <Badge colorScheme={entry.sample_source === 'auto' ? 'green' : 'purple'} variant="subtle">
+                              {getSourceLabel(entry.sample_source)}
+                            </Badge>
+                          </Td>
+                          <Td isNumeric>{entry.n_trees}</Td>
+                          <Td isNumeric>{entry.sample_count.toLocaleString()}</Td>
+                          <Td isNumeric>{entry.contamination.toFixed(2)}</Td>
+                          <Td isNumeric>{formatDuration(entry.duration_ms)}</Td>
+                        </Tr>
+                      ))
+                    )}
+                  </Tbody>
+                </Table>
+              </Box>
+            </VStack>
+          </CardBody>
+        </Card>
+
         {/* Information Cards */}
         <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
           <Card>
@@ -511,7 +609,7 @@ const AIAnalytics: React.FC = () => {
                 <Icon as={FaBrain} boxSize={8} color="blue.500" />
                 <Heading size="sm">{t.aiAnalytics?.isolationForest ?? 'Isolation Forest'}</Heading>
                 <Text fontSize="sm" color="gray.600">
-                  {t.aiAnalytics?.isolationForestDesc ?? '使用隔离森林算法进行无监督异常检测，无需标注数据即可识别异常模式'}
+                  {t.aiAnalytics?.isolationForestDesc ?? 'Unsupervised anomaly detection via Isolation Forest.'}
                 </Text>
               </VStack>
             </CardBody>
@@ -521,9 +619,9 @@ const AIAnalytics: React.FC = () => {
             <CardBody>
               <VStack spacing={3} align="start">
                 <Icon as={FiTarget} boxSize={8} color="green.500" />
-                <Heading size="sm">{t.aiAnalytics?.multiDimFeatures ?? '多维特征提取'}</Heading>
+                <Heading size="sm">{t.aiAnalytics?.multiDimFeatures ?? 'Multi-dimensional features'}</Heading>
                 <Text fontSize="sm" color="gray.600">
-                  {t.aiAnalytics?.multiDimFeaturesDesc ?? '从HTTP请求中提取40+维特征，包括URL模式、IP信誉、时序特征和行为模式'}
+                  {t.aiAnalytics?.multiDimFeaturesDesc ?? '40+ features extracted from each HTTP request.'}
                 </Text>
               </VStack>
             </CardBody>
@@ -533,9 +631,9 @@ const AIAnalytics: React.FC = () => {
             <CardBody>
               <VStack spacing={3} align="start">
                 <Icon as={FiShield} boxSize={8} color="purple.500" />
-                <Heading size="sm">{t.aiAnalytics?.smartThreatScore ?? '智能威胁评分'}</Heading>
+                <Heading size="sm">{t.aiAnalytics?.smartThreatScore ?? 'Smart threat score'}</Heading>
                 <Text fontSize="sm" color="gray.600">
-                  {t.aiAnalytics?.smartThreatScoreDesc ?? '综合异常检测、IP信誉、行为分析和时序趋势，计算综合威胁评分'}
+                  {t.aiAnalytics?.smartThreatScoreDesc ?? 'Composite score from anomaly, IP reputation, behavior and trends.'}
                 </Text>
               </VStack>
             </CardBody>
@@ -547,22 +645,25 @@ const AIAnalytics: React.FC = () => {
       <Modal isOpen={isTrainModalOpen} onClose={onTrainModalClose} size="md">
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>{t.aiAnalytics?.trainModalTitle ?? '训练 ML 模型'}</ModalHeader>
+          <ModalHeader>{t.aiAnalytics?.trainModalTitle ?? 'Train ML model'}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             <VStack spacing={4}>
               <Alert status="info" variant="left-accent">
                 <AlertIcon />
                 <Box>
-                  <Text fontWeight="bold">{t.aiAnalytics?.trainDescription ?? '训练说明'}</Text>
+                  <Text fontWeight="bold">{t.aiAnalytics?.trainDescription ?? 'Training notes'}</Text>
                   <Text fontSize="sm">
-                    {t.aiAnalytics?.trainDescriptionDetail ?? '模型将从历史请求数据中学习正常模式，训练后可自动检测异常行为'}
+                    {t.aiAnalytics?.autoSampleHint ?? 'Will use recently collected real traffic samples.'}
+                  </Text>
+                  <Text fontSize="sm" mt={1} color="gray.600">
+                    {t.aiAnalytics?.collectedSamples ?? 'Collected'}: <b>{collected.toLocaleString()}</b>
                   </Text>
                 </Box>
               </Alert>
 
               <FormControl>
-                <FormLabel>{t.aiAnalytics?.treeCount ?? '树数量'}</FormLabel>
+                <FormLabel>{t.aiAnalytics?.treeCount ?? 'Tree count'}</FormLabel>
                 <NumberInput
                   value={nTrees}
                   onChange={(_, value) => setNTrees(value)}
@@ -576,12 +677,12 @@ const AIAnalytics: React.FC = () => {
                   </NumberInputStepper>
                 </NumberInput>
                 <Text fontSize="xs" color="gray.500" mt={1}>
-                  {t.aiAnalytics?.treeCountHint ?? '更多树可提高准确性，但会增加训练时间和内存使用'}
+                  {t.aiAnalytics?.treeCountHint ?? 'More trees → better accuracy, more memory.'}
                 </Text>
               </FormControl>
 
               <FormControl>
-                <FormLabel>{t.aiAnalytics?.maxSamples ?? '最大样本数'}</FormLabel>
+                <FormLabel>{t.aiAnalytics?.maxSamples ?? 'Max samples per tree'}</FormLabel>
                 <NumberInput
                   value={maxSamples}
                   onChange={(_, value) => setMaxSamples(value)}
@@ -595,12 +696,12 @@ const AIAnalytics: React.FC = () => {
                   </NumberInputStepper>
                 </NumberInput>
                 <Text fontSize="xs" color="gray.500" mt={1}>
-                  {t.aiAnalytics?.maxSamplesHint ?? '每棵树使用的样本数，影响树的最大深度'}
+                  {t.aiAnalytics?.maxSamplesHint ?? 'Samples drawn per tree.'}
                 </Text>
               </FormControl>
 
               <FormControl>
-                <FormLabel>{t.aiAnalytics?.contamination ?? '污染率'}</FormLabel>
+                <FormLabel>{t.aiAnalytics?.contamination ?? 'Contamination'}</FormLabel>
                 <NumberInput
                   value={contamination}
                   onChange={(_, value) => setContamination(value)}
@@ -616,7 +717,7 @@ const AIAnalytics: React.FC = () => {
                   </NumberInputStepper>
                 </NumberInput>
                 <Text fontSize="xs" color="gray.500" mt={1}>
-                  {t.aiAnalytics?.contaminationHint ?? '预期异常数据比例，用于设置异常阈值'}
+                  {t.aiAnalytics?.contaminationHint ?? 'Expected anomaly ratio.'}
                 </Text>
               </FormControl>
             </VStack>
@@ -629,9 +730,9 @@ const AIAnalytics: React.FC = () => {
               colorScheme="blue"
               onClick={handleTrain}
               isLoading={training}
-              loadingText={t.aiAnalytics?.training ?? '训练中...'}
+              loadingText={t.aiAnalytics?.training ?? 'Training...'}
             >
-              {t.aiAnalytics?.startTraining ?? '开始训练'}
+              {t.aiAnalytics?.startTraining ?? 'Start training'}
             </Button>
           </ModalFooter>
         </ModalContent>
