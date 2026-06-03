@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0-rc7] - 2026-06-03
+
+### ♻️ 重构
+
+- **拆分 `internal/web/server.go`**（3296 → 1669 行），新增三个文件，保持公开 API 与业务语义不变：
+  - `server_setup.go`（450 行）：`SetupConfigReload` / `setupMLSystem` / `StopMLSystem` / `setupHTTP2ControlRoutes` / `setupConfigVersionRoutes` / `UpdateConfig` / `SetThreatIntelManager` / `cleanupOldConfigResources` / `initDNSCache` / `initConfigWatch` / `initZeroTrustComponents` / `watchConfigFile*` / `applyConfigInPlace`。
+  - `server_helpers.go`（688 行）：`isSupportedLanguage` / `hasValidCertificate` / `domainMatchesCert` / HTTP3 站点级覆盖 / `getClientIP` / `extractTLSFingerprint` / `isPrivateIP` / `isLocalhostIP/Request` / 严格 bot UA / `getCurrentUser` / `getSystemStats` / `formatDuration` / `audit` / `refreshLEPreferredHost(Loop)` / `dnsLookupNameForCertDomain` / `fetchPublicIPv4` / `handleFavicon` / `findMatchingProxyRule` / 访问日志覆盖 / `updateSharedCache` / `updateMemoryMonitor`。
+  - `server_security.go`（256 行）：`securityMiddleware` / `proxyMiddleware` / `checkAuth` / `ProxyRequestWithAuth` / `proxyRecordingWriter` 及其全部 `http.ResponseWriter` 适配方法。
+- `server.go` 仅保留：`Server` 结构体、`NewServer`、`setupRoutes`、`registerRunnerRoutes`、`ServeHTTP`、各 `Get*` 与 `Stop`。
+- **未改一行业务逻辑**：纯文件位置迁移；`go vet ./internal/web/`、`go test ./internal/web/` 全部通过。
+- **触发原因**：满足项目规则 §10（单文件 ≤ 3000 行，> 2000 行即应拆分）。
+
 ## [2.1.0-rc6] - 2026-06-03
 
 ### ✨ 新功能（P3：MCP 证书 CRUD + 长任务进度）
