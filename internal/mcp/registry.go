@@ -29,6 +29,17 @@ type CallContext struct {
 	TokenName string
 	Scopes    []Scope
 	IP        string
+
+	// Confirmed 仅对 destructive tool 有意义。
+	// server 在 handler 调用前根据 ConfirmGate 判定后填入：
+	//   - false：本次属于 dry-run / preview 阶段，handler 应返回预演结果并附带 confirm_token；
+	//   - true ：本次属于真正执行阶段，handler 可放手干。
+	// 非 destructive tool 总是 true。
+	Confirmed bool
+
+	// ConfirmToken 在 dry-run 阶段，由 server 生成并放进来，
+	// handler 应把它原样塞回响应中，方便 AI 客户端二次调用。
+	ConfirmToken string
 }
 
 // Tool 一个注册到 MCP 的工具。

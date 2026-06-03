@@ -47,7 +47,17 @@
       "Bash(awk 'NR>=1177 && /^func \\\\\\(s \\\\*Server\\\\\\) [a-zA-Z]+/{print NR\": \"$0}' /Users/rocky/Sites/sslcat/internal/web/server.go)",
       "Bash(go vet *)",
       "Bash(yarn tsc *)",
-      "Bash(go test *)"
+      "Bash(go test *)",
+      "Bash(awk '/^func|^type|^var|^const/ { if \\(prev\\) print prev_line\": \"NR-prev_line\" lines: \"prev; prev=$0; prev_line=NR } END { print prev_line\": \"NR-prev_line+1\" lines: \"prev }' /Users/rocky/Sites/sslcat/internal/web/server.go)",
+      "Bash(gh run *)",
+      "Bash(git ls-remote *)",
+      "Bash(awk '{print \"remote main:\", $1}')",
+      "Bash(awk '{print \"local origin/main:\", $0}')",
+      "Bash(grep \"^func \\(s \\\\*Server\\)\" internal/web/server_setup.go | sort -u > /tmp/setup_funcs.txt *)",
+      "Bash(git stash *)",
+      "Bash(ruby --version)",
+      "Bash(ruby tests/ml_regression.rb)",
+      "Bash(git checkout *)"
     ],
     "deny": [],
     "ask": []

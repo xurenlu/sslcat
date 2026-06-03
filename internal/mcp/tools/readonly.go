@@ -20,6 +20,23 @@ type Deps struct {
 	ConfigFile string
 	SSL        *ssl.Manager
 	Proxy      *proxy.Manager
+
+	// SaveConfig 持久化当前 *config.Config。nil 时 fallback 到 cfg.Save(ConfigFile)。
+	// 写类 tool 必须通过它持久化，便于 web.Server 在保存同时触发其它后续逻辑（如证书预取）。
+	SaveConfig func() error
+	// EnsureCert 在新增/启用 ssl_only 站点时异步预取证书。可选。
+	EnsureCert func(domain string)
+}
+
+// saveConfig 内部辅助：优先用 Deps.SaveConfig，否则裸调 cfg.Save。
+func (d *Deps) saveConfig() error {
+	if d.SaveConfig != nil {
+		return d.SaveConfig()
+	}
+	if d.Config == nil {
+		return nil
+	}
+	return d.Config.Save(d.ConfigFile)
 }
 
 // RegisterReadOnly 注册 P1 的 4 个只读 tool。

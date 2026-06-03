@@ -4,7 +4,7 @@ sslcat 自 `v2.1.0-rc1` 起内置一个 [Model Context Protocol](https://modelco
 把连接信息交给任意支持 MCP 的 AI 客户端（Claude Desktop、Cursor、Cherry Studio 等），
 AI 就能直接调用 sslcat 工具来运维。
 
-> 当前状态：**P1（只读 + 协议骨架）**。后续 P2~P5 会逐步开放站点、证书、转发等写类工具。
+> 当前状态：**P2（只读 + 站点 CRUD + destructive 二次确认 + Prometheus 指标）**。后续 P3~P5 会逐步开放证书、转发详情等写类工具。
 
 ---
 
@@ -126,6 +126,88 @@ scope 在 token 上设置；调用 tool 时会在 server 端校验，缺权限�
 ```
 
 返回反代路由的完整详情（路径前缀规则、健康检查、会话保持、超时…），适合 AI 诊断转发问题。
+
+---
+
+## P2 提供的写类工具（需 scope=site:write）
+
+### `site_add`
+
+```json
+{
+  "domain": "api.example.com",
+  "backend": { "host": "10.0.0.10", "port": 8080 },
+  "ssl_only": true,
+  "health_check": { "enabled": true, "path": "/healthz", "interval_sec": 30 }
+}
+```
+
+新增反代站点。`backend` 与 `backends` 二选一。新增成功后会异步预取证书。
+若 domain 已存在，返回 `already exists`——改用 `site_update`。
+
+### `site_update`
+
+```json
+{
+  "domain": "api.example.com",
+  "ssl_only": true,
+  "backends": [
+    { "host": "10.0.0.10", "port": 8080, "weight": 2 },
+    { "host": "10.0.0.11", "port": 8080, "weight": 1 }
+  ]
+}
+```
+
+按 domain patch 字段。未传字段不动；传 `backends` 会**整体替换**后端集合。
+
+### `site_enable` / `site_disable`
+
+```json
+{ "domain": "api.example.com" }
+```
+
+启停站点。如果已是目标状态，返回 `{ "ok": true, "no_op": true }` 不再写盘。
+启用时同样会异步预取证书。
+
+### `site_delete`（destructive）
+
+```json
+{ "domain": "api.example.com" }
+```
+
+**两阶段调用**：
+1. 第一次不带 `confirm`，返回：
+   ```json
+   {
+     "requires_confirmation": true,
+     "confirm_token": "<64 hex chars>",
+     "message": "即将删除站点 ...",
+     "preview": { "action": "delete", "site": { ... } }
+   }
+   ```
+   AI 客户端应当把 message 复述给用户，得到确认后再发第二次。
+2. 第二次带上 token：
+   ```json
+   { "domain": "api.example.com", "confirm": "<token from first call>" }
+   ```
+
+token 的生存期是 **60 秒**，并绑定 `(token_name, tool, canonicalized_args)`——
+跨工具复用、跨参数复用、跨调用方复用都会被拒绝；用过即焚，无法重放。
+
+> ⚠️ `site_delete` **只删反代路由**，不会删除已签发的证书。如需清理证书，
+> P3 完工后用 `cert_delete`（同样 destructive、同样需要二次确认）。
+
+---
+
+## Prometheus 指标（v2.1.0-rc4+）
+
+启用 MCP 后自动暴露（与现有 sslcat 指标共用 `/metrics`）：
+
+| 指标 | 类型 | 标签 | 说明 |
+|---|---|---|---|
+| `sslcat_mcp_requests_total` | counter | `tool, status` | tool 调用总次数。`status`: `ok / tool_error / error / forbidden / pending_confirm` |
+| `sslcat_mcp_request_duration_seconds` | histogram | `tool` | tool 调用耗时（秒） |
+| `sslcat_mcp_destructive_pending_confirmations` | gauge | — | 当前等待二次确认的 destructive 调用数 |
 
 ---
 

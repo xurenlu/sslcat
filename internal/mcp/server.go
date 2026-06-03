@@ -25,9 +25,19 @@ type ServerInfo struct {
 type Server struct {
 	Info     ServerInfo
 	Registry *Registry
-	Auditor  *Auditor // 可选，nil 表示不审计
+	Auditor  *Auditor     // 可选，nil 表示不审计
+	Confirm  *ConfirmGate // 可选，nil 表示对 destructive tool 不做二次确认（不推荐生产使用）
+
+	// Metrics 可选指标钩子。每次 tool 调用结束后回调一次。
+	Metrics MetricsRecorder
 
 	log *logrus.Entry
+}
+
+// MetricsRecorder Prometheus 等观测系统的钩子。
+type MetricsRecorder interface {
+	ObserveToolCall(tool, status string, latencySec float64)
+	SetPendingConfirmations(n int)
 }
 
 // NewServer 构造一个 MCP 协议核心。
@@ -176,8 +186,29 @@ func (s *Server) handleToolsCall(ctx context.Context, req *Request, caller *Call
 	}
 	if !hasScope(caller.Scopes, tool.Scope) {
 		s.audit(caller, tool, p.Arguments, "forbidden", 0)
+		s.observe(tool.Name, "forbidden", 0)
 		return NewErrorResponse(req.ID, NewError(CodeForbidden,
 			fmt.Sprintf("scope required: %s", tool.Scope)))
+	}
+
+	// destructive tool 的二次确认：
+	//   - 客户端可在 arguments 中带 "confirm": "<token>"；
+	//   - 若 ConfirmGate 命中并消费，则 Confirmed=true，handler 真正执行；
+	//   - 否则 server 生成新 token 并放进 CallContext.ConfirmToken，
+	//     handler 负责返回预演并把 token 透传给客户端。
+	if tool.Destructive && s.Confirm != nil {
+		confirmToken := extractConfirm(p.Arguments)
+		if confirmToken != "" && s.Confirm.Consume(confirmToken, tool.Name, p.Arguments, caller) {
+			caller.Confirmed = true
+		} else {
+			caller.Confirmed = false
+			caller.ConfirmToken = s.Confirm.Issue(tool.Name, p.Arguments, caller)
+		}
+		if s.Metrics != nil {
+			s.Metrics.SetPendingConfirmations(s.Confirm.PendingCount())
+		}
+	} else {
+		caller.Confirmed = true
 	}
 
 	start := time.Now()
@@ -185,12 +216,44 @@ func (s *Server) handleToolsCall(ctx context.Context, req *Request, caller *Call
 	latency := time.Since(start)
 	if err != nil {
 		s.audit(caller, tool, p.Arguments, "error: "+err.Error(), latency)
+		s.observe(tool.Name, "error", latency.Seconds())
 		// 业务层错误用 isError=true 返回 tool result，而非协议层 error，
 		// 这样 AI 客户端可以把错误内容呈现给用户。
 		return NewResponse(req.ID, ErrorResult("tool error: "+err.Error()))
 	}
-	s.audit(caller, tool, p.Arguments, statusFromResult(result), latency)
+	status := statusFromResult(result)
+	if tool.Destructive && !caller.Confirmed {
+		status = "pending_confirm"
+	}
+	s.audit(caller, tool, p.Arguments, status, latency)
+	s.observe(tool.Name, status, latency.Seconds())
 	return NewResponse(req.ID, result)
+}
+
+func (s *Server) observe(tool, status string, latencySec float64) {
+	if s.Metrics != nil {
+		s.Metrics.ObserveToolCall(tool, status, latencySec)
+	}
+}
+
+// extractConfirm 从 arguments 中读取 "confirm" 字段（字符串）。其它类型/缺失返回 ""。
+func extractConfirm(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return ""
+	}
+	v, ok := m["confirm"]
+	if !ok {
+		return ""
+	}
+	var s string
+	if err := json.Unmarshal(v, &s); err != nil {
+		return ""
+	}
+	return s
 }
 
 func statusFromResult(r ToolResult) string {

@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0-rc4] - 2026-06-03
+
+### ✨ 新功能（P2：MCP 站点 CRUD + destructive 二次确认 + Prometheus 指标）
+
+- **5 个站点写类 tool**（`scope=site:write`）：
+  - `site_add` —— 新增反代站点（支持单后端 / 多后端、ssl_only、health_check）。已存在时直接报 conflict，提示改用 `site_update`。
+  - `site_update` —— 按 domain patch 字段；传 `backends` 整体替换后端集合。
+  - `site_enable` / `site_disable` —— 启停站点；已是目标状态时返回 `no_op=true` 不再保存。
+  - `site_delete` —— `destructive=true`，标注"本工具只删反代路由，不删证书"。
+  - 写操作行为与 `/api/proxy` 完全一致：调用 `cfg.Save` + 启用站点时异步 `EnsureDomainCert`。
+- **destructive 二次确认**（`internal/mcp/confirm.go`）：
+  - destructive tool 第一次调用返回 dry-run 预演 + `confirm_token`（60 秒 TTL）；
+  - AI 把 token 放进 `arguments.confirm` 再调一次才真正执行；
+  - token 与 `(token_name, tool, canonicalized_args)` 强绑定，无法跨工具/跨参数/跨调用方复用；
+  - 不挂 `ConfirmGate` 时 destructive tool 直接执行（向后兼容）。
+- **Prometheus 指标**（`internal/mcp/metrics.go`，复用默认 registry）：
+  - `sslcat_mcp_requests_total{tool, status}` —— status 取值 `ok / tool_error / error / forbidden / pending_confirm`；
+  - `sslcat_mcp_request_duration_seconds{tool}` —— histogram；
+  - `sslcat_mcp_destructive_pending_confirmations` —— gauge，反映当前等待二次确认的 destructive 调用数。
+- **Deps 扩展**：增加 `SaveConfig` 与 `EnsureCert` 回调，write tool 通过它持久化配置与触发证书预取，避免依赖 `web.Server`。
+- **测试**：新增 ~30 个 case 覆盖二次确认 token 生命周期、站点 CRUD、destructive 服务层流程、metrics 钩子。
+
+### 🐛 Bug 修复（AI 异常检测随测试暴露）
+
+- **`FeatureExtractor.extractBehavioralFeatures` data race**：之前在 `ipStatesMutex` 读锁内只拿 IPState 指针就立即解锁，后续对 `state.UniquePaths` / `state.RequestTimes` 等 map/slice 的读取会与 `extractIPFeatures` 在写锁下的修改并发，被 `go test -race` 抓到。改为持读锁覆盖整个函数。这是接入主请求中间件后必然会触发的并发问题。
+- **`InferenceEngine.Predict` nil 解引用**：之前先调用 `ie.featureExtractor.Extract(...)` 再判断 `forest == nil`；当模型尚未加载（包括启动初期和测试场景）时 `featureExtractor` 也是 nil，直接 panic。改为先在 modelMutex 下取出 forest+extractor 再判 nil，保证 `ServeHTTP` defer 中的异步推理在冷启动期间也安全。
+
+### 🧪 自动化回归测试
+
+- **Go 单元测试**（`internal/ml/sampler_test.go` / `persistence_test.go` / `inference_test.go`，21 个用例）：覆盖 `RequestSampler` 环形覆盖与并发观测、`PredictionBuffer` 最新优先与 limit 截断、`SaveModelJSON` / `LoadModelJSON` 往返且分数一致、`TrainingHistoryStore` Append → List → maxKeep 截断、`InferenceEngine` 无模型时的安全返回、装载后真实累计 `total_predictions` / `anomaly_count`、`RecentPredictions` 不携带 `FeatureVector` / `Features` 重字段、并发 Predict 计数无 race。全部用 `-race` 跑过。
+- **Ruby 黑盒集成回归**（`tests/ml_regression.rb`，10 个用例）：通过新增的 `cmd/ml-testserver` 最小 HTTP 服务驱动训练 → 推理 → 持久化 → 重启加载完整链路，断言 cold-start / observe 累积 / 训练前后 stats 变化 / `predictions/recent` 前端契约 / `training/history` / 模型落盘 / 重启自动加载等关键回归点。报告同时输出 `reports/ml_regression.json` 与 `reports/ml_regression.md`，符合仓库"自动化测试输出 JSON + Markdown"约定。
+
 ## [2.1.0-rc3] - 2026-06-03
 
 ### ✨ 新功能（AI 异常检测真实化）

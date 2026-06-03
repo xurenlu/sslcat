@@ -3,6 +3,7 @@ package web
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/xurenlu/sslcat/internal/mcp"
 	mcptools "github.com/xurenlu/sslcat/internal/mcp/tools"
@@ -29,7 +30,7 @@ func (s *Server) setupMCPRoutes() {
 		}
 	}
 
-	// 2. 注册中心 + 只读 tool
+	// 2. 注册中心 + tool
 	registry := mcp.NewRegistry()
 	deps := &mcptools.Deps{
 		Version:    s.version,
@@ -37,17 +38,38 @@ func (s *Server) setupMCPRoutes() {
 		ConfigFile: s.config.ConfigFile,
 		SSL:        s.sslManager,
 		Proxy:      s.proxyManager,
+		// 写类 tool 需通过这里持久化（行为与 api_proxy.go 一致）
+		SaveConfig: func() error {
+			return s.config.Save(s.config.ConfigFile)
+		},
+		// 新增/启用站点时异步预取证书（与 api_proxy.go 行为一致）
+		EnsureCert: func(domain string) {
+			if s.sslManager == nil {
+				return
+			}
+			go func(d string) {
+				if err := s.sslManager.EnsureDomainCert(d); err != nil {
+					s.log.Warnf("MCP: failed to prefetch certificate for %s: %v", d, err)
+				}
+			}(domain)
+		},
 	}
 	if err := mcptools.RegisterReadOnly(registry, deps); err != nil {
 		s.log.WithError(err).Error("register MCP read-only tools failed; MCP service NOT mounted")
 		return
 	}
+	if err := mcptools.RegisterSiteWriters(registry, deps); err != nil {
+		s.log.WithError(err).Error("register MCP site writer tools failed; MCP service NOT mounted")
+		return
+	}
 
-	// 3. 协议核心
+	// 3. 协议核心 + 二次确认 + Prometheus 指标
 	srv := mcp.NewServer(mcp.ServerInfo{
 		Name:    "sslcat",
 		Version: strings.TrimPrefix(s.version, "v"),
 	}, registry, auditor)
+	srv.Confirm = mcp.NewConfirmGate(60 * time.Second)
+	srv.Metrics = mcp.NewPromMetrics()
 
 	// 4. 鉴权
 	auth := mcp.NewAuthenticator(&s.config.MCP)

@@ -32,6 +32,7 @@ SSLcat 是一个集成 SSL 证书管理、反向代理、WAF、安全审计、�
 
 ## 版本记录
 
+- `2.1.0-rc4`：MCP 内置接入 P2。新增站点写类工具 `site_add / site_update / site_enable / site_disable / site_delete`；引入 destructive 二次确认机制（dry-run 返回 `confirm_token`，60 秒 TTL，绑定 token name+tool+args 哈希，防重放）；接入 Prometheus 指标 `sslcat_mcp_requests_total / request_duration_seconds / destructive_pending_confirmations`。复用现有 `/api/proxy` 的保存行为（`cfg.Save` + 异步证书预取）。
 - `2.1.0-rc3`：AI 异常检测真实化。修复前端"训练模型"按钮空转、"最近检测"硬编码假数据、`total_predictions` 永远为 0 的问题。新增内置 `RequestSampler` 真实流量采样、模型 JSON 持久化（`${data_dir}/ml/isolation_forest.json`）、训练历史 JSON 存储、`InferenceEngine` 真实统计与最近预测环形缓冲、新接口 `predictions/recent` 与 `training/history`、`ServeHTTP` defer 异步采样+推理接入主流量。
 - `2.1.0-rc1`：MCP 内置接入 P1。新增 `internal/mcp` 协议骨架、Streamable HTTP transport、独立 Token + Scope/RBAC 鉴权、审计日志，以及 4 个只读工具 `version_info / site_list / cert_list / proxy_route_list`。新增 CLI 子命令 `sslcat mcp [enable|disable|token|doctor]`。默认关闭。
 - `2.0.0-rc41`：移除 GitHub Actions 中 setup-node 的 Yarn 缓存预探测，避免其在 Corepack 启用前调用全局 Yarn 1 导致 release 构建失败。
