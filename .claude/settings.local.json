@@ -57,7 +57,17 @@
       "Bash(git stash *)",
       "Bash(ruby --version)",
       "Bash(ruby tests/ml_regression.rb)",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(cat /Users/rocky/.claude/settings.json 2>&1 | head -100)",
+      "Bash(git check-ignore *)",
+      "Bash(go clean *)",
+      "Bash(git -C /Users/rocky/Sites/sslcat status -s)",
+      "Bash(git -C /Users/rocky/Sites/sslcat add CHANGELOG.md VERSION frontend/package.json main.go product-overview.md PRODUCT-OVERVIEW.md)",
+      "Bash(git -C /Users/rocky/Sites/sslcat diff --cached --stat)",
+      "Bash(git -C /Users/rocky/Sites/sslcat status -s PRODUCT-OVERVIEW.md product-overview.md)",
+      "Bash(git -C /Users/rocky/Sites/sslcat show :VERSION)",
+      "Bash(git -C /Users/rocky/Sites/sslcat log --oneline -3)",
+      "Bash(git -C /Users/rocky/Sites/sslcat diff --cached VERSION main.go frontend/package.json)"
     ],
     "deny": [],
     "ask": []

@@ -4,7 +4,7 @@ sslcat 自 `v2.1.0-rc1` 起内置一个 [Model Context Protocol](https://modelco
 把连接信息交给任意支持 MCP 的 AI 客户端（Claude Desktop、Cursor、Cherry Studio 等），
 AI 就能直接调用 sslcat 工具来运维。
 
-> 当前状态：**P2（只读 + 站点 CRUD + destructive 二次确认 + Prometheus 指标）**。后续 P3~P5 会逐步开放证书、转发详情等写类工具。
+> 当前状态：**P3（只读 + 站点 CRUD + 证书 CRUD + 长任务轮询 + destructive 二次确认 + Prometheus 指标）**。后续 P4~P5 会开放转发详情写类工具与 Resources。
 
 ---
 
@@ -196,6 +196,113 @@ token 的生存期是 **60 秒**，并绑定 `(token_name, tool, canonicalized_a
 
 > ⚠️ `site_delete` **只删反代路由**，不会删除已签发的证书。如需清理证书，
 > P3 完工后用 `cert_delete`（同样 destructive、同样需要二次确认）。
+
+---
+
+## P3 提供的证书 + 长任务工具
+
+### `cert_issue`（异步，scope=cert:write）
+
+```json
+{
+  "domain": "api.example.com",
+  "challenge": "http-01"
+}
+```
+
+或 DNS-01：
+
+```json
+{
+  "domain": "*.example.com",
+  "challenge": "dns-01",
+  "dns_provider": "cloudflare-prod"
+}
+```
+
+立即返回 `task_id`，**不会阻塞**。证书申请通常 10~30 秒，用 `task_status` 轮询：
+
+```json
+{
+  "ok": true,
+  "task_id": "9c8a7b6e-...",
+  "status": "pending",
+  "poll_with": "task_status",
+  "poll_example": { "task_id": "9c8a7b6e-..." }
+}
+```
+
+通配域名（`*.example.com`）自动强制 dns-01；未配置 `ssl.email` 时直接报错。
+
+### `cert_renew`（异步，scope=cert:write）
+
+参数与 `cert_issue` 相同。会先清空 ACME cache 再申请。
+
+### `cert_upload`（同步，scope=cert:write）
+
+```json
+{
+  "domain": "api.example.com",
+  "cert_pem": "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n",
+  "key_pem":  "-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----\n"
+}
+```
+
+校验顺序：PEM 解析 → cert/key 配对 → CN/SAN 覆盖 domain → 写盘 → reload。任何一步失败都返回 `isError=true`，**不会**写出半成品文件。
+
+### `cert_delete`（destructive，scope=cert:write）
+
+```json
+{ "domain": "api.example.com" }
+```
+
+两阶段（同 `site_delete`）。第一次预演会额外提示：
+
+- `used_by_site` —— 该域名是否还有反代规则在用；
+- `days_remaining` —— 还有多少天到期（避免误删长期有效证书）；
+- `self_signed` —— 是否只是自签兜底，删了无所谓。
+
+### `cert_dns_provider_list`（scope=read）
+
+无参数。返回 sslcat 已配置的 DNS 厂商及健康状态。`cert_issue` dns-01 模式之前先调它选 provider。
+
+### `task_status`（scope=read）
+
+```json
+{ "task_id": "9c8a7b6e-...", "include_events": true }
+```
+
+返回任务详情：
+
+```json
+{
+  "id": "9c8a7b6e-...",
+  "tool": "cert_issue",
+  "status": "running",
+  "progress": 60,
+  "message": "using_http01",
+  "events": [
+    { "time": "...", "progress": 5,  "status": "started",      "message": "..." },
+    { "time": "...", "progress": 30, "status": "checking_dns", "message": "..." },
+    { "time": "...", "progress": 60, "status": "using_http01", "message": "..." }
+  ],
+  "owner_name": "claude-desktop-rocky",
+  "created_at": "...",
+  "updated_at": "..."
+}
+```
+
+`status` 取值：`pending / running / succeeded / failed`。AI 客户端循环调用直到 `succeeded` 或 `failed` 即可。
+
+> 🔒 **Owner 隔离**：每个 token 只能查到自己创建的任务。`admin` scope 可查全部。
+
+### `task_list`（scope=read）
+
+```json
+{ "status": "running", "limit": 20 }
+```
+
+只返回顶层字段（id / tool / status / progress / message / 时间戳 / error），不展开 events——要详情请用 `task_status`。
 
 ---
 

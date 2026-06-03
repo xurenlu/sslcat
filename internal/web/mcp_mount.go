@@ -32,12 +32,14 @@ func (s *Server) setupMCPRoutes() {
 
 	// 2. 注册中心 + tool
 	registry := mcp.NewRegistry()
+	taskReg := mcp.NewTaskRegistry()
 	deps := &mcptools.Deps{
 		Version:    s.version,
 		Config:     s.config,
 		ConfigFile: s.config.ConfigFile,
 		SSL:        s.sslManager,
 		Proxy:      s.proxyManager,
+		Tasks:      taskReg,
 		// 写类 tool 需通过这里持久化（行为与 api_proxy.go 一致）
 		SaveConfig: func() error {
 			return s.config.Save(s.config.ConfigFile)
@@ -60,6 +62,14 @@ func (s *Server) setupMCPRoutes() {
 	}
 	if err := mcptools.RegisterSiteWriters(registry, deps); err != nil {
 		s.log.WithError(err).Error("register MCP site writer tools failed; MCP service NOT mounted")
+		return
+	}
+	if err := mcptools.RegisterCertWriters(registry, deps); err != nil {
+		s.log.WithError(err).Error("register MCP cert writer tools failed; MCP service NOT mounted")
+		return
+	}
+	if err := mcptools.RegisterTaskReaders(registry, deps); err != nil {
+		s.log.WithError(err).Error("register MCP task reader tools failed; MCP service NOT mounted")
 		return
 	}
 

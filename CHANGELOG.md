@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0-rc6] - 2026-06-03
+
+### ✨ 新功能（P3：MCP 证书 CRUD + 长任务进度）
+
+- **证书 CRUD 工具**（`scope=cert:write`）：
+  - `cert_issue` —— 异步申请 Let's Encrypt 证书；支持 http-01 / dns-01 + DNS 厂商参数；通配域名自动强制 dns-01。立即返回 `task_id`。
+  - `cert_renew` —— 强制续签（清空 ACME cache 后重申）。同样异步。
+  - `cert_upload` —— 上传自有证书。校验：PEM 解析、cert/key 配对、CN/SAN 覆盖 domain。同步操作，校验失败前不依赖 SSL manager（方便诊断）。
+  - `cert_delete` —— `destructive=true`，第一次返回预演（含是否被反代规则引用、剩余天数、是否真证书的警告），第二次带 `confirm` 才真正删。
+  - `cert_dns_provider_list`（read scope）—— 列出已配置的 DNS 厂商及健康状态。
+- **长任务模型**（`internal/mcp/tasks.go`）：
+  - `TaskRegistry` 维护进程内任务：`pending → running → succeeded/failed`，progress 0~100，最多保留 50 条 event 历史。
+  - 完成超过 7 天的任务自动 GC。
+  - **Owner 隔离**：每个任务记录创建方 `token name`；非 admin 只能读自己创建的任务；nil caller 视为内部调用（GC / 指标）放行。
+- **task 查询工具**（`scope=read`）：
+  - `task_status` —— 查询单任务详情；可选 `include_events=false` 减少返回体积。
+  - `task_list` —— 列出本 token 创建的任务，支持 status 过滤。
+- **进度桥接**：`cert_issue` / `cert_renew` 通过 `ssl.Manager.TryCreateProgressChannel` 拿独占 channel，把 `CertProgressEvent` 实时转写到 `TaskRegistry`，AI 客户端轮询 `task_status` 即可看到 `checking_dns / using_dns01 / using_http01 / success` 等 ACME 阶段。
+- **Deps 扩展**：增加 `Tasks *mcp.TaskRegistry` 字段；`mcp_mount.go` 创建 registry 并注入。
+- **测试**：21 个新 case 覆盖 TaskRegistry 全生命周期与 owner 隔离、cert_upload 的 PEM/配对/SAN 校验、cert_delete 两阶段、cert_dns_provider_list、task_status/list owner 边界。
+
+### 🔒 安全
+
+- destructive cert_delete 默认走二次确认；预演 payload 含"是否被反代引用 / 是否真证书 / 剩余天数"三项警告，让 AI 客户端有材料向用户提示。
+
+## [2.1.0-rc5] - 2026-06-03
+
+### 🐛 Bug 修复（AI 异常检测随测试暴露）
+
+- **`FeatureExtractor.extractBehavioralFeatures` data race**：之前在 `ipStatesMutex` 读锁内只拿 IPState 指针就立即解锁，后续对 `state.UniquePaths` / `state.RequestTimes` 等 map/slice 的读取会与 `extractIPFeatures` 在写锁下的修改并发，被 `go test -race` 抓到。改为持读锁覆盖整个函数。这是接入主请求中间件后必然会触发的并发问题。
+- **`InferenceEngine.Predict` nil 解引用**：之前先调用 `ie.featureExtractor.Extract(...)` 再判断 `forest == nil`；当模型尚未加载（包括启动初期和测试场景）时 `featureExtractor` 也是 nil，直接 panic。改为先在 modelMutex 下取出 forest+extractor 再判 nil，保证 `ServeHTTP` defer 中的异步推理在冷启动期间也安全。
+
+### 🧪 自动化回归测试
+
+- **Go 单元测试**（`internal/ml/sampler_test.go` / `persistence_test.go` / `inference_test.go`，21 个用例）：覆盖 `RequestSampler` 环形覆盖与并发观测、`PredictionBuffer` 最新优先与 limit 截断、`SaveModelJSON` / `LoadModelJSON` 往返且分数一致、`TrainingHistoryStore` Append → List → maxKeep 截断、`InferenceEngine` 无模型时的安全返回、装载后真实累计 `total_predictions` / `anomaly_count`、`RecentPredictions` 不携带 `FeatureVector` / `Features` 重字段、并发 Predict 计数无 race。全部用 `-race` 跑过。
+- **Ruby 黑盒集成回归**（`tests/ml_regression.rb`，10 个用例）：通过新增的 `cmd/ml-testserver` 最小 HTTP 服务驱动训练 → 推理 → 持久化 → 重启加载完整链路，断言 cold-start / observe 累积 / 训练前后 stats 变化 / `predictions/recent` 前端契约 / `training/history` / 模型落盘 / 重启自动加载等关键回归点。报告同时输出 `reports/ml_regression.json` 与 `reports/ml_regression.md`，符合仓库 CLAUDE.md 第 9 节"自动化测试输出 JSON + Markdown"约定。
+
 ## [2.1.0-rc4] - 2026-06-03
 
 ### ✨ 新功能（P2：MCP 站点 CRUD + destructive 二次确认 + Prometheus 指标）
@@ -26,16 +63,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `sslcat_mcp_destructive_pending_confirmations` —— gauge，反映当前等待二次确认的 destructive 调用数。
 - **Deps 扩展**：增加 `SaveConfig` 与 `EnsureCert` 回调，write tool 通过它持久化配置与触发证书预取，避免依赖 `web.Server`。
 - **测试**：新增 ~30 个 case 覆盖二次确认 token 生命周期、站点 CRUD、destructive 服务层流程、metrics 钩子。
-
-### 🐛 Bug 修复（AI 异常检测随测试暴露）
-
-- **`FeatureExtractor.extractBehavioralFeatures` data race**：之前在 `ipStatesMutex` 读锁内只拿 IPState 指针就立即解锁，后续对 `state.UniquePaths` / `state.RequestTimes` 等 map/slice 的读取会与 `extractIPFeatures` 在写锁下的修改并发，被 `go test -race` 抓到。改为持读锁覆盖整个函数。这是接入主请求中间件后必然会触发的并发问题。
-- **`InferenceEngine.Predict` nil 解引用**：之前先调用 `ie.featureExtractor.Extract(...)` 再判断 `forest == nil`；当模型尚未加载（包括启动初期和测试场景）时 `featureExtractor` 也是 nil，直接 panic。改为先在 modelMutex 下取出 forest+extractor 再判 nil，保证 `ServeHTTP` defer 中的异步推理在冷启动期间也安全。
-
-### 🧪 自动化回归测试
-
-- **Go 单元测试**（`internal/ml/sampler_test.go` / `persistence_test.go` / `inference_test.go`，21 个用例）：覆盖 `RequestSampler` 环形覆盖与并发观测、`PredictionBuffer` 最新优先与 limit 截断、`SaveModelJSON` / `LoadModelJSON` 往返且分数一致、`TrainingHistoryStore` Append → List → maxKeep 截断、`InferenceEngine` 无模型时的安全返回、装载后真实累计 `total_predictions` / `anomaly_count`、`RecentPredictions` 不携带 `FeatureVector` / `Features` 重字段、并发 Predict 计数无 race。全部用 `-race` 跑过。
-- **Ruby 黑盒集成回归**（`tests/ml_regression.rb`，10 个用例）：通过新增的 `cmd/ml-testserver` 最小 HTTP 服务驱动训练 → 推理 → 持久化 → 重启加载完整链路，断言 cold-start / observe 累积 / 训练前后 stats 变化 / `predictions/recent` 前端契约 / `training/history` / 模型落盘 / 重启自动加载等关键回归点。报告同时输出 `reports/ml_regression.json` 与 `reports/ml_regression.md`，符合仓库"自动化测试输出 JSON + Markdown"约定。
 
 ## [2.1.0-rc3] - 2026-06-03
 

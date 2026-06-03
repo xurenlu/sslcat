@@ -26,6 +26,9 @@ type Deps struct {
 	SaveConfig func() error
 	// EnsureCert 在新增/启用 ssl_only 站点时异步预取证书。可选。
 	EnsureCert func(domain string)
+
+	// Tasks 长任务注册表，cert_issue / cert_renew 等异步 tool 用。可为 nil（功能降级）。
+	Tasks *mcp.TaskRegistry
 }
 
 // saveConfig 内部辅助：优先用 Deps.SaveConfig，否则裸调 cfg.Save。
