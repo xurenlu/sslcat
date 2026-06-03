@@ -477,35 +477,29 @@ func (fe *FeatureExtractor) extractTimeFeatures(r *http.Request, remoteAddr stri
 }
 
 // extractBehavioralFeatures 提取行为特征
+// 注意：本函数在整段访问期间持有 ipStates 的读锁，因为 IPState 内部的 map/slice
+// 字段在 extractIPFeatures 中会被写锁修改；如果只在第 482 行拿引用就放锁，
+// 后续对 state.UniquePaths / state.RequestTimes 等的读取会与写者发生 data race。
 func (fe *FeatureExtractor) extractBehavioralFeatures(r *http.Request, remoteAddr string, responseTime time.Duration) *BehavioralFeatures {
 	fe.ipStatesMutex.RLock()
-	state := fe.ipStates[remoteAddr]
-	fe.ipStatesMutex.RUnlock()
+	defer fe.ipStatesMutex.RUnlock()
 
 	features := &BehavioralFeatures{}
 
+	state := fe.ipStates[remoteAddr]
 	if state == nil {
 		return features
 	}
 
-	// 检测路径遍历模式
 	features.PathTraversalPattern = fe.detectPathTraversalPattern(state)
-
-	// 检测参数暴力破解
 	features.ParamBruteForce = fe.detectParamBruteForce(state)
-
-	// 检测顺序访问
 	features.SequentialAccess = fe.detectSequentialAccess(state)
-
-	// 检测快速顺序请求
 	features.RapidSequentialRequests = fe.detectRapidSequentialRequests(state)
 
-	// 计算UA切换频率
 	if len(state.UserAgentHistory) > 1 {
 		features.UserAgentSwitchFrequency = float64(state.UAChangeCount) / float64(state.RequestCount)
 	}
 
-	// 检测扫描行为
 	features.IsScanning = fe.detectScanning(state)
 
 	return features

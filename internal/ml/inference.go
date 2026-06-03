@@ -163,18 +163,20 @@ func (ie *InferenceEngine) SetModel(forest *IsolationForest, extractor *FeatureE
 }
 
 // Predict 预测（同步）
+// 当模型或特征提取器尚未注入时返回 (nil, nil)，调用方应据此跳过推理；
+// 不会 panic，便于 ServeHTTP 中间件在模型加载前安全调用。
 func (ie *InferenceEngine) Predict(r *http.Request, statusCode int, responseTime time.Duration, remoteAddr string) (*AnomalyPrediction, error) {
-	// 提取特征
-	features := ie.featureExtractor.Extract(r, statusCode, responseTime, remoteAddr)
-	featureVector := ie.featureExtractor.GetFeatureVector(features)
-
 	ie.modelMutex.RLock()
 	forest := ie.forest
+	extractor := ie.featureExtractor
 	ie.modelMutex.RUnlock()
 
-	if forest == nil {
+	if forest == nil || extractor == nil {
 		return nil, nil
 	}
+
+	features := extractor.Extract(r, statusCode, responseTime, remoteAddr)
+	featureVector := extractor.GetFeatureVector(features)
 
 	// 预测
 	score, level := forest.GetAnomalyScore(featureVector)
