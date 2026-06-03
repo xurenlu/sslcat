@@ -192,6 +192,7 @@ const SidebarContent = () => {
         { name: t.navigation.settings, icon: FiSettings, path: buildPath(adminPrefix, '/settings'), keywords: 'config basic notification 配置 通知' },
         { name: t.navigation.userManagement, icon: FiUsers, path: buildPath(adminPrefix, '/users'), keywords: 'admin members roles 用户 权限' },
         { name: t.navigation.changePassword, icon: FiKey, path: buildPath(adminPrefix, '/change-password'), keywords: 'security auth password 密码 安全' },
+        { name: t.mcp?.title ?? 'MCP (AI Assistant)', icon: FaRobot, path: buildPath(adminPrefix, '/mcp'), badge: 'AI', keywords: 'mcp ai claude cursor cherry assistant token 助手 接入' },
         { name: t.navigation.configHistory ?? '配置历史', icon: FiArchive, path: buildPath(adminPrefix, '/config-history'), keywords: 'config history version backup rollback 配置历史 版本 备份 回滚' },
       ]
     }

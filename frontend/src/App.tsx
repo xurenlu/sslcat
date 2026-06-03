@@ -45,6 +45,7 @@ import ThreatIntel from './pages/ThreatIntel'
 import EdgeRouting from './pages/EdgeRouting'
 import SecurityMTLS from './pages/SecurityMTLS'
 import AuditLogs from './pages/AuditLogs'
+import MCPPage from './pages/MCP'
 
 // 辅助组件：为需要 Layout 的页面添加 Layout
 const LayoutRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -232,6 +233,13 @@ const AppRoutes: React.FC = () => {
         <AuthGuard>
           <LayoutRoute>
             <ChangePassword />
+          </LayoutRoute>
+        </AuthGuard>
+      } />
+      <Route path={`${adminPrefix}/mcp`} element={
+        <AuthGuard>
+          <LayoutRoute>
+            <MCPPage />
           </LayoutRoute>
         </AuthGuard>
       } />

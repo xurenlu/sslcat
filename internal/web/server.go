@@ -1158,6 +1158,8 @@ func (s *Server) setupRoutes() {
 
 	// MCP 服务（默认关闭，启用时挂在 admin_prefix + path_prefix 下）
 	s.setupMCPRoutes()
+	// MCP 管理 API（admin session 鉴权，给前端 React 页面用，与 MCP 运行时无关）
+	s.setupMCPManagementRoutes()
 
 	// 前端 SPA 路由 - 必须放在最后，作为 fallback
 	s.setupFrontendRoutes()

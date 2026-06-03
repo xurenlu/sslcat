@@ -111,6 +111,7 @@ export interface Translation {
     auditLogs?: string
     apiPerformance?: string
     configHistory?: string
+    mcpService?: string
   }
   
   // 仪表板
@@ -2436,4 +2437,74 @@ export interface Translation {
     remove?: string
   }
 
+  // MCP（Model Context Protocol）服务管理页
+  mcp?: {
+    title: string
+    subtitle: string
+    statusEnabled: string
+    statusDisabled: string
+    enable: string
+    disable: string
+    enableConfirm: string
+    disableConfirm: string
+    requiresRestart: string
+    pathPrefix: string
+    streamUrl: string
+    healthUrl: string
+    protocolVersion: string
+    tokensTab: string
+    auditTab: string
+    aboutTab: string
+
+    tokenCount: string
+    createToken: string
+    tokenName: string
+    tokenNamePlaceholder: string
+    description: string
+    descriptionPlaceholder: string
+    scopes: string
+    scopeRead: string
+    scopeSiteWrite: string
+    scopeCertWrite: string
+    scopeProxyWrite: string
+    scopeSecurityWrite: string
+    scopeOpsWrite: string
+    scopeAdmin: string
+    ipAllowlist: string
+    ipAllowlistPlaceholder: string
+    expiresAt: string
+    expiresAtPlaceholder: string
+    rateLimit: string
+    rateLimitPlaceholder: string
+    create: string
+    cancel: string
+    revoke: string
+    revokeConfirm: string
+    noTokens: string
+    columnName: string
+    columnScopes: string
+    columnExpires: string
+    columnCreated: string
+    columnActions: string
+    never: string
+
+    tokenCreatedTitle: string
+    tokenCreatedWarning: string
+    plaintextLabel: string
+    copyToken: string
+    tokenCopied: string
+    iSavedIt: string
+    quickStart: string
+    quickStartHint: string
+
+    auditDate: string
+    auditTailLabel: string
+    auditEmpty: string
+    auditNotExist: string
+    refresh: string
+
+    aboutLine1: string
+    aboutLine2: string
+    aboutDocsLink: string
+  }
 }

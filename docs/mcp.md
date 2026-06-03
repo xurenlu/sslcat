@@ -1,10 +1,11 @@
-# MCP 内置接入（v2.1.0-rc1+）
+# MCP 内置接入（v2.1.0+）
 
-sslcat 自 `v2.1.0-rc1` 起内置一个 [Model Context Protocol](https://modelcontextprotocol.io/) 服务端。
+sslcat 自 `v2.1.0` 起内置一个 [Model Context Protocol](https://modelcontextprotocol.io/) 服务端。
 把连接信息交给任意支持 MCP 的 AI 客户端（Claude Desktop、Cursor、Cherry Studio 等），
 AI 就能直接调用 sslcat 工具来运维。
 
-> 当前状态：**P4（站点 + 证书 + 转发 + 上游健康检查 + Resources + 长任务轮询 + destructive 二次确认 + Prometheus 指标）**。后续 P5 是前端 Token 管理页 + Ruby 端到端测试 + 正式 v2.1.0。
+> **正式版**：v2.1.0 发布。20 个工具 + 3 个 resource + Web 管理后台「MCP」页面 + Ruby 端到端集成测试 + 4 套客户端接入示例。
+> 客户端配置见 [`docs/mcp-client-setup.md`](./mcp-client-setup.md)。
 
 ---
 

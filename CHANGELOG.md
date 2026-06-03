@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-06-03
+
+### 🎉 正式版（v2.1.0 发布）
+
+汇总 P1~P5：sslcat 现在自身就是一个完整的 [Model Context Protocol](https://modelcontextprotocol.io/) 服务端，可被 Claude / Cursor / Cherry Studio 等任意 MCP 客户端直接接入，AI 可全权完成站点 / 证书 / 转发 / 健康探测 / 资源浏览的运维。
+
+**工具清单（共 20 个）**：
+
+| 类别 | 工具 |
+|---|---|
+| 通用 | `version_info` |
+| 站点 CRUD | `site_list / site_add / site_update / site_enable / site_disable / site_delete` |
+| 证书 CRUD | `cert_list / cert_issue / cert_renew / cert_upload / cert_delete / cert_dns_provider_list` |
+| 转发路由 | `proxy_route_list / proxy_route_add / proxy_route_update / proxy_route_delete / upstream_health_check` |
+| 长任务 | `task_status / task_list` |
+
+**Resources（3 个）**：`sslcat://config/current`（脱敏配置）、`sslcat://metrics/snapshot`（指标快照）、`sslcat://logs/access{?since,domain,limit}`（访问日志尾部）。
+
+**Web 管理后台**：新增 `${admin_prefix}/mcp` 页面（侧边栏「系统管理」段，badge=AI），支持启停 MCP、创建/吊销 Token（明文仅本次显示）、按日期浏览审计日志、查看协议元信息。i18n 双语（zh-cn / en-us）。
+
+**集成测试**：`tests/mcp_e2e.rb` + `cmd/mcp-testserver`，24 个用例覆盖 initialize、tools/list、site/cert/proxy CRUD、destructive 两阶段、resources、长任务边界，输出 `reports/mcp_e2e.json` + `.md`。
+
+**接入文档**：`docs/mcp.md`（完整协议与工具说明）、`docs/mcp-client-setup.md`（Claude Desktop / Cursor / Cherry Studio / Continue.dev / curl 调试 5 套示例）。
+
+---
+
+### ✨ 新功能（P5：前端管理页 + Ruby 端到端 + 多客户端文档）
+
+- **前端 MCP 管理页**：
+  - `frontend/src/pages/MCP.tsx`：Tabs（Tokens / Audit log / About）。Token 表格列出全部 token；"创建 Token" 模态框（scope 多选 / IP 白名单 / TTL / rate-limit）；创建成功后明文 token 弹窗带复制 + 客户端 JSON 一键粘贴 + 强制"我已保存"才能关。
+  - 审计日志面板按日期 + tail N 浏览，状态 badge 用颜色区分 ok / forbidden / pending_confirm / 其它。
+  - 启停 MCP 开关；接入 docs/mcp.md 与 mcp-client-setup.md 的链接。
+  - 路由 `${admin_prefix}/mcp` 挂到 App.tsx，Sidebar 系统管理段加入口（badge=AI）。
+  - 文案全部走 i18n：`zh-cn.ts` / `en-us.ts` / `types.ts` 新增 `mcp` 段（70+ 词条，覆盖按钮 / 列名 / 警告 / scope 说明 / 关于）。
+- **管理后台 API**（`internal/web/api_mcp.go`，走 admin session 鉴权而非 MCP Bearer）：
+  - `GET ${admin_prefix}/api/mcp/status` —— 启用状态、协议版本、URL 路径、token 数
+  - `GET ${admin_prefix}/api/mcp/tokens` —— token 列表（不含 hash）
+  - `POST ${admin_prefix}/api/mcp/tokens` —— 创建 token（明文仅本次返回）
+  - `DELETE ${admin_prefix}/api/mcp/tokens?name=<n>` —— 吊销
+  - `GET ${admin_prefix}/api/mcp/audit?date=YYYYMMDD&tail=N` —— 审计日志
+  - `POST ${admin_prefix}/api/mcp/{enable,disable}` —— 启停（需重启进程才生效）
+- **Ruby 端到端测试**（`tests/mcp_e2e.rb` + `cmd/mcp-testserver`，24 用例全过）：
+  - 最小化 testserver 跳过登录 / TLS / 首次设置，直接挂 MCP 协议核心 + 全部工具 + Resources。
+  - `/admin/token` 端点一次性发 admin token（仅测试用）。
+  - Ruby 用标准库 `net/http` + `openssl` 生成自签 PEM 走 cert_upload，验证"PEM 校验在 SSL nil 检查之前"。
+  - 报告同时输出 `reports/mcp_e2e.json` 和 `.md`。
+- **多客户端接入文档**（`docs/mcp-client-setup.md`）：Claude Desktop / Cursor / Cherry Studio / Continue.dev 4 种 MCP 客户端的具体配置 JSON + curl 完整调试链路 + 常见踩坑表。
+- **Go 单元测试**：`internal/web/api_mcp_test.go` 覆盖 scope 校验白名单、`publicToken` 不泄漏 hash、`writeJSONStatus` content-type、`mcpTokenCreateReq` 字段解析。
+
 ## [2.1.0-rc8] - 2026-06-03
 
 ### ✨ 新功能（P4：MCP 转发 CRUD + 上游健康检查 + Resources）
