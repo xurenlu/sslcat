@@ -23,10 +23,11 @@ type ServerInfo struct {
 
 // Server MCP 协议核心。无状态，由 transport 复用。
 type Server struct {
-	Info     ServerInfo
-	Registry *Registry
-	Auditor  *Auditor     // 可选，nil 表示不审计
-	Confirm  *ConfirmGate // 可选，nil 表示对 destructive tool 不做二次确认（不推荐生产使用）
+	Info      ServerInfo
+	Registry  *Registry
+	Resources *ResourceRegistry // 可选，nil 表示不提供 resources/*
+	Auditor   *Auditor          // 可选，nil 表示不审计
+	Confirm   *ConfirmGate      // 可选，nil 表示对 destructive tool 不做二次确认（不推荐生产使用）
 
 	// Metrics 可选指标钩子。每次 tool 调用结束后回调一次。
 	Metrics MetricsRecorder
@@ -66,6 +67,12 @@ func (s *Server) Handle(ctx context.Context, req *Request, caller *CallContext) 
 		return s.handleToolsList(req, caller)
 	case "tools/call":
 		return s.handleToolsCall(ctx, req, caller)
+	case "resources/list":
+		return s.handleResourcesList(req, caller)
+	case "resources/templates/list":
+		return s.handleResourceTemplatesList(req, caller)
+	case "resources/read":
+		return s.handleResourcesRead(ctx, req, caller)
 	case "notifications/initialized":
 		// 客户端通知，无需响应
 		return nil
@@ -103,6 +110,12 @@ func (s *Server) handleInitialize(req *Request) *Response {
 			// 工具列表不会动态变化（注册一次），不发送 list_changed 通知
 			"listChanged": false,
 		},
+	}
+	if s.Resources != nil {
+		caps["resources"] = map[string]any{
+			"listChanged": false,
+			"subscribe":   false,
+		}
 	}
 
 	res := initializeResult{
@@ -288,4 +301,55 @@ func hasScope(have []Scope, need Scope) bool {
 		}
 	}
 	return false
+}
+
+// ----- resources -----
+
+func (s *Server) handleResourcesList(req *Request, caller *CallContext) *Response {
+	if s.Resources == nil {
+		return NewResponse(req.ID, resourceListResult{Resources: []*Resource{}})
+	}
+	return NewResponse(req.ID, resourceListResult{Resources: s.Resources.ListResources()})
+}
+
+func (s *Server) handleResourceTemplatesList(req *Request, caller *CallContext) *Response {
+	if s.Resources == nil {
+		return NewResponse(req.ID, resourceTemplatesListResult{ResourceTemplates: []*ResourceTemplate{}})
+	}
+	return NewResponse(req.ID, resourceTemplatesListResult{ResourceTemplates: s.Resources.ListTemplates()})
+}
+
+type resourcesReadParams struct {
+	URI string `json:"uri"`
+}
+
+func (s *Server) handleResourcesRead(ctx context.Context, req *Request, caller *CallContext) *Response {
+	if s.Resources == nil {
+		return NewErrorResponse(req.ID, NewError(CodeMethodNotFound, "resources not supported"))
+	}
+	var p resourcesReadParams
+	if err := json.Unmarshal(req.Params, &p); err != nil {
+		return NewErrorResponse(req.ID, NewError(CodeInvalidParams, "invalid params: "+err.Error()))
+	}
+	if p.URI == "" {
+		return NewErrorResponse(req.ID, NewError(CodeInvalidParams, "uri required"))
+	}
+	reader, scope, ok := s.Resources.Resolve(p.URI)
+	if !ok {
+		return NewErrorResponse(req.ID, NewError(CodeResourceNotFound, "unknown resource uri: "+p.URI))
+	}
+	if !hasScope(caller.Scopes, scope) {
+		return NewErrorResponse(req.ID, NewError(CodeForbidden,
+			fmt.Sprintf("scope required: %s", scope)))
+	}
+	mime, text, err := reader(ctx, p.URI, caller)
+	if err != nil {
+		return NewErrorResponse(req.ID, NewError(CodeInternalError, "read resource failed: "+err.Error()))
+	}
+	if mime == "" {
+		mime = "application/json"
+	}
+	return NewResponse(req.ID, resourceReadResult{
+		Contents: []resourceContent{{URI: p.URI, MimeType: mime, Text: text}},
+	})
 }

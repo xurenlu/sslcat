@@ -4,7 +4,7 @@ sslcat 自 `v2.1.0-rc1` 起内置一个 [Model Context Protocol](https://modelco
 把连接信息交给任意支持 MCP 的 AI 客户端（Claude Desktop、Cursor、Cherry Studio 等），
 AI 就能直接调用 sslcat 工具来运维。
 
-> 当前状态：**P3（只读 + 站点 CRUD + 证书 CRUD + 长任务轮询 + destructive 二次确认 + Prometheus 指标）**。后续 P4~P5 会开放转发详情写类工具与 Resources。
+> 当前状态：**P4（站点 + 证书 + 转发 + 上游健康检查 + Resources + 长任务轮询 + destructive 二次确认 + Prometheus 指标）**。后续 P5 是前端 Token 管理页 + Ruby 端到端测试 + 正式 v2.1.0。
 
 ---
 
@@ -303,6 +303,151 @@ token 的生存期是 **60 秒**，并绑定 `(token_name, tool, canonicalized_a
 ```
 
 只返回顶层字段（id / tool / status / progress / message / 时间戳 / error），不展开 events——要详情请用 `task_status`。
+
+---
+
+## P4 提供的转发 + 健康检查工具
+
+### `proxy_route_add`（scope=proxy:write）
+
+在已有站点上加一条 PathPrefixRule。先 `site_add` 把站点建好。
+
+```json
+{
+  "domain": "api.example.com",
+  "rule": {
+    "name": "v2-api",
+    "prefixes": ["/api/v2/"],
+    "exact": false,
+    "backends": [
+      { "host": "10.0.0.10", "port": 8080, "weight": 2 },
+      { "host": "10.0.0.11", "port": 8080, "weight": 1 }
+    ]
+  }
+}
+```
+
+同站内 `rule.name` 必须唯一，prefix 必须以 `/` 开头。
+
+### `proxy_route_update`（scope=proxy:write）
+
+按 `(domain, name)` 定位并 patch 字段：
+
+```json
+{
+  "domain": "api.example.com",
+  "name": "v2-api",
+  "enabled": false,
+  "backends": [{ "host": "10.0.0.99", "port": 9090 }]
+}
+```
+
+传 `backends` 会**整体替换**；未传字段不动。
+
+### `proxy_route_delete`（scope=proxy:write, destructive）
+
+两阶段确认。预演含 prefixes/backends 详情：
+
+```json
+{
+  "requires_confirmation": true,
+  "confirm_token": "...",
+  "message": "即将删除站点 \"api.example.com\" 的路由 \"v2-api\"（涉及前缀 [/api/v2/]）。dry-run。",
+  "preview": { "action": "delete_route", "domain": "api.example.com", "route": { ... } }
+}
+```
+
+第二次带 `"confirm": "<token>"` 才真正删。
+
+### `upstream_health_check`（scope=read）
+
+对站点后端并发 TCP 拨号探测：
+
+```json
+{ "domain": "api.example.com", "timeout_ms": 1500, "include_routes": true }
+```
+
+返回每个后端的可达性与响应时间：
+
+```json
+{
+  "domain": "api.example.com",
+  "timeout_ms": 1500,
+  "total": 4,
+  "reachable": 3,
+  "all_reachable": false,
+  "results": [
+    { "host": "10.0.0.10", "port": 8080, "reachable": true, "latency_ms": 12 },
+    { "host": "10.0.0.11", "port": 8080, "reachable": false, "latency_ms": 1500, "error": "i/o timeout" },
+    ...
+  ]
+}
+```
+
+> 仅 TCP 拨号，不走 HTTP 健康检查路径——服务侦听端口但应用挂死的场景检测不出来。
+
+---
+
+## Resources（v2.1.0-rc8+）
+
+Resource 是 MCP 协议提供的"被 AI 拉取的命名上下文"，比 tool 更适合大段只读数据。AI 客户端通过 `resources/list`、`resources/templates/list`、`resources/read` 三个标准方法访问。
+
+### 列出可用 resource
+
+```jsonc
+// resources/list 返回静态 URI 列表
+{ "resources": [
+    { "uri": "sslcat://config/current",    "name": "Current sslcat configuration (redacted)", "mimeType": "application/json" },
+    { "uri": "sslcat://metrics/snapshot",  "name": "Runtime metrics snapshot", "mimeType": "application/json" }
+] }
+
+// resources/templates/list 返回模板 URI
+{ "resourceTemplates": [
+    { "uriTemplate": "sslcat://logs/access{?since,domain,limit}", "name": "Access log tail", "mimeType": "text/plain" }
+] }
+```
+
+### `sslcat://config/current`（scope=read）
+
+返回当前配置的**脱敏快照**——字段名含 `password / secret / token / api_key / private_key / totp / auth_key / token_hash` 等子串的值会被替换为 `"***"`。脱敏只动一份深拷贝，运行时配置不受影响。
+
+### `sslcat://metrics/snapshot`（scope=read）
+
+```json
+{
+  "app": "sslcat",
+  "version": "2.1.0-rc8",
+  "server_time": "...",
+  "sites_total": 12,
+  "sites_enabled": 10,
+  "static_sites": 1,
+  "php_sites": 0,
+  "cluster_mode": "standalone",
+  "certs_total": 11,
+  "certs_expiring_in_30d": 2,
+  "proxy_stats": { ... },
+  "mcp_tasks_total": 3,
+  "mcp_tasks_by_status": { "succeeded": 2, "running": 1 }
+}
+```
+
+比 `/metrics` Prometheus 文本更适合 AI 直接解读。
+
+### `sslcat://logs/access{?since,domain,limit}`（scope=read）
+
+读访问日志尾部，按时间窗口 / 域名 / 行数过滤。
+
+- `since` —— 接受 duration（`10m` / `1h` / `30s`）或 RFC3339 绝对时间；
+- `domain` —— 简单子串过滤（不区分大小写）；
+- `limit` —— 行数上限，默认 200，最大 2000。
+
+例：
+
+```
+sslcat://logs/access?since=10m&domain=api.example.com&limit=100
+```
+
+返回 `text/plain`，前两行是注释 header（路径、过滤参数），其余每行一条原始日志。解析行首时间戳支持 nginx 默认格式与 RFC3339；解析不出来时**保守保留**（避免静默丢日志）。
 
 ---
 

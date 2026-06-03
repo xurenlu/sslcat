@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/xurenlu/sslcat/internal/mcp"
+	mcpresources "github.com/xurenlu/sslcat/internal/mcp/resources"
 	mcptools "github.com/xurenlu/sslcat/internal/mcp/tools"
 )
 
@@ -72,14 +73,33 @@ func (s *Server) setupMCPRoutes() {
 		s.log.WithError(err).Error("register MCP task reader tools failed; MCP service NOT mounted")
 		return
 	}
+	if err := mcptools.RegisterProxyTools(registry, deps); err != nil {
+		s.log.WithError(err).Error("register MCP proxy tools failed; MCP service NOT mounted")
+		return
+	}
 
-	// 3. 协议核心 + 二次确认 + Prometheus 指标
+	// 3. Resource 注册中心
+	resourceReg := mcp.NewResourceRegistry()
+	if err := mcpresources.Register(resourceReg, &mcpresources.Deps{
+		Version:    s.version,
+		Config:     s.config,
+		ConfigFile: s.config.ConfigFile,
+		SSL:        s.sslManager,
+		Proxy:      s.proxyManager,
+		Tasks:      taskReg,
+	}); err != nil {
+		s.log.WithError(err).Error("register MCP resources failed; MCP service NOT mounted")
+		return
+	}
+
+	// 4. 协议核心 + 二次确认 + Prometheus 指标 + Resources
 	srv := mcp.NewServer(mcp.ServerInfo{
 		Name:    "sslcat",
 		Version: strings.TrimPrefix(s.version, "v"),
 	}, registry, auditor)
 	srv.Confirm = mcp.NewConfirmGate(60 * time.Second)
 	srv.Metrics = mcp.NewPromMetrics()
+	srv.Resources = resourceReg
 
 	// 4. 鉴权
 	auth := mcp.NewAuthenticator(&s.config.MCP)

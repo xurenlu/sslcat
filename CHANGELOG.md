@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0-rc8] - 2026-06-03
+
+### ✨ 新功能（P4：MCP 转发 CRUD + 上游健康检查 + Resources）
+
+- **4 个转发工具**：
+  - `proxy_route_add`（scope=proxy:write）—— 在已有站点上新增 PathPrefixRule；同站内 name 唯一；prefix 必须以 / 开头。
+  - `proxy_route_update`（scope=proxy:write）—— 按 (domain, name) patch 字段；传 `backends` 整体替换。
+  - `proxy_route_delete`（scope=proxy:write, destructive）—— 两阶段确认（同 site_delete）；预演含 prefixes/backends 详情。
+  - `upstream_health_check`（scope=read）—— 对站点后端并发 TCP 拨号探测；可选 `include_routes=true` 一并探测 PathPrefixRules 的后端；超时 100~10000 ms（默认 2000）。
+- **MCP Resource 协议层**（`internal/mcp/resources.go`）：
+  - 新增 `ResourceRegistry` + `Resource` / `ResourceTemplate`（URI Template，简化版仅支 `{?param}`）。
+  - 实现 MCP 标准方法 `resources/list`、`resources/templates/list`、`resources/read`。
+  - `initialize` capabilities 在 Resources 启用时声明。
+  - 未配置 Resources 时 list 返回空、read 返回 `MethodNotFound`，向后兼容。
+- **3 个核心 Resource**（`internal/mcp/resources/`）：
+  - `sslcat://config/current`（application/json，scope=read）—— 当前配置的脱敏快照。深拷贝后递归把字段名含 password/secret/token/api_key/private_key/totp/auth_key/token_hash 等子串的值替换为 ***；原始 config 不会被修改。
+  - `sslcat://metrics/snapshot`（application/json，scope=read）—— 运行指标快照：站点总数/启用数、证书总数/30 天内到期数、集群模式、proxy_stats、当前 MCP 任务 by status。
+  - `sslcat://logs/access{?since,domain,limit}`（text/plain，scope=read）—— 访问日志尾部。`since` 接受 duration（`10m`、`1h`）或 RFC3339；`domain` 子串过滤；`limit` 上限 2000（默认 200）。解析 nginx 默认格式与 RFC3339 行首时间戳；解析失败时保守保留（避免静默丢日志）。
+- **挂载**：`mcp_mount.go` 创建 `ResourceRegistry`、注册 3 个 resource 并注入 `mcp.Server`。
+- **测试**：~20 个新 case 覆盖 proxy 工具 CRUD + 健康检查（本地 listener 验证活/死后端混合）、ResourceRegistry 解析（静态/模板/未知 URI/scope 检查）、3 个 resource 实读（脱敏不泄漏、原始 config 不被改、metrics 计数、access log 时间窗口/域名/limit 过滤）。
+
+### 🔒 安全
+
+- destructive `proxy_route_delete` 走二次确认；预演中含 `prefixes` 与 `backends`，AI 能向用户复述"即将删除 /api/v1/ → 10.0.0.10:8080 这条路由"。
+- Resource 脱敏不修改原始 config（值拷贝 + 顶层 slice 单独 deep copy），不会通过 resources/read 间接污染运行时配置。
+
 ## [2.1.0-rc7] - 2026-06-03
 
 ### ♻️ 重构

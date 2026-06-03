@@ -32,6 +32,7 @@ SSLcat 是一个集成 SSL 证书管理、反向代理、WAF、安全审计、�
 
 ## 版本记录
 
+- `2.1.0-rc8`：MCP 内置接入 P4。新增 4 个转发工具 `proxy_route_add / update / delete / upstream_health_check`（PathPrefixRule 级别 CRUD + 并发 TCP 拨号探测，destructive delete 走二次确认）；新增 MCP Resource 协议层（`resources/list / templates/list / read`），实现 3 个核心 resource：`sslcat://config/current`（脱敏快照，深拷贝不污染原 config）、`sslcat://metrics/snapshot`（站点/证书/任务统计 JSON）、`sslcat://logs/access{?since,domain,limit}`（按时间窗口/域名/limit 过滤的访问日志尾部）。
 - `2.1.0-rc6`：MCP 内置接入 P3。证书 CRUD 工具 `cert_issue / cert_renew / cert_upload / cert_delete / cert_dns_provider_list`；新增 MCP 长任务模型（`TaskRegistry` + owner 隔离 + 7 天 GC），异步任务 `task_status` 轮询，ACME 进度事件通过 `ssl.Manager` 既有 progress channel 实时桥接到任务事件流；destructive `cert_delete` 走二次确认。
 - `2.1.0-rc5`：AI 异常检测真实化补测。修复 `FeatureExtractor.extractBehavioralFeatures` 在 `ipStatesMutex` 释放后仍访问 `IPState` 内部 map/slice 引发的 data race（被 `go test -race` 抓到，接入主流量后必然触发），以及 `InferenceEngine.Predict` 在模型未加载时直接调 nil 特征提取器导致 panic 的问题。新增 Go 单元测试（21 用例）覆盖 sampler/persistence/inference 关键路径，新增 Ruby 黑盒集成测试（10 用例，`tests/ml_regression.rb` + `cmd/ml-testserver`）驱动训练→推理→持久化→重启加载完整链路，报告同时输出 `reports/ml_regression.json` 与 `.md`。
 - `2.1.0-rc4`：MCP 内置接入 P2。新增站点写类工具 `site_add / site_update / site_enable / site_disable / site_delete`；引入 destructive 二次确认机制（dry-run 返回 `confirm_token`，60 秒 TTL，绑定 token name+tool+args 哈希，防重放）；接入 Prometheus 指标 `sslcat_mcp_requests_total / request_duration_seconds / destructive_pending_confirmations`。复用现有 `/api/proxy` 的保存行为（`cfg.Save` + 异步证书预取）。
