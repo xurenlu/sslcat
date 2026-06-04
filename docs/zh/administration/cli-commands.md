@@ -24,6 +24,39 @@ sslcat -config /path/to/sslcat.conf <command>
 
 ## 可用命令
 
+### 0. 运维诊断 (`status` / `doctor`)
+
+运维诊断命令用于快速确认当前配置摘要和本地健康状态，适合服务器现场排查和自动化脚本调用。
+
+#### 查看状态摘要
+
+```bash
+# 文本摘要
+sslcat status
+
+# JSON 输出，适合监控或脚本
+sslcat status --json
+
+# 支持将 -config 放在命令前
+sslcat -config /etc/sslcat/sslcat.conf status --json
+```
+
+#### 执行本地自检
+
+```bash
+# 检查配置、端口权限、证书目录、站点根目录、代理后端和 MCP 状态
+sslcat doctor
+
+# JSON 输出
+sslcat doctor --json
+```
+
+**注意事项：**
+- `doctor` 发现错误时会以非 0 状态码退出，便于 CI/监控识别。
+- `status --json` 不输出敏感 token 明文。
+
+---
+
 ### 1. 配置管理 (`config`)
 
 配置管理命令用于查看、获取和设置配置项。
@@ -122,6 +155,23 @@ Proxy Rules:
    SSL Only: true
 ```
 
+#### 后端健康探测
+
+```bash
+# 探测所有启用后端
+sslcat proxy health-check
+
+# 探测指定域名
+sslcat proxy health-check --domain example.com
+
+# 一并探测 PathPrefixRule 后端，并输出 JSON
+sslcat proxy health-check --domain example.com --include-routes --json
+```
+
+**说明：**
+- 当前探测方式为 TCP 拨号，不请求 HTTP 健康检查路径。
+- 任一后端不可达时，命令会以非 0 状态码退出。
+
 #### 添加代理规则
 
 ```bash
@@ -201,7 +251,56 @@ sslcat proxy delete -domain example.com
 
 ---
 
-### 3. SSL 证书管理 (`ssl`)
+### 3. 站点管理 (`site`)
+
+站点管理命令用于管理静态站点和 PHP 站点。
+
+#### 列出站点
+
+```bash
+sslcat site list
+sslcat site list --json
+```
+
+#### 添加静态站点
+
+```bash
+sslcat site add --type static --domain app.example.com --root /srv/app --index index.html --try-files
+```
+
+#### 添加 PHP 站点
+
+```bash
+sslcat site add --type php --domain php.example.com --root /srv/php --index index.php --fcgi 127.0.0.1:9000
+```
+
+#### 更新站点
+
+```bash
+sslcat site update --type static --domain app.example.com --root /srv/app-new --enabled
+sslcat site update --type php --domain php.example.com --fcgi unix:/run/php/php-fpm.sock
+```
+
+#### 启用或禁用站点
+
+```bash
+sslcat site enable --type static --domain app.example.com
+sslcat site disable --type php --domain php.example.com
+```
+
+#### 删除站点
+
+```bash
+sslcat site delete --type static --domain app.example.com --yes
+```
+
+**注意事项：**
+- 删除站点必须显式追加 `--yes`。
+- 修改配置后需要重启 SSLcat 服务才能生效。
+
+---
+
+### 4. SSL 证书管理 (`ssl`)
 
 SSL 证书管理命令用于管理 SSL 证书。**注意：当前版本的部分 SSL 命令功能为占位符实现，完整功能正在开发中。**
 

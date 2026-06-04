@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -25,6 +26,8 @@ type Manager struct {
 	commands   map[string]*Command
 	config     *config.Config
 	configFile string
+	version    string
+	build      string
 }
 
 // NewManager 创建新的 CLI 管理器
@@ -54,12 +57,24 @@ func (m *Manager) Execute(args []string) error {
 	return cmd.Handler(args[1:])
 }
 
+// HasCommand 判断命令是否已注册。
+func (m *Manager) HasCommand(name string) bool {
+	_, exists := m.commands[name]
+	return exists
+}
+
 // ShowHelp 显示帮助信息
 func (m *Manager) ShowHelp() {
 	fmt.Println("SSLcat CLI Commands:")
 	fmt.Println()
 
-	for name, cmd := range m.commands {
+	names := make([]string, 0, len(m.commands))
+	for name := range m.commands {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		cmd := m.commands[name]
 		fmt.Printf("  %-15s %s\n", name, cmd.Description)
 	}
 	fmt.Println()
@@ -176,7 +191,7 @@ func (m *Manager) RegisterProxyCommands() {
 		Description: "Proxy management",
 		Handler: func(args []string) error {
 			if len(args) == 0 {
-				return fmt.Errorf("proxy subcommand required (list|add|update|delete)")
+				return fmt.Errorf("proxy subcommand required (list|add|update|delete|health-check)")
 			}
 
 			subcmd := args[0]
@@ -189,6 +204,8 @@ func (m *Manager) RegisterProxyCommands() {
 				return m.updateProxyRule(args[1:])
 			case "delete":
 				return m.deleteProxyRule(args[1:])
+			case "health-check":
+				return m.healthCheckProxy(args[1:])
 			default:
 				return fmt.Errorf("unknown proxy subcommand: %s", subcmd)
 			}
@@ -786,6 +803,12 @@ func (m *Manager) SetConfig(cfg *config.Config) {
 // SetConfigFile 设置配置文件路径
 func (m *Manager) SetConfigFile(configFile string) {
 	m.configFile = configFile
+}
+
+// SetVersion 设置 CLI 输出使用的版本信息。
+func (m *Manager) SetVersion(version, build string) {
+	m.version = version
+	m.build = build
 }
 
 // RegisterBlockCommands 注册封禁管理命令

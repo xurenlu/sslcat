@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0-rc1] - 2026-06-04
+
+### Added
+
+- 新增 CLI 运维命令 `sslcat status [--json]`，输出版本、配置文件、监听参数、站点/代理/证书/MCP 摘要，方便脚本和监控采集。
+- 新增 CLI 自检命令 `sslcat doctor [--json]`，检查配置文件、配置校验、端口权限、证书目录、站点根目录、代理后端和 MCP token 状态。
+- 新增 CLI 站点管理命令 `sslcat site list/add/update/delete/enable/disable`，支持静态站点与 PHP 站点的基础 CRUD；删除站点必须显式追加 `--yes`。
+- 新增 `sslcat proxy health-check [--domain <domain>] [--include-routes] [--json]`，对代理主后端和可选 PathPrefixRule 后端执行 TCP 可达性探测。
+
+### Changed
+
+- CLI 入口现在支持全局 `-config` 放在命令前，例如 `sslcat -config ./sslcat.conf status --json`。
+- CLI 帮助输出按命令名排序，并补充新增运维命令示例。
+
 ## [2.1.0] - 2026-06-03
 
 ### 🎉 正式版（v2.1.0 发布）
