@@ -198,8 +198,9 @@ func (c *Collector) RecordAccess(record *AccessRecord) {
 // 注意：这个采样仅影响排行榜（Top IPs、Top UAs、Top Cities），不影响真实请求数统计
 // 真实请求数（total_requests、unique_ips等）始终会被完整记录
 func (c *Collector) shouldSampleForFunnel() bool {
-	// 获取当前条目数（不加锁，允许轻微不准确）
+	c.mu.RLock()
 	ipCount := len(c.ipEntries)
+	c.mu.RUnlock()
 
 	// 未达到一半限制，全部记录
 	if ipCount < c.maxIPEntries/2 {

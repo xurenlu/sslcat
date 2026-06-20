@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0-rc1] - 2026-06-21
+
+### Added
+
+- MCP 新增只读工具 `error_log_list` / `error_log_tail`，可列出 sslcat 内部错误日志与所有 proxy/static/php 站点 error log 来源，并按 `id`、`kind`、`domain`、`keyword`、`since`、`limit` 读取近期错误。
+- MCP 新增 Resources：`sslcat://logs/error-sources` 与 `sslcat://logs/error{?id,kind,domain,since,keyword,limit,max_bytes}`，AI 客户端可直接读取近期内部错误和站点错误日志。
+- 新增 `internal/mcp/logview` 有界日志读取层，默认只读取文件尾部 1MB、最大 4MB，避免 MCP 排障时因大日志文件阻塞请求路径。
+
+### Fixed
+
+- 修复统计采样路径无锁读取 `ipEntries` 长度的问题，避免高并发访问统计更新时触发 map data race。
+
 ## [2.2.0-rc1] - 2026-06-04
 
 ### Added

@@ -2,7 +2,7 @@
 
 ## 当前定位
 
-SSLcat 是一个集成 SSL 证书管理、反向代理、WAF、安全审计、站点托管和 Git 部署能力的自托管网关管理工具。2.0.x rc 主线侧重稳定性，2.1.x 起新增 **MCP 内置接入**，让 AI 客户端可以直接担任运维助理；2.2.x 起补强 CLI 运维工具箱，让无 Web/无 AI 客户端的服务器现场也能完成基础诊断和站点管理。
+SSLcat 是一个集成 SSL 证书管理、反向代理、WAF、安全审计、站点托管和 Git 部署能力的自托管网关管理工具。2.0.x rc 主线侧重稳定性，2.1.x 起新增 **MCP 内置接入**，让 AI 客户端可以直接担任运维助理；2.2.x 起补强 CLI 运维工具箱，让无 Web/无 AI 客户端的服务器现场也能完成基础诊断和站点管理；2.3.x 起增强 MCP 可观测性，让 AI 能直接查看近期内部错误和所有站点 error log。
 
 ## 主要功能
 
@@ -11,7 +11,7 @@ SSLcat 是一个集成 SSL 证书管理、反向代理、WAF、安全审计、�
 - 管理面板、多用户、会话、审计日志和配置版本管理。
 - WAF、DDoS、防爆破、IP/UA/TLS 指纹封禁和白名单管理。
 - 运行监控、慢请求分析、缓存、压缩和图片优化。
-- **MCP（Model Context Protocol）内置服务**：sslcat 自身即是 MCP server，可被 Claude / Cursor / Cherry Studio 等 AI 客户端直接调用，AI 通过 tool 调用即可完成站点、证书、转发的查询与管理。默认关闭；启用时需通过 `sslcat mcp token create` 颁发独立 token，支持 scope、IP 白名单、速率限制与审计日志。
+- **MCP（Model Context Protocol）内置服务**：sslcat 自身即是 MCP server，可被 Claude / Cursor / Cherry Studio 等 AI 客户端直接调用，AI 通过 tool 调用即可完成站点、证书、转发的查询与管理，并能读取近期内部错误、访问日志和所有站点 error log。默认关闭；启用时需通过 `sslcat mcp token create` 颁发独立 token，支持 scope、IP 白名单、速率限制与审计日志。
 - **CLI 运维能力**：`status` / `doctor` 输出配置摘要与本地自检；`site` 管理静态/PHP 站点；`proxy health-check` 探测上游后端；支持 `--json` 输出和命令前置 `-config`，方便脚本、监控和故障现场使用。
 
 ## 当前设计取向
@@ -25,6 +25,7 @@ SSLcat 是一个集成 SSL 证书管理、反向代理、WAF、安全审计、�
 - sslcat 服务自身重启时只对账 Runner Docker 容器状态，恢复管理态与代理规则，不把已有业务容器跟随重启。
 - 版本号需要在 CLI、服务端 API 响应、前端包信息和变更记录中保持一致。
 - CLI 危险操作默认需要显式确认，例如删除站点必须追加 `--yes`。
+- MCP 排障读取日志时必须使用有界尾读，避免大日志文件在高并发或事故现场拖垮管理面。
 
 ## 近期待改进
 
@@ -34,6 +35,7 @@ SSLcat 是一个集成 SSL 证书管理、反向代理、WAF、安全审计、�
 
 ## 版本记录
 
+- `2.3.0-rc1`：MCP 可观测性增强。新增 `error_log_list / error_log_tail` 两个只读工具，以及 `sslcat://logs/error-sources`、`sslcat://logs/error{?...}` 两个 resource，可查看近期内部错误和所有 proxy/static/php 站点 error log；新增有界日志尾读层，默认只读最后 1MB、最大 4MB；修复统计采样无锁读取 `ipEntries` 长度导致的高并发 data race 风险。
 - `2.2.0-rc1`：CLI 运维增强 P1。新增 `status`、`doctor`、静态/PHP `site` 管理、`proxy health-check`，支持 JSON 输出与命令前置 `-config`。
 - `2.1.0`：**正式版**。MCP 内置接入 P5（前端管理页 + Ruby 端到端 + 多客户端文档）+ 完成 P1~P5 全部能力。20 个工具 + 3 个 resource + Web 管理后台「MCP」页面 + 24 用例 e2e + 4 客户端接入示例。
 - `2.1.0-rc8`：MCP 内置接入 P4。新增 4 个转发工具 `proxy_route_add / update / delete / upstream_health_check`（PathPrefixRule 级别 CRUD + 并发 TCP 拨号探测，destructive delete 走二次确认）；新增 MCP Resource 协议层（`resources/list / templates/list / read`），实现 3 个核心 resource：`sslcat://config/current`（脱敏快照，深拷贝不污染原 config）、`sslcat://metrics/snapshot`（站点/证书/任务统计 JSON）、`sslcat://logs/access{?since,domain,limit}`（按时间窗口/域名/limit 过滤的访问日志尾部）。

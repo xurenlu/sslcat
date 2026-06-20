@@ -56,6 +56,12 @@ func RegisterReadOnly(reg *mcp.Registry, d *Deps) error {
 	if err := reg.RegisterTool(proxyRouteListTool(d)); err != nil {
 		return err
 	}
+	if err := reg.RegisterTool(errorLogListTool(d)); err != nil {
+		return err
+	}
+	if err := reg.RegisterTool(errorLogTailTool(d)); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -265,19 +271,19 @@ type proxyRouteListArgs struct {
 }
 
 type proxyRouteDetail struct {
-	Domain          string                 `json:"domain"`
-	Enabled         bool                   `json:"enabled"`
-	SSLOnly         bool                   `json:"ssl_only"`
-	Backends        []map[string]any       `json:"backends"`
-	PathPrefixes    []string               `json:"path_prefixes,omitempty"`
-	PathPrefixRules []map[string]any       `json:"path_prefix_rules,omitempty"`
-	HealthCheck     map[string]any         `json:"health_check,omitempty"`
-	SessionAffinity map[string]any         `json:"session_affinity,omitempty"`
-	WAFEnabled      *bool                  `json:"waf_enabled,omitempty"`
-	Bot             map[string]any         `json:"bot_detection,omitempty"`
-	Timeouts        map[string]any         `json:"timeouts,omitempty"`
-	GitDeploy       map[string]any         `json:"git_deploy,omitempty"`
-	Extra           map[string]any         `json:"extra,omitempty"`
+	Domain          string           `json:"domain"`
+	Enabled         bool             `json:"enabled"`
+	SSLOnly         bool             `json:"ssl_only"`
+	Backends        []map[string]any `json:"backends"`
+	PathPrefixes    []string         `json:"path_prefixes,omitempty"`
+	PathPrefixRules []map[string]any `json:"path_prefix_rules,omitempty"`
+	HealthCheck     map[string]any   `json:"health_check,omitempty"`
+	SessionAffinity map[string]any   `json:"session_affinity,omitempty"`
+	WAFEnabled      *bool            `json:"waf_enabled,omitempty"`
+	Bot             map[string]any   `json:"bot_detection,omitempty"`
+	Timeouts        map[string]any   `json:"timeouts,omitempty"`
+	GitDeploy       map[string]any   `json:"git_deploy,omitempty"`
+	Extra           map[string]any   `json:"extra,omitempty"`
 }
 
 func proxyRouteListTool(d *Deps) *mcp.Tool {
@@ -302,11 +308,11 @@ func proxyRouteListTool(d *Deps) *mcp.Tool {
 				out = append(out, buildRouteDetail(r))
 			}
 			return mcp.TextResult(map[string]any{
-				"total":               len(out),
-				"unmatched_behavior":  d.Config.Proxy.UnmatchedBehavior,
-				"unmatched_redirect":  d.Config.Proxy.UnmatchedRedirectURL,
+				"total":                           len(out),
+				"unmatched_behavior":              d.Config.Proxy.UnmatchedBehavior,
+				"unmatched_redirect":              d.Config.Proxy.UnmatchedRedirectURL,
 				"default_resp_header_timeout_sec": d.Config.Proxy.DefaultResponseHeaderTimeoutSec,
-				"routes":              out,
+				"routes":                          out,
 			}), nil
 		},
 	}
@@ -327,10 +333,10 @@ func buildRouteDetail(r *config.ProxyRule) proxyRouteDetail {
 	pathRules := []map[string]any{}
 	for _, pr := range r.PathPrefixRules {
 		pathRules = append(pathRules, map[string]any{
-			"name":     pr.Name,
-			"prefixes": pr.Prefixes,
-			"exact":    pr.Exact,
-			"enabled":  pr.Enabled,
+			"name":          pr.Name,
+			"prefixes":      pr.Prefixes,
+			"exact":         pr.Exact,
+			"enabled":       pr.Enabled,
 			"backend_count": len(pr.Backends),
 		})
 	}
@@ -345,12 +351,12 @@ func buildRouteDetail(r *config.ProxyRule) proxyRouteDetail {
 	}
 	if r.HealthCheckEnabled {
 		d.HealthCheck = map[string]any{
-			"enabled":             true,
-			"path":                r.HealthCheckPath,
-			"interval_sec":        r.HealthCheckInterval,
-			"timeout_sec":         r.HealthCheckTimeout,
-			"method":              r.HealthCheckMethod,
-			"expected_status":     r.ExpectedStatusCode,
+			"enabled":         true,
+			"path":            r.HealthCheckPath,
+			"interval_sec":    r.HealthCheckInterval,
+			"timeout_sec":     r.HealthCheckTimeout,
+			"method":          r.HealthCheckMethod,
+			"expected_status": r.ExpectedStatusCode,
 		}
 	}
 	if r.SessionAffinityEnabled {

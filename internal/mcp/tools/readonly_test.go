@@ -3,16 +3,24 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/xurenlu/sslcat/internal/config"
 	"github.com/xurenlu/sslcat/internal/mcp"
 )
 
 func newDeps() *Deps {
+	dir := os.TempDir()
 	cfg := &config.Config{
 		AdminPrefix: "/sslcat-panel",
+		Server: config.ServerConfig{
+			ErrorLogEnabled: true,
+			ErrorLogPath:    filepath.Join(dir, "sslcat-mcp-test-error.log"),
+		},
 		Proxy: config.ProxyConfig{
 			UnmatchedBehavior: "503",
 			Rules: []config.ProxyRule{
@@ -32,10 +40,11 @@ func newDeps() *Deps {
 					SessionAffinityCookie:  "JSESSIONID",
 				},
 				{
-					Domain:   "b.example.com",
-					Enabled:  false,
-					Target:   "127.0.0.1",
-					Port:     9000,
+					Domain:       "b.example.com",
+					Enabled:      false,
+					Target:       "127.0.0.1",
+					Port:         9000,
+					ErrorLogPath: filepath.Join(dir, "sslcat-mcp-test-b-error.log"),
 				},
 			},
 		},
@@ -85,10 +94,53 @@ func TestRegisterReadOnly_AllRegistered(t *testing.T) {
 	if err := RegisterReadOnly(reg, newDeps()); err != nil {
 		t.Fatalf("register: %v", err)
 	}
-	for _, name := range []string{"version_info", "site_list", "cert_list", "proxy_route_list"} {
+	for _, name := range []string{"version_info", "site_list", "cert_list", "proxy_route_list", "error_log_list", "error_log_tail"} {
 		if _, ok := reg.GetTool(name); !ok {
 			t.Errorf("tool %s missing", name)
 		}
+	}
+}
+
+func TestErrorLogTools(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &config.Config{
+		Server: config.ServerConfig{
+			ErrorLogEnabled: true,
+			ErrorLogPath:    filepath.Join(dir, "error.log"),
+		},
+		Proxy: config.ProxyConfig{Rules: []config.ProxyRule{
+			{Domain: "a.example.com", Enabled: true},
+			{Domain: "b.example.com", Enabled: true, ErrorLogPath: filepath.Join(dir, "b-error.log")},
+		}},
+	}
+	now := time.Now().Add(-1 * time.Minute).Format(time.RFC3339)
+	if err := os.WriteFile(cfg.Server.ErrorLogPath, []byte(now+" ERROR a.example.com upstream failed\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	reg := mcp.NewRegistry()
+	_ = RegisterReadOnly(reg, &Deps{Config: cfg})
+
+	listRes := callTool(t, reg, "error_log_list", `{"kind":"proxy"}`)
+	var listOut struct {
+		Total   int `json:"total"`
+		Sources []struct {
+			ID     string `json:"id"`
+			Domain string `json:"domain"`
+		} `json:"sources"`
+	}
+	unmarshalText(t, listRes, &listOut)
+	if listOut.Total != 2 {
+		t.Fatalf("expected 2 proxy log sources, got %d", listOut.Total)
+	}
+
+	tailRes := callTool(t, reg, "error_log_tail", `{"id":"internal","domain":"a.example.com","keyword":"ERROR","since":"10m"}`)
+	var tailOut struct {
+		LineCount int      `json:"line_count"`
+		Lines     []string `json:"lines"`
+	}
+	unmarshalText(t, tailRes, &tailOut)
+	if tailOut.LineCount != 1 || !strings.Contains(tailOut.Lines[0], "upstream failed") {
+		t.Fatalf("unexpected tail result: %+v", tailOut)
 	}
 }
 
@@ -116,7 +168,7 @@ func TestSiteListTool(t *testing.T) {
 	t.Run("all sites", func(t *testing.T) {
 		res := callTool(t, reg, "site_list", `{}`)
 		var out struct {
-			Total int           `json:"total"`
+			Total int              `json:"total"`
 			Sites []map[string]any `json:"sites"`
 		}
 		unmarshalText(t, res, &out)
@@ -127,7 +179,9 @@ func TestSiteListTool(t *testing.T) {
 
 	t.Run("enabled only", func(t *testing.T) {
 		res := callTool(t, reg, "site_list", `{"enabled_only":true}`)
-		var out struct{ Total int `json:"total"` }
+		var out struct {
+			Total int `json:"total"`
+		}
 		unmarshalText(t, res, &out)
 		if out.Total != 1 {
 			t.Errorf("expected 1 enabled site, got %d", out.Total)
@@ -177,9 +231,9 @@ func TestProxyRouteListTool(t *testing.T) {
 			Total             int    `json:"total"`
 			UnmatchedBehavior string `json:"unmatched_behavior"`
 			Routes            []struct {
-				Domain          string                 `json:"domain"`
-				HealthCheck     map[string]any         `json:"health_check"`
-				SessionAffinity map[string]any         `json:"session_affinity"`
+				Domain          string         `json:"domain"`
+				HealthCheck     map[string]any `json:"health_check"`
+				SessionAffinity map[string]any `json:"session_affinity"`
 			} `json:"routes"`
 		}
 		unmarshalText(t, res, &out)
@@ -191,9 +245,9 @@ func TestProxyRouteListTool(t *testing.T) {
 		}
 		// a.example.com should expose health_check & session_affinity blocks
 		var aRoute *struct {
-			Domain          string                 `json:"domain"`
-			HealthCheck     map[string]any         `json:"health_check"`
-			SessionAffinity map[string]any         `json:"session_affinity"`
+			Domain          string         `json:"domain"`
+			HealthCheck     map[string]any `json:"health_check"`
+			SessionAffinity map[string]any `json:"session_affinity"`
 		}
 		for i := range out.Routes {
 			if out.Routes[i].Domain == "a.example.com" {
@@ -213,7 +267,9 @@ func TestProxyRouteListTool(t *testing.T) {
 
 	t.Run("domain filter", func(t *testing.T) {
 		res := callTool(t, reg, "proxy_route_list", `{"domain":"b.example.com"}`)
-		var out struct{ Total int `json:"total"` }
+		var out struct {
+			Total int `json:"total"`
+		}
 		unmarshalText(t, res, &out)
 		if out.Total != 1 {
 			t.Errorf("expected 1 route, got %d", out.Total)
