@@ -166,6 +166,7 @@ begin
   tool_names = tools.map { |t| t['name'] }.sort
   expected = %w[
     cert_delete cert_dns_provider_list cert_issue cert_list cert_renew cert_upload
+    error_log_list error_log_tail
     proxy_route_add proxy_route_delete proxy_route_list proxy_route_update
     site_add site_delete site_disable site_enable site_list site_update
     task_list task_status upstream_health_check version_info
@@ -265,6 +266,9 @@ begin
   assert('resources/templates/list includes logs/access',
     templates.any? { |t| (t['uriTemplate'] || '').include?('sslcat://logs/access') },
     templates.inspect)
+  assert('resources/templates/list includes logs/error',
+    templates.any? { |t| (t['uriTemplate'] || '').include?('sslcat://logs/error') },
+    templates.inspect)
 
   # ----- 5c. resources/read config/current 必须脱敏 token_hash -----
   resp = rpc(token, sid, 'resources/read', { uri: 'sslcat://config/current' })
@@ -278,7 +282,29 @@ begin
     text.include?('"path_prefix"') || text.include?('"PathPrefix"') || text.include?('access_log_path') || text.include?('test@example.com'),
     'expected non-sensitive fields missing')
 
-  # ----- 5d. resources/read unknown uri 报错 -----
+  # ----- 5d. error log MCP 能力 -----
+  resp = rpc(token, sid, 'tools/call', { name: 'error_log_list', arguments: {} })
+  error_sources = rpc_text_result(resp)
+  assert('error_log_list includes internal source',
+    error_sources.is_a?(Hash) && (error_sources['sources'] || []).any? { |s| s['id'] == 'internal' },
+    error_sources.inspect)
+
+  resp = rpc(token, sid, 'tools/call', {
+    name: 'error_log_tail',
+    arguments: { id: 'internal', keyword: 'ERROR', since: '10m', limit: 20 },
+  })
+  error_tail = rpc_text_result(resp)
+  assert('error_log_tail reads recent internal error',
+    error_tail.is_a?(Hash) && (error_tail['lines'] || []).any? { |line| line.include?('mcp-testserver') },
+    error_tail.inspect)
+
+  resp = rpc(token, sid, 'resources/read', { uri: 'sslcat://logs/error?id=internal&keyword=ERROR&since=10m&limit=20' })
+  error_text = resp[:body].dig('result', 'contents', 0, 'text') || ''
+  assert('logs/error resource reads recent internal error',
+    error_text.include?('mcp-testserver') && error_text.include?('ERROR'),
+    error_text)
+
+  # ----- 5e. resources/read unknown uri 报错 -----
   resp = rpc(token, sid, 'resources/read', { uri: 'sslcat://nope' })
   err_code = resp[:body].dig('error', 'code')
   assert('unknown resource uri returns -32020',

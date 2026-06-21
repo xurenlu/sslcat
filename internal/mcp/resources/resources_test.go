@@ -29,8 +29,11 @@ func newTestDeps(t *testing.T) *Deps {
 			},
 		},
 		Server: config.ServerConfig{
-			SecretKey:      "should-be-hidden",
-			AccessLogPath:  filepath.Join(dir, "access.log"),
+			SecretKey:        "should-be-hidden",
+			AccessLogEnabled: true,
+			AccessLogPath:    filepath.Join(dir, "access.log"),
+			ErrorLogEnabled:  true,
+			ErrorLogPath:     filepath.Join(dir, "error.log"),
 		},
 		MCP: config.MCPConfig{
 			Enabled: true,
@@ -41,8 +44,14 @@ func newTestDeps(t *testing.T) *Deps {
 		Proxy: config.ProxyConfig{
 			Rules: []config.ProxyRule{
 				{Domain: "a.example.com", Enabled: true},
-				{Domain: "b.example.com", Enabled: false},
+				{Domain: "b.example.com", Enabled: false, ErrorLogPath: filepath.Join(dir, "b-error.log")},
 			},
+		},
+		StaticSites: []config.StaticSite{
+			{Domain: "static.example.com", Enabled: true, ErrorLogPath: filepath.Join(dir, "static-error.log")},
+		},
+		PHPSites: []config.PHPSite{
+			{Domain: "php.example.com", Enabled: true, Root: filepath.Join(dir, "php-root")},
 		},
 		Cluster: config.ClusterConfig{Mode: "standalone"},
 	}
@@ -61,19 +70,22 @@ func TestRegister_AllRegistered(t *testing.T) {
 	if err := Register(reg, d); err != nil {
 		t.Fatalf("register: %v", err)
 	}
-	if len(reg.ListResources()) != 2 {
-		t.Errorf("expected 2 static resources, got %d", len(reg.ListResources()))
+	if len(reg.ListResources()) != 3 {
+		t.Errorf("expected 3 static resources, got %d", len(reg.ListResources()))
 	}
-	if len(reg.ListTemplates()) != 1 {
-		t.Errorf("expected 1 template, got %d", len(reg.ListTemplates()))
+	if len(reg.ListTemplates()) != 2 {
+		t.Errorf("expected 2 templates, got %d", len(reg.ListTemplates()))
 	}
-	for _, uri := range []string{"sslcat://config/current", "sslcat://metrics/snapshot"} {
+	for _, uri := range []string{"sslcat://config/current", "sslcat://metrics/snapshot", "sslcat://logs/error-sources"} {
 		if _, _, ok := reg.Resolve(uri); !ok {
 			t.Errorf("resource %s not resolvable", uri)
 		}
 	}
 	if _, _, ok := reg.Resolve("sslcat://logs/access?since=10m"); !ok {
 		t.Error("logs template not resolvable with query")
+	}
+	if _, _, ok := reg.Resolve("sslcat://logs/error?id=internal&limit=20"); !ok {
+		t.Error("error logs template not resolvable with query")
 	}
 }
 
@@ -231,6 +243,57 @@ func TestLogsAccess_InvalidSince(t *testing.T) {
 	_, _, err := reader(context.Background(), "sslcat://logs/access?since=invalid", nil)
 	if err == nil {
 		t.Error("expected error for invalid since")
+	}
+}
+
+func TestLogsErrorSources(t *testing.T) {
+	d := newTestDeps(t)
+	defer d.Tasks.Close()
+	_ = os.WriteFile(d.Config.Server.ErrorLogPath, []byte("internal error\n"), 0644)
+	_ = os.WriteFile(d.Config.Proxy.Rules[1].ErrorLogPath, []byte("b error\n"), 0644)
+	reg := mcp.NewResourceRegistry()
+	_ = Register(reg, d)
+	reader, _, _ := reg.Resolve("sslcat://logs/error-sources")
+	mime, body, err := reader(context.Background(), "sslcat://logs/error-sources", nil)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if mime != "application/json" {
+		t.Errorf("mime=%s", mime)
+	}
+	if !strings.Contains(body, "internal") || !strings.Contains(body, "proxy:b.example.com") {
+		t.Fatalf("expected internal and proxy sources, body=%s", body)
+	}
+}
+
+func TestLogsErrorTail(t *testing.T) {
+	d := newTestDeps(t)
+	defer d.Tasks.Close()
+	now := time.Now().Add(-1 * time.Minute).Format(time.RFC3339)
+	old := time.Now().Add(-2 * time.Hour).Format(time.RFC3339)
+	lines := []string{
+		old + " ERROR old a.example.com",
+		now + " ERROR fresh a.example.com backend failed",
+		now + " WARN fresh b.example.com",
+		now + " ERROR fresh a.example.com panic recovered",
+	}
+	if err := os.WriteFile(d.Config.Server.ErrorLogPath, []byte(strings.Join(lines, "\n")+"\n"), 0644); err != nil {
+		t.Fatalf("write log: %v", err)
+	}
+	reg := mcp.NewResourceRegistry()
+	_ = Register(reg, d)
+	reader, _, _ := reg.Resolve("sslcat://logs/error?id=internal&since=10m&domain=a.example.com&keyword=ERROR")
+	_, body, err := reader(context.Background(), "sslcat://logs/error?id=internal&since=10m&domain=a.example.com&keyword=ERROR", nil)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if got := countLogLines(body); got != 2 {
+		t.Errorf("expected 2 recent error lines, got %d body=%s", got, body)
+	}
+	for _, line := range strings.Split(body, "\n") {
+		if strings.Contains(line, "ERROR old ") {
+			t.Errorf("old line should be filtered, body=%s", body)
+		}
 	}
 }
 

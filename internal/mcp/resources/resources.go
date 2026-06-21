@@ -1,8 +1,10 @@
 // Package resources 实现 MCP 的 3 个核心 resource：
 //
-//   sslcat://config/current              当前完整配置（脱敏）
-//   sslcat://metrics/snapshot            当前指标快照（JSON）
-//   sslcat://logs/access{?since,domain,limit}  访问日志尾部（按时间窗口/域名过滤）
+//	sslcat://config/current              当前完整配置（脱敏）
+//	sslcat://metrics/snapshot            当前指标快照（JSON）
+//	sslcat://logs/access{?since,domain,limit}  访问日志尾部（按时间窗口/域名过滤）
+//	sslcat://logs/error-sources          错误日志源清单（内部 + 所有站点）
+//	sslcat://logs/error{?id,kind,domain,since,keyword,limit,max_bytes} 错误日志尾部
 //
 // 所有 resource 都要求 scope=read；不暴露任何能解出明文密码/token 的数据。
 package resources
@@ -23,6 +25,7 @@ import (
 
 	"github.com/xurenlu/sslcat/internal/config"
 	"github.com/xurenlu/sslcat/internal/mcp"
+	"github.com/xurenlu/sslcat/internal/mcp/logview"
 	"github.com/xurenlu/sslcat/internal/proxy"
 	"github.com/xurenlu/sslcat/internal/ssl"
 )
@@ -30,15 +33,15 @@ import (
 // Deps 子集，避免与 tools.Deps 耦合循环 import。
 // 都是可选；nil 字段在对应 resource 内部检测后返回错误。
 type Deps struct {
-	Version     string
-	Config      *config.Config
-	ConfigFile  string
-	SSL         *ssl.Manager
-	Proxy       *proxy.Manager
-	Tasks       *mcp.TaskRegistry
+	Version    string
+	Config     *config.Config
+	ConfigFile string
+	SSL        *ssl.Manager
+	Proxy      *proxy.Manager
+	Tasks      *mcp.TaskRegistry
 }
 
-// Register 把 3 个 resource 注册到 ResourceRegistry。
+// Register 把核心 resource 注册到 ResourceRegistry。
 func Register(reg *mcp.ResourceRegistry, d *Deps) error {
 	if err := reg.Register(&mcp.Resource{
 		URI:         "sslcat://config/current",
@@ -68,6 +71,27 @@ func Register(reg *mcp.ResourceRegistry, d *Deps) error {
 		Scope:       mcp.ScopeRead,
 		MatchPrefix: "sslcat://logs/access",
 		Reader:      logsAccessReader(d),
+	}); err != nil {
+		return err
+	}
+	if err := reg.Register(&mcp.Resource{
+		URI:         "sslcat://logs/error-sources",
+		Name:        "Error log sources",
+		Description: "sslcat 内部错误日志与所有站点 error log 的配置清单，包含启用状态、文件路径、大小和更新时间。",
+		MimeType:    "application/json",
+		Scope:       mcp.ScopeRead,
+		Reader:      logsErrorSourcesReader(d),
+	}); err != nil {
+		return err
+	}
+	if err := reg.RegisterTemplate(&mcp.ResourceTemplate{
+		URITemplate: "sslcat://logs/error{?id,kind,domain,since,keyword,limit,max_bytes}",
+		Name:        "Error log tail",
+		Description: "错误日志尾部。query 参数：id=internal 或 proxy:域名/static:域名/php:域名；kind/domain 可替代 id；since=10m 或 RFC3339；keyword=关键字；limit 默认 200 最大 2000；max_bytes 默认 1MB 最大 4MB。",
+		MimeType:    "text/plain",
+		Scope:       mcp.ScopeRead,
+		MatchPrefix: "sslcat://logs/error",
+		Reader:      logsErrorReader(d),
 	}); err != nil {
 		return err
 	}
@@ -285,6 +309,71 @@ func logsAccessReader(d *Deps) mcp.ResourceReader {
 		}
 		body := header + "\n" + strings.Join(lines, "\n")
 		if len(lines) > 0 && !strings.HasSuffix(body, "\n") {
+			body += "\n"
+		}
+		return "text/plain", body, nil
+	}
+}
+
+// ---------- sslcat://logs/error-sources / sslcat://logs/error?... ----------
+
+func logsErrorSourcesReader(d *Deps) mcp.ResourceReader {
+	return func(ctx context.Context, uri string, caller *mcp.CallContext) (string, string, error) {
+		if d.Config == nil {
+			return "", "", fmt.Errorf("config not loaded")
+		}
+		sources := logview.ListSources(d.Config)
+		buf, err := json.MarshalIndent(map[string]any{
+			"total":   len(sources),
+			"sources": sources,
+		}, "", "  ")
+		if err != nil {
+			return "", "", err
+		}
+		return "application/json", string(buf), nil
+	}
+}
+
+func logsErrorReader(d *Deps) mcp.ResourceReader {
+	return func(ctx context.Context, uri string, caller *mcp.CallContext) (string, string, error) {
+		if d.Config == nil {
+			return "", "", fmt.Errorf("config not loaded")
+		}
+		q, err := mcp.ParseURIQuery(uri)
+		if err != nil {
+			return "", "", fmt.Errorf("parse query: %w", err)
+		}
+		src, ok := logview.FindSource(d.Config, q.Get("id"), q.Get("kind"), q.Get("domain"))
+		if !ok {
+			return "", "", fmt.Errorf("error log source not found")
+		}
+		since, err := logview.ParseSince(q.Get("since"), time.Now())
+		if err != nil {
+			return "", "", fmt.Errorf("invalid 'since': %w", err)
+		}
+		res, err := logview.ReadTail(src, logview.TailOptions{
+			Limit:    parseIntDefault(q.Get("limit"), logview.DefaultLimit),
+			MaxBytes: int64(parseIntDefault(q.Get("max_bytes"), int(logview.DefaultMaxBytes))),
+			Since:    since,
+			Domain:   q.Get("domain"),
+			Keyword:  q.Get("keyword"),
+		})
+		if err != nil {
+			return "", "", err
+		}
+		header := fmt.Sprintf("# sslcat error log tail\n# source=%s kind=%s path=%s lines=%d limit=%d max_bytes=%d",
+			res.Source.ID, res.Source.Kind, res.Source.Path, res.LineCount, res.Limit, res.MaxBytes)
+		if !since.IsZero() {
+			header += " since=" + since.Format(time.RFC3339)
+		}
+		if res.Truncated {
+			header += " truncated=true"
+		}
+		if res.FilterNote != "" {
+			header += "\n# " + res.FilterNote
+		}
+		body := header + "\n" + strings.Join(res.Lines, "\n")
+		if len(res.Lines) > 0 && !strings.HasSuffix(body, "\n") {
 			body += "\n"
 		}
 		return "text/plain", body, nil

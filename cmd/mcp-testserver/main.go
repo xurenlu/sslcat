@@ -5,13 +5,15 @@
 // 全部挂到一个 bare http.Server 上，省掉 sslcat 主进程的登录、TLS、首次设置等流程。
 //
 // 用法：
-//   go run ./cmd/mcp-testserver -addr=:18000 -data=./reports/mcp-e2e-data
+//
+//	go run ./cmd/mcp-testserver -addr=:18000 -data=./reports/mcp-e2e-data
 //
 // 端点：
-//   GET  /health                          → ok
-//   POST /admin/token                     → 一次性创建 token，返回明文（仅测试用）
-//   POST /mcp/stream  (MCP Streamable HTTP)
-//   GET  /mcp/stream/health
+//
+//	GET  /health                          → ok
+//	POST /admin/token                     → 一次性创建 token，返回明文（仅测试用）
+//	POST /mcp/stream  (MCP Streamable HTTP)
+//	GET  /mcp/stream/health
 package main
 
 import (
@@ -43,23 +45,30 @@ func main() {
 	certDir := *dataDir + "/certs"
 	keyDir := *dataDir + "/keys"
 	accessLog := *dataDir + "/access.log"
+	errorLog := *dataDir + "/error.log"
 	_ = os.MkdirAll(certDir, 0755)
 	_ = os.MkdirAll(keyDir, 0700)
 	if _, err := os.Stat(accessLog); err != nil {
 		_ = os.WriteFile(accessLog, []byte{}, 0644)
 	}
+	if _, err := os.Stat(errorLog); err != nil {
+		line := time.Now().Add(-5*time.Minute).Format(time.RFC3339) + " ERROR internal startup check failed component=mcp-testserver domain=ruby.example.com\n"
+		_ = os.WriteFile(errorLog, []byte(line), 0644)
+	}
 
 	cfg := &config.Config{
 		AdminPrefix: "/sslcat-panel",
 		Server: config.ServerConfig{
-			Host:          "127.0.0.1",
-			Port:          8443, // 必须 1..65535，否则 cfg.Save 内 validate 会拒绝
-			PortMode:      "standard",
-			CustomPort:    8080,
-			EnableHTTPS:   true,
-			LogLevel:      "info",
-			DataDir:       *dataDir,
-			AccessLogPath: accessLog,
+			Host:            "127.0.0.1",
+			Port:            8443, // 必须 1..65535，否则 cfg.Save 内 validate 会拒绝
+			PortMode:        "standard",
+			CustomPort:      8080,
+			EnableHTTPS:     true,
+			LogLevel:        "info",
+			DataDir:         *dataDir,
+			AccessLogPath:   accessLog,
+			ErrorLogEnabled: true,
+			ErrorLogPath:    errorLog,
 		},
 		SSL: config.SSLConfig{
 			Email:            "test@example.com",

@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0-rc1] - 2026-06-21
+
+### Added
+
+- MCP 新增只读工具 `error_log_list` / `error_log_tail`，可列出 sslcat 内部错误日志与所有 proxy/static/php 站点 error log 来源，并按 `id`、`kind`、`domain`、`keyword`、`since`、`limit` 读取近期错误。
+- MCP 新增 Resources：`sslcat://logs/error-sources` 与 `sslcat://logs/error{?id,kind,domain,since,keyword,limit,max_bytes}`，AI 客户端可直接读取近期内部错误和站点错误日志。
+- 新增 `internal/mcp/logview` 有界日志读取层，默认只读取文件尾部 1MB、最大 4MB，避免 MCP 排障时因大日志文件阻塞请求路径。
+
+### Fixed
+
+- 修复统计采样路径无锁读取 `ipEntries` 长度的问题，避免高并发访问统计更新时触发 map data race。
+
+## [2.2.0-rc1] - 2026-06-04
+
+### Added
+
+- 新增 CLI 运维命令 `sslcat status [--json]`，输出版本、配置文件、监听参数、站点/代理/证书/MCP 摘要，方便脚本和监控采集。
+- 新增 CLI 自检命令 `sslcat doctor [--json]`，检查配置文件、配置校验、端口权限、证书目录、站点根目录、代理后端和 MCP token 状态。
+- 新增 CLI 站点管理命令 `sslcat site list/add/update/delete/enable/disable`，支持静态站点与 PHP 站点的基础 CRUD；删除站点必须显式追加 `--yes`。
+- 新增 `sslcat proxy health-check [--domain <domain>] [--include-routes] [--json]`，对代理主后端和可选 PathPrefixRule 后端执行 TCP 可达性探测。
+
+### Changed
+
+- CLI 入口现在支持全局 `-config` 放在命令前，例如 `sslcat -config ./sslcat.conf status --json`。
+- CLI 帮助输出按命令名排序，并补充新增运维命令示例。
+
 ## [2.1.0] - 2026-06-03
 
 ### 🎉 正式版（v2.1.0 发布）

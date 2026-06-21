@@ -39,7 +39,7 @@ import (
 )
 
 var (
-	version = "2.1.0"
+	version = "2.3.0-rc1"
 	build   = "dev"
 )
 
@@ -79,18 +79,11 @@ func main() {
 		return
 	}
 
+	cliManager := newCLIManager()
+	cliCommandIndex := findCLICommandIndex(cliManager, os.Args[1:])
 	// 检查是否是 CLI 命令（在定义 flag 之前检查）
-	if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], "-") {
+	if cliCommandIndex >= 0 {
 		// 处理子命令
-		cliManager := cli.NewManager()
-		cliManager.RegisterConfigCommands()
-		cliManager.RegisterProxyCommands()
-		cliManager.RegisterSSLCommands()
-		cliManager.RegisterBlockCommands()
-		cliManager.RegisterHelpCommand()
-		cliManager.RegisterConsoleCommand()
-		cliManager.RegisterRenewDueCommand()
-		cliManager.RegisterMCPCommands()
 
 		// 解析配置文件路径：未指定 -config 时，若存在系统安装配置则优先使用（与 systemd 服务一致）
 		configFile := "sslcat.conf"
@@ -120,7 +113,7 @@ func main() {
 		cliManager.SetConfigFile(configFile)
 
 		// 执行命令
-		if err := cliManager.Execute(os.Args[1:]); err != nil {
+		if err := cliManager.Execute(os.Args[cliCommandIndex:]); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ 命令执行失败: %v\n", err)
 			fmt.Fprintf(os.Stderr, "💡 提示: 使用 'sslcat help' 查看所有可用命令\n")
 			os.Exit(1)
@@ -610,6 +603,31 @@ func main() {
 	}
 
 	logrus.Info("SSLcat server stopped")
+}
+
+func newCLIManager() *cli.Manager {
+	cliManager := cli.NewManager()
+	cliManager.SetVersion(version, build)
+	cliManager.RegisterOpsCommands()
+	cliManager.RegisterConfigCommands()
+	cliManager.RegisterProxyCommands()
+	cliManager.RegisterSiteCommands()
+	cliManager.RegisterSSLCommands()
+	cliManager.RegisterBlockCommands()
+	cliManager.RegisterHelpCommand()
+	cliManager.RegisterConsoleCommand()
+	cliManager.RegisterRenewDueCommand()
+	cliManager.RegisterMCPCommands()
+	return cliManager
+}
+
+func findCLICommandIndex(cliManager *cli.Manager, args []string) int {
+	for i, arg := range args {
+		if cliManager.HasCommand(arg) {
+			return i + 1
+		}
+	}
+	return -1
 }
 
 // filteredErrorLog 过滤频繁的 TLS handshake 错误日志
@@ -1116,12 +1134,7 @@ func showHelp() {
 	fmt.Println()
 
 	// 创建 CLI 管理器并注册所有命令以显示帮助
-	cliManager := cli.NewManager()
-	cliManager.RegisterConfigCommands()
-	cliManager.RegisterProxyCommands()
-	cliManager.RegisterSSLCommands()
-	cliManager.RegisterHelpCommand()
-	cliManager.RegisterConsoleCommand()
+	cliManager := newCLIManager()
 	cliManager.ShowHelp()
 
 	fmt.Println("启动参数:")
@@ -1152,7 +1165,11 @@ func showHelp() {
 	fmt.Println("  sslcat help                   显示 CLI 命令帮助")
 	fmt.Println("  sslcat console                启动交互式 Terminal UI 控制台")
 	fmt.Println("  sslcat config show            显示完整配置")
+	fmt.Println("  sslcat status --json          输出当前配置摘要（JSON）")
+	fmt.Println("  sslcat doctor                 执行本地诊断")
+	fmt.Println("  sslcat site list              列出静态/PHP 站点")
 	fmt.Println("  sslcat proxy list              列出所有代理规则")
+	fmt.Println("  sslcat proxy health-check --domain example.com")
 	fmt.Println("  sslcat ssl list               列出所有 SSL 证书")
 	fmt.Println("  sslcat renew   同上；未写 -config 时若存在 /etc/sslcat/sslcat.conf 会自动使用")
 	fmt.Println("  sslcat renew -config /etc/sslcat/sslcat.conf   批量续期已过期或 3 天内过期的证书")

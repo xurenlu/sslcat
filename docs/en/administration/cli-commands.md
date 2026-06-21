@@ -24,6 +24,39 @@ sslcat -config /path/to/sslcat.conf <command>
 
 ## Available Commands
 
+### 0. Operations Diagnostics (`status` / `doctor`)
+
+Operations diagnostics commands provide a quick local summary for troubleshooting and automation.
+
+#### Show Status Summary
+
+```bash
+# Human-readable summary
+sslcat status
+
+# JSON output for scripts or monitoring
+sslcat status --json
+
+# Global -config can be placed before the command
+sslcat -config /etc/sslcat/sslcat.conf status --json
+```
+
+#### Run Local Diagnostics
+
+```bash
+# Check config, port privileges, cert dirs, site roots, proxy backends, and MCP state
+sslcat doctor
+
+# JSON output
+sslcat doctor --json
+```
+
+**Notes:**
+- `doctor` exits with a non-zero status when errors are found.
+- `status --json` does not print plaintext tokens.
+
+---
+
 ### 1. Configuration Management (`config`)
 
 Configuration management commands are used to view, get, and set configuration items.
@@ -122,6 +155,23 @@ Proxy Rules:
    SSL Only: true
 ```
 
+#### Backend Health Check
+
+```bash
+# Probe all enabled backends
+sslcat proxy health-check
+
+# Probe a specific domain
+sslcat proxy health-check --domain example.com
+
+# Include PathPrefixRule backends and print JSON
+sslcat proxy health-check --domain example.com --include-routes --json
+```
+
+**Notes:**
+- The current probe is a TCP dial check and does not request the HTTP health-check path.
+- If any backend is unreachable, the command exits with a non-zero status.
+
 #### Add Proxy Rule
 
 ```bash
@@ -201,7 +251,56 @@ sslcat proxy delete -domain example.com
 
 ---
 
-### 3. SSL Certificate Management (`ssl`)
+### 3. Site Management (`site`)
+
+Site management commands manage static and PHP sites.
+
+#### List Sites
+
+```bash
+sslcat site list
+sslcat site list --json
+```
+
+#### Add Static Site
+
+```bash
+sslcat site add --type static --domain app.example.com --root /srv/app --index index.html --try-files
+```
+
+#### Add PHP Site
+
+```bash
+sslcat site add --type php --domain php.example.com --root /srv/php --index index.php --fcgi 127.0.0.1:9000
+```
+
+#### Update Site
+
+```bash
+sslcat site update --type static --domain app.example.com --root /srv/app-new --enabled
+sslcat site update --type php --domain php.example.com --fcgi unix:/run/php/php-fpm.sock
+```
+
+#### Enable or Disable Site
+
+```bash
+sslcat site enable --type static --domain app.example.com
+sslcat site disable --type php --domain php.example.com
+```
+
+#### Delete Site
+
+```bash
+sslcat site delete --type static --domain app.example.com --yes
+```
+
+**Notes:**
+- Site deletion requires an explicit `--yes`.
+- Restart SSLcat after configuration changes.
+
+---
+
+### 4. SSL Certificate Management (`ssl`)
 
 SSL certificate management commands are used to manage SSL certificates. **Note: Some SSL command functionalities in the current version are placeholder implementations, and full functionality is under development.**
 

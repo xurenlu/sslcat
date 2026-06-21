@@ -132,6 +132,13 @@ curl -sk $BASE \
   -H "Mcp-Session-Id: $SID" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":5,"method":"resources/read","params":{"uri":"sslcat://logs/access?since=10m&limit=50"}}' | jq -r .result.contents[0].text
+
+# 7. 读近期内部错误
+curl -sk $BASE \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Mcp-Session-Id: $SID" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":6,"method":"resources/read","params":{"uri":"sslcat://logs/error?id=internal&keyword=ERROR&since=10m&limit=50"}}' | jq -r .result.contents[0].text
 ```
 
 ---

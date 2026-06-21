@@ -4,7 +4,7 @@ sslcat 自 `v2.1.0` 起内置一个 [Model Context Protocol](https://modelcontex
 把连接信息交给任意支持 MCP 的 AI 客户端（Claude Desktop、Cursor、Cherry Studio 等），
 AI 就能直接调用 sslcat 工具来运维。
 
-> **正式版**：v2.1.0 发布。20 个工具 + 3 个 resource + Web 管理后台「MCP」页面 + Ruby 端到端集成测试 + 4 套客户端接入示例。
+> **正式版**：v2.1.0 发布。v2.3.0-rc1 起提供 22 个工具 + 5 个 resource/resource template，并支持通过 MCP 查看近期内部错误和所有站点 error log。
 > 客户端配置见 [`docs/mcp-client-setup.md`](./mcp-client-setup.md)。
 
 ---
@@ -84,7 +84,7 @@ sslcat mcp doctor
 
 | scope | 覆盖工具 | 备注 |
 |---|---|---|
-| `read` | `version_info`、`site_list`、`cert_list`、`proxy_route_list` | 只读 |
+| `read` | `version_info`、`site_list`、`cert_list`、`proxy_route_list`、`error_log_list`、`error_log_tail` | 只读 |
 | `site:write` | （P2 起）站点 CRUD | 写 |
 | `cert:write` | （P3 起）证书申请/续期/删除 | 写 |
 | `proxy:write` | （P4 起）转发路由 CRUD | 写 |
@@ -127,6 +127,27 @@ scope 在 token 上设置；调用 tool 时会在 server 端校验，缺权限�
 ```
 
 返回反代路由的完整详情（路径前缀规则、健康检查、会话保持、超时…），适合 AI 诊断转发问题。
+
+### `error_log_list`
+
+```json
+{ "kind": "proxy", "domain": "api.example.com" }
+```
+
+列出 sslcat 内部错误日志和所有站点 error log 来源。返回每个来源的 `id`、`kind`、`domain`、`path`、`enabled`、`shared`、`exists`、`size_bytes` 和 `modified_at`。`kind` 可取 `internal / proxy / static / php`。
+
+### `error_log_tail`
+
+```json
+{
+  "id": "internal",
+  "keyword": "ERROR",
+  "since": "10m",
+  "limit": 100
+}
+```
+
+读取指定错误日志来源的尾部内容。`id` 可来自 `error_log_list`，例如 `internal`、`proxy:api.example.com`、`static:www.example.com`、`php:app.example.com`。也可用 `kind + domain` 选择站点。默认只读取文件尾部 1MB，`max_bytes` 最大 4MB，避免大日志文件拖慢 MCP 请求。
 
 ---
 
@@ -399,12 +420,14 @@ Resource 是 MCP 协议提供的"被 AI 拉取的命名上下文"，比 tool 更
 // resources/list 返回静态 URI 列表
 { "resources": [
     { "uri": "sslcat://config/current",    "name": "Current sslcat configuration (redacted)", "mimeType": "application/json" },
-    { "uri": "sslcat://metrics/snapshot",  "name": "Runtime metrics snapshot", "mimeType": "application/json" }
+    { "uri": "sslcat://metrics/snapshot",  "name": "Runtime metrics snapshot", "mimeType": "application/json" },
+    { "uri": "sslcat://logs/error-sources", "name": "Error log sources", "mimeType": "application/json" }
 ] }
 
 // resources/templates/list 返回模板 URI
 { "resourceTemplates": [
-    { "uriTemplate": "sslcat://logs/access{?since,domain,limit}", "name": "Access log tail", "mimeType": "text/plain" }
+    { "uriTemplate": "sslcat://logs/access{?since,domain,limit}", "name": "Access log tail", "mimeType": "text/plain" },
+    { "uriTemplate": "sslcat://logs/error{?id,kind,domain,since,keyword,limit,max_bytes}", "name": "Error log tail", "mimeType": "text/plain" }
 ] }
 ```
 
@@ -449,6 +472,33 @@ sslcat://logs/access?since=10m&domain=api.example.com&limit=100
 ```
 
 返回 `text/plain`，前两行是注释 header（路径、过滤参数），其余每行一条原始日志。解析行首时间戳支持 nginx 默认格式与 RFC3339；解析不出来时**保守保留**（避免静默丢日志）。
+
+### `sslcat://logs/error-sources`（scope=read）
+
+返回所有错误日志来源清单，包括：
+
+- `internal`：sslcat 内部错误日志（`server.error_log_path`）；
+- `proxy:<domain>`：反向代理站点 error log；
+- `static:<domain>`：静态站点 error log；
+- `php:<domain>`：PHP 站点 error log，优先使用 `monitoring_config.log_file`，其次是站点 `error_log_path`，最后回退到 `root/logs/php_errors.log`。
+
+### `sslcat://logs/error{?id,kind,domain,since,keyword,limit,max_bytes}`（scope=read）
+
+读错误日志尾部，适合 AI 在事故现场快速查看近期内部错误和站点错误。参数：
+
+- `id` —— 日志源 ID，例如 `internal` 或 `proxy:api.example.com`；
+- `kind` / `domain` —— 未传 `id` 时选择日志源，也用于按行过滤域名；
+- `since` —— duration（`10m` / `1h`）或 RFC3339；
+- `keyword` —— 按行关键字过滤，例如 `ERROR`、`panic`、`upstream`；
+- `limit` —— 默认 200，最大 2000；
+- `max_bytes` —— 默认 1MB，最大 4MB。
+
+例：
+
+```
+sslcat://logs/error?id=internal&keyword=ERROR&since=10m&limit=100
+sslcat://logs/error?kind=proxy&domain=api.example.com&keyword=upstream&limit=200
+```
 
 ---
 
