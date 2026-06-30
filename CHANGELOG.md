@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0-rc2] - 2026-06-30
+
+### Fixed
+
+- 修复冷启动后通配符证书可能无法匹配新子域的问题：当证书以具体域名文件名保存、但 SAN 覆盖通配符域名时，TLS 握手现在会扫描磁盘证书 SAN 并加载匹配证书。
+
 ## [2.3.0-rc1] - 2026-06-21
 
 ### Added

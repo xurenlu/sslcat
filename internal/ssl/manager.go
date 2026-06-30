@@ -526,6 +526,14 @@ func (m *Manager) GetCertificate(domain string) (*tls.Certificate, error) {
 		return cert, nil
 	}
 
+	// 兼容历史上传方式：用户可能把通配符证书保存为具体域名文件名
+	// （例如 api.example.com.crt 的 SAN 是 *.example.com）。冷启动缓存为空时，
+	// 需要扫描磁盘证书 SAN，否则新子域会在重启后找不到可用证书。
+	if cert, certKey := m.loadMatchingCertFromDisk(domain); cert != nil {
+		m.log.Debugf("Loaded matching certificate from disk: %s for domain %s", certKey, domain)
+		return cert, nil
+	}
+
 	// 使用元数据缓存检查证书是否存在，避免频繁磁盘查找
 	metadata := m.getCertMetadata(domain)
 	if !metadata.exists {
@@ -766,13 +774,15 @@ func (m *Manager) domainMatchesCert(domain string, cert *tls.Certificate) bool {
 		return false
 	}
 
-	// 检查 CN
-	if x509Cert.Subject.CommonName == domain {
+	return certificateMatchesDomain(domain, x509Cert)
+}
+
+func certificateMatchesDomain(domain string, cert *x509.Certificate) bool {
+	if cert.Subject.CommonName == domain {
 		return true
 	}
 
-	// 检查 SAN (Subject Alternative Names)
-	for _, dnsName := range x509Cert.DNSNames {
+	for _, dnsName := range cert.DNSNames {
 		if matchDomain(domain, dnsName) {
 			return true
 		}
@@ -860,6 +870,69 @@ func (m *Manager) loadWildcardCertFromDisk(domain string) *tls.Certificate {
 
 	m.log.Debugf("Loaded wildcard certificate from disk: %s for domain %s", wildcardDomain, domain)
 	return &cert
+}
+
+func (m *Manager) loadMatchingCertFromDisk(domain string) (*tls.Certificate, string) {
+	entries, err := os.ReadDir(m.config.SSL.CertDir)
+	if err != nil {
+		m.log.Debugf("Failed to scan certificate directory for %s: %v", domain, err)
+		return nil, ""
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasSuffix(strings.ToLower(name), ".crt") {
+			continue
+		}
+
+		certKey := strings.TrimSuffix(name, ".crt")
+		certPath := filepath.Join(m.config.SSL.CertDir, name)
+		keyPath := filepath.Join(m.config.SSL.KeyDir, certKey+".key")
+		certStat, statErr := os.Stat(certPath)
+		if statErr != nil {
+			continue
+		}
+
+		certData, readErr := os.ReadFile(certPath)
+		if readErr != nil {
+			continue
+		}
+		block, _ := pem.Decode(certData)
+		if block == nil || block.Type != "CERTIFICATE" {
+			continue
+		}
+		x509Cert, parseErr := x509.ParseCertificate(block.Bytes)
+		if parseErr != nil || !certificateMatchesDomain(domain, x509Cert) {
+			continue
+		}
+
+		if _, statErr := os.Stat(keyPath); statErr != nil {
+			continue
+		}
+
+		cert, loadErr := tls.LoadX509KeyPair(certPath, keyPath)
+		if loadErr != nil {
+			m.log.Debugf("Skipping certificate %s during SAN scan: %v", certKey, loadErr)
+			continue
+		}
+
+		m.certMutex.Lock()
+		m.certCache[certKey] = &cert
+		m.certDiskModTime[certKey] = certStat.ModTime()
+		m.certMutex.Unlock()
+		m.updateCertMetadata(certKey, &cert)
+
+		m.failedCacheMutex.Lock()
+		delete(m.failedDomainCache, domain)
+		m.failedCacheMutex.Unlock()
+
+		return &cert, certKey
+	}
+
+	return nil, ""
 }
 
 // matchDomain 域名匹配函数，支持通配符

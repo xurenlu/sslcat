@@ -84,3 +84,58 @@ func TestHotReloadModTimeTracking(t *testing.T) {
 		t.Fatalf("certDiskModTime %v want %v after touch", got3, st3.ModTime())
 	}
 }
+
+func TestGetCertificateColdStartScansDiskSAN(t *testing.T) {
+	tmp := t.TempDir()
+	certDir := filepath.Join(tmp, "certs")
+	keyDir := filepath.Join(tmp, "keys")
+	if err := os.MkdirAll(certDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(keyDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &config.Config{}
+	cfg.SSL.CertDir = certDir
+	cfg.SSL.KeyDir = keyDir
+	cfg.SSL.DisableSelfSigned = true
+
+	writer, err := NewManager(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tlsCert, err := writer.generateSelfSignedCert("*.niuwoai.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.saveCertificateToDisk("api.niuwoai.com", tlsCert); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(certDir, "*.niuwoai.com.crt")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(keyDir, "*.niuwoai.com.key")); err != nil {
+		t.Fatal(err)
+	}
+
+	cold, err := NewManager(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cert, err := cold.GetCertificate("pub.niuwoai.com")
+	if err != nil {
+		t.Fatalf("GetCertificate should find matching SAN from api.niuwoai.com.crt: %v", err)
+	}
+	if cert == nil || !cold.domainMatchesCert("pub.niuwoai.com", cert) {
+		t.Fatal("loaded certificate should match pub.niuwoai.com")
+	}
+
+	cold.certMutex.RLock()
+	_, cached := cold.certCache["api.niuwoai.com"]
+	cold.certMutex.RUnlock()
+	if !cached {
+		t.Fatal("matching disk certificate should be cached under its file key")
+	}
+}
