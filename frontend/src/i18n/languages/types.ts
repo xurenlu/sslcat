@@ -953,6 +953,13 @@ export interface Translation {
     pathPrefixRules: string
     actions: string
     rules: string
+    phpVersion: string
+    connectionAddress: string
+    memoryLimit: string
+    executionTime: string
+    defaultPhpVersion: string
+    defaultMemoryLimit: string
+    defaultExecutionTime: string
     tryFiles: string
     tryFilesEnabled: string
     tryFilesDisabled: string

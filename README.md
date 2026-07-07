@@ -1,6 +1,6 @@
 # SSLcat 🚀
 
-[![Version](https://img.shields.io/badge/version-2.3.0--rc2-blue.svg)](https://github.com/xurenlu/sslcat/releases/tag/v2.3.0-rc2)
+[![Version](https://img.shields.io/badge/version-2.3.0--rc3-blue.svg)](https://github.com/xurenlu/sslcat/releases/tag/v2.3.0-rc3)
 [![Go Version](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://golang.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![CPU Optimized](https://img.shields.io/badge/CPU%20optimized-97%25%20reduction-brightgreen.svg)](#performance)

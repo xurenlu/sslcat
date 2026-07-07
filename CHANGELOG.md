@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0-rc3] - 2026-07-07
+
+### Fixed
+
+- 修复 Web 站点管理页删除静态/PHP 站点只弹成功提示、未调用后端删除接口的问题；删除成功后会重新拉取站点列表，避免刷新后站点复现。
+- 修复站点列表兼容字段读取不完整导致根目录、入口文件、PHP 连接地址等信息可能显示为空的问题。
+
 ## [2.3.0-rc2] - 2026-06-30
 
 ### Fixed

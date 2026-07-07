@@ -132,30 +132,37 @@ const SitesManagement: React.FC = () => {
     }
   }
 
-  const validateFCGIAddress = (addr: string): boolean => {
-    if (!addr.trim()) return false
-    
-    // 检查 Unix Socket 格式: unix:/path/to/sock
-    if (addr.startsWith('unix:')) {
-      const path = addr.substring(5)
-      return path.length > 0 && path.startsWith('/')
+  const getResponseError = async (response: Response): Promise<string> => {
+    try {
+      const data = await response.json()
+      return data.error || data.message || response.statusText
+    } catch {
+      return response.statusText
     }
-    
-    // 检查 TCP 格式: host:port
-    const tcpPattern = /^[a-zA-Z0-9.-]+:\d+$/
-    return tcpPattern.test(addr)
   }
 
-
-  const handleDeleteSite = async (id: string, type: 'static' | 'php') => {
+  const handleDeleteSite = async (domain: string, type: 'static' | 'php') => {
     try {
-      // TODO: 实际的 API 调用
-      if (type === 'static') {
-        setStaticSites(staticSites.filter(site => site.id !== id))
-      } else {
-        setPHPSites(phpSites.filter(site => site.id !== id))
+      const endpoint = type === 'static' ? '/api/static-sites/delete' : '/api/php-sites/delete'
+      const response = await fetch(
+        buildApiPath(adminPrefix, `${endpoint}?domain=${encodeURIComponent(domain)}`),
+        {
+          method: 'DELETE',
+          credentials: 'include',
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error(await getResponseError(response))
       }
-      
+
+      if (type === 'static') {
+        setStaticSites((sites) => sites.filter((site) => site.domain !== domain))
+      } else {
+        setPHPSites((sites) => sites.filter((site) => site.domain !== domain))
+      }
+
+      await refreshData()
       toastMessages.siteDeleteSuccess()
     } catch (error) {
       toastMessages.siteDeleteFailed(error instanceof Error ? error.message : undefined)
@@ -224,13 +231,13 @@ const SitesManagement: React.FC = () => {
           <TabPanel>
             <VStack spacing={6} align="stretch">
               <Flex justify="space-between" align="center">
-                <Text fontSize="lg" fontWeight="medium">{t.sites.staticSiteList || 'Static Site List'}</Text>
+                <Text fontSize="lg" fontWeight="medium">{t.sites.staticSiteList}</Text>
                 <Button
                   leftIcon={<Icon as={FiPlus} />}
                   colorScheme="blue"
                   onClick={() => openCreateModal('static')}
                 >
-                  {t.sites.addStaticSite || '+ Add Static Site'}
+                  {t.sites.addStaticSite}
                 </Button>
               </Flex>
 
@@ -240,17 +247,17 @@ const SitesManagement: React.FC = () => {
                     <Table variant="simple">
                       <Thead>
                         <Tr>
-                          <Th>{t.sites.domain || 'Domain'}</Th>
-                          <Th>{t.sites.rootDirectory || 'Root Directory'}</Th>
-                          <Th>{t.sites.status || 'Status'}</Th>
-                          <Th>{t.sites.indexFile || 'Index File'}</Th>
-                          <Th>{t.sites.pathPrefixRules || 'Path Prefix Rules'}</Th>
-                          <Th>{t.sites.actions || 'Actions'}</Th>
+                          <Th>{t.sites.domain}</Th>
+                          <Th>{t.sites.rootDirectory}</Th>
+                          <Th>{t.sites.status}</Th>
+                          <Th>{t.sites.indexFile}</Th>
+                          <Th>{t.sites.pathPrefixRules}</Th>
+                          <Th>{t.sites.actions}</Th>
                         </Tr>
                       </Thead>
                       <Tbody>
                         {staticSites.map((site) => (
-                          <Tr key={site.id}>
+                          <Tr key={site.domain}>
                             <Td>
                               <HStack>
                                 <Icon as={FiGlobe} />
@@ -259,7 +266,7 @@ const SitesManagement: React.FC = () => {
                             </Td>
                             <Td>
                               <Text fontSize="sm" fontFamily="mono">
-                                {site.rootPath}
+                                {site.rootPath || site.root}
                               </Text>
                             </Td>
                             <Td>
@@ -267,10 +274,10 @@ const SitesManagement: React.FC = () => {
                                 {site.enabled ? t.common.enable : t.common.disable}
                               </Badge>
                             </Td>
-                            <Td>{site.indexFile}</Td>
+                            <Td>{site.indexFile || site.index}</Td>
                             <Td>
                               <Badge colorScheme="blue">
-                                {site.path_prefix_rules?.length || 0} {t.sites.rules || 'rules'}
+                                {site.path_prefix_rules?.length || 0} {t.sites.rules}
                               </Badge>
                             </Td>
                             <Td>
@@ -288,7 +295,7 @@ const SitesManagement: React.FC = () => {
                                   size="sm"
                                   variant="ghost"
                                   colorScheme="red"
-                                  onClick={() => handleDeleteSite(site.id || site.domain, 'static')}
+                                  onClick={() => handleDeleteSite(site.domain, 'static')}
                                 />
                               </HStack>
                             </Td>
@@ -299,13 +306,13 @@ const SitesManagement: React.FC = () => {
                   ) : (
                     <Box textAlign="center" py={8}>
                       <Icon as={FiFolder} boxSize={12} color="gray.300" mb={4} />
-                      <Text color="gray.500" mb={4}>{t.sites.noStaticSites || 'No static sites yet'}</Text>
+                      <Text color="gray.500" mb={4}>{t.sites.noStaticSites}</Text>
                       <Button
                         leftIcon={<Icon as={FiPlus} />}
                         colorScheme="blue"
                         onClick={() => openCreateModal('static')}
                       >
-                        {t.sites.addFirstStaticSite || '+ Add First Static Site'}
+                        {t.sites.addFirstStaticSite}
                       </Button>
                     </Box>
                   )}
@@ -318,13 +325,13 @@ const SitesManagement: React.FC = () => {
           <TabPanel>
             <VStack spacing={6} align="stretch">
               <Flex justify="space-between" align="center">
-                <Text fontSize="lg" fontWeight="medium">{t.sites.phpSites || 'PHP Sites'}</Text>
+                <Text fontSize="lg" fontWeight="medium">{t.sites.phpSites}</Text>
                 <Button
                   leftIcon={<Icon as={FiPlus} />}
                   colorScheme="green"
                   onClick={() => openCreateModal('php')}
                 >
-                  {t.sites.createSite || '+ Add PHP Site'}
+                  {t.sites.createSite}
                 </Button>
               </Flex>
 
@@ -334,20 +341,20 @@ const SitesManagement: React.FC = () => {
                     <Table variant="simple">
                       <Thead>
                         <Tr>
-                          <Th>{t.sites.domain || 'Domain'}</Th>
-                          <Th>{t.sites.rootDirectory || 'Root Directory'}</Th>
-                          <Th>PHP Version</Th>
-                          <Th>Connection Address</Th>
-                          <Th>{t.sites.status || 'Status'}</Th>
-                          <Th>Memory Limit</Th>
-                          <Th>Execution Time</Th>
-                          <Th>{t.sites.pathPrefixRules || 'Path Prefix Rules'}</Th>
-                          <Th>{t.sites.actions || 'Actions'}</Th>
+                          <Th>{t.sites.domain}</Th>
+                          <Th>{t.sites.rootDirectory}</Th>
+                          <Th>{t.sites.phpVersion}</Th>
+                          <Th>{t.sites.connectionAddress}</Th>
+                          <Th>{t.sites.status}</Th>
+                          <Th>{t.sites.memoryLimit}</Th>
+                          <Th>{t.sites.executionTime}</Th>
+                          <Th>{t.sites.pathPrefixRules}</Th>
+                          <Th>{t.sites.actions}</Th>
                         </Tr>
                       </Thead>
                       <Tbody>
                         {phpSites.map((site) => (
-                          <Tr key={site.id}>
+                          <Tr key={site.domain}>
                             <Td>
                               <HStack>
                                 <Icon as={FiCode} />
@@ -356,15 +363,15 @@ const SitesManagement: React.FC = () => {
                             </Td>
                             <Td>
                               <Text fontSize="sm" fontFamily="mono">
-                                {site.rootPath}
+                                {site.rootPath || site.root}
                               </Text>
                             </Td>
                             <Td>
-                              <Badge colorScheme="purple">PHP {site.phpVersion}</Badge>
+                              <Badge colorScheme="purple">PHP {site.phpVersion || t.sites.defaultPhpVersion}</Badge>
                             </Td>
                             <Td>
                               <Text fontSize="sm" fontFamily="mono" color="blue.600">
-                                {site.fcgiAddr}
+                                {site.fcgiAddr || site.fcgi_addr}
                               </Text>
                             </Td>
                             <Td>
@@ -372,11 +379,11 @@ const SitesManagement: React.FC = () => {
                                 {site.enabled ? t.common.enable : t.common.disable}
                               </Badge>
                             </Td>
-                            <Td>{site.memoryLimit}</Td>
-                            <Td>{site.maxExecutionTime}s</Td>
+                            <Td>{site.memoryLimit || t.sites.defaultMemoryLimit}</Td>
+                            <Td>{site.maxExecutionTime ? `${site.maxExecutionTime}s` : t.sites.defaultExecutionTime}</Td>
                             <Td>
                               <Badge colorScheme="green">
-                                {site.path_prefix_rules?.length || 0} {t.sites.rules || 'rules'}
+                                {site.path_prefix_rules?.length || 0} {t.sites.rules}
                               </Badge>
                             </Td>
                             <Td>
@@ -394,7 +401,7 @@ const SitesManagement: React.FC = () => {
                                   size="sm"
                                   variant="ghost"
                                   colorScheme="red"
-                                  onClick={() => handleDeleteSite(site.id || site.domain, 'php')}
+                                  onClick={() => handleDeleteSite(site.domain, 'php')}
                                 />
                               </HStack>
                             </Td>
@@ -405,13 +412,13 @@ const SitesManagement: React.FC = () => {
                   ) : (
                     <Box textAlign="center" py={8}>
                       <Icon as={FiCode} boxSize={12} color="gray.300" mb={4} />
-                      <Text color="gray.500" mb={4}>暂无 PHP 站点</Text>
+                      <Text color="gray.500" mb={4}>{t.sites.noPHPSites}</Text>
                       <Button
                         leftIcon={<Icon as={FiPlus} />}
                         colorScheme="green"
                         onClick={() => openCreateModal('php')}
                       >
-                        添加第一个 PHP 站点
+                        {t.sites.addFirstPHPSite}
                       </Button>
                     </Box>
                   )}
