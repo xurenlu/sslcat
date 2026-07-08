@@ -9,7 +9,7 @@ pprof 是 Go 内置的性能分析工具，通过 HTTP 端点提供实时性能�
 pprof 端点已经集成到 SSLcat 中，可以通过以下地址访问：
 
 ```
-http://localhost:8080/debug/pprof/
+http://localhost:18080/debug/pprof/
 ```
 
 ### 主要端点
@@ -28,17 +28,17 @@ http://localhost:8080/debug/pprof/
 
 ```bash
 # 在浏览器中打开
-http://your-server:8080/debug/pprof/heap
+http://your-server:18080/debug/pprof/heap
 
 # 或使用 go tool pprof
-go tool pprof http://your-server:8080/debug/pprof/heap
+go tool pprof http://your-server:18080/debug/pprof/heap
 ```
 
 ### 2. 分析 CPU 性能
 
 ```bash
 # 采集 30 秒的 CPU profile
-go tool pprof http://your-server:8080/debug/pprof/profile?seconds=30
+go tool pprof http://your-server:18080/debug/pprof/profile?seconds=30
 
 # 在交互式界面中可以使用以下命令：
 # top - 查看占用资源最多的函数
@@ -50,7 +50,7 @@ go tool pprof http://your-server:8080/debug/pprof/profile?seconds=30
 
 ```bash
 # 查看 goroutine 堆栈
-go tool pprof http://your-server:8080/debug/pprof/goroutine
+go tool pprof http://your-server:18080/debug/pprof/goroutine
 
 # 交互式命令：
 # top - 查看 goroutine 数量最多的函数
@@ -61,9 +61,9 @@ go tool pprof http://your-server:8080/debug/pprof/goroutine
 
 ```bash
 # 下载 2 个不同时间点的 heap profile
-curl http://your-server:8080/debug/pprof/heap > heap1.pprof
+curl http://your-server:18080/debug/pprof/heap > heap1.pprof
 sleep 60
-curl http://your-server:8080/debug/pprof/heap > heap2.pprof
+curl http://your-server:18080/debug/pprof/heap > heap2.pprof
 
 # 比较差异
 go tool pprof -base heap1.pprof heap2.pprof
@@ -92,8 +92,8 @@ s.mux.HandleFunc("/debug/pprof/", func(w http.ResponseWriter, r *http.Request) {
 
 ```bash
 # 只允许本地访问
-iptables -A INPUT -p tcp --dport 8080 -s 127.0.0.1 -j ACCEPT
-iptables -A INPUT -p tcp --dport 8080 -j DROP
+iptables -A INPUT -p tcp --dport 18080 -s 127.0.0.1 -j ACCEPT
+iptables -A INPUT -p tcp --dport 18080 -j DROP
 ```
 
 ### 3. 使用 SSH 隧道
@@ -102,10 +102,10 @@ iptables -A INPUT -p tcp --dport 8080 -j DROP
 
 ```bash
 # 在本地建立隧道
-ssh -L 8080:localhost:8080 rocky@shifen.de
+ssh -L 18080:localhost:18080 rocky@shifen.de
 
 # 然后在本地访问
-http://localhost:8080/debug/pprof/
+http://localhost:18080/debug/pprof/
 ```
 
 ## 实际应用场景
@@ -114,10 +114,10 @@ http://localhost:8080/debug/pprof/
 
 ```bash
 # 1. 先获取当前 heap
-go tool pprof http://shifen.de:8080/debug/pprof/heap
+go tool pprof http://shifen.de:18080/debug/pprof/heap
 
 # 2. 等待一段时间后再次获取
-go tool pprof http://shifen.de:8080/debug/pprof/heap
+go tool pprof http://shifen.de:18080/debug/pprof/heap
 
 # 3. 使用 top 命令查看占用内存最多的对象
 (pprof) top20
@@ -127,7 +127,7 @@ go tool pprof http://shifen.de:8080/debug/pprof/heap
 
 ```bash
 # 采集 30 秒的 CPU profile
-go tool pprof http://shifen.de:8080/debug/pprof/profile?seconds=30
+go tool pprof http://shifen.de:18080/debug/pprof/profile?seconds=30
 
 # 查看占用 CPU 最多的函数
 (pprof) top10
@@ -137,7 +137,7 @@ go tool pprof http://shifen.de:8080/debug/pprof/profile?seconds=30
 
 ```bash
 # 获取 goroutine 信息
-go tool pprof http://shifen.de:8080/debug/pprof/goroutine
+go tool pprof http://shifen.de:18080/debug/pprof/goroutine
 
 # 查看 goroutine 数量最多的函数
 (pprof) top20
@@ -215,11 +215,11 @@ A: pprof 的端点访问一般不会显著影响性能，但在高负载情况�
 
 ### Q: 如何在容器中使用？
 
-A: 确保端口正确映射，例如：`docker run -p 8080:8080 sslcat`
+A: 确保端口正确映射，例如：`docker run -p 18080:18080 sslcat`
 
 ### Q: 看不到 pprof 数据？
 
-A: 检查防火墙和端口配置，确保 `8080` 端口可以访问。
+A: 检查防火墙和端口配置，确保 `18080` 端口可以访问。
 
 ## 更多资源
 

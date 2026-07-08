@@ -5,7 +5,7 @@ SSLcat 提供了现代、直观的基于 Web 的管理界面，用于配置、�
 ## 访问界面
 
 ### 默认访问
-- **URL**: `http://localhost:8080/admin` (或您配置的管理端口)
+- **URL**: `http://localhost:18080/admin` (或您配置的管理端口)
 - **默认用户名**: `admin`
 - **默认密码**: `admin123` (请立即修改!)
 
@@ -16,7 +16,7 @@ SSLcat 提供了现代、直观的基于 Web 的管理界面，用于配置、�
     "admin": {
       "enabled": true,
       "host": "0.0.0.0",
-      "port": 8080,
+      "port": 18080,
       "path": "/admin",
       "auth": {
         "username": "admin",

@@ -408,7 +408,7 @@ curl -I https://acme-v02.api.letsencrypt.org/directory
 **Proxy not working:**
 ```bash
 # Check proxy rules
-curl -X GET http://localhost:8080/sslcat-panel/api/proxy/rules
+curl -X GET http://localhost:18080/sslcat-panel/api/proxy/rules
 
 # Test backend connectivity
 curl -I http://127.0.0.1:8080/health

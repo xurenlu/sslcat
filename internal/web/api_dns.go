@@ -90,7 +90,7 @@ func (s *Server) handleAPIDNSProviderDomains(w http.ResponseWriter, r *http.Requ
 
 	// 从缓存获取域名列表
 	cache := s.dnsCache.GetProviderCache(providerName)
-	
+
 	// 只返回 type 为 "domain" 的域名
 	domains := make([]map[string]interface{}, 0)
 	for _, d := range cache.Domains {
@@ -203,7 +203,7 @@ func (s *Server) handleAPIDNSProvidersPost(w http.ResponseWriter, r *http.Reques
 			Endpoint:  req.Endpoint,
 			Priority:  req.Priority,
 		}
-		
+
 		// 如果新的 APIKey 或 APISecret 为空，保留原有值
 		if updatedProvider.APIKey == "" {
 			updatedProvider.APIKey = existingProvider.APIKey
@@ -218,7 +218,7 @@ func (s *Server) handleAPIDNSProvidersPost(w http.ResponseWriter, r *http.Reques
 		if updatedProvider.Endpoint == "" {
 			updatedProvider.Endpoint = existingProvider.Endpoint
 		}
-		
+
 		s.config.SSL.DNSProviders[existingIndex] = updatedProvider
 		finalProvider = updatedProvider
 	} else {
@@ -243,6 +243,7 @@ func (s *Server) handleAPIDNSProvidersPost(w http.ResponseWriter, r *http.Reques
 		json.NewEncoder(w).Encode(map[string]string{"error": "failed to save config"})
 		return
 	}
+	s.syncSSLManagerConfig()
 
 	// 如果提供商已启用，注册到SSL Manager并触发缓存更新
 	if finalProvider.Enabled {
@@ -320,6 +321,7 @@ func (s *Server) handleAPIDNSProvidersDelete(w http.ResponseWriter, r *http.Requ
 		json.NewEncoder(w).Encode(map[string]string{"error": "failed to save config"})
 		return
 	}
+	s.syncSSLManagerConfig()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -468,6 +470,7 @@ func (s *Server) handleAPIDNSConfig(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"error": "failed to save config"})
 		return
 	}
+	s.syncSSLManagerConfig()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{

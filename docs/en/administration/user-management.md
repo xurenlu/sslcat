@@ -27,7 +27,7 @@ This guide explains how to manage user accounts, permissions, and access control
 sslcat users create -username admin -email admin@example.com -role admin
 
 # Or using API
-curl -X POST http://localhost:8080/api/v1/users \
+curl -X POST http://localhost:18080/api/v1/users \
   -H "Content-Type: application/json" \
   -d '{
     "username": "admin",
@@ -90,7 +90,7 @@ sslcat users reset-password -username admin
 
 ```bash
 # Get API token
-curl -X POST http://localhost:8080/api/v1/auth/login \
+curl -X POST http://localhost:18080/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "username": "admin",
@@ -99,7 +99,7 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
 
 # Use API token
 curl -H "Authorization: Bearer YOUR_TOKEN" \
-  http://localhost:8080/api/v1/config
+  http://localhost:18080/api/v1/config
 ```
 
 ## Access Control

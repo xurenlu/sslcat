@@ -188,6 +188,9 @@ func (s *Server) handleAPISettingsUpdate(w http.ResponseWriter, r *http.Request)
 	oldPrefix := s.config.AdminPrefix
 	sharedCacheChanged := false
 	memoryOptionsChanged := false
+	sslConfigChanged := false
+	proxyConfigChanged := false
+	securityConfigChanged := false
 
 	// 更新配置（只更新提供的字段）
 	if req.AdminPrefix != "" {
@@ -198,32 +201,41 @@ func (s *Server) handleAPISettingsUpdate(w http.ResponseWriter, r *http.Request)
 	}
 	if req.SSLEmail != "" {
 		s.config.SSL.Email = req.SSLEmail
+		sslConfigChanged = true
 	}
 	if req.SSLDisableSelfSigned != nil {
 		s.config.SSL.DisableSelfSigned = *req.SSLDisableSelfSigned
+		sslConfigChanged = true
 	}
 	if req.ProxyUnmatchedBehavior != "" {
 		s.config.Proxy.UnmatchedBehavior = req.ProxyUnmatchedBehavior
+		proxyConfigChanged = true
 	}
 	if req.ProxyUnmatchedRedirectURL != "" {
 		s.config.Proxy.UnmatchedRedirectURL = req.ProxyUnmatchedRedirectURL
+		proxyConfigChanged = true
 	}
 
 	// 安全设置
 	if req.Security.EnableCaptcha != nil {
 		s.config.Security.EnableCaptcha = *req.Security.EnableCaptcha
+		securityConfigChanged = true
 	}
 	if req.Security.EnableDDOS != nil {
 		s.config.Security.EnableDDOS = *req.Security.EnableDDOS
+		securityConfigChanged = true
 	}
 	if req.Security.EnableWAF != nil {
 		s.config.Security.EnableWAF = *req.Security.EnableWAF
+		securityConfigChanged = true
 	}
 	if req.Security.EnableUAFilter != nil {
 		s.config.Security.EnableUAFilter = *req.Security.EnableUAFilter
+		securityConfigChanged = true
 	}
 	if req.Security.MinFormMs != nil && *req.Security.MinFormMs >= 0 && *req.Security.MinFormMs <= 10000 {
 		s.config.Security.MinFormMs = *req.Security.MinFormMs
+		securityConfigChanged = true
 	}
 
 	if req.Server.SharedCacheMaxSizeMB != nil {
@@ -270,6 +282,15 @@ func (s *Server) handleAPISettingsUpdate(w http.ResponseWriter, r *http.Request)
 	}
 	if memoryOptionsChanged {
 		s.updateMemoryMonitor(s.config.Monitoring.MemoryMaxUsagePercent, s.config.Monitoring.MemoryReleaseCooldownSec)
+	}
+	if sslConfigChanged {
+		s.syncSSLManagerConfig()
+	}
+	if proxyConfigChanged {
+		s.syncProxyManagerConfig()
+	}
+	if securityConfigChanged {
+		s.syncSecurityManagerConfig()
 	}
 
 	// 如果管理前缀变化，重建路由并发送通知
@@ -332,6 +353,9 @@ func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) 
 	oldPrefix := s.config.AdminPrefix
 	sharedCacheChanged := false
 	memoryOptionsChanged := false
+	sslConfigChanged := false
+	proxyConfigChanged := false
+	securityConfigChanged := false
 
 	// 更新配置（只更新提供的字段）
 	if req.AdminPrefix != "" && req.AdminPrefix != oldPrefix {
@@ -346,10 +370,12 @@ func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) 
 
 	if req.LetsEncryptEmail != "" {
 		s.config.SSL.Email = req.LetsEncryptEmail
+		sslConfigChanged = true
 	}
 
 	if req.SSLStaging != nil {
 		s.config.SSL.Staging = *req.SSLStaging
+		sslConfigChanged = true
 	}
 
 	if req.EnableHTTPS != nil {
@@ -366,6 +392,7 @@ func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) 
 
 	if req.EnableDDoSProtection != nil {
 		s.config.Security.EnableDDOS = *req.EnableDDoSProtection
+		securityConfigChanged = true
 	}
 
 	if req.MaxRequestsPerMinute != "" {
@@ -375,11 +402,13 @@ func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) 
 			if s.ddosProtector != nil {
 				s.ddosProtector.SetCustomRequestsPer5Minutes(maxReq)
 			}
+			securityConfigChanged = true
 		}
 	}
 
 	if req.EnableRateLimit != nil {
 		s.config.Security.EnableUAFilter = *req.EnableRateLimit
+		securityConfigChanged = true
 	}
 
 	if req.EnableAccessLog != nil {
@@ -442,6 +471,7 @@ func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) 
 			sec = 120
 		}
 		s.config.Proxy.DefaultResponseHeaderTimeoutSec = sec
+		proxyConfigChanged = true
 	}
 
 	if memoryOptionsChanged {
@@ -460,6 +490,15 @@ func (s *Server) handleAPISettingsBasic(w http.ResponseWriter, r *http.Request) 
 	}
 	if memoryOptionsChanged {
 		s.updateMemoryMonitor(s.config.Monitoring.MemoryMaxUsagePercent, s.config.Monitoring.MemoryReleaseCooldownSec)
+	}
+	if sslConfigChanged {
+		s.syncSSLManagerConfig()
+	}
+	if proxyConfigChanged {
+		s.syncProxyManagerConfig()
+	}
+	if securityConfigChanged {
+		s.syncSecurityManagerConfig()
 	}
 
 	// 如果管理前缀变化，重建路由并发送通知

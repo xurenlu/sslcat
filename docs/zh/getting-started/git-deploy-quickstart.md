@@ -43,7 +43,7 @@ SSLcat 会自动配置 SSH 环境：
 cat ~/.ssh/id_rsa.pub
 
 # 添加到 SSLcat
-curl -X POST http://localhost:8080/admin/api/git-server/ssh-key/add \
+curl -X POST http://localhost:18080/admin/api/git-server/ssh-key/add \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -d '{
@@ -191,13 +191,13 @@ git push sslcat main
 
 ```bash
 # 查看应用列表
-curl http://localhost:8080/admin/api/git-server/apps
+curl http://localhost:18080/admin/api/git-server/apps
 
 # 查看应用详情
-curl http://localhost:8080/admin/api/git-server/app?name=myapp
+curl http://localhost:18080/admin/api/git-server/app?name=myapp
 
 # 查看推送历史
-curl http://localhost:8080/admin/api/git-server/push-history?app=myapp&limit=10
+curl http://localhost:18080/admin/api/git-server/push-history?app=myapp&limit=10
 ```
 
 ## 步骤 7: 访问你的应用
@@ -219,7 +219,7 @@ http://your-server-ip:8001
 ### 设置环境变量
 
 ```bash
-curl -X POST http://localhost:8080/admin/api/git-server/app/env?name=myapp \
+curl -X POST http://localhost:18080/admin/api/git-server/app/env?name=myapp \
   -H "Content-Type: application/json" \
   -d '{
     "env_vars": {
@@ -235,7 +235,7 @@ curl -X POST http://localhost:8080/admin/api/git-server/app/env?name=myapp \
 限制只有特定密钥可以推送到应用：
 
 ```bash
-curl -X POST http://localhost:8080/admin/api/git-server/app/bind-key \
+curl -X POST http://localhost:18080/admin/api/git-server/app/bind-key \
   -H "Content-Type: application/json" \
   -d '{
     "app_name": "myapp",
@@ -246,7 +246,7 @@ curl -X POST http://localhost:8080/admin/api/git-server/app/bind-key \
 ### 自定义域名和端口
 
 ```bash
-curl -X POST http://localhost:8080/admin/api/git-server/app/routing?name=myapp \
+curl -X POST http://localhost:18080/admin/api/git-server/app/routing?name=myapp \
   -H "Content-Type: application/json" \
   -d '{
     "domain": "myapp.example.com",
@@ -274,7 +274,7 @@ ssh -T git@your-server
 
 ```bash
 # 查看应用日志
-curl http://localhost:8080/admin/api/git-server/logs?app=myapp&lines=100
+curl http://localhost:18080/admin/api/git-server/logs?app=myapp&lines=100
 
 # 或者直接在服务器上查看
 tail -f /data/repos/myapp/logs/deploy-$(date +%Y-%m-%d).log

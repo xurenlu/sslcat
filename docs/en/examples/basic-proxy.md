@@ -432,7 +432,7 @@ done
 curl https://example.com/health
 
 # Check SSLcat metrics
-curl http://localhost:8080/metrics
+curl http://localhost:18080/metrics
 ```
 
 ### 4. Caching
@@ -449,16 +449,16 @@ curl -I https://example.com/static/style.css | grep -i cache
 ### 1. Metrics Endpoint
 ```bash
 # Get Prometheus metrics
-curl http://localhost:8080/metrics
+curl http://localhost:18080/metrics
 
 # Get specific metrics
-curl http://localhost:8080/metrics | grep sslcat_requests_total
+curl http://localhost:18080/metrics | grep sslcat_requests_total
 ```
 
 ### 2. Health Dashboard
 ```bash
 # Check SSLcat health
-curl http://localhost:8080/health
+curl http://localhost:18080/health
 
 # Check backend health
 curl https://example.com/health

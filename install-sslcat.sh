@@ -767,7 +767,9 @@ EOF
 {
   "server": {
     "host": "0.0.0.0",
-    "port": 8080,
+    "port": 18080,
+    "port_mode": "custom",
+    "custom_port": 18080,
     "debug": true
   },
   "ssl": {
@@ -973,7 +975,7 @@ show_installation_info() {
         echo "  - $(msg macos_background)"
         echo
         echo "🌐 $(msg web_panel)"
-        echo "  - $(msg access_url): http://localhost:8080/sslcat-panel"
+        echo "  - $(msg access_url): http://localhost:18080/sslcat-panel"
         echo "  - $(msg default_user): admin"
         echo "  - $(msg default_pass): admin*9527"
         echo

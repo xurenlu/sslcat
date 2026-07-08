@@ -83,7 +83,7 @@ SSLcat 使用 JSON 格式的配置文件，默认文件名为 `sslcat.conf`。
     "admin": {
       "enabled": true,
       "host": "0.0.0.0",
-      "port": 8080,
+      "port": 18080,
       "path": "/admin",
       "auth": {
         "username": "admin",

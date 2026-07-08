@@ -24,7 +24,7 @@ services:
   web:
     build: .
     ports:
-      - "8080:8080"
+      - "18080:18080"
     environment:
       - NODE_ENV=production
       - DATABASE_URL=${DATABASE_URL}
@@ -125,7 +125,7 @@ services:
 services:
   web:
     ports:
-      - "8080:8080"  # 容器内部端口
+      - "18080:18080"  # 容器内部端口
 ```
 
 SSLcat 会通过反向代理将外部请求转发到你的应用。
@@ -218,7 +218,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8080:8080"
+      - "18080:18080"
     environment:
       - MYSQL_DSN=user:password@tcp(mysql:3306)/myapp?parseTime=true
       - REDIS_ADDR=redis:6379
@@ -268,7 +268,7 @@ services:
   api:
     build: ./api
     ports:
-      - "8080:8080"
+      - "18080:18080"
     environment:
       - DATABASE_URL=postgresql://postgres:password@db:5432/api_db
       - REDIS_URL=redis://redis:6379
@@ -353,7 +353,7 @@ services:
   web:
     build: .
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:18080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -538,4 +538,3 @@ docker-compose -f docker-compose.yml build --no-cache
 ---
 
 现在你可以使用 Docker Compose 轻松部署复杂的多容器应用了！🚀
-

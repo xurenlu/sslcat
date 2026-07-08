@@ -984,7 +984,7 @@ func Load(configFile string) (*Config, error) {
 			EnablePprof: false,  // 默认禁用 pprof
 			// 新的端口配置默认值
 			PortMode:             "standard", // 默认标准模式
-			CustomPort:           8080,       // 默认自定义端口
+			CustomPort:           18080,      // 默认自定义端口
 			EnableHTTPS:          true,       // 默认启用 HTTPS
 			HTTP2Enabled:         false,      // 默认禁用 HTTP/2
 			HTTP3Enabled:         false,      // 默认禁用 HTTP/3
@@ -1610,7 +1610,7 @@ func getDefaultConfig() *Config {
 			LogLevel:          "info",
 			EnablePprof:       false,
 			PortMode:          "standard",
-			CustomPort:        8080,
+			CustomPort:        18080,
 			EnableHTTPS:       true,
 			HTTP2Enabled:      false, // 默认禁用 HTTP/2
 			HTTP3Enabled:      false, // 默认禁用 HTTP/3

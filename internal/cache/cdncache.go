@@ -101,6 +101,22 @@ func NewCDNCache(cfg *config.Config) *CDNCache {
 	return cache
 }
 
+// UpdateConfig 更新缓存运行时配置。
+func (c *CDNCache) UpdateConfig(cfg *config.Config) {
+	if c == nil || cfg == nil {
+		return
+	}
+
+	c.mutex.Lock()
+	c.cfg = cfg
+	c.compressor = compression.NewCompressor(compression.FromConfig(cfg))
+	c.mutex.Unlock()
+
+	if c.isEnabled() {
+		c.StartCleaner()
+	}
+}
+
 // ServeIfFresh 若命中缓存且未过期，直接回源本地文件
 func (c *CDNCache) ServeIfFresh(w http.ResponseWriter, r *http.Request) bool {
 	return c.ServeIfFreshWithConfig(w, r, false)

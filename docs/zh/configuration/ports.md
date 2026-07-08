@@ -41,7 +41,7 @@ SSLcat v1.3.10-rc1 引入了全新的端口配置系统，支持两种模式：*
 {
   "server": {
     "port_mode": "custom",
-    "custom_port": 8080,
+    "custom_port": 18080,
     "enable_https": false
   }
 }
@@ -60,7 +60,7 @@ sslcat --config sslcat.conf
 #### 自定义模式
 ```bash
 # 使用 --port 参数自动启用自定义模式
-sslcat --config sslcat.conf --port 8080
+sslcat --config sslcat.conf --port 18080
 ```
 
 ### 2. 配置文件方式
@@ -83,7 +83,7 @@ sslcat --config sslcat.conf --port 8080
   "server": {
     "host": "0.0.0.0",
     "port_mode": "custom",
-    "custom_port": 8080,
+    "custom_port": 18080,
     "enable_https": false,
     "debug": false
   }
@@ -105,9 +105,9 @@ sslcat --config sslcat.conf --port 8080
 | 场景 | 推荐模式 | 端口 | 协议 | SSL 证书 | 适用环境 |
 |------|----------|------|------|----------|----------|
 | 生产环境 | 标准模式 | 80 + 443 | HTTP + HTTPS | 自动申请 | 公网部署 |
-| 开发环境 | 自定义模式 | 8080 | HTTP | 不支持 | 本地开发 |
+| 开发环境 | 自定义模式 | 18080 | HTTP | 不支持 | 本地开发 |
 | 内网部署 | 自定义模式 | 3000 | HTTP | 不支持 | 内网环境 |
-| 反向代理 | 自定义模式 | 8080 | HTTP | 由代理处理 | 容器化部署 |
+| 反向代理 | 自定义模式 | 18080 | HTTP | 由代理处理 | 容器化部署 |
 
 ## 🔧 配置迁移
 
@@ -165,7 +165,7 @@ SSLcat 会自动将旧配置迁移到新格式：
 {
   "server": {
     "port_mode": "custom",
-    "custom_port": 8080,
+    "custom_port": 18080,
     "enable_https": false,
     "host": "0.0.0.0"
   }
@@ -181,7 +181,7 @@ SSLcat 会自动将旧配置迁移到新格式：
 # 检查端口占用
 sudo netstat -tlnp | grep :80
 sudo netstat -tlnp | grep :443
-sudo netstat -tlnp | grep :8080
+sudo netstat -tlnp | grep :18080
 ```
 
 #### 2. 权限不足
@@ -190,7 +190,7 @@ sudo netstat -tlnp | grep :8080
 sudo sslcat --config sslcat.conf
 
 # 自定义模式可以使用普通用户
-sslcat --config sslcat.conf --port 8080
+sslcat --config sslcat.conf --port 18080
 ```
 
 #### 3. SSL 证书问题
@@ -223,7 +223,7 @@ sudo journalctl -u sslcat --since "1 hour ago"
 
 ### 开发环境
 1. 使用自定义模式
-2. 选择非特权端口（8080、3000、8000）
+2. 选择非特权端口（18080、3000、8000）
 3. 通过反向代理提供 HTTPS（如需要）
 
 ### 容器化部署
@@ -240,7 +240,7 @@ sudo journalctl -u sslcat --since "1 hour ago"
 {
   "server": {
     "port_mode": "custom",
-    "custom_port": 8080,
+    "custom_port": 18080,
     "enable_https": false
   }
 }

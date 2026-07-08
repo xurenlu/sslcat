@@ -4,7 +4,7 @@ SSLcat 提供全面的 REST API，用于配置管理、监控和管理。
 
 ## 基本信息
 
-- **基础 URL**: `http://localhost:8080/api/v1`
+- **基础 URL**: `http://localhost:18080/api/v1`
 - **认证方式**: Bearer Token 或 Basic Auth
 - **内容类型**: `application/json`
 - **速率限制**: 每分钟 30 个请求（可配置）
@@ -14,13 +14,13 @@ SSLcat 提供全面的 REST API，用于配置管理、监控和管理。
 ### Bearer Token 认证
 ```bash
 curl -H "Authorization: Bearer your-api-key" \
-     http://localhost:8080/api/v1/config
+     http://localhost:18080/api/v1/config
 ```
 
 ### 基本认证
 ```bash
 curl -u username:password \
-     http://localhost:8080/api/v1/config
+     http://localhost:18080/api/v1/config
 ```
 
 ## 配置管理
@@ -614,7 +614,7 @@ X-RateLimit-Reset: 1640995200
 import sslcat
 
 client = sslcat.Client(
-    base_url="http://localhost:8080/api/v1",
+    base_url="http://localhost:18080/api/v1",
     api_key="your-api-key"
 )
 
@@ -637,7 +637,7 @@ metrics = client.get_metrics()
 const SSLcat = require('sslcat-sdk');
 
 const client = new SSLcat({
-  baseUrl: 'http://localhost:8080/api/v1',
+  baseUrl: 'http://localhost:18080/api/v1',
   apiKey: 'your-api-key'
 });
 
@@ -665,7 +665,7 @@ import (
 
 func main() {
     client := sslcat.NewClient(
-        "http://localhost:8080/api/v1",
+        "http://localhost:18080/api/v1",
         "your-api-key",
     )
     

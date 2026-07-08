@@ -28,7 +28,7 @@
   "server": {
     "host": "0.0.0.0",
     "port_mode": "standard",  // "standard" | "custom"
-    "custom_port": 8080,      // 仅在 port_mode="custom" 时生效
+    "custom_port": 18080,     // 仅在 port_mode="custom" 时生效
     "enable_https": true,     // 是否启用 HTTPS（仅在 standard 模式下）
     "debug": false
   }
@@ -273,7 +273,7 @@ func (c *Config) LoadFromFile(filename string) error {
 {
   "server": {
     "port_mode": "custom",
-    "custom_port": 8080
+    "custom_port": 18080
   }
 }
 ```

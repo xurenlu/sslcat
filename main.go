@@ -39,7 +39,7 @@ import (
 )
 
 var (
-	version = "2.3.0-rc3"
+	version = "2.3.0-rc6"
 	build   = "dev"
 )
 
@@ -139,7 +139,7 @@ func main() {
 		pprofDisable = flag.Bool("pprof-disable", false, "禁用 pprof 性能分析端点")
 		pprofExport  = flag.String("pprof-export", "", "导出 pprof 数据 (heap|cpu|goroutine|allocs|block|mutex)")
 		pprofOutput  = flag.String("pprof-output", "", "导出文件路径 (默认: ./sslcat-{type}-{timestamp}.pprof)")
-		pprofServer  = flag.String("pprof-server", "http://localhost:8080", "pprof 服务器地址")
+		pprofServer  = flag.String("pprof-server", "http://localhost:18080", "pprof 服务器地址")
 	)
 
 	flag.Parse()
@@ -951,7 +951,7 @@ func handlePprofCommands(configFile *string, pprofEnable, pprofDisable *bool, pp
 			os.Exit(1)
 		}
 		fmt.Println("✅ pprof 性能分析端点已启用")
-		fmt.Println("   访问地址: http://localhost:8080/debug/pprof/")
+		fmt.Println("   访问地址: http://localhost:18080/debug/pprof/")
 		fmt.Println("   注意: 需要重启 sslcat 服务使配置生效")
 		return
 	}
@@ -1158,7 +1158,7 @@ func showHelp() {
 	fmt.Println("    -pprof-disable               禁用 pprof 性能分析端点")
 	fmt.Println("    -pprof-export <type>        导出 pprof 数据 (heap|cpu|goroutine|allocs|block|mutex)")
 	fmt.Println("    -pprof-output <path>        导出文件路径")
-	fmt.Println("    -pprof-server <url>         pprof 服务器地址（默认：http://localhost:8080）")
+	fmt.Println("    -pprof-server <url>         pprof 服务器地址（默认：http://localhost:18080）")
 	fmt.Println()
 	fmt.Println("示例:")
 	fmt.Println("  sslcat -h                     显示此帮助信息")

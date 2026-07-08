@@ -225,7 +225,7 @@ GitServer
 
 **通过 WebSocket API** (JavaScript):
 ```javascript
-const ws = new WebSocket('ws://localhost:8080/admin/api/git-server/logs/stream-ws?app=myapp')
+const ws = new WebSocket('ws://localhost:18080/admin/api/git-server/logs/stream-ws?app=myapp')
 
 ws.onmessage = (event) => {
   const message = JSON.parse(event.data)
@@ -240,7 +240,7 @@ ws.onmessage = (event) => {
 
 **通过 SSE API** (JavaScript):
 ```javascript
-const eventSource = new EventSource('http://localhost:8080/admin/api/git-server/logs/stream?app=myapp')
+const eventSource = new EventSource('http://localhost:18080/admin/api/git-server/logs/stream?app=myapp')
 
 eventSource.addEventListener('log', (event) => {
   const logEntry = JSON.parse(event.data)

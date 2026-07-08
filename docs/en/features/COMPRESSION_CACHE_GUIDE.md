@@ -172,13 +172,13 @@ func (c *CompressionCache) Set(key string, data []byte, algorithm string) {
 
 ```bash
 # Check cache status
-curl http://localhost:8080/admin/api/cache/stats
+curl http://localhost:18080/admin/api/cache/stats
 
 # Clear cache
-curl -X POST http://localhost:8080/admin/api/cache/clear
+curl -X POST http://localhost:18080/admin/api/cache/clear
 
 # Get cache info
-curl http://localhost:8080/admin/api/cache/info
+curl http://localhost:18080/admin/api/cache/info
 ```
 
 ## 🔍 Troubleshooting

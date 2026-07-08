@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"reflect"
+	"strings"
 )
 
 // ChangeLevel 配置变更级别
@@ -79,6 +80,9 @@ func (cd *ChangeDetector) DetectChanges(oldConfig, newConfig *Config) []ConfigCh
 	// 检测监控配置变更
 	cd.detectMonitoringChanges(&oldConfig.Monitoring, &newConfig.Monitoring)
 
+	// 兜底检测未单独列出的配置段，避免漏字段导致运行时不重载
+	cd.detectRemainingConfigChanges(oldConfig, newConfig)
+
 	return cd.changes
 }
 
@@ -141,6 +145,11 @@ func (cd *ChangeDetector) detectSSLChanges(old, new *SSLConfig) {
 	// DNS提供商变更 - 软重载
 	if !reflect.DeepEqual(old.DNSProviders, new.DNSProviders) {
 		cd.addChange("SSL.DNSProviders", len(old.DNSProviders), len(new.DNSProviders), SoftReload, "DNS提供商配置变更")
+	}
+
+	// 证书挑战方式变更 - 软重载
+	if !reflect.DeepEqual(old.ChallengeMethods, new.ChallengeMethods) {
+		cd.addChange("SSL.ChallengeMethods", old.ChallengeMethods, new.ChallengeMethods, SoftReload, "SSL证书挑战方式变更")
 	}
 }
 
@@ -226,6 +235,51 @@ func (cd *ChangeDetector) detectMonitoringChanges(old, new *MonitoringConfig) {
 	if old.Enabled != new.Enabled {
 		cd.addChange("Monitoring.Enabled", old.Enabled, new.Enabled, SoftReload, "监控开关变更")
 	}
+}
+
+// detectRemainingConfigChanges 兜底检测未单独列出的配置段。
+func (cd *ChangeDetector) detectRemainingConfigChanges(old, new *Config) {
+	cd.addSectionChangeIfNeeded("Server", old.Server, new.Server, SoftReload, "服务器其他配置变更")
+	cd.addSectionChangeIfNeeded("SSL", old.SSL, new.SSL, SoftReload, "SSL其他配置变更")
+	cd.addSectionChangeIfNeeded("Proxy", old.Proxy, new.Proxy, SoftReload, "代理其他配置变更")
+	cd.addSectionChangeIfNeeded("Security", old.Security, new.Security, SoftReload, "安全其他配置变更")
+	cd.addSectionChangeIfNeeded("CDNCache", old.CDNCache, new.CDNCache, SoftReload, "CDN缓存配置变更")
+	cd.addSectionChangeIfNeeded("Compression", old.Compression, new.Compression, SoftReload, "压缩其他配置变更")
+	cd.addSectionChangeIfNeeded("Cluster", old.Cluster, new.Cluster, SoftReload, "集群配置变更")
+	cd.addSectionChangeIfNeeded("StaticSites", old.StaticSites, new.StaticSites, SoftReload, "静态站点配置变更")
+	cd.addSectionChangeIfNeeded("PHPSites", old.PHPSites, new.PHPSites, SoftReload, "PHP站点配置变更")
+	cd.addSectionChangeIfNeeded("Runners", old.Runners, new.Runners, SoftReload, "Runner配置变更")
+	cd.addSectionChangeIfNeeded("ThreatIntel", old.ThreatIntel, new.ThreatIntel, SoftReload, "威胁情报配置变更")
+	cd.addSectionChangeIfNeeded("Notification", old.Notification, new.Notification, SoftReload, "通知配置变更")
+	cd.addSectionChangeIfNeeded("UpstreamCache", old.UpstreamCache, new.UpstreamCache, SoftReload, "上游缓存配置变更")
+	cd.addSectionChangeIfNeeded("AISecurity", old.AISecurity, new.AISecurity, SoftReload, "AI安全配置变更")
+	cd.addSectionChangeIfNeeded("ImageOptimization", old.ImageOptimization, new.ImageOptimization, SoftReload, "图片优化配置变更")
+	cd.addSectionChangeIfNeeded("Monitoring", old.Monitoring, new.Monitoring, SoftReload, "监控其他配置变更")
+	cd.addSectionChangeIfNeeded("CacheWarmup", old.CacheWarmup, new.CacheWarmup, SoftReload, "缓存预热配置变更")
+	cd.addSectionChangeIfNeeded("Report", old.Report, new.Report, SoftReload, "报告配置变更")
+	cd.addSectionChangeIfNeeded("MCP", old.MCP, new.MCP, SoftReload, "MCP配置变更")
+	cd.addSectionChangeIfNeeded("Admin", old.Admin, new.Admin, SoftReload, "管理员配置变更")
+	cd.addSectionChangeIfNeeded("AdminPrefix", old.AdminPrefix, new.AdminPrefix, HardReload, "管理前缀变更需要重启")
+	cd.addSectionChangeIfNeeded("BotAPIPrefix", old.BotAPIPrefix, new.BotAPIPrefix, HardReload, "机器人检测API前缀变更需要重启")
+}
+
+func (cd *ChangeDetector) addSectionChangeIfNeeded(field string, oldValue, newValue interface{}, level ChangeLevel, description string) {
+	if reflect.DeepEqual(oldValue, newValue) || cd.hasChangeAtLeast(field, SoftReload) {
+		return
+	}
+	cd.addChange(field, oldValue, newValue, level, description)
+}
+
+func (cd *ChangeDetector) hasChangeAtLeast(field string, minLevel ChangeLevel) bool {
+	for _, change := range cd.changes {
+		if change.Level < minLevel {
+			continue
+		}
+		if change.Field == field || strings.HasPrefix(change.Field, field+".") {
+			return true
+		}
+	}
+	return false
 }
 
 // addChange 添加配置变更记录

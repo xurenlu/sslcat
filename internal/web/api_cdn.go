@@ -255,6 +255,7 @@ func (s *Server) handleAPICDNRulesCreate(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "保存配置失败", http.StatusInternalServerError)
 		return
 	}
+	s.syncProxyManagerConfig()
 
 	// 记录操作日志
 	currentUser := s.getCurrentUser(r)

@@ -1,6 +1,6 @@
 # SSLcat 🚀
 
-[![Version](https://img.shields.io/badge/version-2.3.0--rc3-blue.svg)](https://github.com/xurenlu/sslcat/releases/tag/v2.3.0-rc3)
+[![Version](https://img.shields.io/badge/version-2.3.0--rc4-blue.svg)](https://github.com/xurenlu/sslcat/releases/tag/v2.3.0-rc4)
 [![Go Version](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://golang.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![CPU Optimized](https://img.shields.io/badge/CPU%20optimized-97%25%20reduction-brightgreen.svg)](#performance)
@@ -82,9 +82,9 @@ SSLcat 是一个功能强大的高性能 SSL 代理服务器，使用 Go 语言�
 curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/install.sh | bash
 
 # Start with default config / 使用默认配置启动
-sslcat --port 8080
+sslcat --port 18080
 
-# Open web UI / 打开 Web 界面: http://localhost:8080/sslcat-panel/
+# Open web UI / 打开 Web 界面: http://localhost:18080/sslcat-panel/
 # Default login / 默认登录: admin / admin*9527
 ```
 
@@ -100,7 +100,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "8080:8080"
+      - "18080:18080"
     volumes:
       - ./data:/app/data
       - ./sslcat.conf:/app/sslcat.conf

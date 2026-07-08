@@ -443,8 +443,24 @@ func (s *Server) applyConfigInPlace(newCfg *config.Config) {
 	s.config.Proxy = newCfg.Proxy
 	s.config.Security = newCfg.Security
 	s.config.AdminPrefix = newCfg.AdminPrefix
+	s.config.BotAPIPrefix = newCfg.BotAPIPrefix
 	s.config.Cluster = newCfg.Cluster
 	s.config.StaticSites = newCfg.StaticSites
 	s.config.PHPSites = newCfg.PHPSites
 	s.config.CDNCache = newCfg.CDNCache
+	s.config.Compression = newCfg.Compression
+	s.config.Runners = newCfg.Runners
+	s.config.ThreatIntel = newCfg.ThreatIntel
+	s.config.Notification = newCfg.Notification
+	s.config.UpstreamCache = newCfg.UpstreamCache
+	s.config.AISecurity = newCfg.AISecurity
+	s.config.ImageOptimization = newCfg.ImageOptimization
+	s.config.Monitoring = newCfg.Monitoring
+	s.config.CacheWarmup = newCfg.CacheWarmup
+	s.config.Report = newCfg.Report
+	s.config.MCP = newCfg.MCP
+
+	s.syncSSLManagerConfig()
+	s.syncProxyManagerConfig()
+	s.syncSecurityManagerConfig()
 }

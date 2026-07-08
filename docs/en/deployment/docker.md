@@ -150,7 +150,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "8080:8080"  # Admin interface
+      - "18080:18080"  # Admin interface
     volumes:
       - ./sslcat.conf:/app/sslcat.conf
       - ./data:/app/data

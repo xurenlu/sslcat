@@ -43,7 +43,7 @@ On first startup, SSLcat will:
 cat ~/.ssh/id_rsa.pub
 
 # Add to SSLcat
-curl -X POST http://localhost:8080/admin/api/git-server/ssh-key/add \
+curl -X POST http://localhost:18080/admin/api/git-server/ssh-key/add \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -d '{
@@ -311,13 +311,13 @@ Specify custom ports for your application:
 2. **Build Failed**
    ```bash
    # Check build logs
-   curl http://localhost:8080/admin/api/git-server/logs/my-app
+   curl http://localhost:18080/admin/api/git-server/logs/my-app
    ```
 
 3. **Application Not Starting**
    ```bash
    # Check application logs
-   curl http://localhost:8080/admin/api/git-server/logs/my-app/application
+   curl http://localhost:18080/admin/api/git-server/logs/my-app/application
    ```
 
 ### Debug Mode
@@ -338,10 +338,10 @@ View deployment logs:
 
 ```bash
 # View deployment logs
-curl http://localhost:8080/admin/api/git-server/logs/my-app
+curl http://localhost:18080/admin/api/git-server/logs/my-app
 
 # View application logs
-curl http://localhost:8080/admin/api/git-server/logs/my-app/application
+curl http://localhost:18080/admin/api/git-server/logs/my-app/application
 ```
 
 ## Best Practices

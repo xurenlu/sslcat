@@ -5,7 +5,7 @@ SSLcat provides a modern, intuitive web-based management interface for configuri
 ## Accessing the Interface
 
 ### Default Access
-- **URL**: `http://localhost:8080/admin` (or your configured admin port)
+- **URL**: `http://localhost:18080/admin` (or your configured admin port)
 - **Default Username**: `admin`
 - **Default Password**: `admin123` (change immediately!)
 
@@ -16,7 +16,7 @@ SSLcat provides a modern, intuitive web-based management interface for configuri
     "admin": {
       "enabled": true,
       "host": "0.0.0.0",
-      "port": 8080,
+      "port": 18080,
       "path": "/admin",
       "auth": {
         "username": "admin",
@@ -135,13 +135,13 @@ The web interface provides access to the full REST API:
 ```bash
 # Get current configuration
 curl -H "Authorization: Bearer your-token" \
-     http://localhost:8080/api/v1/config
+     http://localhost:18080/api/v1/config
 
 # Update proxy rules
 curl -X PUT -H "Authorization: Bearer your-token" \
      -H "Content-Type: application/json" \
      -d '{"domain":"example.com","target":"http://backend:8080"}' \
-     http://localhost:8080/api/v1/proxy/rules
+     http://localhost:18080/api/v1/proxy/rules
 ```
 
 ### API Documentation

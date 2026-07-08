@@ -30,7 +30,7 @@
     "port_mode": "standard",  // "standard" | "custom"
     "port": 80,              // HTTP port (standard mode)
     "ssl_port": 443,         // HTTPS port (standard mode)
-    "custom_port": 8080,     // Custom port (custom mode)
+    "custom_port": 18080,    // Custom port (custom mode)
     "enable_https": true     // HTTPS support (standard mode only)
   }
 }

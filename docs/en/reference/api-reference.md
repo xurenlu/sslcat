@@ -5,7 +5,7 @@ SSLcat provides a comprehensive REST API for configuration management, monitorin
 ## Base URL
 
 ```
-http://localhost:8080/api/v1
+http://localhost:18080/api/v1
 ```
 
 ## Authentication
@@ -15,13 +15,13 @@ All API endpoints require authentication. Use one of these methods:
 ### API Key Authentication
 ```bash
 curl -H "Authorization: Bearer your-api-key" \
-     http://localhost:8080/api/v1/config
+     http://localhost:18080/api/v1/config
 ```
 
 ### Basic Authentication
 ```bash
 curl -u username:password \
-     http://localhost:8080/api/v1/config
+     http://localhost:18080/api/v1/config
 ```
 
 ## Configuration Management
@@ -615,7 +615,7 @@ X-RateLimit-Reset: 1640995200
 import sslcat
 
 client = sslcat.Client(
-    base_url="http://localhost:8080/api/v1",
+    base_url="http://localhost:18080/api/v1",
     api_key="your-api-key"
 )
 
@@ -638,7 +638,7 @@ metrics = client.get_metrics()
 const SSLcat = require('sslcat-sdk');
 
 const client = new SSLcat({
-  baseUrl: 'http://localhost:8080/api/v1',
+  baseUrl: 'http://localhost:18080/api/v1',
   apiKey: 'your-api-key'
 });
 
@@ -666,7 +666,7 @@ import (
 
 func main() {
     client := sslcat.NewClient(
-        "http://localhost:8080/api/v1",
+        "http://localhost:18080/api/v1",
         "your-api-key",
     )
     

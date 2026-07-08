@@ -82,7 +82,7 @@ curl -I https://example.com
 **解决方案**:
 ```bash
 # 检查后端服务状态
-curl http://localhost:8080/health
+curl http://localhost:18080/health
 
 # 检查 SSLcat 配置
 sslcat -config sslcat.conf -validate
@@ -186,7 +186,7 @@ sslcat -config sslcat.conf -test
 
 ```bash
 # 检查后端健康状态
-curl http://localhost:8080/health
+curl http://localhost:18080/health
 curl http://localhost:8081/health
 curl http://localhost:8082/health
 
@@ -202,10 +202,10 @@ done
 **解决方案**:
 ```bash
 # 检查健康检查端点
-curl http://localhost:8080/health
+curl http://localhost:18080/health
 
 # 检查健康检查配置
-curl -I http://localhost:8080/health
+curl -I http://localhost:18080/health
 
 # 验证后端服务正在运行
 ps aux | grep your-backend-service
@@ -246,7 +246,7 @@ ps aux | grep your-backend-service
 top -p $(pgrep sslcat)
 
 # 检查 SSLcat 指标
-curl http://localhost:8080/metrics | grep cpu
+curl http://localhost:18080/metrics | grep cpu
 ```
 
 ### 问题：内存使用率高
@@ -279,7 +279,7 @@ curl http://localhost:8080/metrics | grep cpu
 ps aux | grep sslcat
 
 # 检查内存指标
-curl http://localhost:8080/metrics | grep memory
+curl http://localhost:18080/metrics | grep memory
 ```
 
 ### 问题：响应时间慢
@@ -404,10 +404,10 @@ sslcat -config /full/path/to/sslcat.conf
 
 ```bash
 # 检查指标端点
-curl http://localhost:8080/metrics
+curl http://localhost:18080/metrics
 
 # 检查是否启用了监控
-curl http://localhost:8080/health
+curl http://localhost:18080/health
 ```
 
 ### 问题：追踪不工作

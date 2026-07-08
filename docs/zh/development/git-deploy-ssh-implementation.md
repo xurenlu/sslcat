@@ -152,7 +152,7 @@ sudo useradd -r -s /bin/bash -m -d /home/git git
 sudo systemctl restart sshd
 
 # 3. 添加 SSH 公钥
-curl -X POST http://localhost:8080/admin/api/git-server/ssh-key/add \
+curl -X POST http://localhost:18080/admin/api/git-server/ssh-key/add \
   -H "Content-Type: application/json" \
   -d '{
     "name": "my-dev-key",
@@ -163,7 +163,7 @@ curl -X POST http://localhost:8080/admin/api/git-server/ssh-key/add \
 ### 2. 创建应用（可选，推送时会自动创建）
 
 ```bash
-curl -X POST http://localhost:8080/admin/api/git-server/app/create \
+curl -X POST http://localhost:18080/admin/api/git-server/app/create \
   -H "Content-Type: application/json" \
   -d '{
     "name": "myapp"
@@ -189,13 +189,13 @@ git push sslcat main
 ### 4. 查看推送历史
 
 ```bash
-curl http://localhost:8080/admin/api/git-server/push-history?app=myapp&limit=10
+curl http://localhost:18080/admin/api/git-server/push-history?app=myapp&limit=10
 ```
 
 ### 5. 绑定 SSH 密钥到应用（可选，用于限制推送权限）
 
 ```bash
-curl -X POST http://localhost:8080/admin/api/git-server/app/bind-key \
+curl -X POST http://localhost:18080/admin/api/git-server/app/bind-key \
   -H "Content-Type: application/json" \
   -d '{
     "app_name": "myapp",

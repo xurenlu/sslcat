@@ -432,7 +432,7 @@ done
 curl https://example.com/health
 
 # 检查 SSLcat 指标
-curl http://localhost:8080/metrics
+curl http://localhost:18080/metrics
 ```
 
 ### 4. 缓存
@@ -449,16 +449,16 @@ curl -I https://example.com/static/style.css | grep -i cache
 ### 1. 指标端点
 ```bash
 # 获取 Prometheus 指标
-curl http://localhost:8080/metrics
+curl http://localhost:18080/metrics
 
 # 获取特定指标
-curl http://localhost:8080/metrics | grep sslcat_requests_total
+curl http://localhost:18080/metrics | grep sslcat_requests_total
 ```
 
 ### 2. 健康仪表板
 ```bash
 # 检查 SSLcat 健康状态
-curl http://localhost:8080/health
+curl http://localhost:18080/health
 
 # 检查后端健康状态
 curl https://example.com/health

@@ -86,7 +86,7 @@ go tool pprof http://shifen.de:8080/debug/pprof/allocs
 
 ```bash
 ssh rocky@shifen.de
-curl http://localhost:8080/debug/pprof/heap > /tmp/heap_v1.pprof
+curl http://localhost:18080/debug/pprof/heap > /tmp/heap_v1.pprof
 ```
 
 ### 2. 监控一段时间
@@ -96,14 +96,14 @@ curl http://localhost:8080/debug/pprof/heap > /tmp/heap_v1.pprof
 watch -n 5 'ps aux | grep sslcat'
 
 # 同时监控 pprof
-go tool pprof http://localhost:8080/debug/pprof/heap
+go tool pprof http://localhost:18080/debug/pprof/heap
 ```
 
 ### 3. 对比分析
 
 ```bash
 # 等待 10 分钟后再次获取
-curl http://localhost:8080/debug/pprof/heap > /tmp/heap_v2.pprof
+curl http://localhost:18080/debug/pprof/heap > /tmp/heap_v2.pprof
 
 # 对比差异
 go tool pprof -base /tmp/heap_v1.pprof /tmp/heap_v2.pprof
@@ -146,7 +146,7 @@ pprof 输出示例：
 **症状：** Goroutine 数量持续增长
 **排查：**
 ```bash
-go tool pprof http://localhost:8080/debug/pprof/goroutine
+go tool pprof http://localhost:18080/debug/pprof/goroutine
 (pprof) top20
 ```
 查看哪些 goroutine 数量最多
@@ -165,7 +165,7 @@ go tool pprof http://localhost:8080/debug/pprof/goroutine
 **症状：** 定期内存增长
 **排查：**
 ```bash
-go tool pprof http://localhost:8080/debug/pprof/heap
+go tool pprof http://localhost:18080/debug/pprof/heap
 (pprof) top20 | grep ticker
 ```
 检查定时器是否正确清理
@@ -184,7 +184,7 @@ SSLcat 已经内置了内存监控器，可以这样配合使用：
 
 ```bash
 # 获取详细的 heap profile
-go tool pprof http://localhost:8080/debug/pprof/heap
+go tool pprof http://localhost:18080/debug/pprof/heap
 (pprof) top20
 ```
 
@@ -196,7 +196,7 @@ go tool pprof http://localhost:8080/debug/pprof/heap
 
 ```bash
 # 修复后再次采集
-curl http://localhost:8080/debug/pprof/heap > heap_fixed.pprof
+curl http://localhost:18080/debug/pprof/heap > heap_fixed.pprof
 
 # 对比
 go tool pprof -base heap_before.pprof heap_fixed.pprof
@@ -212,7 +212,7 @@ go tool pprof -base heap_before.pprof heap_fixed.pprof
 #!/bin/bash
 # collect_heaps.sh
 DATE=$(date +%Y%m%d_%H%M%S)
-curl http://localhost:8080/debug/pprof/heap > /tmp/heap_${DATE}.pprof
+curl http://localhost:18080/debug/pprof/heap > /tmp/heap_${DATE}.pprof
 echo "采集完成: heap_${DATE}.pprof"
 ```
 
@@ -220,14 +220,14 @@ echo "采集完成: heap_${DATE}.pprof"
 
 ```bash
 # 查看实时的 goroutine 数量
-watch -n 1 'curl -s http://localhost:8080/debug/pprof/goroutine?debug=1 | grep -c "goroutine"'
+watch -n 1 'curl -s http://localhost:18080/debug/pprof/goroutine?debug=1 | grep -c "goroutine"'
 ```
 
 ### 技巧 3：生成报告
 
 ```bash
 # 生成可视化的调用图
-go tool pprof -png http://localhost:8080/debug/pprof/heap > heap_graph.png
+go tool pprof -png http://localhost:18080/debug/pprof/heap > heap_graph.png
 ```
 
 ## 总结

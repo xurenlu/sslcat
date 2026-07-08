@@ -128,6 +128,12 @@ func (s *Server) handleConfigApply(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to save config: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	s.syncSSLManagerConfig()
+	s.syncProxyManagerConfig()
+	s.syncSecurityManagerConfig()
+	if s.notificationIntegrator != nil {
+		s.notificationIntegrator.ReloadFromConfig(s.config.Notification)
+	}
 	// 清理pending
 	s.pendingImport = nil
 	s.pendingDiff = nil

@@ -82,7 +82,7 @@ curl -I https://example.com
 **Solutions**:
 ```bash
 # Check backend service status
-curl http://localhost:8080/health
+curl http://localhost:18080/health
 
 # Check SSLcat configuration
 sslcat -config sslcat.conf -validate
@@ -185,7 +185,7 @@ sslcat -config sslcat.conf -test
 
 ```bash
 # Check backend health
-curl http://localhost:8080/health
+curl http://localhost:18080/health
 curl http://localhost:8081/health
 curl http://localhost:8082/health
 
@@ -201,10 +201,10 @@ done
 **Solutions**:
 ```bash
 # Check health check endpoint
-curl http://localhost:8080/health
+curl http://localhost:18080/health
 
 # Check health check configuration
-curl -I http://localhost:8080/health
+curl -I http://localhost:18080/health
 
 # Verify backend service is running
 ps aux | grep your-backend-service
@@ -245,7 +245,7 @@ ps aux | grep your-backend-service
 top -p $(pgrep sslcat)
 
 # Check SSLcat metrics
-curl http://localhost:8080/metrics | grep cpu
+curl http://localhost:18080/metrics | grep cpu
 ```
 
 ### Issue: Memory Usage High
@@ -278,7 +278,7 @@ curl http://localhost:8080/metrics | grep cpu
 ps aux | grep sslcat
 
 # Check memory metrics
-curl http://localhost:8080/metrics | grep memory
+curl http://localhost:18080/metrics | grep memory
 ```
 
 ### Issue: Slow Response Times
@@ -403,10 +403,10 @@ sslcat -config /full/path/to/sslcat.conf
 
 ```bash
 # Check metrics endpoint
-curl http://localhost:8080/metrics
+curl http://localhost:18080/metrics
 
 # Check if monitoring is enabled
-curl http://localhost:8080/health
+curl http://localhost:18080/health
 ```
 
 ### Issue: Tracing Not Working

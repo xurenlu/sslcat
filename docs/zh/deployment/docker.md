@@ -150,7 +150,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "8080:8080"  # 管理界面
+      - "18080:18080"  # 管理界面
     volumes:
       - ./sslcat.conf:/app/sslcat.conf
       - ./data:/app/data

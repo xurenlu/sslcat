@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0-rc6] - 2026-07-08
+
+### Fixed
+
+- 补齐配置热重载变更检测兜底，未单独列出的配置段变化也会触发软重载，避免页面/文件显示已更新但运行时仍使用旧配置。
+- 设置页保存 SSL、代理和安全相关配置后会立即同步对应运行时，减少保存后马上操作时读到旧配置的窗口期。
+- 修复 CDN / 上游缓存配置在代理热重载后仍可能保留旧配置引用的问题；配置导入和从节点原地应用配置时同步当前全部配置段并刷新核心运行时。
+
+## [2.3.0-rc5] - 2026-07-08
+
+### Fixed
+
+- 修复 DNS-01 挑战方法配置变更不会触发 SSL 管理器热重载的问题，避免已勾选 DNS-01 后证书预检和申请仍误判为未启用并回退 HTTP-01。
+- DNS Provider 和挑战方法配置保存后会立即同步 SSL 运行时状态，申请证书弹窗可马上识别已配置的 DNS-01 能力。
+
+## [2.3.0-rc4] - 2026-07-08
+
+### Fixed
+
+- 将初始安装和示例配置的自定义模式默认端口从 `8080` 调整为 `18080`，避免配置合并时缺省 `server.custom_port` 回落到常见业务端口。
+- 同步更新 README、端口配置文档与本地 Docker Compose 示例中的默认访问地址和端口映射。
+
 ## [2.3.0-rc3] - 2026-07-07
 
 ### Fixed

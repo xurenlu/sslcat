@@ -27,7 +27,7 @@
 sslcat users create -username admin -email admin@example.com -role admin
 
 # 或使用 API
-curl -X POST http://localhost:8080/api/v1/users \
+curl -X POST http://localhost:18080/api/v1/users \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your-token" \
   -d '{
@@ -45,7 +45,7 @@ sslcat users list
 
 # 或使用 API
 curl -H "Authorization: Bearer your-token" \
-     http://localhost:8080/api/v1/users
+     http://localhost:18080/api/v1/users
 ```
 
 ### 更新用户
@@ -54,7 +54,7 @@ curl -H "Authorization: Bearer your-token" \
 sslcat users update -username admin -role super-admin
 
 # 或使用 API
-curl -X PUT http://localhost:8080/api/v1/users/user-1 \
+curl -X PUT http://localhost:18080/api/v1/users/user-1 \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your-token" \
   -d '{
@@ -69,7 +69,7 @@ curl -X PUT http://localhost:8080/api/v1/users/user-1 \
 sslcat users delete -username admin
 
 # 或使用 API
-curl -X DELETE http://localhost:8080/api/v1/users/user-1 \
+curl -X DELETE http://localhost:18080/api/v1/users/user-1 \
   -H "Authorization: Bearer your-token"
 ```
 
@@ -345,7 +345,7 @@ sslcat sessions clear
 sslcat users password -username admin
 
 # 或使用 API
-curl -X POST http://localhost:8080/api/v1/users/user-1/password \
+curl -X POST http://localhost:18080/api/v1/users/user-1/password \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your-token" \
   -d '{
@@ -386,7 +386,7 @@ sslcat users mfa verify -username admin -code 123456
 sslcat api key generate -user admin -name "automation"
 
 # 或使用 API
-curl -X POST http://localhost:8080/api/v1/api-keys \
+curl -X POST http://localhost:18080/api/v1/api-keys \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your-token" \
   -d '{

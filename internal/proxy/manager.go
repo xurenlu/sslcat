@@ -2442,6 +2442,15 @@ func (m *Manager) Reload(newConfig *config.Config) error {
 	oldConfig := m.config
 	m.config = newConfig
 
+	if m.cdnCache != nil {
+		m.cdnCache.UpdateConfig(newConfig)
+	}
+	if m.upstreamCache != nil {
+		m.upstreamCache.StopCleaner()
+	}
+	m.upstreamCache = cache.NewUpstreamCache(newConfig)
+	m.upstreamCache.StartCleaner()
+
 	// 重新初始化负载均衡器
 	m.lbMutex.Lock()
 	// 停止旧的负载均衡器

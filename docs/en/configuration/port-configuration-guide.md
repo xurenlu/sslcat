@@ -41,7 +41,7 @@ SSLcat v1.3.10-rc1 introduces a new port configuration system that supports two 
 {
   "server": {
     "port_mode": "custom",
-    "custom_port": 8080,
+    "custom_port": 18080,
     "enable_https": false
   }
 }
@@ -83,7 +83,7 @@ For development or internal use:
   "server": {
     "host": "0.0.0.0",
     "port_mode": "custom",
-    "custom_port": 8080,
+    "custom_port": 18080,
     "enable_https": false
   }
 }
@@ -103,7 +103,7 @@ For development or internal use:
 |--------|------|-------------|---------|
 | `port_mode` | string | Port mode: "standard" or "custom" | "standard" |
 | `enable_https` | boolean | Enable HTTPS support | true |
-| `custom_port` | integer | Custom port number (custom mode only) | 8080 |
+| `custom_port` | integer | Custom port number (custom mode only) | 18080 |
 
 ### SSL Configuration (Standard Mode)
 
@@ -148,7 +148,7 @@ For development or internal use:
   "server": {
     "host": "0.0.0.0",
     "port_mode": "custom",
-    "custom_port": 8080,
+    "custom_port": 18080,
     "enable_https": false
   },
   "proxy": {
@@ -170,7 +170,7 @@ For development or internal use:
   "server": {
     "host": "0.0.0.0",
     "port_mode": "custom",
-    "custom_port": 8080,
+    "custom_port": 18080,
     "enable_https": false
   },
   "proxy": {
