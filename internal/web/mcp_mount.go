@@ -10,13 +10,14 @@ import (
 	mcptools "github.com/xurenlu/sslcat/internal/mcp/tools"
 )
 
-// setupMCPRoutes 当配置启用 MCP 时，挂载 Streamable HTTP transport 到 admin mux。
+// setupMCPRoutes 挂载 Streamable HTTP transport 到 admin mux。
 // 路径形如：/sslcat-panel/mcp/stream
 //
-// 关闭或未配置时是 no-op。挂上的 handler 自己处理 Bearer 鉴权与会话。
+// 路由始终注册；是否启用由请求时的当前配置决定。这样管理后台/CLI
+// 切换 mcp.enabled 后，配置热重载即可立即生效，不需要重启主进程。
 func (s *Server) setupMCPRoutes() {
-	if s.config == nil || !s.config.IsMCPEnabled() {
-		s.log.Info("MCP service disabled (config.mcp.enabled=false)")
+	if s.config == nil {
+		s.log.Warn("MCP service not mounted: config is nil")
 		return
 	}
 
@@ -103,28 +104,53 @@ func (s *Server) setupMCPRoutes() {
 
 	// 4. 鉴权
 	auth := mcp.NewAuthenticator(&s.config.MCP)
-	if len(s.config.MCP.Tokens) == 0 {
+	if s.config.IsMCPEnabled() && len(s.config.MCP.Tokens) == 0 {
 		s.log.Warn("MCP enabled but no tokens configured; all requests will be rejected. " +
 			"Run: sslcat mcp token create --name <name> --scopes read,site:write,...")
 	}
 
 	// 5. 挂载 handler
 	prefix := s.config.AdminPrefix + s.config.GetMCPPathPrefix()
-	// Streamable HTTP 单端点；同时挂带 / 与不带 / 两个路径，避免 mux 行为差异
 	handler := mcp.NewStreamableHTTPHandler(srv, auth, mcp.HTTPHandlerOptions{})
 	streamPath := prefix + "/stream"
 
 	// http.ServeMux 区分尾斜杠；这里挂精确路径，AI 客户端按 docs 写死即可
-	s.mux.Handle(streamPath, withMCPRequestLog(s, "stream", handler))
+	s.mux.Handle(streamPath, withMCPRequestLog(s, "stream", s.withMCPEnabledGate(handler)))
 
 	// 健康检查（便于 ops 排查）：GET /sslcat-panel/mcp/health
 	s.mux.HandleFunc(prefix+"/health", func(w http.ResponseWriter, r *http.Request) {
+		if !s.config.IsMCPEnabled() {
+			writeJSONStatus(w, http.StatusServiceUnavailable, map[string]any{
+				"status":   "disabled",
+				"protocol": mcp.ProtocolVersion,
+				"enabled":  false,
+			})
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-MCP-Protocol-Version", mcp.ProtocolVersion)
 		_, _ = w.Write([]byte(`{"status":"ok","protocol":"` + mcp.ProtocolVersion + `"}`))
 	})
 
-	s.log.Infof("MCP service mounted at %s (stream=%s)", prefix, streamPath)
+	if s.config.IsMCPEnabled() {
+		s.log.Infof("MCP service mounted at %s (stream=%s)", prefix, streamPath)
+	} else {
+		s.log.Infof("MCP service mounted at %s but currently disabled (stream=%s)", prefix, streamPath)
+	}
+}
+
+func (s *Server) withMCPEnabledGate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodOptions && (s.config == nil || !s.config.IsMCPEnabled()) {
+			writeJSONStatus(w, http.StatusServiceUnavailable, map[string]any{
+				"error":    "mcp disabled",
+				"enabled":  false,
+				"protocol": mcp.ProtocolVersion,
+			})
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // withMCPRequestLog 简单访问日志：只记录路径、方法、状态、远端地址。

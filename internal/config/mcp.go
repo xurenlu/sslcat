@@ -3,7 +3,7 @@ package config
 // MCPConfig 内置 MCP（Model Context Protocol）服务的配置。
 //
 // MCP 是 sslcat 的"第二个管理面"，与现有 /sslcat-panel/api/* 并列。
-// 默认关闭；启用后挂在 admin server 同端口的 PathPrefix 下。
+// 默认开启；未颁发 token 时所有 tool 调用仍会被鉴权层拒绝。
 type MCPConfig struct {
 	Enabled    bool   `json:"enabled"`               // 是否启用 MCP 服务
 	PathPrefix string `json:"path_prefix,omitempty"` // 相对 admin_prefix 的路径，默认 "/mcp"

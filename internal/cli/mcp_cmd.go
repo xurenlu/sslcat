@@ -12,12 +12,13 @@ import (
 )
 
 // RegisterMCPCommands 注册 MCP 管理命令：
-//   sslcat mcp token create --name <n> [--scopes read,site:write] [--expires-at RFC3339] [--ip-allowlist cidr,...] [--rate-limit 60/min] [--desc "..."]
-//   sslcat mcp token list
-//   sslcat mcp token revoke --name <n>
-//   sslcat mcp doctor
-//   sslcat mcp enable
-//   sslcat mcp disable
+//
+//	sslcat mcp token create --name <n> [--scopes read,site:write] [--expires-at RFC3339] [--ip-allowlist cidr,...] [--rate-limit 60/min] [--desc "..."]
+//	sslcat mcp token list
+//	sslcat mcp token revoke --name <n>
+//	sslcat mcp doctor
+//	sslcat mcp enable
+//	sslcat mcp disable
 func (m *Manager) RegisterMCPCommands() {
 	m.RegisterCommand(&Command{
 		Name:        "mcp",
@@ -193,9 +194,9 @@ func (m *Manager) mcpToggle(enable bool) error {
 		return fmt.Errorf("save config: %w", err)
 	}
 	if enable {
-		fmt.Println("✅ MCP 服务已启用。下次启动 sslcat 主进程后生效。")
+		fmt.Println("✅ MCP 服务已启用。运行中的 sslcat 会通过配置热重载立即生效；未运行时下次启动生效。")
 	} else {
-		fmt.Println("✅ MCP 服务已禁用。下次启动 sslcat 主进程后生效。")
+		fmt.Println("✅ MCP 服务已禁用。运行中的 sslcat 会通过配置热重载立即生效；未运行时下次启动生效。")
 	}
 	return nil
 }
@@ -306,13 +307,13 @@ func truncate(s string, n int) string {
 
 func validateScopes(scopes []string) error {
 	allowed := map[string]bool{
-		"read":            true,
-		"site:write":      true,
-		"cert:write":      true,
-		"proxy:write":     true,
-		"security:write":  true,
-		"ops:write":       true,
-		"admin":           true,
+		"read":           true,
+		"site:write":     true,
+		"cert:write":     true,
+		"proxy:write":    true,
+		"security:write": true,
+		"ops:write":      true,
+		"admin":          true,
 	}
 	for _, s := range scopes {
 		if !allowed[s] {
@@ -321,4 +322,3 @@ func validateScopes(scopes []string) error {
 	}
 	return nil
 }
-

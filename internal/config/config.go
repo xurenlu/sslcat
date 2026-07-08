@@ -1195,7 +1195,7 @@ func Load(configFile string) (*Config, error) {
 			MaxSizeBytes:  5 * 1024 * 1024, // 最大文件大小 5MB
 		},
 		MCP: MCPConfig{
-			Enabled:    false, // 默认关闭 MCP 服务，需用户显式开启
+			Enabled:    true, // 默认开启 MCP 服务；未创建 token 时所有调用仍会被拒绝
 			PathPrefix: "/mcp",
 			Tokens:     []MCPToken{},
 			Audit: MCPAuditConfig{
@@ -1815,6 +1815,15 @@ func getDefaultConfig() *Config {
 			StripMetadata: false,
 			MinSizeBytes:  60 * 1024,
 			MaxSizeBytes:  5 * 1024 * 1024,
+		},
+		MCP: MCPConfig{
+			Enabled:    true,
+			PathPrefix: "/mcp",
+			Tokens:     []MCPToken{},
+			Audit: MCPAuditConfig{
+				Enabled: true,
+				File:    "./data/mcp_audit.log",
+			},
 		},
 	}
 }

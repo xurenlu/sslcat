@@ -1156,7 +1156,7 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/cluster/status", s.handleAPIClusterStatus)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/cluster/test-master", s.handleAPIClusterTestMaster)
 
-	// MCP 服务（默认关闭，启用时挂在 admin_prefix + path_prefix 下）
+	// MCP 服务（路由常驻挂载，运行时按 mcp.enabled 动态放行）
 	s.setupMCPRoutes()
 	// MCP 管理 API（admin session 鉴权，给前端 React 页面用，与 MCP 运行时无关）
 	s.setupMCPManagementRoutes()
@@ -1628,6 +1628,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.mux.ServeHTTP(wrappedWriter, r)
 	}
 }
+
 // GetWAFEngine 获取WAF引擎
 func (s *Server) GetWAFEngine() *waf.AdvancedEngine {
 	return s.wafEngine

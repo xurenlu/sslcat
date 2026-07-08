@@ -3,7 +3,7 @@
 把下面这套连接信息交给任意支持 MCP 的 AI 客户端，AI 就能直接管理 sslcat。
 
 > 共同前提：
-> 1. 已用 `sslcat mcp enable` 启用 MCP（或在管理后台「MCP」页面点开关）；
+> 1. MCP 默认启用；如果曾手动关闭，请用 `sslcat mcp enable` 或管理后台「MCP」页面重新打开（无需重启）；
 > 2. 已颁发一个 token（CLI: `sslcat mcp token create --name <n> --scopes read,site:write,cert:write,proxy:write` 或在管理后台「MCP」页面"创建 Token"按钮）；
 > 3. 知道 sslcat 的对外 URL，例如 `https://your-host.example.com`。
 >

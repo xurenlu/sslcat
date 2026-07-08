@@ -11,7 +11,7 @@ SSLcat 是一个集成 SSL 证书管理、反向代理、WAF、安全审计、�
 - 管理面板、多用户、会话、审计日志和配置版本管理。
 - WAF、DDoS、防爆破、IP/UA/TLS 指纹封禁和白名单管理。
 - 运行监控、慢请求分析、缓存、压缩和图片优化。
-- **MCP（Model Context Protocol）内置服务**：sslcat 自身即是 MCP server，可被 Claude / Cursor / Cherry Studio 等 AI 客户端直接调用，AI 通过 tool 调用即可完成站点、证书、转发的查询与管理，并能读取近期内部错误、访问日志和所有站点 error log。默认关闭；启用时需通过 `sslcat mcp token create` 颁发独立 token，支持 scope、IP 白名单、速率限制与审计日志。
+- **MCP（Model Context Protocol）内置服务**：sslcat 自身即是 MCP server，可被 Claude / Cursor / Cherry Studio 等 AI 客户端直接调用，AI 通过 tool 调用即可完成站点、证书、转发的查询与管理，并能读取近期内部错误、访问日志和所有站点 error log。默认开启；调用工具前仍需通过 `sslcat mcp token create` 颁发独立 token，支持 scope、IP 白名单、速率限制与审计日志。
 - **CLI 运维能力**：`status` / `doctor` 输出配置摘要与本地自检；`site` 管理静态/PHP 站点；`proxy health-check` 探测上游后端；支持 `--json` 输出和命令前置 `-config`，方便脚本、监控和故障现场使用。
 
 ## 当前设计取向
@@ -29,6 +29,8 @@ SSLcat 是一个集成 SSL 证书管理、反向代理、WAF、安全审计、�
 - 配置热重载采用显式字段检测加配置段兜底检测，未单独列出的配置变化也应刷新核心运行时。
 - CLI 危险操作默认需要显式确认，例如删除站点必须追加 `--yes`。
 - MCP 排障读取日志时必须使用有界尾读，避免大日志文件在高并发或事故现场拖垮管理面。
+- MCP 路由启动时常驻挂载，启停开关应随配置热重载立即生效；无 token 时保持不可调用，避免默认开启削弱权限边界。
+- Linux systemd 默认使用 `GOMEMLIMIT=1280MiB`、`GOGC=200`、`GODEBUG=madvdontneed=1` 启动，优先控制长期运行后的 RSS 高水位残留。
 
 ## 近期待改进
 
@@ -38,6 +40,8 @@ SSLcat 是一个集成 SSL 证书管理、反向代理、WAF、安全审计、�
 
 ## 版本记录
 
+- `2.3.0-rc8`：MCP 路由改为启动时常驻挂载，启停开关随配置热重载立即生效；默认配置开启 MCP，但没有 token 时工具调用仍会被拒绝。
+- `2.3.0-rc7`：systemd 默认内存参数统一为内存优先配置，并在 README 与各安装脚本中写明推荐启动方式。
 - `2.3.0-rc6`：配置热重载兜底修复。未单独列出的配置段变化会触发软重载；设置页保存 SSL/代理/安全配置、CDN 规则、配置导入和从节点原地应用配置后会同步核心运行时；CDN / 上游缓存会随代理热重载更新配置引用。
 - `2.3.0-rc5`：DNS-01 配置热重载修复。挑战方法变化会触发 SSL 管理器软重载，DNS 配置保存后立即同步证书申请运行时，避免已启用 DNS-01 时预检和申请仍回退 HTTP-01。
 - `2.3.0-rc4`：初始安装端口默认值调整。自定义端口模式默认从 `8080` 改为 `18080`，同步更新安装配置、Docker Compose 示例、README 与端口配置文档，减少与业务服务端口冲突。

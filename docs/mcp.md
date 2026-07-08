@@ -21,13 +21,23 @@ AI 就能直接调用 sslcat 工具来运维。
 
 ## 快速开始
 
-### 1. 启用 MCP
+### 1. 确认 MCP 端点
+
+MCP 默认启用，并固定挂载在管理端口同一个 HTTP 服务下。新安装还没有 token 时，health 可访问，tool 调用会被鉴权层拒绝。
 
 ```bash
-sslcat mcp enable
+curl -k https://<your-host>/sslcat-panel/mcp/health
 ```
 
-或者直接修改 `sslcat.conf`：
+需要临时关闭时可执行：
+
+```bash
+sslcat mcp disable
+```
+
+管理后台和 CLI 的启停开关会随配置热重载立即生效；只有修改 `admin_prefix` 或 `mcp.path_prefix` 这种路由路径时才需要重启主进程。
+
+默认配置等价于：
 
 ```json
 {
@@ -66,11 +76,7 @@ sslcat mcp token create \
 
 > ⚠️ 明文 token 只显示一次，丢了只能 revoke 重发。
 
-### 3. 重启 sslcat 主进程
-
-让新的配置生效。
-
-### 4. 自检
+### 3. 自检
 
 ```bash
 sslcat mcp doctor
@@ -504,7 +510,7 @@ sslcat://logs/error?kind=proxy&domain=api.example.com&keyword=upstream&limit=200
 
 ## Prometheus 指标（v2.1.0-rc4+）
 
-启用 MCP 后自动暴露（与现有 sslcat 指标共用 `/metrics`）：
+MCP 启用时自动暴露（与现有 sslcat 指标共用 `/metrics`）：
 
 | 指标 | 类型 | 标签 | 说明 |
 |---|---|---|---|

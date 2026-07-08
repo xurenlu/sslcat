@@ -71,16 +71,16 @@ func (s *Server) handleMCPMgmtStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := map[string]any{
-		"enabled":           s.config.MCP.Enabled,
-		"path_prefix":       s.config.GetMCPPathPrefix(),
-		"stream_url_path":   s.config.AdminPrefix + s.config.GetMCPPathPrefix() + "/stream",
-		"health_url_path":   s.config.AdminPrefix + s.config.GetMCPPathPrefix() + "/health",
-		"token_count":       len(s.config.MCP.Tokens),
-		"audit_enabled":     s.config.MCP.Audit.Enabled,
-		"audit_file":        s.config.GetMCPAuditFile(),
-		"protocol_version":  mcp.ProtocolVersion,
+		"enabled":          s.config.MCP.Enabled,
+		"path_prefix":      s.config.GetMCPPathPrefix(),
+		"stream_url_path":  s.config.AdminPrefix + s.config.GetMCPPathPrefix() + "/stream",
+		"health_url_path":  s.config.AdminPrefix + s.config.GetMCPPathPrefix() + "/health",
+		"token_count":      len(s.config.MCP.Tokens),
+		"audit_enabled":    s.config.MCP.Audit.Enabled,
+		"audit_file":       s.config.GetMCPAuditFile(),
+		"protocol_version": mcp.ProtocolVersion,
 	}
-	writeJSONStatus(w,http.StatusOK, out)
+	writeJSONStatus(w, http.StatusOK, out)
 }
 
 // ---------- /tokens : GET 列出, POST 创建, DELETE 删除 ----------
@@ -95,7 +95,7 @@ func (s *Server) handleMCPMgmtTokens(w http.ResponseWriter, r *http.Request) {
 		for i := range s.config.MCP.Tokens {
 			out = append(out, publicToken(&s.config.MCP.Tokens[i]))
 		}
-		writeJSONStatus(w,http.StatusOK, map[string]any{
+		writeJSONStatus(w, http.StatusOK, map[string]any{
 			"tokens": out,
 			"total":  len(out),
 		})
@@ -126,18 +126,18 @@ type mcpTokenCreateReq struct {
 func (s *Server) handleMCPMgmtTokensCreate(w http.ResponseWriter, r *http.Request) {
 	var req mcpTokenCreateReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSONStatus(w,http.StatusBadRequest, map[string]string{"error": "invalid JSON: " + err.Error()})
+		writeJSONStatus(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON: " + err.Error()})
 		return
 	}
 	req.Name = strings.TrimSpace(req.Name)
 	if req.Name == "" {
-		writeJSONStatus(w,http.StatusBadRequest, map[string]string{"error": "name is required"})
+		writeJSONStatus(w, http.StatusBadRequest, map[string]string{"error": "name is required"})
 		return
 	}
 	// 重名检查
 	for _, t := range s.config.MCP.Tokens {
 		if t.Name == req.Name {
-			writeJSONStatus(w,http.StatusConflict, map[string]string{"error": "token name already exists"})
+			writeJSONStatus(w, http.StatusConflict, map[string]string{"error": "token name already exists"})
 			return
 		}
 	}
@@ -145,24 +145,24 @@ func (s *Server) handleMCPMgmtTokensCreate(w http.ResponseWriter, r *http.Reques
 		req.Scopes = []string{"read"}
 	}
 	if err := validateMCPScopes(req.Scopes); err != nil {
-		writeJSONStatus(w,http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeJSONStatus(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
 	if req.ExpiresAt != "" {
 		if _, err := time.Parse(time.RFC3339, req.ExpiresAt); err != nil {
-			writeJSONStatus(w,http.StatusBadRequest, map[string]string{"error": "expires_at must be RFC3339"})
+			writeJSONStatus(w, http.StatusBadRequest, map[string]string{"error": "expires_at must be RFC3339"})
 			return
 		}
 	}
 
 	plain, err := mcp.GenerateToken()
 	if err != nil {
-		writeJSONStatus(w,http.StatusInternalServerError, map[string]string{"error": "generate token: " + err.Error()})
+		writeJSONStatus(w, http.StatusInternalServerError, map[string]string{"error": "generate token: " + err.Error()})
 		return
 	}
 	hash, err := mcp.HashToken(plain)
 	if err != nil {
-		writeJSONStatus(w,http.StatusInternalServerError, map[string]string{"error": "hash token: " + err.Error()})
+		writeJSONStatus(w, http.StatusInternalServerError, map[string]string{"error": "hash token: " + err.Error()})
 		return
 	}
 	entry := config.MCPToken{
@@ -178,10 +178,10 @@ func (s *Server) handleMCPMgmtTokensCreate(w http.ResponseWriter, r *http.Reques
 	s.config.MCP.Tokens = append(s.config.MCP.Tokens, entry)
 	if err := s.config.Save(s.config.ConfigFile); err != nil {
 		s.config.MCP.Tokens = s.config.MCP.Tokens[:len(s.config.MCP.Tokens)-1]
-		writeJSONStatus(w,http.StatusInternalServerError, map[string]string{"error": "save config: " + err.Error()})
+		writeJSONStatus(w, http.StatusInternalServerError, map[string]string{"error": "save config: " + err.Error()})
 		return
 	}
-	writeJSONStatus(w,http.StatusCreated, map[string]any{
+	writeJSONStatus(w, http.StatusCreated, map[string]any{
 		"ok":     true,
 		"token":  plain, // 明文，仅本次返回
 		"public": publicToken(&entry),
@@ -192,7 +192,7 @@ func (s *Server) handleMCPMgmtTokensCreate(w http.ResponseWriter, r *http.Reques
 func (s *Server) handleMCPMgmtTokensDelete(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimSpace(r.URL.Query().Get("name"))
 	if name == "" {
-		writeJSONStatus(w,http.StatusBadRequest, map[string]string{"error": "name is required"})
+		writeJSONStatus(w, http.StatusBadRequest, map[string]string{"error": "name is required"})
 		return
 	}
 	idx := -1
@@ -203,7 +203,7 @@ func (s *Server) handleMCPMgmtTokensDelete(w http.ResponseWriter, r *http.Reques
 		}
 	}
 	if idx < 0 {
-		writeJSONStatus(w,http.StatusNotFound, map[string]string{"error": "token not found"})
+		writeJSONStatus(w, http.StatusNotFound, map[string]string{"error": "token not found"})
 		return
 	}
 	deleted := s.config.MCP.Tokens[idx]
@@ -215,10 +215,10 @@ func (s *Server) handleMCPMgmtTokensDelete(w http.ResponseWriter, r *http.Reques
 		newList = append(newList, deleted)
 		newList = append(newList, s.config.MCP.Tokens[idx:]...)
 		s.config.MCP.Tokens = newList
-		writeJSONStatus(w,http.StatusInternalServerError, map[string]string{"error": "save config: " + err.Error()})
+		writeJSONStatus(w, http.StatusInternalServerError, map[string]string{"error": "save config: " + err.Error()})
 		return
 	}
-	writeJSONStatus(w,http.StatusOK, map[string]any{
+	writeJSONStatus(w, http.StatusOK, map[string]any{
 		"ok":             true,
 		"deleted_public": publicToken(&deleted),
 	})
@@ -239,7 +239,7 @@ func (s *Server) handleMCPMgmtAudit(w http.ResponseWriter, r *http.Request) {
 		date = time.Now().Format("20060102")
 	}
 	if len(date) != 8 {
-		writeJSONStatus(w,http.StatusBadRequest, map[string]string{"error": "date must be YYYYMMDD"})
+		writeJSONStatus(w, http.StatusBadRequest, map[string]string{"error": "date must be YYYYMMDD"})
 		return
 	}
 	tail := 200
@@ -265,7 +265,7 @@ func (s *Server) handleMCPMgmtAudit(w http.ResponseWriter, r *http.Request) {
 	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			writeJSONStatus(w,http.StatusOK, map[string]any{
+			writeJSONStatus(w, http.StatusOK, map[string]any{
 				"date":    date,
 				"path":    path,
 				"exists":  false,
@@ -273,7 +273,7 @@ func (s *Server) handleMCPMgmtAudit(w http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
-		writeJSONStatus(w,http.StatusInternalServerError, map[string]string{"error": "open audit: " + err.Error()})
+		writeJSONStatus(w, http.StatusInternalServerError, map[string]string{"error": "open audit: " + err.Error()})
 		return
 	}
 	defer f.Close()
@@ -296,7 +296,7 @@ func (s *Server) handleMCPMgmtAudit(w http.ResponseWriter, r *http.Request) {
 			buf = buf[len(buf)-tail:]
 		}
 	}
-	writeJSONStatus(w,http.StatusOK, map[string]any{
+	writeJSONStatus(w, http.StatusOK, map[string]any{
 		"date":    date,
 		"path":    path,
 		"exists":  true,
@@ -317,24 +317,25 @@ func (s *Server) handleMCPMgmtToggle(enable bool) http.HandlerFunc {
 			return
 		}
 		if s.config.MCP.Enabled == enable {
-			writeJSONStatus(w,http.StatusOK, map[string]any{
-				"ok":     true,
-				"no_op":  true,
-				"state":  enable,
+			writeJSONStatus(w, http.StatusOK, map[string]any{
+				"ok":    true,
+				"no_op": true,
+				"state": enable,
 			})
 			return
 		}
 		s.config.MCP.Enabled = enable
 		if err := s.config.Save(s.config.ConfigFile); err != nil {
 			s.config.MCP.Enabled = !enable
-			writeJSONStatus(w,http.StatusInternalServerError, map[string]string{"error": "save config: " + err.Error()})
+			writeJSONStatus(w, http.StatusInternalServerError, map[string]string{"error": "save config: " + err.Error()})
 			return
 		}
-		writeJSONStatus(w,http.StatusOK, map[string]any{
-			"ok":             true,
-			"state":          enable,
-			"requires_restart": true,
-			"hint":           "MCP 服务挂载在 admin server 启动时；需要重启 sslcat 主进程才生效。",
+		writeJSONStatus(w, http.StatusOK, map[string]any{
+			"ok":                  true,
+			"state":               enable,
+			"requires_restart":    false,
+			"applied_immediately": true,
+			"hint":                "MCP 服务路由常驻挂载，启停配置会随热重载立即生效；修改 admin_prefix 或 mcp.path_prefix 时仍需重启。",
 		})
 	}
 }

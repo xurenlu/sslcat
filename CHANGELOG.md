@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0-rc8] - 2026-07-09
+
+### Changed
+
+- MCP 服务路由改为启动时常驻挂载，管理后台或 CLI 启停 `mcp.enabled` 后可随配置热重载立即生效，不再需要重启 sslcat 主进程。
+- MCP 默认配置改为开启；未创建 token 时工具调用仍会被鉴权层拒绝，保持默认权限边界。
+- MCP 管理后台与 CLI 启停提示改为“立即生效”，仅修改 `admin_prefix` 或 `mcp.path_prefix` 这类路由路径时仍需要重启。
+
+## [2.3.0-rc7] - 2026-07-08
+
+### Changed
+
+- 默认 systemd 安装统一启用 Go 运行时内存参数 `GOMEMLIMIT=1280MiB`、`GOGC=200`、`GODEBUG=madvdontneed=1`，让长期运行后的空闲堆页更积极归还给 Linux，降低 RSS 高水位残留。
+- README 补充推荐运行时参数说明，并同步 release 安装脚本、源码安装脚本与 systemd 服务模板。
+
 ## [2.3.0-rc6] - 2026-07-08
 
 ### Fixed

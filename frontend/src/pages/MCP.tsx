@@ -171,7 +171,7 @@ const MCPPage: React.FC = () => {
       toast({ status: 'error', title: t.common.error, description: j.error || `HTTP ${r.status}` })
       return
     }
-    toast({ status: 'success', title: t.common.success, description: tt.requiresRestart })
+    toast({ status: 'success', title: t.common.success, description: tt.toggleApplied })
     refreshStatus()
   }
 

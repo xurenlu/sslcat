@@ -192,6 +192,47 @@ func TestSaveConfigEmpty(t *testing.T) {
 	}
 }
 
+func TestSaveConfigPersistsDisabledMCP(t *testing.T) {
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "sslcat.conf")
+
+	testConfig := getDefaultConfig()
+	if !testConfig.MCP.Enabled {
+		t.Fatal("默认配置应启用 MCP")
+	}
+	testConfig.MCP.Enabled = false
+
+	if err := testConfig.Save(configFile); err != nil {
+		t.Fatalf("保存配置失败: %v", err)
+	}
+
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		t.Fatalf("读取配置文件失败: %v", err)
+	}
+
+	var savedConfig map[string]interface{}
+	if err := json.Unmarshal(data, &savedConfig); err != nil {
+		t.Fatalf("解析配置文件失败: %v", err)
+	}
+
+	mcpMap, ok := savedConfig["mcp"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("保存的配置应包含 mcp 字段，实际: %s", string(data))
+	}
+	if enabled, ok := mcpMap["enabled"].(bool); !ok || enabled {
+		t.Fatalf("mcp.enabled 应保存为 false，实际: %#v", mcpMap["enabled"])
+	}
+
+	loadedConfig, err := Load(configFile)
+	if err != nil {
+		t.Fatalf("加载配置失败: %v", err)
+	}
+	if loadedConfig.MCP.Enabled {
+		t.Fatal("重新加载后 MCP 应保持关闭")
+	}
+}
+
 func TestLoadAndSaveRoundTrip(t *testing.T) {
 	// 创建临时目录
 	tempDir := t.TempDir()
@@ -381,4 +422,3 @@ func TestSaveConfigWithZeroValues(t *testing.T) {
 
 	t.Logf("保存的配置文件内容:\n%s", string(data))
 }
-

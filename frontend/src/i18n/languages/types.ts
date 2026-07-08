@@ -2454,7 +2454,7 @@ export interface Translation {
     disable: string
     enableConfirm: string
     disableConfirm: string
-    requiresRestart: string
+    toggleApplied: string
     pathPrefix: string
     streamUrl: string
     healthUrl: string
