@@ -39,7 +39,7 @@ import (
 )
 
 var (
-	version = "2.3.0-rc8"
+	version = "2.3.0-rc9"
 	build   = "dev"
 )
 
@@ -564,11 +564,16 @@ func main() {
 		log.Info("报告生成系统已启动")
 	}
 
-	// 等待信号
-	quit := make(chan os.Signal, 1)
+	// 等待信号。SIGHUP 仅触发配置热重载；SIGINT/SIGTERM 才关闭进程。
+	quit := make(chan os.Signal, 4)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
-	sig := <-quit
-	logrus.Infof("Received signal %v, starting graceful shutdown...", sig)
+	defer signal.Stop(quit)
+	sig := waitForShutdownSignal(quit, configWatcher.ForceReload)
+	if sig != nil {
+		logrus.Infof("Received signal %v, starting graceful shutdown...", sig)
+	} else {
+		logrus.Warn("Signal channel closed, starting graceful shutdown...")
+	}
 
 	// 发送系统关闭通知
 	notificationIntegrator.SendSystemShutdownNotification()

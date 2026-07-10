@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0-rc9] - 2026-07-10
+
+### Fixed
+
+- 修复 systemd 执行 `ExecReload=/bin/kill -HUP $MAINPID` 时主进程误进入优雅停机的问题；`SIGHUP` 现在调用现有配置热重载并继续监听，只有 `SIGINT` / `SIGTERM` 才关闭服务。
+- 为 SIGHUP 成功与失败路径补充回归测试，确保重载失败只记录错误而不会中断代理服务。
+
 ## [2.3.0-rc8] - 2026-07-09
 
 ### Changed
