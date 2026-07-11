@@ -84,17 +84,26 @@ type ThreatIntelManager struct {
 	mutex    sync.RWMutex
 	log      *logrus.Entry
 	stopChan chan struct{}
+	stopOnce sync.Once
+
+	// IOC 持久化采用有界单 worker 队列。SQLite 只有一个写连接，为每条 IOC
+	// 创建 goroutine 只会让大量 goroutine 堵在连接池中。
+	persistenceQueue     chan *IOC
+	persistenceStartOnce sync.Once
+	persistenceWaitGroup sync.WaitGroup
 
 	// 持久化
 	rotator *logger.Rotator
 	DB      *ThreatIntelDB // SQLite数据库（公开以便访问）
 }
 
+const iocPersistenceQueueSize = 512
+
 // GetSources 获取所有数据源（线程安全）
 func (tim *ThreatIntelManager) GetSources() map[string]*ThreatIntelSource {
 	tim.mutex.RLock()
 	defer tim.mutex.RUnlock()
-	
+
 	result := make(map[string]*ThreatIntelSource)
 	for k, v := range tim.sources {
 		result[k] = v
@@ -105,10 +114,11 @@ func (tim *ThreatIntelManager) GetSources() map[string]*ThreatIntelSource {
 // NewThreatIntelManager 创建威胁情报管理器
 func NewThreatIntelManager(cfg *config.Config) *ThreatIntelManager {
 	return &ThreatIntelManager{
-		config:   cfg,
-		sources:  make(map[string]*ThreatIntelSource),
-		iocs:     make(map[string]*IOC),
-		stopChan: make(chan struct{}),
+		config:           cfg,
+		sources:          make(map[string]*ThreatIntelSource),
+		iocs:             make(map[string]*IOC),
+		stopChan:         make(chan struct{}),
+		persistenceQueue: make(chan *IOC, iocPersistenceQueueSize),
 		log: logrus.WithFields(logrus.Fields{
 			"component": "threat_intel_manager",
 		}),
@@ -133,28 +143,36 @@ func (tim *ThreatIntelManager) Start() {
 	// 从数据库加载威胁情报源
 	tim.loadSourcesFromDB()
 
+	// 初始化日志轮转器
+	if rot, err := logger.NewRotator("./data/threat_intel.log", 10*1024*1024, 10); err == nil {
+		tim.rotator = rot
+	}
+
+	// SQLite 写入是串行的。以有界队列施加背压，避免批量情报导入时为每条 IOC
+	// 派生 goroutine，进而耗尽内存和调度器。
+	tim.startPersistenceWorker()
+
 	// 启动更新任务
 	go tim.updateLoop()
 
 	// 启动数据清理任务
 	go tim.cleanupLoop()
 
-	// 初始化日志轮转器
-	if rot, err := logger.NewRotator("./data/threat_intel.log", 10*1024*1024, 10); err == nil {
-		tim.rotator = rot
-	}
 }
 
 // Stop 停止威胁情报管理器
 func (tim *ThreatIntelManager) Stop() {
-	tim.log.Info("Stopping threat intelligence manager")
-	close(tim.stopChan)
-	if tim.rotator != nil {
-		_ = tim.rotator.Close()
-	}
-	if tim.DB != nil {
-		_ = tim.DB.Close()
-	}
+	tim.stopOnce.Do(func() {
+		tim.log.Info("Stopping threat intelligence manager")
+		close(tim.stopChan)
+		tim.persistenceWaitGroup.Wait()
+		if tim.rotator != nil {
+			_ = tim.rotator.Close()
+		}
+		if tim.DB != nil {
+			_ = tim.DB.Close()
+		}
+	})
 }
 
 // initSources 初始化威胁情报源
@@ -226,9 +244,10 @@ func (tim *ThreatIntelManager) initSources() {
 	}
 
 	tim.sources["tor_exit_nodes"] = &ThreatIntelSource{
-		Name:       "Tor Exit Nodes",
-		URL:        "https://check.torproject.org/tor-exit-nodes.txt",
-		Enabled:    true,
+		Name: "Tor Exit Nodes",
+		URL:  "https://check.torproject.org/tor-exit-nodes.txt",
+		// 在部分网络环境中该源长期不可达。默认关闭，管理员仍可在情报源管理中按需启用。
+		Enabled:    false,
 		UpdateFreq: 1 * time.Hour,
 		IOCs:       make(map[string]*IOC),
 	}
@@ -497,9 +516,39 @@ func (tim *ThreatIntelManager) AddIOC(ioc *IOC) {
 	tim.iocs[key] = ioc
 	tim.mutex.Unlock()
 
-	// 异步保存到数据库和日志（避免持锁执行 I/O）
-	go tim.SaveIOCToDB(ioc)
-	go tim.logIOC(ioc)
+	// 通过有界队列异步持久化。队列满时调用方等待，形成背压，避免为每条 IOC
+	// 创建 goroutine 后同时堵塞在 SQLite 单连接的连接池中。
+	select {
+	case <-tim.stopChan:
+		return
+	default:
+	}
+
+	select {
+	case tim.persistenceQueue <- ioc:
+	case <-tim.stopChan:
+	}
+}
+
+func (tim *ThreatIntelManager) startPersistenceWorker() {
+	tim.persistenceStartOnce.Do(func() {
+		tim.persistenceWaitGroup.Add(1)
+		go tim.persistenceLoop()
+	})
+}
+
+func (tim *ThreatIntelManager) persistenceLoop() {
+	defer tim.persistenceWaitGroup.Done()
+
+	for {
+		select {
+		case <-tim.stopChan:
+			return
+		case ioc := <-tim.persistenceQueue:
+			tim.SaveIOCToDB(ioc)
+			tim.logIOC(ioc)
+		}
+	}
 }
 
 // logIOC 记录IOC到日志

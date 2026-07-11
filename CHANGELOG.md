@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0-rc10] - 2026-07-12
+
+### Fixed
+
+- 威胁情报 IOC 持久化改为有界单 worker 队列，避免大批量源（如 blocklist.de）为每条 IOC 派生数据库写入 goroutine，消除 SQLite 单连接下的 goroutine 堆积和内存峰值。
+- 默认停用在部分网络环境中长期不可达的 Tor Exit Nodes 情报源；管理员仍可按需启用。
+
 ## [2.3.0-rc9] - 2026-07-10
 
 ### Fixed
