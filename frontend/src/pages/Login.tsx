@@ -336,6 +336,12 @@ const Login: React.FC = () => {
         return
       }
 
+      if (beginData.rp_origin && window.location.origin !== beginData.rp_origin) {
+        setError(t.settings.webauthnDomainMismatch.replace('{origin}', beginData.rp_origin))
+        setIsLoading(false)
+        return
+      }
+
       // 辅助函数：将 Base64 URL 编码的字符串转换为 ArrayBuffer
       const base64URLToArrayBuffer = (base64URL: string): ArrayBuffer => {
         // Base64 URL 编码使用 - 和 _ 而不是 + 和 /

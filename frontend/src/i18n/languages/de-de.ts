@@ -603,6 +603,7 @@ export const deDE: Translation = {
     webauthnDeleteError: 'Löschen fehlgeschlagen',
     webauthnUserCanceled: 'Benutzer hat Verifizierung abgebrochen',
     webauthnVerificationFailed: 'Biometrische Verifizierung fehlgeschlagen: {error}',
+    webauthnDomainMismatch: 'Die WebAuthn-Verifizierung ist an {origin} gebunden. Bitte öffnen Sie das Admin-Panel unter dieser Adresse, bevor Sie sich registrieren oder anmelden.',
     webauthnGetUserInfoFailed: 'Benutzerinformationen konnten nicht abgerufen werden',
     webauthnBeginRegisterFailed: 'Registrierung konnte nicht gestartet werden',
     webauthnFinishRegisterFailed: 'Registrierung fehlgeschlagen',

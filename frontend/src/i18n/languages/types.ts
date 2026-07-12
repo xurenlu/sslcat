@@ -854,6 +854,7 @@ export interface Translation {
     webauthnDeleteError: string
     webauthnUserCanceled: string
     webauthnVerificationFailed: string
+    webauthnDomainMismatch: string
     webauthnGetUserInfoFailed: string
     webauthnBeginRegisterFailed: string
     webauthnFinishRegisterFailed: string

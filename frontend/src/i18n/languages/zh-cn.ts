@@ -730,6 +730,7 @@ export const zhCN: Translation = {
     webauthnDeleteError: '删除失败',
     webauthnUserCanceled: '用户取消了验证',
     webauthnVerificationFailed: '生物识别验证失败: {error}',
+    webauthnDomainMismatch: '当前 WebAuthn 验证绑定到 {origin}，请使用该地址访问管理面板后再注册或登录。',
     webauthnGetUserInfoFailed: '获取用户信息失败',
     webauthnBeginRegisterFailed: '开始注册失败',
     webauthnFinishRegisterFailed: '注册失败',

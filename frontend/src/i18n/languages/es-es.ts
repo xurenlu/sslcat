@@ -603,6 +603,7 @@ export const esES: Translation = {
     webauthnDeleteError: 'Error al Eliminar',
     webauthnUserCanceled: 'Usuario canceló la verificación',
     webauthnVerificationFailed: 'Verificación biométrica fallida: {error}',
+    webauthnDomainMismatch: 'La verificación WebAuthn está vinculada a {origin}. Acceda al panel de administración desde esa dirección antes de registrarse o iniciar sesión.',
     webauthnGetUserInfoFailed: 'Error al obtener información del usuario',
     webauthnBeginRegisterFailed: 'Error al iniciar registro',
     webauthnFinishRegisterFailed: 'Registro fallido',

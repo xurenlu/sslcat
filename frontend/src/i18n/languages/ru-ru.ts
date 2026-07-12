@@ -603,6 +603,7 @@ export const ruRU: Translation = {
     webauthnDeleteError: 'Удаление Не Удалось',
     webauthnUserCanceled: 'Пользователь отменил проверку',
     webauthnVerificationFailed: 'Биометрическая проверка не удалась: {error}',
+    webauthnDomainMismatch: 'Проверка WebAuthn привязана к {origin}. Перед регистрацией или входом откройте панель управления по этому адресу.',
     webauthnGetUserInfoFailed: 'Не удалось получить информацию о пользователе',
     webauthnBeginRegisterFailed: 'Не удалось начать регистрацию',
     webauthnFinishRegisterFailed: 'Регистрация не удалась',

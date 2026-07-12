@@ -603,6 +603,7 @@ export const jaJP: Translation = {
     webauthnDeleteError: '削除に失敗しました',
     webauthnUserCanceled: 'ユーザーが認証をキャンセルしました',
     webauthnVerificationFailed: '生体認証に失敗しました: {error}',
+    webauthnDomainMismatch: 'WebAuthn 認証は {origin} に紐付けられています。登録またはログインする前に、このアドレスで管理パネルを開いてください。',
     webauthnGetUserInfoFailed: 'ユーザー情報の取得に失敗しました',
     webauthnBeginRegisterFailed: '登録の開始に失敗しました',
     webauthnFinishRegisterFailed: '登録に失敗しました',

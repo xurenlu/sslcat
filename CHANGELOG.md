@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0-rc4] - 2026-07-12
+
+### Fixed
+
+- WebAuthn 注册和登录的 begin API 现在返回实际绑定的 RP Origin；管理面板在调用浏览器生物识别前检查当前访问地址，不匹配时直接提示用户应使用的完整地址，避免显示难懂的浏览器 RP ID 错误。
+
 ## [2.4.0-rc3] - 2026-07-12
 
 ### Fixed

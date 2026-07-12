@@ -390,6 +390,10 @@ const FirstTimeSetup: React.FC = () => {
         throw new Error(beginData.error || '开始注册失败')
       }
 
+      if (beginData.rp_origin && window.location.origin !== beginData.rp_origin) {
+        throw new Error(t.settings.webauthnDomainMismatch.replace('{origin}', beginData.rp_origin))
+      }
+
       // 辅助函数：将 Base64 URL 编码的字符串转换为 ArrayBuffer
       const base64URLToArrayBuffer = (base64URL: string): ArrayBuffer => {
         const base64 = base64URL.replace(/-/g, '+').replace(/_/g, '/')
@@ -1083,4 +1087,3 @@ const FirstTimeSetup: React.FC = () => {
 }
 
 export default FirstTimeSetup
-

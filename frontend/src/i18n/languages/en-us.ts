@@ -734,6 +734,7 @@ export const enUS: Translation = {
     webauthnDeleteError: 'Delete Failed',
     webauthnUserCanceled: 'User canceled verification',
     webauthnVerificationFailed: 'Biometric verification failed: {error}',
+    webauthnDomainMismatch: 'WebAuthn verification is bound to {origin}. Please access the admin panel at that address before registering or signing in.',
     webauthnGetUserInfoFailed: 'Failed to get user information',
     webauthnBeginRegisterFailed: 'Failed to start registration',
     webauthnFinishRegisterFailed: 'Registration failed',

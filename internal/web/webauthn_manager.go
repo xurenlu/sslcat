@@ -63,6 +63,8 @@ type WebAuthnManager struct {
 	db       *sql.DB
 	webauthn *webauthn.WebAuthn
 	dbPath   string
+	rpID     string
+	rpOrigin string
 	log      WebAuthnLogger
 }
 
@@ -96,9 +98,11 @@ func NewWebAuthnManager(log WebAuthnLogger, dataDir string, rpID string, rpOrigi
 	db.SetConnMaxLifetime(5 * time.Minute)
 
 	manager := &WebAuthnManager{
-		db:     db,
-		dbPath: dbPath,
-		log:    log,
+		db:       db,
+		dbPath:   dbPath,
+		rpID:     rpID,
+		rpOrigin: rpOrigin,
+		log:      log,
 	}
 
 	// 初始化数据库表
@@ -123,6 +127,16 @@ func NewWebAuthnManager(log WebAuthnLogger, dataDir string, rpID string, rpOrigi
 	manager.webauthn = wa
 
 	return manager, nil
+}
+
+// RPID 返回当前 WebAuthn 凭证绑定的 relying party ID。
+func (wm *WebAuthnManager) RPID() string {
+	return wm.rpID
+}
+
+// RPOrigin 返回当前 WebAuthn 凭证绑定的访问来源。
+func (wm *WebAuthnManager) RPOrigin() string {
+	return wm.rpOrigin
 }
 
 // initDatabase 初始化数据库表
@@ -317,4 +331,3 @@ func (wm *WebAuthnManager) GetUser(username string) (*WebAuthnUser, error) {
 		Credentials: webauthnCreds,
 	}, nil
 }
-

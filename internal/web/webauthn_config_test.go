@@ -29,3 +29,17 @@ func TestResolveWebAuthnRelyingPartyRejectsMismatchedOrigin(t *testing.T) {
 		t.Fatal("expected origin mismatch error")
 	}
 }
+
+func TestWebAuthnManagerRelyingPartyMetadata(t *testing.T) {
+	manager := &WebAuthnManager{
+		rpID:     "h1.niuwoai.com",
+		rpOrigin: "https://h1.niuwoai.com",
+	}
+
+	if got := manager.RPID(); got != "h1.niuwoai.com" {
+		t.Fatalf("RPID() = %q", got)
+	}
+	if got := manager.RPOrigin(); got != "https://h1.niuwoai.com" {
+		t.Fatalf("RPOrigin() = %q", got)
+	}
+}

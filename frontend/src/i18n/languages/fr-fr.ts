@@ -603,6 +603,7 @@ export const frFR: Translation = {
     webauthnDeleteError: 'Échec de la Suppression',
     webauthnUserCanceled: 'Utilisateur a annulé la vérification',
     webauthnVerificationFailed: 'Vérification biométrique échouée: {error}',
+    webauthnDomainMismatch: 'La vérification WebAuthn est associée à {origin}. Accédez au panneau d’administration à cette adresse avant de vous inscrire ou de vous connecter.',
     webauthnGetUserInfoFailed: 'Échec de récupération des informations utilisateur',
     webauthnBeginRegisterFailed: 'Échec du démarrage de l\'enregistrement',
     webauthnFinishRegisterFailed: 'Échec de l\'enregistrement',

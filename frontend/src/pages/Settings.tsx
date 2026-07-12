@@ -234,6 +234,10 @@ const Settings: React.FC = () => {
         throw new Error(beginData.error || t.settings.webauthnBeginRegisterFailed)
       }
 
+      if (beginData.rp_origin && window.location.origin !== beginData.rp_origin) {
+        throw new Error(t.settings.webauthnDomainMismatch.replace('{origin}', beginData.rp_origin))
+      }
+
       // 调试：打印接收到的数据
       console.log('WebAuthn beginData:', JSON.stringify(beginData, null, 2))
       console.log('beginData.options:', beginData.options)

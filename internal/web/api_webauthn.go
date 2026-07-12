@@ -173,6 +173,8 @@ func (s *Server) handleAPIWebAuthnBeginRegistration(w http.ResponseWriter, r *ht
 		"options":     publicKeyOptions, // 直接返回 publicKeyOptions，不再包装
 		"session_key": sessionKey,
 		"device_name": req.DeviceName,
+		"rp_id":       s.webauthnManager.RPID(),
+		"rp_origin":   s.webauthnManager.RPOrigin(),
 	})
 }
 
@@ -389,6 +391,8 @@ func (s *Server) handleAPIWebAuthnBeginLogin(w http.ResponseWriter, r *http.Requ
 		"success":     true,
 		"options":     publicKeyOptions, // 直接返回 publicKeyOptions，不再包装
 		"session_key": sessionKey,
+		"rp_id":       s.webauthnManager.RPID(),
+		"rp_origin":   s.webauthnManager.RPOrigin(),
 	})
 }
 
