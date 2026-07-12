@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0-rc1] - 2026-07-12
+
+### Fixed
+
+- 修复未识别的裸参数（例如误输入 `sslcat reset-passwords`）会被 flag 解析器忽略、进而误启动服务的问题；现在会明确报错退出并提示查看帮助。
+
 ## [2.4.0] - 2026-07-12
 
 ### Added

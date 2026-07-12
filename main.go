@@ -39,7 +39,7 @@ import (
 )
 
 var (
-	version = "2.4.0"
+	version = "2.4.0-rc1"
 	build   = "dev"
 )
 
@@ -143,6 +143,11 @@ func main() {
 	)
 
 	flag.Parse()
+	if err := rejectUnexpectedPositionalArguments(flag.Args()); err != nil {
+		fmt.Fprintf(os.Stderr, "❌ %v\n", err)
+		fmt.Fprintln(os.Stderr, "💡 提示: 使用 'sslcat help' 查看所有可用命令")
+		os.Exit(1)
+	}
 
 	if *showVersion {
 		ver := strings.TrimPrefix(version, "v")
@@ -634,6 +639,13 @@ func findCLICommandIndex(cliManager *cli.Manager, args []string) int {
 		}
 	}
 	return -1
+}
+
+func rejectUnexpectedPositionalArguments(args []string) error {
+	if len(args) == 0 {
+		return nil
+	}
+	return fmt.Errorf("unknown command or argument: %s", args[0])
 }
 
 // filteredErrorLog 过滤频繁的 TLS handshake 错误日志
