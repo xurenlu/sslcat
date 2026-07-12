@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	_ "net/http/pprof" // 导入 pprof 用于性能分析
 	"os"
@@ -454,53 +453,23 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	server.sessionManager = sessionManager
 	server.log.Infof("会话管理器已初始化，存储类型: %s，数据目录: %s", sessionStorage, dataDir)
 
-	// 初始化 WebAuthn 管理器
-	// 确定 RPID 和 RPOrigin
-	// WebAuthn 要求 RPID 必须是有效的域名，不能是 IP 地址
-	rpID := cfg.Server.Host
-	if rpID == "" || rpID == "0.0.0.0" {
-		rpID = "localhost"
-	}
-	// 移除端口号（如果有）
-	if idx := strings.Index(rpID, ":"); idx != -1 {
-		rpID = rpID[:idx]
-	}
-	// 检查是否是 IP 地址，如果是则使用 localhost
-	if net.ParseIP(rpID) != nil {
-		rpID = "localhost"
-	}
-
-	// 确定 RPOrigin
-	port := 8080
-	if cfg.Server.PortMode == "custom" && cfg.Server.CustomPort != 0 {
-		port = cfg.Server.CustomPort
-	}
-
-	protocol := "http"
-	if cfg.Server.EnableHTTPS || port == 443 {
-		protocol = "https"
-	}
-
-	// 构建 RPOrigin（标准端口不需要显示端口号）
-	var rpOrigin string
-	if (protocol == "http" && port == 80) || (protocol == "https" && port == 443) {
-		rpOrigin = fmt.Sprintf("%s://%s", protocol, rpID)
-	} else {
-		rpOrigin = fmt.Sprintf("%s://%s:%d", protocol, rpID, port)
-	}
-
-	webauthnManager, err := NewWebAuthnManager(
-		server.log.WithField("component", "webauthn"),
-		dataDir,
-		rpID,
-		rpOrigin,
-	)
+	// WebAuthn 必须使用实际对外访问的域名，而不是监听地址（如 0.0.0.0）。
+	rpID, rpOrigin, err := resolveWebAuthnRelyingParty(cfg.Server)
 	if err != nil {
-		server.log.Warnf("WebAuthn 初始化失败（功能将不可用）: %v", err)
-		// 不阻止服务器启动，WebAuthn 功能将不可用
+		server.log.Warnf("WebAuthn 配置无效（功能将不可用）: %v", err)
 	} else {
-		server.webauthnManager = webauthnManager
-		server.log.Infof("WebAuthn 管理器已初始化，RPID: %s, RPOrigin: %s", rpID, rpOrigin)
+		webauthnManager, err := NewWebAuthnManager(
+			server.log.WithField("component", "webauthn"),
+			dataDir,
+			rpID,
+			rpOrigin,
+		)
+		if err != nil {
+			server.log.Warnf("WebAuthn 初始化失败（功能将不可用）: %v", err)
+		} else {
+			server.webauthnManager = webauthnManager
+			server.log.Infof("WebAuthn 管理器已初始化，RPID: %s, RPOrigin: %s", rpID, rpOrigin)
+		}
 	}
 
 	// 设置通知集成器

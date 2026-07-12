@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0-rc2] - 2026-07-12
+
+### Fixed
+
+- WebAuthn 改用显式的 `server.webauthn_rp_id` 与 `server.webauthn_rp_origin`，不再把 `0.0.0.0` 等监听地址错误推导为 `localhost`；启动时校验 RP ID 与 Origin 的域名关系。
+
 ## [2.4.0-rc1] - 2026-07-12
 
 ### Fixed

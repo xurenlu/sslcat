@@ -33,12 +33,26 @@ go mod tidy
 
 WebAuthn 需要配置以下参数：
 
-1. **RPID (Relying Party ID)**: 通常是你的域名（不含协议和端口）
+1. **RPID (Relying Party ID)**: 在 `server.webauthn_rp_id` 中配置实际管理面板域名（不含协议和端口）
    - 例如：`example.com` 或 `sslcat.example.com`
    - 不能是 `localhost`（生产环境）
 
-2. **RPOrigin**: 完整的源地址
+2. **RPOrigin**: 在 `server.webauthn_rp_origin` 中配置完整的源地址
    - 例如：`https://sslcat.example.com` 或 `http://localhost:8080`（开发环境）
+
+配置示例：
+
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "webauthn_rp_id": "h1.niuwoai.com",
+    "webauthn_rp_origin": "https://h1.niuwoai.com"
+  }
+}
+```
+
+`server.host` 是监听地址，不能替代 WebAuthn 的公网域名。修改 RP ID / Origin 后需要重启 sslcat。
 
 ## 初始化 WebAuthn 管理器
 
@@ -222,4 +236,3 @@ await fetch('/api/webauthn/register/finish', {
 - [ ] 在设置页面添加 WebAuthn 管理界面
 - [ ] 在登录页面添加 WebAuthn 登录选项
 - [ ] 测试各种浏览器和设备
-

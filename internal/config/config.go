@@ -69,6 +69,9 @@ type ServerConfig struct {
 	PortMode    string `json:"port_mode"`    // "standard" | "custom" (默认 "standard")
 	CustomPort  int    `json:"custom_port"`  // 自定义端口（仅在 custom 模式生效）
 	EnableHTTPS bool   `json:"enable_https"` // 是否启用 HTTPS（默认 true）
+	// WebAuthn 依赖方配置。监听地址（如 0.0.0.0）不能作为公网 RP ID 使用。
+	WebAuthnRPID     string `json:"webauthn_rp_id"`
+	WebAuthnRPOrigin string `json:"webauthn_rp_origin"`
 
 	// HTTP/2 配置
 	HTTP2Enabled bool         `json:"http2_enabled"` // 是否启用 HTTP/2（默认 false）

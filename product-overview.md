@@ -41,6 +41,7 @@ SSLcat 是一个集成 SSL 证书管理、反向代理、WAF、安全审计、�
 
 ## 版本记录
 
+- `2.4.0-rc2`：修复 WebAuthn 将监听地址错误推导为 RP ID 的问题。新增 `server.webauthn_rp_id` 与 `server.webauthn_rp_origin`，可明确绑定实际公网域名与 HTTPS Origin。
 - `2.4.0-rc1`：修复未识别的裸 CLI 参数会被忽略、继而启动服务的问题；例如误输入 `sslcat reset-passwords` 现会明确报错退出。
 - `2.4.0`：新增 `sslcat reset-password` 主程序命令。该命令仅允许 root / sudo 执行，密码仅经交互式终端双次输入，以 bcrypt 原子写入管理员密码文件并设为 `0600`，不会出现在参数或进程列表中。
 - `2.3.0-rc9`：修复 systemd `ExecReload` 发送 `SIGHUP` 时误关闭 sslcat 的问题；SIGHUP 改为进程内配置热重载并保持服务在线，同时补充信号路径回归测试。
