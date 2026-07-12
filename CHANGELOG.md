@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-07-12
+
+### Added
+
+- 新增主程序命令 `sslcat reset-password`：仅允许 root 或 `sudo` 执行，交互式双次输入密码并以 bcrypt 哈希、原子替换和 `0600` 文件权限重置管理员密码；密码不再经过命令行参数或进程列表。
+
 ## [2.3.0-rc10] - 2026-07-12
 
 ### Fixed

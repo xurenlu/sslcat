@@ -39,7 +39,7 @@ import (
 )
 
 var (
-	version = "2.3.0-rc10"
+	version = "2.4.0"
 	build   = "dev"
 )
 
@@ -614,6 +614,7 @@ func newCLIManager() *cli.Manager {
 	cliManager := cli.NewManager()
 	cliManager.SetVersion(version, build)
 	cliManager.RegisterOpsCommands()
+	cliManager.RegisterPasswordCommands()
 	cliManager.RegisterConfigCommands()
 	cliManager.RegisterProxyCommands()
 	cliManager.RegisterSiteCommands()

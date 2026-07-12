@@ -12,7 +12,7 @@ SSLcat 是一个集成 SSL 证书管理、反向代理、WAF、安全审计、�
 - WAF、DDoS、防爆破、IP/UA/TLS 指纹封禁和白名单管理。
 - 运行监控、慢请求分析、缓存、压缩和图片优化。
 - **MCP（Model Context Protocol）内置服务**：sslcat 自身即是 MCP server，可被 Claude / Cursor / Cherry Studio 等 AI 客户端直接调用，AI 通过 tool 调用即可完成站点、证书、转发的查询与管理，并能读取近期内部错误、访问日志和所有站点 error log。默认开启；调用工具前仍需通过 `sslcat mcp token create` 颁发独立 token，支持 scope、IP 白名单、速率限制与审计日志。
-- **CLI 运维能力**：`status` / `doctor` 输出配置摘要与本地自检；`site` 管理静态/PHP 站点；`proxy health-check` 探测上游后端；支持 `--json` 输出和命令前置 `-config`，方便脚本、监控和故障现场使用。
+- **CLI 运维能力**：`status` / `doctor` 输出配置摘要与本地自检；`site` 管理静态/PHP 站点；`proxy health-check` 探测上游后端；`reset-password` 仅允许 root / sudo 交互式重置管理员密码；支持 `--json` 输出和命令前置 `-config`，方便脚本、监控和故障现场使用。
 
 ## 当前设计取向
 
@@ -41,6 +41,7 @@ SSLcat 是一个集成 SSL 证书管理、反向代理、WAF、安全审计、�
 
 ## 版本记录
 
+- `2.4.0`：新增 `sslcat reset-password` 主程序命令。该命令仅允许 root / sudo 执行，密码仅经交互式终端双次输入，以 bcrypt 原子写入管理员密码文件并设为 `0600`，不会出现在参数或进程列表中。
 - `2.3.0-rc9`：修复 systemd `ExecReload` 发送 `SIGHUP` 时误关闭 sslcat 的问题；SIGHUP 改为进程内配置热重载并保持服务在线，同时补充信号路径回归测试。
 - `2.3.0-rc8`：MCP 路由改为启动时常驻挂载，启停开关随配置热重载立即生效；默认配置开启 MCP，但没有 token 时工具调用仍会被拒绝。
 - `2.3.0-rc7`：systemd 默认内存参数统一为内存优先配置，并在 README 与各安装脚本中写明推荐启动方式。

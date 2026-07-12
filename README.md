@@ -219,19 +219,15 @@ If you forget your web management interface login password, you can reset it usi
 # 进入 sslcat 目录 / Go to sslcat directory
 cd /opt/sslcat  # 或你的 sslcat 安装目录 / or your sslcat installation directory
 
-# 重置密码 / Reset password
-# 用法: go run tools/cmd/reset_password/main.go <用户名> <新密码>
-# Usage: go run tools/cmd/reset_password/main.go <username> <new_password>
-go run tools/cmd/reset_password/main.go admin "your_new_password"
-
-# 示例 / Example:
-go run tools/cmd/reset_password/main.go admin "MyNewPass123!"
+# 重置密码 / Reset password（仅 root / sudo 可执行）
+# Reset password (root / sudo only)
+sudo sslcat reset-password
 ```
 
 **注意 / Note**:
-- 密码必须包含字母和数字 / Password must contain letters and numbers
+- 密码必须至少 10 位，并包含至少三类字符（大写、小写、数字、符号） / Password must be at least 10 characters and include at least three character classes
+- 重置命令会交互式要求输入两次密码；不会从命令行参数读取密码 / The command asks for the password twice interactively and never accepts it as an argument
 - 重置后无需重启服务 / No need to restart service after reset
-- 默认管理员账号 / Default admin account: `admin` / `admin*9527`
 
 ---
 
