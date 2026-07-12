@@ -157,6 +157,7 @@ sslcat_*.tar.gz
 *.jpeg
 *.gif
 *.ico
+!internal/assets/logo.png
 
 # Binary files
 *.bin

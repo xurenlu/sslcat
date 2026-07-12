@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0-rc3] - 2026-07-12
+
+### Fixed
+
+- 修复带管理前缀部署时 Logo 依赖被 `.gitignore` 排除的 Vite 哈希 PNG，导致发布二进制缺少图片的问题；Logo 现由 Go 直接嵌入并通过 `<admin_prefix>/logo.png` 稳定提供。
+
 ## [2.4.0-rc2] - 2026-07-12
 
 ### Fixed

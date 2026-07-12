@@ -22,7 +22,6 @@ import {
 import { Link as RouterLink, useLocation } from 'react-router-dom'
 import { useTranslation } from '../hooks/useLanguage'
 import { useConfig, buildPath } from '../contexts/ConfigContext'
-import logoImage from '../logo.png'
 import {
   FiHome,
   FiSettings,
@@ -128,8 +127,7 @@ const SidebarContent = () => {
   const { adminPrefix, version } = useConfig()
   const [searchQuery, setSearchQuery] = useState('')
   
-  // 构建带有 adminPrefix 的 logo 路径
-  const logoSrc = `${adminPrefix}${logoImage}`
+  const logoSrc = `${adminPrefix}/logo.png`
 
   const categories = useMemo(() => [
     {

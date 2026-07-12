@@ -20,6 +20,7 @@ func (s *Server) setupFrontendRoutes() {
 
 	// 静态资源路由 (JS, CSS, 图片等)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/assets/", s.handleFrontendAssets)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/logo.png", s.handleFrontendLogo)
 
 	// SPA 入口路由 - 返回 index.html
 	s.mux.HandleFunc(s.config.AdminPrefix+"/spa/", s.handleSPA)
@@ -47,6 +48,20 @@ func (s *Server) setupFrontendRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/php-sites", s.handleSPA)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/tokens", s.handleSPA)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/ai-security", s.handleSPA)
+}
+
+func (s *Server) handleFrontendLogo(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(assets.LogoPNG)))
+	if r.Method == http.MethodHead {
+		return
+	}
+	_, _ = w.Write(assets.LogoPNG)
 }
 
 // handleFrontendAssets 处理前端静态资源

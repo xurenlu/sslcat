@@ -9,6 +9,9 @@ import (
 //go:embed all:frontend
 var frontendFiles embed.FS
 
+//go:embed logo.png
+var LogoPNG []byte
+
 // GetFrontendFS 返回前端静态文件的文件系统
 func GetFrontendFS() (fs.FS, error) {
 	return fs.Sub(frontendFiles, "frontend")

@@ -1,7 +1,7 @@
 {
   "name": "sslcat-frontend",
   "private": true,
-  "version": "2.4.0-rc2",
+  "version": "2.4.0-rc3",
   "packageManager": "yarn@4.15.0",
   "type": "module",
   "scripts": {
