@@ -90,11 +90,11 @@ fi
 
 echo ""
 echo "【6】pprof 状态"
-if curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1/debug/pprof/" 2>/dev/null | grep -q 200; then
-  echo "  pprof 已启用: http://127.0.0.1/debug/pprof/"
-  echo "  抓 CPU 30s: curl -o cpu.prof 'http://127.0.0.1/debug/pprof/profile?seconds=30'"
+if curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:6060/debug/pprof/" 2>/dev/null | grep -q 200; then
+  echo "  pprof 已启用: http://127.0.0.1:6060/debug/pprof/"
+  echo "  抓 CPU 30s: curl -o cpu.prof 'http://127.0.0.1:6060/debug/pprof/profile?seconds=30'"
 else
-  echo "  pprof 未启用，在配置中设置 server.enable_pprof: true 后重启"
+  echo "  pprof 未启用，在配置中设置 server.enable_pprof: true、server.pprof_addr: 127.0.0.1:6060 后重启"
 fi
 
 echo ""

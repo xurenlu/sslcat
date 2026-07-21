@@ -203,6 +203,11 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=sslcat
 
+# Go 运行时内存管理优化 - 优先控制长期运行后的 RSS 高水位残留
+Environment="GOMEMLIMIT=1280MiB"
+Environment="GOGC=200"
+Environment="GODEBUG=madvdontneed=1"
+
 # 安全设置
 NoNewPrivileges=true
 PrivateTmp=true

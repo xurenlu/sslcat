@@ -57,62 +57,6 @@ type Config struct {
 	MCP MCPConfig `json:"mcp"`
 }
 
-// ServerConfig 服务器配置
-type ServerConfig struct {
-	Host        string `json:"host"`
-	Port        int    `json:"port"` // 向后兼容，保留原字段
-	Debug       bool   `json:"debug"`
-	LogLevel    string `json:"log_level"`    // debug|info|warn|error
-	EnablePprof bool   `json:"enable_pprof"` // 是否启用 pprof 性能分析端点
-
-	// 新的端口配置
-	PortMode    string `json:"port_mode"`    // "standard" | "custom" (默认 "standard")
-	CustomPort  int    `json:"custom_port"`  // 自定义端口（仅在 custom 模式生效）
-	EnableHTTPS bool   `json:"enable_https"` // 是否启用 HTTPS（默认 true）
-	// WebAuthn 依赖方配置。监听地址（如 0.0.0.0）不能作为公网 RP ID 使用。
-	WebAuthnRPID     string `json:"webauthn_rp_id"`
-	WebAuthnRPOrigin string `json:"webauthn_rp_origin"`
-
-	// HTTP/2 配置
-	HTTP2Enabled bool         `json:"http2_enabled"` // 是否启用 HTTP/2（默认 false）
-	HTTP2Config  *HTTP2Config `json:"http2_config,omitempty"`
-
-	// HTTP/3 配置
-	HTTP3Enabled bool         `json:"http3_enabled"` // 是否启用 HTTP/3（默认 false）
-	HTTP3Config  *HTTP3Config `json:"http3_config,omitempty"`
-
-	// 访问日志
-	AccessLogEnabled  bool   `json:"access_log_enabled"`
-	AccessLogFormat   string `json:"access_log_format"` // nginx|apache|json
-	AccessLogPath     string `json:"access_log_path"`
-	AccessLogMaxSize  int64  `json:"access_log_max_size"` // bytes
-	AccessLogMaxFiles int    `json:"access_log_max_files"`
-
-	// 错误日志
-	ErrorLogEnabled  bool   `json:"error_log_enabled"`
-	ErrorLogPath     string `json:"error_log_path"`
-	ErrorLogMaxSize  int64  `json:"error_log_max_size"` // bytes
-	ErrorLogMaxFiles int    `json:"error_log_max_files"`
-
-	// 共享内存缓存
-	SharedCacheMaxSizeMB int    `json:"shared_cache_max_size_mb"` // 共享缓存最大容量（MB）
-	CacheBackendType     string `json:"cache_backend_type"`       // 缓存后端类型：bigcache/simple/auto（默认simple）
-
-	// 客户端连接超时（秒）
-	ReadTimeoutSec  int `json:"read_timeout_sec"`
-	WriteTimeoutSec int `json:"write_timeout_sec"`
-	IdleTimeoutSec  int `json:"idle_timeout_sec"`
-	// 最大上传大小（字节），用于限制 multipart 上传体积
-	MaxUploadBytes int64 `json:"max_upload_bytes"`
-
-	// Session 存储配置
-	SessionStorage string `json:"session_storage"` // memory|file (默认 file)
-	DataDir        string `json:"data_dir"`        // 数据目录（用于文件存储）
-
-	// 安全密钥（用于 Token 签名等）
-	SecretKey string `json:"secret_key"`
-}
-
 // SSLConfig SSL证书配置
 type SSLConfig struct {
 	Email             string   `json:"email"`
@@ -195,17 +139,6 @@ type AdminConfig struct {
 	EnableTOTP     bool   `json:"enable_totp"`
 	TOTPSecret     string `json:"totp_secret,omitempty"`
 	TOTPSecretFile string `json:"totp_secret_file"`
-}
-
-// ProxyConfig 代理配置
-type ProxyConfig struct {
-	Rules []ProxyRule `json:"rules"`
-	// 未命中代理规则时的行为: "404" | "302" | "blank" | "502"
-	UnmatchedBehavior string `json:"unmatched_behavior"`
-	// 当 UnmatchedBehavior=="302" 时的跳转URL
-	UnmatchedRedirectURL string `json:"unmatched_redirect_url"`
-	// 全局默认：等待后端响应头超时（秒），单条规则未设置时使用，默认 10
-	DefaultResponseHeaderTimeoutSec int `json:"default_response_header_timeout_sec"`
 }
 
 // ProxyRule 代理规则
@@ -985,6 +918,7 @@ func Load(configFile string) (*Config, error) {
 			Debug:       false,
 			LogLevel:    "info", // 默认日志级别
 			EnablePprof: false,  // 默认禁用 pprof
+			PprofAddr:   "127.0.0.1:6060",
 			// 新的端口配置默认值
 			PortMode:             "standard", // 默认标准模式
 			CustomPort:           18080,      // 默认自定义端口
@@ -1027,9 +961,13 @@ func Load(configFile string) (*Config, error) {
 			TOTPSecretFile: "./data/admin.totp",
 		},
 		Proxy: ProxyConfig{
-			Rules:                []ProxyRule{},
-			UnmatchedBehavior:    "503", // 默认使用低成本 503，减少未匹配域名的资源消耗
-			UnmatchedRedirectURL: "",
+			Rules:                           []ProxyRule{},
+			UnmatchedBehavior:               "503", // 默认使用低成本 503，减少未匹配域名的资源消耗
+			UnmatchedRedirectURL:            "",
+			DefaultResponseHeaderTimeoutSec: 10,
+			MaxIdleConns:                    1024,
+			MaxIdleConnsPerHost:             256,
+			MaxConnsPerHost:                 256,
 		},
 		CDNCache: CDNCacheConfig{
 			Enabled:           false,
@@ -1612,6 +1550,7 @@ func getDefaultConfig() *Config {
 			Debug:             false,
 			LogLevel:          "info",
 			EnablePprof:       false,
+			PprofAddr:         "127.0.0.1:6060",
 			PortMode:          "standard",
 			CustomPort:        18080,
 			EnableHTTPS:       true,
@@ -1652,9 +1591,13 @@ func getDefaultConfig() *Config {
 			TOTPSecretFile: "./data/admin.totp",
 		},
 		Proxy: ProxyConfig{
-			Rules:                []ProxyRule{},
-			UnmatchedBehavior:    "503", // 默认使用低成本 503，减少未匹配域名的资源消耗
-			UnmatchedRedirectURL: "",
+			Rules:                           []ProxyRule{},
+			UnmatchedBehavior:               "503", // 默认使用低成本 503，减少未匹配域名的资源消耗
+			UnmatchedRedirectURL:            "",
+			DefaultResponseHeaderTimeoutSec: 10,
+			MaxIdleConns:                    1024,
+			MaxIdleConnsPerHost:             256,
+			MaxConnsPerHost:                 256,
 		},
 		CDNCache: CDNCacheConfig{
 			Enabled:           false,

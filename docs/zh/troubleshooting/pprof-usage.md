@@ -6,11 +6,24 @@ pprof 是 Go 内置的性能分析工具，通过 HTTP 端点提供实时性能�
 
 ## 访问 pprof
 
-pprof 端点已经集成到 SSLcat 中，可以通过以下地址访问：
+pprof 使用独立监听器，默认只绑定 loopback，不会出现在 80/443 或自定义业务端口：
 
 ```
-http://localhost:18080/debug/pprof/
+http://127.0.0.1:6060/debug/pprof/
 ```
+
+配置示例：
+
+```json
+{
+  "server": {
+    "enable_pprof": true,
+    "pprof_addr": "127.0.0.1:6060"
+  }
+}
+```
+
+`pprof_addr` 只接受 `127.0.0.0/8`、`::1` 或 `localhost`；通配地址、私网地址和公网地址都会使服务拒绝启动。
 
 ### 主要端点
 
@@ -27,18 +40,18 @@ http://localhost:18080/debug/pprof/
 ### 1. 查看内存使用情况
 
 ```bash
-# 在浏览器中打开
-http://your-server:18080/debug/pprof/heap
+# 在服务器本机或 SSH 隧道另一端打开
+http://127.0.0.1:6060/debug/pprof/heap
 
 # 或使用 go tool pprof
-go tool pprof http://your-server:18080/debug/pprof/heap
+go tool pprof http://127.0.0.1:6060/debug/pprof/heap
 ```
 
 ### 2. 分析 CPU 性能
 
 ```bash
 # 采集 30 秒的 CPU profile
-go tool pprof http://your-server:18080/debug/pprof/profile?seconds=30
+go tool pprof 'http://127.0.0.1:6060/debug/pprof/profile?seconds=30'
 
 # 在交互式界面中可以使用以下命令：
 # top - 查看占用资源最多的函数
@@ -50,7 +63,7 @@ go tool pprof http://your-server:18080/debug/pprof/profile?seconds=30
 
 ```bash
 # 查看 goroutine 堆栈
-go tool pprof http://your-server:18080/debug/pprof/goroutine
+go tool pprof http://127.0.0.1:6060/debug/pprof/goroutine
 
 # 交互式命令：
 # top - 查看 goroutine 数量最多的函数
@@ -61,9 +74,9 @@ go tool pprof http://your-server:18080/debug/pprof/goroutine
 
 ```bash
 # 下载 2 个不同时间点的 heap profile
-curl http://your-server:18080/debug/pprof/heap > heap1.pprof
+curl http://127.0.0.1:6060/debug/pprof/heap > heap1.pprof
 sleep 60
-curl http://your-server:18080/debug/pprof/heap > heap2.pprof
+curl http://127.0.0.1:6060/debug/pprof/heap > heap2.pprof
 
 # 比较差异
 go tool pprof -base heap1.pprof heap2.pprof
@@ -71,41 +84,20 @@ go tool pprof -base heap1.pprof heap2.pprof
 
 ## 生产环境使用注意事项
 
-### 1. 添加认证保护
+### 1. 不要通过反向代理暴露 pprof
 
-在生产环境中，建议为 pprof 端点添加认证保护：
+不要在 nginx、sing-box、SSLcat 代理规则或容器端口映射中把 6060 暴露到公网/内网。heap、goroutine 等 profile 可能包含内部路径和内存数据。
 
-```go
-s.mux.HandleFunc("/debug/pprof/", func(w http.ResponseWriter, r *http.Request) {
-    // 检查是否为认证用户
-    if !s.isAuthenticatedAdmin(r) {
-        http.Error(w, "Unauthorized", http.StatusUnauthorized)
-        return
-    }
-    http.DefaultServeMux.ServeHTTP(w, r)
-})
-```
-
-### 2. 限制访问
-
-如果服务器部署在内部网络，可以通过防火墙限制访问：
-
-```bash
-# 只允许本地访问
-iptables -A INPUT -p tcp --dport 18080 -s 127.0.0.1 -j ACCEPT
-iptables -A INPUT -p tcp --dport 18080 -j DROP
-```
-
-### 3. 使用 SSH 隧道
+### 2. 使用 SSH 隧道
 
 如果服务器是远程的，可以使用 SSH 隧道：
 
 ```bash
 # 在本地建立隧道
-ssh -L 18080:localhost:18080 rocky@shifen.de
+ssh -L 6060:127.0.0.1:6060 user@your-server
 
 # 然后在本地访问
-http://localhost:18080/debug/pprof/
+http://127.0.0.1:6060/debug/pprof/
 ```
 
 ## 实际应用场景
@@ -114,10 +106,10 @@ http://localhost:18080/debug/pprof/
 
 ```bash
 # 1. 先获取当前 heap
-go tool pprof http://shifen.de:18080/debug/pprof/heap
+go tool pprof http://127.0.0.1:6060/debug/pprof/heap
 
 # 2. 等待一段时间后再次获取
-go tool pprof http://shifen.de:18080/debug/pprof/heap
+go tool pprof http://127.0.0.1:6060/debug/pprof/heap
 
 # 3. 使用 top 命令查看占用内存最多的对象
 (pprof) top20
@@ -127,7 +119,7 @@ go tool pprof http://shifen.de:18080/debug/pprof/heap
 
 ```bash
 # 采集 30 秒的 CPU profile
-go tool pprof http://shifen.de:18080/debug/pprof/profile?seconds=30
+go tool pprof 'http://127.0.0.1:6060/debug/pprof/profile?seconds=30'
 
 # 查看占用 CPU 最多的函数
 (pprof) top10
@@ -137,7 +129,7 @@ go tool pprof http://shifen.de:18080/debug/pprof/profile?seconds=30
 
 ```bash
 # 获取 goroutine 信息
-go tool pprof http://shifen.de:18080/debug/pprof/goroutine
+go tool pprof http://127.0.0.1:6060/debug/pprof/goroutine
 
 # 查看 goroutine 数量最多的函数
 (pprof) top20
@@ -215,15 +207,14 @@ A: pprof 的端点访问一般不会显著影响性能，但在高负载情况�
 
 ### Q: 如何在容器中使用？
 
-A: 确保端口正确映射，例如：`docker run -p 18080:18080 sslcat`
+A: 不要发布 6060 端口；在容器内执行 pprof 命令，或通过仅绑定宿主机 loopback 的方式建立 SSH 隧道。
 
 ### Q: 看不到 pprof 数据？
 
-A: 检查防火墙和端口配置，确保 `18080` 端口可以访问。
+A: 检查 `server.enable_pprof`、`server.pprof_addr` 和启动日志；远程机器必须先建立 SSH 隧道。
 
 ## 更多资源
 
 - [Go pprof 官方文档](https://pkg.go.dev/net/http/pprof)
 - [Profiling Go Programs](https://go.dev/blog/pprof)
 - [Dave Cheney 的 pprof 教程](https://dave.cheney.net/2013/06/30/how-to-write-benchmarks-in-go)
-

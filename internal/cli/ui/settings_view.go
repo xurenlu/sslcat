@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/xurenlu/sslcat/internal/config"
 )
@@ -184,10 +184,10 @@ func (m settingsModel) View() string {
 		}
 
 		help := renderHelp(map[string]string{
-			"↑↓/jk":  "移动",
+			"↑↓/jk":   "移动",
 			"Enter/e": "编辑",
-			"s":      "保存配置",
-			"q/Esc":  "返回",
+			"s":       "保存配置",
+			"q/Esc":   "返回",
 		})
 
 		content = lipgloss.JoinVertical(
@@ -252,6 +252,11 @@ func buildSettingsItems(cfg *config.Config) []settingsItem {
 	items = append(items, settingsItem{
 		key:   "server.enable_pprof",
 		value: strconv.FormatBool(srv.EnablePprof),
+	})
+
+	items = append(items, settingsItem{
+		key:   "server.pprof_addr",
+		value: srv.PprofAddr,
 	})
 
 	items = append(items, settingsItem{
@@ -374,6 +379,9 @@ func (m settingsModel) setServerValue(field string, value string) error {
 		}
 		srv.EnablePprof = val
 
+	case "pprof_addr":
+		srv.PprofAddr = value
+
 	case "access_log_enabled":
 		val, err := strconv.ParseBool(value)
 		if err != nil {
@@ -440,4 +448,3 @@ func (i settingsItem) Title() string {
 func (i settingsItem) Description() string {
 	return i.value
 }
-

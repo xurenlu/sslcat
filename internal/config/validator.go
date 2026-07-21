@@ -126,6 +126,15 @@ func (v *ConfigValidator) validateServerConfig(cfg *ServerConfig) {
 		v.addError("server.host", "主机地址不能为空", cfg.Host)
 	}
 
+	if cfg.EnablePprof {
+		pprofHost, _, err := net.SplitHostPort(cfg.PprofAddr)
+		pprofHost = strings.Trim(pprofHost, "[]")
+		pprofIP := net.ParseIP(pprofHost)
+		if err != nil || (pprofIP == nil && !strings.EqualFold(pprofHost, "localhost")) || (pprofIP != nil && !pprofIP.IsLoopback()) {
+			v.addError("server.pprof_addr", "pprof 只能监听 loopback 地址", cfg.PprofAddr)
+		}
+	}
+
 	// 验证超时配置
 	if cfg.ReadTimeoutSec < 0 {
 		v.addWarning("server.read_timeout_sec", "读取超时不应为负数", strconv.Itoa(cfg.ReadTimeoutSec))
@@ -187,6 +196,19 @@ func (v *ConfigValidator) validateAdminConfig(cfg *AdminConfig) {
 
 // validateProxyConfig 验证代理配置
 func (v *ConfigValidator) validateProxyConfig(cfg *ProxyConfig) {
+	if cfg.DefaultResponseHeaderTimeoutSec < 1 || cfg.DefaultResponseHeaderTimeoutSec > 120 {
+		v.addError("proxy.default_response_header_timeout_sec", "响应头超时必须在1-120秒之间", strconv.Itoa(cfg.DefaultResponseHeaderTimeoutSec))
+	}
+	if cfg.MaxIdleConns < 1 || cfg.MaxIdleConns > 65536 {
+		v.addError("proxy.max_idle_conns", "空闲连接总数必须在1-65536之间", strconv.Itoa(cfg.MaxIdleConns))
+	}
+	if cfg.MaxIdleConnsPerHost < 1 || cfg.MaxIdleConnsPerHost > cfg.MaxIdleConns {
+		v.addError("proxy.max_idle_conns_per_host", "单上游空闲连接数必须为正数且不超过空闲连接总数", strconv.Itoa(cfg.MaxIdleConnsPerHost))
+	}
+	if cfg.MaxConnsPerHost < 1 || cfg.MaxConnsPerHost > 65536 {
+		v.addError("proxy.max_conns_per_host", "单上游总连接数必须在1-65536之间", strconv.Itoa(cfg.MaxConnsPerHost))
+	}
+
 	if len(cfg.Rules) == 0 {
 		v.addWarning("proxy.rules", "没有配置代理规则", "0")
 		return

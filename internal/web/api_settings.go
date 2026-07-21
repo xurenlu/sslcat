@@ -101,6 +101,9 @@ func (s *Server) handleAPISettings(w http.ResponseWriter, r *http.Request) {
 		"proxy_unmatched_redirect_url": s.config.Proxy.UnmatchedRedirectURL,
 		"proxy": map[string]interface{}{
 			"default_response_header_timeout_sec": s.config.Proxy.DefaultResponseHeaderTimeoutSec,
+			"max_idle_conns":                      s.config.Proxy.MaxIdleConns,
+			"max_idle_conns_per_host":             s.config.Proxy.MaxIdleConnsPerHost,
+			"max_conns_per_host":                  s.config.Proxy.MaxConnsPerHost,
 		},
 		"security": map[string]interface{}{
 			"enable_captcha":    s.config.Security.EnableCaptcha,

@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	_ "net/http/pprof" // 导入 pprof 用于性能分析
 	"os"
 	"path/filepath"
 	"strings"
@@ -659,93 +658,6 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 	return server
 }
 func (s *Server) setupRoutes() {
-	// 性能分析路由 (pprof) - 必须在最前面，避免被前端 SPA 路由拦截
-	// 用于调试性能问题，仅允许本地访问
-	if s.config.Server.EnablePprof {
-		s.mux.HandleFunc("/debug/pprof/", func(w http.ResponseWriter, r *http.Request) {
-			// 安全检查：只允许本地访问
-			clientIP := s.getClientIP(r)
-			if !s.isPrivateIP(clientIP) && clientIP != "127.0.0.1" && clientIP != "::1" {
-				http.Error(w, "Forbidden: pprof endpoint is only accessible from localhost", http.StatusForbidden)
-				return
-			}
-			http.DefaultServeMux.ServeHTTP(w, r)
-		})
-		s.mux.HandleFunc("/debug/pprof/cmdline", func(w http.ResponseWriter, r *http.Request) {
-			clientIP := s.getClientIP(r)
-			if !s.isPrivateIP(clientIP) && clientIP != "127.0.0.1" && clientIP != "::1" {
-				http.Error(w, "Forbidden", http.StatusForbidden)
-				return
-			}
-			http.DefaultServeMux.ServeHTTP(w, r)
-		})
-		s.mux.HandleFunc("/debug/pprof/profile", func(w http.ResponseWriter, r *http.Request) {
-			clientIP := s.getClientIP(r)
-			if !s.isPrivateIP(clientIP) && clientIP != "127.0.0.1" && clientIP != "::1" {
-				http.Error(w, "Forbidden", http.StatusForbidden)
-				return
-			}
-			http.DefaultServeMux.ServeHTTP(w, r)
-		})
-		s.mux.HandleFunc("/debug/pprof/symbol", func(w http.ResponseWriter, r *http.Request) {
-			clientIP := s.getClientIP(r)
-			if !s.isPrivateIP(clientIP) && clientIP != "127.0.0.1" && clientIP != "::1" {
-				http.Error(w, "Forbidden", http.StatusForbidden)
-				return
-			}
-			http.DefaultServeMux.ServeHTTP(w, r)
-		})
-		s.mux.HandleFunc("/debug/pprof/heap", func(w http.ResponseWriter, r *http.Request) {
-			clientIP := s.getClientIP(r)
-			if !s.isPrivateIP(clientIP) && clientIP != "127.0.0.1" && clientIP != "::1" {
-				http.Error(w, "Forbidden", http.StatusForbidden)
-				return
-			}
-			http.DefaultServeMux.ServeHTTP(w, r)
-		})
-		s.mux.HandleFunc("/debug/pprof/goroutine", func(w http.ResponseWriter, r *http.Request) {
-			clientIP := s.getClientIP(r)
-			if !s.isPrivateIP(clientIP) && clientIP != "127.0.0.1" && clientIP != "::1" {
-				http.Error(w, "Forbidden", http.StatusForbidden)
-				return
-			}
-			http.DefaultServeMux.ServeHTTP(w, r)
-		})
-		s.mux.HandleFunc("/debug/pprof/allocs", func(w http.ResponseWriter, r *http.Request) {
-			clientIP := s.getClientIP(r)
-			if !s.isPrivateIP(clientIP) && clientIP != "127.0.0.1" && clientIP != "::1" {
-				http.Error(w, "Forbidden", http.StatusForbidden)
-				return
-			}
-			http.DefaultServeMux.ServeHTTP(w, r)
-		})
-		s.mux.HandleFunc("/debug/pprof/block", func(w http.ResponseWriter, r *http.Request) {
-			clientIP := s.getClientIP(r)
-			if !s.isPrivateIP(clientIP) && clientIP != "127.0.0.1" && clientIP != "::1" {
-				http.Error(w, "Forbidden", http.StatusForbidden)
-				return
-			}
-			http.DefaultServeMux.ServeHTTP(w, r)
-		})
-		s.mux.HandleFunc("/debug/pprof/threadcreate", func(w http.ResponseWriter, r *http.Request) {
-			clientIP := s.getClientIP(r)
-			if !s.isPrivateIP(clientIP) && clientIP != "127.0.0.1" && clientIP != "::1" {
-				http.Error(w, "Forbidden", http.StatusForbidden)
-				return
-			}
-			http.DefaultServeMux.ServeHTTP(w, r)
-		})
-		s.mux.HandleFunc("/debug/pprof/mutex", func(w http.ResponseWriter, r *http.Request) {
-			clientIP := s.getClientIP(r)
-			if !s.isPrivateIP(clientIP) && clientIP != "127.0.0.1" && clientIP != "::1" {
-				http.Error(w, "Forbidden", http.StatusForbidden)
-				return
-			}
-			http.DefaultServeMux.ServeHTTP(w, r)
-		})
-		s.log.Info("pprof 性能分析端点已启用: /debug/pprof/*")
-	}
-
 	// 根路径重定向
 	s.mux.HandleFunc("/", s.handleRoot)
 
@@ -1634,6 +1546,21 @@ func (s *Server) Stop() {
 
 	// 停止 ML 系统
 	s.StopMLSystem()
+
+	if s.auditRotator != nil {
+		_ = s.auditRotator.Close()
+	}
+	if s.accessLogger != nil {
+		_ = s.accessLogger.Close()
+	}
+	s.accessLoggersMu.Lock()
+	for key, accessLogger := range s.accessLoggers {
+		if accessLogger != nil && accessLogger != s.accessLogger {
+			_ = accessLogger.Close()
+		}
+		delete(s.accessLoggers, key)
+	}
+	s.accessLoggersMu.Unlock()
 
 	s.log.Info("Web server stopped")
 }

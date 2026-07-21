@@ -25,9 +25,9 @@ func GetDefaultTransport() *http.Transport {
 				KeepAlive: 30 * time.Second,
 			}).DialContext,
 			ForceAttemptHTTP2:     true,
-			MaxIdleConns:          100,              // 最大空闲连接数
-			MaxIdleConnsPerHost:   10,               // 每个主机的最大空闲连接数
-			MaxConnsPerHost:       0,                // 0 表示不限制每个主机的连接数
+			MaxIdleConns:          1024,             // 最大空闲连接数
+			MaxIdleConnsPerHost:   128,              // 每个主机的最大空闲连接数
+			MaxConnsPerHost:       256,              // 限制慢上游触发的拨号并发
 			IdleConnTimeout:       90 * time.Second, // 空闲连接超时
 			TLSHandshakeTimeout:   10 * time.Second,
 			ExpectContinueTimeout: 1 * time.Second,

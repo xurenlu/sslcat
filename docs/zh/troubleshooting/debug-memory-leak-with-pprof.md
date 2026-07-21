@@ -2,8 +2,10 @@
 
 ## 前置条件
 
-已集成 pprof，SSLcat 运行后可通过以下端点访问：
-- `http://shifen.de:8080/debug/pprof/` (需要确保 8080 端口可访问)
+启用 pprof 后，SSLcat 默认只在服务器 loopback 地址提供端点：
+- `http://127.0.0.1:6060/debug/pprof/`
+
+远程操作前先建立 SSH 隧道：`ssh -L 6060:127.0.0.1:6060 user@your-server`。不要把 pprof 映射到公网或私网业务端口。
 
 ## 排查内存泄漏的完整流程
 
@@ -11,10 +13,10 @@
 
 ```bash
 # 方式 1：浏览器访问（最简单）
-http://shifen.de:8080/debug/pprof/heap
+http://127.0.0.1:6060/debug/pprof/heap
 
 # 方式 2：使用 go tool pprof（更详细）
-go tool pprof http://shifen.de:8080/debug/pprof/heap
+go tool pprof http://127.0.0.1:6060/debug/pprof/heap
 ```
 
 进入交互式界面后，使用以下命令：
@@ -29,13 +31,13 @@ go tool pprof http://shifen.de:8080/debug/pprof/heap
 
 ```bash
 # 1. 第一次获取 heap profile
-curl http://shifen.de:8080/debug/pprof/heap > heap_before.pprof
+curl http://127.0.0.1:6060/debug/pprof/heap > heap_before.pprof
 
 # 2. 等待一段时间（例如 10 分钟）
 sleep 600
 
 # 3. 第二次获取 heap profile
-curl http://shifen.de:8080/debug/pprof/heap > heap_after.pprof
+curl http://127.0.0.1:6060/debug/pprof/heap > heap_after.pprof
 
 # 4. 比较差异
 go tool pprof -base heap_before.pprof heap_after.pprof
@@ -59,7 +61,7 @@ go tool pprof -base heap_before.pprof heap_after.pprof
 ### 步骤 4：查看 Goroutine 泄漏
 
 ```bash
-go tool pprof http://shifen.de:8080/debug/pprof/goroutine
+go tool pprof http://127.0.0.1:6060/debug/pprof/goroutine
 
 # 查看 goroutine 数量是否异常增长
 (pprof) top20
@@ -72,7 +74,7 @@ go tool pprof http://shifen.de:8080/debug/pprof/goroutine
 ### 步骤 5：分析内存分配模式
 
 ```bash
-go tool pprof http://shifen.de:8080/debug/pprof/allocs
+go tool pprof http://127.0.0.1:6060/debug/pprof/allocs
 
 # 查看总分配量（比 heap 更能反映泄漏）
 (pprof) top20
@@ -86,7 +88,7 @@ go tool pprof http://shifen.de:8080/debug/pprof/allocs
 
 ```bash
 ssh rocky@shifen.de
-curl http://localhost:18080/debug/pprof/heap > /tmp/heap_v1.pprof
+curl http://127.0.0.1:6060/debug/pprof/heap > /tmp/heap_v1.pprof
 ```
 
 ### 2. 监控一段时间
@@ -96,14 +98,14 @@ curl http://localhost:18080/debug/pprof/heap > /tmp/heap_v1.pprof
 watch -n 5 'ps aux | grep sslcat'
 
 # 同时监控 pprof
-go tool pprof http://localhost:18080/debug/pprof/heap
+go tool pprof http://127.0.0.1:6060/debug/pprof/heap
 ```
 
 ### 3. 对比分析
 
 ```bash
 # 等待 10 分钟后再次获取
-curl http://localhost:18080/debug/pprof/heap > /tmp/heap_v2.pprof
+curl http://127.0.0.1:6060/debug/pprof/heap > /tmp/heap_v2.pprof
 
 # 对比差异
 go tool pprof -base /tmp/heap_v1.pprof /tmp/heap_v2.pprof
@@ -146,7 +148,7 @@ pprof 输出示例：
 **症状：** Goroutine 数量持续增长
 **排查：**
 ```bash
-go tool pprof http://localhost:18080/debug/pprof/goroutine
+go tool pprof http://127.0.0.1:6060/debug/pprof/goroutine
 (pprof) top20
 ```
 查看哪些 goroutine 数量最多
@@ -165,7 +167,7 @@ go tool pprof http://localhost:18080/debug/pprof/goroutine
 **症状：** 定期内存增长
 **排查：**
 ```bash
-go tool pprof http://localhost:18080/debug/pprof/heap
+go tool pprof http://127.0.0.1:6060/debug/pprof/heap
 (pprof) top20 | grep ticker
 ```
 检查定时器是否正确清理
@@ -184,7 +186,7 @@ SSLcat 已经内置了内存监控器，可以这样配合使用：
 
 ```bash
 # 获取详细的 heap profile
-go tool pprof http://localhost:18080/debug/pprof/heap
+go tool pprof http://127.0.0.1:6060/debug/pprof/heap
 (pprof) top20
 ```
 
@@ -196,7 +198,7 @@ go tool pprof http://localhost:18080/debug/pprof/heap
 
 ```bash
 # 修复后再次采集
-curl http://localhost:18080/debug/pprof/heap > heap_fixed.pprof
+curl http://127.0.0.1:6060/debug/pprof/heap > heap_fixed.pprof
 
 # 对比
 go tool pprof -base heap_before.pprof heap_fixed.pprof
@@ -212,7 +214,7 @@ go tool pprof -base heap_before.pprof heap_fixed.pprof
 #!/bin/bash
 # collect_heaps.sh
 DATE=$(date +%Y%m%d_%H%M%S)
-curl http://localhost:18080/debug/pprof/heap > /tmp/heap_${DATE}.pprof
+curl http://127.0.0.1:6060/debug/pprof/heap > /tmp/heap_${DATE}.pprof
 echo "采集完成: heap_${DATE}.pprof"
 ```
 
@@ -220,14 +222,14 @@ echo "采集完成: heap_${DATE}.pprof"
 
 ```bash
 # 查看实时的 goroutine 数量
-watch -n 1 'curl -s http://localhost:18080/debug/pprof/goroutine?debug=1 | grep -c "goroutine"'
+watch -n 1 'curl -s http://127.0.0.1:6060/debug/pprof/goroutine?debug=1 | grep -c "goroutine"'
 ```
 
 ### 技巧 3：生成报告
 
 ```bash
 # 生成可视化的调用图
-go tool pprof -png http://localhost:18080/debug/pprof/heap > heap_graph.png
+go tool pprof -png http://127.0.0.1:6060/debug/pprof/heap > heap_graph.png
 ```
 
 ## 总结
@@ -246,4 +248,3 @@ go tool pprof -png http://localhost:18080/debug/pprof/heap > heap_graph.png
 ⚠️ **安全**：pprof 端点应该添加认证保护
 ⚠️ **性能**：频繁采集 heap profile 会影响性能
 ⚠️ **存储**：heap profile 文件可能很大，注意清理
-
