@@ -22,7 +22,7 @@ echo ""
 # 1. 检查 Goroutine 数量（通过 API）
 echo "[1] 检查 Goroutine 数量..."
 # 尝试通过 API 获取（需要认证）
-GOROUTINE_COUNT=$(curl -s "http://localhost/debug/pprof/goroutine?debug=1" 2>/dev/null | grep -c "^goroutine " || echo "0")
+GOROUTINE_COUNT=$(curl -s "http://127.0.0.1:6060/debug/pprof/goroutine?debug=1" 2>/dev/null | grep -c "^goroutine " || echo "0")
 if [ "$GOROUTINE_COUNT" = "0" ]; then
     # 如果 API 不可用，尝试通过系统调用估算
     THREAD_COUNT=$(ps -p $PID -o nlwp --no-headers | tr -d ' ')
@@ -130,7 +130,7 @@ echo ""
 if [ $(echo "$AVG_CPU > 5" | bc) -eq 1 ]; then
     echo "[8] CPU 使用率较高，生成 CPU Profile（30秒）..."
     echo "  正在收集 CPU Profile，请等待 30 秒..."
-    curl -s "http://localhost/debug/pprof/profile?seconds=30" > /tmp/cpu-longrun.prof 2>/dev/null || echo "  ⚠️  无法收集 CPU Profile（可能需要认证）"
+    curl -s "http://127.0.0.1:6060/debug/pprof/profile?seconds=30" > /tmp/cpu-longrun.prof 2>/dev/null || echo "  ⚠️  无法收集 CPU Profile（请确认已启用独立 loopback 服务）"
     if [ -f /tmp/cpu-longrun.prof ]; then
         FILE_SIZE=$(ls -lh /tmp/cpu-longrun.prof | awk '{print $5}')
         echo "  ✓ CPU Profile 已保存: /tmp/cpu-longrun.prof ($FILE_SIZE)"
@@ -172,4 +172,3 @@ fi
 echo "📊 持续监控命令："
 echo "   watch -n 5 'ps -p $PID -o %cpu,%mem,etime && echo \"---\" && ls /proc/$PID/fd 2>/dev/null | wc -l'"
 echo ""
-

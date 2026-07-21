@@ -30,6 +30,26 @@ ssh root@sg1.1605ai.com 'bash -s' < scripts/diagnose-slow-requests.sh
 | **压缩缓存未命中** | 每次请求都重新压缩 | 确认压缩缓存配置 |
 | **客户端网络慢** | 服务器已写完，但客户端接收慢 | 优化 CDN/网络 |
 
+### 3. 上游 API 慢并伴随 goroutine 增长
+
+先确认 goroutine 是否持续增长且请求结束后不回落。`net/http.(*Transport).dialConn` 短时增多通常表示慢上游触发了建连扩张，不等同于永久泄漏。默认连接池参数如下：
+
+```json
+{
+  "proxy": {
+    "default_response_header_timeout_sec": 10,
+    "max_idle_conns": 1024,
+    "max_idle_conns_per_host": 256,
+    "max_conns_per_host": 256
+  }
+}
+```
+
+- `max_conns_per_host` 限制同一上游正在拨号、活跃和空闲连接的总数，必须保持为正数。
+- AI 流式接口只要在响应头超时前返回响应头，后续流式 body 不受该超时限制。
+- 如果上游服务本身无法在 10 秒内返回响应头，可按单条规则提高 `response_header_timeout_sec`，同时继续保留连接总数上限。
+- 配置热重载会主动关闭旧 Transport 的空闲连接；观察 goroutine 是否在 `idle_timeout_sec` 窗口内回落。
+
 ## 三、使用 pprof 精确定位
 
 1. 在配置中启用 pprof：
@@ -37,7 +57,8 @@ ssh root@sg1.1605ai.com 'bash -s' < scripts/diagnose-slow-requests.sh
 ```json
 {
   "server": {
-    "enable_pprof": true
+    "enable_pprof": true,
+    "pprof_addr": "127.0.0.1:6060"
   }
 }
 ```
@@ -46,7 +67,7 @@ ssh root@sg1.1605ai.com 'bash -s' < scripts/diagnose-slow-requests.sh
 
 ```bash
 # 抓 30 秒 CPU profile（在慢请求发生时执行）
-curl -o cpu.prof 'http://127.0.0.1/debug/pprof/profile?seconds=30'
+curl -o cpu.prof 'http://127.0.0.1:6060/debug/pprof/profile?seconds=30'
 
 # 本地分析
 go tool pprof -http=:8080 cpu.prof

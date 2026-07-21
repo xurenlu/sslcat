@@ -25,6 +25,7 @@ import (
 	"github.com/xurenlu/sslcat/internal/logger"
 	"github.com/xurenlu/sslcat/internal/monitor"
 	"github.com/xurenlu/sslcat/internal/notification"
+	"github.com/xurenlu/sslcat/internal/profiling"
 	"github.com/xurenlu/sslcat/internal/proxy"
 	"github.com/xurenlu/sslcat/internal/report"
 	"github.com/xurenlu/sslcat/internal/runner"
@@ -39,7 +40,7 @@ import (
 )
 
 var (
-	version = "2.4.0-rc4"
+	version = "2.4.0-rc5"
 	build   = "dev"
 )
 
@@ -137,9 +138,10 @@ func main() {
 		// pprof 相关命令
 		pprofEnable  = flag.Bool("pprof-enable", false, "启用 pprof 性能分析端点")
 		pprofDisable = flag.Bool("pprof-disable", false, "禁用 pprof 性能分析端点")
+		pprofAddr    = flag.String("pprof-addr", "", "pprof 独立监听地址（仅允许 loopback，默认读取配置）")
 		pprofExport  = flag.String("pprof-export", "", "导出 pprof 数据 (heap|cpu|goroutine|allocs|block|mutex)")
 		pprofOutput  = flag.String("pprof-output", "", "导出文件路径 (默认: ./sslcat-{type}-{timestamp}.pprof)")
-		pprofServer  = flag.String("pprof-server", "http://localhost:18080", "pprof 服务器地址")
+		pprofServer  = flag.String("pprof-server", "http://127.0.0.1:6060", "pprof 服务器地址")
 	)
 
 	flag.Parse()
@@ -157,7 +159,7 @@ func main() {
 
 	// pprof 命令处理
 	if *pprofEnable || *pprofDisable || *pprofExport != "" {
-		handlePprofCommands(configFile, pprofEnable, pprofDisable, pprofExport, pprofOutput, pprofServer)
+		handlePprofCommands(configFile, pprofEnable, pprofDisable, pprofAddr, pprofExport, pprofOutput, pprofServer)
 		return
 	}
 
@@ -298,6 +300,9 @@ func main() {
 	}
 	if *host != "0.0.0.0" {
 		cfg.Server.Host = *host
+	}
+	if *pprofAddr != "" {
+		cfg.Server.PprofAddr = *pprofAddr
 	}
 
 	// 启动时输出关键配置（不打印密码）
@@ -495,6 +500,17 @@ func main() {
 		idleTimeout = 120 * time.Second
 	}
 
+	var profilingServer *profiling.Server
+	if cfg.Server.EnablePprof {
+		profilingServer, err = profiling.Start(cfg.Server.PprofAddr)
+		if err != nil {
+			log.Fatalf("failed to start loopback-only pprof server: %v", err)
+		}
+		runtime.SetMutexProfileFraction(10) // 采样 10% 的 mutex 争用
+		runtime.SetBlockProfileRate(1)      // 记录所有阻塞操作
+		log.WithField("address", profilingServer.Addr()).Info("Loopback-only pprof server started")
+	}
+
 	// 根据端口模式启动服务器
 	var serverManager *ServerManager
 	switch cfg.Server.PortMode {
@@ -506,14 +522,6 @@ func main() {
 	default:
 		// 默认使用标准模式
 		serverManager = startStandardMode(cfg, webServer, sslManager, proxyManager, readTimeout, writeTimeout, idleTimeout)
-	}
-
-	// 启用 mutex 和 block profiling（在 pprof 启用时）
-	// 这可以帮助诊断锁竞争和阻塞问题
-	if cfg.Server.EnablePprof {
-		runtime.SetMutexProfileFraction(10) // 采样 10% 的 mutex 争用
-		runtime.SetBlockProfileRate(1)      // 记录所有阻塞操作
-		logrus.Info("Mutex 和 Block profiling 已启用")
 	}
 
 	// 启动内存监控
@@ -605,6 +613,16 @@ func main() {
 	// 停止所有 HTTP/HTTPS 服务器（包括 HTTP/2 和 HTTP/3）
 	if serverManager != nil {
 		serverManager.Stop()
+	}
+
+	if profilingServer != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		if err := profilingServer.Shutdown(ctx); err != nil {
+			logrus.Warnf("Failed to stop pprof server cleanly: %v", err)
+		}
+		cancel()
+		runtime.SetMutexProfileFraction(0)
+		runtime.SetBlockProfileRate(0)
 	}
 
 	// 停止通知管理器
@@ -953,7 +971,7 @@ func startCustomMode(cfg *config.Config, webServer http.Handler, readTimeout, wr
 }
 
 // handlePprofCommands 处理 pprof 相关命令
-func handlePprofCommands(configFile *string, pprofEnable, pprofDisable *bool, pprofExport, pprofOutput, pprofServer *string) {
+func handlePprofCommands(configFile *string, pprofEnable, pprofDisable *bool, pprofAddr, pprofExport, pprofOutput, pprofServer *string) {
 	// 加载配置
 	cfg, err := config.Load(*configFile)
 	if err != nil {
@@ -964,12 +982,20 @@ func handlePprofCommands(configFile *string, pprofEnable, pprofDisable *bool, pp
 	// 启用 pprof
 	if *pprofEnable {
 		cfg.Server.EnablePprof = true
+		if *pprofAddr != "" {
+			if err := profiling.ValidateAddr(*pprofAddr); err != nil {
+				fmt.Printf("❌ pprof 监听地址不安全: %v\n", err)
+				os.Exit(1)
+			}
+			cfg.Server.PprofAddr = *pprofAddr
+		}
 		if err := saveConfig(cfg, *configFile); err != nil {
 			fmt.Printf("❌ 保存配置失败: %v\n", err)
 			os.Exit(1)
 		}
 		fmt.Println("✅ pprof 性能分析端点已启用")
-		fmt.Println("   访问地址: http://localhost:18080/debug/pprof/")
+		fmt.Printf("   访问地址: http://%s/debug/pprof/\n", cfg.Server.PprofAddr)
+		fmt.Println("   安全限制: 仅监听 loopback；远程分析请使用 SSH 端口转发")
 		fmt.Println("   注意: 需要重启 sslcat 服务使配置生效")
 		return
 	}
@@ -1174,9 +1200,10 @@ func showHelp() {
 	fmt.Println("  性能分析 (pprof):")
 	fmt.Println("    -pprof-enable               启用 pprof 性能分析端点")
 	fmt.Println("    -pprof-disable               禁用 pprof 性能分析端点")
+	fmt.Println("    -pprof-addr <host:port>     独立监听地址，仅允许 loopback（默认：127.0.0.1:6060）")
 	fmt.Println("    -pprof-export <type>        导出 pprof 数据 (heap|cpu|goroutine|allocs|block|mutex)")
 	fmt.Println("    -pprof-output <path>        导出文件路径")
-	fmt.Println("    -pprof-server <url>         pprof 服务器地址（默认：http://localhost:18080）")
+	fmt.Println("    -pprof-server <url>         导出时使用的 pprof 地址（默认：http://127.0.0.1:6060）")
 	fmt.Println()
 	fmt.Println("示例:")
 	fmt.Println("  sslcat -h                     显示此帮助信息")

@@ -134,10 +134,10 @@ Environment="GOGC=50"  # 每增长 50% 触发一次 GC
 
 ```bash
 # 查看 pprof 内存信息
-curl -s http://localhost:18080/debug/pprof/heap?debug=1
+curl -s http://127.0.0.1:6060/debug/pprof/heap?debug=1
 
 # 查看 Goroutine 信息
-curl -s http://localhost:18080/debug/pprof/goroutine?debug=1
+curl -s http://127.0.0.1:6060/debug/pprof/goroutine?debug=1
 ```
 
 ### 查看内存历史
@@ -159,4 +159,3 @@ grep "Memory:" /var/log/sslcat-monitor.log | sort -k 3 -n -r | head -20
 - [MEMORY_SPIKE_4AM_ANALYSIS.md](../../MEMORY_SPIKE_4AM_ANALYSIS.md) - 详细问题分析
 - [MEMORY_LEAK_HOTFIX.md](../../MEMORY_LEAK_HOTFIX.md) - 内存泄漏修复补丁
 - [sslcat-memory-monitor.sh](../../sslcat-memory-monitor.sh) - 内存监控脚本
-

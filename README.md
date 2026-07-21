@@ -90,6 +90,18 @@ sslcat --port 18080
 
 > **📝 Configuration Format / 配置格式**: SSLcat uses **JSON** configuration files (not YAML). All examples below use JSON syntax. / SSLcat 使用 **JSON** 配置文件（不是 YAML）。以下所有示例都使用 JSON 语法。
 
+### Recommended systemd Runtime / 推荐 systemd 运行参数
+
+Linux systemd installs use memory-first Go runtime defaults:
+
+```ini
+Environment="GOMEMLIMIT=1280MiB"
+Environment="GOGC=200"
+Environment="GODEBUG=madvdontneed=1"
+```
+
+`GODEBUG=madvdontneed=1` asks Go to return unused heap pages to Linux with `MADV_DONTNEED`, so RSS drops sooner after traffic spikes. Keep these defaults unless the host is CPU-first or very memory-rich; adjust `GOMEMLIMIT` for smaller or larger machines.
+
 ### Docker Compose
 
 ```yaml

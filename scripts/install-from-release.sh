@@ -521,6 +521,12 @@ ExecStart=/opt/sslcat/sslcat --config /etc/sslcat/sslcat.conf
 Restart=always
 RestartSec=3
 User=root
+
+# Go 运行时内存管理优化 - 优先控制长期运行后的 RSS 高水位残留
+Environment="GOMEMLIMIT=1280MiB"
+Environment="GOGC=200"
+Environment="GODEBUG=madvdontneed=1"
+
 ProtectHome=false
 ReadWritePaths=/opt/sslcat /etc/sslcat /opt/sslcat /home/git/
 
@@ -539,5 +545,4 @@ PUBLIC_IP=$(curl -s https://ip4.dev/myip | tr -d '\n' | xargs)
 msg installed_path "$DEST_LINUX/sslcat"
 msg config_path "$CONF_LINUX"
 msg panel_hint "$PUBLIC_IP"
-
 

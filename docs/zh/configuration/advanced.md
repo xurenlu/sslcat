@@ -289,11 +289,11 @@
       "path": "/health",
       "timeout": "5s",
       "interval": "30s"
-    },
-    "profiling": {
-      "enabled": true,
-      "path": "/debug/pprof"
     }
+  },
+  "server": {
+    "enable_pprof": true,
+    "pprof_addr": "127.0.0.1:6060"
   }
 }
 ```

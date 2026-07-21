@@ -2,19 +2,17 @@ package logger
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
-// writeRequest 表示一个写入请求
-type writeRequest struct {
-	data []byte
-	err  chan error
-	n    chan int
-}
+const rotatorQueueSize = 4096
 
 // Rotator 是一个简单的按大小轮转文件写入器
 // 默认通过重命名为 filename.YYYYMMDD-HHMMSS 的方式进行滚动，并保留最近 MaxFiles 个文件
@@ -23,12 +21,14 @@ type Rotator struct {
 	Path     string
 	MaxSize  int64
 	MaxFiles int
-	mu       sync.Mutex
 	file     *os.File
 	curSize  int64
-	writeCh  chan writeRequest // 异步写入通道
-	stopCh   chan struct{}     // 停止信号
-	once     sync.Once         // 确保 stop 只执行一次
+	writeCh  chan []byte   // 异步写入通道
+	stopCh   chan struct{} // 停止信号
+	once     sync.Once     // 确保 stop 只执行一次
+	closing  atomic.Bool
+	active   atomic.Int64
+	workerWG sync.WaitGroup
 }
 
 // NewRotator 创建一个新的轮转写入器
@@ -46,13 +46,14 @@ func NewRotator(path string, maxSize int64, maxFiles int) (*Rotator, error) {
 		Path:     path,
 		MaxSize:  maxSize,
 		MaxFiles: maxFiles,
-		writeCh:  make(chan writeRequest, 1000), // 缓冲1000条写入请求
+		writeCh:  make(chan []byte, rotatorQueueSize),
 		stopCh:   make(chan struct{}),
 	}
 	if err := rot.open(); err != nil {
 		return nil, err
 	}
 	// 启动异步写入协程
+	rot.workerWG.Add(1)
 	go rot.asyncWriter()
 	return rot, nil
 }
@@ -71,40 +72,26 @@ func (r *Rotator) open() error {
 
 // asyncWriter 异步写入协程，处理所有文件I/O操作
 func (r *Rotator) asyncWriter() {
+	defer r.workerWG.Done()
 	for {
 		select {
-		case req := <-r.writeCh:
-			// 执行实际的写入操作（在单独的协程中，不会阻塞调用方）
-			n, err := r.writeSync(req.data)
-			// 将结果返回给调用方
-			if req.err != nil {
-				req.err <- err
-			}
-			if req.n != nil {
-				req.n <- n
-			}
+		case data := <-r.writeCh:
+			_, _ = r.writeSync(data)
 		case <-r.stopCh:
-			// 处理剩余的写入请求
-			for len(r.writeCh) > 0 {
-				req := <-r.writeCh
-				r.writeSync(req.data)
-				if req.err != nil {
-					req.err <- nil
-				}
-				if req.n != nil {
-					req.n <- 0
+			for {
+				select {
+				case data := <-r.writeCh:
+					_, _ = r.writeSync(data)
+				default:
+					return
 				}
 			}
-			return
 		}
 	}
 }
 
 // writeSync 同步写入，必须在 asyncWriter 协程中调用
 func (r *Rotator) writeSync(p []byte) (int, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	if r.file == nil {
 		if err := r.open(); err != nil {
 			return 0, err
@@ -128,13 +115,22 @@ func (r *Rotator) writeSync(p []byte) (int, error) {
 // Write 实现 io.Writer 接口（异步非阻塞）
 // 注意：返回值可能不准确（因为是异步的），但不会阻塞调用方
 func (r *Rotator) Write(p []byte) (int, error) {
+	if r.closing.Load() {
+		return 0, io.ErrClosedPipe
+	}
+	r.active.Add(1)
+	defer r.active.Add(-1)
+	if r.closing.Load() {
+		return 0, io.ErrClosedPipe
+	}
+
 	// 复制数据，避免被修改
 	data := make([]byte, len(p))
 	copy(data, p)
 
 	// 非阻塞发送到写入通道
 	select {
-	case r.writeCh <- writeRequest{data: data}:
+	case r.writeCh <- data:
 		// 成功发送，假设写入成功（异步处理）
 		return len(p), nil
 	default:
@@ -148,32 +144,18 @@ func (r *Rotator) Write(p []byte) (int, error) {
 func (r *Rotator) Close() error {
 	var err error
 	r.once.Do(func() {
-		// 发送停止信号
-		close(r.stopCh)
-
-		// 等待异步写入协程退出（最多等待1秒）
-		done := make(chan struct{})
-		go func() {
-			// 等待 asyncWriter 退出
-			for range r.writeCh {
-			}
-			close(done)
-		}()
-
-		select {
-		case <-done:
-			// 正常退出
-		case <-time.After(1 * time.Second):
-			// 超时，强制关闭
+		r.closing.Store(true)
+		for r.active.Load() > 0 {
+			runtime.Gosched()
 		}
+		close(r.stopCh)
+		r.workerWG.Wait()
 
 		// 关闭文件
-		r.mu.Lock()
 		if r.file != nil {
 			err = r.file.Close()
 			r.file = nil
 		}
-		r.mu.Unlock()
 	})
 	return err
 }

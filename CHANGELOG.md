@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0-rc5] - 2026-07-21
+
+### Fixed
+
+- 将 pprof 从 80/443/自定义业务路由拆分到独立 loopback 监听器，默认使用 `127.0.0.1:6060`，并拒绝通配、私网及公网监听地址，避免内网横向访问调试数据。
+- 上游反向代理改用有界连接池：默认单主机总连接上限 256、空闲连接上限 256，建连默认超时收紧到 10 秒；配置热重载和服务停止时主动关闭废弃 Transport 的空闲连接，抑制慢上游导致的拨号 goroutine 堆积。
+- 修复异步日志轮转器关闭时额外 drain goroutine 永不退出、可能与文件关闭竞态的问题；队列扩至 4096，并移除单 worker 写盘热路径中的无效互斥锁。
+
+### Changed
+
+- Linux systemd 安装模板统一设置 `GOMEMLIMIT=1280MiB`、`GOGC=200` 与 `GODEBUG=madvdontneed=1`，降低流量峰值后 RSS 长期维持高水位的概率。
+
 ## [2.4.0-rc4] - 2026-07-12
 
 ### Fixed

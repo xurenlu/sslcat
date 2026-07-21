@@ -15,7 +15,10 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=sslcat
 
-# Go 运行时内存管理优化
+# Go 运行时内存管理优化 - 优先控制长期运行后的 RSS 高水位残留
+# GOMEMLIMIT: 限制最大内存，超过时强制触发 GC
+# GOGC: GC 触发阈值，默认 200 用较少 CPU 换取适度堆余量
+# GODEBUG=madvdontneed=1: 使用 Linux madvise(MADV_DONTNEED) 更快释放内存给操作系统
 Environment="GOMEMLIMIT=1280MiB"
 Environment="GOGC=200"
 Environment="GODEBUG=madvdontneed=1"

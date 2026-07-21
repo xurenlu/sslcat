@@ -64,7 +64,7 @@ watch -n 1 'ps aux | grep sslcat | grep -v grep'
 bash scripts/debug-cpu-issue.sh
 
 # 查看 Goroutine 数量（应该没有明显变化）
-curl -s "http://localhost/debug/pprof/goroutine?debug=1" | grep -c "^goroutine "
+curl -s "http://127.0.0.1:6060/debug/pprof/goroutine?debug=1" | grep -c "^goroutine "
 ```
 
 ## 预期效果
@@ -109,4 +109,3 @@ sudo systemctl restart sslcat
 - Goroutine 数量（应该没有明显变化）
 - 日志实时性（用户反馈）
 - 配置文件同步延迟（集群模式）
-

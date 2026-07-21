@@ -32,6 +32,8 @@ SSLcat 是一个集成 SSL 证书管理、反向代理、WAF、安全审计、�
 - MCP 排障读取日志时必须使用有界尾读，避免大日志文件在高并发或事故现场拖垮管理面。
 - MCP 路由启动时常驻挂载，启停开关应随配置热重载立即生效；无 token 时保持不可调用，避免默认开启削弱权限边界。
 - Linux systemd 默认使用 `GOMEMLIMIT=1280MiB`、`GOGC=200`、`GODEBUG=madvdontneed=1` 启动，优先控制长期运行后的 RSS 高水位残留。
+- pprof 必须运行在独立 loopback 监听器；远程分析统一通过 SSH 隧道，不允许复用 80/443/管理面板路由。
+- 上游 Transport 必须限制单主机总连接数，并在配置热重载或停机时关闭废弃连接池，避免慢上游放大拨号 goroutine。
 
 ## 近期待改进
 
@@ -41,8 +43,9 @@ SSLcat 是一个集成 SSL 证书管理、反向代理、WAF、安全审计、�
 
 ## 版本记录
 
-- `2.4.0-rc3`：修复带管理前缀部署时 Logo 的 Vite 哈希 PNG 被忽略、未随二进制发布的问题；Logo 改为 Go 内嵌并从 `<admin_prefix>/logo.png` 提供。
+- `2.4.0-rc5`：pprof 拆分到默认 `127.0.0.1:6060` 的独立 loopback 服务；上游连接池增加单主机 256 连接硬上限并主动回收失效 Transport；修复异步日志轮转器关闭竞态并扩大有界队列。
 - `2.4.0-rc4`：WebAuthn 注册与登录在调用浏览器 API 前校验当前 Origin；不匹配时直接提示凭证绑定的完整管理面板地址，避免暴露难懂的浏览器 RP ID 报错。
+- `2.4.0-rc3`：修复带管理前缀部署时 Logo 的 Vite 哈希 PNG 被忽略、未随二进制发布的问题；Logo 改为 Go 内嵌并从 `<admin_prefix>/logo.png` 提供。
 - `2.4.0-rc2`：修复 WebAuthn 将监听地址错误推导为 RP ID 的问题。新增 `server.webauthn_rp_id` 与 `server.webauthn_rp_origin`，可明确绑定实际公网域名与 HTTPS Origin。
 - `2.4.0-rc1`：修复未识别的裸 CLI 参数会被忽略、继而启动服务的问题；例如误输入 `sslcat reset-passwords` 现会明确报错退出。
 - `2.4.0`：新增 `sslcat reset-password` 主程序命令。该命令仅允许 root / sudo 执行，密码仅经交互式终端双次输入，以 bcrypt 原子写入管理员密码文件并设为 `0600`，不会出现在参数或进程列表中。

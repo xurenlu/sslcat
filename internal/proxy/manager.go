@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha1"
-	"crypto/tls"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -42,13 +41,6 @@ const (
 	// 图片优化的最大可处理体积（4MB），避免大图/未知长度占用大量内存
 	maxImageOptimizeBytes = 4 * 1024 * 1024
 )
-
-// loggingTransport 包装Transport以记录实际发送的请求
-type loggingTransport struct {
-	base   http.RoundTripper
-	log    *logrus.Entry
-	config *config.Config
-}
 
 // ResponseProcessor 响应处理器接口
 type ResponseProcessor interface {
@@ -258,6 +250,13 @@ func (m *Manager) Stop() {
 		m.cdnCache.StopCleaner()
 		m.log.Info("Stopped CDN cache cleaner")
 	}
+
+	m.cacheMutex.Lock()
+	for key, cachedProxy := range m.proxyCache {
+		closeProxyIdleConnections(cachedProxy)
+		delete(m.proxyCache, key)
+	}
+	m.cacheMutex.Unlock()
 
 	m.log.Info("Proxy manager stopped")
 }
@@ -1460,56 +1459,7 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 		m.logRequestDetails(req, "OUTGOING_REQUEST", rule)
 	}
 
-	// 获取超时配置，如果为0则使用默认值
-	connectTimeout := rule.ConnectTimeoutSec
-	if connectTimeout <= 0 {
-		connectTimeout = 30 // 默认30秒
-	}
-	keepAliveTimeout := rule.KeepAliveTimeoutSec
-	if keepAliveTimeout <= 0 {
-		keepAliveTimeout = 30 // 默认30秒
-	}
-	idleTimeout := rule.IdleTimeoutSec
-	if idleTimeout <= 0 {
-		idleTimeout = 90 // 默认90秒
-	}
-	tlsHandshakeTimeout := rule.TLSHandshakeTimeoutSec
-	if tlsHandshakeTimeout <= 0 {
-		tlsHandshakeTimeout = 10 // 默认10秒
-	}
-	expectContinueTimeout := rule.ExpectContinueTimeoutSec
-	if expectContinueTimeout <= 0 {
-		expectContinueTimeout = 1 // 默认1秒
-	}
-	responseHeaderTimeout := rule.ResponseHeaderTimeoutSec
-	if responseHeaderTimeout <= 0 {
-		responseHeaderTimeout = m.config.Proxy.DefaultResponseHeaderTimeoutSec
-	}
-	if responseHeaderTimeout <= 0 {
-		responseHeaderTimeout = 10 // 默认10秒，快速失败避免长时间等待
-	}
-
-	// 自定义传输配置
-	baseTransport := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:   time.Duration(connectTimeout) * time.Second,
-			KeepAlive: time.Duration(keepAliveTimeout) * time.Second,
-		}).DialContext,
-		ForceAttemptHTTP2:      rule.UpstreamHTTP2Enabled,
-		MaxIdleConns:           1024,
-		MaxIdleConnsPerHost:    128,
-		MaxConnsPerHost:        0,
-		IdleConnTimeout:        time.Duration(idleTimeout) * time.Second,
-		TLSHandshakeTimeout:    time.Duration(tlsHandshakeTimeout) * time.Second,
-		ExpectContinueTimeout:  time.Duration(expectContinueTimeout) * time.Second,
-		ResponseHeaderTimeout:  time.Duration(responseHeaderTimeout) * time.Second, // 响应头超时，防止连接泄漏
-		MaxResponseHeaderBytes: 1 << 20,                                            // 限制响应头最大 1MB，防止内存攻击
-		ReadBufferSize:         32 * 1024,                                          // 32KB 读缓冲，减少小缓冲区频繁分配
-		WriteBufferSize:        32 * 1024,                                          // 32KB 写缓冲，减少小缓冲区频繁分配
-		// 不验证后端证书，允许自签名证书
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
+	baseTransport := newUpstreamTransport(rule, &m.config.Proxy)
 
 	// 包装Transport以记录实际发送的请求
 	proxy.Transport = &loggingTransport{
@@ -1593,6 +1543,7 @@ func (m *Manager) getOrCreateProxy(rule *config.ProxyRule) *httputil.ReverseProx
 	m.cacheMutex.Lock()
 	if cachedProxy, exists := m.proxyCache[key]; exists {
 		m.cacheMutex.Unlock()
+		closeProxyIdleConnections(proxy)
 		return cachedProxy
 	}
 	m.proxyCache[key] = proxy
@@ -1643,6 +1594,9 @@ func (m *Manager) buildProxyCacheKey(rule *config.ProxyRule, targetURL string) s
 	write("expect_continue_timeout=%d", rule.ExpectContinueTimeoutSec)
 	write("response_header_timeout=%d", rule.ResponseHeaderTimeoutSec)
 	write("default_response_header_timeout=%d", m.config.Proxy.DefaultResponseHeaderTimeoutSec)
+	write("max_idle_conns=%d", m.config.Proxy.MaxIdleConns)
+	write("max_idle_conns_per_host=%d", m.config.Proxy.MaxIdleConnsPerHost)
+	write("max_conns_per_host=%d", m.config.Proxy.MaxConnsPerHost)
 	write("upstream_http2=%t", rule.UpstreamHTTP2Enabled)
 	write("optimize_host_header=%t", rule.OptimizeHostHeader)
 	write("cloud_storage_endpoint=%s", rule.CloudStorageEndpoint)
@@ -2481,6 +2435,7 @@ func (m *Manager) Reload(newConfig *config.Config) error {
 	// 清理不再使用的代理缓存
 	for key := range m.proxyCache {
 		if !expectedKeys[key] {
+			closeProxyIdleConnections(m.proxyCache[key])
 			delete(m.proxyCache, key)
 		}
 	}
@@ -2765,268 +2720,6 @@ func (m *Manager) extractHostFromTarget(target string, port int) string {
 		return net.JoinHostPort(target, strconv.Itoa(port))
 	}
 	return target
-}
-
-// RoundTrip 实现http.RoundTripper接口，记录实际发送的请求
-func (lt *loggingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	// 只在调试模式下记录详细的上游请求信息
-	if lt.config.Server.Debug {
-		// 构造等效的curl命令
-		curlCmd := lt.buildCurlCommand(req)
-
-		lt.log.WithFields(logrus.Fields{
-			"type":           "ACTUAL_OUTGOING_REQUEST",
-			"method":         req.Method,
-			"url":            req.URL.String(),
-			"host":           req.Header.Get("Host"),
-			"user_agent":     req.Header.Get("User-Agent"),
-			"content_type":   req.Header.Get("Content-Type"),
-			"content_length": req.ContentLength,
-			"curl_command":   curlCmd,
-		}).Debug("实际发送给上游的HTTP请求")
-
-		// 单独记录curl命令，便于复制
-		lt.log.Debugf("等效的curl命令: %s", curlCmd)
-
-		// 记录重要的请求头部
-		importantHeaders := []string{
-			"Authorization",
-			"Cookie",
-			"X-Forwarded-For",
-			"X-Real-IP",
-			"X-Forwarded-Proto",
-			"X-Forwarded-Host",
-			"Accept",
-			"Accept-Encoding",
-			"Accept-Language",
-			"Cache-Control",
-			"Referer",
-			// 追踪头部
-			"traceparent",
-			"tracestate",
-			"X-Trace-ID",
-			"X-Span-ID",
-			"X-Request-ID",
-			"X-B3-TraceId",
-			"X-B3-SpanId",
-			"X-B3-ParentSpanId",
-			"X-Cloud-Trace-Context",
-			"X-Amzn-Trace-Id",
-			"baggage",
-		}
-
-		headers := make(map[string]string)
-		for _, header := range importantHeaders {
-			if value := req.Header.Get(header); value != "" {
-				headers[header] = redactHeaderValue(header, value)
-			}
-		}
-
-		if len(headers) > 0 {
-			lt.log.WithFields(logrus.Fields{
-				"type":    "ACTUAL_OUTGOING_REQUEST",
-				"headers": headers,
-			}).Debug("实际发送的请求头部信息")
-		}
-	}
-
-	// 执行实际的请求
-	resp, err := lt.base.RoundTrip(req)
-
-	// 只在调试模式下记录详细的上游响应信息
-	if resp != nil && lt.config.Server.Debug {
-		lt.log.WithFields(logrus.Fields{
-			"type":           "ACTUAL_RESPONSE",
-			"status_code":    resp.StatusCode,
-			"status":         resp.Status,
-			"content_type":   resp.Header.Get("Content-Type"),
-			"content_length": resp.ContentLength,
-			"server":         resp.Header.Get("Server"),
-		}).Debug("上游服务器实际返回的HTTP响应")
-	}
-
-	return resp, err
-}
-
-// buildCurlCommand 构造等效的curl命令
-func (lt *loggingTransport) buildCurlCommand(req *http.Request) string {
-	var parts []string
-
-	// 基础curl命令
-	parts = append(parts, "curl")
-
-	// HTTP方法
-	if req.Method != "GET" {
-		parts = append(parts, "-X", req.Method)
-	}
-
-	// 添加所有请求头
-	for name, values := range req.Header {
-		for _, value := range values {
-			value = redactHeaderValue(name, value)
-			// 对特殊字符进行转义
-			escapedValue := strings.ReplaceAll(value, "'", "'\\''")
-			parts = append(parts, "-H", fmt.Sprintf("'%s: %s'", name, escapedValue))
-		}
-	}
-
-	// 如果有请求体
-	if req.Body != nil && req.ContentLength > 0 {
-		// 注意：这里无法读取Body内容，因为Body已经被消费了
-		// 只能提示用户手动添加
-		if req.ContentLength > 0 {
-			parts = append(parts, "-d", "'[REQUEST_BODY]'")
-		}
-	}
-
-	// 添加URL（使用单引号包围以避免shell解释）
-	parts = append(parts, fmt.Sprintf("'%s'", req.URL.String()))
-
-	// 添加一些常用选项
-	parts = append(parts, "-v")         // 详细输出
-	parts = append(parts, "--insecure") // 忽略SSL证书验证（如果需要）
-
-	return strings.Join(parts, " ")
-}
-
-// CloudStorageInfo 云存储服务信息
-type CloudStorageInfo struct {
-	Type     string `json:"type"`     // aliyun_oss, aws_s3, tencent_cos
-	Name     string `json:"name"`     // 服务名称
-	Region   string `json:"region"`   // 区域
-	Bucket   string `json:"bucket"`   // 存储桶
-	Endpoint string `json:"endpoint"` // 端点
-}
-
-// isCloudStorageService 检测是否为云存储服务
-func (m *Manager) isCloudStorageService(target string) bool {
-	targetLower := strings.ToLower(target)
-	return strings.Contains(targetLower, "aliyuncs.com") ||
-		strings.Contains(targetLower, "amazonaws.com") ||
-		strings.Contains(targetLower, "qcloud.com") ||
-		strings.Contains(targetLower, "myqcloud.com") ||
-		strings.Contains(targetLower, "oss-") ||
-		strings.Contains(targetLower, ".s3.") ||
-		strings.Contains(targetLower, ".cos.")
-}
-
-// detectCloudStorageInfo 检测云存储服务详细信息
-func (m *Manager) detectCloudStorageInfo(target string) *CloudStorageInfo {
-	targetLower := strings.ToLower(target)
-
-	// 提取hostname（去除协议）
-	extractHostname := func(target string) string {
-		if strings.HasPrefix(strings.ToLower(target), "http://") || strings.HasPrefix(strings.ToLower(target), "https://") {
-			if parsedURL, err := url.Parse(target); err == nil {
-				return parsedURL.Hostname()
-			}
-		}
-		return target
-	}
-
-	// 阿里云OSS检测
-	if strings.Contains(targetLower, "aliyuncs.com") || strings.Contains(targetLower, "oss-") {
-		hostname := extractHostname(target)
-		// 解析bucket.oss-region.aliyuncs.com格式
-		parts := strings.Split(hostname, ".")
-		if len(parts) >= 3 {
-			return &CloudStorageInfo{
-				Type:     "aliyun_oss",
-				Name:     "阿里云OSS",
-				Bucket:   parts[0],
-				Region:   extractRegionFromOSS(parts),
-				Endpoint: hostname,
-			}
-		}
-		return &CloudStorageInfo{
-			Type:     "aliyun_oss",
-			Name:     "阿里云OSS",
-			Endpoint: hostname,
-		}
-	}
-
-	// AWS S3检测
-	if strings.Contains(targetLower, "amazonaws.com") || strings.Contains(targetLower, ".s3.") {
-		hostname := extractHostname(target)
-		// 解析bucket.s3-region.amazonaws.com格式
-		parts := strings.Split(hostname, ".")
-		if len(parts) >= 3 {
-			return &CloudStorageInfo{
-				Type:     "aws_s3",
-				Name:     "AWS S3",
-				Bucket:   parts[0],
-				Region:   extractRegionFromS3(parts),
-				Endpoint: hostname,
-			}
-		}
-		return &CloudStorageInfo{
-			Type:     "aws_s3",
-			Name:     "AWS S3",
-			Endpoint: hostname,
-		}
-	}
-
-	// 腾讯云COS检测
-	if strings.Contains(targetLower, "qcloud.com") || strings.Contains(targetLower, "myqcloud.com") || strings.Contains(targetLower, ".cos.") {
-		hostname := extractHostname(target)
-		// 解析bucket.cos-region.myqcloud.com格式
-		parts := strings.Split(hostname, ".")
-		if len(parts) >= 3 {
-			return &CloudStorageInfo{
-				Type:     "tencent_cos",
-				Name:     "腾讯云COS",
-				Bucket:   parts[0],
-				Region:   extractRegionFromCOS(parts),
-				Endpoint: hostname,
-			}
-		}
-		return &CloudStorageInfo{
-			Type:     "tencent_cos",
-			Name:     "腾讯云COS",
-			Endpoint: hostname,
-		}
-	}
-
-	return nil
-}
-
-// extractRegionFromOSS 从阿里云OSS域名中提取区域信息
-func extractRegionFromOSS(parts []string) string {
-	if len(parts) < 2 {
-		return ""
-	}
-	// 格式: bucket.oss-region.aliyuncs.com
-	ossPart := parts[1]
-	if strings.HasPrefix(ossPart, "oss-") {
-		return strings.TrimPrefix(ossPart, "oss-")
-	}
-	return ""
-}
-
-// extractRegionFromS3 从AWS S3域名中提取区域信息
-func extractRegionFromS3(parts []string) string {
-	if len(parts) < 2 {
-		return ""
-	}
-	// 格式: bucket.s3-region.amazonaws.com
-	s3Part := parts[1]
-	if strings.HasPrefix(s3Part, "s3-") {
-		return strings.TrimPrefix(s3Part, "s3-")
-	}
-	return ""
-}
-
-// extractRegionFromCOS 从腾讯云COS域名中提取区域信息
-func extractRegionFromCOS(parts []string) string {
-	if len(parts) < 2 {
-		return ""
-	}
-	// 格式: bucket.cos-region.myqcloud.com
-	cosPart := parts[1]
-	if strings.HasPrefix(cosPart, "cos-") {
-		return strings.TrimPrefix(cosPart, "cos-")
-	}
-	return ""
 }
 
 // ExtractTraceHeaders 提取追踪头部信息

@@ -27,7 +27,7 @@ echo ""
 # 2. 检查 Goroutine 数量
 echo "[2] 检查 Goroutine 数量..."
 if command -v curl &> /dev/null; then
-    GOROUTINE_COUNT=$(curl -s "http://localhost/debug/pprof/goroutine?debug=1" 2>/dev/null | grep -c "^goroutine " || echo "0")
+    GOROUTINE_COUNT=$(curl -s "http://127.0.0.1:6060/debug/pprof/goroutine?debug=1" 2>/dev/null | grep -c "^goroutine " || echo "0")
     echo "  Goroutine 数量: $GOROUTINE_COUNT"
     if [ "$GOROUTINE_COUNT" -gt 500 ]; then
         echo "  ⚠️  警告: Goroutine 数量过多，可能存在泄露"
@@ -84,7 +84,7 @@ echo ""
 echo "[6] 生成 CPU Profile（30秒）..."
 if command -v curl &> /dev/null; then
     echo "  正在收集 CPU Profile，请等待 30 秒..."
-    curl -s "http://localhost/debug/pprof/profile?seconds=30" > /tmp/cpu.prof 2>/dev/null || echo "  ⚠️  无法收集 CPU Profile"
+    curl -s "http://127.0.0.1:6060/debug/pprof/profile?seconds=30" > /tmp/cpu.prof 2>/dev/null || echo "  ⚠️  无法收集 CPU Profile"
     if [ -f /tmp/cpu.prof ]; then
         FILE_SIZE=$(ls -lh /tmp/cpu.prof | awk '{print $5}')
         echo "  ✓ CPU Profile 已保存: /tmp/cpu.prof ($FILE_SIZE)"
@@ -115,4 +115,3 @@ echo "1. 如果 Runner 应用过多，考虑增加日志检查间隔（从1秒�
 echo "2. 如果健康检查间隔过短，建议设置为 ≥ 60 秒"
 echo "3. 检查是否有 goroutine 泄露"
 echo "4. 查看 CPU Profile 找出热点函数"
-
