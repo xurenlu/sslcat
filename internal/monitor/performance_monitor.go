@@ -178,8 +178,9 @@ func (pm *PerformanceMonitor) setBaseline() {
 
 // checkPerformanceDeviation 检查性能偏差
 func (pm *PerformanceMonitor) checkPerformanceDeviation() {
-	// 检查QPS偏差
-	if pm.baselineQPS > 0 {
+	// 检查QPS偏差 — 低流量基线时绝对量极小，增加绝对量下限避免噪声
+	const minQPSForDeviation = 5.0
+	if pm.baselineQPS > 0 && pm.currentQPS > minQPSForDeviation {
 		qpsDeviation := (pm.currentQPS - pm.baselineQPS) / pm.baselineQPS
 		if qpsDeviation < -pm.qpsDeviationThreshold {
 			pm.qpsWarningCount++

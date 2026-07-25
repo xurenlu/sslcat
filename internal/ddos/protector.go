@@ -64,6 +64,8 @@ type ClientInfo struct {
 	RequestRate  float64   `json:"request_rate"`
 	Suspicious   bool      `json:"suspicious"`
 	BlockCount   int       `json:"block_count"`
+	// 最近一次记录"可疑请求模式"的时间，用于冷却去重
+	LastSuspiciousLog time.Time `json:"-"`
 	// 滑动窗口：记录每个请求的时间戳
 	RequestTimestamps []time.Time `json:"-"`
 }
@@ -451,15 +453,22 @@ func (p *Protector) CheckRequest(r *http.Request) (bool, string) {
 		p.mutex.Unlock()
 	}
 
-	// 检查请求模式
+	// 检查请求模式（带冷却去重，避免同一 IP 重复刷"可疑的请求模式"日志）
 	if p.isSuspiciousPattern(r, &clientCopy) {
-		p.enqueueAttackRecord(clientIP, userAgent, r.URL.String(), r.Method,
-			"suspicious_pattern", "medium", "可疑的请求模式", false)
+		// 同一 IP 5 分钟内只记录一次可疑模式，减少日志洪泛
+		shouldLog := now.Sub(clientCopy.LastSuspiciousLog) > 5*time.Minute
+		if shouldLog {
+			p.enqueueAttackRecord(clientIP, userAgent, r.URL.String(), r.Method,
+				"suspicious_pattern", "medium", "可疑的请求模式", false)
+		}
 
 		// 更新状态（快速加锁）
 		p.mutex.Lock()
 		if c, ok := p.clients[clientIP]; ok {
 			c.Suspicious = true
+			if shouldLog {
+				c.LastSuspiciousLog = now
+			}
 		}
 		p.mutex.Unlock()
 	}
@@ -691,21 +700,32 @@ func (p *Protector) isSuspiciousPattern(r *http.Request, client *ClientInfo) boo
 		return true
 	}
 
-	// 检查SQL注入尝试
-	sqlKeywords := []string{
-		"union", "select", "insert", "delete", "drop", "update",
-		"or 1=1", "and 1=1", "' or '", "\" or \"",
+	// 检查SQL注入尝试 — 只匹配真正的注入特征组合，避免误判含 update/select/delete 等普通词的 URL
+	sqlInjectionPatterns := []string{
+		"union select", // UNION SELECT 联合查询
+		"insert into",  // INSERT INTO
+		"delete from",  // DELETE FROM
+		"drop table",   // DROP TABLE
+		"update set",   // UPDATE SET
+		"or 1=1",       // 经典布尔注入
+		"and 1=1",      // 经典布尔注入
+		"' or '",       // 引号 OR 注入
+		"\" or \"",     // 双引号 OR 注入
+		"';",           // 引号后分号（语句终止）
+		"'--",          // 引号后注释
+		"xp_",          // SQL Server 扩展存储过程
+		"exec(",        // 存储过程执行
 	}
 
 	urlLower := strings.ToLower(url)
-	for _, keyword := range sqlKeywords {
-		if strings.Contains(urlLower, keyword) {
+	for _, pattern := range sqlInjectionPatterns {
+		if strings.Contains(urlLower, pattern) {
 			return true
 		}
 	}
 
-	// 检查异常请求频率 - 放宽阈值
-	if client.RequestRate > 120 { // 每分钟超过120个请求（2次/秒）
+	// 检查异常请求频率 — 需要足够观察窗口，避免新客户端冷启动误判
+	if client.RequestRate > 120 && client.LastRequest.Sub(client.FirstRequest) > 10*time.Second {
 		return true
 	}
 
