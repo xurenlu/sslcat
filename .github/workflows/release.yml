@@ -300,7 +300,6 @@ jobs:
             所有平台都启用 **CGO**，完整支持 **SQLite** 数据库！
             
             - **Linux AMD64** - x86_64 服务器（推荐）
-            - **Linux ARM64** - ARM 服务器（树莓派、云服务器等）
             - **macOS Intel** - Intel 芯片 Mac
             - **macOS Apple Silicon** - M1/M2/M3 芯片 Mac
             
@@ -308,15 +307,17 @@ jobs:
             
             ```bash
             # macOS (自动选择架构)
-            curl -fsSL https://github.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_darwin-$(uname -m).tar.gz -o sslcat.tgz
+            ARCH="$(uname -m)"
+            case "$ARCH" in
+              x86_64) ARCH=amd64 ;;
+              arm64) ARCH=arm64 ;;
+              *) printf 'Unsupported macOS architecture: %s\n' "$ARCH" >&2; exit 1 ;;
+            esac
+            curl -fsSL https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_darwin-${ARCH}.tar.gz -o sslcat.tgz
             tar -xzf sslcat.tgz && sudo ./install-sslcat.sh
             
             # Linux AMD64  
-            curl -fsSL https://github.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-amd64.tar.gz -o sslcat.tgz
-            tar -xzf sslcat.tgz && sudo ./install-sslcat.sh
-            
-            # Linux ARM64 (树莓派等)
-            curl -fsSL https://github.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-arm64.tar.gz -o sslcat.tgz
+            curl -fsSL https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-amd64.tar.gz -o sslcat.tgz
             tar -xzf sslcat.tgz && sudo ./install-sslcat.sh
             ```
             
@@ -327,38 +328,32 @@ jobs:
             **Linux AMD64 (x86_64 服务器)**
             ```bash
             # GitHub
-            https://github.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-amd64.tar.gz
+            https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-amd64.tar.gz
             # CDN镜像
-            https://cdn.wxside.com/xurenlu/sslcat/releases/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-amd64.tar.gz
+            https://img.niuwoai.com/xurenlu/sslcat/releases/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-amd64.tar.gz
             ```
             
-            **Linux ARM64 (树莓派、ARM服务器)**
-            ```bash
-            # GitHub
-            https://github.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-arm64.tar.gz
-            # CDN镜像
-            https://cdn.wxside.com/xurenlu/sslcat/releases/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_linux-arm64.tar.gz
-            ```
-            
+            > 当前发布流程暂不提供 Linux ARM64 预编译包；ARM 设备请从源码构建。
+
             **macOS Intel (Intel芯片Mac)**
             ```bash
             # GitHub
-            https://github.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_darwin-amd64.tar.gz
+            https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_darwin-amd64.tar.gz
             # CDN镜像
-            https://cdn.wxside.com/xurelu/sslcat/releases/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_darwin-amd64.tar.gz
+            https://img.niuwoai.com/xurenlu/sslcat/releases/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_darwin-amd64.tar.gz
             ```
             
             **macOS Apple Silicon (M1/M2/M3芯片Mac)**
             ```bash
             # GitHub
-            https://github.com/xurenlu/sslcat/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_darwin-arm64.tar.gz
+            https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_darwin-arm64.tar.gz
             # CDN镜像
-            https://cdn.wxside.com/xurenlu/sslcat/releases/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_darwin-arm64.tar.gz
+            https://img.niuwoai.com/xurenlu/sslcat/releases/${{ github.ref_name }}/sslcat_${{ github.ref_name }}_darwin-arm64.tar.gz
             ```
             
             ### 📝 更新日志
             
-            详见 [CHANGELOG.md](https://github.com/xurenlu/sslcat/blob/${{ github.ref_name }}/CHANGELOG.md)
+            详见 [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/CHANGELOG.md)
             
             ### ✨ 主要特性
             
@@ -367,7 +362,7 @@ jobs:
             - ✅ 自动 SSL 证书申请
             - ✅ Docker 构建优化
             - ✅ 前端配置和翻译修复
-            - ✅ CDN镜像同步 (cdn.wxside.com)
+            - ✅ CDN镜像同步 (img.niuwoai.com)
           files: artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

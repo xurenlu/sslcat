@@ -1,6 +1,6 @@
 # Product Overview
 
-> 最后更新：2026-11-20 | 当前版本：v2.5.0-rc1
+> 最后更新：2026-11-20 | 当前版本：v2.5.0-rc2
 
 ## 项目简介
 
@@ -36,6 +36,8 @@ SSLcat 是一个集成反向代理、SSL 证书管理、安全防护和运维管
 - 构建：`go build -o sslcat .`
 - 运行：`./sslcat --config /etc/sslcat/sslcat.conf`
 - 服务：`systemctl restart sslcat`
+- 发布仓库：`niuwoai/sslcat`；国内镜像使用 `https://img.niuwoai.com`，版本对象路径保持 `xurenlu/sslcat/releases/<tag>/`，最新目录为 `latest/`。
+- 当前预编译发布平台：Linux AMD64、macOS Intel 和 macOS Apple Silicon；Linux ARM64 构建暂未启用。
 
 ## 已知问题 / 待办
 

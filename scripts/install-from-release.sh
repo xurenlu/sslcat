@@ -3,7 +3,7 @@ set -euo pipefail
 
 # sslcat 一键安装脚本（Linux/macOS）
 # 用法（推荐传版本）：
-#   curl -fsSL https://raw.githubusercontent.com/xurenlu/sslcat/main/scripts/install-from-release.sh | sudo bash -s -- -v 1.3.2
+#   curl -fsSL https://raw.githubusercontent.com/niuwoai/sslcat/main/scripts/install-from-release.sh | sudo bash -s -- -v 2.5.0-rc1
 
 VER=""
 DEST_LINUX="/opt/sslcat"
@@ -192,7 +192,7 @@ done
 set_lang "$USER_LANG"
 
 if [[ -z "$VER" ]]; then
-  VER="1.3.2"
+  VER="2.5.0-rc1"
   msg missing_version "$VER"
 fi
 
@@ -307,8 +307,8 @@ PREFERRED="sslcat_v${VER}_${OS}-${ARCH}"
 EXT=".tar.gz"
 if [[ "$OS" == "windows" ]]; then EXT=".zip"; fi
 TMP="$(mktemp -d)"
-URL_GH="https://github.com/xurenlu/sslcat/releases/download/v${VER}/sslcat_v${VER}_${OS}-${ARCH}${EXT}"
-URL_CN="https://cdn.wxside.com/sslcat/releases/download/v${VER}/sslcat_v${VER}_${OS}-${ARCH}${EXT}"
+URL_GH="https://github.com/niuwoai/sslcat/releases/download/v${VER}/sslcat_v${VER}_${OS}-${ARCH}${EXT}"
+URL_CN="https://img.niuwoai.com/xurenlu/sslcat/releases/v${VER}/sslcat_v${VER}_${OS}-${ARCH}${EXT}"
 
 # 用户选择下载源
 msg select_download_source

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0-rc2] - 2026-11-20
+
+### Fixed
+
+- 发布工作流、安装器及中英文安装文档统一使用 `img.niuwoai.com` 镜像域名，保留实际 OSS 存储前缀 `xurenlu/sslcat/releases/<tag>/`，修复安装器错误的镜像路径与 macOS Intel 链接目录拼写。
+- 下载链接同步至 `niuwoai/sslcat` 仓库；发布说明按实际构建平台提供下载地址，macOS 安装示例将 `x86_64` 正确映射为 `amd64`。
+- 安装器默认下载和安装文档示例改为已发布并验证的 `v2.5.0-rc1`；旧默认版本和旧文档示例在新镜像均返回 404，不将尚未发布的候选版本作为下载目标。
+
 ## [2.5.0-rc1] - 2026-11-20
 
 ### Fixed

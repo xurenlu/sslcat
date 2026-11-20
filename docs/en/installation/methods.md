@@ -5,15 +5,18 @@ This guide covers how to install SSLcat. We provide pre-compiled binary files th
 ## Download Installation Package
 
 ### Download Binary Files
+
+These examples use the published `v2.5.0-rc1` Linux AMD64 package. The current release workflow does not provide prebuilt Linux ARM packages.
+
 ```bash
 # GitHub download
-curl -L https://github.com/xurenlu/sslcat/releases/download/v1.3.20-rc2/sslcat_v1.3.20-rc2_linux-amd64.tar.gz -o sslcat.tar.gz
+curl -L https://github.com/niuwoai/sslcat/releases/download/v2.5.0-rc1/sslcat_v2.5.0-rc1_linux-amd64.tar.gz -o sslcat.tar.gz
 
 # CDN mirror download (faster for Chinese users)
-curl -L https://cdn.wxside.com/xurenlu/sslcat/releases/v1.3.20-rc2/sslcat_v1.3.20-rc2_linux-amd64.tar.gz -o sslcat.tar.gz
+curl -L https://img.niuwoai.com/xurenlu/sslcat/releases/v2.5.0-rc1/sslcat_v2.5.0-rc1_linux-amd64.tar.gz -o sslcat.tar.gz
 
 # Or using wget
-wget https://github.com/xurenlu/sslcat/releases/download/v1.3.20-rc2/sslcat_v1.3.20-rc2_linux-amd64.tar.gz -O sslcat.tar.gz
+wget https://github.com/niuwoai/sslcat/releases/download/v2.5.0-rc1/sslcat_v2.5.0-rc1_linux-amd64.tar.gz -O sslcat.tar.gz
 ```
 
 ### Extract and Install
@@ -45,7 +48,7 @@ The installation script `install-sslcat.sh` automatically performs the following
 set -e
 
 # Configuration variables
-SSLCAT_VERSION="1.3.20-rc2"
+SSLCAT_VERSION="2.5.0-rc1"
 SSLCAT_USER="sslcat"
 SSLCAT_HOME="/opt/sslcat"
 SSLCAT_CONFIG="/etc/sslcat"
@@ -77,14 +80,12 @@ download_sslcat() {
     # Detect architecture
     ARCH=$(uname -m)
     case $ARCH in
-        x86_64) ARCH="amd64" ;;
-        aarch64) ARCH="arm64" ;;
-        armv7l) ARCH="arm" ;;
-        *) echo "Error: Unsupported architecture $ARCH"; exit 1 ;;
+        x86_64|amd64) ARCH="amd64" ;;
+        *) echo "Error: This release provides Linux binaries for AMD64 only; detected $ARCH"; exit 1 ;;
     esac
     
     # Download binary file
-    DOWNLOAD_URL="https://github.com/xurenlu/sslcat/releases/download/v${SSLCAT_VERSION}/sslcat_v${SSLCAT_VERSION}_linux-${ARCH}.tar.gz"
+    DOWNLOAD_URL="https://github.com/niuwoai/sslcat/releases/download/v${SSLCAT_VERSION}/sslcat_v${SSLCAT_VERSION}_linux-${ARCH}.tar.gz"
     
     cd /tmp
     wget -q "$DOWNLOAD_URL" -O sslcat.tar.gz

@@ -5,15 +5,18 @@
 ## 下载安装包
 
 ### 下载二进制文件
+
+以下示例使用已发布的 `v2.5.0-rc1` Linux AMD64 安装包；当前发布流程暂不提供 Linux ARM 预编译包。
+
 ```bash
 # GitHub 下载
-curl -L https://github.com/xurenlu/sslcat/releases/download/v1.3.20-rc2/sslcat_v1.3.20-rc2_linux-amd64.tar.gz -o sslcat.tar.gz
+curl -L https://github.com/niuwoai/sslcat/releases/download/v2.5.0-rc1/sslcat_v2.5.0-rc1_linux-amd64.tar.gz -o sslcat.tar.gz
 
 # CDN 镜像下载（推荐国内用户）
-curl -L https://cdn.wxside.com/xurenlu/sslcat/releases/v1.3.20-rc2/sslcat_v1.3.20-rc2_linux-amd64.tar.gz -o sslcat.tar.gz
+curl -L https://img.niuwoai.com/xurenlu/sslcat/releases/v2.5.0-rc1/sslcat_v2.5.0-rc1_linux-amd64.tar.gz -o sslcat.tar.gz
 
 # 或者使用 wget
-wget https://github.com/xurenlu/sslcat/releases/download/v1.3.20-rc2/sslcat_v1.3.20-rc2_linux-amd64.tar.gz -O sslcat.tar.gz
+wget https://github.com/niuwoai/sslcat/releases/download/v2.5.0-rc1/sslcat_v2.5.0-rc1_linux-amd64.tar.gz -O sslcat.tar.gz
 ```
 
 ### 解压并安装
@@ -45,7 +48,7 @@ sudo ./install-sslcat.sh
 set -e
 
 # 配置变量
-SSLCAT_VERSION="1.3.20-rc2"
+SSLCAT_VERSION="2.5.0-rc1"
 SSLCAT_USER="sslcat"
 SSLCAT_HOME="/opt/sslcat"
 SSLCAT_CONFIG="/etc/sslcat"
@@ -77,14 +80,12 @@ download_sslcat() {
     # 检测架构
     ARCH=$(uname -m)
     case $ARCH in
-        x86_64) ARCH="amd64" ;;
-        aarch64) ARCH="arm64" ;;
-        armv7l) ARCH="arm" ;;
-        *) echo "错误: 不支持的架构 $ARCH"; exit 1 ;;
+        x86_64|amd64) ARCH="amd64" ;;
+        *) echo "错误: 此版本的 Linux 预编译包仅支持 AMD64，当前架构为 $ARCH"; exit 1 ;;
     esac
     
     # 下载二进制文件
-    DOWNLOAD_URL="https://github.com/xurenlu/sslcat/releases/download/v${SSLCAT_VERSION}/sslcat_v${SSLCAT_VERSION}_linux-${ARCH}.tar.gz"
+    DOWNLOAD_URL="https://github.com/niuwoai/sslcat/releases/download/v${SSLCAT_VERSION}/sslcat_v${SSLCAT_VERSION}_linux-${ARCH}.tar.gz"
     
     cd /tmp
     wget -q "$DOWNLOAD_URL" -O sslcat.tar.gz
