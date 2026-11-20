@@ -32,6 +32,7 @@ type ConfigWatcher struct {
 
 	// 回调函数
 	onConfigChange  func(*Config, *Config) error // (oldConfig, newConfig) -> error
+	onConfigApply   func(*Config, *Config) (*Config, error)
 	onReloadStart   func()
 	onReloadSuccess func(*Config)
 	onReloadError   func(error)
@@ -41,6 +42,9 @@ type ConfigWatcher struct {
 	lastChangeTime   time.Time
 	debounceTimer    *time.Timer
 	debounceMutex    sync.Mutex
+
+	// reloadMutex 串行化并发重载（事件防抖 timer 与 ForceReload 可能同时触发）
+	reloadMutex sync.Mutex
 }
 
 // NewConfigWatcher 创建配置监听器
@@ -165,8 +169,14 @@ func (cw *ConfigWatcher) handleFileEvent(event fsnotify.Event) {
 	}
 }
 
-// reloadConfig 重载配置
-func (cw *ConfigWatcher) reloadConfig() {
+// reloadConfig 重载配置，返回真实错误。
+// 并发重载通过 reloadMutex 串行化；失败时不更新 config 与 lastHash，
+// 保留旧配置及哈希直到配置变化回调成功后才提交新配置。
+func (cw *ConfigWatcher) reloadConfig() error {
+	// 串行化并发重载，避免事件防抖 timer 与 ForceReload 交错执行
+	cw.reloadMutex.Lock()
+	defer cw.reloadMutex.Unlock()
+
 	cw.log.Info("Reloading configuration...")
 
 	// 触发重载开始回调
@@ -174,58 +184,68 @@ func (cw *ConfigWatcher) reloadConfig() {
 		cw.onReloadStart()
 	}
 
-	// 计算新的配置哈希
+	// 计算新配置哈希
 	newHash, err := calculateConfigHash(cw.configFile)
 	if err != nil {
-		cw.log.Errorf("Failed to calculate config hash: %v", err)
+		reloadErr := fmt.Errorf("failed to calculate config hash: %w", err)
+		cw.log.Errorf("%v", reloadErr)
 		if cw.onReloadError != nil {
-			cw.onReloadError(fmt.Errorf("failed to calculate config hash: %w", err))
+			cw.onReloadError(reloadErr)
 		}
-		return
+		return reloadErr
 	}
 
-	// 检查配置是否真的有变化
-	if newHash == cw.lastHash {
+	// 检查配置是否真的没有变化。无变化视为成功，保留旧配置与哈希。
+	if newHash == cw.GetLastHash() {
 		cw.log.Debug("Config hash unchanged, skipping reload")
-		return
+		return nil
 	}
 
 	// 加载新配置
 	newConfig, err := Load(cw.configFile)
 	if err != nil {
-		cw.log.Errorf("Failed to load new config: %v", err)
+		reloadErr := fmt.Errorf("failed to load new config: %w", err)
+		cw.log.Errorf("%v", reloadErr)
 		if cw.onReloadError != nil {
-			cw.onReloadError(fmt.Errorf("failed to load new config: %w", err))
+			cw.onReloadError(reloadErr)
 		}
-		return
+		return reloadErr
 	}
 
 	// 验证新配置
 	if err := cw.validateConfig(newConfig); err != nil {
-		cw.log.Errorf("New config validation failed: %v", err)
+		reloadErr := fmt.Errorf("config validation failed: %w", err)
+		cw.log.Errorf("%v", reloadErr)
 		if cw.onReloadError != nil {
-			cw.onReloadError(fmt.Errorf("config validation failed: %w", err))
+			cw.onReloadError(reloadErr)
 		}
-		return
+		return reloadErr
 	}
 
-	// 获取旧配置的副本
+	// 获取旧配置副本
 	cw.mutex.RLock()
 	oldConfig := cw.config
 	cw.mutex.RUnlock()
 
-	// 触发配置变化回调
-	if cw.onConfigChange != nil {
-		if err := cw.onConfigChange(oldConfig, newConfig); err != nil {
-			cw.log.Errorf("Config change callback failed: %v", err)
-			if cw.onReloadError != nil {
-				cw.onReloadError(fmt.Errorf("config change callback failed: %w", err))
-			}
-			return
+	// 应用回调可返回保留启动时字段的运行配置，磁盘哈希仍对应请求配置。
+	if cw.onConfigApply != nil {
+		newConfig, err = cw.onConfigApply(oldConfig, newConfig)
+		if err == nil && newConfig == nil {
+			err = fmt.Errorf("config apply callback returned nil configuration")
 		}
+	} else if cw.onConfigChange != nil {
+		err = cw.onConfigChange(oldConfig, newConfig)
+	}
+	if err != nil {
+		reloadErr := fmt.Errorf("config change callback failed: %w", err)
+		cw.log.Errorf("%v", reloadErr)
+		if cw.onReloadError != nil {
+			cw.onReloadError(reloadErr)
+		}
+		return reloadErr
 	}
 
-	// 更新配置
+	// 更新配置与哈希（callback 成功后才提交新配置）
 	cw.mutex.Lock()
 	cw.config = newConfig
 	cw.lastHash = newHash
@@ -237,6 +257,8 @@ func (cw *ConfigWatcher) reloadConfig() {
 	if cw.onReloadSuccess != nil {
 		cw.onReloadSuccess(newConfig)
 	}
+
+	return nil
 }
 
 // validateConfig 验证配置（委托给公共函数）
@@ -263,6 +285,11 @@ func (cw *ConfigWatcher) OnConfigChange(callback func(*Config, *Config) error) {
 	cw.onConfigChange = callback
 }
 
+// OnConfigApply 设置返回实际运行配置的应用回调；优先于 OnConfigChange。
+func (cw *ConfigWatcher) OnConfigApply(callback func(*Config, *Config) (*Config, error)) {
+	cw.onConfigApply = callback
+}
+
 // OnReloadStart 设置重载开始回调
 func (cw *ConfigWatcher) OnReloadStart(callback func()) {
 	cw.onReloadStart = callback
@@ -283,11 +310,10 @@ func (cw *ConfigWatcher) SetDebounceInterval(interval time.Duration) {
 	cw.debounceInterval = interval
 }
 
-// ForceReload 强制重载配置
+// ForceReload 强制重载配置，返回真实错误。
 func (cw *ConfigWatcher) ForceReload() error {
 	cw.log.Info("Force reloading configuration...")
-	cw.reloadConfig()
-	return nil
+	return cw.reloadConfig()
 }
 
 // GetLastHash 获取最后的配置哈希

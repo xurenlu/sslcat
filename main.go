@@ -391,9 +391,9 @@ func main() {
 	var reloadStartTime time.Time
 
 	// 设置配置变化回调
-	configWatcher.OnConfigChange(func(oldConfig, newConfig *config.Config) error {
+	configWatcher.OnConfigApply(func(oldConfig, newConfig *config.Config) (*config.Config, error) {
 		log.Info("Configuration changed, starting hot reload...")
-		return reloadManager.ReloadAll(oldConfig, newConfig)
+		return reloadManager.ReloadEffective(oldConfig, newConfig)
 	})
 
 	configWatcher.OnReloadStart(func() {
