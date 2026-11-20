@@ -11,12 +11,14 @@
 
 ### 步骤 1：下载并安装
 
+以下示例使用已发布的 `v2.5.0-rc1` Linux AMD64 安装包。
+
 ```bash
 # 下载安装包
-curl -L https://github.com/xurenlu/sslcat/releases/download/v1.3.20-rc2/sslcat_v1.3.20-rc2_linux-amd64.tar.gz -o sslcat.tar.gz
+curl -L https://github.com/niuwoai/sslcat/releases/download/v2.5.0-rc1/sslcat_v2.5.0-rc1_linux-amd64.tar.gz -o sslcat.tar.gz
 
 # CDN 镜像下载（推荐国内用户）
-curl -L https://cdn.wxside.com/xurenlu/sslcat/releases/v1.3.20-rc2/sslcat_v1.3.20-rc2_linux-amd64.tar.gz -o sslcat.tar.gz
+curl -L https://img.niuwoai.com/xurenlu/sslcat/releases/v2.5.0-rc1/sslcat_v2.5.0-rc1_linux-amd64.tar.gz -o sslcat.tar.gz
 
 # 解压并安装
 tar -xzf sslcat.tar.gz
@@ -209,7 +211,7 @@ sudo netstat -tlnp | grep :443
 - **日志**：`sudo journalctl -u sslcat -f`
 - **配置**：检查 `/etc/sslcat/sslcat.conf`
 - **文档**：[完整文档](../README.md)
-- **问题**：[GitHub 问题](https://github.com/xurenlu/sslcat/issues)
+- **问题**：[GitHub 问题](https://github.com/niuwoai/sslcat/issues)
 
 ## 📚 下一步
 
@@ -227,4 +229,4 @@ sudo netstat -tlnp | grep :443
 
 ---
 
-*需要帮助？查看我们的[故障排除指南](troubleshooting/common-issues.md)或[加入社区](https://github.com/xurenlu/sslcat/discussions)。*
+*需要帮助？查看我们的[故障排除指南](troubleshooting/common-issues.md)或[加入社区](https://github.com/niuwoai/sslcat/discussions)。*

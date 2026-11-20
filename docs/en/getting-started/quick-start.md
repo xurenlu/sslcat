@@ -12,12 +12,14 @@ Get SSLcat running in 5 minutes with this quick start guide.
 
 ### Step 1: Download and Install
 
+These examples use the published `v2.5.0-rc1` Linux AMD64 package.
+
 ```bash
 # Download installation package
-curl -L https://github.com/xurenlu/sslcat/releases/download/v1.3.20-rc2/sslcat_v1.3.20-rc2_linux-amd64.tar.gz -o sslcat.tar.gz
+curl -L https://github.com/niuwoai/sslcat/releases/download/v2.5.0-rc1/sslcat_v2.5.0-rc1_linux-amd64.tar.gz -o sslcat.tar.gz
 
 # CDN mirror download (faster for Chinese users)
-curl -L https://cdn.wxside.com/xurenlu/sslcat/releases/v1.3.20-rc2/sslcat_v1.3.20-rc2_linux-amd64.tar.gz -o sslcat.tar.gz
+curl -L https://img.niuwoai.com/xurenlu/sslcat/releases/v2.5.0-rc1/sslcat_v2.5.0-rc1_linux-amd64.tar.gz -o sslcat.tar.gz
 
 # Extract and install
 tar -xzf sslcat.tar.gz
@@ -204,7 +206,7 @@ sudo netstat -tlnp | grep :443
 - **Logs**: `sudo journalctl -u sslcat -f`
 - **Configuration**: Check `/etc/sslcat/sslcat.conf`
 - **Documentation**: [Full documentation](../README.md)
-- **Issues**: [GitHub Issues](https://github.com/xurenlu/sslcat/issues)
+- **Issues**: [GitHub Issues](https://github.com/niuwoai/sslcat/issues)
 
 ## Next Steps
 
@@ -222,4 +224,4 @@ You have successfully installed and configured SSLcat! Your SSL proxy server is 
 
 ---
 
-*Need help? Check out our [troubleshooting guide](troubleshooting/common-issues.md) or [join the community](https://github.com/xurenlu/sslcat/discussions).*
+*Need help? Check out our [troubleshooting guide](troubleshooting/common-issues.md) or [join the community](https://github.com/niuwoai/sslcat/discussions).*
