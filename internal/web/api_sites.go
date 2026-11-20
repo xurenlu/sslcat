@@ -18,7 +18,7 @@ func (s *Server) handleAPIStaticSites(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": true,
-			"sites":   s.config.StaticSites,
+			"sites":   newStaticSiteAPIResponses(s.config.StaticSites),
 		})
 		return
 	}
@@ -29,17 +29,20 @@ func (s *Server) handleAPIStaticSites(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var req struct {
-			Domain           string                  `json:"domain"`
-			Root             string                  `json:"root"`
-			Index            string                  `json:"index"`
-			Enabled          bool                    `json:"enabled"`
-			Headers          map[string]string       `json:"headers"`
-			PathPrefixRules  []config.PathPrefixRule `json:"path_prefix_rules"`
-			AccessLogEnabled *bool                   `json:"access_log_enabled,omitempty"`
-			AccessLogPath    string                  `json:"access_log_path,omitempty"`
-			HTTP2Enabled     *bool                   `json:"http2_enabled,omitempty"`
-			HTTP3Enabled     *bool                   `json:"http3_enabled,omitempty"`
-			TryFiles         bool                    `json:"try_files"`
+			Domain           string                      `json:"domain"`
+			Root             string                      `json:"root"`
+			Index            string                      `json:"index"`
+			Enabled          bool                        `json:"enabled"`
+			Headers          map[string]string           `json:"headers"`
+			PathPrefixRules  []config.PathPrefixRule     `json:"path_prefix_rules"`
+			AccessLogEnabled *bool                       `json:"access_log_enabled,omitempty"`
+			AccessLogPath    string                      `json:"access_log_path,omitempty"`
+			ErrorLogEnabled  *bool                       `json:"error_log_enabled,omitempty"`
+			ErrorLogPath     string                      `json:"error_log_path,omitempty"`
+			HTTP2Enabled     *bool                       `json:"http2_enabled,omitempty"`
+			HTTP3Enabled     *bool                       `json:"http3_enabled,omitempty"`
+			TryFiles         bool                        `json:"try_files"`
+			BasicAuth        *staticSiteBasicAuthRequest `json:"basic_auth,omitempty"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -66,6 +69,16 @@ func (s *Server) handleAPIStaticSites(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 		}
+		var existingBasicAuth *config.StaticSiteBasicAuth
+		if existingIndex >= 0 {
+			existingBasicAuth = s.config.StaticSites[existingIndex].BasicAuth
+		}
+		basicAuth, err := buildStaticSiteBasicAuth(req.BasicAuth, existingBasicAuth)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
 
 		newSite := config.StaticSite{
 			Domain:           req.Domain,
@@ -76,9 +89,12 @@ func (s *Server) handleAPIStaticSites(w http.ResponseWriter, r *http.Request) {
 			PathPrefixRules:  req.PathPrefixRules,
 			AccessLogEnabled: req.AccessLogEnabled,
 			AccessLogPath:    req.AccessLogPath,
+			ErrorLogEnabled:  req.ErrorLogEnabled,
+			ErrorLogPath:     req.ErrorLogPath,
 			HTTP2Enabled:     req.HTTP2Enabled,
 			HTTP3Enabled:     req.HTTP3Enabled,
 			TryFiles:         req.TryFiles,
+			BasicAuth:        basicAuth,
 		}
 
 		if existingIndex >= 0 {
@@ -105,7 +121,7 @@ func (s *Server) handleAPIStaticSites(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": true,
-			"site":    newSite,
+			"site":    newStaticSiteAPIResponse(newSite),
 			"action":  map[bool]string{true: "updated", false: "created"}[existingIndex >= 0],
 		})
 		return
@@ -117,17 +133,20 @@ func (s *Server) handleAPIStaticSites(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var req struct {
-			Domain           string                  `json:"domain"`
-			Root             string                  `json:"root"`
-			Index            string                  `json:"index"`
-			Enabled          bool                    `json:"enabled"`
-			Headers          map[string]string       `json:"headers"`
-			PathPrefixRules  []config.PathPrefixRule `json:"path_prefix_rules"`
-			AccessLogEnabled *bool                   `json:"access_log_enabled,omitempty"`
-			AccessLogPath    string                  `json:"access_log_path,omitempty"`
-			HTTP2Enabled     *bool                   `json:"http2_enabled,omitempty"`
-			HTTP3Enabled     *bool                   `json:"http3_enabled,omitempty"`
-			TryFiles         bool                    `json:"try_files"`
+			Domain           string                      `json:"domain"`
+			Root             string                      `json:"root"`
+			Index            string                      `json:"index"`
+			Enabled          bool                        `json:"enabled"`
+			Headers          map[string]string           `json:"headers"`
+			PathPrefixRules  []config.PathPrefixRule     `json:"path_prefix_rules"`
+			AccessLogEnabled *bool                       `json:"access_log_enabled,omitempty"`
+			AccessLogPath    string                      `json:"access_log_path,omitempty"`
+			ErrorLogEnabled  *bool                       `json:"error_log_enabled,omitempty"`
+			ErrorLogPath     string                      `json:"error_log_path,omitempty"`
+			HTTP2Enabled     *bool                       `json:"http2_enabled,omitempty"`
+			HTTP3Enabled     *bool                       `json:"http3_enabled,omitempty"`
+			TryFiles         bool                        `json:"try_files"`
+			BasicAuth        *staticSiteBasicAuthRequest `json:"basic_auth,omitempty"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -160,6 +179,12 @@ func (s *Server) handleAPIStaticSites(w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(map[string]string{"error": "site not found"})
 			return
 		}
+		basicAuth, err := buildStaticSiteBasicAuth(req.BasicAuth, s.config.StaticSites[existingIndex].BasicAuth)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
 
 		// 更新站点
 		s.config.StaticSites[existingIndex] = config.StaticSite{
@@ -171,9 +196,12 @@ func (s *Server) handleAPIStaticSites(w http.ResponseWriter, r *http.Request) {
 			PathPrefixRules:  req.PathPrefixRules,
 			AccessLogEnabled: req.AccessLogEnabled,
 			AccessLogPath:    req.AccessLogPath,
+			ErrorLogEnabled:  req.ErrorLogEnabled,
+			ErrorLogPath:     req.ErrorLogPath,
 			HTTP2Enabled:     req.HTTP2Enabled,
 			HTTP3Enabled:     req.HTTP3Enabled,
 			TryFiles:         req.TryFiles,
+			BasicAuth:        basicAuth,
 		}
 
 		if err := s.config.Save(s.config.ConfigFile); err != nil {
@@ -185,7 +213,7 @@ func (s *Server) handleAPIStaticSites(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": true,
-			"site":    s.config.StaticSites[existingIndex],
+			"site":    newStaticSiteAPIResponse(s.config.StaticSites[existingIndex]),
 			"action":  "updated",
 		})
 		return
@@ -441,7 +469,7 @@ func (s *Server) handleAPIStaticSitesDelete(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":      true,
-		"deleted_site": deletedSite,
+		"deleted_site": newStaticSiteAPIResponse(deletedSite),
 	})
 }
 
@@ -566,7 +594,7 @@ func (s *Server) handleAPIStaticSitesRename(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
-		"site":    s.config.StaticSites[targetIndex],
+		"site":    newStaticSiteAPIResponse(s.config.StaticSites[targetIndex]),
 	})
 }
 

@@ -837,6 +837,17 @@ export const zhCN: Translation = {
     tryFilesEnabled: '已启用',
     tryFilesDisabled: '已禁用',
     tryFilesHelp: '启用后，请求路径不存在时回退到默认文件，用于 Vue/React Router 等 SPA 前端路由',
+    basicAuthTitle: '基础访问认证',
+    basicAuthDescription: '访问此静态站点的文件或路径代理前，要求客户端提供用户名和密码。',
+    basicAuthEnabled: '已启用 Basic Auth',
+    basicAuthDisabled: '未启用 Basic Auth',
+    basicAuthUsername: '用户名',
+    basicAuthPassword: '密码',
+    basicAuthPasswordPlaceholder: '输入新密码',
+    basicAuthPasswordSetHelp: '密码已设置；留空可保留原密码，输入内容则更新密码。',
+    basicAuthPasswordNewHelp: '首次启用时必须设置密码。',
+    basicAuthUsernameRequired: '启用 Basic Auth 时必须填写用户名。',
+    basicAuthPasswordRequired: '首次启用 Basic Auth 时必须设置密码。',
   },
 
   cdn: {

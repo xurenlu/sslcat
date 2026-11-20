@@ -6,6 +6,8 @@ import (
 	"sort"
 )
 
+const acmeDNSChallengeTTL = 600
+
 // DNSProviderManager DNS服务商管理器
 type DNSProviderManager struct {
 	providers  map[string]DNSProviderInterface
@@ -229,7 +231,7 @@ func (m *DNSProviderManager) ListProviders() []string {
 
 // CreateDNSChallengeWithFailover 使用故障转移机制创建DNS挑战
 func (m *DNSProviderManager) CreateDNSChallengeWithFailover(ctx context.Context, domain, name, value string) (interface{}, error) {
-	err := m.SetTXTRecordWithFailover(ctx, domain, name, value, 600)
+	err := m.SetTXTRecordWithFailover(ctx, domain, name, value, acmeDNSChallengeTTL)
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +252,7 @@ func (m *DNSProviderManager) CreateDNSChallenge(ctx context.Context, domain, nam
 		return nil, err
 	}
 
-	err = provider.SetTXTRecord(ctx, domain, name, value, 600)
+	err = provider.SetTXTRecord(ctx, domain, name, value, acmeDNSChallengeTTL)
 	if err != nil {
 		return nil, err
 	}
@@ -260,6 +262,24 @@ func (m *DNSProviderManager) CreateDNSChallenge(ctx context.Context, domain, nam
 		Name:   name,
 		Value:  value,
 		Type:   "dns-01",
+	}, nil
+}
+
+// presentDNSChallenge binds cleanup to the exact provider instance that created
+// the record, even if provider registrations change before cleanup runs.
+func (m *DNSProviderManager) presentDNSChallenge(ctx context.Context, domain, name, value, providerName string) (func() error, error) {
+	provider, err := m.GetProvider(providerName)
+	if err != nil {
+		return nil, err
+	}
+	if err := provider.SetTXTRecord(ctx, domain, name, value, acmeDNSChallengeTTL); err != nil {
+		return nil, fmt.Errorf("create DNS challenge with provider %s: %w", providerName, err)
+	}
+	return func() error {
+		if err := provider.DeleteTXTRecord(ctx, domain, name); err != nil {
+			return fmt.Errorf("cleanup DNS challenge with provider %s: %w", providerName, err)
+		}
+		return nil
 	}, nil
 }
 

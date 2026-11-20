@@ -71,14 +71,45 @@ func (m *Manager) sendProgressEvent(domain string, event CertProgressEvent) {
 	m.progressMutex.RLock()
 	defer m.progressMutex.RUnlock()
 
+	if requested, ok := m.progressRoutes[domain]; ok {
+		domain = requested
+	}
+	m.sendProgressEventLocked(domain, event)
+}
+
+// Final request events already carry the SSE identity and must bypass issuance
+// routing, including a queued request that just obtained the same SAN lock.
+func (m *Manager) sendRequestProgressEvent(domain string, event CertProgressEvent) {
+	m.progressMutex.RLock()
+	defer m.progressMutex.RUnlock()
+	m.sendProgressEventLocked(domain, event)
+}
+
+func (m *Manager) sendProgressEventLocked(domain string, event CertProgressEvent) {
 	ch, ok := m.progressChannels[domain]
 	if !ok {
 		return
 	}
+	event.Domain = domain
 	select {
 	case ch <- event:
 	default:
 		// 通道已满，跳过（避免阻塞）
+	}
+}
+
+// The caller holds the issuance identity lock for the entire routed operation.
+func (m *Manager) routeProgressIdentity(issued, requested string) func() {
+	m.progressMutex.Lock()
+	if m.progressRoutes == nil {
+		m.progressRoutes = make(map[string]string)
+	}
+	m.progressRoutes[issued] = requested
+	m.progressMutex.Unlock()
+	return func() {
+		m.progressMutex.Lock()
+		delete(m.progressRoutes, issued)
+		m.progressMutex.Unlock()
 	}
 }
 

@@ -45,6 +45,10 @@ interface StaticSiteForm {
   error_log_path: string
   http2_enabled: boolean | null
   http3_enabled: boolean | null
+  basic_auth_enabled: boolean
+  basic_auth_username: string
+  basic_auth_password: string
+  basic_auth_password_set: boolean
 }
 
 const StaticSiteEdit: React.FC = () => {
@@ -71,6 +75,10 @@ const StaticSiteEdit: React.FC = () => {
     error_log_path: '',
     http2_enabled: null,
     http3_enabled: null,
+    basic_auth_enabled: false,
+    basic_auth_username: '',
+    basic_auth_password: '',
+    basic_auth_password_set: false,
   })
   
   const [loading, setLoading] = useState(false)
@@ -110,6 +118,10 @@ const StaticSiteEdit: React.FC = () => {
             error_log_path: site.error_log_path || '',
             http2_enabled: site.http2_enabled ?? null,
             http3_enabled: site.http3_enabled ?? null,
+            basic_auth_enabled: site.basic_auth?.enabled ?? false,
+            basic_auth_username: site.basic_auth?.username ?? '',
+            basic_auth_password: '',
+            basic_auth_password_set: site.basic_auth?.password_set ?? false,
           })
         }
       } catch (error) {
@@ -158,6 +170,28 @@ const StaticSiteEdit: React.FC = () => {
       return
     }
 
+    if (formData.basic_auth_enabled && !formData.basic_auth_username.trim()) {
+      toast({
+        title: t.sites.basicAuthTitle,
+        description: t.sites.basicAuthUsernameRequired,
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+      return
+    }
+
+    if (formData.basic_auth_enabled && !formData.basic_auth_password_set && !formData.basic_auth_password) {
+      toast({
+        title: t.sites.basicAuthTitle,
+        description: t.sites.basicAuthPasswordRequired,
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+      return
+    }
+
     setSaving(true)
     try {
       // 如果没有 domain 参数，说明是新增站点，使用 POST；否则使用 PUT 更新
@@ -183,6 +217,11 @@ const StaticSiteEdit: React.FC = () => {
           error_log_path: formData.error_log_path || undefined,
           http2_enabled: formData.http2_enabled,
           http3_enabled: formData.http3_enabled,
+          basic_auth: {
+            enabled: formData.basic_auth_enabled,
+            username: formData.basic_auth_username.trim(),
+            password: formData.basic_auth_password || undefined,
+          },
         }),
       })
 
@@ -468,6 +507,59 @@ const StaticSiteEdit: React.FC = () => {
                     </Button>
                   </HStack>
                 </Box>
+              </SimpleGrid>
+            </VStack>
+          </CardBody>
+        </Card>
+
+        {/* 静态站点访问认证 */}
+        <Card>
+          <CardBody>
+            <VStack spacing={4} align="stretch">
+              <Heading size="md" display="flex" alignItems="center">
+                <Icon as={FiShield} mr={2} />
+                {t.sites.basicAuthTitle}
+              </Heading>
+              <Text fontSize="sm" color="gray.500">
+                {t.sites.basicAuthDescription}
+              </Text>
+              <FormControl display="flex" alignItems="center">
+                <Switch
+                  id="static-basic-auth-enabled"
+                  isChecked={formData.basic_auth_enabled}
+                  onChange={(event) => handleInputChange('basic_auth_enabled', event.target.checked)}
+                />
+                <FormLabel htmlFor="static-basic-auth-enabled" mb="0" ml={2}>
+                  {formData.basic_auth_enabled ? t.sites.basicAuthEnabled : t.sites.basicAuthDisabled}
+                </FormLabel>
+              </FormControl>
+              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                <FormControl isRequired={formData.basic_auth_enabled} isDisabled={!formData.basic_auth_enabled}>
+                  <FormLabel>{t.sites.basicAuthUsername}</FormLabel>
+                  <Input
+                    value={formData.basic_auth_username}
+                    onChange={(event) => handleInputChange('basic_auth_username', event.target.value)}
+                    autoComplete="username"
+                  />
+                </FormControl>
+                <FormControl
+                  isRequired={formData.basic_auth_enabled && !formData.basic_auth_password_set}
+                  isDisabled={!formData.basic_auth_enabled}
+                >
+                  <FormLabel>{t.sites.basicAuthPassword}</FormLabel>
+                  <Input
+                    type="password"
+                    value={formData.basic_auth_password}
+                    onChange={(event) => handleInputChange('basic_auth_password', event.target.value)}
+                    placeholder={t.sites.basicAuthPasswordPlaceholder}
+                    autoComplete="new-password"
+                  />
+                  <FormHelperText>
+                    {formData.basic_auth_password_set
+                      ? t.sites.basicAuthPasswordSetHelp
+                      : t.sites.basicAuthPasswordNewHelp}
+                  </FormHelperText>
+                </FormControl>
               </SimpleGrid>
             </VStack>
           </CardBody>

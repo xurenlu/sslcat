@@ -42,7 +42,7 @@ func (m *Manager) siteList(args []string) error {
 	}
 	if hasFlag(args, "--json", "-json") {
 		return printJSON(map[string]interface{}{
-			"static_sites": m.config.StaticSites,
+			"static_sites": redactedStaticSites(m.config.StaticSites),
 			"php_sites":    m.config.PHPSites,
 		})
 	}
@@ -68,6 +68,20 @@ func (m *Manager) siteList(args []string) error {
 		}
 	}
 	return nil
+}
+
+func redactedStaticSites(sites []config.StaticSite) []config.StaticSite {
+	redacted := make([]config.StaticSite, len(sites))
+	copy(redacted, sites)
+	for i := range redacted {
+		if redacted[i].BasicAuth == nil {
+			continue
+		}
+		auth := *redacted[i].BasicAuth
+		auth.PasswordHash = ""
+		redacted[i].BasicAuth = &auth
+	}
+	return redacted
 }
 
 func (m *Manager) siteAdd(args []string) error {
