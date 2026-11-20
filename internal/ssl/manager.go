@@ -65,6 +65,7 @@ type Manager struct {
 	metadataMutex     sync.RWMutex
 	// 证书申请进度事件通道：用于实时推送申请进度
 	progressChannels map[string]chan CertProgressEvent
+	progressRoutes   map[string]string // issued SAN -> requested progress identity
 	progressMutex    sync.RWMutex
 	certRequestLocks map[string]*certRequestLock
 	certRequestMu    sync.Mutex
@@ -75,6 +76,19 @@ type Manager struct {
 	acmeAccountKeyMutex sync.Mutex
 	// certDiskModTime 记录各域名证书文件上次加载时的 ModTime，用于热加载（CLI/外部更新磁盘后不重启）
 	certDiskModTime map[string]time.Time
+	// 本地加载与签发独立加锁；覆盖读盘、校验及发布整个过程。
+	certStoreMu        sync.Mutex
+	certDiskState      map[string]certDiskState
+	certLoadFailures   map[string]certLoadFailure
+	certDirectoryState certDiskState
+	certLastScan       time.Time
+	// SAN index is rebuilt only when cache contents change, under certMutex.
+	certIndex       map[string][]indexedCertificate
+	renewalMu       sync.Mutex
+	renewalFailures map[string]time.Time
+	// 窄申请边界，测试可注入离线签发器，生产使用既有入口。
+	requestDNS  func(string, string) error
+	requestHTTP func(string) (*tls.Certificate, error)
 }
 
 // CertProgressEvent 证书申请进度事件
@@ -200,6 +214,7 @@ func (m *Manager) DeleteCertificate(domain string) error {
 	m.certMutex.Lock()
 	delete(m.certCache, domain)
 	delete(m.certDiskModTime, domain)
+	m.certIndex = nil
 	m.certMutex.Unlock()
 
 	m.metadataMutex.Lock()
@@ -458,118 +473,6 @@ func (m *Manager) notifyExpiringCerts() {
 	}
 }
 
-// GetCertificate 获取指定域名的证书
-func (m *Manager) GetCertificate(domain string) (*tls.Certificate, error) {
-	// 检查失败缓存，避免重复查找已知没有证书的域名
-	m.failedCacheMutex.RLock()
-	if expireTime, exists := m.failedDomainCache[domain]; exists {
-		if time.Now().Before(expireTime) {
-			// 仍在缓存期内，直接返回错误，避免重复查找
-			m.failedCacheMutex.RUnlock()
-			// 不记录日志，避免日志刷屏
-			return nil, fmt.Errorf("no certificate for %s (cached failure)", domain)
-		}
-		// 缓存已过期，删除过期条目
-		m.failedCacheMutex.RUnlock()
-		m.failedCacheMutex.Lock()
-		delete(m.failedDomainCache, domain)
-		m.failedCacheMutex.Unlock()
-	} else {
-		m.failedCacheMutex.RUnlock()
-	}
-
-	// 首先检查是否有包含此域名的多域名证书
-	var matchedKey string
-	m.certMutex.RLock()
-	for cachedDomain, cert := range m.certCache {
-		if m.domainMatchesCert(domain, cert) {
-			matchedKey = cachedDomain
-			break
-		}
-	}
-	m.certMutex.RUnlock()
-
-	if matchedKey != "" {
-		m.maybeReloadCertIfStale(matchedKey)
-		m.certMutex.RLock()
-		cert := m.certCache[matchedKey]
-		m.certMutex.RUnlock()
-		if cert != nil && m.domainMatchesCert(domain, cert) {
-			m.log.Debugf("Domain %s matches cached certificate %s", domain, matchedKey)
-			return cert, nil
-		}
-	}
-
-	// 检查单域名证书
-	m.certMutex.RLock()
-	_, directHit := m.certCache[domain]
-	m.certMutex.RUnlock()
-	if directHit {
-		m.maybeReloadCertIfStale(domain)
-		m.certMutex.RLock()
-		cert := m.certCache[domain]
-		m.certMutex.RUnlock()
-		if cert != nil {
-			return cert, nil
-		}
-	}
-
-	// 尝试查找通配符证书（例如 *.facev.app 匹配 f.facev.app）
-	if wildcardCert := m.findWildcardCert(domain); wildcardCert != nil {
-		m.log.Debugf("Domain %s matched wildcard certificate", domain)
-		return wildcardCert, nil
-	}
-
-	// 尝试从磁盘加载通配符证书
-	if cert := m.loadWildcardCertFromDisk(domain); cert != nil {
-		m.log.Debugf("Loaded wildcard certificate from disk for domain %s", domain)
-		return cert, nil
-	}
-
-	// 兼容历史上传方式：用户可能把通配符证书保存为具体域名文件名
-	// （例如 api.example.com.crt 的 SAN 是 *.example.com）。冷启动缓存为空时，
-	// 需要扫描磁盘证书 SAN，否则新子域会在重启后找不到可用证书。
-	if cert, certKey := m.loadMatchingCertFromDisk(domain); cert != nil {
-		m.log.Debugf("Loaded matching certificate from disk: %s for domain %s", certKey, domain)
-		return cert, nil
-	}
-
-	// 使用元数据缓存检查证书是否存在，避免频繁磁盘查找
-	metadata := m.getCertMetadata(domain)
-	if !metadata.exists {
-		// 证书不存在，添加到失败缓存
-		m.failedCacheMutex.Lock()
-		m.failedDomainCache[domain] = time.Now().Add(15 * time.Minute)
-		m.failedCacheMutex.Unlock()
-		return nil, fmt.Errorf("no certificate for %s", domain)
-	}
-
-	// 证书文件存在，从磁盘加载（与 CLI 续期等路径统一，并记录 cert mtime 供热加载）
-	if err := m.LoadCertificateFromDisk(domain); err != nil {
-		m.log.Errorf("Failed to load certificate %s: %v", domain, err)
-		m.metadataMutex.Lock()
-		m.certMetadataCache[domain] = &certMetadata{
-			exists:      false,
-			lastChecked: time.Now(),
-		}
-		m.metadataMutex.Unlock()
-		return nil, err
-	}
-
-	m.certMutex.RLock()
-	cert := m.certCache[domain]
-	m.certMutex.RUnlock()
-	if cert == nil {
-		return nil, fmt.Errorf("no certificate for %s", domain)
-	}
-
-	m.failedCacheMutex.Lock()
-	delete(m.failedDomainCache, domain)
-	m.failedCacheMutex.Unlock()
-
-	return cert, nil
-}
-
 // generateSelfSignedCert 生成自签名证书
 func (m *Manager) generateSelfSignedCert(domain string) (*tls.Certificate, error) {
 	// 生成私钥
@@ -608,27 +511,21 @@ func (m *Manager) generateSelfSignedCert(domain string) (*tls.Certificate, error
 		Bytes: certDER,
 	})
 
-	// 保存证书和密钥
-	certPath := filepath.Join(m.config.SSL.CertDir, domain+".crt")
-	keyPath := filepath.Join(m.config.SSL.KeyDir, domain+".key")
-
-	if err := writeFileAtomically(certPath, certPEM, 0644); err != nil {
-		m.log.Errorf("Failed to save certificate: %v", err)
-	}
-
-	if err := writeFileAtomically(keyPath, keyPEM, 0600); err != nil {
-		m.log.Errorf("Failed to save private key: %v", err)
-	}
-
-	// 加载证书到内存
+	// 与磁盘热加载串行发布，避免旧加载覆盖刚生成的新证书。
+	m.certStoreMu.Lock()
+	defer m.certStoreMu.Unlock()
 	cert, err := tls.X509KeyPair(certPEM, keyPEM)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse certificate: %w", err)
+	}
+	if err := m.writeCertificateLocked(domain, &cert); err != nil {
+		return nil, fmt.Errorf("save self-signed certificate for %s: %w", domain, err)
 	}
 
 	// 缓存证书
 	m.certMutex.Lock()
 	m.certCache[domain] = &cert
+	m.certIndex = nil
 	m.certMutex.Unlock()
 	m.updateCertMetadata(domain, &cert) // 更新元数据缓存
 
@@ -652,287 +549,6 @@ func (m *Manager) autoRenewCerts() {
 			return
 		}
 	}
-}
-
-// renewExpiringCerts 续期即将过期的证书
-func (m *Manager) renewExpiringCerts() {
-	// 从磁盘扫描所有证书文件，而不仅仅是内存缓存
-	// 这样可以确保所有证书都会被检查续期，即使没有被访问过
-	certDir := m.config.SSL.CertDir
-	entries, err := os.ReadDir(certDir)
-	if err != nil {
-		m.log.Warnf("Failed to read certificate directory for renewal check: %v", err)
-		return
-	}
-
-	var domains []string
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		name := e.Name()
-		if !strings.HasSuffix(strings.ToLower(name), ".crt") {
-			continue
-		}
-		domain := strings.TrimSuffix(name, ".crt")
-		domains = append(domains, domain)
-	}
-
-	m.log.Infof("Checking %d certificates for renewal", len(domains))
-
-	for _, domain := range domains {
-		certPath := filepath.Join(m.config.SSL.CertDir, domain+".crt")
-
-		// 检查证书是否即将过期（30天内）
-		if m.isCertExpiringSoon(certPath) {
-			m.log.Infof("Certificate expiring soon, starting renewal: %s", domain)
-			if m.config.SSL.DisableSelfSigned {
-				if m.acmeMgr != nil && m.isAllowedDomain(domain) {
-					cert, err := m.acmeMgr.GetCertificate(&tls.ClientHelloInfo{ServerName: domain})
-					if err != nil {
-						m.log.Errorf("ACME renewal failed %s: %v", domain, err)
-
-						// 发送证书续期失败通知
-						if m.notificationIntegrator != nil {
-							m.notificationIntegrator.SendCertFailedNotification(domain, fmt.Sprintf("自动续期失败: %v", err))
-						}
-					} else if cert != nil {
-						m.log.Infof("ACME renewal triggered: %s", domain)
-
-						// 立即保存证书到磁盘并加载到缓存
-						if saveErr := m.saveCertificateToDisk(domain, cert); saveErr != nil {
-							m.log.Warnf("Failed to save renewed certificate to disk for %s: %v", domain, saveErr)
-						} else {
-							// 保存成功后，加载到缓存
-							if loadErr := m.LoadCertificateFromDisk(domain); loadErr != nil {
-								m.log.Warnf("Failed to load renewed certificate from disk for %s: %v", domain, loadErr)
-								// 如果从磁盘加载失败，直接缓存内存中的证书
-								m.certMutex.Lock()
-								m.certCache[domain] = cert
-								m.certMutex.Unlock()
-								m.updateCertMetadata(domain, cert)
-							}
-							// 清除失败缓存
-							m.failedCacheMutex.Lock()
-							delete(m.failedDomainCache, domain)
-							m.failedCacheMutex.Unlock()
-						}
-
-						// 同时尝试同步 ACME 缓存中的其他证书
-						if _, syncErr := m.SyncACMECertsToDisk(); syncErr != nil {
-							m.log.Debugf("ACME post-renewal sync failed: %v", syncErr)
-						}
-
-						// 发送证书续期成功通知
-						if m.notificationIntegrator != nil {
-							m.notificationIntegrator.SendCertSuccessNotification(domain, 1, 0)
-						}
-					} else {
-						m.log.Warnf("ACME renewal returned nil certificate for %s", domain)
-					}
-				} else {
-					m.log.Warnf("Self-signed renewal disabled; ACME unavailable or domain not allowed: %s", domain)
-				}
-				continue
-			}
-			if _, err := m.generateSelfSignedCert(domain); err != nil {
-				m.log.Errorf("Failed to renew certificate %s: %v", domain, err)
-			}
-		}
-	}
-}
-
-// isCertExpiringSoon 检查证书是否即将过期
-func (m *Manager) isCertExpiringSoon(certPath string) bool {
-	certData, err := os.ReadFile(certPath)
-	if err != nil {
-		return false
-	}
-
-	block, _ := pem.Decode(certData)
-	if block == nil {
-		return false
-	}
-
-	cert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return false
-	}
-
-	// 检查是否在30天内过期
-	return time.Until(cert.NotAfter) < 30*24*time.Hour
-}
-
-// domainMatchesCert 检查域名是否匹配证书的SAN
-func (m *Manager) domainMatchesCert(domain string, cert *tls.Certificate) bool {
-	if len(cert.Certificate) == 0 {
-		return false
-	}
-
-	x509Cert, err := x509.ParseCertificate(cert.Certificate[0])
-	if err != nil {
-		return false
-	}
-
-	return certificateMatchesDomain(domain, x509Cert)
-}
-
-func certificateMatchesDomain(domain string, cert *x509.Certificate) bool {
-	if cert.Subject.CommonName == domain {
-		return true
-	}
-
-	for _, dnsName := range cert.DNSNames {
-		if matchDomain(domain, dnsName) {
-			return true
-		}
-	}
-
-	return false
-}
-
-// findWildcardCert 查找匹配的通配符证书
-func (m *Manager) findWildcardCert(domain string) *tls.Certificate {
-	parts := strings.Split(domain, ".")
-	if len(parts) < 2 {
-		return nil
-	}
-
-	wildcardDomain := "*." + strings.Join(parts[1:], ".")
-
-	var matchedKey string
-	m.certMutex.RLock()
-	for cachedDomain, cert := range m.certCache {
-		if cachedDomain == wildcardDomain || strings.Contains(cachedDomain, "*") {
-			if m.domainMatchesCert(domain, cert) {
-				matchedKey = cachedDomain
-				break
-			}
-		}
-	}
-	m.certMutex.RUnlock()
-
-	if matchedKey != "" {
-		m.maybeReloadCertIfStale(matchedKey)
-		m.certMutex.RLock()
-		cert := m.certCache[matchedKey]
-		m.certMutex.RUnlock()
-		if cert != nil && m.domainMatchesCert(domain, cert) {
-			m.log.Debugf("Domain %s matches wildcard certificate %s", domain, matchedKey)
-			return cert
-		}
-	}
-
-	return nil
-}
-
-// loadWildcardCertFromDisk 从磁盘加载通配符证书
-func (m *Manager) loadWildcardCertFromDisk(domain string) *tls.Certificate {
-	parts := strings.Split(domain, ".")
-	if len(parts) < 2 {
-		return nil
-	}
-
-	// 尝试匹配 *.domain.com 格式的通配符证书文件名
-	wildcardDomain := "*." + strings.Join(parts[1:], ".")
-	certPath := filepath.Join(m.config.SSL.CertDir, wildcardDomain+".crt")
-	keyPath := filepath.Join(m.config.SSL.KeyDir, wildcardDomain+".key")
-
-	// 检查文件是否存在
-	if _, err := os.Stat(certPath); err != nil {
-		return nil
-	}
-	if _, err := os.Stat(keyPath); err != nil {
-		return nil
-	}
-
-	// 加载证书
-	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
-	if err != nil {
-		m.log.Errorf("Failed to load wildcard certificate %s: %v", wildcardDomain, err)
-		return nil
-	}
-
-	// 验证证书是否匹配域名
-	if !m.domainMatchesCert(domain, &cert) {
-		m.log.Debugf("Wildcard certificate %s does not match domain %s", wildcardDomain, domain)
-		return nil
-	}
-
-	// 加载成功，更新证书缓存与磁盘 mtime（供热加载）
-	m.certMutex.Lock()
-	m.certCache[wildcardDomain] = &cert
-	if st, err := os.Stat(certPath); err == nil {
-		m.certDiskModTime[wildcardDomain] = st.ModTime()
-	}
-	m.certMutex.Unlock()
-	m.updateCertMetadata(wildcardDomain, &cert)
-
-	m.log.Debugf("Loaded wildcard certificate from disk: %s for domain %s", wildcardDomain, domain)
-	return &cert
-}
-
-func (m *Manager) loadMatchingCertFromDisk(domain string) (*tls.Certificate, string) {
-	entries, err := os.ReadDir(m.config.SSL.CertDir)
-	if err != nil {
-		m.log.Debugf("Failed to scan certificate directory for %s: %v", domain, err)
-		return nil, ""
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if !strings.HasSuffix(strings.ToLower(name), ".crt") {
-			continue
-		}
-
-		certKey := strings.TrimSuffix(name, ".crt")
-		certPath := filepath.Join(m.config.SSL.CertDir, name)
-		keyPath := filepath.Join(m.config.SSL.KeyDir, certKey+".key")
-		certStat, statErr := os.Stat(certPath)
-		if statErr != nil {
-			continue
-		}
-
-		certData, readErr := os.ReadFile(certPath)
-		if readErr != nil {
-			continue
-		}
-		block, _ := pem.Decode(certData)
-		if block == nil || block.Type != "CERTIFICATE" {
-			continue
-		}
-		x509Cert, parseErr := x509.ParseCertificate(block.Bytes)
-		if parseErr != nil || !certificateMatchesDomain(domain, x509Cert) {
-			continue
-		}
-
-		if _, statErr := os.Stat(keyPath); statErr != nil {
-			continue
-		}
-
-		cert, loadErr := tls.LoadX509KeyPair(certPath, keyPath)
-		if loadErr != nil {
-			m.log.Debugf("Skipping certificate %s during SAN scan: %v", certKey, loadErr)
-			continue
-		}
-
-		m.certMutex.Lock()
-		m.certCache[certKey] = &cert
-		m.certDiskModTime[certKey] = certStat.ModTime()
-		m.certMutex.Unlock()
-		m.updateCertMetadata(certKey, &cert)
-
-		m.failedCacheMutex.Lock()
-		delete(m.failedDomainCache, domain)
-		m.failedCacheMutex.Unlock()
-
-		return &cert, certKey
-	}
-
-	return nil, ""
 }
 
 // matchDomain 域名匹配函数，支持通配符
@@ -982,7 +598,7 @@ func (m *Manager) GetTLSConfig() *tls.Config {
 					return cert, nil
 				}
 				// 如果没有证书，回退到默认自签证书
-				if m.defaultCert != nil {
+				if m.domainMatchesCert(host, m.defaultCert) {
 					return m.defaultCert, nil
 				}
 				return nil, fmt.Errorf("no certificate available for %s (certificate must be requested manually from admin panel)", host)
@@ -992,7 +608,7 @@ func (m *Manager) GetTLSConfig() *tls.Config {
 			if cert, err := m.GetCertificate(host); err == nil {
 				return cert, nil
 			}
-			if m.defaultCert != nil {
+			if m.domainMatchesCert(host, m.defaultCert) {
 				return m.defaultCert, nil
 			}
 			return nil, fmt.Errorf("no certificate available for %s", host)
@@ -1324,47 +940,12 @@ func (m *Manager) EnableACME() error {
 	return nil
 }
 
-// EnsureDomainCert 主动为指定域名申请（或加载）证书（当启用 ACME 时）
-func (m *Manager) EnsureDomainCert(domain string) error {
-	if m.acmeMgr == nil {
-		return nil
-	}
-	domain = strings.ToLower(strings.TrimSpace(domain))
-	if domain == "" {
-		return fmt.Errorf("empty domain")
-	}
-	unlock := m.lockCertRequest(domain)
-	defer unlock()
-
-	// 记录证书续期/申请请求的详细信息
-	m.log.Infof("Certificate request initiated for domain: %s", domain)
-
-	// 检查是否已有证书，记录旧证书的有效期
-	if existingCert := m.getCertificateFromCache(domain); existingCert != nil {
-		if x509Cert, err := x509.ParseCertificate(existingCert.Certificate[0]); err == nil {
-			m.log.Infof("Existing certificate found for %s: NotBefore=%v, NotAfter=%v, DaysRemaining=%.1f",
-				domain, x509Cert.NotBefore, x509Cert.NotAfter, time.Until(x509Cert.NotAfter).Hours()/24)
-
-			// 强制删除ACME缓存中的旧证书，以触发重新申请
-			if m.acmeMgr.Cache != nil {
-				m.log.Infof("Deleting ACME cache for %s to force renewal", domain)
-				if err := m.acmeMgr.Cache.Delete(context.Background(), domain); err != nil {
-					m.log.Warnf("Failed to delete ACME cache for %s: %v (will continue anyway)", domain, err)
-				} else {
-					m.log.Infof("ACME cache deleted successfully for %s", domain)
-				}
-			}
-		}
-	} else {
-		m.log.Infof("No existing certificate found for %s, will request new certificate", domain)
-	}
-
-	// 不重试，一次失败就结束
-	return m.ensureDomainCertWithRetry(domain, 1)
-}
-
 // ensureDomainCertWithRetry 带重试机制的证书申请
 func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error {
+	providerName, challengeErr := m.selectChallenge(domain)
+	if challengeErr != nil {
+		return challengeErr
+	}
 	var lastErr error
 	startTime := time.Now()
 
@@ -1396,148 +977,25 @@ func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error
 			})
 		}
 
-		// 第一次尝试时检查域名解析
-		if attempt == 1 {
+		// 挑战方式由 CLI 和后台共享的 selectChallenge 决定。
+		if providerName != "" {
 			m.sendProgressEvent(domain, CertProgressEvent{
-				Domain:      domain,
-				Status:      "checking_dns",
-				Message:     "正在检查域名解析...",
-				Attempt:     attempt,
-				MaxAttempts: maxRetries,
-				Progress:    10,
-				Timestamp:   time.Now(),
+				Domain: domain, Status: "using_dns01",
+				Message: fmt.Sprintf("使用 DNS-01 验证，DNS服务商: %s", providerName),
+				Attempt: attempt, MaxAttempts: maxRetries, Progress: 30, Timestamp: time.Now(),
 			})
-
-			dnsCheckStart := time.Now()
-			if resolved, info, err := m.checkDomainResolution(domain); err != nil {
-				m.log.Warnf("Domain resolution check failed for %s: %v", domain, err)
+			if err := m.issueDNSCertificate(domain, providerName); err != nil {
 				m.sendProgressEvent(domain, CertProgressEvent{
-					Domain:      domain,
-					Status:      "checking_dns",
-					Message:     fmt.Sprintf("DNS解析检查失败: %v", err),
-					Attempt:     attempt,
-					MaxAttempts: maxRetries,
-					Progress:    15,
-					Error:       err.Error(),
-					Timestamp:   time.Now(),
+					Domain: domain, Status: "failed", Message: fmt.Sprintf("DNS-01 验证失败: %v", err),
+					Attempt: attempt, MaxAttempts: maxRetries, Error: err.Error(), Timestamp: time.Now(),
 				})
-			} else {
-				dnsCheckDuration := time.Since(dnsCheckStart)
-				m.log.Infof("Domain resolution check for %s: %s (耗时: %v)", domain, info, dnsCheckDuration)
-				resolvedMsg := "DNS解析检查完成"
-				if !resolved {
-					resolvedMsg = "DNS解析检查完成，但域名可能未指向本服务器"
-					m.log.Warnf("Domain %s may not resolve to this server, HTTP-01 validation might fail", domain)
+				if m.notificationIntegrator != nil {
+					m.notificationIntegrator.SendCertFailedNotification(domain, err.Error())
 				}
-				m.sendProgressEvent(domain, CertProgressEvent{
-					Domain:      domain,
-					Status:      "checking_dns",
-					Message:     resolvedMsg + ": " + info,
-					Attempt:     attempt,
-					MaxAttempts: maxRetries,
-					Progress:    15,
-					Timestamp:   time.Now(),
-				})
+				return fmt.Errorf("DNS-01 request for %s failed: %w", domain, err)
 			}
-		}
-
-		// 临时放行该域名以触发申请（避免必须写入配置）
-		m.AllowDomainTemporary(domain, 24*time.Hour)
-
-		// 优先使用DNS-01验证（如果配置了DNS提供商且域名属于某个提供商）
-		supportsDNS := m.supportsDNSChallenge()
-		hasProvider := m.hasAvailableDNSProvider()
-		m.log.Infof("Certificate request for %s: supportsDNSChallenge=%v, hasAvailableDNSProvider=%v", domain, supportsDNS, hasProvider)
-
-		if supportsDNS && hasProvider {
-			providerName := m.findDNSProviderForDomain(domain)
-			m.log.Infof("findDNSProviderForDomain(%s) returned: %s", domain, providerName)
-
-			if providerName != "" {
-				m.sendProgressEvent(domain, CertProgressEvent{
-					Domain:      domain,
-					Status:      "using_dns01",
-					Message:     fmt.Sprintf("使用 DNS-01 验证，DNS服务商: %s", providerName),
-					Attempt:     attempt,
-					MaxAttempts: maxRetries,
-					Progress:    30,
-					Timestamp:   time.Now(),
-				})
-
-				dnsStart := time.Now()
-				m.log.Infof("Domain %s found in DNS provider %s, using DNS-01 validation", domain, providerName)
-				if dnsErr := m.RequestCertificateWithDNS(domain, providerName); dnsErr == nil {
-					dnsDuration := time.Since(dnsStart)
-					totalDuration := time.Since(startTime)
-					m.log.Infof("DNS-01 validation successful for domain: %s (DNS耗时: %v, 总耗时: %v)", domain, dnsDuration, totalDuration)
-
-					m.sendProgressEvent(domain, CertProgressEvent{
-						Domain:      domain,
-						Status:      "success",
-						Message:     fmt.Sprintf("证书申请成功！耗时: %v", totalDuration),
-						Attempt:     attempt,
-						MaxAttempts: maxRetries,
-						Progress:    100,
-						Timestamp:   time.Now(),
-					})
-
-					// 发送证书申请成功通知
-					if m.notificationIntegrator != nil {
-						m.notificationIntegrator.SendCertSuccessNotification(domain, attempt, totalDuration)
-					}
-
-					return nil
-				} else {
-					dnsDuration := time.Since(dnsStart)
-					m.log.Warnf("DNS-01 validation failed for %s (耗时: %v): %v, will try HTTP-01 as fallback", domain, dnsDuration, dnsErr)
-
-					m.sendProgressEvent(domain, CertProgressEvent{
-						Domain:      domain,
-						Status:      "using_dns01",
-						Message:     fmt.Sprintf("DNS-01 验证失败，将尝试 HTTP-01: %v", dnsErr),
-						Attempt:     attempt,
-						MaxAttempts: maxRetries,
-						Progress:    50,
-						Error:       dnsErr.Error(),
-						Timestamp:   time.Now(),
-					})
-					// DNS-01失败，继续尝试HTTP-01作为备选
-				}
-			} else {
-				m.log.Warnf("Domain %s not found in any DNS provider, will use HTTP-01", domain)
-			}
-		} else {
-			// 详细说明为什么没有使用 DNS-01
-			var reasons []string
-			if !supportsDNS {
-				if len(m.config.SSL.ChallengeMethods) > 0 {
-					reasons = append(reasons, fmt.Sprintf("DNS-01 未在配置的挑战方法中 (当前配置: %v)", m.config.SSL.ChallengeMethods))
-				} else {
-					reasons = append(reasons, "未配置挑战方法且没有可用的 DNS 提供商")
-				}
-			}
-			if !hasProvider {
-				reasons = append(reasons, "没有可用的 DNS 提供商")
-			}
-			if supportsDNS && hasProvider {
-				// 这种情况说明 findDNSProviderForDomain 返回了空字符串
-				reasons = append(reasons, fmt.Sprintf("域名 %s 不在任何已配置的 DNS 提供商管理的域名列表中", domain))
-			}
-
-			if len(reasons) > 0 {
-				reasonMsg := strings.Join(reasons, "; ")
-				m.log.Warnf("将使用 HTTP-01 验证申请证书 %s，原因: %s", domain, reasonMsg)
-
-				m.sendProgressEvent(domain, CertProgressEvent{
-					Domain:      domain,
-					Status:      "using_http01",
-					Message:     fmt.Sprintf("将使用 HTTP-01 验证，原因: %s", reasonMsg),
-					Attempt:     attempt,
-					MaxAttempts: maxRetries,
-					Progress:    30,
-					Timestamp:   time.Now(),
-				})
-			}
+			// The caller reports success only after historical aliases persist.
+			return nil
 		}
 
 		// 尝试HTTP-01验证（作为备选或主要方式）
@@ -1553,7 +1011,7 @@ func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error
 			Timestamp:   time.Now(),
 		})
 		acmeStart := time.Now()
-		cert, err := m.acmeMgr.GetCertificate(&tls.ClientHelloInfo{ServerName: domain})
+		cert, err := m.issueHTTPCertificate(domain)
 		acmeDuration := time.Since(acmeStart)
 		if err == nil && cert == nil {
 			err = fmt.Errorf("acme returned nil certificate")
@@ -1573,65 +1031,8 @@ func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error
 
 			syncStart := time.Now()
 
-			// 记录新证书的有效期信息
-			if x509Cert, err := x509.ParseCertificate(cert.Certificate[0]); err == nil {
-				m.log.Infof("New certificate obtained for %s: NotBefore=%v, NotAfter=%v, ValidDays=%.1f",
-					domain, x509Cert.NotBefore, x509Cert.NotAfter, x509Cert.NotAfter.Sub(x509Cert.NotBefore).Hours()/24)
-			}
-
-			// 先保存证书到磁盘
-			if saveErr := m.saveCertificateToDisk(domain, cert); saveErr != nil {
-				m.log.Errorf("Failed to save certificate to disk for %s: %v", domain, saveErr)
-				// 即使保存失败，也尝试直接缓存内存中的证书
-				m.certMutex.Lock()
-				m.certCache[domain] = cert
-				m.certMutex.Unlock()
-				m.updateCertMetadata(domain, cert)
-				m.log.Infof("Certificate cached in memory for %s (disk save failed)", domain)
-				// 清除失败缓存
-				m.failedCacheMutex.Lock()
-				delete(m.failedDomainCache, domain)
-				m.failedCacheMutex.Unlock()
-			} else {
-				certPath := filepath.Join(m.config.SSL.CertDir, domain+".crt")
-				keyPath := filepath.Join(m.config.SSL.KeyDir, domain+".key")
-				m.log.Infof("Certificate saved to disk: cert=%s, key=%s", certPath, keyPath)
-
-				// 保存成功后，强制从磁盘重新加载证书以确保缓存是最新的
-				m.log.Infof("Reloading certificate from disk to ensure cache is up-to-date: %s", domain)
-
-				// 先清除旧的缓存
-				m.certMutex.Lock()
-				delete(m.certCache, domain)
-				m.certMutex.Unlock()
-
-				if loadErr := m.LoadCertificateFromDisk(domain); loadErr != nil {
-					m.log.Errorf("Failed to load certificate from disk for %s: %v", domain, loadErr)
-					// 如果从磁盘加载失败，直接缓存内存中的证书
-					m.certMutex.Lock()
-					m.certCache[domain] = cert
-					m.certMutex.Unlock()
-					m.updateCertMetadata(domain, cert)
-					m.log.Infof("Certificate cached in memory for %s (disk load failed)", domain)
-				} else {
-					m.log.Infof("Certificate successfully loaded from disk to cache: %s", domain)
-					// 验证加载的证书有效期
-					if loadedCert := m.getCertificateFromCache(domain); loadedCert != nil {
-						if x509Cert, err := x509.ParseCertificate(loadedCert.Certificate[0]); err == nil {
-							m.log.Infof("Loaded certificate verification for %s: NotAfter=%v, DaysRemaining=%.1f",
-								domain, x509Cert.NotAfter, time.Until(x509Cert.NotAfter).Hours()/24)
-						}
-					}
-				}
-				// 清除失败缓存（LoadCertificateFromDisk 内部应该已经处理了，但为了安全还是清除一下）
-				m.failedCacheMutex.Lock()
-				delete(m.failedDomainCache, domain)
-				m.failedCacheMutex.Unlock()
-			}
-
-			// 同时尝试同步 ACME 缓存中的其他证书
-			if _, syncErr := m.SyncACMECertsToDisk(); syncErr != nil {
-				m.log.Debugf("ACME post-issue sync failed: %v", syncErr)
+			if saveErr := m.persistIssuedCertificate(domain, cert); saveErr != nil {
+				return fmt.Errorf("persist issued certificate for %s: %w", domain, saveErr)
 			}
 			syncDuration := time.Since(syncStart)
 
@@ -1639,21 +1040,7 @@ func (m *Manager) ensureDomainCertWithRetry(domain string, maxRetries int) error
 			m.log.Infof("Certificate request successful for domain: %s (attempt %d, ACME耗时: %v, 同步耗时: %v, 总耗时: %v)",
 				domain, attempt, acmeDuration, syncDuration, totalDuration)
 
-			m.sendProgressEvent(domain, CertProgressEvent{
-				Domain:      domain,
-				Status:      "success",
-				Message:     fmt.Sprintf("证书申请成功！总耗时: %v", totalDuration),
-				Attempt:     attempt,
-				MaxAttempts: maxRetries,
-				Progress:    100,
-				Timestamp:   time.Now(),
-			})
-
-			// 发送证书申请成功通知
-			if m.notificationIntegrator != nil {
-				m.notificationIntegrator.SendCertSuccessNotification(domain, attempt, totalDuration)
-			}
-
+			// The caller reports success after alias synchronization as well.
 			return nil
 		}
 
@@ -1733,9 +1120,9 @@ func (m *Manager) tryDNSValidation(domain string) error {
 // findDNSProviderForDomain 查找域名属于哪个DNS提供商
 func (m *Manager) findDNSProviderForDomain(domain string) string {
 	// 处理通配符域名：*.example.com -> example.com
-	searchDomain := domain
-	if strings.HasPrefix(domain, "*.") {
-		searchDomain = domain[2:]
+	searchDomain := normalizedCertName(domain)
+	if strings.HasPrefix(searchDomain, "*.") {
+		searchDomain = searchDomain[2:]
 		m.log.Debugf("Wildcard domain detected: %s, using root domain: %s", domain, searchDomain)
 	}
 
@@ -1780,8 +1167,10 @@ func (m *Manager) findDNSProviderForDomain(domain string) string {
 		// 检查域名是否在该提供商的域名列表中
 		for _, d := range domains {
 			if d.Type == "domain" {
-				// 精确匹配或主域名匹配
-				if strings.EqualFold(d.Name, domain) || strings.EqualFold(d.Name, mainDomain) {
+				// Match the complete zone suffix, including delegated zones and
+				// multi-label public suffixes; never infer a zone from two labels.
+				zone := normalizedCertName(d.Name)
+				if zone != "" && (searchDomain == zone || strings.HasSuffix(searchDomain, "."+zone)) {
 					m.log.Infof("Domain %s matched provider %s (matched domain: %s)", domain, providerName, d.Name)
 					return providerName
 				}
@@ -2085,22 +1474,14 @@ func (m *Manager) GenerateMultiDomainCert(domains []string) (*tls.Certificate, e
 		Bytes: certDER,
 	})
 
-	// 保存多域名证书 (使用主域名作为文件名)
-	certPath := filepath.Join(m.config.SSL.CertDir, primaryDomain+".crt")
-	keyPath := filepath.Join(m.config.SSL.KeyDir, primaryDomain+".key")
-
-	if err := writeFileAtomically(certPath, certPEM, 0644); err != nil {
-		m.log.Errorf("Failed to save certificate: %v", err)
-	}
-
-	if err := writeFileAtomically(keyPath, keyPEM, 0600); err != nil {
-		m.log.Errorf("Failed to save private key: %v", err)
-	}
-
-	// 加载证书到内存
+	m.certStoreMu.Lock()
+	defer m.certStoreMu.Unlock()
 	cert, err := tls.X509KeyPair(certPEM, keyPEM)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse certificate: %w", err)
+	}
+	if err := m.writeCertificateLocked(primaryDomain, &cert); err != nil {
+		return nil, fmt.Errorf("save multi-domain certificate for %s: %w", primaryDomain, err)
 	}
 
 	// 为所有域名缓存同一个证书
@@ -2108,6 +1489,7 @@ func (m *Manager) GenerateMultiDomainCert(domains []string) (*tls.Certificate, e
 	for _, domain := range domains {
 		m.certCache[domain] = &cert
 	}
+	m.certIndex = nil
 	m.certMutex.Unlock()
 	// 更新所有域名的元数据缓存
 	for _, domain := range domains {
@@ -2116,106 +1498,6 @@ func (m *Manager) GenerateMultiDomainCert(domains []string) (*tls.Certificate, e
 
 	m.log.Infof("Successfully generated and cached multi-domain certificate: %v", domains)
 	return &cert, nil
-}
-
-// LoadCertificateFromDisk 从磁盘加载指定域名证书到缓存
-func (m *Manager) LoadCertificateFromDisk(domain string) error {
-	certPath := filepath.Join(m.config.SSL.CertDir, domain+".crt")
-	keyPath := filepath.Join(m.config.SSL.KeyDir, domain+".key")
-
-	certStat, err := os.Stat(certPath)
-	if err != nil {
-		return fmt.Errorf("certificate file not found: %s", certPath)
-	}
-	if _, err := os.Stat(keyPath); err != nil {
-		return fmt.Errorf("private key file not found: %s", keyPath)
-	}
-
-	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
-	if err != nil {
-		return fmt.Errorf("failed to load certificate: %w", err)
-	}
-
-	m.certMutex.Lock()
-	m.certCache[domain] = &cert
-	m.certDiskModTime[domain] = certStat.ModTime()
-	m.certMutex.Unlock()
-	m.updateCertMetadata(domain, &cert) // 更新元数据缓存
-	m.log.Debugf("Loaded certificate from disk into cache: %s", domain)
-	return nil
-}
-
-// maybeReloadCertIfStale 若磁盘 .crt 的 ModTime 新于上次加载记录，则重新加载（TLS 握手路径，免重启换证）
-func (m *Manager) maybeReloadCertIfStale(certKey string) {
-	certPath := filepath.Join(m.config.SSL.CertDir, certKey+".crt")
-	st, err := os.Stat(certPath)
-	if err != nil {
-		return
-	}
-	m.certMutex.RLock()
-	last, ok := m.certDiskModTime[certKey]
-	m.certMutex.RUnlock()
-	if ok && !st.ModTime().After(last) {
-		return
-	}
-	if err := m.LoadCertificateFromDisk(certKey); err != nil {
-		m.log.Debugf("TLS certificate hot-reload skipped for %s: %v", certKey, err)
-		return
-	}
-	m.log.Infof("TLS certificate hot-reloaded from disk: %s", certKey)
-}
-
-func (m *Manager) periodicReloadCertsFromDiskIfChanged() {
-	ticker := time.NewTicker(45 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-			m.reloadAllCachedCertsIfCertFilesStale()
-		case <-m.stopChan:
-			return
-		}
-	}
-}
-
-// reloadAllCachedCertsIfCertFilesStale 扫描证书目录：缓存中已有条目且 .crt mtime 变新则重载（兜底：独立 CLI 续期后主进程尚未握手时）
-func (m *Manager) reloadAllCachedCertsIfCertFilesStale() {
-	certDir := m.config.SSL.CertDir
-	entries, err := os.ReadDir(certDir)
-	if err != nil {
-		m.log.Debugf("hot reload scan skipped: %v", err)
-		return
-	}
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		name := e.Name()
-		if !strings.HasSuffix(strings.ToLower(name), ".crt") {
-			continue
-		}
-		domain := strings.TrimSuffix(name, ".crt")
-		certPath := filepath.Join(certDir, name)
-		st, err := os.Stat(certPath)
-		if err != nil {
-			continue
-		}
-		m.certMutex.RLock()
-		_, inCache := m.certCache[domain]
-		last, hasLast := m.certDiskModTime[domain]
-		m.certMutex.RUnlock()
-		if !inCache {
-			continue
-		}
-		if hasLast && !st.ModTime().After(last) {
-			continue
-		}
-		if err := m.LoadCertificateFromDisk(domain); err != nil {
-			m.log.Debugf("TLS hot-reload (periodic) failed for %s: %v", domain, err)
-			continue
-		}
-		m.log.Infof("TLS certificate hot-reloaded from disk (periodic scan): %s", domain)
-	}
 }
 
 // cleanExpiredTempDomains 清理过期的临时域名（在锁保护下执行）
@@ -2786,15 +2068,14 @@ func (m *Manager) performDNSChallenge(domain, providerName string) error {
 			Message: fmt.Sprintf("正在创建 DNS TXT 记录: %s (在 %s 下)", recordName, dnsDomain),
 		})
 
-		// 创建DNS挑战，使用故障转移机制（使用根域名创建DNS记录）
-		challengeInfo, err := m.dnsManager.CreateDNSChallengeWithFailover(ctx, dnsDomain, recordName, keyAuth)
+		// Creation and cleanup must use the selected provider instance. A
+		// globally higher-priority provider may manage an unrelated zone.
+		cleanup, err := m.dnsManager.presentDNSChallenge(ctx, dnsDomain, recordName, keyAuth, providerName)
 		if err != nil {
 			return fmt.Errorf("failed to create DNS challenge: %w", err)
 		}
-
-		// 清理函数
 		defer func() {
-			if cleanupErr := m.dnsManager.CleanupDNSChallenge(ctx, challengeInfo); cleanupErr != nil {
+			if cleanupErr := cleanup(); cleanupErr != nil {
 				m.log.Warnf("Failed to cleanup DNS challenge: %v", cleanupErr)
 			}
 		}()
@@ -2942,114 +2223,6 @@ func (m *Manager) FindDNSProviderForDomain(domain string) string {
 // CheckDomainResolution 公开方法：检查域名解析状态
 func (m *Manager) CheckDomainResolution(domain string) (bool, string, error) {
 	return m.checkDomainResolution(domain)
-}
-
-// saveCertificate 保存证书到文件
-func (m *Manager) saveCertificate(domain string, certDER [][]byte, privateKey *rsa.PrivateKey) error {
-	// 编码私钥
-	keyPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
-	})
-
-	// 编码证书
-	var certPEM []byte
-	for _, der := range certDER {
-		certPEM = append(certPEM, pem.EncodeToMemory(&pem.Block{
-			Type:  "CERTIFICATE",
-			Bytes: der,
-		})...)
-	}
-
-	// 保存文件
-	certPath := filepath.Join(m.config.SSL.CertDir, domain+".crt")
-	keyPath := filepath.Join(m.config.SSL.KeyDir, domain+".key")
-
-	if err := writeFileAtomically(certPath, certPEM, 0644); err != nil {
-		return fmt.Errorf("failed to save certificate file: %w", err)
-	}
-
-	if err := writeFileAtomically(keyPath, keyPEM, 0600); err != nil {
-		return fmt.Errorf("failed to save private key file: %w", err)
-	}
-
-	// 加载到缓存
-	cert, err := tls.X509KeyPair(certPEM, keyPEM)
-	if err != nil {
-		return fmt.Errorf("failed to parse certificate: %w", err)
-	}
-
-	m.certMutex.Lock()
-	m.certCache[domain] = &cert
-	m.certMutex.Unlock()
-
-	m.updateCertMetadata(domain, &cert) // 更新元数据缓存
-
-	return nil
-}
-
-// saveCertificateToDisk 将 tls.Certificate 持久化到磁盘
-func (m *Manager) saveCertificateToDisk(domain string, cert *tls.Certificate) error {
-	if cert == nil || len(cert.Certificate) == 0 {
-		return fmt.Errorf("invalid certificate")
-	}
-
-	// 编码证书链
-	var certPEM []byte
-	for _, derBytes := range cert.Certificate {
-		certPEM = append(certPEM, pem.EncodeToMemory(&pem.Block{
-			Type:  "CERTIFICATE",
-			Bytes: derBytes,
-		})...)
-	}
-
-	// 编码私钥
-	var keyPEM []byte
-	if cert.PrivateKey != nil {
-		switch key := cert.PrivateKey.(type) {
-		case *rsa.PrivateKey:
-			keyPEM = pem.EncodeToMemory(&pem.Block{
-				Type:  "RSA PRIVATE KEY",
-				Bytes: x509.MarshalPKCS1PrivateKey(key),
-			})
-		case *ecdsa.PrivateKey:
-			keyBytes, err := x509.MarshalECPrivateKey(key)
-			if err != nil {
-				return fmt.Errorf("failed to marshal EC private key: %w", err)
-			}
-			keyPEM = pem.EncodeToMemory(&pem.Block{
-				Type:  "EC PRIVATE KEY",
-				Bytes: keyBytes,
-			})
-		default:
-			return fmt.Errorf("unsupported private key type: %T", key)
-		}
-	} else {
-		return fmt.Errorf("certificate has no private key")
-	}
-
-	// 确保目录存在
-	if err := os.MkdirAll(m.config.SSL.CertDir, 0755); err != nil {
-		return fmt.Errorf("failed to create cert directory: %w", err)
-	}
-	if err := os.MkdirAll(m.config.SSL.KeyDir, 0755); err != nil {
-		return fmt.Errorf("failed to create key directory: %w", err)
-	}
-
-	// 保存文件
-	certPath := filepath.Join(m.config.SSL.CertDir, domain+".crt")
-	keyPath := filepath.Join(m.config.SSL.KeyDir, domain+".key")
-
-	if err := writeFileAtomically(certPath, certPEM, 0644); err != nil {
-		return fmt.Errorf("failed to write certificate file: %w", err)
-	}
-
-	if err := writeFileAtomically(keyPath, keyPEM, 0600); err != nil {
-		return fmt.Errorf("failed to write key file: %w", err)
-	}
-
-	m.log.Infof("Certificate persisted to disk: %s (cert: %s, key: %s)", domain, certPath, keyPath)
-	return nil
 }
 
 // GetDNSProviders 获取可用的DNS服务商列表

@@ -965,6 +965,17 @@ export interface Translation {
     tryFilesEnabled: string
     tryFilesDisabled: string
     tryFilesHelp: string
+    basicAuthTitle: string
+    basicAuthDescription: string
+    basicAuthEnabled: string
+    basicAuthDisabled: string
+    basicAuthUsername: string
+    basicAuthPassword: string
+    basicAuthPasswordPlaceholder: string
+    basicAuthPasswordSetHelp: string
+    basicAuthPasswordNewHelp: string
+    basicAuthUsernameRequired: string
+    basicAuthPasswordRequired: string
   }
 
   // CDN管理

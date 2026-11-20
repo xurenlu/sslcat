@@ -15,7 +15,7 @@ const toastMessages = {
 vi.mock('../../src/contexts/ConfigContext', () => ({
   useConfig: () => ({
     adminPrefix: '/admin',
-    version: '2.4.0-rc5',
+    version: '2.5.0',
     isLoading: false,
     error: null,
     refreshConfig: vi.fn(),

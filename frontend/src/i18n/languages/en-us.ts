@@ -841,6 +841,17 @@ export const enUS: Translation = {
     tryFilesEnabled: 'Enabled',
     tryFilesDisabled: 'Disabled',
     tryFilesHelp: 'When enabled, fallback to index file when path not found, for Vue/React Router SPA',
+    basicAuthTitle: 'Basic Authentication',
+    basicAuthDescription: 'Require a username and password before serving files or path-prefix proxies for this static site.',
+    basicAuthEnabled: 'Basic Auth enabled',
+    basicAuthDisabled: 'Basic Auth disabled',
+    basicAuthUsername: 'Username',
+    basicAuthPassword: 'Password',
+    basicAuthPasswordPlaceholder: 'Enter a new password',
+    basicAuthPasswordSetHelp: 'A password is set. Leave blank to keep it, or enter a value to replace it.',
+    basicAuthPasswordNewHelp: 'A password is required when Basic Auth is enabled for the first time.',
+    basicAuthUsernameRequired: 'A username is required when Basic Auth is enabled.',
+    basicAuthPasswordRequired: 'A password is required when Basic Auth is enabled for the first time.',
   },
 
   cdn: {

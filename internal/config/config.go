@@ -642,6 +642,10 @@ type StaticSite struct {
 	Index   string `json:"index"`
 	Enabled bool   `json:"enabled"`
 
+	// BasicAuth 为静态站点提供独立的 HTTP Basic Auth 保护。
+	// 密码仅保存 bcrypt 哈希，管理 API 不得返回 PasswordHash。
+	BasicAuth *StaticSiteBasicAuth `json:"basic_auth,omitempty"`
+
 	// 路径前缀匹配配置
 	PathPrefixes []string `json:"path_prefixes,omitempty"` // 路径前缀列表，如 ["/api/v1/", "/api/v2/"]
 	PathExact    bool     `json:"path_exact"`              // 是否精确匹配路径前缀
@@ -668,6 +672,13 @@ type StaticSite struct {
 	// TryFiles 启用时，当请求路径不存在则回退到 index 文件（类似 nginx try_files）
 	// 用于 SPA（Vue Router、React Router 等）的前端路由支持
 	TryFiles bool `json:"try_files"`
+}
+
+// StaticSiteBasicAuth 静态站点 HTTP Basic Auth 配置。
+type StaticSiteBasicAuth struct {
+	Enabled      bool   `json:"enabled"`
+	Username     string `json:"username"`
+	PasswordHash string `json:"password_hash,omitempty"`
 }
 
 // BotDetectionConfig 机器人检测配置

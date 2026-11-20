@@ -106,6 +106,9 @@ func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request) bool {
 			continue
 		}
 		if strings.EqualFold(site.Domain, host) {
+			if !authorizeStaticSiteBasicAuth(w, r, site.BasicAuth) {
+				return true
+			}
 			// 优先检查并应用路径前缀代理规则（最长前缀优先）
 			if len(site.PathPrefixRules) > 0 {
 				var (
