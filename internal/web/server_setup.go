@@ -1,15 +1,10 @@
 package web
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
-	"net/http"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/sirupsen/logrus"
 	"github.com/xurenlu/sslcat/internal/compression"
 	"github.com/xurenlu/sslcat/internal/config"
@@ -294,20 +289,6 @@ func (s *Server) initDNSCache() {
 	s.log.Infof("DNS cache initialized for %d providers: %v", len(enabledProviders), enabledProviders)
 }
 
-// initConfigWatch 计算初始哈希并启动后台监听
-func (s *Server) initConfigWatch() {
-	path := s.config.ConfigFile
-	if path == "" {
-		path = "/etc/sslcat/sslcat.conf"
-	}
-	if b, err := os.ReadFile(path); err == nil {
-		sum := sha256.Sum256(b)
-		s.lastConfigHash = hex.EncodeToString(sum[:])
-	}
-	go s.watchConfigFileLoop()
-	go s.watchConfigFileFS()
-}
-
 // initZeroTrustComponents 初始化 Zero Trust 组件 (Phase 5)
 func (s *Server) initZeroTrustComponents() {
 	s.rbacManager = security.NewRBACManager()
@@ -334,133 +315,4 @@ func (s *Server) initZeroTrustComponents() {
 		s.mtlsManager = mtlsMgr
 		s.log.Info("mTLS manager initialized")
 	}
-}
-
-// watchConfigFileLoop 定时检查配置文件变化并热加载（仅在 Slave 模式生效）
-func (s *Server) watchConfigFileLoop() {
-	interval := 5 * time.Second
-	if !s.config.IsSlaveMode() {
-		interval = 30 * time.Second
-	}
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	for range ticker.C {
-		if !s.config.IsSlaveMode() {
-			continue
-		}
-		path := s.config.ConfigFile
-		if path == "" {
-			path = "/etc/sslcat/sslcat.conf"
-		}
-		b, err := os.ReadFile(path)
-		if err != nil || len(b) == 0 {
-			continue
-		}
-		sum := sha256.Sum256(b)
-		hash := hex.EncodeToString(sum[:])
-		if hash == s.lastConfigHash || hash == "" {
-			continue
-		}
-		var newCfg config.Config
-		if err := json.Unmarshal(b, &newCfg); err != nil {
-			s.log.Warnf("Failed to parse synced config: %v", err)
-			continue
-		}
-		newCfg.ConfigFile = s.config.ConfigFile
-		oldPrefix := s.config.AdminPrefix
-		s.applyConfigInPlace(&newCfg)
-		s.lastConfigHash = hash
-		if oldPrefix != s.config.AdminPrefix {
-			s.mux = http.NewServeMux()
-			s.setupRoutes()
-		}
-		s.log.Infof("Config reloaded from %s (cluster sync)", path)
-	}
-}
-
-// watchConfigFileFS 使用 fsnotify 监听文件变化，触发热加载
-func (s *Server) watchConfigFileFS() {
-	if !s.config.IsSlaveMode() {
-		return
-	}
-	path := s.config.ConfigFile
-	if path == "" {
-		path = "/etc/sslcat/sslcat.conf"
-	}
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		s.log.Warnf("fsnotify init failed: %v", err)
-		return
-	}
-	defer watcher.Close()
-
-	dir := filepath.Dir(path)
-	if err := watcher.Add(dir); err != nil {
-		s.log.Warnf("fsnotify add failed: %v", err)
-		return
-	}
-	for {
-		select {
-		case ev, ok := <-watcher.Events:
-			if !ok {
-				return
-			}
-			if ev.Name == path && (ev.Op&fsnotify.Write == fsnotify.Write || ev.Op&fsnotify.Create == fsnotify.Create || ev.Op&fsnotify.Rename == fsnotify.Rename) {
-				time.Sleep(150 * time.Millisecond)
-				if b, err := os.ReadFile(path); err == nil && len(b) > 0 {
-					var newCfg config.Config
-					if err := json.Unmarshal(b, &newCfg); err == nil {
-						newCfg.ConfigFile = s.config.ConfigFile
-						oldPrefix := s.config.AdminPrefix
-						s.applyConfigInPlace(&newCfg)
-						sum := sha256.Sum256(b)
-						s.lastConfigHash = hex.EncodeToString(sum[:])
-						if oldPrefix != s.config.AdminPrefix {
-							s.mux = http.NewServeMux()
-							s.setupRoutes()
-						}
-						s.log.Infof("Config reloaded by fsnotify from %s", path)
-					}
-				}
-			}
-		case err, ok := <-watcher.Errors:
-			if !ok {
-				return
-			}
-			s.log.Debugf("fsnotify error: %v", err)
-		}
-	}
-}
-
-// applyConfigInPlace 将 newCfg 内容拷贝到现有 s.config，保持指针不变
-func (s *Server) applyConfigInPlace(newCfg *config.Config) {
-	if newCfg == nil {
-		return
-	}
-	s.config.Server = newCfg.Server
-	s.config.SSL = newCfg.SSL
-	s.config.Admin = newCfg.Admin
-	s.config.Proxy = newCfg.Proxy
-	s.config.Security = newCfg.Security
-	s.config.AdminPrefix = newCfg.AdminPrefix
-	s.config.BotAPIPrefix = newCfg.BotAPIPrefix
-	s.config.Cluster = newCfg.Cluster
-	s.config.StaticSites = newCfg.StaticSites
-	s.config.PHPSites = newCfg.PHPSites
-	s.config.CDNCache = newCfg.CDNCache
-	s.config.Compression = newCfg.Compression
-	s.config.Runners = newCfg.Runners
-	s.config.ThreatIntel = newCfg.ThreatIntel
-	s.config.Notification = newCfg.Notification
-	s.config.UpstreamCache = newCfg.UpstreamCache
-	s.config.AISecurity = newCfg.AISecurity
-	s.config.ImageOptimization = newCfg.ImageOptimization
-	s.config.Monitoring = newCfg.Monitoring
-	s.config.CacheWarmup = newCfg.CacheWarmup
-	s.config.Report = newCfg.Report
-	s.config.MCP = newCfg.MCP
-
-	s.syncSSLManagerConfig()
-	s.syncProxyManagerConfig()
-	s.syncSecurityManagerConfig()
 }

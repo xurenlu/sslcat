@@ -13,6 +13,53 @@ import (
 	"github.com/xurenlu/sslcat/internal/config"
 )
 
+// buildFastCGIParams 构造转发给 PHP-FPM 的 FastCGI 参数。
+// 站点级 PHP 指令通过 PHP_ADMIN_VALUE 下发，校验失败时跳过并记录告警，
+// 避免一条非法指令导致整个站点无法访问。
+func (s *Server) buildFastCGIParams(site *config.PHPSite, r *http.Request, scriptPath string) map[string]string {
+	params := map[string]string{
+		"GATEWAY_INTERFACE": "CGI/1.1",
+		"REQUEST_METHOD":    r.Method,
+		"SCRIPT_FILENAME":   scriptPath,
+		"SCRIPT_NAME":       r.URL.Path,
+		"QUERY_STRING":      r.URL.RawQuery,
+		"REQUEST_URI":       r.URL.RequestURI(),
+		"DOCUMENT_ROOT":     site.Root,
+		"SERVER_PROTOCOL":   r.Proto,
+		"REMOTE_ADDR":       s.getClientIP(r),
+		"SERVER_SOFTWARE":   "sslcat",
+	}
+	if ct := r.Header.Get("Content-Type"); ct != "" {
+		params["CONTENT_TYPE"] = ct
+	}
+	if r.ContentLength > 0 {
+		params["CONTENT_LENGTH"] = fmt.Sprintf("%d", r.ContentLength)
+	}
+	if r.TLS != nil {
+		params["HTTPS"] = "on"
+	}
+
+	for k, v := range site.Vars {
+		if strings.EqualFold(k, "PHP_ADMIN_VALUE") || strings.EqualFold(k, "PHP_VALUE") {
+			continue
+		}
+		params[k] = v
+	}
+
+	if iniValue, err := buildPHPAdminValue(site.PHPAdminIni); err != nil {
+		s.log.Warnf("跳过 PHP 站点 %s 的 PHP_ADMIN_VALUE: %v", site.Domain, err)
+	} else if iniValue != "" {
+		params["PHP_ADMIN_VALUE"] = iniValue
+	}
+
+	if site.MonitoringConfig != nil && site.MonitoringConfig.EnablePerformanceMonitoring {
+		params["SSL_CAT_PERFORMANCE_MONITORING"] = "1"
+		params["SSL_CAT_DOMAIN"] = site.Domain
+	}
+
+	return params
+}
+
 // servePHP 若命中 PHP 站点与脚本，使用 FastCGI 转发
 func (s *Server) servePHP(w http.ResponseWriter, r *http.Request) bool {
 	host := r.Host
@@ -90,38 +137,7 @@ func (s *Server) servePHP(w http.ResponseWriter, r *http.Request) bool {
 		defer conn.Close()
 
 		// 准备 FastCGI PARAMS
-		params := map[string]string{
-			"GATEWAY_INTERFACE": "CGI/1.1",
-			"REQUEST_METHOD":    r.Method,
-			"SCRIPT_FILENAME":   scriptPath,
-			"SCRIPT_NAME":       r.URL.Path,
-			"QUERY_STRING":      r.URL.RawQuery,
-			"REQUEST_URI":       r.URL.RequestURI(),
-			"DOCUMENT_ROOT":     site.Root,
-			"SERVER_PROTOCOL":   r.Proto,
-			"REMOTE_ADDR":       s.getClientIP(r),
-			"SERVER_SOFTWARE":   "sslcat",
-		}
-		if ct := r.Header.Get("Content-Type"); ct != "" {
-			params["CONTENT_TYPE"] = ct
-		}
-		if r.ContentLength > 0 {
-			params["CONTENT_LENGTH"] = fmt.Sprintf("%d", r.ContentLength)
-		}
-		if r.TLS != nil {
-			params["HTTPS"] = "on"
-		}
-
-		// 添加自定义环境变量
-		for k, v := range site.Vars {
-			params[k] = v
-		}
-
-		// 添加性能监控相关环境变量
-		if site.MonitoringConfig != nil && site.MonitoringConfig.EnablePerformanceMonitoring {
-			params["SSL_CAT_PERFORMANCE_MONITORING"] = "1"
-			params["SSL_CAT_DOMAIN"] = site.Domain
-		}
+		params := s.buildFastCGIParams(&site, r, scriptPath)
 
 		// 发送 FastCGI 请求
 		const reqID = 1

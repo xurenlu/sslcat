@@ -249,6 +249,7 @@ func (s *Server) handleAPIPHPSites(w http.ResponseWriter, r *http.Request) {
 			Enabled          bool                    `json:"enabled"`
 			FCGIAddr         string                  `json:"fcgi_addr"`
 			Vars             map[string]string       `json:"vars"`
+			PHPAdminIni      map[string]string       `json:"php_admin_ini"`
 			Headers          map[string]string       `json:"headers"`
 			PathPrefixRules  []config.PathPrefixRule `json:"path_prefix_rules"`
 			AccessLogEnabled *bool                   `json:"access_log_enabled,omitempty"`
@@ -266,6 +267,12 @@ func (s *Server) handleAPIPHPSites(w http.ResponseWriter, r *http.Request) {
 		if req.Domain == "" || req.Root == "" {
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(map[string]string{"error": "domain and root are required"})
+			return
+		}
+
+		if _, err := buildPHPAdminValue(req.PHPAdminIni); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 			return
 		}
 
@@ -295,6 +302,7 @@ func (s *Server) handleAPIPHPSites(w http.ResponseWriter, r *http.Request) {
 			Enabled:          req.Enabled,
 			FCGIAddr:         req.FCGIAddr,
 			Vars:             req.Vars,
+			PHPAdminIni:      sanitizePHPAdminIni(req.PHPAdminIni),
 			ResponseHeaders:  sanitizeHeaderMap(req.Headers),
 			PathPrefixRules:  req.PathPrefixRules,
 			AccessLogEnabled: req.AccessLogEnabled,
@@ -345,6 +353,7 @@ func (s *Server) handleAPIPHPSites(w http.ResponseWriter, r *http.Request) {
 			Enabled          bool                    `json:"enabled"`
 			FCGIAddr         string                  `json:"fcgi_addr"`
 			Vars             map[string]string       `json:"vars"`
+			PHPAdminIni      map[string]string       `json:"php_admin_ini"`
 			Headers          map[string]string       `json:"headers"`
 			PathPrefixRules  []config.PathPrefixRule `json:"path_prefix_rules"`
 			AccessLogEnabled *bool                   `json:"access_log_enabled,omitempty"`
@@ -375,6 +384,12 @@ func (s *Server) handleAPIPHPSites(w http.ResponseWriter, r *http.Request) {
 			req.Vars = make(map[string]string)
 		}
 
+		if _, err := buildPHPAdminValue(req.PHPAdminIni); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+
 		// 查找现有站点
 		existingIndex := -1
 		for i, site := range s.config.PHPSites {
@@ -398,6 +413,7 @@ func (s *Server) handleAPIPHPSites(w http.ResponseWriter, r *http.Request) {
 			Enabled:          req.Enabled,
 			FCGIAddr:         req.FCGIAddr,
 			Vars:             req.Vars,
+			PHPAdminIni:      sanitizePHPAdminIni(req.PHPAdminIni),
 			ResponseHeaders:  sanitizeHeaderMap(req.Headers),
 			PathPrefixRules:  req.PathPrefixRules,
 			AccessLogEnabled: req.AccessLogEnabled,

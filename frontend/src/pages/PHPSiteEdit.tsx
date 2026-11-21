@@ -21,8 +21,9 @@ import {
   Flex,
   SimpleGrid,
   Select,
+  IconButton,
 } from '@chakra-ui/react'
-import { FiArrowLeft, FiGlobe, FiSave, FiCode, FiServer, FiShield } from 'react-icons/fi'
+import { FiArrowLeft, FiGlobe, FiSave, FiCode, FiServer, FiShield, FiTrash2 } from 'react-icons/fi'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useConfig, buildPath, buildApiPath } from '../contexts/ConfigContext'
 import { useTranslation } from '../hooks/useLanguage'
@@ -38,6 +39,7 @@ interface PHPSiteForm {
   enabled: boolean
   fcgi_addr: string
   vars: Record<string, string>
+  php_admin_ini: Record<string, string>
   headers: Record<string, string>
   path_prefix_rules: PathPrefixRule[]
   waf_enabled?: boolean | null
@@ -48,6 +50,16 @@ interface PHPSiteForm {
   http2_enabled: boolean | null
   http3_enabled: boolean | null
 }
+
+const PHP_ADMIN_DIRECTIVES = [
+  'memory_limit', 'post_max_size', 'upload_max_filesize', 'max_execution_time',
+  'max_input_time', 'max_input_vars', 'max_file_uploads',
+  'session.upload_progress.enabled', 'session.use_strict_mode',
+  'session.cookie_httponly', 'session.cookie_secure', 'session.cookie_samesite',
+  'fatal_error_backtraces', 'display_errors', 'log_errors', 'error_log',
+  'expose_php', 'allow_url_include', 'disable_functions', 'opcache.enable',
+  'opcache.validate_timestamps', 'date.timezone', 'default_charset', 'short_open_tag',
+]
 
 const PHPSiteEdit: React.FC = () => {
   const [searchParams] = useSearchParams()
@@ -69,6 +81,7 @@ const PHPSiteEdit: React.FC = () => {
       MEMORY_LIMIT: '128M',
       MAX_EXECUTION_TIME: '30',
     },
+    php_admin_ini: {},
     headers: {},
     path_prefix_rules: [],
     waf_enabled: null,
@@ -113,6 +126,7 @@ const PHPSiteEdit: React.FC = () => {
               MEMORY_LIMIT: '128M',
               MAX_EXECUTION_TIME: '30',
             },
+            php_admin_ini: site.php_admin_ini || {},
             headers: site.response_headers || {},
             path_prefix_rules: site.path_prefix_rules || [],
             waf_enabled: site.waf_enabled ?? null,
@@ -168,6 +182,43 @@ const PHPSiteEdit: React.FC = () => {
     }))
   }
 
+  const handleIniChange = (key: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      php_admin_ini: {
+        ...prev.php_admin_ini,
+        [key]: value,
+      },
+    }))
+  }
+
+  const handleIniKeyRename = (oldKey: string, newKey: string) => {
+    setFormData(prev => {
+      if (newKey !== oldKey && newKey in prev.php_admin_ini) return prev
+      const next: Record<string, string> = {}
+      Object.entries(prev.php_admin_ini).forEach(([k, v]) => {
+        next[k === oldKey ? newKey : k] = v
+      })
+      return { ...prev, php_admin_ini: next }
+    })
+  }
+
+  const handleIniRemove = (key: string) => {
+    setFormData(prev => {
+      const next = { ...prev.php_admin_ini }
+      delete next[key]
+      return { ...prev, php_admin_ini: next }
+    })
+  }
+
+  const handleIniAdd = () => {
+    setFormData(prev => {
+      const key = PHP_ADMIN_DIRECTIVES.find(directive => !(directive in prev.php_admin_ini))
+      if (!key) return prev
+      return { ...prev, php_admin_ini: { ...prev.php_admin_ini, [key]: '' } }
+    })
+  }
+
   const handleSave = async () => {
     if (!formData.domain || !formData.root) {
       toast({
@@ -195,6 +246,7 @@ const PHPSiteEdit: React.FC = () => {
           enabled: formData.enabled,
           fcgi_addr: formData.fcgi_addr,
           vars: formData.vars,
+          php_admin_ini: formData.php_admin_ini,
           headers: formData.headers,
           path_prefix_rules: formData.path_prefix_rules,
           waf_enabled: formData.waf_enabled,
@@ -532,6 +584,64 @@ const PHPSiteEdit: React.FC = () => {
                   />
                 </FormControl>
               </SimpleGrid>
+
+              <Divider />
+
+              <Box>
+                <HStack justify="space-between" mb={2}>
+                  <Heading size="sm">PHP 指令（php_admin_value）</Heading>
+                  <Button size="sm" variant="outline" onClick={handleIniAdd} isDisabled={PHP_ADMIN_DIRECTIVES.every(key => key in formData.php_admin_ini)}>
+                    添加指令
+                  </Button>
+                </HStack>
+                <Text fontSize="sm" color="gray.500" mb={3}>
+                  通过 FastCGI 的 PHP_ADMIN_VALUE 下发，优先级等同 php-fpm pool 的 php_admin_value，可覆盖 php.ini。
+                  仅支持白名单内的指令，不支持的指令会被后端拒绝。
+                </Text>
+                {Object.keys(formData.php_admin_ini).length === 0 ? (
+                  <Text fontSize="sm" color="gray.500">
+                    暂未配置站点级 PHP 指令
+                  </Text>
+                ) : (
+                  <VStack spacing={2} align="stretch">
+                    {Object.entries(formData.php_admin_ini).map(([key, value], index) => (
+                      <HStack key={index} spacing={2}>
+                        <Select
+                          size="sm"
+                          value={key}
+                          onChange={(e) => handleIniKeyRename(key, e.target.value)}
+                          fontFamily="monospace"
+                          flex={1}
+                        >
+                          {!PHP_ADMIN_DIRECTIVES.includes(key) && <option value={key}>{key}</option>}
+                          {PHP_ADMIN_DIRECTIVES.map(directive => (
+                            <option key={directive} value={directive} disabled={directive !== key && directive in formData.php_admin_ini}>
+                              {directive}
+                            </option>
+                          ))}
+                        </Select>
+                        <Input
+                          size="sm"
+                          value={value}
+                          onChange={(e) => handleIniChange(key, e.target.value)}
+                          placeholder="-1"
+                          fontFamily="monospace"
+                          flex={1}
+                        />
+                        <IconButton
+                          aria-label="删除指令"
+                          icon={<FiTrash2 />}
+                          size="sm"
+                          colorScheme="red"
+                          variant="ghost"
+                          onClick={() => handleIniRemove(key)}
+                        />
+                      </HStack>
+                    ))}
+                  </VStack>
+                )}
+
+              </Box>
             </VStack>
           </CardBody>
         </Card>

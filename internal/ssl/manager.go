@@ -908,13 +908,23 @@ func (m *Manager) HTTPChallengeHandler(h http.Handler) http.Handler {
 
 // EnableACME 运行中启用/重建 ACME 管理器（根据当前配置）
 func (m *Manager) EnableACME() error {
-	email := strings.TrimSpace(m.config.SSL.Email)
-	if email == "" {
-		return fmt.Errorf("empty acme email")
+	mgr, err := m.buildACMEManager(m.config)
+	if err != nil {
+		return err
 	}
-	acmeCacheDir := filepath.Join(filepath.Dir(m.config.SSL.CertDir), "acme-cache")
+	m.acmeMgr = mgr
+	m.log.Info("ACME configuration enabled")
+	return nil
+}
+
+func (m *Manager) buildACMEManager(cfg *config.Config) (*autocert.Manager, error) {
+	email := strings.TrimSpace(cfg.SSL.Email)
+	if email == "" {
+		return nil, fmt.Errorf("empty acme email")
+	}
+	acmeCacheDir := filepath.Join(filepath.Dir(cfg.SSL.CertDir), "acme-cache")
 	if err := os.MkdirAll(acmeCacheDir, 0755); err != nil {
-		m.log.Warnf("Failed to create ACME cache directory: %v", err)
+		return nil, fmt.Errorf("create ACME cache directory: %w", err)
 	}
 	mgr := &autocert.Manager{
 		Prompt: autocert.AcceptTOS,
@@ -929,15 +939,13 @@ func (m *Manager) EnableACME() error {
 		},
 	}
 	client := &acme.Client{}
-	if m.config.SSL.Staging {
+	if cfg.SSL.Staging {
 		client.DirectoryURL = "https://acme-staging-v02.api.letsencrypt.org/directory"
 	} else {
 		client.DirectoryURL = "https://acme-v02.api.letsencrypt.org/directory"
 	}
 	mgr.Client = client
-	m.acmeMgr = mgr
-	m.log.Infof("ACME enabled (email: %s, staging=%v)", email, m.config.SSL.Staging)
-	return nil
+	return mgr, nil
 }
 
 // ensureDomainCertWithRetry 带重试机制的证书申请
@@ -2159,22 +2167,21 @@ func (m *Manager) GetName() string {
 func (m *Manager) Reload(newConfig *config.Config) error {
 	m.log.Info("Reloading SSL manager configuration")
 
-	// 更新配置引用
-	m.config = newConfig
+	var acmeManager *autocert.Manager
+	if strings.TrimSpace(newConfig.SSL.Email) != "" {
+		var err error
+		acmeManager, err = m.buildACMEManager(newConfig)
+		if err != nil {
+			return fmt.Errorf("reload ACME configuration: %w", err)
+		}
+	}
 
-	// 清空旧的 DNS 提供商并重新初始化
+	m.config = newConfig
+	m.acmeMgr = acmeManager
 	if m.dnsManager != nil {
 		m.dnsManager.ClearProviders()
 	}
 	m.initializeDNSProviders()
-
-	// 如果配置了 Email，重新启用/更新 ACME
-	if strings.TrimSpace(newConfig.SSL.Email) != "" {
-		if err := m.EnableACME(); err != nil {
-			m.log.Warnf("Failed to reload ACME configuration: %v", err)
-		}
-	}
-
 	return nil
 }
 

@@ -99,6 +99,30 @@ func (cd *ChangeDetector) GetMaxChangeLevel() ChangeLevel {
 
 // detectServerChanges 检测服务器配置变更
 func (cd *ChangeDetector) detectServerChanges(old, new *ServerConfig) {
+	for _, field := range []struct {
+		name string
+		old  interface{}
+		new  interface{}
+	}{
+		{"Host", old.Host, new.Host},
+		{"EnableHTTPS", old.EnableHTTPS, new.EnableHTTPS},
+		{"EnablePprof", old.EnablePprof, new.EnablePprof},
+		{"PprofAddr", old.PprofAddr, new.PprofAddr},
+		{"HTTP2Enabled", old.HTTP2Enabled, new.HTTP2Enabled},
+		{"HTTP2Config", old.HTTP2Config, new.HTTP2Config},
+		{"HTTP3Enabled", old.HTTP3Enabled, new.HTTP3Enabled},
+		{"HTTP3Config", old.HTTP3Config, new.HTTP3Config},
+		{"ReadTimeoutSec", old.ReadTimeoutSec, new.ReadTimeoutSec},
+		{"WriteTimeoutSec", old.WriteTimeoutSec, new.WriteTimeoutSec},
+		{"IdleTimeoutSec", old.IdleTimeoutSec, new.IdleTimeoutSec},
+		{"SessionStorage", old.SessionStorage, new.SessionStorage},
+		{"DataDir", old.DataDir, new.DataDir},
+		{"SecretKey", old.SecretKey, new.SecretKey},
+	} {
+		if !reflect.DeepEqual(field.old, field.new) {
+			cd.addChange("Server."+field.name, field.old, field.new, HardReload, "启动时配置变更需要重启")
+		}
+	}
 	// 端口变更 - 硬重载
 	if old.Port != new.Port {
 		cd.addChange("Server.Port", old.Port, new.Port, HardReload, "服务器端口变更需要重启")

@@ -8,7 +8,7 @@
 
 ### 我想了解...
 
-- **什么是代理循环？为什么要检测？** → [用户文档](docs/zh/proxy-loop-detection.md)
+- **什么是代理循环？为什么要检测？** → [用户文档](../zh/proxy-loop-detection.md)
 - **如何在前端使用这个功能？** → [前端实现文档](FRONTEND_LOOP_DETECTION.md)
 - **后端是如何实现的？** → [后端实现文档](PROXY_LOOP_DETECTION.md)
 - **整体架构是怎样的？** → [架构设计文档](LOOP_DETECTION_ARCHITECTURE.md)
@@ -20,7 +20,7 @@
 
 ### 1. 用户文档
 
-#### [代理循环检测功能](docs/zh/proxy-loop-detection.md)
+#### [代理循环检测功能](../zh/proxy-loop-detection.md)
 **适合人群**：所有用户
 
 **内容**：
@@ -218,7 +218,7 @@
 ### 按角色分类
 
 #### 👤 普通用户
-1. [用户文档](docs/zh/proxy-loop-detection.md) - 必读
+1. [用户文档](../zh/proxy-loop-detection.md) - 必读
 2. [功能演示](LOOP_DETECTION_DEMO.md) - 推荐
 
 #### 💻 前端开发者
@@ -238,13 +238,13 @@
 
 #### 📊 项目管理者
 1. [完整实现总结](COMPLETE_LOOP_DETECTION_SUMMARY.md) - 必读
-2. [用户文档](docs/zh/proxy-loop-detection.md) - 推荐
+2. [用户文档](../zh/proxy-loop-detection.md) - 推荐
 3. [对比文档](PROXY_LOOP_DETECTION_COMPARISON.md) - 推荐
 
 ### 按内容分类
 
 #### 📖 概念和背景
-- [用户文档](docs/zh/proxy-loop-detection.md)
+- [用户文档](../zh/proxy-loop-detection.md)
 - [完整实现总结](COMPLETE_LOOP_DETECTION_SUMMARY.md) - 项目背景部分
 
 #### 💡 实现细节
@@ -284,7 +284,7 @@
 ### 我想知道...
 
 #### "如何使用这个功能？"
-→ [用户文档](docs/zh/proxy-loop-detection.md)
+→ [用户文档](../zh/proxy-loop-detection.md)
 
 #### "前端是如何实现的？"
 → [前端实现文档](FRONTEND_LOOP_DETECTION.md)
@@ -311,16 +311,16 @@
 → [功能演示](LOOP_DETECTION_DEMO.md) - 测试用例部分
 
 #### "有哪些配置示例？"
-→ [用户文档](docs/zh/proxy-loop-detection.md) - 配置示例部分
+→ [用户文档](../zh/proxy-loop-detection.md) - 配置示例部分
 
 ## 📚 推荐阅读顺序
 
 ### 快速了解（15 分钟）
-1. [用户文档](docs/zh/proxy-loop-detection.md) - 5 分钟
+1. [用户文档](../zh/proxy-loop-detection.md) - 5 分钟
 2. [功能演示](LOOP_DETECTION_DEMO.md) - 场景 1-3 - 10 分钟
 
 ### 深入理解（1 小时）
-1. [用户文档](docs/zh/proxy-loop-detection.md) - 10 分钟
+1. [用户文档](../zh/proxy-loop-detection.md) - 10 分钟
 2. [前端实现总结](FRONTEND_LOOP_DETECTION_SUMMARY.md) - 15 分钟
 3. [循环检测实现总结](LOOP_DETECTION_IMPLEMENTATION_SUMMARY.md) - 15 分钟
 4. [架构设计文档](LOOP_DETECTION_ARCHITECTURE.md) - 20 分钟

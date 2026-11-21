@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 前端构建与测试工具采用受支持的 Vite 7、Vitest 4 和 ESLint 10；更新 Axios、React Router、Sentry 及国际化依赖，保持 React 18 与 Chakra UI 2 的界面体系。
 - 收窄 Three.js 类型依赖范围，移除国际化类型占位包，并补充依赖审计、兼容性决策与验证记录。
 - 补充 SQLite 驱动持久化与事务回归、前端认证及导航回归；缓存过期测试改用确定性的过期元数据，避免短 TTL 受压缩、磁盘与并发编译耗时影响。
+- 合入最新主分支，保留移至 `docker/` 的 CGO 构建入口及本轮 Go 版本；按新增 PR CI 复验 Go 构建、管理与配置回归、监控竞态检查及 Yarn 4 前端构建，候选版本保持 `2.5.0-rc3`。
 
 ## [2.5.0-rc2] - 2026-11-20
 

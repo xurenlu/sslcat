@@ -714,6 +714,10 @@ type PHPSite struct {
 	FCGIAddr string            `json:"fcgi_addr"` // unix:/path/php-fpm.sock 或 127.0.0.1:9000
 	Vars     map[string]string `json:"vars"`
 
+	// PHPAdminIni 通过 FastCGI 的 PHP_ADMIN_VALUE 下发站点级 PHP 指令，
+	// 等价于 php-fpm pool 的 php_admin_value。仅白名单指令会被下发。
+	PHPAdminIni map[string]string `json:"php_admin_ini,omitempty"`
+
 	// 路径前缀匹配配置
 	PathPrefixes []string `json:"path_prefixes,omitempty"` // 路径前缀列表，如 ["/api/v1/", "/api/v2/"]
 	PathExact    bool     `json:"path_exact"`              // 是否精确匹配路径前缀
@@ -2082,7 +2086,7 @@ func (c *Config) saveToPath(configPath string, data []byte) error {
 		return fmt.Errorf("创建配置目录失败 (%s): %w", configDir, err)
 	}
 
-	if err := writeFileAtomically(configPath, data, 0644); err != nil {
+	if err := writeFileAtomically(configPath, data, 0600); err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("保存配置文件失败: 目标目录不存在 (%s)。请检查目录权限或使用备用路径", configPath)
 		} else if os.IsPermission(err) {
@@ -2186,6 +2190,9 @@ func (c *Config) canWriteToPath(path string) bool {
 // 1. 版本备份：保留最近10个版本备份（每次保存都创建新备份）
 // 2. 按天备份：保留最近10个按天备份（每天只保留一个）
 func (c *Config) createBackup(configFile string) error {
+	if err := secureConfigBackups(configFile); err != nil {
+		return err
+	}
 	// 如果配置文件不存在，不需要备份
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
 		return nil
@@ -2258,10 +2265,10 @@ func (c *Config) createVersionBackup(configDir, configBaseName string, data []by
 		maxVersion = maxVersion - 1
 	}
 
-	// 创建新的备份文件（版本号加1）
+	// 创建新的备份文件（版本号加1）。配置含凭据，仅所有者可读写。
 	newVersion := maxVersion + 1
 	newBackupFile := filepath.Join(configDir, fmt.Sprintf("%s.backup.v%d", configBaseName, newVersion))
-	if err := os.WriteFile(newBackupFile, data, 0644); err != nil {
+	if err := writeFileAtomically(newBackupFile, data, 0600); err != nil {
 		return fmt.Errorf("写入备份文件失败: %w", err)
 	}
 
@@ -2293,8 +2300,8 @@ func (c *Config) createDailyBackup(configDir, configBaseName string, data []byte
 		}
 	}
 
-	// 创建或更新今天的备份
-	if err := os.WriteFile(todayBackupFile, data, 0644); err != nil {
+	// 创建或更新今天的备份（含配置凭据，仅所有者可读写）
+	if err := writeFileAtomically(todayBackupFile, data, 0600); err != nil {
 		return fmt.Errorf("写入按天备份文件失败: %w", err)
 	}
 

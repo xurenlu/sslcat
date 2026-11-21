@@ -1,6 +1,6 @@
 # SSLcat 架构与 TLS 修复约束
 
-> 版本：2.5.0-rc3 · 更新：2026-11-21
+> 版本：2.5.0-rc3 · 更新：2026-11-22
 
 SSLcat 是既有 Go 反向代理服务，本文记录 TLS 修复约束、发布镜像链路与构建工具链。当前维护范围为 Go 工具链及后端、前端依赖，运行结构沿用既有模块边界。完整组件说明见 [架构概述](docs/zh/getting-started/architecture.md)。
 
@@ -46,9 +46,9 @@ h1 省略 `ssl.auto_renew`，按 `SSLConfig.IsAutoRenewEnabled` 的默认语义�
 
 ## 构建工具链与依赖
 
-根模块以 `go 1.27.4` 同时规定语言与最低补丁版本，移除旧 `toolchain go1.25.1`。发布工作流的 `actions/setup-go` 从 `go.mod` 的 `go` 行读取版本，避免 CI 初始化旧版本后再隐式下载另一个编译器。Go 1.27 的 macOS 最低支持版本为 macOS 13。
+根模块以 `go 1.27.4` 同时规定语言与最低补丁版本，移除旧 `toolchain go1.25.1`。PR 与发布工作流的 `actions/setup-go` 从 `go.mod` 的 `go` 行读取版本，避免 CI 初始化旧版本后再隐式下载另一个编译器。Go 1.27 的 macOS 最低支持版本为 macOS 13。
 
-Alpine 构建入口固定 `golang:1.27.4-alpine3.24`，Debian 构建入口固定 `golang:1.27.4-bookworm`；这些标签已从官方镜像元数据确认存在。镜像存在不代表容器内 CGO、静态链接或 Zig 交叉编译已经通过。发布前仍需分别检查实际编译器版本、链接方式及目标系统运行结果。
+CGO 构建入口随主分支目录整理移至 `docker/Dockerfile.cgo` 与 `docker/Dockerfile.cgo.zig`，保留本轮工具链升级。Alpine 构建入口固定 `golang:1.27.4-alpine3.24`，Debian 构建入口固定 `golang:1.27.4-bookworm`；这些标签已从官方镜像元数据确认存在。镜像存在不代表容器内 CGO、静态链接或 Zig 交叉编译已经通过。发布前仍需分别检查实际编译器版本、链接方式及目标系统运行结果。
 
 Linux 源码安装器按 major/minor/patch 比较稳定 Go 版本，拒绝 rc/beta/devel。版本探测强制 `GOTOOLCHAIN=local` 并忽略继承的旧 GOROOT，优先复用合格的系统工具链，失败后检查专用缓存。补装使用官方 SHA-256 校验的 amd64/arm64 归档，在 `/opt/sslcat-toolchains` 内的本次随机暂存目录解压，检查 Go、标准库源码目录和编译链接工具后重命名发布至 `go1.27.4`；失败或可捕获信号触发本次暂存清理，旧不完整目录保留备份，发布失败时尝试恢复。清理所需目标、暂存与备份路径由隔离子 shell 持有，不依赖 Bash 3.2 在显式 `exit` 时会先释放的函数局部变量。该目录位于应用递归授权目录之外；只调整当前会话 PATH、GOROOT 与 GOTOOLCHAIN，不覆盖系统 Go 或修改 `/etc/profile`。测试服务器的编译和模板测试入口在每次 SSH 会话重新选择工具链；其他独立会话需显式选择路径与 GOROOT。
 
