@@ -714,6 +714,10 @@ type PHPSite struct {
 	FCGIAddr string            `json:"fcgi_addr"` // unix:/path/php-fpm.sock 或 127.0.0.1:9000
 	Vars     map[string]string `json:"vars"`
 
+	// PHPAdminIni 通过 FastCGI 的 PHP_ADMIN_VALUE 下发站点级 PHP 指令，
+	// 等价于 php-fpm pool 的 php_admin_value。仅白名单指令会被下发。
+	PHPAdminIni map[string]string `json:"php_admin_ini,omitempty"`
+
 	// 路径前缀匹配配置
 	PathPrefixes []string `json:"path_prefixes,omitempty"` // 路径前缀列表，如 ["/api/v1/", "/api/v2/"]
 	PathExact    bool     `json:"path_exact"`              // 是否精确匹配路径前缀
