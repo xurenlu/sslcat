@@ -817,6 +817,7 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/monitoring/stats", s.handleAPIMonitoringStats)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/monitoring/metrics", s.handleAPIMonitoringMetrics)
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/monitoring/watchdog/restart", s.handleAPIMonitoringWatchdogRestart)
+	s.mux.HandleFunc(s.config.AdminPrefix+"/api/monitoring/baselines/reset", s.handleAPIMonitoringBaselinesReset)
 
 	// WAF API
 	s.mux.HandleFunc(s.config.AdminPrefix+"/api/waf/stats", s.handleAPIWAFStats)

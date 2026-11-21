@@ -86,15 +86,44 @@ scrape_configs:
 
 ## Baseline Establishment
 
-- Goroutine baseline: 5 minutes after startup
+- Goroutine baseline: 5 minutes after startup (warm-up period)
 - Memory baseline: 5 minutes after startup
 - Performance baseline: 10 minutes after startup
 
+The goroutine monitor does not capture its baseline at startup. It starts before any
+traffic arrives, so the goroutine count at that moment only reflects an idle process;
+using it as the baseline makes normal steady-state traffic look like leak growth.
+During the warm-up period the monitor only samples without alerting, and when the
+period ends it takes the **median** of those samples as the baseline — the median
+rather than the mean, so an occasional traffic spike during warm-up cannot skew it.
+
+After a lasting shift in traffic levels (many new sites onboarded, upstream count
+doubled), the baselines can be recalibrated manually:
+
+```bash
+curl -X POST -H "Authorization: Bearer $SSLCAT_WRITE_TOKEN" \
+  https://your-domain/sslcat-panel/api/monitoring/baselines/reset
+```
+
+This resets the goroutine, memory, and performance baselines together, and returns
+the post-reset statistics in the response.
+
 ## Alert Rules
 
-The monitoring system will automatically alert in the following cases:
+Goroutine leak detection considers both level and trend, so steady-state fluctuation
+is not reported as a leak:
 
-- Goroutine count exceeds baseline by 50%
+- **Warning**: 100 above baseline **and** rising for 3 consecutive check intervals
+- **Critical**: 500 above baseline (an absolute increase of this size alerts on its
+  own, no trend condition), together with a stack dump
+
+The trend compares the mean of the last 10 samples against the previous 10; the
+difference must exceed ±10 to count as rising or falling, and fewer than 20 samples
+yields no trend verdict. Alerts have a 10-minute cooldown — repeated threshold hits
+within the window only increment counters instead of repeating the log line.
+
+Alert conditions for the other monitors:
+
 - Memory usage exceeds baseline by 50%
 - QPS drops by more than 20%
 - Response time increases by more than 50%
