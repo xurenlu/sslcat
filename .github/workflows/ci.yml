@@ -1,0 +1,67 @@
+name: PR CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Frontend and Go build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CGO_ENABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Enable Yarn
+        run: corepack enable
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: yarn install --immutable
+      - name: Build frontend
+        working-directory: frontend
+        run: yarn build
+      - name: Embed frontend
+        run: |
+          mkdir -p internal/assets/frontend
+          cp -R frontend/dist/. internal/assets/frontend/
+      - name: Build Go packages
+        run: go build ./...
+
+  regression:
+    name: Go regression and race tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CGO_ENABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test configuration, management, TLS and monitoring
+        run: go test ./internal/config ./internal/web ./internal/ssl ./internal/monitor -count=1 -timeout=5m
+      - name: Check configuration and monitoring races
+        run: go test -race ./internal/config ./internal/monitor -count=1 -timeout=5m
