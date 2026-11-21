@@ -356,6 +356,31 @@ func (s *Server) handleAPIMonitoringWatchdogRestart(w http.ResponseWriter, r *ht
 	s.writeSuccessResponse(w, nil, "Watchdog restarted successfully")
 }
 
+// handleAPIMonitoringBaselinesReset 重置所有监控基线
+// 基线在服务预热期结束时自动确定，但业务流量水位长期变化后（例如接入新站点、
+// 上游数量翻倍），旧基线会持续偏低。此接口供运维在确认当前水位即稳态时手动校准。
+func (s *Server) handleAPIMonitoringBaselinesReset(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizeAPI(w, r, false) {
+		return
+	}
+
+	if r.Method != "POST" {
+		s.writeErrorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	if s.monitorManager == nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, "Monitor manager not initialized")
+		return
+	}
+
+	s.monitorManager.ResetAllBaselines()
+	s.log.Info("监控基线已通过管理接口重置")
+
+	// 回传重置后的统计，便于运维确认新基线数值
+	s.writeSuccessResponse(w, s.monitorManager.GetAllStats(), "Monitoring baselines reset successfully")
+}
+
 // handleAPIMonitoringMetrics 获取历史指标数据
 func (s *Server) handleAPIMonitoringMetrics(w http.ResponseWriter, r *http.Request) {
 	if !s.authorizeAPI(w, r, true) {
