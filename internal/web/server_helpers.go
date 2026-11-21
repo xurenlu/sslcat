@@ -138,37 +138,111 @@ func (s *Server) domainMatchesCert(domain string, cert *x509.Certificate) bool {
 	return false
 }
 
-// getClientIP 获取客户端真实 IP（带反伪造保护）
+// getClientIP 获取客户端真实 IP（带反伪造保护）。
+//
+// 安全模型：
+//   - 默认不信任任何转发头。只有直接对端 IP 命中 server.trusted_proxies
+//     配置（IP 或 CIDR）时，才解析代理提供的 X-Forwarded-For / X-Real-IP /
+//     CF-Connecting-IP。
+//   - X-Forwarded-For 从右往左剥离已信任代理，返回最左侧第一个未信任 IP，
+//     从而避免最左端被伪造。
+//   - 无效 IP 一律拒绝；无法解析的 RemoteAddr 原样兜底返回。
 func (s *Server) getClientIP(r *http.Request) string {
-	remoteIP := r.RemoteAddr
-	if idx := strings.LastIndex(remoteIP, ":"); idx != -1 {
-		remoteIP = remoteIP[:idx]
+	remoteIP := remoteHostIP(r.RemoteAddr)
+	// 直接对端 IP 无效：不信任任何转发头，返回原始 host 兜底。
+	if net.ParseIP(remoteIP) == nil {
+		return remoteIP
 	}
-	isTrustedSource := s.isPrivateIP(remoteIP) || remoteIP == "127.0.0.1" || remoteIP == "::1"
-	if isTrustedSource {
-		if cfIP := r.Header.Get("CF-Connecting-IP"); cfIP != "" {
-			cfIP = strings.TrimSpace(cfIP)
-			if !s.isLocalhostIP(cfIP) {
-				return cfIP
-			}
+
+	// 直接对端不是受信任代理 => 忽略所有转发头，直接返回对端 IP。
+	if !s.isTrustedProxy(remoteIP) {
+		return remoteIP
+	}
+
+	header := strings.ToLower(strings.TrimSpace(s.config.Server.TrustedProxyHeader))
+	switch header {
+	case "", "x-forwarded-for":
+		if ip := s.parseXFF(strings.Join(r.Header.Values("X-Forwarded-For"), ",")); ip != "" {
+			return ip
 		}
-		if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
-			realIP = strings.TrimSpace(realIP)
-			if !s.isLocalhostIP(realIP) {
-				return realIP
-			}
-		}
-		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			ips := strings.Split(xff, ",")
-			if len(ips) > 0 {
-				ip := strings.TrimSpace(ips[0])
-				if !s.isPrivateIP(ip) && !s.isLocalhostIP(ip) {
-					return ip
-				}
+	case "x-real-ip", "cf-connecting-ip":
+		values := r.Header.Values(header)
+		if len(values) == 1 {
+			if ip := parseForwardedIP(values[0]); ip != "" {
+				return ip
 			}
 		}
 	}
 	return remoteIP
+}
+
+// remoteHostIP 从 host:port 形式的 RemoteAddr 中解析出纯 IP 地址。
+// 兼容 IPv4（1.2.3.4:5678）与带方括号的 IPv6（[::1]:5678），也接受无端口形式。
+// 无法解析时原样返回输入。
+func remoteHostIP(remoteAddr string) string {
+	host := strings.TrimSpace(remoteAddr)
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.Trim(host, "[]")
+	return host
+}
+
+// parseForwardedIP 校验并归一化代理头中的单个 IP 值。
+// 支持纯 IP 与 host:port；无效输入返回空串。
+func parseForwardedIP(v string) string {
+	ip := remoteHostIP(v)
+	if net.ParseIP(ip) == nil {
+		return ""
+	}
+	return ip
+}
+
+// isTrustedProxy 判断给定 IP 是否命中 server.trusted_proxies（IP 或 CIDR）。
+// 空列表（默认）不信任任何来源。无效条目被忽略。
+func (s *Server) isTrustedProxy(ip string) bool {
+	parsed := net.ParseIP(ip)
+	if parsed == nil {
+		return false
+	}
+	for _, entry := range s.config.Server.TrustedProxies {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		// 优先按 CIDR 解析（如 10.0.0.0/8、2001:db8::/32）。
+		if _, cidr, err := net.ParseCIDR(entry); err == nil {
+			if cidr.Contains(parsed) {
+				return true
+			}
+			continue
+		}
+		// 否则按单个 IP（兼容带端口形式）精确匹配。
+		if entryIP := net.ParseIP(remoteHostIP(entry)); entryIP != nil && entryIP.Equal(parsed) {
+			return true
+		}
+	}
+	return false
+}
+
+// parseXFF 从右往左剥离已信任代理，返回最左侧第一个未信任的真实客户端 IP。
+// X-Forwarded-For 由最左侧的真实客户端与沿途每级代理依次追加，越靠左越靠前
+// 链路；仅右端由受信任代理写入值可信，故从右往左扫描并在遇到受信任代理时继续
+// 向左，遇到未信任 IP（即真实客户端）为止。无效 IP 会终止信任链解析。
+func (s *Server) parseXFF(xff string) string {
+	parts := strings.Split(xff, ",")
+	// 从右往左剥离受信任代理。
+	for i := len(parts) - 1; i >= 0; i-- {
+		ip := parseForwardedIP(parts[i])
+		if ip == "" {
+			return ""
+		}
+		if s.isTrustedProxy(ip) {
+			continue
+		}
+		return ip
+	}
+	return ""
 }
 
 // extractTLSFingerprint 从 TLS 连接提取指纹

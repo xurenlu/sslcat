@@ -22,6 +22,13 @@ type ServerConfig struct {
 	HTTP3Enabled bool         `json:"http3_enabled"` // 是否启用 HTTP/3（默认 false）
 	HTTP3Config  *HTTP3Config `json:"http3_config,omitempty"`
 
+	// TrustedProxies 受信任的反向代理 IP / CIDR 列表。
+	// 默认空：不信任任何转发头（X-Forwarded-For / X-Real-IP / CF-Connecting-IP）。
+	// 仅当直接对端 IP 命中此列表时，getClientIP 才会解析代理提供的转发头，
+	// 且 X-Forwarded-For 从右往左剥离已信任代理，以抵御最左端伪造。
+	TrustedProxies     []string `json:"trusted_proxies,omitempty"`
+	TrustedProxyHeader string   `json:"trusted_proxy_header,omitempty"`
+
 	AccessLogEnabled  bool   `json:"access_log_enabled"`
 	AccessLogFormat   string `json:"access_log_format"` // nginx|apache|json
 	AccessLogPath     string `json:"access_log_path"`

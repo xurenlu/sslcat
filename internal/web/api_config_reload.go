@@ -72,13 +72,21 @@ func (api *ConfigReloadAPI) handleReload(w http.ResponseWriter, r *http.Request)
 		"timestamp": time.Now().Unix(),
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	if err != nil {
 		response["error"] = err.Error()
 		api.server.log.Errorf("Config reload failed: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	} else {
-		api.server.log.Infof("Config reload succeeded in %v", duration)
-		response["message"] = "Configuration reloaded successfully"
+		stats := api.reloadManager.GetStats()
+		response["restart_required"] = stats["restart_required"]
+		response["restart_fields"] = stats["restart_fields"]
+		if stats["restart_required"] == true {
+			response["message"] = "Runtime configuration reloaded; startup changes pending restart"
+		} else {
+			response["message"] = "Configuration reloaded successfully"
+		}
+		api.server.log.Infof("Config reload completed in %v (restart required: %v)", duration, stats["restart_required"])
 	}
 
 	w.Header().Set("Content-Type", "application/json")
