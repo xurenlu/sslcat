@@ -1,6 +1,6 @@
 # Product Overview
 
-> 最后更新：2026-11-20 | 当前版本：v2.5.0-rc2
+> 最后更新：2026-11-22 | 当前版本：v2.5.0-rc3
 
 ## 项目简介
 
@@ -27,8 +27,8 @@ SSLcat 是一个集成反向代理、SSL 证书管理、安全防护和运维管
 
 ## 技术栈
 
-- 后端：Go 1.25、SQLite、net/http
-- 前端：React、TypeScript、Vite
+- 后端：Go 1.27.4、SQLite、net/http；macOS 构建产物最低支持 macOS 13。
+- 前端：React 18、TypeScript 5.9、Vite 7；依赖选择与验证记录见 [依赖维护记录](docs/zh/development/dependency-maintenance-20261120.md)。
 - 部署：systemd
 
 ## 部署

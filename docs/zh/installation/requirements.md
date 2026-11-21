@@ -26,18 +26,19 @@
 
 ### 支持的操作系统
 - **Linux**: Ubuntu 18.04+, CentOS 7+, RHEL 7+, Debian 9+
-- **macOS**: 10.14+ (Mojave+)
+- **macOS**: 13+ (Ventura+；使用 Go 1.27 构建的版本)
 - **Windows**: Windows 10+, Windows Server 2016+
 
 ### 推荐操作系统
 - **Linux**: Ubuntu 20.04 LTS, CentOS 8, RHEL 8
-- **macOS**: macOS 11+ (Big Sur+)
+- **macOS**: macOS 13+ (Ventura+)
 - **Windows**: Windows Server 2019+
 
 ## 软件依赖
 
 ### 必需软件
-- **Go**: 1.21+ (用于从源码构建)
+- **Go**: 1.27.4 或更新的稳定版本（用于从源码构建，以根目录 `go.mod` 为准）
+- **Node.js / Yarn**: 构建前端时建议 Node.js 24 LTS，也可使用 22.13 或更新的 22.x；通过 Corepack 使用 Yarn 4.15.0。运行预编译二进制不需要 Node.js。
 - **Docker**: 20.10+ (用于容器部署)
 - **OpenSSL**: 1.1.1+ (用于 SSL/TLS 支持)
 

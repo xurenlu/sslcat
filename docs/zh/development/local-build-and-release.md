@@ -6,7 +6,7 @@
 
 ### 必需工具
 
-1. **Go 1.21+**
+1. **Go 工具链**：使用根目录 `go.mod` 声明的 Go 1.27.4 或更新的稳定版本；本地与 CI 保持一致。Go 1.27 的 macOS 最低支持版本为 macOS 13。
    ```bash
    go version
    ```
@@ -21,6 +21,14 @@
    brew install gh
    gh auth login
    ```
+
+4. **前端构建工具**：建议 Node.js 24 LTS，也可使用 Node.js 22.13 或更新的 22.x；Yarn 版本固定为 4.15.0，通过 Corepack 使用。当前发布工作流使用 Node.js 22，完整工具组合最低要求需同时满足 Vite、Vitest、ESLint 和 jsdom。
+
+Linux 源码安装器优先使用合格的系统 Go；需要补装时校验官方归档 SHA-256，并在同一文件系统暂存后安装到 `/opt/sslcat-toolchains/go1.27.4`。只调整当前安装会话的 PATH、GOROOT 与 GOTOOLCHAIN，保留系统已有 Go。测试服务器的编译和模板测试脚本会在每次 SSH 会话重新选择；其他独立 Shell 会话可显式选择专用工具链：
+
+```bash
+export GOROOT="/opt/sslcat-toolchains/go1.27.4" PATH="/opt/sslcat-toolchains/go1.27.4/bin:$PATH" GOTOOLCHAIN=local
+```
 
 ### 推荐工具（用于交叉编译）
 

@@ -2,6 +2,7 @@ package cache
 
 import (
 	"bytes"
+	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -212,8 +213,10 @@ func TestUpstreamCache_StoreAndRetrieve(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	cfg := &config.Config{
-		CDNCache: config.CDNCacheConfig{
-			CacheDir: tempDir,
+		UpstreamCache: config.UpstreamCacheConfig{
+			Enabled:         true,
+			CacheDir:        tempDir,
+			RespectUpstream: true,
 		},
 	}
 	uc := NewUpstreamCache(cfg)
@@ -397,12 +400,14 @@ func TestUpstreamCache_Expiration(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	cfg := &config.Config{
-		CDNCache: config.CDNCacheConfig{
-			CacheDir: tempDir,
+		UpstreamCache: config.UpstreamCacheConfig{
+			Enabled:         true,
+			CacheDir:        tempDir,
+			DefaultTTL:      time.Hour,
+			RespectUpstream: false,
 		},
 	}
 	uc := NewUpstreamCache(cfg)
-	uc.defaultTTL = 100 * time.Millisecond // 很短的TTL用于测试
 
 	// 创建测试请求和响应
 	req := httptest.NewRequest("GET", "/test.js", nil)
@@ -422,18 +427,32 @@ func TestUpstreamCache_Expiration(t *testing.T) {
 	}
 
 	// 立即检索应该成功
-	_, _, err = uc.Get(req)
+	entry, _, err := uc.Get(req)
 	if err != nil {
 		t.Fatalf("Failed to get from cache immediately: %v", err)
 	}
 
-	// 等待过期
-	time.Sleep(200 * time.Millisecond)
+	// 明确将落盘条目标记为过期，避免依赖压缩速度和真实时间等待。
+	entry.ExpiresAt = time.Now().Add(-time.Second)
+	metaData, err := json.Marshal(entry)
+	if err != nil {
+		t.Fatalf("Failed to marshal expired cache entry: %v", err)
+	}
+	metaPath := uc.getMetaPath(entry.Key)
+	if err := writeCacheFileAtomically(metaPath, metaData, 0644); err != nil {
+		t.Fatalf("Failed to expire cache metadata: %v", err)
+	}
 
-	// 过期后检索应该失败
+	// 过期后检索应该失败，并移除过期条目。
 	_, _, err = uc.Get(req)
 	if err == nil {
-		t.Error("Expected cache miss after expiration")
+		t.Fatal("Expected cache miss after expiration")
+	}
+	if _, err := os.Stat(metaPath); !os.IsNotExist(err) {
+		t.Errorf("Expected expired metadata to be removed, got: %v", err)
+	}
+	if _, err := os.Stat(uc.getDataPath(entry.Key)); !os.IsNotExist(err) {
+		t.Errorf("Expected expired cache data to be removed, got: %v", err)
 	}
 }
 

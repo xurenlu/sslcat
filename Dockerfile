@@ -1,7 +1,7 @@
 # SSLcat Dockerfile
 
 # 构建阶段
-FROM golang:1.25.1-alpine3.20 AS builder
+FROM golang:1.27.4-alpine3.24 AS builder
 
 # 设置工作目录
 WORKDIR /app
@@ -22,7 +22,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o sslcat main.go
 
 # 运行阶段
-FROM alpine:latest
+FROM alpine:3.24
 
 # 安装必要的包
 RUN apk --no-cache add ca-certificates tzdata certbot

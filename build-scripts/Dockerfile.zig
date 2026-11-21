@@ -1,5 +1,5 @@
 # 使用 Zig 进行交叉编译，生成兼容老版本 GLIBC 的二进制文件
-FROM golang:1.23.4-alpine AS builder
+FROM golang:1.27.4-alpine3.24 AS builder
 
 # 安装 Zig 和必要的工具
 RUN apk add --no-cache \
@@ -37,7 +37,7 @@ RUN file sslcat
 RUN ldd sslcat || echo "Static binary or ldd not available"
 
 # 最终阶段
-FROM alpine:latest
+FROM alpine:3.24
 
 # 安装运行时依赖
 RUN apk add --no-cache ca-certificates

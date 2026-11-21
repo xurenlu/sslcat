@@ -15,7 +15,7 @@ fi
 
 # 检查 Zig 是否在 Docker 中可用
 echo "📦 检查 Zig 环境..."
-docker run --rm golang:1.23.4-alpine sh -c "apk add --no-cache zig && zig version"
+docker run --rm golang:1.27.4-alpine3.24 sh -c "apk add --no-cache zig && zig version"
 
 # 构建 Docker 镜像
 echo "🏗️  构建 Zig 编译环境..."

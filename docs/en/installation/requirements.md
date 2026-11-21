@@ -12,7 +12,7 @@ This document outlines the system requirements for running SSLcat in various env
 | **Debian** | 9+ | x86_64, ARM64 | ✅ Full Support |
 | **CentOS** | 7+ | x86_64, ARM64 | ✅ Full Support |
 | **RHEL** | 7+ | x86_64, ARM64 | ✅ Full Support |
-| **macOS** | 10.14+ | x86_64, ARM64 | ✅ Full Support |
+| **macOS** | 13+ (Ventura+) for builds using Go 1.27 | x86_64, ARM64 | ✅ Full Support |
 | **Windows** | 10+ | x86_64, ARM64 | ✅ Full Support |
 | **Alpine Linux** | 3.12+ | x86_64, ARM64 | ✅ Full Support |
 
@@ -59,7 +59,7 @@ This document outlines the system requirements for running SSLcat in various env
 
 | Package | Version | Purpose | Installation |
 |---------|---------|---------|--------------|
-| **Go** | 1.21+ | Runtime (if building from source) | [Go Installation Guide](https://golang.org/doc/install) |
+| **Go** | 1.27.4 or a newer stable version; see the root `go.mod` | Build toolchain (source builds only) | [Go Installation Guide](https://go.dev/doc/install) |
 | **curl** | 7.0+ | Download and API calls | `apt install curl` / `yum install curl` |
 | **wget** | 1.0+ | Download utility | `apt install wget` / `yum install wget` |
 
@@ -78,6 +78,8 @@ This document outlines the system requirements for running SSLcat in various env
 | **Git** | 2.0+ | Version control | `apt install git` / `yum install git` |
 | **Make** | 4.0+ | Build system | `apt install build-essential` |
 | **GCC** | 7.0+ | Compiler | `apt install gcc` / `yum install gcc` |
+| **Node.js** | 24.x LTS recommended; 22.x requires 22.13+ | Frontend builds only | [Node.js Downloads](https://nodejs.org/en/download) |
+| **Yarn** | 4.15.0 | Frontend package manager | Corepack; version pinned in `frontend/package.json` |
 
 ## 🌐 Network Requirements
 

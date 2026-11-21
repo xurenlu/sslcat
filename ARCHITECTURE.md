@@ -1,8 +1,8 @@
 # SSLcat 架构与 TLS 修复约束
 
-> 版本：2.5.0-rc2 · 更新：2026-11-20
+> 版本：2.5.0-rc3 · 更新：2026-11-22
 
-SSLcat 是既有 Go 反向代理服务，本文记录 TLS 修复约束与发布镜像链路。当前变更统一镜像下载链接，不引入新服务、数据库、认证方式或新的服务入口。完整组件说明见 [架构概述](docs/zh/getting-started/architecture.md)。
+SSLcat 是既有 Go 反向代理服务，本文记录 TLS 修复约束、发布镜像链路与构建工具链。当前维护范围为 Go 工具链及后端、前端依赖，运行结构沿用既有模块边界。完整组件说明见 [架构概述](docs/zh/getting-started/architecture.md)。
 
 ## 运行结构
 
@@ -40,9 +40,21 @@ h1 省略 `ssl.auto_renew`，按 `SSLConfig.IsAutoRenewEnabled` 的默认语义�
 
 ## 版本与交付
 
-TLS 修复沿用生产程序的 `2.5.0` 版本线，首个修复版本为 `2.5.0-rc1`，当前镜像链接修复版本为 `2.5.0-rc2`。历史仓库版本文件为 `2.4.0-rc5`，构建必须同步 `VERSION`、Go 默认版本、前端版本和注入参数。线上程序缺少 `vcs.revision`，通过同工具链重建基线与代码、程序差异检查确认来源，不能仅凭版本字符串断言源码完全一致。
+维护版本沿用生产程序的 `2.5.0` 版本线，首个 TLS 修复版本为 `2.5.0-rc1`，镜像链接修复版本为 `2.5.0-rc2`，当前依赖维护候选版本为 `2.5.0-rc3`。历史仓库版本文件为 `2.4.0-rc5`，构建必须同步 `VERSION`、Go 默认版本、前端版本和注入参数。线上程序缺少 `vcs.revision`，通过同工具链重建基线与代码、程序差异检查确认来源，不能仅凭版本字符串断言源码完全一致。
 
 涉及 TLS 代码变更时，交付前执行离线 TLS 回归、并发检查与 Linux 构建；上线前备份旧二进制并检查生产配置。上线后验证进程、端口、严格 TLS、版本与 API 健康，并用证书指纹确认精确域名优先。失败时恢复旧二进制；本次不涉及数据库迁移。
+
+## 构建工具链与依赖
+
+根模块以 `go 1.27.4` 同时规定语言与最低补丁版本，移除旧 `toolchain go1.25.1`。PR 与发布工作流的 `actions/setup-go` 从 `go.mod` 的 `go` 行读取版本，避免 CI 初始化旧版本后再隐式下载另一个编译器。Go 1.27 的 macOS 最低支持版本为 macOS 13。
+
+CGO 构建入口随主分支目录整理移至 `docker/Dockerfile.cgo` 与 `docker/Dockerfile.cgo.zig`，保留本轮工具链升级。Alpine 构建入口固定 `golang:1.27.4-alpine3.24`，Debian 构建入口固定 `golang:1.27.4-bookworm`；这些标签已从官方镜像元数据确认存在。镜像存在不代表容器内 CGO、静态链接或 Zig 交叉编译已经通过。发布前仍需分别检查实际编译器版本、链接方式及目标系统运行结果。
+
+Linux 源码安装器按 major/minor/patch 比较稳定 Go 版本，拒绝 rc/beta/devel。版本探测强制 `GOTOOLCHAIN=local` 并忽略继承的旧 GOROOT，优先复用合格的系统工具链，失败后检查专用缓存。补装使用官方 SHA-256 校验的 amd64/arm64 归档，在 `/opt/sslcat-toolchains` 内的本次随机暂存目录解压，检查 Go、标准库源码目录和编译链接工具后重命名发布至 `go1.27.4`；失败或可捕获信号触发本次暂存清理，旧不完整目录保留备份，发布失败时尝试恢复。清理所需目标、暂存与备份路径由隔离子 shell 持有，不依赖 Bash 3.2 在显式 `exit` 时会先释放的函数局部变量。该目录位于应用递归授权目录之外；只调整当前会话 PATH、GOROOT 与 GOTOOLCHAIN，不覆盖系统 Go 或修改 `/etc/profile`。测试服务器的编译和模板测试入口在每次 SSH 会话重新选择工具链；其他独立会话需显式选择路径与 GOROOT。
+
+CGO SQLite 与纯 Go SQLite 分别验证；`modernc.org/sqlite` 的 libc 必须使用该版本自身 `go.mod` 要求的配套版本，不能独立追逐 libc 最新版。HTTP/3 先更新同分支安全补丁，WebAuthn 凭证持久化和 TUI、GeoIP 的 API 迁移保留为独立兼容性边界。
+
+前端保留 React 18 / Chakra UI 2，采用仍受支持的 Vite 7.3、Vitest 4.1 和 ESLint 10，TypeScript 使用与 typescript-eslint 兼容的 5.9 分支。Three.js 类型与运行库保持同一 0.x 次版本。版本范围匹配的安全公告、静态调用链与实际线上可利用性分别记录；升级后的安全结论以新锁文件和真实扫描结果为准。详见 [依赖维护记录](docs/zh/development/dependency-maintenance-20261120.md)。
 
 ## 发布与镜像下载
 
@@ -50,4 +62,4 @@ GitHub 发布仓库为 `niuwoai/sslcat`。现有工作流构建 Linux AMD64、ma
 
 产物先发布到 GitHub Release，再上传至 OSS 的 `xurenlu/sslcat/releases/<tag>/`，随后复制到 Bucket 根目录 `latest/`。镜像入口统一为 `https://img.niuwoai.com`；仓库迁移不改变既有 OSS 对象前缀。安装器的 GitHub 和镜像 URL 必须使用相同版本、平台和文件名，保持既有下载源选择与失败回退。
 
-链接变更需检查工作流与 Shell 语法、版本一致性、安装器选择与回退分支，并验证已发布包在新域名下的严格 HTTPS 下载、大小和 SHA256。文档示例使用已发布的 `v2.5.0-rc1`；当前源码候选 `2.5.0-rc2` 在合入默认分支并正式打标签前，不作为可下载的发布包。
+链接变更需检查工作流与 Shell 语法、版本一致性、安装器选择与回退分支，并验证已发布包在新域名下的严格 HTTPS 下载、大小和 SHA256。文档示例使用已发布的 `v2.5.0-rc1`；当前源码候选 `2.5.0-rc3` 在合入默认分支并正式打标签前，不作为可下载的发布包。

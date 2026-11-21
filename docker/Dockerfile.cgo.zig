@@ -1,5 +1,5 @@
 # 使用 Zig 作为 C 编译器在 ARM64 容器内交叉编译到 AMD64
-FROM golang:1.25-alpine AS builder
+FROM golang:1.27.4-alpine3.24 AS builder
 
 # 安装基础工具和 Zig
 RUN apk add --no-cache \
@@ -10,7 +10,7 @@ RUN apk add --no-cache \
 
 # 下载并安装 Zig（用作 C 交叉编译器）
 RUN cd /tmp && \
-    curl -L https://ziglang.org/download/0.11.0/zig-linux-aarch64-0.11.0.tar.xz -o zig.tar.xz && \
+    curl --fail --show-error --location --connect-timeout 10 --max-time 300 https://ziglang.org/download/0.11.0/zig-linux-aarch64-0.11.0.tar.xz -o zig.tar.xz && \
     tar -xf zig.tar.xz && \
     mv zig-linux-*/ /usr/local/zig && \
     rm zig.tar.xz

@@ -36,7 +36,7 @@ echo ""
 # 创建临时 Dockerfile
 TEMP_DOCKERFILE=$(mktemp)
 cat > "$TEMP_DOCKERFILE" << 'EOF'
-FROM golang:1.23-alpine
+FROM golang:1.27.4-alpine3.24
 
 # 安装 CGO 依赖
 RUN apk add --no-cache gcc musl-dev sqlite-dev git

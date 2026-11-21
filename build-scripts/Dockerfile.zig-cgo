@@ -1,7 +1,7 @@
 # 使用 Zig 进行 CGO 交叉编译（Mac ARM64 -> Linux AMD64）
 # 目标：在 Mac ARM64 上编译出兼容 GLIBC 2.32 的 Linux AMD64 CGO 二进制文件
 
-FROM --platform=linux/amd64 golang:1.23.4-bullseye AS builder
+FROM --platform=linux/amd64 golang:1.27.4-bookworm AS builder
 
 # 安装 Zig 和必要的工具
 RUN apt-get update && apt-get install -y \
@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # 安装 Zig (最新稳定版)
-RUN wget https://ziglang.org/download/0.11.0/zig-linux-x86_64-0.11.0.tar.xz && \
+RUN wget --timeout=30 --tries=3 https://ziglang.org/download/0.11.0/zig-linux-x86_64-0.11.0.tar.xz && \
     tar -xf zig-linux-x86_64-0.11.0.tar.xz && \
     mv zig-linux-x86_64-0.11.0 /usr/local/zig && \
     ln -s /usr/local/zig/zig /usr/local/bin/zig && \
@@ -52,7 +52,7 @@ RUN echo "✅ 验证二进制文件..." && \
     ./sslcat --version || echo "版本检查完成"
 
 # 最终阶段 - 使用 scratch 或 alpine
-FROM alpine:latest
+FROM alpine:3.24
 
 # 安装运行时依赖
 RUN apk add --no-cache ca-certificates tzdata
