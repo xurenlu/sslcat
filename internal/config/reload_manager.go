@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -22,9 +23,11 @@ type ReloadableComponent interface {
 
 // ReloadManager 重载管理器
 type ReloadManager struct {
-	components []ReloadableComponent
-	mutex      sync.RWMutex
-	log        *logrus.Entry
+	components    []ReloadableComponent
+	mutex         sync.RWMutex
+	reloadMutex   sync.Mutex
+	log           *logrus.Entry
+	restartFields []string
 
 	// 重载统计
 	reloadCount    int64
@@ -77,6 +80,17 @@ func (rm *ReloadManager) UnregisterComponent(componentName string) {
 
 // ReloadAll 重载所有组件（增强版：智能变更检测）
 func (rm *ReloadManager) ReloadAll(oldConfig, newConfig *Config) error {
+	_, err := rm.ReloadEffective(oldConfig, newConfig)
+	return err
+}
+
+// ReloadEffective 返回实际应用的配置；启动时字段保持旧值，磁盘配置留待重启生效。
+func (rm *ReloadManager) ReloadEffective(oldConfig, newConfig *Config) (*Config, error) {
+	rm.reloadMutex.Lock()
+	defer rm.reloadMutex.Unlock()
+	if oldConfig == nil || newConfig == nil {
+		return nil, fmt.Errorf("old and new configurations are required")
+	}
 	startTime := time.Now()
 	components := rm.snapshotComponents()
 
@@ -92,16 +106,17 @@ func (rm *ReloadManager) ReloadAll(oldConfig, newConfig *Config) error {
 
 	rm.log.Infof("Configuration changes detected: %d changes, max level: %s", len(changes), maxLevel)
 
-	// 记录所有变更
+	// 记录所有变更。只记录字段名、级别与描述，绝不打印旧/新配置值，
+	// 避免 Admin/Cluster/SSL 等配置段中的密码、TOTP、密钥等凭据泄露到日志。
 	for _, change := range changes {
-		rm.log.Infof("Config change: %s (%s -> %s) [%s] - %s",
-			change.Field, change.OldValue, change.NewValue, change.Level, change.Description)
+		rm.log.Infof("Config change: %s [%s] - %s",
+			change.Field, change.Level, change.Description)
 	}
 
 	// 第二阶段：根据变更级别决定是否需要重载
 	if maxLevel == NoReloadNeeded {
 		rm.log.Info("No reload needed, only logging configuration changes")
-		return nil
+		return newConfig, nil
 	}
 
 	// 第三阶段：验证配置
@@ -109,49 +124,79 @@ func (rm *ReloadManager) ReloadAll(oldConfig, newConfig *Config) error {
 		rm.mutex.Lock()
 		rm.errorCount++
 		rm.mutex.Unlock()
-		return fmt.Errorf("configuration validation failed: %v", errs)
+		return nil, fmt.Errorf("configuration validation failed: %v", errs)
 	}
 
+	activeConfig, err := runtimeReloadConfig(oldConfig, newConfig, changes)
+	if err == nil {
+		if errs := ValidateConfig(activeConfig); len(errs) > 0 {
+			err = fmt.Errorf("active configuration validation failed: %v", errs)
+		}
+	}
+	if err != nil {
+		rm.mutex.Lock()
+		rm.errorCount++
+		rm.mutex.Unlock()
+		return nil, err
+	}
 	rm.log.Infof("Starting reload of %d components (level: %s)", len(components), maxLevel)
 
 	// 第四阶段：验证所有组件
 	for _, component := range components {
-		if err := component.Validate(newConfig); err != nil {
+		if err := component.Validate(activeConfig); err != nil {
 			rm.mutex.Lock()
 			rm.errorCount++
 			rm.mutex.Unlock()
-			return fmt.Errorf("component %s validation failed: %w", component.GetName(), err)
+			return nil, fmt.Errorf("component %s validation failed: %w", component.GetName(), err)
 		}
 	}
 
 	rm.log.Info("All components validated successfully")
 
-	// 第五阶段：重载所有组件
-	var failedComponents []string
-	for _, component := range components {
-		if err := component.Reload(newConfig); err != nil {
-			rm.log.Errorf("Failed to reload component %s: %v", component.GetName(), err)
-			failedComponents = append(failedComponents, component.GetName())
-		} else {
-			rm.log.Infof("Successfully reloaded component: %s", component.GetName())
+	for i, component := range components {
+		if err := component.Reload(activeConfig); err != nil {
+			reloadErr := fmt.Errorf("component %s reload failed: %w", component.GetName(), err)
+			// 失败组件也可能已修改内部状态，因此一并尝试回滚。
+			for j := i; j >= 0; j-- {
+				if rollbackErr := components[j].Reload(oldConfig); rollbackErr != nil {
+					reloadErr = errors.Join(reloadErr, fmt.Errorf("component %s rollback failed: %w", components[j].GetName(), rollbackErr))
+				}
+			}
+			rm.mutex.Lock()
+			rm.errorCount++
+			rm.mutex.Unlock()
+			return nil, reloadErr
 		}
+		rm.log.Infof("Successfully reloaded component: %s", component.GetName())
 	}
 
 	duration := time.Since(startTime)
 
-	if len(failedComponents) > 0 {
-		rm.mutex.Lock()
-		rm.errorCount++
-		rm.mutex.Unlock()
-		return fmt.Errorf("failed to reload components: %v", failedComponents)
-	}
-
 	rm.mutex.Lock()
 	rm.successCount++
+	for _, change := range changes {
+		if change.Level != HardReload {
+			continue
+		}
+		found := false
+		for _, field := range rm.restartFields {
+			if field == change.Field {
+				found = true
+				break
+			}
+		}
+		if !found {
+			rm.restartFields = append(rm.restartFields, change.Field)
+		}
+	}
+	restartFields := append([]string(nil), rm.restartFields...)
 	rm.mutex.Unlock()
+	if len(restartFields) > 0 {
+		rm.log.Warnf("Restart required to activate configuration fields: %v", restartFields)
+	}
 	rm.log.Infof("Successfully reloaded all %d components in %v", len(components), duration)
 
-	return nil
+	return activeConfig, nil
 }
 
 // GetStats 获取重载统计信息
@@ -166,6 +211,8 @@ func (rm *ReloadManager) GetStats() map[string]interface{} {
 		"error_count":      rm.errorCount,
 		"last_reload_time": rm.lastReloadTime,
 		"component_names":  rm.getComponentNames(),
+		"restart_required": len(rm.restartFields) > 0,
+		"restart_fields":   append([]string{}, rm.restartFields...),
 	}
 }
 
@@ -201,6 +248,8 @@ func (rm *ReloadManager) ValidateAllComponents(newConfig *Config) error {
 
 // ReloadComponent 重载指定组件
 func (rm *ReloadManager) ReloadComponent(componentName string, newConfig *Config) error {
+	rm.reloadMutex.Lock()
+	defer rm.reloadMutex.Unlock()
 	for _, component := range rm.snapshotComponents() {
 		if component.GetName() == componentName {
 			// 先验证

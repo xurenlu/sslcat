@@ -56,7 +56,6 @@ type Server struct {
 	version          string
 	leRedirectHost   string
 	lastLECheck      time.Time
-	lastConfigHash   string
 	compressor       *compression.Compressor
 	compressionCache *CompressionCache
 
@@ -645,9 +644,6 @@ func NewServer(cfg *config.Config, proxyMgr *proxy.Manager, secMgr *security.Man
 		server.proxyManager.SetResponseProcessor(server.imageOptimizer)
 		server.log.Info("Image optimizer enabled and integrated with proxy manager")
 	}
-
-	// 初始化配置文件哈希并启动热加载监听（Slave 模式）
-	server.initConfigWatch()
 
 	// 启动定时检查有效LE证书对应域名是否解析到本机公网IP
 	go server.refreshLEPreferredHostLoop()
@@ -1495,6 +1491,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// 代理中间件
 	if s.proxyMiddleware(wrappedWriter, r) {
+		return
+	}
+
+	// 管理 API 统一鉴权：面板前缀下的 /api/ 一律要求会话或有效 API token
+	if !s.adminAPIAuthGuard(wrappedWriter, r) {
 		return
 	}
 
