@@ -15,6 +15,7 @@ func TestBigCacheWrapper(t *testing.T) {
 		MaxItemSize:     1024 * 1024,      // 1MB
 		DefaultTTL:      1 * time.Hour,
 		CleanupInterval: 1 * time.Minute,
+		BackendType:     CacheBackendBigCache,
 	}
 
 	// 创建缓存实例

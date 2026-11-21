@@ -1,7 +1,7 @@
 # 使用 Zig + Alpine 进行 CGO 交叉编译（Mac ARM64 -> Linux AMD64）
 # 优势：镜像更小，编译更快
 
-FROM golang:1.23-alpine AS builder
+FROM golang:1.27.4-alpine3.24 AS builder
 
 # 配置代理和镜像源
 ARG HTTP_PROXY

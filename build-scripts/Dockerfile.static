@@ -1,5 +1,5 @@
 # 使用 Debian 基础镜像来构建静态链接的 CGO 二进制文件
-FROM golang:1.23-bullseye AS builder
+FROM golang:1.27.4-bookworm AS builder
 
 # 安装必要的构建工具和静态库
 RUN apt-get update && apt-get install -y \

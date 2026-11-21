@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0-rc3] - 2026-11-20
+
+### Changed
+
+- Go 最低工具链升级至官方最新稳定版 `1.27.4`，CI 继续从 `go.mod` 读取版本；同步 Docker 构建入口、源码安装器、测试工具及中英文系统要求，macOS 产物最低支持 macOS 13。
+- 源码安装器使用校验后的专用工具链，支持同文件系统暂存发布、旧目录备份、失败恢复与暂存清理，并兼容 Bash 3.2 的显式退出清理；版本探测禁止隐式下载，后续测试 SSH 入口同步选择 PATH 与 GOROOT。
+- 更新 Go 网络、加密、图像、Brotli、JWT、AWS SDK、指标、文件监听和 SQLite 依赖；HTTP/3 使用 `quic-go v0.59.1` 安全补丁，纯 Go SQLite 与其要求的 libc 版本配套升级。
+- 前端构建与测试工具采用受支持的 Vite 7、Vitest 4 和 ESLint 10；更新 Axios、React Router、Sentry 及国际化依赖，保持 React 18 与 Chakra UI 2 的界面体系。
+- 收窄 Three.js 类型依赖范围，移除国际化类型占位包，并补充依赖审计、兼容性决策与验证记录。
+- 补充 SQLite 驱动持久化与事务回归、前端认证及导航回归；缓存过期测试改用确定性的过期元数据，避免短 TTL 受压缩、磁盘与并发编译耗时影响。
+
 ## [2.5.0-rc2] - 2026-11-20
 
 ### Fixed

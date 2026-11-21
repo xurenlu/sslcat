@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { ChakraProvider } from '@chakra-ui/react'
 import FirstTimeSetup from '../../src/pages/FirstTimeSetup'
 import theme from '../../src/theme'
+import { zhCN } from '../../src/i18n/languages/zh-cn'
 
 vi.mock('../../src/contexts/ConfigContext', () => ({
   useConfig: () => ({
@@ -17,15 +18,10 @@ vi.mock('../../src/contexts/ConfigContext', () => ({
     `${prefix}${path.startsWith('/api') ? path : `/api${path}`}`,
 }))
 
-vi.mock('../../src/hooks/useLanguage', () => ({
-  useTranslation: () => ({
-    setup: {
-      password_placeholder: '请输入密码',
-      confirm_password_placeholder: '请确认密码',
-      loading: '提交中...',
-    },
-  }),
-}))
+vi.mock('../../src/hooks/useLanguage', async () => {
+  const { zhCN } = await import('../../src/i18n/languages/zh-cn')
+  return { useTranslation: () => zhCN }
+})
 
 const renderComponent = () =>
   render(
@@ -48,11 +44,11 @@ describe('FirstTimeSetup', () => {
     const submitButton = screen.getByRole('button', { name: '完成设置' })
     expect(submitButton).toBeDisabled()
 
-    const passwordInput = screen.getByPlaceholderText('请输入密码')
+    const passwordInput = screen.getByPlaceholderText(zhCN.setup.password_placeholder)
     await user.type(passwordInput, 'Short1!')
     await user.tab()
 
-    const confirmInput = screen.getByPlaceholderText('请确认密码')
+    const confirmInput = screen.getByPlaceholderText(zhCN.setup.confirm_password_placeholder)
     await user.type(confirmInput, 'Short1!')
     await user.tab()
 
@@ -70,8 +66,8 @@ describe('FirstTimeSetup', () => {
       renderComponent()
     })
 
-    const passwordInput = screen.getByPlaceholderText('请输入密码')
-    const confirmInput = screen.getByPlaceholderText('请确认密码')
+    const passwordInput = screen.getByPlaceholderText(zhCN.setup.password_placeholder)
+    const confirmInput = screen.getByPlaceholderText(zhCN.setup.confirm_password_placeholder)
     const emailInput = screen.getByPlaceholderText('admin@example.com')
 
     await user.type(passwordInput, 'StrongPassw0rd!')
@@ -91,9 +87,9 @@ describe('FirstTimeSetup', () => {
       renderComponent()
     })
 
-    await user.type(screen.getByPlaceholderText('请输入密码'), 'ValidPassw0rd!')
+    await user.type(screen.getByPlaceholderText(zhCN.setup.password_placeholder), 'ValidPassw0rd!')
     await user.tab()
-    await user.type(screen.getByPlaceholderText('请确认密码'), 'ValidPassw0rd!')
+    await user.type(screen.getByPlaceholderText(zhCN.setup.confirm_password_placeholder), 'ValidPassw0rd!')
     await user.tab()
     await user.type(screen.getByPlaceholderText('admin@example.com'), 'admin@example.com')
     await user.tab()

@@ -1,7 +1,7 @@
 import { ChakraProvider } from '@chakra-ui/react'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation, useSearchParams } from 'react-router-dom'
 import SitesManagement from '../../src/pages/SitesManagement'
 import theme from '../../src/theme'
 
@@ -70,11 +70,18 @@ vi.mock('../../src/hooks/useToastMessages', () => ({
   useToastMessages: () => toastMessages,
 }))
 
+const RouteLocation = () => {
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
+  return <output data-testid="route-location">{location.pathname}|{searchParams.get('domain')}</output>
+}
+
 const renderPage = () =>
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={['/admin/sites']}>
       <ChakraProvider theme={theme}>
         <SitesManagement />
+        <RouteLocation />
       </ChakraProvider>
     </MemoryRouter>
   )
@@ -82,7 +89,27 @@ const renderPage = () =>
 describe('SitesManagement 删除站点', () => {
   afterEach(() => {
     vi.restoreAllMocks()
+    vi.unstubAllGlobals()
     Object.values(toastMessages).forEach((mock) => mock.mockClear())
+  })
+
+  it('编辑站点时保留管理前缀并通过查询参数传递域名', async () => {
+    const domain = 'example.com'
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          sites: [{ domain, root: '/srv/example', index: 'index.html', enabled: true }],
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ sites: [] }) }))
+
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText(domain)
+    await user.click(screen.getByLabelText('编辑'))
+
+    expect(screen.getByTestId('route-location')).toHaveTextContent(`/admin/static-site-edit|${domain}`)
   })
 
   it('删除静态站点时应调用后端删除 API 并刷新列表', async () => {
