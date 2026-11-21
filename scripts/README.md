@@ -98,17 +98,31 @@
 - `frontend/dist/` - 前端编译文件
 - `internal/assets/frontend/` - 嵌入的前端文件
 
-## 📊 监控和分析脚本
+## 🩺 诊断与故障修复脚本
 
-### `analyze_timers.py`
-**定时器分析**
+位于 `scripts/diagnostics/`，用于分析 shifen.de 线上 CPU/内存问题，需要访问远端服务器，请在有权限的环境中谨慎使用。
 
-分析系统中的定时器使用情况。
+| 脚本 | 用途 |
+|------|------|
+| `analyze_timers.py` | 分析 SSLcat 定时器叠加执行点 |
+| `deploy-cpu-fix-to-shifen.sh` | 部署 CPU 修复版本到 shifen.de |
+| `deploy-source-only-to-shifen.sh` | 仅更新 shifen.de 源代码 |
+| `fix-shifen-spike.sh` | shifen.de CPU/内存飙升快速修复 |
+| `quick-fix-shifen.sh` | 快速修复 shifen.de CPU 高占用问题 |
+| `sslcat-memory-monitor.sh` | 监控 SSLcat 内存并自动重启服务 |
 
-### `sslcat-memory-monitor.sh`
-**内存监控**
+详细诊断报告位于 `docs/reports/SHIFEN_CPU_MEMORY_SPIKE_DIAGNOSIS.md`。
 
-监控 SSLCat 的内存使用情况。
+## 🧹 维护脚本
+
+位于 `scripts/maintenance/`。
+
+### `fix_yaml_to_json.py`
+**批量将 docs 目录中的 YAML 配置示例转换为 JSON 格式**
+
+```bash
+python3 scripts/maintenance/fix_yaml_to_json.py
+```
 
 ## 🚀 快速开始
 

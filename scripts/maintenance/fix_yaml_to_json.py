@@ -8,6 +8,9 @@ import json
 import yaml
 from pathlib import Path
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parent.parent
+
 def yaml_to_json(yaml_text):
     """将YAML文本转换为JSON格式"""
     try:
@@ -90,7 +93,7 @@ def process_file(file_path):
 
 def main():
     """主函数"""
-    docs_dir = Path("docs")
+    docs_dir = REPO_ROOT / "docs"
     fixed_count = 0
     
     # 处理所有markdown文件
