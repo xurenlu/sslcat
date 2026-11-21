@@ -59,7 +59,7 @@ build_cgo_docker() {
     build_args="$build_args --progress=plain"
     
     # 构建镜像
-    if docker build $build_args -f Dockerfile.cgo -t "$tag_name" .; then
+    if docker build $build_args -f docker/Dockerfile.cgo -t "$tag_name" .; then
         print_success "CGO Docker 镜像构建完成: $tag_name"
         
         # 显示镜像信息

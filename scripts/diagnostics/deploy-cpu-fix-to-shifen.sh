@@ -7,6 +7,8 @@ set -e
 SERVER="rocky@shifen.de"
 REMOTE_BUILD_DIR="/tmp/sslcat-build-$$"
 REMOTE_INSTALL_DIR="/opt/sslcat"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 echo "=== 部署 sslcat CPU 修复版本到 shifen.de ==="
 
@@ -18,7 +20,7 @@ ssh $SERVER "mkdir -p $REMOTE_BUILD_DIR"
 echo "[2/6] 复制源代码到服务器..."
 rsync -avz --exclude='.git' --exclude='build' --exclude='data' --exclude='dist' \
     --exclude='docker-data' --exclude='node_modules' \
-    ./ $SERVER:$REMOTE_BUILD_DIR/
+    "$REPO_ROOT/" $SERVER:$REMOTE_BUILD_DIR/
 
 # 3. 在服务器上编译
 echo "[3/6] 在服务器上编译（启用 CGO）..."

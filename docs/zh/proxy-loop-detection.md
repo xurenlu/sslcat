@@ -281,11 +281,11 @@ sudo ss -tlnp | grep sslcat
 
 ## 相关文档
 
-- [前端循环检测详细文档](../../FRONTEND_LOOP_DETECTION.md)
-- [前端循环检测实现总结](../../FRONTEND_LOOP_DETECTION_SUMMARY.md)
-- [后端循环检测实现](../../PROXY_LOOP_DETECTION.md)
-- [循环检测架构设计](../../LOOP_DETECTION_ARCHITECTURE.md)
-- [与 Nginx/Caddy 的对比](../../PROXY_LOOP_DETECTION_COMPARISON.md)
+- [前端循环检测详细文档](../reports/FRONTEND_LOOP_DETECTION.md)
+- [前端循环检测实现总结](../reports/FRONTEND_LOOP_DETECTION_SUMMARY.md)
+- [后端循环检测实现](../reports/PROXY_LOOP_DETECTION.md)
+- [循环检测架构设计](../reports/LOOP_DETECTION_ARCHITECTURE.md)
+- [与 Nginx/Caddy 的对比](../reports/PROXY_LOOP_DETECTION_COMPARISON.md)
 
 ## 总结
 
